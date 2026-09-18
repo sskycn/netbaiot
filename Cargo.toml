@@ -1,0 +1,40 @@
+[workspace]
+members = ["apps/netbaiot-server", "crates/*"]
+exclude = ["fuzz"]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+rust-version = "1.88"
+
+[workspace.dependencies]
+netbaiot-core = { path = "crates/netbaiot-core" }
+netbaiot-runtime = { path = "crates/netbaiot-runtime" }
+netbaiot-codecs = { path = "crates/netbaiot-codecs" }
+netbaiot-storage = { path = "crates/netbaiot-storage" }
+netbaiot-transports = { path = "crates/netbaiot-transports" }
+async-trait = "0.1"
+bytes = "1"
+hmac = "0.12"
+sha2 = "0.10"
+subtle = "2"
+serde = { version = "1", features = ["derive", "rc"] }
+serde_json = "1"
+thiserror = "2"
+tokio = { version = "1", features = ["full", "test-util"] }
+tokio-util = { version = "0.7", features = ["rt"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio-rustls", "postgres", "json", "uuid", "migrate", "macros"] }
+hyper = { version = "1", features = ["server", "http1"] }
+hyper-util = { version = "0.1", features = ["tokio"] }
+http-body-util = "0.1"
+tokio-rustls = { version = "0.26", default-features = false, features = ["ring", "tls12"] }
+rustls-pemfile = "2"
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
+
+[workspace.lints.rust]
+unsafe_code = "forbid"

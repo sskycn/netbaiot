@@ -1,0 +1,27 @@
+[package]
+name = "netbaiot-transports"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+netbaiot-core.workspace = true
+netbaiot-runtime.workspace = true
+async-trait.workspace = true
+bytes.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+tracing.workspace = true
+hyper.workspace = true
+hyper-util.workspace = true
+http-body-util.workspace = true
+tokio-rustls.workspace = true
+hmac.workspace = true
+sha2.workspace = true
+
+[lints]
+workspace = true
