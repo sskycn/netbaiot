@@ -1,0 +1,61 @@
+[package]
+name = "netbaiot-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+bytes = "1"
+netbaiot-core = { path = "../crates/netbaiot-core" }
+netbaiot-codecs = { path = "../crates/netbaiot-codecs" }
+netbaiot-runtime = { path = "../crates/netbaiot-runtime" }
+netbaiot-transports = { path = "../crates/netbaiot-transports" }
+
+[workspace]
+members = ["."]
+
+[[bin]]
+name = "mqtt_fixed_header"
+path = "fuzz_targets/mqtt_fixed_header.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "mqtt_remaining_length"
+path = "fuzz_targets/mqtt_remaining_length.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "mqtt_packet"
+path = "fuzz_targets/mqtt_packet.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "tcp_frame"
+path = "fuzz_targets/tcp_frame.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "udp_envelope"
+path = "fuzz_targets/udp_envelope.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "json_codec"
+path = "fuzz_targets/json_codec.rs"
+test = false
+doc = false
+bench = false

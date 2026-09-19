@@ -1,0 +1,21 @@
+{
+  "http": "127.0.0.1:8080",
+  "mqtt": "127.0.0.1:1883",
+  "tcp": "127.0.0.1:9000",
+  "udp": "127.0.0.1:9001",
+  "development": true,
+  "limits": {},
+  "tls": null,
+  "delivery_url": null,
+  "credentials": [{
+    "credential_id": "demo-device",
+    "secret_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+    "identity": {
+      "device_key": { "tenant_id": "demo", "product_id": "sensor", "device_id": "device-1" },
+      "credential_version": 1,
+      "codec_id": "netbaiot-json",
+      "codec_version": 1,
+      "permissions": { "publish": true, "commands": true }
+    }
+  }]
+}

@@ -25,3 +25,13 @@ sha2.workspace = true
 
 [lints]
 workspace = true
+
+[dev-dependencies]
+netbaiot-codecs.workspace = true
+netbaiot-storage.workspace = true
+uuid.workspace = true
+
+[[bench]]
+name = "foundation"
+path = "../../benches/foundation.rs"
+harness = false

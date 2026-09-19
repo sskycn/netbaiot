@@ -17,6 +17,17 @@ Priority order:
 
 > Correctness > Resource Safety > Reliability > Maintainability > Performance
 
+## Local Dependency Paths
+
+When native dependency discovery is required, use the following local library
+directories:
+
+* PostgreSQL: `/opt/local/lib/pgsql`
+* ICU: `/opt/local/lib/icu`
+
+Do not assume PostgreSQL or ICU libraries are installed in system or Homebrew
+library paths.
+
 ---
 
 ## Architecture
