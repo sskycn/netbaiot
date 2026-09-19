@@ -1,0 +1,364 @@
+{
+  "name": "generator_calibration",
+  "scope": "execute/simple-query counts; parse/bind excluded; BEGIN/COMMIT included; observer SELECT excluded; server duration excludes network/client scheduling; SQLx health-check Sync/Ready exchanges are not SQL statements; not physical wire RTT counts; no per-command tracing ID in PostgreSQL",
+  "queries": [
+    {
+      "sql": "COMMIT",
+      "count": 1248,
+      "sum_ms": 93.94100000000013,
+      "mean_ms": 0.07527323717948718,
+      "p50_ms": 0.0245,
+      "p95_ms": 0.307,
+      "max_ms": 1.25
+    },
+    {
+      "sql": "SELECT record FROM commands WHERE NOT terminal AND expires_at>$1 AND next_attempt_at<=$1 AND (tenant_id,product_id,device_id) IN (SELECT d.tenant_id,d.product_id,d.device_id FROM jsonb_to_recordset($2) AS d(tenant_id text,product_id text,device_id text)) ORDER BY next_attempt_at LIMIT $3 FOR UPDATE SKIP LOCKED",
+      "count": 527,
+      "sum_ms": 25.80199999999996,
+      "mean_ms": 0.048960151802656546,
+      "p50_ms": 0.039,
+      "p95_ms": 0.125,
+      "max_ms": 0.245
+    },
+    {
+      "sql": "SELECT pg_advisory_xact_lock(782634291)",
+      "count": 172,
+      "sum_ms": 23.465000000000003,
+      "mean_ms": 0.13642441860465115,
+      "p50_ms": 0.006,
+      "p95_ms": 1.218,
+      "max_ms": 2.323
+    },
+    {
+      "sql": "WITH selected AS (SELECT message_id FROM delivery_jobs WHERE NOT done AND next_attempt_at<=$1 AND expires_at>$1 AND attempts<$2 AND (lease_expiry IS NULL OR lease_expiry<=$1) ORDER BY next_attempt_at LIMIT $3 FOR UPDATE SKIP LOCKED), claimed AS (UPDATE delivery_jobs j SET attempts=attempts+1,lease_owner=$4,lease_expiry=$5 FROM selected s WHERE j.message_id=s.message_id RETURNING j.message_id,j.attempts,j.expires_at) SELECT c.attempts,c.expires_at,m.message FROM claimed c JOIN ingress_messages m USING(message_id)",
+      "count": 227,
+      "sum_ms": 21.924999999999976,
+      "mean_ms": 0.09658590308370044,
+      "p50_ms": 0.071,
+      "p95_ms": 0.258,
+      "max_ms": 0.693
+    },
+    {
+      "sql": "BEGIN",
+      "count": 1248,
+      "sum_ms": 14.509000000000006,
+      "mean_ms": 0.011625801282051281,
+      "p50_ms": 0.006,
+      "p95_ms": 0.046,
+      "max_ms": 0.089
+    },
+    {
+      "sql": "SELECT count(*) n,coalesce(sum(charge),0)::bigint bytes,coalesce(sum(charge) FILTER (WHERE tenant_id=$1),0)::bigint tenant_bytes,coalesce(sum(charge) FILTER (WHERE tenant_id=$1 AND product_id=$2 AND device_id=$3),0)::bigint device_bytes,count(*) FILTER (WHERE tenant_id=$1) tenant,count(*) FILTER (WHERE tenant_id=$1 AND product_id=$2 AND device_id=$3) device FROM ingress_messages",
+      "count": 136,
+      "sum_ms": 12.982999999999997,
+      "mean_ms": 0.09546323529411765,
+      "p50_ms": 0.0755,
+      "p95_ms": 0.227,
+      "max_ms": 0.266
+    },
+    {
+      "sql": "INSERT INTO ingress_messages VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)",
+      "count": 136,
+      "sum_ms": 10.681999999999997,
+      "mean_ms": 0.07854411764705882,
+      "p50_ms": 0.057,
+      "p95_ms": 0.167,
+      "max_ms": 0.893
+    },
+    {
+      "sql": "INSERT INTO delivery_jobs(message_id,next_attempt_at,expires_at) VALUES ($1,$2,$3)",
+      "count": 136,
+      "sum_ms": 10.333000000000002,
+      "mean_ms": 0.07597794117647058,
+      "p50_ms": 0.05,
+      "p95_ms": 0.187,
+      "max_ms": 0.748
+    },
+    {
+      "sql": "SELECT set_config('statement_timeout',$1,true),set_config('lock_timeout',$1,true)",
+      "count": 1248,
+      "sum_ms": 9.285999999999905,
+      "mean_ms": 0.0074407051282051285,
+      "p50_ms": 0.005,
+      "p95_ms": 0.022,
+      "max_ms": 0.051
+    },
+    {
+      "sql": "UPDATE delivery_jobs SET done=$1,next_attempt_at=$2,lease_owner=NULL,lease_expiry=NULL,last_error=$3 WHERE message_id=$4 AND lease_owner=$5 AND attempts=$6 AND lease_expiry>$7",
+      "count": 136,
+      "sum_ms": 6.7379999999999995,
+      "mean_ms": 0.04954411764705882,
+      "p50_ms": 0.043,
+      "p95_ms": 0.103,
+      "max_ms": 0.147
+    },
+    {
+      "sql": "DELETE FROM ingress_messages WHERE tenant_id=$1 AND product_id=$2 AND device_id=$3 AND source_message_id=$4 AND expires_at<=$5",
+      "count": 136,
+      "sum_ms": 5.4559999999999995,
+      "mean_ms": 0.04011764705882353,
+      "p50_ms": 0.0285,
+      "p95_ms": 0.081,
+      "max_ms": 0.14
+    },
+    {
+      "sql": "DELETE FROM ingress_messages WHERE message_id IN (SELECT message_id FROM ingress_messages WHERE expires_at<=$1 ORDER BY expires_at LIMIT $2 FOR UPDATE SKIP LOCKED)",
+      "count": 114,
+      "sum_ms": 4.854999999999998,
+      "mean_ms": 0.04258771929824561,
+      "p50_ms": 0.035500000000000004,
+      "p95_ms": 0.112,
+      "max_ms": 0.154
+    },
+    {
+      "sql": "UPDATE commands SET record=$2,terminal=$3 WHERE command_id=$1",
+      "count": 144,
+      "sum_ms": 4.652999999999999,
+      "mean_ms": 0.0323125,
+      "p50_ms": 0.03,
+      "p95_ms": 0.063,
+      "max_ms": 0.216
+    },
+    {
+      "sql": "UPDATE delivery_jobs SET done=true,last_error='expired_or_exhausted' WHERE message_id IN (SELECT message_id FROM delivery_jobs WHERE NOT done AND (expires_at<=$1 OR (attempts>=$2 AND (lease_expiry IS NULL OR lease_expiry<=$1))) LIMIT $3 FOR UPDATE SKIP LOCKED)",
+      "count": 114,
+      "sum_ms": 4.243000000000001,
+      "mean_ms": 0.037219298245614034,
+      "p50_ms": 0.032,
+      "p95_ms": 0.091,
+      "max_ms": 0.117
+    },
+    {
+      "sql": "INSERT INTO command_attempts VALUES ($1,$2,$3,'dispatching')",
+      "count": 36,
+      "sum_ms": 3.3329999999999993,
+      "mean_ms": 0.09258333333333334,
+      "p50_ms": 0.0785,
+      "p95_ms": 0.179,
+      "max_ms": 0.67
+    },
+    {
+      "sql": "DELETE FROM commands WHERE command_id IN (SELECT command_id FROM commands WHERE retain_until<=$1 ORDER BY retain_until LIMIT $2 FOR UPDATE SKIP LOCKED)",
+      "count": 114,
+      "sum_ms": 2.974999999999998,
+      "mean_ms": 0.026096491228070177,
+      "p50_ms": 0.022,
+      "p95_ms": 0.07,
+      "max_ms": 0.098
+    },
+    {
+      "sql": "UPDATE commands SET next_attempt_at=$2 WHERE command_id=$1",
+      "count": 36,
+      "sum_ms": 2.9209999999999994,
+      "mean_ms": 0.08113888888888889,
+      "p50_ms": 0.043,
+      "p95_ms": 0.286,
+      "max_ms": 0.612
+    },
+    {
+      "sql": "SELECT record FROM commands WHERE command_id=$1 FOR UPDATE",
+      "count": 108,
+      "sum_ms": 2.2959999999999976,
+      "mean_ms": 0.02125925925925926,
+      "p50_ms": 0.018,
+      "p95_ms": 0.048,
+      "max_ms": 0.058
+    },
+    {
+      "sql": "INSERT INTO commands VALUES ($1,$2,$3,$4,$5,$6,$7,$8,false)",
+      "count": 36,
+      "sum_ms": 1.9569999999999996,
+      "mean_ms": 0.05436111111111111,
+      "p50_ms": 0.051,
+      "p95_ms": 0.084,
+      "max_ms": 0.331
+    },
+    {
+      "sql": "UPDATE command_attempts SET state=$3 WHERE command_id=$1 AND attempt=$2",
+      "count": 72,
+      "sum_ms": 1.6579999999999997,
+      "mean_ms": 0.02302777777777778,
+      "p50_ms": 0.0235,
+      "p95_ms": 0.04,
+      "max_ms": 0.052
+    },
+    {
+      "sql": "SELECT record FROM commands WHERE NOT terminal AND expires_at<=$1 LIMIT $2 FOR UPDATE SKIP LOCKED",
+      "count": 114,
+      "sum_ms": 1.3800000000000001,
+      "mean_ms": 0.012105263157894737,
+      "p50_ms": 0.008,
+      "p95_ms": 0.035,
+      "max_ms": 0.073
+    },
+    {
+      "sql": "SELECT message_id,canonical,accepted_at FROM ingress_messages WHERE tenant_id=$1 AND product_id=$2 AND device_id=$3 AND source_message_id=$4",
+      "count": 136,
+      "sum_ms": 0.9660000000000007,
+      "mean_ms": 0.007102941176470588,
+      "p50_ms": 0.006,
+      "p95_ms": 0.015,
+      "max_ms": 0.02
+    },
+    {
+      "sql": "SELECT count(*) n,count(*) FILTER (WHERE tenant_id=$1) tenant,count(*) FILTER (WHERE tenant_id=$1 AND product_id=$2 AND device_id=$3) device FROM commands",
+      "count": 36,
+      "sum_ms": 0.9370000000000003,
+      "mean_ms": 0.026027777777777778,
+      "p50_ms": 0.0185,
+      "p95_ms": 0.066,
+      "max_ms": 0.076
+    },
+    {
+      "sql": "SELECT record FROM commands WHERE command_id=$1",
+      "count": 36,
+      "sum_ms": 0.43600000000000017,
+      "mean_ms": 0.01211111111111111,
+      "p50_ms": 0.009999999999999998,
+      "p95_ms": 0.027,
+      "max_ms": 0.029
+    }
+  ],
+  "transactions": {
+    "outbox_claim": {
+      "count": 227,
+      "statement_counts": {
+        "4": 227
+      },
+      "server_ms": 45.97399999999998,
+      "example": [
+        "BEGIN",
+        "SELECT set_config('statement_timeout',$1,true),set_config('lock_timeout',$1,true)",
+        "WITH selected AS (SELECT message_id FROM delivery_jobs WHERE NOT done AND next_attempt_at<=$1 AND expires_at>$1 AND attempts<$2 AND (lease_expiry IS NULL OR lease_expiry<=$1) ORDER BY next_attempt_at LIMIT $3 FOR UPDATE SKIP LOCKED), claimed AS (UPDATE delivery_jobs j SET attempts=attempts+1,lease_owner=$4,lease_expiry=$5 FROM selected s WHERE j.message_id=s.message_id RETURNING j.message_id,j.attempts,j.expires_at) SELECT c.attempts,c.expires_at,m.message FROM claimed c JOIN ingress_messages m USING(message_id)",
+        "COMMIT"
+      ]
+    },
+    "maintenance": {
+      "count": 114,
+      "statement_counts": {
+        "7": 114
+      },
+      "server_ms": 16.079,
+      "example": [
+        "BEGIN",
+        "SELECT set_config('statement_timeout',$1,true),set_config('lock_timeout',$1,true)",
+        "DELETE FROM ingress_messages WHERE message_id IN (SELECT message_id FROM ingress_messages WHERE expires_at<=$1 ORDER BY expires_at LIMIT $2 FOR UPDATE SKIP LOCKED)",
+        "DELETE FROM commands WHERE command_id IN (SELECT command_id FROM commands WHERE retain_until<=$1 ORDER BY retain_until LIMIT $2 FOR UPDATE SKIP LOCKED)",
+        "SELECT record FROM commands WHERE NOT terminal AND expires_at<=$1 LIMIT $2 FOR UPDATE SKIP LOCKED",
+        "UPDATE delivery_jobs SET done=true,last_error='expired_or_exhausted' WHERE message_id IN (SELECT message_id FROM delivery_jobs WHERE NOT done AND (expires_at<=$1 OR (attempts>=$2 AND (lease_expiry IS NULL OR lease_expiry<=$1))) LIMIT $3 FOR UPDATE SKIP LOCKED)",
+        "COMMIT"
+      ]
+    },
+    "command_claim_empty": {
+      "count": 491,
+      "statement_counts": {
+        "4": 491
+      },
+      "server_ms": 36.52699999999997,
+      "example": [
+        "BEGIN",
+        "SELECT set_config('statement_timeout',$1,true),set_config('lock_timeout',$1,true)",
+        "SELECT record FROM commands WHERE NOT terminal AND expires_at>$1 AND next_attempt_at<=$1 AND (tenant_id,product_id,device_id) IN (SELECT d.tenant_id,d.product_id,d.device_id FROM jsonb_to_recordset($2) AS d(tenant_id text,product_id text,device_id text)) ORDER BY next_attempt_at LIMIT $3 FOR UPDATE SKIP LOCKED",
+        "COMMIT"
+      ]
+    },
+    "telemetry_ingress": {
+      "count": 100,
+      "statement_counts": {
+        "9": 100
+      },
+      "server_ms": 72.41499999999998,
+      "example": [
+        "BEGIN",
+        "SELECT set_config('statement_timeout',$1,true),set_config('lock_timeout',$1,true)",
+        "SELECT pg_advisory_xact_lock(782634291)",
+        "DELETE FROM ingress_messages WHERE tenant_id=$1 AND product_id=$2 AND device_id=$3 AND source_message_id=$4 AND expires_at<=$5",
+        "SELECT message_id,canonical,accepted_at FROM ingress_messages WHERE tenant_id=$1 AND product_id=$2 AND device_id=$3 AND source_message_id=$4",
+        "SELECT count(*) n,coalesce(sum(charge),0)::bigint bytes,coalesce(sum(charge) FILTER (WHERE tenant_id=$1),0)::bigint tenant_bytes,coalesce(sum(charge) FILTER (WHERE tenant_id=$1 AND product_id=$2 AND device_id=$3),0)::bigint device_bytes,count(*) FILTER (WHERE tenant_id=$1) tenant,count(*) FILTER (WHERE tenant_id=$1 AND product_id=$2 AND device_id=$3) device FROM ingress_messages",
+        "INSERT INTO ingress_messages VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)",
+        "INSERT INTO delivery_jobs(message_id,next_attempt_at,expires_at) VALUES ($1,$2,$3)",
+        "COMMIT"
+      ]
+    },
+    "outbox_finish": {
+      "count": 136,
+      "statement_counts": {
+        "4": 136
+      },
+      "server_ms": 22.358999999999995,
+      "example": [
+        "BEGIN",
+        "SELECT set_config('statement_timeout',$1,true),set_config('lock_timeout',$1,true)",
+        "UPDATE delivery_jobs SET done=$1,next_attempt_at=$2,lease_owner=NULL,lease_expiry=NULL,last_error=$3 WHERE message_id=$4 AND lease_owner=$5 AND attempts=$6 AND lease_expiry>$7",
+        "COMMIT"
+      ]
+    },
+    "command_insert": {
+      "count": 36,
+      "statement_counts": {
+        "7": 36
+      },
+      "server_ms": 32.317,
+      "example": [
+        "BEGIN",
+        "SELECT set_config('statement_timeout',$1,true),set_config('lock_timeout',$1,true)",
+        "SELECT pg_advisory_xact_lock(782634291)",
+        "SELECT record FROM commands WHERE command_id=$1",
+        "SELECT count(*) n,count(*) FILTER (WHERE tenant_id=$1) tenant,count(*) FILTER (WHERE tenant_id=$1 AND product_id=$2 AND device_id=$3) device FROM commands",
+        "INSERT INTO commands VALUES ($1,$2,$3,$4,$5,$6,$7,$8,false)",
+        "COMMIT"
+      ]
+    },
+    "command_claim_nonempty": {
+      "count": 36,
+      "statement_counts": {
+        "7": 36
+      },
+      "server_ms": 16.083,
+      "example": [
+        "BEGIN",
+        "SELECT set_config('statement_timeout',$1,true),set_config('lock_timeout',$1,true)",
+        "SELECT record FROM commands WHERE NOT terminal AND expires_at>$1 AND next_attempt_at<=$1 AND (tenant_id,product_id,device_id) IN (SELECT d.tenant_id,d.product_id,d.device_id FROM jsonb_to_recordset($2) AS d(tenant_id text,product_id text,device_id text)) ORDER BY next_attempt_at LIMIT $3 FOR UPDATE SKIP LOCKED",
+        "UPDATE commands SET record=$2,terminal=$3 WHERE command_id=$1",
+        "UPDATE commands SET next_attempt_at=$2 WHERE command_id=$1",
+        "INSERT INTO command_attempts VALUES ($1,$2,$3,'dispatching')",
+        "COMMIT"
+      ]
+    },
+    "command_state": {
+      "count": 72,
+      "statement_counts": {
+        "6": 72
+      },
+      "server_ms": 14.565999999999997,
+      "example": [
+        "BEGIN",
+        "SELECT set_config('statement_timeout',$1,true),set_config('lock_timeout',$1,true)",
+        "SELECT record FROM commands WHERE command_id=$1 FOR UPDATE",
+        "UPDATE commands SET record=$2,terminal=$3 WHERE command_id=$1",
+        "UPDATE command_attempts SET state=$3 WHERE command_id=$1 AND attempt=$2",
+        "COMMIT"
+      ]
+    },
+    "command_ack_ingress": {
+      "count": 36,
+      "statement_counts": {
+        "11": 36
+      },
+      "server_ms": 11.41,
+      "example": [
+        "BEGIN",
+        "SELECT set_config('statement_timeout',$1,true),set_config('lock_timeout',$1,true)",
+        "SELECT pg_advisory_xact_lock(782634291)",
+        "DELETE FROM ingress_messages WHERE tenant_id=$1 AND product_id=$2 AND device_id=$3 AND source_message_id=$4 AND expires_at<=$5",
+        "SELECT message_id,canonical,accepted_at FROM ingress_messages WHERE tenant_id=$1 AND product_id=$2 AND device_id=$3 AND source_message_id=$4",
+        "SELECT count(*) n,coalesce(sum(charge),0)::bigint bytes,coalesce(sum(charge) FILTER (WHERE tenant_id=$1),0)::bigint tenant_bytes,coalesce(sum(charge) FILTER (WHERE tenant_id=$1 AND product_id=$2 AND device_id=$3),0)::bigint device_bytes,count(*) FILTER (WHERE tenant_id=$1) tenant,count(*) FILTER (WHERE tenant_id=$1 AND product_id=$2 AND device_id=$3) device FROM ingress_messages",
+        "SELECT record FROM commands WHERE command_id=$1 FOR UPDATE",
+        "UPDATE commands SET record=$2,terminal=$3 WHERE command_id=$1",
+        "INSERT INTO ingress_messages VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)",
+        "INSERT INTO delivery_jobs(message_id,next_attempt_at,expires_at) VALUES ($1,$2,$3)",
+        "COMMIT"
+      ]
+    }
+  }
+}

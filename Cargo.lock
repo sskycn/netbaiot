@@ -864,6 +864,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "netbaiot-loadgen"
+version = "0.1.0"
+dependencies = [
+ "bytes",
+ "hmac",
+ "netbaiot-core",
+ "netbaiot-runtime",
+ "reqwest",
+ "rustls-pemfile",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tokio",
+ "tokio-rustls",
+ "uuid",
+]
+
+[[package]]
 name = "netbaiot-runtime"
 version = "0.1.0"
 dependencies = [

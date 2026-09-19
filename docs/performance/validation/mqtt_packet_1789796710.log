@@ -1,0 +1,36 @@
+   Compiling netbaiot-fuzz v0.0.0 (/Users/sam/Dev/work/sskycn/netbaiot/fuzz)
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.25s
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.03s
+     Running `fuzz/target/aarch64-apple-darwin/release/mqtt_packet -artifact_prefix=/Users/sam/Dev/work/sskycn/netbaiot/fuzz/artifacts/mqtt_packet/ -runs=100000 -max_len=65540 /Users/sam/Dev/work/sskycn/netbaiot/fuzz/corpus/mqtt_packet`
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 2266773867
+INFO: Loaded 1 modules   (187067 inline 8-bit counters): 187067 [0x1053c5660, 0x1053f311b),
+INFO: Loaded 1 PC tables (187067 PCs): 187067 [0x1053f3120,0x1056cdcd0),
+INFO:      498 files found in /Users/sam/Dev/work/sskycn/netbaiot/fuzz/corpus/mqtt_packet
+INFO: seed corpus: files: 498 min: 1b max: 65525b total: 277365b rss: 42Mb
+#499	INITED cov: 481 ft: 1808 corp: 272/25Kb exec/s: 0 rss: 51Mb
+#2305	REDUCE cov: 481 ft: 1808 corp: 272/25Kb lim: 2092 exec/s: 0 rss: 53Mb L: 43/2070 MS: 1 EraseBytes-
+#3039	REDUCE cov: 481 ft: 1808 corp: 272/25Kb lim: 2092 exec/s: 0 rss: 54Mb L: 35/2070 MS: 4 ChangeASCIIInt-ChangeBinInt-ChangeBinInt-EraseBytes-
+#12808	REDUCE cov: 481 ft: 1808 corp: 272/25Kb lim: 2180 exec/s: 0 rss: 62Mb L: 553/2070 MS: 4 ChangeBinInt-CopyPart-CopyPart-EraseBytes-
+#13739	REDUCE cov: 481 ft: 1808 corp: 272/25Kb lim: 2180 exec/s: 0 rss: 63Mb L: 58/2070 MS: 1 EraseBytes-
+#13905	REDUCE cov: 481 ft: 1808 corp: 272/25Kb lim: 2180 exec/s: 0 rss: 63Mb L: 37/2070 MS: 1 EraseBytes-
+#17786	REDUCE cov: 481 ft: 1808 corp: 272/25Kb lim: 2213 exec/s: 0 rss: 66Mb L: 34/2070 MS: 1 EraseBytes-
+#31158	REDUCE cov: 481 ft: 1808 corp: 272/25Kb lim: 2345 exec/s: 31158 rss: 77Mb L: 33/2070 MS: 2 CopyPart-EraseBytes-
+#39771	REDUCE cov: 481 ft: 1808 corp: 272/25Kb lim: 2422 exec/s: 19885 rss: 83Mb L: 890/2070 MS: 3 EraseBytes-ChangeByte-InsertByte-
+#41978	REDUCE cov: 481 ft: 1808 corp: 272/25Kb lim: 2444 exec/s: 20989 rss: 86Mb L: 1986/1986 MS: 1 EraseBytes-
+#46981	REDUCE cov: 481 ft: 1808 corp: 272/25Kb lim: 2488 exec/s: 23490 rss: 89Mb L: 55/1986 MS: 3 ShuffleBytes-InsertByte-EraseBytes-
+#51542	REDUCE cov: 481 ft: 1808 corp: 272/25Kb lim: 2532 exec/s: 25771 rss: 93Mb L: 98/1986 MS: 1 EraseBytes-
+#52423	REDUCE cov: 481 ft: 1808 corp: 272/25Kb lim: 2532 exec/s: 26211 rss: 94Mb L: 423/1986 MS: 1 EraseBytes-
+#58689	REDUCE cov: 481 ft: 1808 corp: 272/25Kb lim: 2587 exec/s: 19563 rss: 98Mb L: 996/1986 MS: 1 EraseBytes-
+#65536	pulse  cov: 481 ft: 1808 corp: 272/25Kb lim: 2653 exec/s: 21845 rss: 103Mb
+#65715	REDUCE cov: 481 ft: 1808 corp: 272/25Kb lim: 2653 exec/s: 21905 rss: 103Mb L: 904/1986 MS: 1 EraseBytes-
+#66447	REDUCE cov: 481 ft: 1808 corp: 272/25Kb lim: 2653 exec/s: 22149 rss: 104Mb L: 127/1986 MS: 2 ShuffleBytes-EraseBytes-
+#69660	NEW    cov: 481 ft: 1811 corp: 273/25Kb lim: 2675 exec/s: 23220 rss: 106Mb L: 50/1986 MS: 3 ShuffleBytes-ChangeBinInt-CopyPart-
+#74236	REDUCE cov: 481 ft: 1811 corp: 273/25Kb lim: 2719 exec/s: 24745 rss: 110Mb L: 211/1986 MS: 1 EraseBytes-
+#76512	REDUCE cov: 481 ft: 1811 corp: 273/25Kb lim: 2741 exec/s: 25504 rss: 111Mb L: 46/1986 MS: 1 EraseBytes-
+#80624	REDUCE cov: 481 ft: 1811 corp: 273/25Kb lim: 2774 exec/s: 20156 rss: 114Mb L: 37/1986 MS: 2 ShuffleBytes-EraseBytes-
+#87184	REDUCE cov: 481 ft: 1811 corp: 273/25Kb lim: 2829 exec/s: 21796 rss: 119Mb L: 25/1986 MS: 3 CopyPart-EraseBytes-ChangeBinInt-
+#92505	REDUCE cov: 481 ft: 1811 corp: 273/25Kb lim: 2873 exec/s: 23126 rss: 123Mb L: 17/1986 MS: 1 EraseBytes-
+#93357	REDUCE cov: 481 ft: 1811 corp: 273/25Kb lim: 2873 exec/s: 23339 rss: 123Mb L: 517/1986 MS: 2 InsertRepeatedBytes-EraseBytes-
+#100000	DONE   cov: 481 ft: 1811 corp: 273/25Kb lim: 2939 exec/s: 20000 rss: 128Mb
+Done 100000 runs in 5 second(s)

@@ -1,0 +1,40 @@
+   Compiling tracing v0.1.44
+   Compiling form_urlencoded v1.2.2
+   Compiling base64 v0.22.1
+   Compiling hyper v1.11.0
+   Compiling url v2.5.8
+   Compiling netbaiot-runtime v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-runtime)
+   Compiling sqlx-core v0.8.6
+   Compiling hyper-util v0.1.20
+   Compiling netbaiot-transports v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-transports)
+   Compiling sqlx-postgres v0.8.6
+   Compiling sqlx v0.8.6
+   Compiling netbaiot-storage v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-storage)
+    Finished `bench` profile [optimized + debuginfo] target(s) in 7.47s
+     Running ../../benches/foundation.rs (target/release/deps/foundation-15bfddf0aabf1763)
+mqtt_decode: 20000 iterations, 2282280 ops/s, p50=416 ns p95=417 ns p99=459 ns
+mqtt_encode: 20000 iterations, 3313956 ops/s, p50=250 ns p95=292 ns p99=292 ns
+topic_acl: 20000 iterations, 5430111 ops/s, p50=125 ns p95=167 ns p99=167 ns
+subscription_lookup: 20000 iterations, 11204739 ops/s, p50=42 ns p95=83 ns p99=84 ns
+json_codec: 20000 iterations, 547280 ops/s, p50=1750 ns p95=2416 ns p99=2500 ns
+tcp_frame: 20000 iterations, 10744503 ops/s, p50=83 ns p95=84 ns p99=84 ns
+ingress_admission: 20000 iterations, 3704590 ops/s, p50=250 ns p95=291 ns p99=292 ns
+mqtt_decode_small: 10000 iterations, 4784403 ops/s, p50=167 ns p95=209 ns p99=209 ns
+mqtt_decode_medium: 10000 iterations, 3824213 ops/s, p50=250 ns p95=250 ns p99=291 ns
+mqtt_decode_maximum: 10000 iterations, 777003 ops/s, p50=1375 ns p95=1542 ns p99=1667 ns
+json_codec_small: 10000 iterations, 656780 ops/s, p50=1541 ns p95=1584 ns p99=1667 ns
+json_codec_medium: 10000 iterations, 31287 ops/s, p50=31709 ns p95=33041 ns p99=36417 ns
+json_codec_maximum: 10000 iterations, 5923 ops/s, p50=169583 ns p95=173209 ns p99=196584 ns
+session_lookup_1: 10000 iterations, 14034260 ops/s, p50=42 ns p95=84 ns p99=84 ns
+subscription_lookup_1: 10000 iterations, 23663990 ops/s, p50=41 ns p95=42 ns p99=42 ns
+topic_acl_1: 10000 iterations, 8574792 ops/s, p50=84 ns p95=125 ns p99=125 ns
+ingress_bookkeeping_1: 10000 iterations, 4208829 ops/s, p50=208 ns p95=250 ns p99=250 ns
+session_lookup_64: 10000 iterations, 14058924 ops/s, p50=42 ns p95=84 ns p99=84 ns
+subscription_lookup_64: 10000 iterations, 23043705 ops/s, p50=41 ns p95=42 ns p99=42 ns
+topic_acl_64: 10000 iterations, 8308236 ops/s, p50=84 ns p95=125 ns p99=125 ns
+ingress_bookkeeping_64: 10000 iterations, 732386 ops/s, p50=1375 ns p95=1417 ns p99=1542 ns
+session_lookup_256: 10000 iterations, 13927577 ops/s, p50=42 ns p95=84 ns p99=84 ns
+subscription_lookup_256: 10000 iterations, 21917808 ops/s, p50=41 ns p95=42 ns p99=42 ns
+topic_acl_256: 10000 iterations, 7950971 ops/s, p50=125 ns p95=125 ns p99=125 ns
+ingress_bookkeeping_256: 10000 iterations, 201498 ops/s, p50=5000 ns p95=5083 ns p99=6250 ns
+layout_bytes: session_endpoint=72 queued_command=112 device_message=152 command_record=144

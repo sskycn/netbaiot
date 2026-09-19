@@ -1,0 +1,5 @@
+error: failed to download `arbitrary v1.4.2`
+
+Caused by:
+  attempting to make an HTTP request, but --offline was specified
+Error: failed to build fuzz script: ASAN_OPTIONS="detect_odr_violation=0" RUSTFLAGS=" -Cpasses=sancov-module -Cllvm-args=-sanitizer-coverage-level=4 -Cllvm-args=-sanitizer-coverage-inline-8bit-counters -Cllvm-args=-sanitizer-coverage-pc-table -Cllvm-args=-sanitizer-coverage-trace-compares --cfg fuzzing -Cllvm-args=-simplifycfg-branch-fold-threshold=0 -Zsanitizer=address -Cdebug-assertions -Ccodegen-units=1" "cargo" "build" "--manifest-path" "/Users/sam/Dev/work/sskycn/netbaiot/fuzz/Cargo.toml" "--target" "aarch64-apple-darwin" "--release" "--config" "profile.release.debug=\"line-tables-only\"" "--bin" "mqtt_fixed_header"

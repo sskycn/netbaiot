@@ -1,0 +1,93 @@
+   Compiling libc v0.2.189
+   Compiling proc-macro2 v1.0.107
+   Compiling quote v1.0.47
+   Compiling unicode-ident v1.0.24
+   Compiling cfg-if v1.0.4
+   Compiling find-msvc-tools v0.1.11
+   Compiling shlex v2.0.1
+   Compiling version_check v0.9.5
+   Compiling bytes v1.12.1
+   Compiling pin-project-lite v0.2.17
+   Compiling parking_lot_core v0.9.12
+   Compiling scopeguard v1.2.0
+   Compiling itoa v1.0.18
+   Compiling serde_core v1.0.229
+   Compiling smallvec v1.15.2
+   Compiling lock_api v0.4.14
+   Compiling generic-array v0.14.7
+   Compiling typenum v1.20.1
+   Compiling futures-core v0.3.34
+   Compiling subtle v2.6.1
+   Compiling getrandom v0.4.3
+   Compiling zmij v1.0.23
+   Compiling thiserror v2.0.20
+   Compiling once_cell v1.21.4
+   Compiling serde v1.0.229
+   Compiling http v1.5.0
+   Compiling syn v3.0.4
+   Compiling jobserver v0.1.35
+   Compiling cc v1.4.4
+   Compiling errno v0.3.14
+   Compiling signal-hook-registry v1.4.8
+   Compiling parking_lot v0.12.5
+   Compiling mio v1.2.2
+   Compiling socket2 v0.6.5
+   Compiling block-buffer v0.10.4
+   Compiling crypto-common v0.1.7
+   Compiling ring v0.17.14
+   Compiling getrandom v0.2.17
+   Compiling httparse v1.10.1
+   Compiling serde_json v1.0.151
+   Compiling zeroize v1.9.0
+   Compiling untrusted v0.9.0
+   Compiling rustls-pki-types v1.15.1
+   Compiling uuid v1.25.0
+   Compiling digest v0.10.7
+   Compiling syn v2.0.119
+   Compiling tokio-macros v2.7.2
+   Compiling thiserror-impl v2.0.20
+   Compiling serde_derive v1.0.229
+   Compiling tokio v1.53.1
+   Compiling futures-macro v0.3.34
+   Compiling http-body v1.1.0
+   Compiling slab v0.4.12
+   Compiling rustls v0.23.43
+   Compiling memchr v2.8.3
+   Compiling futures-task v0.3.34
+   Compiling futures-util v0.3.34
+   Compiling cpufeatures v0.2.17
+   Compiling tracing-core v0.1.36
+   Compiling futures-channel v0.3.34
+   Compiling atomic-waker v1.1.2
+   Compiling httpdate v1.0.3
+   Compiling futures-sink v0.3.34
+   Compiling sha2 v0.10.9
+   Compiling hmac v0.12.1
+   Compiling async-trait v0.1.92
+   Compiling libfuzzer-sys v0.4.13
+   Compiling http-body-util v0.1.5
+   Compiling arbitrary v1.4.2
+   Compiling tracing-attributes v0.1.31
+   Compiling tracing v0.1.44
+   Compiling netbaiot-core v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-core)
+   Compiling netbaiot-codecs v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-codecs)
+   Compiling rustls-webpki v0.103.15
+   Compiling tokio-util v0.7.19
+   Compiling hyper v1.11.0
+   Compiling netbaiot-runtime v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-runtime)
+   Compiling hyper-util v0.1.20
+   Compiling tokio-rustls v0.26.4
+   Compiling netbaiot-transports v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-transports)
+   Compiling netbaiot-fuzz v0.0.0 (/Users/sam/Dev/work/sskycn/netbaiot/fuzz)
+    Finished `release` profile [optimized + debuginfo] target(s) in 27.31s
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.10s
+     Running `fuzz/target/aarch64-apple-darwin/release/mqtt_fixed_header -artifact_prefix=/Users/sam/Dev/work/sskycn/netbaiot/fuzz/artifacts/mqtt_fixed_header/ -runs=20000 -max_len=65540 /Users/sam/Dev/work/sskycn/netbaiot/fuzz/corpus/mqtt_fixed_header`
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 2262764399
+INFO: Loaded 1 modules   (186905 inline 8-bit counters): 186905 [0x103740bc0, 0x10376e5d9),
+INFO: Loaded 1 PC tables (186905 PCs): 186905 [0x10376e5e0,0x103a48770),
+INFO:       48 files found in /Users/sam/Dev/work/sskycn/netbaiot/fuzz/corpus/mqtt_fixed_header
+INFO: seed corpus: files: 48 min: 1b max: 8b total: 167b rss: 41Mb
+#49	INITED cov: 69 ft: 69 corp: 29/68b exec/s: 0 rss: 42Mb
+#20000	DONE   cov: 69 ft: 69 corp: 29/68b lim: 205 exec/s: 0 rss: 44Mb
+Done 20000 runs in 0 second(s)

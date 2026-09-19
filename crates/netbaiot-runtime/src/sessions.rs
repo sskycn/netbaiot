@@ -91,6 +91,16 @@ pub struct SessionLease {
     pub cancel: CancellationToken,
 }
 impl Sessions {
+    /// Current registries, without cloning device identities for metric sampling.
+    pub fn registry_counts(&self) -> Result<(usize, usize, usize)> {
+        let state = lock(&self.state)?;
+        Ok((
+            state.sessions.len(),
+            state.tenants.len(),
+            state.presence.len(),
+        ))
+    }
+
     pub fn new(limits: Arc<Limits>) -> Arc<Self> {
         Arc::new(Self {
             state: Mutex::new(SessionState {

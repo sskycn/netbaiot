@@ -1,0 +1,12 @@
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.02s
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.02s
+     Running `fuzz/target/aarch64-apple-darwin/release/mqtt_remaining_length -artifact_prefix=/Users/sam/Dev/work/sskycn/netbaiot/fuzz/artifacts/mqtt_remaining_length/ -runs=20000 -max_len=8 /Users/sam/Dev/work/sskycn/netbaiot/fuzz/corpus/mqtt_remaining_length`
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 1076500185
+INFO: Loaded 1 modules   (186905 inline 8-bit counters): 186905 [0x102ef4bc0, 0x102f225d9),
+INFO: Loaded 1 PC tables (186905 PCs): 186905 [0x102f225e0,0x1031fc770),
+INFO:       19 files found in /Users/sam/Dev/work/sskycn/netbaiot/fuzz/corpus/mqtt_remaining_length
+INFO: seed corpus: files: 19 min: 1b max: 8b total: 72b rss: 41Mb
+#20	INITED cov: 46 ft: 46 corp: 13/49b exec/s: 0 rss: 42Mb
+#20000	DONE   cov: 46 ft: 46 corp: 13/49b lim: 8 exec/s: 0 rss: 43Mb
+Done 20000 runs in 0 second(s)

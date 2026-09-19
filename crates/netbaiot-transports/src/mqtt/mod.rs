@@ -246,6 +246,12 @@ pub async fn connection(
                             s.ingress.metrics.inc(Metric::MqttPubacks);
                             if let Some(pending) = ids.entries.remove(&id)
                                 && let Some(command) = pending.command {
+                                tracing::debug!(
+                                    command_id=%command.command_id.0,
+                                    attempt=command.attempt,
+                                    command_ack_elapsed_us=pending.sent_at.elapsed().as_micros(),
+                                    "command send start to PUBACK handling"
+                                );
                                 s.router.state(&auth.device_key, command.command_id, command.attempt, DeliveryState::Received).await?;
                             }
                         }

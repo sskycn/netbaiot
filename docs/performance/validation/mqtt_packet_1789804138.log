@@ -1,0 +1,33 @@
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.02s
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.02s
+     Running `fuzz/target/aarch64-apple-darwin/release/mqtt_packet -artifact_prefix=/Users/sam/Dev/work/sskycn/netbaiot/fuzz/artifacts/mqtt_packet/ -runs=100000 -max_len=65540 /Users/sam/Dev/work/sskycn/netbaiot/fuzz/corpus/mqtt_packet`
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 1078234922
+INFO: Loaded 1 modules   (187067 inline 8-bit counters): 187067 [0x101575660, 0x1015a311b),
+INFO: Loaded 1 PC tables (187067 PCs): 187067 [0x1015a3120,0x10187dcd0),
+INFO:      520 files found in /Users/sam/Dev/work/sskycn/netbaiot/fuzz/corpus/mqtt_packet
+INFO: seed corpus: files: 520 min: 1b max: 65525b total: 284540b rss: 42Mb
+#521	INITED cov: 481 ft: 1811 corp: 272/24Kb exec/s: 0 rss: 52Mb
+#3267	REDUCE cov: 481 ft: 1811 corp: 272/24Kb lim: 2016 exec/s: 0 rss: 55Mb L: 20/1986 MS: 1 EraseBytes-
+#7244	REDUCE cov: 481 ft: 1811 corp: 272/24Kb lim: 2046 exec/s: 0 rss: 59Mb L: 890/1986 MS: 2 EraseBytes-InsertRepeatedBytes-
+#16894	REDUCE cov: 481 ft: 1811 corp: 272/24Kb lim: 2133 exec/s: 0 rss: 66Mb L: 16/1986 MS: 5 CopyPart-CopyPart-ChangeBinInt-EraseBytes-EraseBytes-
+#33814	REDUCE cov: 481 ft: 1811 corp: 272/24Kb lim: 2298 exec/s: 33814 rss: 79Mb L: 472/1986 MS: 1 EraseBytes-
+#44315	REDUCE cov: 481 ft: 1811 corp: 272/24Kb lim: 2397 exec/s: 22157 rss: 87Mb L: 361/1986 MS: 1 EraseBytes-
+#44566	REDUCE cov: 481 ft: 1811 corp: 272/24Kb lim: 2397 exec/s: 22283 rss: 87Mb L: 57/1986 MS: 1 EraseBytes-
+#47097	REDUCE cov: 481 ft: 1811 corp: 272/24Kb lim: 2419 exec/s: 23548 rss: 89Mb L: 12/1986 MS: 1 EraseBytes-
+#47388	NEW    cov: 484 ft: 1814 corp: 273/24Kb lim: 2419 exec/s: 23694 rss: 89Mb L: 10/1986 MS: 1 ChangeBinInt-
+#49270	REDUCE cov: 484 ft: 1814 corp: 273/24Kb lim: 2430 exec/s: 24635 rss: 91Mb L: 227/1986 MS: 2 CMP-EraseBytes- DE: "\000\000\0002"-
+#49906	REDUCE cov: 484 ft: 1814 corp: 273/24Kb lim: 2430 exec/s: 24953 rss: 91Mb L: 9/1986 MS: 1 EraseBytes-
+#50861	REDUCE cov: 484 ft: 1814 corp: 273/24Kb lim: 2430 exec/s: 25430 rss: 92Mb L: 516/1986 MS: 5 CrossOver-CrossOver-ChangeBinInt-ChangeBinInt-EraseBytes-
+#50918	NEW    cov: 484 ft: 1815 corp: 274/24Kb lim: 2430 exec/s: 25459 rss: 92Mb L: 53/1986 MS: 2 ShuffleBytes-CopyPart-
+#52340	REDUCE cov: 484 ft: 1815 corp: 274/24Kb lim: 2441 exec/s: 26170 rss: 93Mb L: 11/1986 MS: 2 InsertByte-EraseBytes-
+#64631	REDUCE cov: 484 ft: 1815 corp: 274/24Kb lim: 2562 exec/s: 21543 rss: 101Mb L: 76/1986 MS: 1 EraseBytes-
+#64722	REDUCE cov: 484 ft: 1815 corp: 274/24Kb lim: 2562 exec/s: 21574 rss: 101Mb L: 10/1986 MS: 1 EraseBytes-
+#65536	pulse  cov: 484 ft: 1815 corp: 274/24Kb lim: 2562 exec/s: 21845 rss: 102Mb
+#87913	REDUCE cov: 484 ft: 1815 corp: 274/24Kb lim: 2782 exec/s: 21978 rss: 117Mb L: 62/1986 MS: 4 PersAutoDict-PersAutoDict-InsertByte-EraseBytes- DE: "\000\000\0002"-"\000\000\0002"-
+#93151	REDUCE cov: 484 ft: 1815 corp: 274/24Kb lim: 2826 exec/s: 23287 rss: 121Mb L: 1966/1966 MS: 1 EraseBytes-
+#100000	DONE   cov: 484 ft: 1815 corp: 274/24Kb lim: 2892 exec/s: 25000 rss: 125Mb
+###### Recommended dictionary. ######
+"\000\000\0002" # Uses: 4632
+###### End of recommended dictionary. ######
+Done 100000 runs in 4 second(s)

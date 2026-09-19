@@ -1,0 +1,16 @@
+{"iterations":10000,"name":"admission_devices_1_tenants_1","ops_per_sec":3377142.754863676,"p50_ns":209,"p95_ns":417,"p99_ns":417}
+{"iterations":10000,"name":"admission_devices_1_tenants_1","ops_per_sec":4518583.351821871,"p50_ns":208,"p95_ns":250,"p99_ns":334}
+{"iterations":10000,"name":"admission_devices_16_tenants_1","ops_per_sec":3851213.7485249853,"p50_ns":208,"p95_ns":375,"p99_ns":375}
+{"iterations":10000,"name":"admission_devices_16_tenants_16","ops_per_sec":2621862.1881065518,"p50_ns":333,"p95_ns":375,"p99_ns":417}
+{"iterations":10000,"name":"admission_devices_64_tenants_1","ops_per_sec":2700604.2602032204,"p50_ns":333,"p95_ns":375,"p99_ns":375}
+{"iterations":10000,"name":"admission_devices_64_tenants_64","ops_per_sec":2480107.0612616204,"p50_ns":375,"p95_ns":417,"p99_ns":417}
+{"iterations":10000,"name":"admission_devices_256_tenants_1","ops_per_sec":1986853.7832576972,"p50_ns":459,"p95_ns":500,"p99_ns":542}
+{"iterations":10000,"name":"admission_devices_256_tenants_256","ops_per_sec":1443513.650803366,"p50_ns":667,"p95_ns":708,"p99_ns":709}
+{"iterations":10000,"name":"admission_devices_1024_tenants_1","ops_per_sec":949607.4655100195,"p50_ns":1041,"p95_ns":1084,"p99_ns":1125}
+{"iterations":10000,"name":"admission_devices_1024_tenants_1024","ops_per_sec":552590.4778493003,"p50_ns":1750,"p95_ns":1875,"p99_ns":1917}
+{"iterations":10000,"name":"admission_devices_2000_tenants_1","ops_per_sec":553642.1682221798,"p50_ns":1792,"p95_ns":1834,"p99_ns":1916}
+{"iterations":10000,"name":"admission_devices_2000_tenants_2000","ops_per_sec":299132.882573981,"p50_ns":3291,"p95_ns":3375,"p99_ns":4125}
+{"iterations":10000,"name":"auth_valid","ops_per_sec":2641048.4962530127,"p50_ns":334,"p95_ns":375,"p99_ns":459}
+{"iterations":10000,"name":"auth_missing","ops_per_sec":8279571.316915495,"p50_ns":84,"p95_ns":125,"p99_ns":125}
+{"iterations":10000,"name":"auth_bad_key","ops_per_sec":2741040.2247652984,"p50_ns":333,"p95_ns":375,"p99_ns":417}
+{"iterations":10000,"name":"auth_hmac_1024","ops_per_sec":418567.66146247543,"p50_ns":2375,"p95_ns":2459,"p99_ns":3000}

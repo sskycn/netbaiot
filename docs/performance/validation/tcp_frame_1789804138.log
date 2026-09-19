@@ -1,0 +1,20 @@
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.02s
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.03s
+     Running `fuzz/target/aarch64-apple-darwin/release/tcp_frame -artifact_prefix=/Users/sam/Dev/work/sskycn/netbaiot/fuzz/artifacts/tcp_frame/ -runs=20000 -max_len=65540 /Users/sam/Dev/work/sskycn/netbaiot/fuzz/corpus/tcp_frame`
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 1083714967
+INFO: Loaded 1 modules   (186934 inline 8-bit counters): 186934 [0x1037a1110, 0x1037ceb46),
+INFO: Loaded 1 PC tables (186934 PCs): 186934 [0x1037ceb48,0x103aa8ea8),
+INFO:       81 files found in /Users/sam/Dev/work/sskycn/netbaiot/fuzz/corpus/tcp_frame
+INFO: seed corpus: files: 81 min: 1b max: 65504b total: 117524b rss: 42Mb
+#82	INITED cov: 81 ft: 336 corp: 46/4588b exec/s: 0 rss: 45Mb
+#766	REDUCE cov: 81 ft: 336 corp: 46/4587b lim: 1037 exec/s: 0 rss: 45Mb L: 71/1037 MS: 4 ChangeBinInt-ChangeBinInt-ChangeASCIIInt-EraseBytes-
+#849	NEW    cov: 81 ft: 337 corp: 47/4805b lim: 1037 exec/s: 0 rss: 45Mb L: 218/1037 MS: 3 ChangeBinInt-ChangeBit-EraseBytes-
+#2020	REDUCE cov: 81 ft: 337 corp: 47/4793b lim: 1047 exec/s: 0 rss: 46Mb L: 178/1037 MS: 1 EraseBytes-
+#3462	REDUCE cov: 81 ft: 337 corp: 47/4776b lim: 1057 exec/s: 0 rss: 47Mb L: 89/1037 MS: 2 ChangeBinInt-EraseBytes-
+#4598	REDUCE cov: 81 ft: 337 corp: 47/4775b lim: 1067 exec/s: 0 rss: 48Mb L: 107/1037 MS: 1 EraseBytes-
+#5874	REDUCE cov: 81 ft: 337 corp: 47/4746b lim: 1077 exec/s: 0 rss: 49Mb L: 149/1037 MS: 1 EraseBytes-
+#16897	REDUCE cov: 81 ft: 337 corp: 47/4723b lim: 1177 exec/s: 0 rss: 56Mb L: 205/1037 MS: 3 ChangeBinInt-ChangeBinInt-CrossOver-
+#17207	REDUCE cov: 81 ft: 337 corp: 47/4719b lim: 1177 exec/s: 0 rss: 56Mb L: 103/1037 MS: 5 CrossOver-ChangeByte-EraseBytes-ChangeByte-ShuffleBytes-
+#20000	DONE   cov: 81 ft: 337 corp: 47/4719b lim: 1197 exec/s: 0 rss: 58Mb
+Done 20000 runs in 0 second(s)

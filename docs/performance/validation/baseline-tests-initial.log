@@ -1,0 +1,303 @@
+   Compiling cfg-if v1.0.4
+   Compiling pin-project-lite v0.2.17
+   Compiling futures-core v0.3.34
+   Compiling libc v0.2.189
+   Compiling serde_core v1.0.229
+   Compiling bytes v1.12.1
+   Compiling scopeguard v1.2.0
+   Compiling stable_deref_trait v1.2.1
+   Compiling zerofrom v0.1.8
+   Compiling typenum v1.20.1
+   Compiling yoke v0.8.3
+   Compiling lock_api v0.4.14
+   Compiling itoa v1.0.18
+   Compiling once_cell v1.21.4
+   Compiling memchr v2.8.3
+   Compiling writeable v0.6.4
+   Compiling zerovec v0.11.8
+   Compiling litemap v0.8.3
+   Compiling socket2 v0.6.5
+   Compiling mio v1.2.2
+   Compiling zerotrie v0.2.5
+   Compiling generic-array v0.14.7
+   Compiling futures-task v0.3.34
+   Compiling slab v0.4.12
+   Compiling utf8_iter v1.0.4
+   Compiling futures-io v0.3.34
+   Compiling tinystr v0.8.4
+   Compiling potential_utf v0.1.6
+   Compiling getrandom v0.2.17
+   Compiling errno v0.3.14
+   Compiling zeroize v1.9.0
+   Compiling icu_locale_core v2.3.0
+   Compiling thiserror v2.0.20
+   Compiling crypto-common v0.1.7
+   Compiling block-buffer v0.10.4
+   Compiling icu_collections v2.3.0
+   Compiling rustls-pki-types v1.15.1
+   Compiling signal-hook-registry v1.4.8
+   Compiling icu_normalizer_data v2.3.0
+   Compiling percent-encoding v2.3.2
+   Compiling zmij v1.0.23
+   Compiling icu_properties_data v2.3.0
+   Compiling futures-sink v0.3.34
+   Compiling serde v1.0.229
+   Compiling subtle v2.6.1
+   Compiling serde_json v1.0.151
+   Compiling untrusted v0.9.0
+   Compiling getrandom v0.4.3
+   Compiling ring v0.17.14
+   Compiling icu_provider v2.3.1
+   Compiling uuid v1.25.0
+   Compiling futures-util v0.3.34
+   Compiling cpufeatures v0.2.17
+   Compiling tracing-core v0.1.36
+   Compiling log v0.4.34
+   Compiling icu_properties v2.3.0
+   Compiling smallvec v1.15.2
+   Compiling digest v0.10.7
+   Compiling webpki-roots v1.0.9
+   Compiling tracing v0.1.44
+   Compiling parking_lot_core v0.9.12
+   Compiling equivalent v1.0.2
+   Compiling allocator-api2 v0.2.21
+   Compiling foldhash v0.1.5
+   Compiling parking_lot v0.12.5
+   Compiling zerocopy v0.8.56
+   Compiling crossbeam-utils v0.8.22
+   Compiling icu_normalizer v2.3.0
+   Compiling rustls-webpki v0.103.15
+   Compiling tokio v1.53.1
+   Compiling hashbrown v0.15.5
+   Compiling netbaiot-core v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-core)
+   Compiling tinyvec_macros v0.1.1
+   Compiling hashbrown v0.17.1
+   Compiling crc-catalog v2.5.0
+   Compiling parking v2.2.1
+   Compiling hashlink v0.10.0
+   Compiling event-listener v5.4.2
+   Compiling indexmap v2.14.0
+   Compiling crc v3.4.0
+   Compiling idna_adapter v1.2.2
+   Compiling tinyvec v1.12.0
+   Compiling rustls v0.23.43
+   Compiling crossbeam-queue v0.3.13
+   Compiling hmac v0.12.1
+   Compiling sha2 v0.10.9
+   Compiling webpki-roots v0.26.11
+   Compiling either v1.18.0
+   Compiling futures-channel v0.3.34
+   Compiling form_urlencoded v1.2.2
+   Compiling rand_core v0.6.4
+   Compiling base64 v0.22.1
+   Compiling bitflags v2.13.1
+   Compiling idna v1.1.0
+   Compiling unicode-normalization v0.1.25
+   Compiling num-traits v0.2.19
+   Compiling unicode-bidi v0.3.18
+   Compiling ppv-lite86 v0.2.21
+   Compiling unicode-properties v0.1.4
+   Compiling atoi v2.0.0
+   Compiling rand_chacha v0.3.1
+   Compiling stringprep v0.1.5
+   Compiling url v2.5.8
+   Compiling futures-intrusive v0.5.0
+   Compiling rand v0.8.7
+   Compiling home v0.5.12
+   Compiling dotenvy v0.15.7
+   Compiling byteorder v1.5.0
+   Compiling hex v0.4.3
+   Compiling whoami v1.6.1
+   Compiling hkdf v0.12.4
+   Compiling tokio-util v0.7.19
+   Compiling md-5 v0.10.6
+   Compiling http v1.5.0
+   Compiling tokio-stream v0.1.19
+   Compiling netbaiot-runtime v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-runtime)
+   Compiling sqlx-core v0.8.6
+   Compiling http-body v1.1.0
+   Compiling tower-service v0.3.3
+   Compiling try-lock v0.2.5
+   Compiling httparse v1.10.1
+   Compiling atomic-waker v1.1.2
+   Compiling want v0.3.1
+   Compiling httpdate v1.0.3
+   Compiling ipnet v2.12.1
+   Compiling hyper v1.11.0
+   Compiling tokio-rustls v0.26.4
+   Compiling http-body-util v0.1.5
+   Compiling netbaiot-codecs v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-codecs)
+   Compiling sync_wrapper v1.0.2
+   Compiling regex-syntax v0.8.11
+   Compiling tower-layer v0.3.3
+   Compiling lazy_static v1.5.0
+   Compiling sqlx-postgres v0.8.6
+   Compiling tower v0.5.3
+   Compiling ryu v1.0.23
+   Compiling hyper-util v0.1.20
+   Compiling tower-http v0.6.11
+   Compiling regex-automata v0.4.18
+   Compiling serde_urlencoded v0.7.1
+   Compiling sharded-slab v0.1.7
+   Compiling tracing-log v0.2.0
+   Compiling netbaiot-transports v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-transports)
+   Compiling hyper-rustls v0.27.9
+   Compiling thread_local v1.1.10
+   Compiling matchers v0.2.0
+   Compiling nu-ansi-term v0.50.3
+   Compiling reqwest v0.12.28
+   Compiling rustls-pemfile v2.2.0
+   Compiling tracing-subscriber v0.3.23
+   Compiling sqlx-macros-core v0.8.6
+   Compiling sqlx-macros v0.8.6
+   Compiling sqlx v0.8.6
+   Compiling netbaiot-storage v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-storage)
+   Compiling netbaiot-server v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/apps/netbaiot-server)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 27.49s
+     Running unittests src/lib.rs (target/debug/deps/netbaiot_codecs-f5f01d8d558017a8)
+
+running 2 tests
+test tests::all_payloads_and_bounds ... ok
+test hostile::unknown_identity_duplicate_fields_and_huge_maps_are_rejected ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/netbaiot_core-fde6234a6ab151c5)
+
+running 1 test
+test tests::identities_are_namespace_safe ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/netbaiot_runtime-26c0d053d4221041)
+
+running 10 tests
+test limits::tests::defaults_and_invalid ... ok
+test quota::tests::source_rate_table_has_capacity_and_global_limit ... ok
+test quota::tests::expired_tenant_identity_replacement_is_shared ... ok
+test sessions::tests::queue_count_and_bytes_are_bounded ... ok
+test sessions::tests::stale_disconnect_cannot_remove_new_generation ... ok
+test quota::tests::ingress_limits_isolate_devices_tenants_and_bytes ... ok
+test sessions::tests::audit_tenant_budget_survives_superseded_queue ... ok
+test quota::tests::connection_limits_and_raii_cleanup ... ok
+test sessions::audit_cleanup::cancelled_receiver_and_failed_enqueue_release_all_budgets ... ok
+test worker::audit::command_backoff_is_positive_bounded_and_spread_across_ids ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running unittests src/lib.rs (target/debug/deps/netbaiot_server-a172e7a3375131e1)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (target/debug/deps/netbaiot_server-1f18d3d88f9f12d6)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/server.rs (target/debug/deps/server-ebf2fcb251029a39)
+
+running 5 tests
+test config_input_is_bounded_and_malformed_config_fails ... ok
+test public_streams_require_tls_and_volatile_store_requires_loopback ... ok
+test tls_composition_completes_verified_handshake ... ok
+test composition_root_serves_http_and_stops_all_listeners ... ok
+test audit_tls_handshake_timeout_shutdown_and_invalid_key ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+     Running unittests src/lib.rs (target/debug/deps/netbaiot_storage-8d1a6f712960b69d)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/semantics.rs (target/debug/deps/semantics-8f56d4e6c64965f9)
+
+running 13 tests
+test audit_outbox_child ... ignored, owned subprocess helper for audit_outbox_process_crash_recovery
+test audit_outbox_process_crash_recovery ... ignored, requires fresh NETBAIOT_TEST_DATABASE_URL; kills only owned children
+test audit_postgres_attempt_history_cannot_regress ... ignored, requires fresh NETBAIOT_TEST_DATABASE_URL
+test audit_postgres_concurrency_leases_pool_pressure_and_cleanup ... ignored, requires fresh NETBAIOT_TEST_DATABASE_URL
+test delivery_attempts_are_bounded_and_stale_leases_cannot_finish ... ok
+test audit_command_retry_uses_bounded_backoff ... ok
+test capacity_failures_do_not_create_partial_jobs_or_commands ... ok
+test audit_stale_command_attempt_is_fenced ... ok
+test byte_quota_isolates_device_from_other_devices ... ok
+test memory_acceptance_outbox_dedup_lease_and_retention ... ok
+test postgres_transaction_and_command_contract ... ignored, requires NETBAIOT_TEST_DATABASE_URL pointing at a fresh disposable PostgreSQL database
+test memory_command_lifecycle_and_atomic_ack ... ok
+test audit_late_transport_update_preserves_completed_command ... ok
+
+test result: ok. 8 passed; 0 failed; 5 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+     Running unittests src/lib.rs (target/debug/deps/netbaiot_transports-6489987638755e88)
+
+running 18 tests
+test mqtt::packet::audit::remaining_length_all_widths_and_invalid_continuations ... ok
+test mqtt::packet::tests::exact_packet_size_boundary ... ok
+test mqtt::packet::tests::malformed_and_boundaries ... ok
+test mqtt::packet::tests::incremental_and_multiple ... ok
+test mqtt::packet::tests::audit_malformed_wildcards_are_protocol_errors ... ok
+test mqtt::packet::audit::connect_flags_utf8_and_packet_identifiers_are_strict ... ok
+test common::audit_deadlines::audit_expired_packet_rejects_even_ready_socket_bytes ... ok
+test common::audit_deadlines::audit_partial_next_packet_keeps_original_deadline ... ok
+test mqtt::packet::tests::arbitrary_bytes_smoke ... ok
+test mqtt::tests::packet_identifier_wrap_skips_live_entries ... ok
+test mqtt::tests::packet_ids_reuse_only_after_ack ... ok
+test mqtt::tests::state_rejects_double_connect ... ok
+test mqtt::topics::tests::exact_acl_and_stale_cleanup ... ok
+test tcp::tests::split_multiple_and_invalid ... ok
+test udp::audit::full_replay_cache_never_evicts_live_entry_and_sequence_does_not_wrap ... ok
+test udp::tests::replay_reordering_and_expiry ... ok
+test udp::tests::arbitrary_envelopes ... ok
+test mqtt::packet::audit::every_supported_packet_survives_every_split_and_coalescing ... ok
+
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/end_to_end.rs (target/debug/deps/end_to_end-f747d0b7eaf3932b)
+
+running 25 tests
+test audit_crash_child ... ignored, subprocess helper, invoked only by audit_postgres_process_crash_boundaries
+test audit_postgres_process_crash_boundaries ... ignored, requires fresh NETBAIOT_TEST_DATABASE_URL; kills only owned test child processes
+test audit_disconnected_auth_cannot_replace_new_session ... ok
+test audit_http_rejects_unsupported_content_encoding ... ok
+test audit_shutdown_during_auth_cannot_register_session ... ok
+test audit_http_body_admission_respects_tenant_capacity ... ok
+test audit_udp_oversize_and_failed_ingress_do_not_consume_sequence ... ok
+test business_api_rejects_device_credentials_and_persists_authorized_commands ... FAILED
+test mqtt_control_packet_flood_is_rate_limited ... ok
+test mqtt_acl_subscribe_unsubscribe_qos0_and_ping ... ok
+test mqtt_ingress_application_ack_dedup_and_command_execution ... ok
+test http_acceptance_dedup_conflict_pull_ack_and_limits ... ok
+test command_worker_routes_durable_claim_to_active_session ... ok
+test audit_mqtt_acl_path_tricks_will_and_client_id_ownership ... ok
+test shutdown_drains_accepted_ingress_without_leaking_owners ... ok
+test tcp_split_frames_downlink_and_shutdown ... ok
+test mqtt_reconnect_keeps_new_session_and_cleans_subscriptions ... ok
+test mqtt_protocol_rejections ... ok
+test audit_shutdown_during_http_body_tcp_frame_and_udp_ingress ... ok
+test slow_writer_is_bounded_and_disconnect_mid_frame_releases_connection ... ok
+test mqtt_never_acknowledges_before_acceptance_and_closes_on_storage_timeout ... ok
+test udp_authentication_replay_and_no_fake_session ... ok
+test audit_http_chunked_limits_malformed_auth_and_slow_body ... ok
+test delivery_worker_times_out_retries_with_bound_and_shuts_down ... ok
+test mqtt_keepalive_and_partial_frame_deadlines ... ok
+
+failures:
+
+---- business_api_rejects_device_credentials_and_persists_authorized_commands stdout ----
+
+thread 'business_api_rejects_device_credentials_and_persists_authorized_commands' (2546811) panicked at crates/netbaiot-transports/tests/end_to_end.rs:477:10:
+called `Result::unwrap()` on an `Err` value: Os { code: 54, kind: ConnectionReset, message: "Connection reset by peer" }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    business_api_rejects_device_credentials_and_persists_authorized_commands
+
+test result: FAILED. 22 passed; 1 failed; 2 ignored; 0 measured; 0 filtered out; finished in 1.60s
+
+error: test failed, to rerun pass `-p netbaiot-transports --test end_to_end`

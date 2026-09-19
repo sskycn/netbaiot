@@ -1,0 +1,25 @@
+{
+  "epoch": 1789796617.275284,
+  "database": "cap_dataset_1000000",
+  "phase": "post-load background maintenance",
+  "backends": [
+    {
+      "pid": 62955,
+      "state": "active",
+      "wait_type": "Timeout",
+      "wait": "VacuumDelay",
+      "query_age_seconds": 10.284938,
+      "process": {
+        "pid": 62955,
+        "rss_kib": 13184,
+        "vsz_kib": 435498432,
+        "cpu_seconds": 0.66,
+        "ps_cpu_percent": 7.3,
+        "threads": 1,
+        "fds": 11,
+        "network_sockets": 0
+      }
+    }
+  ],
+  "scope": "bulk load had completed before this snapshot; VacuumDelay identifies background maintenance, not loader or application-server CPU"
+}

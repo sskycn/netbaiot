@@ -52,6 +52,10 @@ pub struct Subscriptions {
     entries: Mutex<HashMap<String, Subscription>>,
 }
 impl Subscriptions {
+    pub fn count(&self) -> Result<usize> {
+        Ok(lock(&self.entries)?.len())
+    }
+
     pub fn new(limits: Arc<Limits>) -> Arc<Self> {
         Arc::new(Self {
             limits,

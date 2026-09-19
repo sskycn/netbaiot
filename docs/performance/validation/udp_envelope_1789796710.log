@@ -1,0 +1,27 @@
+   Compiling netbaiot-fuzz v0.0.0 (/Users/sam/Dev/work/sskycn/netbaiot/fuzz)
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.21s
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.03s
+     Running `fuzz/target/aarch64-apple-darwin/release/udp_envelope -artifact_prefix=/Users/sam/Dev/work/sskycn/netbaiot/fuzz/artifacts/udp_envelope/ -runs=20000 -max_len=1201 /Users/sam/Dev/work/sskycn/netbaiot/fuzz/corpus/udp_envelope`
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 2275043246
+INFO: Loaded 1 modules   (186905 inline 8-bit counters): 186905 [0x10557cbc0, 0x1055aa5d9),
+INFO: Loaded 1 PC tables (186905 PCs): 186905 [0x1055aa5e0,0x105884770),
+INFO:       55 files found in /Users/sam/Dev/work/sskycn/netbaiot/fuzz/corpus/udp_envelope
+INFO: seed corpus: files: 55 min: 1b max: 167b total: 4382b rss: 41Mb
+#56	INITED cov: 79 ft: 117 corp: 40/3043b exec/s: 0 rss: 43Mb
+#1107	REDUCE cov: 79 ft: 117 corp: 40/3042b lim: 106 exec/s: 0 rss: 43Mb L: 76/100 MS: 1 EraseBytes-
+#4936	REDUCE cov: 79 ft: 117 corp: 40/3038b lim: 137 exec/s: 0 rss: 44Mb L: 76/100 MS: 4 InsertRepeatedBytes-CrossOver-EraseBytes-EraseBytes-
+#6928	REDUCE cov: 79 ft: 117 corp: 40/3037b lim: 151 exec/s: 0 rss: 44Mb L: 77/100 MS: 2 CopyPart-EraseBytes-
+#13344	REDUCE cov: 79 ft: 117 corp: 40/3036b lim: 214 exec/s: 0 rss: 45Mb L: 76/100 MS: 1 EraseBytes-
+#15365	REDUCE cov: 79 ft: 117 corp: 40/3035b lim: 228 exec/s: 0 rss: 46Mb L: 77/100 MS: 1 EraseBytes-
+#17628	REDUCE cov: 79 ft: 118 corp: 41/3167b lim: 249 exec/s: 0 rss: 46Mb L: 132/132 MS: 3 CMP-ShuffleBytes-InsertRepeatedBytes- DE: "\377\377\377\334"-
+#17674	REDUCE cov: 79 ft: 118 corp: 41/3146b lim: 249 exec/s: 0 rss: 47Mb L: 111/111 MS: 1 EraseBytes-
+#18465	REDUCE cov: 79 ft: 118 corp: 41/3137b lim: 256 exec/s: 0 rss: 47Mb L: 102/102 MS: 1 EraseBytes-
+#18587	REDUCE cov: 79 ft: 119 corp: 42/3240b lim: 256 exec/s: 0 rss: 47Mb L: 103/103 MS: 2 InsertByte-ChangeBit-
+#19768	REDUCE cov: 79 ft: 120 corp: 43/3365b lim: 264 exec/s: 0 rss: 47Mb L: 125/125 MS: 1 CrossOver-
+#19883	REDUCE cov: 79 ft: 120 corp: 43/3341b lim: 264 exec/s: 0 rss: 47Mb L: 79/125 MS: 5 ChangeByte-InsertByte-EraseBytes-InsertByte-CrossOver-
+#20000	DONE   cov: 79 ft: 120 corp: 43/3341b lim: 264 exec/s: 0 rss: 47Mb
+###### Recommended dictionary. ######
+"\377\377\377\334" # Uses: 202
+###### End of recommended dictionary. ######
+Done 20000 runs in 0 second(s)

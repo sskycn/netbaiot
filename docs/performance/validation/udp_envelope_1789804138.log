@@ -1,0 +1,21 @@
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.02s
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.03s
+     Running `fuzz/target/aarch64-apple-darwin/release/udp_envelope -artifact_prefix=/Users/sam/Dev/work/sskycn/netbaiot/fuzz/artifacts/udp_envelope/ -runs=20000 -max_len=1201 /Users/sam/Dev/work/sskycn/netbaiot/fuzz/corpus/udp_envelope`
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 1085452828
+INFO: Loaded 1 modules   (186905 inline 8-bit counters): 186905 [0x105b28bc0, 0x105b565d9),
+INFO: Loaded 1 PC tables (186905 PCs): 186905 [0x105b565e0,0x105e30770),
+INFO:       63 files found in /Users/sam/Dev/work/sskycn/netbaiot/fuzz/corpus/udp_envelope
+INFO: seed corpus: files: 63 min: 1b max: 167b total: 5070b rss: 41Mb
+#64	INITED cov: 79 ft: 120 corp: 43/3341b exec/s: 0 rss: 43Mb
+#279	REDUCE cov: 79 ft: 120 corp: 43/3326b lim: 125 exec/s: 0 rss: 43Mb L: 87/125 MS: 5 ChangeBinInt-ChangeByte-CopyPart-EraseBytes-CopyPart-
+#817	REDUCE cov: 79 ft: 120 corp: 43/3302b lim: 125 exec/s: 0 rss: 43Mb L: 101/101 MS: 3 ChangeASCIIInt-CrossOver-CrossOver-
+#1280	REDUCE cov: 79 ft: 120 corp: 43/3295b lim: 125 exec/s: 0 rss: 43Mb L: 80/101 MS: 3 ChangeByte-ChangeBit-EraseBytes-
+#1573	REDUCE cov: 79 ft: 120 corp: 43/3285b lim: 125 exec/s: 0 rss: 43Mb L: 91/100 MS: 3 CopyPart-ChangeASCIIInt-EraseBytes-
+#6565	REDUCE cov: 79 ft: 120 corp: 43/3281b lim: 173 exec/s: 0 rss: 44Mb L: 87/100 MS: 2 ChangeBit-EraseBytes-
+#7241	REDUCE cov: 79 ft: 120 corp: 43/3277b lim: 173 exec/s: 0 rss: 44Mb L: 83/100 MS: 1 EraseBytes-
+#11672	REDUCE cov: 79 ft: 120 corp: 43/3275b lim: 215 exec/s: 0 rss: 45Mb L: 78/100 MS: 1 CrossOver-
+#12158	REDUCE cov: 79 ft: 120 corp: 43/3273b lim: 215 exec/s: 0 rss: 45Mb L: 76/100 MS: 1 EraseBytes-
+#17687	REDUCE cov: 79 ft: 120 corp: 43/3272b lim: 265 exec/s: 0 rss: 47Mb L: 82/100 MS: 4 ShuffleBytes-ChangeBinInt-EraseBytes-CopyPart-
+#20000	DONE   cov: 79 ft: 120 corp: 43/3272b lim: 281 exec/s: 0 rss: 47Mb
+Done 20000 runs in 0 second(s)

@@ -546,6 +546,14 @@ async fn http_acceptance_dedup_conflict_pull_ack_and_limits() {
             .unwrap()
             .connected
     );
+    let metrics = String::from_utf8(http(&f, "GET", "/metrics", b"").await).unwrap();
+    assert!(metrics.starts_with("HTTP/1.1 200"));
+    assert!(metrics.contains("netbaiot_ingress_inflight 0\n"));
+    // The metrics request itself owns one protocol permit.
+    assert!(metrics.contains("netbaiot_protocol_inflight 1\n"));
+    assert!(metrics.contains("netbaiot_registered_sessions 0\n"));
+    assert!(metrics.contains("netbaiot_subscription_entries 0\n"));
+    assert!(metrics.contains("netbaiot_runtime_alive_tasks "));
     f.shutdown().await;
 }
 async fn tcp_read(c: &mut TcpStream) -> Vec<u8> {
