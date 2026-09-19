@@ -15,6 +15,7 @@ inconsistent hierarchies and invalid timeout/retention relationships at startup.
 | HTTP handlers | one/connection; request stage 1/device | 4 throughout handler/body | 16 handlers |
 | UDP datagram | 1200 B | authenticated quotas | one sequential owner |
 | Ingress operations | 1/device | 4 | 16; 2 MiB payload bytes |
+| Ingress bounded wait | existing connection owner | shared hierarchy | 16 waiters; 2 MiB; 25 ms |
 | MQTT protocol/admission rate | 16/s | 128/s | 512/s |
 | Connection/HTTP/UDP rate | 32/s/IP | authenticated admission | 512/s |
 | Subscriptions | 2/device and connection | 128 | 512 |
@@ -77,7 +78,7 @@ the weak-identity registry itself is bounded by max_devices.
 | UDP socket → owner | one 1201-byte receive buffer | drop oversized, no response | finish one bounded operation then stop |
 | HTTP → handler | 16 permits + authenticated 4/tenant, 1/device + reservation/body limit | 429 or connection close; 413 for body | reject new work; graceful response completion |
 | Packet → auth | one inline auth/owner, 5 s; source rates | refuse/close/drop | no new ingress after drain |
-| Codec → ingress | one message; device/tenant/node permits and bytes | HTTP 429; MQTT/TCP close; UDP drop | admitted operations finish with deadlines |
+| Codec → ingress | one message; device→tenant→node→byte permits; 16-item/2 MiB/25 ms wait | HTTP 429; MQTT/TCP close; UDP drop | admitted operations finish with deadlines; cancellation releases all permits |
 | Ingress → PostgreSQL | 8 pool connections, bounded callers; storage quotas | reject, no application ACK | transaction commits or rolls back |
 | DB outbox → delivery worker | one leased item, TTL/attempt limits | stay durable until due/terminal/expired | finish current bounded call; recover leases after restart |
 | DB commands → session channel | 32 items and three byte permits | enqueue fails; durable retry within limits | stop claims; drop queue; preserve durable record |
@@ -90,6 +91,9 @@ static and capacity-checked; no growing auth cache exists. Replay eviction only
 removes expired entries; an otherwise full cache rejects new boots. Presence and
 rate-table expirations run on bounded collections. Delivery and command attempts
 are persisted and bounded; device execution must remain idempotent across retries.
+The bounded ingress wait runs inside the existing connection/HTTP request owner;
+it does not spawn one task per waiting item. The protocol parser permit is not held
+through durable ingress, database work, acknowledgement queueing, or socket writes.
 
 The focused audit and measured physical-memory limitations are recorded in
 [correctness-resource-reliability-audit.md](correctness-resource-reliability-audit.md).

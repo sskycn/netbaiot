@@ -47,6 +47,18 @@ impl ByteBudget {
                 .map_err(|_| Error::Overloaded)?,
         })
     }
+    async fn reserve_until(
+        &self,
+        bytes: usize,
+        deadline: tokio::time::Instant,
+    ) -> Result<BytesPermit> {
+        let n = u32::try_from(bytes).map_err(|_| Error::Overloaded)?;
+        let permit = tokio::time::timeout_at(deadline, self.0.clone().acquire_many_owned(n))
+            .await
+            .map_err(|_| Error::Overloaded)?
+            .map_err(|_| Error::Draining)?;
+        Ok(BytesPermit { _permit: permit })
+    }
     pub fn available(&self) -> usize {
         self.0.available_permits()
     }
@@ -210,22 +222,42 @@ impl RateLimiter {
             .take(self.limits.requests_per_ip_second)
     }
 }
+struct AdmissionEntry {
+    slots: Arc<Semaphore>,
+    rate: Window,
+}
 struct AdmissionState {
     global: Window,
-    devices: HashMap<DeviceKey, (usize, Window)>,
-    tenants: HashMap<TenantId, (usize, Window)>,
+    devices: HashMap<DeviceKey, AdmissionEntry>,
+    tenants: HashMap<TenantId, AdmissionEntry>,
 }
 pub struct Admission {
     limits: Arc<Limits>,
     state: Mutex<AdmissionState>,
     slots: Arc<Semaphore>,
     bytes: ByteBudget,
+    waiter_slots: Arc<Semaphore>,
+    waiter_bytes: ByteBudget,
 }
 pub struct AdmissionLease {
-    owner: Arc<Admission>,
-    device: DeviceKey,
-    _slot: OwnedSemaphorePermit,
+    _device_slot: OwnedSemaphorePermit,
+    _tenant_slot: OwnedSemaphorePermit,
+    _global_slot: OwnedSemaphorePermit,
     _bytes: BytesPermit,
+    wait_us: u64,
+    lock_wait_us: u64,
+    lock_hold_us: u64,
+}
+impl AdmissionLease {
+    pub fn wait_us(&self) -> u64 {
+        self.wait_us
+    }
+    pub fn lock_wait_us(&self) -> u64 {
+        self.lock_wait_us
+    }
+    pub fn lock_hold_us(&self) -> u64 {
+        self.lock_hold_us
+    }
 }
 impl Admission {
     /// In-flight permits, not a waiting queue. The two gauges are sampled independently.
@@ -248,81 +280,227 @@ impl Admission {
             }),
             slots: Arc::new(Semaphore::new(limits.max_ingress)),
             bytes: ByteBudget::new(limits.max_ingress_bytes),
+            waiter_slots: Arc::new(Semaphore::new(limits.max_ingress_waiters)),
+            waiter_bytes: ByteBudget::new(limits.max_ingress_wait_bytes),
             limits,
         })
     }
-    pub fn acquire(self: &Arc<Self>, device: &DeviceKey, bytes: usize) -> Result<AdmissionLease> {
-        let slot = self
-            .slots
-            .clone()
-            .try_acquire_owned()
-            .map_err(|_| Error::Overloaded)?;
-        let bytes = self.bytes.reserve(bytes)?;
+    pub fn waiting(&self) -> (usize, usize) {
+        (
+            self.limits.max_ingress_waiters - self.waiter_slots.available_permits(),
+            self.limits.max_ingress_wait_bytes - self.waiter_bytes.available(),
+        )
+    }
+    /// Applies only the bounded rate tables. Callers remain owned by their
+    /// connection task, so this does not create a second concurrency lifetime.
+    pub fn check_rate(&self, device: &DeviceKey) -> Result<(u64, u64)> {
+        let lock_started = Instant::now();
         let mut state = lock(&self.state)?;
+        let lock_wait_us = lock_started.elapsed().as_micros() as u64;
         state.global.take(self.limits.requests_per_second)?;
-        state
-            .devices
-            .retain(|_, (n, w)| *n > 0 || w.start.elapsed() < Duration::from_secs(1));
-        state
-            .tenants
-            .retain(|_, (n, w)| *n > 0 || w.start.elapsed() < Duration::from_secs(1));
+        if !state.devices.contains_key(device) && state.devices.len() >= self.limits.max_devices {
+            let capacity = self.limits.max_ingress_per_device;
+            state.devices.retain(|_, entry| {
+                entry.slots.available_permits() < capacity
+                    || entry.rate.start.elapsed() < Duration::from_secs(1)
+            });
+        }
+        if !state.tenants.contains_key(&device.tenant_id)
+            && state.tenants.len() >= self.limits.max_devices
+        {
+            let capacity = self.limits.max_ingress_per_tenant;
+            state.tenants.retain(|_, entry| {
+                entry.slots.available_permits() < capacity
+                    || entry.rate.start.elapsed() < Duration::from_secs(1)
+            });
+        }
         if (!state.devices.contains_key(device) && state.devices.len() >= self.limits.max_devices)
             || (!state.tenants.contains_key(&device.tenant_id)
                 && state.tenants.len() >= self.limits.max_devices)
         {
             return Err(Error::Overloaded);
         }
-        let d = state.devices.entry(device.clone()).or_insert_with(|| {
-            (
-                0,
-                Window {
+        state
+            .devices
+            .entry(device.clone())
+            .or_insert_with(|| AdmissionEntry {
+                slots: Arc::new(Semaphore::new(self.limits.max_ingress_per_device)),
+                rate: Window {
                     start: Instant::now(),
                     count: 0,
                 },
-            )
-        });
-        if d.0 >= self.limits.max_ingress_per_device {
-            return Err(Error::Overloaded);
-        }
-        d.1.take(self.limits.messages_per_device_second)?;
-        let t = state
+            })
+            .rate
+            .take(self.limits.messages_per_device_second)?;
+        state
             .tenants
             .entry(device.tenant_id.clone())
-            .or_insert_with(|| {
-                (
-                    0,
-                    Window {
-                        start: Instant::now(),
-                        count: 0,
-                    },
-                )
+            .or_insert_with(|| AdmissionEntry {
+                slots: Arc::new(Semaphore::new(self.limits.max_ingress_per_tenant)),
+                rate: Window {
+                    start: Instant::now(),
+                    count: 0,
+                },
+            })
+            .rate
+            .take(self.limits.messages_per_tenant_second)?;
+        let lock_hold_us = lock_started
+            .elapsed()
+            .as_micros()
+            .saturating_sub(u128::from(lock_wait_us)) as u64;
+        Ok((lock_wait_us, lock_hold_us))
+    }
+    pub fn acquire(self: &Arc<Self>, device: &DeviceKey, bytes: usize) -> Result<AdmissionLease> {
+        let started = Instant::now();
+        let (device_slots, tenant_slots) = self.entry_slots(device)?;
+        let device_slot = device_slots
+            .clone()
+            .try_acquire_owned()
+            .map_err(|_| Error::Overloaded)?;
+        let tenant_slot = tenant_slots
+            .clone()
+            .try_acquire_owned()
+            .map_err(|_| Error::Overloaded)?;
+        let global_slot = self
+            .slots
+            .clone()
+            .try_acquire_owned()
+            .map_err(|_| Error::Overloaded)?;
+        let bytes = self.bytes.reserve(bytes)?;
+        self.finish_acquire(
+            device,
+            device_slot,
+            tenant_slot,
+            global_slot,
+            bytes,
+            started,
+        )
+    }
+    pub async fn acquire_wait(
+        self: &Arc<Self>,
+        device: &DeviceKey,
+        bytes: usize,
+    ) -> Result<AdmissionLease> {
+        let started = Instant::now();
+        let _waiter_slot = self
+            .waiter_slots
+            .clone()
+            .try_acquire_owned()
+            .map_err(|_| Error::Overloaded)?;
+        let _waiter_bytes = self.waiter_bytes.reserve(bytes)?;
+        let deadline = tokio::time::Instant::now()
+            + Duration::from_millis(self.limits.ingress_wait_timeout_ms);
+        let (device_slots, tenant_slots) = self.entry_slots(device)?;
+        let device_slot = tokio::time::timeout_at(deadline, device_slots.acquire_owned())
+            .await
+            .map_err(|_| Error::Overloaded)?
+            .map_err(|_| Error::Draining)?;
+        let tenant_slot = tokio::time::timeout_at(deadline, tenant_slots.acquire_owned())
+            .await
+            .map_err(|_| Error::Overloaded)?
+            .map_err(|_| Error::Draining)?;
+        let global_slot = tokio::time::timeout_at(deadline, self.slots.clone().acquire_owned())
+            .await
+            .map_err(|_| Error::Overloaded)?
+            .map_err(|_| Error::Draining)?;
+        let active_bytes = self.bytes.reserve_until(bytes, deadline).await?;
+        self.finish_acquire(
+            device,
+            device_slot,
+            tenant_slot,
+            global_slot,
+            active_bytes,
+            started,
+        )
+    }
+    fn entry_slots(&self, device: &DeviceKey) -> Result<(Arc<Semaphore>, Arc<Semaphore>)> {
+        let mut state = lock(&self.state)?;
+        if !state.devices.contains_key(device) && state.devices.len() >= self.limits.max_devices {
+            let capacity = self.limits.max_ingress_per_device;
+            state.devices.retain(|_, entry| {
+                entry.slots.available_permits() < capacity
+                    || entry.rate.start.elapsed() < Duration::from_secs(1)
             });
-        if t.0 >= self.limits.max_ingress_per_tenant {
+        }
+        if !state.tenants.contains_key(&device.tenant_id)
+            && state.tenants.len() >= self.limits.max_devices
+        {
+            let capacity = self.limits.max_ingress_per_tenant;
+            state.tenants.retain(|_, entry| {
+                entry.slots.available_permits() < capacity
+                    || entry.rate.start.elapsed() < Duration::from_secs(1)
+            });
+        }
+        if (!state.devices.contains_key(device) && state.devices.len() >= self.limits.max_devices)
+            || (!state.tenants.contains_key(&device.tenant_id)
+                && state.tenants.len() >= self.limits.max_devices)
+        {
             return Err(Error::Overloaded);
         }
-        t.1.take(self.limits.messages_per_tenant_second)?;
-        t.0 += 1;
-        if let Some(d) = state.devices.get_mut(device) {
-            d.0 += 1;
-        }
-        Ok(AdmissionLease {
-            owner: self.clone(),
-            device: device.clone(),
-            _slot: slot,
-            _bytes: bytes,
-        })
+        let device_slots = state
+            .devices
+            .entry(device.clone())
+            .or_insert_with(|| AdmissionEntry {
+                slots: Arc::new(Semaphore::new(self.limits.max_ingress_per_device)),
+                rate: Window {
+                    start: Instant::now(),
+                    count: 0,
+                },
+            })
+            .slots
+            .clone();
+        let tenant_slots = state
+            .tenants
+            .entry(device.tenant_id.clone())
+            .or_insert_with(|| AdmissionEntry {
+                slots: Arc::new(Semaphore::new(self.limits.max_ingress_per_tenant)),
+                rate: Window {
+                    start: Instant::now(),
+                    count: 0,
+                },
+            })
+            .slots
+            .clone();
+        Ok((device_slots, tenant_slots))
     }
-}
-impl Drop for AdmissionLease {
-    fn drop(&mut self) {
-        if let Ok(mut s) = self.owner.state.lock() {
-            if let Some(d) = s.devices.get_mut(&self.device) {
-                d.0 = d.0.saturating_sub(1);
-            }
-            if let Some(t) = s.tenants.get_mut(&self.device.tenant_id) {
-                t.0 = t.0.saturating_sub(1);
-            }
-        }
+    fn finish_acquire(
+        self: &Arc<Self>,
+        device: &DeviceKey,
+        device_slot: OwnedSemaphorePermit,
+        tenant_slot: OwnedSemaphorePermit,
+        global_slot: OwnedSemaphorePermit,
+        bytes: BytesPermit,
+        started: Instant,
+    ) -> Result<AdmissionLease> {
+        let lock_started = Instant::now();
+        let mut state = lock(&self.state)?;
+        let lock_wait_us = lock_started.elapsed().as_micros() as u64;
+        state.global.take(self.limits.requests_per_second)?;
+        state
+            .devices
+            .get_mut(device)
+            .ok_or(Error::Internal)?
+            .rate
+            .take(self.limits.messages_per_device_second)?;
+        state
+            .tenants
+            .get_mut(&device.tenant_id)
+            .ok_or(Error::Internal)?
+            .rate
+            .take(self.limits.messages_per_tenant_second)?;
+        let lock_hold_us = lock_started
+            .elapsed()
+            .as_micros()
+            .saturating_sub(u128::from(lock_wait_us)) as u64;
+        Ok(AdmissionLease {
+            _device_slot: device_slot,
+            _tenant_slot: tenant_slot,
+            _global_slot: global_slot,
+            _bytes: bytes,
+            wait_us: started.elapsed().as_micros() as u64,
+            lock_wait_us,
+            lock_hold_us,
+        })
     }
 }
 
@@ -354,6 +532,43 @@ mod tests {
             product_id: ProductId::new("p").unwrap(),
             device_id: DeviceId::new(device).unwrap(),
         }
+    }
+    #[tokio::test]
+    async fn ingress_wait_is_count_byte_and_deadline_bounded() {
+        let limits = Arc::new(Limits {
+            max_ingress: 1,
+            max_ingress_per_tenant: 1,
+            max_ingress_per_device: 1,
+            max_ingress_bytes: 8,
+            max_ingress_waiters: 1,
+            max_ingress_wait_bytes: 8,
+            ingress_wait_timeout_ms: 20,
+            requests_per_second: 100,
+            messages_per_device_second: 100,
+            messages_per_tenant_second: 100,
+            ..Limits::default()
+        });
+        let admission = Admission::new(limits);
+        let active = admission.acquire(&key("a", "1"), 8).unwrap();
+        let waiting_owner = admission.clone();
+        let waiting =
+            tokio::spawn(async move { waiting_owner.acquire_wait(&key("b", "2"), 8).await });
+        tokio::task::yield_now().await;
+        assert_eq!(admission.waiting(), (1, 8));
+        assert!(matches!(
+            admission.acquire_wait(&key("c", "3"), 1).await,
+            Err(Error::Overloaded)
+        ));
+        drop(active);
+        assert!(waiting.await.unwrap().is_ok());
+
+        let active = admission.acquire(&key("a", "1"), 8).unwrap();
+        assert!(matches!(
+            admission.acquire_wait(&key("b", "2"), 8).await,
+            Err(Error::Overloaded)
+        ));
+        assert_eq!(admission.waiting(), (0, 0));
+        drop(active);
     }
     #[test]
     fn ingress_limits_isolate_devices_tenants_and_bytes() {

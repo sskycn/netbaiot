@@ -1,0 +1,187 @@
+[
+  {
+    "name": "contract",
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "-p",
+      "netbaiot-storage",
+      "--test",
+      "semantics",
+      "postgres_transaction_and_command_contract",
+      "--",
+      "--ignored",
+      "--exact"
+    ],
+    "database": "cap_validation_contract_1789823074",
+    "exit_code": 0,
+    "seconds": 2.3088748455047607
+  },
+  {
+    "name": "pressure",
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "-p",
+      "netbaiot-storage",
+      "--test",
+      "semantics",
+      "audit_postgres_concurrency_leases_pool_pressure_and_cleanup",
+      "--",
+      "--ignored",
+      "--exact"
+    ],
+    "database": "cap_validation_pressure_1789823074",
+    "exit_code": 0,
+    "seconds": 0.2572910785675049
+  },
+  {
+    "name": "history",
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "-p",
+      "netbaiot-storage",
+      "--test",
+      "semantics",
+      "audit_postgres_attempt_history_cannot_regress",
+      "--",
+      "--ignored",
+      "--exact"
+    ],
+    "database": "cap_validation_history_1789823074",
+    "exit_code": 0,
+    "seconds": 0.13759207725524902
+  },
+  {
+    "name": "outbox",
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "-p",
+      "netbaiot-storage",
+      "--test",
+      "semantics",
+      "audit_outbox_process_crash_recovery",
+      "--",
+      "--ignored",
+      "--exact"
+    ],
+    "database": "cap_validation_outbox_1789823074",
+    "exit_code": 0,
+    "seconds": 0.19229793548583984
+  },
+  {
+    "name": "mqtt",
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "-p",
+      "netbaiot-transports",
+      "--test",
+      "end_to_end",
+      "audit_postgres_process_crash_boundaries",
+      "--",
+      "--ignored",
+      "--exact"
+    ],
+    "database": "cap_validation_mqtt_1789823074",
+    "exit_code": 0,
+    "seconds": 3.7832529544830322
+  },
+  {
+    "name": "mqtt_fixed_header",
+    "command": [
+      "cargo",
+      "+nightly",
+      "fuzz",
+      "run",
+      "mqtt_fixed_header",
+      "--",
+      "-runs=20000",
+      "-max_len=65540"
+    ],
+    "exit_code": 0,
+    "seconds": 5.47905421257019
+  },
+  {
+    "name": "mqtt_remaining_length",
+    "command": [
+      "cargo",
+      "+nightly",
+      "fuzz",
+      "run",
+      "mqtt_remaining_length",
+      "--",
+      "-runs=20000",
+      "-max_len=8"
+    ],
+    "exit_code": 0,
+    "seconds": 1.960035800933838
+  },
+  {
+    "name": "mqtt_packet",
+    "command": [
+      "cargo",
+      "+nightly",
+      "fuzz",
+      "run",
+      "mqtt_packet",
+      "--",
+      "-runs=100000",
+      "-max_len=65540"
+    ],
+    "exit_code": 0,
+    "seconds": 5.700175762176514
+  },
+  {
+    "name": "tcp_frame",
+    "command": [
+      "cargo",
+      "+nightly",
+      "fuzz",
+      "run",
+      "tcp_frame",
+      "--",
+      "-runs=20000",
+      "-max_len=65540"
+    ],
+    "exit_code": 0,
+    "seconds": 2.002126932144165
+  },
+  {
+    "name": "udp_envelope",
+    "command": [
+      "cargo",
+      "+nightly",
+      "fuzz",
+      "run",
+      "udp_envelope",
+      "--",
+      "-runs=20000",
+      "-max_len=1201"
+    ],
+    "exit_code": 0,
+    "seconds": 1.8963420391082764
+  },
+  {
+    "name": "json_codec",
+    "command": [
+      "cargo",
+      "+nightly",
+      "fuzz",
+      "run",
+      "json_codec",
+      "--",
+      "-runs=20000",
+      "-max_len=65537"
+    ],
+    "exit_code": 0,
+    "seconds": 1.140091896057129
+  }
+]

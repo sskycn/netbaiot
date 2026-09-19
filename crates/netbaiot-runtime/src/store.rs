@@ -7,6 +7,42 @@ pub struct StoredIngress {
     pub message: DeviceMessage,
     pub canonical: Vec<u8>,
 }
+#[derive(Clone, Default)]
+pub struct StoreTimings {
+    pub call_to_pool_us: u64,
+    pub pool_wait_us: u64,
+    pub transaction_start_us: u64,
+    pub quota_wait_us: u64,
+    pub quota_accounting_us: u64,
+    pub quota_lock_hold_us: u64,
+    pub dedup_us: u64,
+    pub writes_us: u64,
+    pub commit_us: u64,
+    pub transaction_us: u64,
+}
+pub struct StoreAcceptance {
+    pub receipt: IngressReceipt,
+    pub timings: StoreTimings,
+}
+impl std::ops::Deref for StoreAcceptance {
+    type Target = IngressReceipt;
+    fn deref(&self) -> &Self::Target {
+        &self.receipt
+    }
+}
+#[derive(Clone, Copy, Default)]
+pub struct StoreHealth {
+    pub pool_active: usize,
+    pub pool_idle: usize,
+    pub pool_waiters: usize,
+}
+#[derive(Clone, Copy, Default)]
+pub struct MaintenanceStats {
+    pub ingress_deleted: u64,
+    pub commands_deleted: u64,
+    pub commands_expired: u64,
+    pub jobs_terminal: u64,
+}
 #[derive(Clone)]
 pub struct DeliveryJob {
     pub message: DeviceMessage,
@@ -16,7 +52,10 @@ pub struct DeliveryJob {
 }
 #[async_trait]
 pub trait Store: Send + Sync {
-    async fn accept(&self, input: StoredIngress) -> Result<IngressReceipt>;
+    async fn accept(&self, input: StoredIngress) -> Result<StoreAcceptance>;
+    fn health(&self) -> StoreHealth {
+        StoreHealth::default()
+    }
     async fn claim_jobs(&self, owner: Uuid, now: i64, limit: usize) -> Result<Vec<DeliveryJob>>;
     async fn finish_job(
         &self,
@@ -48,7 +87,7 @@ pub trait Store: Send + Sync {
     ) -> Result<bool>;
     async fn get_command(&self, device: &DeviceKey, id: CommandId)
     -> Result<Option<CommandRecord>>;
-    async fn maintain(&self, now: i64, batch: usize) -> Result<()>;
+    async fn maintain(&self, now: i64, batch: usize) -> Result<MaintenanceStats>;
 }
 /// Canonical identity excludes generated message ID and arrival timestamp.
 pub fn canonical(message: &DeviceMessage) -> Result<Vec<u8>> {

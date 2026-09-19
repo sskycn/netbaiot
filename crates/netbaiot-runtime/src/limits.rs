@@ -35,6 +35,9 @@ pub struct Limits {
     pub max_ingress_per_tenant: usize,
     pub max_ingress_per_device: usize,
     pub max_ingress_bytes: usize,
+    pub max_ingress_waiters: usize,
+    pub max_ingress_wait_bytes: usize,
+    pub ingress_wait_timeout_ms: u64,
     pub max_pending_commands_per_device: usize,
     pub max_pending_commands_per_tenant: usize,
     pub max_pending_commands: usize,
@@ -110,6 +113,9 @@ impl Default for Limits {
             max_ingress_per_tenant: 4,
             max_ingress_per_device: 1,
             max_ingress_bytes: 2097152,
+            max_ingress_waiters: 16,
+            max_ingress_wait_bytes: 2097152,
+            ingress_wait_timeout_ms: 25,
             max_pending_commands_per_device: 16,
             max_pending_commands_per_tenant: 128,
             max_pending_commands: 1024,
@@ -192,6 +198,7 @@ impl Limits {
             || self.max_connections_per_tenant > self.max_connections
             || self.max_ingress_per_device > self.max_ingress_per_tenant
             || self.max_ingress_per_tenant > self.max_ingress
+            || self.max_ingress_waiters > self.max_connections
             || self.max_pending_commands_per_device > self.max_pending_commands_per_tenant
             || self.max_pending_commands_per_tenant > self.max_pending_commands
             || self.replay_ttl_ms <= self.udp_clock_skew_ms.saturating_mul(2)
@@ -211,6 +218,7 @@ impl Limits {
             || self.retry_base_ms > self.retry_max_ms
             || self.max_command_bytes > max_packet / 2
             || self.max_ingress_bytes < max_packet
+            || self.max_ingress_wait_bytes < max_packet
             || self.connection_memory_reservation < max_packet.saturating_mul(8)
             || self.max_network_bytes < self.connection_memory_reservation
             || self.max_password_bytes < 64

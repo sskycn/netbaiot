@@ -122,10 +122,11 @@ pub async fn connection(
                 let frame = frame?;
                 last = Instant::now();
                 s.ingress.metrics.inc(Metric::TcpFrames);
-                let receipt = s.ingress.ingest(&auth, IngressEnvelope {
+                let acceptance = s.ingress.ingest(&auth, IngressEnvelope {
                     transport: Transport::Tcp, payload: &frame, require_command_ack: false,
+                    validated_at: std::time::Instant::now(), validation_us: 0,
                 }).await?;
-                let bytes = serde_json::to_vec(&receipt).map_err(|_| Error::Internal)?;
+                let bytes = serde_json::to_vec(&acceptance.receipt).map_err(|_| Error::Internal)?;
                 write(&mut stream, &framer.encode(&bytes)?, l.write_timeout_ms).await?;
             }
         }

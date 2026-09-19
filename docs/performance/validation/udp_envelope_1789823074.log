@@ -1,0 +1,22 @@
+   Compiling netbaiot-fuzz v0.0.0 (/Users/sam/Dev/work/sskycn/netbaiot/fuzz)
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.19s
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.02s
+     Running `fuzz/target/aarch64-apple-darwin/release/udp_envelope -artifact_prefix=/Users/sam/Dev/work/sskycn/netbaiot/fuzz/artifacts/udp_envelope/ -runs=20000 -max_len=1201 /Users/sam/Dev/work/sskycn/netbaiot/fuzz/corpus/udp_envelope`
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 2850990856
+INFO: Loaded 1 modules   (188283 inline 8-bit counters): 188283 [0x105722a10, 0x10575098b),
+INFO: Loaded 1 PC tables (188283 PCs): 188283 [0x105750990,0x105a30140),
+INFO:       72 files found in /Users/sam/Dev/work/sskycn/netbaiot/fuzz/corpus/udp_envelope
+INFO: seed corpus: files: 72 min: 1b max: 167b total: 5835b rss: 41Mb
+#73	INITED cov: 79 ft: 120 corp: 41/3120b exec/s: 0 rss: 43Mb
+#1820	REDUCE cov: 79 ft: 120 corp: 41/3117b lim: 118 exec/s: 0 rss: 43Mb L: 80/100 MS: 2 ChangeASCIIInt-EraseBytes-
+#5871	REDUCE cov: 79 ft: 120 corp: 41/3115b lim: 158 exec/s: 0 rss: 44Mb L: 77/100 MS: 1 EraseBytes-
+#7797	REDUCE cov: 79 ft: 120 corp: 41/3114b lim: 172 exec/s: 0 rss: 45Mb L: 76/100 MS: 1 EraseBytes-
+#9597	REDUCE cov: 79 ft: 120 corp: 41/3110b lim: 186 exec/s: 0 rss: 45Mb L: 78/100 MS: 5 EraseBytes-CMP-ChangeByte-ChangeBinInt-ChangeASCIIInt- DE: "\377\377\377\377\377\377\377\377"-
+#9698	REDUCE cov: 79 ft: 120 corp: 41/3109b lim: 186 exec/s: 0 rss: 45Mb L: 79/100 MS: 1 EraseBytes-
+#16427	REDUCE cov: 79 ft: 120 corp: 41/3108b lim: 249 exec/s: 0 rss: 46Mb L: 76/100 MS: 4 CopyPart-InsertByte-ChangeByte-EraseBytes-
+#20000	DONE   cov: 79 ft: 120 corp: 41/3108b lim: 280 exec/s: 0 rss: 47Mb
+###### Recommended dictionary. ######
+"\377\377\377\377\377\377\377\377" # Uses: 908
+###### End of recommended dictionary. ######
+Done 20000 runs in 0 second(s)

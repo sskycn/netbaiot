@@ -16,11 +16,13 @@ receipt; different content conflicts. The default retention window is 24 hours
 from first acceptance and is not extended by duplicates. After expiry the same
 source ID may be accepted as new. Devices must not reuse IDs inside that window.
 
-Logical storage counts and charged bytes have device/tenant/global caps. Admission
-uses a PostgreSQL transaction advisory lock, so quota checks and inserts serialize
-across processes using this database. This deliberately favors correctness over
-write throughput; it is a scaling limit to measure before redesign. Quota counts
-operate over capacity-bounded tables. No complete table is loaded into the service.
+Logical storage counts and charged bytes have device/tenant/global caps. PostgreSQL
+maintains exact counter rows in the same transaction as each message/outbox pair.
+The global, tenant, and device updates are one statement with a fixed lock order;
+rollback removes both the durable rows and their charge. The global row remains a
+deliberate cross-process serialization point near the capacity knee, but normal
+admission no longer scans retained message or command tables. Startup migration
+backfills the counters from existing retained data.
 
 The volatile store implements the same transaction semantics under one bounded
 mutex, but cannot survive a crash. Its receipts explicitly report `volatile`.
@@ -40,9 +42,12 @@ or expired jobs remain inspectable until ingress retention expires. Lease owners
 and attempt number protect against stale completion; successful delivery followed
 by a lost database update can be delivered again. Consumers must be idempotent.
 
-No implicit infinite worker restart: a storage/worker failure shuts down the server
-and leaves durable leases recoverable by a restarted process. Database
-statement/lock/acquisition calls and surrounding external operations have deadlines.
+Runtime storage/time-out failures put each fixed worker into a degraded state with
+bounded exponential full-jitter probes. Individual failed messages are not retried
+forever or buffered in RAM. The process remains alive, durable ingress fails without
+claiming success, and workers resume after a successful database call. Startup
+database failure remains fatal. Database statement/lock/acquisition calls and
+surrounding external operations have deadlines; shutdown cancels a pending backoff.
 
 ## Commands
 

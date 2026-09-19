@@ -1,0 +1,7 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.06s
+     Running tests/semantics.rs (target/debug/deps/semantics-f90a94e0c11bec7a)
+
+running 1 test
+test audit_postgres_concurrency_leases_pool_pressure_and_cleanup ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 12 filtered out; finished in 0.12s

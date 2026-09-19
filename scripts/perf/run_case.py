@@ -152,9 +152,12 @@ def run(spec, output):
             except OSError:time.sleep(.05)
         else:raise RuntimeError('server startup timed out')
         time.sleep(1)
+        if database and spec.get('retention_index'):
+            pg(database,"CREATE INDEX commands_expiry_pending ON commands(expires_at) WHERE NOT terminal",timeout=120)
         if database and spec.get('preload'):
             from dataset import seed_sql
-            pg(database,seed_sql(int(spec['preload']),commands=False,done=True),timeout=60)
+            preload_now=int(time.time()*1000)-int(spec.get('preload_age_ms',0))
+            pg(database,seed_sql(int(spec['preload']),commands=bool(spec.get('preload_commands')),done=True,now=preload_now),timeout=600)
         if database and spec.get('quiesce_checkpoint',True):
             at=time.monotonic();pg('postgres','CHECKPOINT',timeout=120);result['checkpoint_before_seconds']=time.monotonic()-at
             time.sleep(2)

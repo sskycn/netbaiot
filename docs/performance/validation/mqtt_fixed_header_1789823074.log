@@ -1,0 +1,15 @@
+   Compiling netbaiot-runtime v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-runtime)
+   Compiling netbaiot-transports v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-transports)
+   Compiling netbaiot-fuzz v0.0.0 (/Users/sam/Dev/work/sskycn/netbaiot/fuzz)
+    Finished `release` profile [optimized + debuginfo] target(s) in 3.52s
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.03s
+     Running `fuzz/target/aarch64-apple-darwin/release/mqtt_fixed_header -artifact_prefix=/Users/sam/Dev/work/sskycn/netbaiot/fuzz/artifacts/mqtt_fixed_header/ -runs=20000 -max_len=65540 /Users/sam/Dev/work/sskycn/netbaiot/fuzz/corpus/mqtt_fixed_header`
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 2839433975
+INFO: Loaded 1 modules   (188283 inline 8-bit counters): 188283 [0x105696a10, 0x1056c498b),
+INFO: Loaded 1 PC tables (188283 PCs): 188283 [0x1056c4990,0x1059a4140),
+INFO:       48 files found in /Users/sam/Dev/work/sskycn/netbaiot/fuzz/corpus/mqtt_fixed_header
+INFO: seed corpus: files: 48 min: 1b max: 8b total: 167b rss: 41Mb
+#49	INITED cov: 69 ft: 69 corp: 29/72b exec/s: 0 rss: 42Mb
+#20000	DONE   cov: 69 ft: 69 corp: 29/72b lim: 205 exec/s: 0 rss: 44Mb
+Done 20000 runs in 0 second(s)

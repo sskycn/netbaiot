@@ -1,0 +1,24 @@
+   Compiling netbaiot-fuzz v0.0.0 (/Users/sam/Dev/work/sskycn/netbaiot/fuzz)
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.25s
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.03s
+     Running `fuzz/target/aarch64-apple-darwin/release/mqtt_packet -artifact_prefix=/Users/sam/Dev/work/sskycn/netbaiot/fuzz/artifacts/mqtt_packet/ -runs=100000 -max_len=65540 /Users/sam/Dev/work/sskycn/netbaiot/fuzz/corpus/mqtt_packet`
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 2843381754
+INFO: Loaded 1 modules   (188445 inline 8-bit counters): 188445 [0x1011834b0, 0x1011b14cd),
+INFO: Loaded 1 PC tables (188445 PCs): 188445 [0x1011b14d0,0x1014916a0),
+INFO:      536 files found in /Users/sam/Dev/work/sskycn/netbaiot/fuzz/corpus/mqtt_packet
+INFO: seed corpus: files: 536 min: 1b max: 65525b total: 289298b rss: 42Mb
+#537	INITED cov: 484 ft: 1815 corp: 281/25Kb exec/s: 0 rss: 52Mb
+#12349	REDUCE cov: 484 ft: 1815 corp: 281/25Kb lim: 2078 exec/s: 0 rss: 62Mb L: 36/1966 MS: 2 ChangeBinInt-EraseBytes-
+#20420	NEW    cov: 484 ft: 1816 corp: 282/25Kb lim: 2155 exec/s: 20420 rss: 68Mb L: 24/1966 MS: 1 CopyPart-
+#45055	REDUCE cov: 484 ft: 1816 corp: 282/25Kb lim: 2397 exec/s: 22527 rss: 86Mb L: 43/1966 MS: 1 EraseBytes-
+#60541	REDUCE cov: 484 ft: 1816 corp: 282/25Kb lim: 2551 exec/s: 30270 rss: 97Mb L: 42/1966 MS: 1 EraseBytes-
+#65482	REDUCE cov: 484 ft: 1816 corp: 282/25Kb lim: 2595 exec/s: 21827 rss: 100Mb L: 35/1966 MS: 1 EraseBytes-
+#65536	pulse  cov: 484 ft: 1816 corp: 282/25Kb lim: 2595 exec/s: 21845 rss: 100Mb
+#72393	REDUCE cov: 484 ft: 1816 corp: 282/25Kb lim: 2661 exec/s: 24131 rss: 105Mb L: 1032/1966 MS: 1 EraseBytes-
+#81027	REDUCE cov: 484 ft: 1816 corp: 282/25Kb lim: 2738 exec/s: 27009 rss: 111Mb L: 225/1966 MS: 4 InsertByte-ChangeASCIIInt-CopyPart-EraseBytes-
+#84388	REDUCE cov: 484 ft: 1816 corp: 282/25Kb lim: 2771 exec/s: 28129 rss: 114Mb L: 263/1966 MS: 1 EraseBytes-
+#85854	REDUCE cov: 484 ft: 1816 corp: 282/25Kb lim: 2782 exec/s: 28618 rss: 115Mb L: 646/1966 MS: 1 EraseBytes-
+#93254	REDUCE cov: 484 ft: 1816 corp: 282/25Kb lim: 2848 exec/s: 23313 rss: 120Mb L: 514/1966 MS: 5 ChangeByte-InsertByte-ChangeBinInt-InsertRepeatedBytes-EraseBytes-
+#100000	DONE   cov: 484 ft: 1816 corp: 282/25Kb lim: 2914 exec/s: 25000 rss: 125Mb
+Done 100000 runs in 4 second(s)

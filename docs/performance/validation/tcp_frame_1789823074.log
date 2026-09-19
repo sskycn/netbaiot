@@ -1,0 +1,21 @@
+   Compiling netbaiot-fuzz v0.0.0 (/Users/sam/Dev/work/sskycn/netbaiot/fuzz)
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.21s
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.02s
+     Running `fuzz/target/aarch64-apple-darwin/release/tcp_frame -artifact_prefix=/Users/sam/Dev/work/sskycn/netbaiot/fuzz/artifacts/tcp_frame/ -runs=20000 -max_len=65540 /Users/sam/Dev/work/sskycn/netbaiot/fuzz/corpus/tcp_frame`
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 2849070415
+INFO: Loaded 1 modules   (188312 inline 8-bit counters): 188312 [0x102f9b000, 0x102fc8f98),
+INFO: Loaded 1 PC tables (188312 PCs): 188312 [0x102fc8f98,0x1032a8918),
+INFO:       89 files found in /Users/sam/Dev/work/sskycn/netbaiot/fuzz/corpus/tcp_frame
+INFO: seed corpus: files: 89 min: 1b max: 65504b total: 118644b rss: 41Mb
+#90	INITED cov: 81 ft: 337 corp: 46/4712b exec/s: 0 rss: 44Mb
+#7463	REDUCE cov: 81 ft: 337 corp: 46/4711b lim: 1107 exec/s: 0 rss: 49Mb L: 1025/1037 MS: 3 CrossOver-EraseBytes-CrossOver-
+#9686	REDUCE cov: 81 ft: 337 corp: 46/4708b lim: 1127 exec/s: 0 rss: 51Mb L: 100/1037 MS: 3 CrossOver-CMP-EraseBytes- DE: "\014\013\013\013"-
+#9717	REDUCE cov: 81 ft: 337 corp: 46/4703b lim: 1127 exec/s: 0 rss: 51Mb L: 109/1037 MS: 1 EraseBytes-
+#15043	REDUCE cov: 81 ft: 337 corp: 46/4702b lim: 1177 exec/s: 0 rss: 55Mb L: 19/1037 MS: 1 EraseBytes-
+#17684	REDUCE cov: 81 ft: 337 corp: 46/4695b lim: 1197 exec/s: 0 rss: 57Mb L: 82/1037 MS: 1 EraseBytes-
+#20000	DONE   cov: 81 ft: 337 corp: 46/4695b lim: 1217 exec/s: 0 rss: 58Mb
+###### Recommended dictionary. ######
+"\014\013\013\013" # Uses: 970
+###### End of recommended dictionary. ######
+Done 20000 runs in 0 second(s)

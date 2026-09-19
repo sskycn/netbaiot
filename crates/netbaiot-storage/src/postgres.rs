@@ -1,12 +1,25 @@
 use async_trait::async_trait;
 use netbaiot_core::*;
 use netbaiot_runtime::*;
-use sqlx::{PgPool, Postgres, Row, Transaction, postgres::PgPoolOptions};
-use std::{sync::Arc, time::Duration};
+use sqlx::{Acquire, PgPool, Postgres, Row, Transaction, postgres::PgPoolOptions};
+use std::{
+    sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    },
+    time::{Duration, Instant},
+};
 use uuid::Uuid;
 pub struct PgStore {
     pool: PgPool,
     limits: Arc<Limits>,
+    pool_waiters: AtomicUsize,
+}
+struct PoolWaiter<'a>(&'a AtomicUsize);
+impl Drop for PoolWaiter<'_> {
+    fn drop(&mut self) {
+        self.0.fetch_sub(1, Ordering::Relaxed);
+    }
 }
 fn db(_: sqlx::Error) -> Error {
     Error::Storage
@@ -28,7 +41,11 @@ impl PgStore {
             .connect(url)
             .await
             .map_err(db)?;
-        Ok(Arc::new(Self { pool, limits }))
+        Ok(Arc::new(Self {
+            pool,
+            limits,
+            pool_waiters: AtomicUsize::new(0),
+        }))
     }
     pub async fn migrate(&self) -> Result<()> {
         sqlx::migrate!("../../migrations")
@@ -37,7 +54,10 @@ impl PgStore {
             .map_err(|_| Error::Storage)
     }
     async fn transaction(&self) -> Result<Transaction<'_, Postgres>> {
+        self.pool_waiters.fetch_add(1, Ordering::Relaxed);
+        let waiter = PoolWaiter(&self.pool_waiters);
         let mut tx = self.pool.begin().await.map_err(db)?;
+        drop(waiter);
         sqlx::query(
             "SELECT set_config('statement_timeout',$1,true),set_config('lock_timeout',$1,true)",
         )
@@ -117,61 +137,167 @@ impl PgStore {
             .map_err(db)?;
         Ok(())
     }
+
+    async fn adjust_ingress_quota(
+        &self,
+        tx: &mut Transaction<'_, Postgres>,
+        device: &DeviceKey,
+        message_delta: i64,
+        byte_delta: i64,
+    ) -> Result<()> {
+        // Keep all three exact counters in one server round trip. The explicit
+        // CTE dependencies also give every writer the same global -> tenant ->
+        // device lock order, matching retention cleanup and avoiding deadlocks.
+        let counts = sqlx::query("WITH global_update AS (UPDATE ingress_quota_global SET messages=messages+$1,bytes=bytes+$2 WHERE singleton AND messages+$1 BETWEEN 0 AND $3 AND bytes+$2 BETWEEN 0 AND $4 RETURNING 1), tenant_update AS (INSERT INTO ingress_quota_tenants(tenant_id,messages,bytes) SELECT $5,$1,$2 FROM global_update WHERE $1 BETWEEN 0 AND $6 AND $2 BETWEEN 0 AND $7 ON CONFLICT (tenant_id) DO UPDATE SET messages=ingress_quota_tenants.messages+$1,bytes=ingress_quota_tenants.bytes+$2 WHERE ingress_quota_tenants.messages+$1 BETWEEN 0 AND $6 AND ingress_quota_tenants.bytes+$2 BETWEEN 0 AND $7 RETURNING 1), device_update AS (INSERT INTO ingress_quota_devices(tenant_id,product_id,device_id,messages,bytes) SELECT $5,$8,$9,$1,$2 FROM tenant_update WHERE $1 BETWEEN 0 AND $10 AND $2 BETWEEN 0 AND $11 ON CONFLICT (tenant_id,product_id,device_id) DO UPDATE SET messages=ingress_quota_devices.messages+$1,bytes=ingress_quota_devices.bytes+$2 WHERE ingress_quota_devices.messages+$1 BETWEEN 0 AND $10 AND ingress_quota_devices.bytes+$2 BETWEEN 0 AND $11 RETURNING 1) SELECT (SELECT count(*) FROM global_update) global_count,(SELECT count(*) FROM tenant_update) tenant_count,(SELECT count(*) FROM device_update) device_count")
+            .bind(message_delta)
+            .bind(byte_delta)
+            .bind(self.limits.max_stored_messages as i64)
+            .bind(self.limits.max_stored_bytes as i64)
+            .bind(device.tenant_id.as_str())
+            .bind(self.limits.max_stored_messages_per_tenant as i64)
+            .bind(self.limits.max_stored_bytes_per_tenant as i64)
+            .bind(device.product_id.as_str())
+            .bind(device.device_id.as_str())
+            .bind(self.limits.max_stored_messages_per_device as i64)
+            .bind(self.limits.max_stored_bytes_per_device as i64)
+            .fetch_one(&mut **tx)
+            .await
+            .map_err(db)?;
+        if counts.try_get::<i64, _>("global_count").map_err(db)? != 1
+            || counts.try_get::<i64, _>("tenant_count").map_err(db)? != 1
+            || counts.try_get::<i64, _>("device_count").map_err(db)? != 1
+        {
+            return Err(Error::Overloaded);
+        }
+        Ok(())
+    }
+
+    async fn reserve_command_quota(
+        &self,
+        tx: &mut Transaction<'_, Postgres>,
+        device: &DeviceKey,
+    ) -> Result<()> {
+        let counts = sqlx::query("WITH global_update AS (UPDATE command_quota_global SET commands=commands+1 WHERE singleton AND commands<$1 RETURNING 1), tenant_update AS (INSERT INTO command_quota_tenants(tenant_id,commands) SELECT $2,1 FROM global_update ON CONFLICT (tenant_id) DO UPDATE SET commands=command_quota_tenants.commands+1 WHERE command_quota_tenants.commands<$3 RETURNING 1), device_update AS (INSERT INTO command_quota_devices(tenant_id,product_id,device_id,commands) SELECT $2,$4,$5,1 FROM tenant_update ON CONFLICT (tenant_id,product_id,device_id) DO UPDATE SET commands=command_quota_devices.commands+1 WHERE command_quota_devices.commands<$6 RETURNING 1) SELECT (SELECT count(*) FROM global_update) global_count,(SELECT count(*) FROM tenant_update) tenant_count,(SELECT count(*) FROM device_update) device_count")
+            .bind(self.limits.max_pending_commands as i64)
+            .bind(device.tenant_id.as_str())
+            .bind(self.limits.max_pending_commands_per_tenant as i64)
+            .bind(device.product_id.as_str())
+            .bind(device.device_id.as_str())
+            .bind(self.limits.max_pending_commands_per_device as i64)
+            .fetch_one(&mut **tx)
+            .await
+            .map_err(db)?;
+        if counts.try_get::<i64, _>("global_count").map_err(db)? != 1
+            || counts.try_get::<i64, _>("tenant_count").map_err(db)? != 1
+            || counts.try_get::<i64, _>("device_count").map_err(db)? != 1
+        {
+            return Err(Error::Overloaded);
+        }
+        Ok(())
+    }
 }
 #[async_trait]
 impl Store for PgStore {
-    async fn accept(&self, input: StoredIngress) -> Result<IngressReceipt> {
+    fn health(&self) -> StoreHealth {
+        let size = self.pool.size() as usize;
+        let idle = self.pool.num_idle();
+        StoreHealth {
+            pool_active: size.saturating_sub(idle),
+            pool_idle: idle,
+            pool_waiters: self.pool_waiters.load(Ordering::Relaxed),
+        }
+    }
+
+    async fn accept(&self, input: StoredIngress) -> Result<StoreAcceptance> {
+        let transaction_started = Instant::now();
+        let mut timings = StoreTimings::default();
         let now = now_ms();
-        let mut tx = self.admission().await?;
+        self.pool_waiters.fetch_add(1, Ordering::Relaxed);
+        let waiter = PoolWaiter(&self.pool_waiters);
+        let pool_started = Instant::now();
+        timings.call_to_pool_us = transaction_started.elapsed().as_micros() as u64;
+        let mut connection = self.pool.acquire().await.map_err(db)?;
+        timings.pool_wait_us = pool_started.elapsed().as_micros() as u64;
+        drop(waiter);
+        let begin_started = Instant::now();
+        let mut tx = connection.begin().await.map_err(db)?;
+        sqlx::query(
+            "SELECT set_config('statement_timeout',$1,true),set_config('lock_timeout',$1,true)",
+        )
+        .bind(format!("{}ms", self.limits.external_timeout_ms))
+        .execute(&mut *tx)
+        .await
+        .map_err(db)?;
+        timings.transaction_start_us = begin_started.elapsed().as_micros() as u64;
         let k = &input.message.device;
-        sqlx::query("DELETE FROM ingress_messages WHERE tenant_id=$1 AND product_id=$2 AND device_id=$3 AND source_message_id=$4 AND expires_at<=$5").bind(k.tenant_id.as_str()).bind(k.product_id.as_str()).bind(k.device_id.as_str()).bind(input.message.source_message_id.as_str()).bind(now).execute(&mut *tx).await.map_err(db)?;
+        let dedup_started = Instant::now();
+        let expired = sqlx::query("DELETE FROM ingress_messages WHERE tenant_id=$1 AND product_id=$2 AND device_id=$3 AND source_message_id=$4 AND expires_at<=$5 RETURNING charge").bind(k.tenant_id.as_str()).bind(k.product_id.as_str()).bind(k.device_id.as_str()).bind(input.message.source_message_id.as_str()).bind(now).fetch_optional(&mut *tx).await.map_err(db)?;
         let old=sqlx::query("SELECT message_id,canonical,accepted_at FROM ingress_messages WHERE tenant_id=$1 AND product_id=$2 AND device_id=$3 AND source_message_id=$4").bind(k.tenant_id.as_str()).bind(k.product_id.as_str()).bind(k.device_id.as_str()).bind(input.message.source_message_id.as_str()).fetch_optional(&mut *tx).await.map_err(db)?;
+        timings.dedup_us = dedup_started.elapsed().as_micros() as u64;
         if let Some(row) = old {
             let data: Vec<u8> = row.try_get("canonical").map_err(db)?;
             if data != input.canonical {
                 return Err(Error::Conflict);
             }
-            return Ok(IngressReceipt {
+            let receipt = IngressReceipt {
                 message_id: MessageId(row.try_get("message_id").map_err(db)?),
                 source_message_id: input.message.source_message_id,
                 accepted_at: row.try_get("accepted_at").map_err(db)?,
                 boundary: ReceiptBoundary::Durable,
                 duplicate: true,
-            });
+            };
+            let commit_started = Instant::now();
+            tx.commit().await.map_err(db)?;
+            timings.commit_us = commit_started.elapsed().as_micros() as u64;
+            timings.transaction_us = transaction_started.elapsed().as_micros() as u64;
+            return Ok(StoreAcceptance { receipt, timings });
         }
-        let count=sqlx::query("SELECT count(*) n,coalesce(sum(charge),0)::bigint bytes,coalesce(sum(charge) FILTER (WHERE tenant_id=$1),0)::bigint tenant_bytes,coalesce(sum(charge) FILTER (WHERE tenant_id=$1 AND product_id=$2 AND device_id=$3),0)::bigint device_bytes,count(*) FILTER (WHERE tenant_id=$1) tenant,count(*) FILTER (WHERE tenant_id=$1 AND product_id=$2 AND device_id=$3) device FROM ingress_messages").bind(k.tenant_id.as_str()).bind(k.product_id.as_str()).bind(k.device_id.as_str()).fetch_one(&mut *tx).await.map_err(db)?;
         let charge = input
             .canonical
             .len()
             .checked_mul(16)
             .and_then(|n| n.checked_add(8192))
             .ok_or(Error::Overloaded)? as i64;
-        if count.try_get::<i64, _>("n").map_err(db)? >= self.limits.max_stored_messages as i64
-            || count
-                .try_get::<i64, _>("bytes")
-                .map_err(db)?
-                .saturating_add(charge)
-                > self.limits.max_stored_bytes as i64
-            || count.try_get::<i64, _>("tenant").map_err(db)?
-                >= self.limits.max_stored_messages_per_tenant as i64
-            || count.try_get::<i64, _>("device").map_err(db)?
-                >= self.limits.max_stored_messages_per_device as i64
-        {
-            return Err(Error::Overloaded);
+        let writes_started = Instant::now();
+        let inserted = sqlx::query("INSERT INTO ingress_messages VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT (tenant_id,product_id,device_id,source_message_id) DO NOTHING RETURNING message_id")
+            .bind(input.message.message_id.0)
+            .bind(k.tenant_id.as_str())
+            .bind(k.product_id.as_str())
+            .bind(k.device_id.as_str())
+            .bind(input.message.source_message_id.as_str())
+            .bind(json(&input.message)?)
+            .bind(&input.canonical)
+            .bind(charge)
+            .bind(now)
+            .bind(now.saturating_add(self.limits.dedup_ttl_ms as i64))
+            .fetch_optional(&mut *tx)
+            .await
+            .map_err(db)?;
+        if inserted.is_none() {
+            let row=sqlx::query("SELECT message_id,canonical,accepted_at FROM ingress_messages WHERE tenant_id=$1 AND product_id=$2 AND device_id=$3 AND source_message_id=$4").bind(k.tenant_id.as_str()).bind(k.product_id.as_str()).bind(k.device_id.as_str()).bind(input.message.source_message_id.as_str()).fetch_one(&mut *tx).await.map_err(db)?;
+            let data: Vec<u8> = row.try_get("canonical").map_err(db)?;
+            if data != input.canonical {
+                return Err(Error::Conflict);
+            }
+            let receipt = IngressReceipt {
+                message_id: MessageId(row.try_get("message_id").map_err(db)?),
+                source_message_id: input.message.source_message_id,
+                accepted_at: row.try_get("accepted_at").map_err(db)?,
+                boundary: ReceiptBoundary::Durable,
+                duplicate: true,
+            };
+            timings.writes_us = writes_started.elapsed().as_micros() as u64;
+            let commit_started = Instant::now();
+            tx.commit().await.map_err(db)?;
+            timings.commit_us = commit_started.elapsed().as_micros() as u64;
+            timings.transaction_us = transaction_started.elapsed().as_micros() as u64;
+            return Ok(StoreAcceptance { receipt, timings });
         }
-        if count
-            .try_get::<i64, _>("tenant_bytes")
-            .map_err(db)?
-            .saturating_add(charge)
-            > self.limits.max_stored_bytes_per_tenant as i64
-            || count
-                .try_get::<i64, _>("device_bytes")
-                .map_err(db)?
-                .saturating_add(charge)
-                > self.limits.max_stored_bytes_per_device as i64
-        {
-            return Err(Error::Overloaded);
-        }
+        let expired_charge = expired
+            .as_ref()
+            .map(|row| row.try_get::<i64, _>("charge").map_err(db))
+            .transpose()?
+            .unwrap_or(0);
         if let DevicePayload::CommandAck(ack) = &input.message.payload {
             let row = sqlx::query("SELECT record FROM commands WHERE command_id=$1 FOR UPDATE")
                 .bind(ack.command_id.0)
@@ -190,20 +316,6 @@ impl Store for PgStore {
             r.delivery = DeliveryState::Received;
             Self::save_command(&mut tx, &r).await?;
         }
-        sqlx::query("INSERT INTO ingress_messages VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)")
-            .bind(input.message.message_id.0)
-            .bind(k.tenant_id.as_str())
-            .bind(k.product_id.as_str())
-            .bind(k.device_id.as_str())
-            .bind(input.message.source_message_id.as_str())
-            .bind(json(&input.message)?)
-            .bind(input.canonical)
-            .bind(charge)
-            .bind(now)
-            .bind(now.saturating_add(self.limits.dedup_ttl_ms as i64))
-            .execute(&mut *tx)
-            .await
-            .map_err(db)?;
         sqlx::query(
             "INSERT INTO delivery_jobs(message_id,next_attempt_at,expires_at) VALUES ($1,$2,$3)",
         )
@@ -213,13 +325,40 @@ impl Store for PgStore {
         .execute(&mut *tx)
         .await
         .map_err(db)?;
+        timings.writes_us = writes_started.elapsed().as_micros() as u64;
+        // Take the globally contended quota row only after all independent
+        // persistence work. PostgreSQL holds an UPDATE row lock until commit;
+        // charging earlier serialized the command-ack/outbox writes behind it.
+        // The charge remains in this transaction, so rollback still releases
+        // both the durable rows and their accounting exactly once.
+        let quota_started = Instant::now();
+        self.adjust_ingress_quota(
+            &mut tx,
+            k,
+            i64::from(expired.is_none()),
+            charge.saturating_sub(expired_charge),
+        )
+        .await?;
+        timings.quota_accounting_us = quota_started.elapsed().as_micros() as u64;
+        timings.quota_wait_us = timings.quota_accounting_us;
+        let commit_started = Instant::now();
         tx.commit().await.map_err(db)?;
-        Ok(IngressReceipt {
-            message_id: input.message.message_id,
-            source_message_id: input.message.source_message_id,
-            accepted_at: now,
-            boundary: ReceiptBoundary::Durable,
-            duplicate: false,
+        timings.commit_us = commit_started.elapsed().as_micros() as u64;
+        // PostgreSQL does not expose the instant at which the row lock was
+        // granted to SQLx. Statement-start through COMMIT is a conservative
+        // upper bound for the quota critical section; QuotaAccounting retains
+        // the statement's wait + execution time separately.
+        timings.quota_lock_hold_us = quota_started.elapsed().as_micros() as u64;
+        timings.transaction_us = transaction_started.elapsed().as_micros() as u64;
+        Ok(StoreAcceptance {
+            receipt: IngressReceipt {
+                message_id: input.message.message_id,
+                source_message_id: input.message.source_message_id,
+                accepted_at: now,
+                boundary: ReceiptBoundary::Durable,
+                duplicate: false,
+            },
+            timings,
         })
     }
     async fn claim_jobs(&self, owner: Uuid, now: i64, limit: usize) -> Result<Vec<DeliveryJob>> {
@@ -271,29 +410,7 @@ impl Store for PgStore {
         {
             return Err(Error::Invalid);
         }
-        let mut tx = self.admission().await?;
-        if let Some(row) = sqlx::query("SELECT record FROM commands WHERE command_id=$1")
-            .bind(command.command_id.0)
-            .fetch_optional(&mut *tx)
-            .await
-            .map_err(db)?
-        {
-            let old = record(&row)?;
-            if old.command != command {
-                return Err(Error::Conflict);
-            }
-            return Ok(old);
-        }
-        let k = &command.device;
-        let count=sqlx::query("SELECT count(*) n,count(*) FILTER (WHERE tenant_id=$1) tenant,count(*) FILTER (WHERE tenant_id=$1 AND product_id=$2 AND device_id=$3) device FROM commands").bind(k.tenant_id.as_str()).bind(k.product_id.as_str()).bind(k.device_id.as_str()).fetch_one(&mut *tx).await.map_err(db)?;
-        if count.try_get::<i64, _>("n").map_err(db)? >= self.limits.max_pending_commands as i64
-            || count.try_get::<i64, _>("tenant").map_err(db)?
-                >= self.limits.max_pending_commands_per_tenant as i64
-            || count.try_get::<i64, _>("device").map_err(db)?
-                >= self.limits.max_pending_commands_per_device as i64
-        {
-            return Err(Error::Overloaded);
-        }
+        let mut tx = self.transaction().await?;
         let r = CommandRecord {
             command,
             delivery: DeliveryState::Queued,
@@ -302,7 +419,7 @@ impl Store for PgStore {
             lease_expires_at: None,
         };
         let k = &r.command.device;
-        sqlx::query("INSERT INTO commands VALUES ($1,$2,$3,$4,$5,$6,$7,$8,false)")
+        let inserted = sqlx::query("INSERT INTO commands VALUES ($1,$2,$3,$4,$5,$6,$7,$8,false) ON CONFLICT (command_id) DO NOTHING RETURNING command_id")
             .bind(r.command.command_id.0)
             .bind(k.tenant_id.as_str())
             .bind(k.product_id.as_str())
@@ -315,9 +432,22 @@ impl Store for PgStore {
                     .expires_at
                     .saturating_add(self.limits.command_ttl_ms as i64),
             )
-            .execute(&mut *tx)
+            .fetch_optional(&mut *tx)
             .await
             .map_err(db)?;
+        if inserted.is_none() {
+            let row = sqlx::query("SELECT record FROM commands WHERE command_id=$1")
+                .bind(r.command.command_id.0)
+                .fetch_one(&mut *tx)
+                .await
+                .map_err(db)?;
+            let old = record(&row)?;
+            if old.command != r.command {
+                return Err(Error::Conflict);
+            }
+            return Ok(old);
+        }
+        self.reserve_command_quota(&mut tx, k).await?;
         tx.commit().await.map_err(db)?;
         Ok(r)
     }
@@ -438,18 +568,30 @@ impl Store for PgStore {
         let row=sqlx::query("SELECT record FROM commands WHERE command_id=$1 AND tenant_id=$2 AND product_id=$3 AND device_id=$4").bind(id.0).bind(device.tenant_id.as_str()).bind(device.product_id.as_str()).bind(device.device_id.as_str()).fetch_optional(&mut *tx).await.map_err(db)?;
         row.as_ref().map(record).transpose()
     }
-    async fn maintain(&self, now: i64, batch: usize) -> Result<()> {
+    async fn maintain(&self, now: i64, batch: usize) -> Result<MaintenanceStats> {
         let mut tx = self.transaction().await?;
         let batch = batch.min(self.limits.delivery_batch) as i64;
-        sqlx::query("DELETE FROM ingress_messages WHERE message_id IN (SELECT message_id FROM ingress_messages WHERE expires_at<=$1 ORDER BY expires_at LIMIT $2 FOR UPDATE SKIP LOCKED)").bind(now).bind(batch).execute(&mut *tx).await.map_err(db)?;
-        sqlx::query("DELETE FROM commands WHERE command_id IN (SELECT command_id FROM commands WHERE retain_until<=$1 ORDER BY retain_until LIMIT $2 FOR UPDATE SKIP LOCKED)").bind(now).bind(batch).execute(&mut *tx).await.map_err(db)?;
+        let ingress_deleted: i64 = sqlx::query_scalar("WITH deleted AS (DELETE FROM ingress_messages WHERE message_id IN (SELECT message_id FROM ingress_messages WHERE expires_at<=$1 ORDER BY expires_at LIMIT $2 FOR UPDATE SKIP LOCKED) RETURNING tenant_id,product_id,device_id,charge), global_delta AS (SELECT count(*) messages,coalesce(sum(charge),0) bytes FROM deleted HAVING count(*)>0), global_update AS (UPDATE ingress_quota_global q SET messages=q.messages-d.messages,bytes=q.bytes-d.bytes FROM global_delta d WHERE q.singleton RETURNING 1), tenant_delta AS (SELECT tenant_id,count(*) messages,sum(charge) bytes FROM deleted GROUP BY tenant_id), tenant_update AS (UPDATE ingress_quota_tenants q SET messages=q.messages-d.messages,bytes=q.bytes-d.bytes FROM tenant_delta d CROSS JOIN global_update g WHERE q.tenant_id=d.tenant_id RETURNING q.tenant_id), device_delta AS (SELECT tenant_id,product_id,device_id,count(*) messages,sum(charge) bytes FROM deleted GROUP BY tenant_id,product_id,device_id), device_update AS (UPDATE ingress_quota_devices q SET messages=q.messages-d.messages,bytes=q.bytes-d.bytes FROM device_delta d JOIN tenant_update t USING(tenant_id) WHERE q.tenant_id=d.tenant_id AND q.product_id=d.product_id AND q.device_id=d.device_id RETURNING 1) SELECT count(*) FROM deleted")
+            .bind(now)
+            .bind(batch)
+            .fetch_one(&mut *tx)
+            .await
+            .map_err(db)?;
+        let commands_deleted: i64 = sqlx::query_scalar("WITH deleted AS (DELETE FROM commands WHERE command_id IN (SELECT command_id FROM commands WHERE retain_until<=$1 ORDER BY retain_until LIMIT $2 FOR UPDATE SKIP LOCKED) RETURNING tenant_id,product_id,device_id), global_delta AS (SELECT count(*) commands FROM deleted HAVING count(*)>0), global_update AS (UPDATE command_quota_global q SET commands=q.commands-d.commands FROM global_delta d WHERE q.singleton RETURNING 1), tenant_delta AS (SELECT tenant_id,count(*) commands FROM deleted GROUP BY tenant_id), tenant_update AS (UPDATE command_quota_tenants q SET commands=q.commands-d.commands FROM tenant_delta d CROSS JOIN global_update g WHERE q.tenant_id=d.tenant_id RETURNING q.tenant_id), device_delta AS (SELECT tenant_id,product_id,device_id,count(*) commands FROM deleted GROUP BY tenant_id,product_id,device_id), device_update AS (UPDATE command_quota_devices q SET commands=q.commands-d.commands FROM device_delta d JOIN tenant_update t USING(tenant_id) WHERE q.tenant_id=d.tenant_id AND q.product_id=d.product_id AND q.device_id=d.device_id RETURNING 1) SELECT count(*) FROM deleted").bind(now).bind(batch).fetch_one(&mut *tx).await.map_err(db)?;
         let rows=sqlx::query("SELECT record FROM commands WHERE NOT terminal AND expires_at<=$1 LIMIT $2 FOR UPDATE SKIP LOCKED").bind(now).bind(batch).fetch_all(&mut *tx).await.map_err(db)?;
+        let commands_expired = rows.len() as u64;
         for row in rows {
             let mut r = record(&row)?;
             r.delivery = DeliveryState::Expired;
             Self::save_command(&mut tx, &r).await?;
         }
-        sqlx::query("UPDATE delivery_jobs SET done=true,last_error='expired_or_exhausted' WHERE message_id IN (SELECT message_id FROM delivery_jobs WHERE NOT done AND (expires_at<=$1 OR (attempts>=$2 AND (lease_expiry IS NULL OR lease_expiry<=$1))) LIMIT $3 FOR UPDATE SKIP LOCKED)").bind(now).bind(self.limits.max_attempts as i32).bind(batch).execute(&mut *tx).await.map_err(db)?;
-        tx.commit().await.map_err(db)
+        let jobs_terminal = sqlx::query("UPDATE delivery_jobs SET done=true,last_error='expired_or_exhausted' WHERE message_id IN (SELECT message_id FROM delivery_jobs WHERE NOT done AND (expires_at<=$1 OR (attempts>=$2 AND (lease_expiry IS NULL OR lease_expiry<=$1))) LIMIT $3 FOR UPDATE SKIP LOCKED)").bind(now).bind(self.limits.max_attempts as i32).bind(batch).execute(&mut *tx).await.map_err(db)?.rows_affected();
+        tx.commit().await.map_err(db)?;
+        Ok(MaintenanceStats {
+            ingress_deleted: ingress_deleted as u64,
+            commands_deleted: commands_deleted as u64,
+            commands_expired,
+            jobs_terminal,
+        })
     }
 }

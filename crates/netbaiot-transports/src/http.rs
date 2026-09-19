@@ -127,9 +127,19 @@ async fn handle(
             s.ingress.sessions.queued_messages()
         ));
         let (ingress_count, ingress_bytes) = s.ingress.admission.in_flight();
+        let (ingress_waiters, ingress_wait_bytes) = s.ingress.admission.waiting();
         let (protocol_count, protocol_bytes) = s.protocol_admission.in_flight();
+        let store = s.ingress.store.health();
+        let degraded_workers = s
+            .ingress
+            .metrics
+            .get(Metric::DependencyDegraded)
+            .saturating_sub(s.ingress.metrics.get(Metric::DependencyRecovered));
         metrics.push_str(&format!(
-            "netbaiot_ingress_inflight {ingress_count}\nnetbaiot_ingress_inflight_bytes {ingress_bytes}\nnetbaiot_protocol_inflight {protocol_count}\nnetbaiot_protocol_inflight_bytes {protocol_bytes}\nnetbaiot_runtime_alive_tasks {}\n",
+            "netbaiot_ingress_inflight {ingress_count}\nnetbaiot_ingress_inflight_bytes {ingress_bytes}\nnetbaiot_ingress_waiters {ingress_waiters}\nnetbaiot_ingress_wait_bytes {ingress_wait_bytes}\nnetbaiot_protocol_inflight {protocol_count}\nnetbaiot_protocol_inflight_bytes {protocol_bytes}\nnetbaiot_database_pool_active {}\nnetbaiot_database_pool_idle {}\nnetbaiot_database_pool_waiters {}\nnetbaiot_dependency_degraded_workers {degraded_workers}\nnetbaiot_runtime_alive_tasks {}\n",
+            store.pool_active,
+            store.pool_idle,
+            store.pool_waiters,
             tokio::runtime::Handle::current().metrics().num_alive_tasks()
         ));
         let (sessions, tenants, presence) = s.ingress.sessions.registry_counts()?;
@@ -193,7 +203,7 @@ async fn handle(
         Ok(b) => b.to_bytes(),
         Err(_) => return Ok(response(StatusCode::PAYLOAD_TOO_LARGE, b"{}".to_vec())),
     };
-    let receipt = s
+    let acceptance = s
         .ingress
         .ingest(
             &auth,
@@ -201,12 +211,14 @@ async fn handle(
                 transport: Transport::Http,
                 payload: &body,
                 require_command_ack: path.ends_with("/ack"),
+                validated_at: std::time::Instant::now(),
+                validation_us: 0,
             },
         )
         .await?;
     Ok(response(
         StatusCode::ACCEPTED,
-        serde_json::to_vec(&receipt).map_err(|_| Error::Internal)?,
+        serde_json::to_vec(&acceptance.receipt).map_err(|_| Error::Internal)?,
     ))
 }
 pub async fn connection(

@@ -65,7 +65,7 @@ impl MemoryStore {
 }
 #[async_trait]
 impl Store for MemoryStore {
-    async fn accept(&self, input: StoredIngress) -> Result<IngressReceipt> {
+    async fn accept(&self, input: StoredIngress) -> Result<StoreAcceptance> {
         let now = now_ms();
         let mut s = lock(&self.state)?;
         let key = (
@@ -80,7 +80,10 @@ impl Store for MemoryStore {
             }
             let mut r = previous.receipt.clone();
             r.duplicate = true;
-            return Ok(r);
+            return Ok(StoreAcceptance {
+                receipt: r,
+                timings: StoreTimings::default(),
+            });
         }
         if let Some(old) = s.messages.remove(&key) {
             s.bytes = s.bytes.saturating_sub(old.charge);
@@ -159,7 +162,10 @@ impl Store for MemoryStore {
                 charge,
             },
         );
-        Ok(receipt)
+        Ok(StoreAcceptance {
+            receipt,
+            timings: StoreTimings::default(),
+        })
     }
     async fn claim_jobs(&self, owner: Uuid, now: i64, limit: usize) -> Result<Vec<DeliveryJob>> {
         let mut s = lock(&self.state)?;
@@ -377,8 +383,9 @@ impl Store for MemoryStore {
             .filter(|c| c.record.command.device == *device)
             .map(|c| c.record.clone()))
     }
-    async fn maintain(&self, now: i64, batch: usize) -> Result<()> {
+    async fn maintain(&self, now: i64, batch: usize) -> Result<MaintenanceStats> {
         let mut s = lock(&self.state)?;
+        let mut stats = MaintenanceStats::default();
         let keys: Vec<_> = s
             .messages
             .iter()
@@ -389,14 +396,17 @@ impl Store for MemoryStore {
         for key in keys {
             if let Some(e) = s.messages.remove(&key) {
                 s.bytes = s.bytes.saturating_sub(e.charge);
+                stats.ingress_deleted += 1;
             }
         }
         for e in s.messages.values_mut() {
-            if e.job.expires <= now
-                || (e.job.attempts >= self.limits.max_attempts
-                    && e.job.lease.is_none_or(|(_, until)| until <= now))
+            if !e.job.done
+                && (e.job.expires <= now
+                    || (e.job.attempts >= self.limits.max_attempts
+                        && e.job.lease.is_none_or(|(_, until)| until <= now)))
             {
                 e.job.done = true;
+                stats.jobs_terminal += 1;
             }
         }
         let keys: Vec<_> = s
@@ -407,16 +417,21 @@ impl Store for MemoryStore {
             .map(|(k, _)| *k)
             .collect();
         for key in keys {
-            s.commands.remove(&key);
+            stats.commands_deleted += u64::from(s.commands.remove(&key).is_some());
         }
         for c in s.commands.values_mut() {
             if c.record.command.expires_at <= now
+                && !matches!(
+                    c.record.delivery,
+                    DeliveryState::Expired | DeliveryState::Failed
+                )
                 && !matches!(
                     c.record.execution,
                     ExecutionState::Succeeded | ExecutionState::Failed
                 )
             {
                 c.record.delivery = DeliveryState::Expired;
+                stats.commands_expired += 1;
             } else if c.record.attempts >= self.limits.max_attempts
                 && c.next <= now
                 && !matches!(
@@ -427,6 +442,6 @@ impl Store for MemoryStore {
                 c.record.delivery = DeliveryState::Failed;
             }
         }
-        Ok(())
+        Ok(stats)
     }
 }

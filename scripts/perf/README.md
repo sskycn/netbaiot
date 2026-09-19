@@ -99,9 +99,11 @@ cluster's `/tmp/netbaiot-capacity-postgres.log`; summarized query counts/timings
 retained, not the large raw log. Dataset scripts bypass application quotas solely
 to measure query plans at 10K/100K/1M rows and do not demonstrate supported capacity.
 
-DB unavailability intentionally tests the existing fail-stop worker policy. A
-`restart` event is an explicit external restart after database recovery, not a
-claim that the service contains an automatic supervisor.
+DB-unavailability cases distinguish startup failure from runtime dependency loss.
+Startup failure remains fatal. Current runtime cases expect fixed workers to enter
+a bounded-backoff degraded state and recover without restarting the process; failed
+individual messages are not buffered or retried forever. Historical `restart`
+events remain explicit external restarts and must not be mixed with that evidence.
 
 ## Complete audit sequence
 
@@ -125,6 +127,25 @@ python3 scripts/perf/slow_sql.py
 python3 scripts/perf/sql_summary.py generator_calibration downlink_sql_profile
 ```
 
+The Admission/persistence follow-up uses the retained groups below. Run them
+serially; `long_soak` is the only four-hour final run and must not overlap builds,
+dataset loading, or another benchmark.
+
+```sh
+python3 scripts/perf/optimization.py capacity
+python3 scripts/perf/optimization.py arrival
+python3 scripts/perf/optimization.py recovery
+python3 scripts/perf/optimization.py fairness
+python3 scripts/perf/optimization.py retention
+python3 scripts/perf/optimization.py controlled_soak
+python3 scripts/perf/optimization.py long_soak
+python3 scripts/perf/dataset.py
+```
+
+The long soak uses four adjacent equal-rate phases. They do not change the load;
+they preserve independent first-hour and final-hour generator histograms so tail
+latency drift can be compared without subtracting cumulative percentiles.
+
 The runner now reserves an unused final credential in a separate `audit-observer`
 tenant for its metrics observer. Intermediate `uplink_isolated_*` results reserved
 only an unused device, which could still share a tenant. `reproduction_overrides`
@@ -147,7 +168,7 @@ The count/byte gauges are separate instantaneous samples, not an atomic snapshot
 Diagnostic logging is limited to 120-second cases. Observer history has a 10,000
 sample cap, multi-generator cases have at most eight generators, injected blocker
 processes are bounded, and each process has an owner and termination deadline.
-The two-hour soak must run without another benchmark, compiler or dataset loader.
+Any long soak must run without another benchmark, compiler or dataset loader.
 Finite repeated windows are labeled as such; they do not prove 24-hour retained
 state capacity or a production SLA.
 

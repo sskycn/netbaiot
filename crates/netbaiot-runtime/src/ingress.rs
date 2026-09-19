@@ -35,6 +35,13 @@ pub struct IngressEnvelope<'a> {
     pub transport: Transport,
     pub payload: &'a [u8],
     pub require_command_ack: bool,
+    pub validated_at: Instant,
+    pub validation_us: u64,
+}
+pub struct IngressAcceptance {
+    pub receipt: IngressReceipt,
+    /// The store call has crossed its configured persistence boundary at this instant.
+    pub persisted_at: Instant,
 }
 pub struct Ingress {
     pub limits: Arc<Limits>,
@@ -93,7 +100,7 @@ impl Ingress {
         &self,
         auth: &AuthenticatedDevice,
         envelope: IngressEnvelope<'_>,
-    ) -> Result<IngressReceipt> {
+    ) -> Result<IngressAcceptance> {
         let result = self.ingest_inner(auth, envelope).await;
         if result.is_err() {
             self.metrics.inc(Metric::IngressRejected);
@@ -107,16 +114,40 @@ impl Ingress {
         &self,
         auth: &AuthenticatedDevice,
         envelope: IngressEnvelope<'_>,
-    ) -> Result<IngressReceipt> {
+    ) -> Result<IngressAcceptance> {
         if self.is_draining() {
             return Err(Error::Draining);
         }
         if !auth.permissions.publish {
             return Err(Error::Forbidden);
         }
-        let _admission = self
+        self.metrics
+            .observe(Histogram::MqttProtocolValidation, envelope.validation_us);
+        self.metrics.observe(
+            Histogram::ValidationToAdmission,
+            envelope.validated_at.elapsed().as_micros() as u64,
+        );
+        let admission = match self
             .admission
-            .acquire(&auth.device_key, envelope.payload.len())?;
+            .acquire_wait(&auth.device_key, envelope.payload.len())
+            .await
+        {
+            Ok(admission) => admission,
+            Err(error) => {
+                self.metrics.inc(Metric::IngressAdmissionRejects);
+                return Err(error);
+            }
+        };
+        self.metrics
+            .observe(Histogram::AdmissionWait, admission.wait_us());
+        self.metrics
+            .observe(Histogram::AdmissionLockWait, admission.lock_wait_us());
+        self.metrics
+            .observe(Histogram::AdmissionLockHold, admission.lock_hold_us());
+        // Stream authentication is cached on the connection before per-message admission.
+        self.metrics
+            .observe(Histogram::AdmissionToAuthentication, 0);
+        let codec_started = Instant::now();
         let codec = self.codecs.get(auth)?;
         let messages = codec
             .decode(
@@ -146,8 +177,13 @@ impl Ingress {
             return Err(Error::Forbidden);
         }
         let command_ack = matches!(message.payload, DevicePayload::CommandAck(_));
+        self.metrics.observe(
+            Histogram::AuthenticationToCodec,
+            codec_started.elapsed().as_micros() as u64,
+        );
         self.metrics
             .add(Metric::IngressBytes, envelope.payload.len() as u64);
+        let codec_complete = Instant::now();
         let canonical = canonical(&message)?;
         if canonical.len()
             > self
@@ -158,24 +194,51 @@ impl Ingress {
         {
             return Err(Error::Codec);
         }
+        let codec_to_store_us = codec_complete.elapsed().as_micros() as u64;
         let start = Instant::now();
-        let receipt = deadline(
+        let acceptance = deadline(
             self.limits.external_timeout_ms,
             self.store.accept(StoredIngress { message, canonical }),
         )
         .await?;
+        let persisted_at = Instant::now();
+        let timings = acceptance.timings;
+        self.metrics.observe(
+            Histogram::CodecToPool,
+            codec_to_store_us.saturating_add(timings.call_to_pool_us),
+        );
+        self.metrics
+            .observe(Histogram::DatabasePoolWait, timings.pool_wait_us);
+        self.metrics
+            .observe(Histogram::TransactionStart, timings.transaction_start_us);
+        self.metrics
+            .observe(Histogram::QuotaWait, timings.quota_wait_us);
+        self.metrics
+            .observe(Histogram::QuotaAccounting, timings.quota_accounting_us);
+        self.metrics
+            .observe(Histogram::QuotaLockHold, timings.quota_lock_hold_us);
+        self.metrics.observe(Histogram::Dedup, timings.dedup_us);
+        self.metrics
+            .observe(Histogram::PersistenceWrites, timings.writes_us);
+        self.metrics.observe(Histogram::Commit, timings.commit_us);
+        self.metrics
+            .observe(Histogram::Transaction, timings.transaction_us);
         self.metrics.add(
             Metric::DatabaseLatencyMs,
             start.elapsed().as_millis() as u64,
         );
         self.sessions.touch(&auth.device_key, envelope.transport)?;
         self.metrics.inc(Metric::IngressAccepted);
+        let receipt = acceptance.receipt;
         if command_ack && !receipt.duplicate {
             self.metrics.inc(Metric::CommandAcked);
         }
         if receipt.duplicate {
             self.metrics.inc(Metric::DedupHits);
         }
-        Ok(receipt)
+        Ok(IngressAcceptance {
+            receipt,
+            persisted_at,
+        })
     }
 }

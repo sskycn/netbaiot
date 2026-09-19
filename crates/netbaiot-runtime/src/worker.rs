@@ -17,6 +17,50 @@ pub enum DeliveryError {
 pub trait DeliverySink: Send + Sync {
     async fn deliver(&self, message: &DeviceMessage) -> std::result::Result<(), DeliveryError>;
 }
+struct DependencyRecovery {
+    degraded: bool,
+    failures: u32,
+    seed: MessageId,
+}
+impl DependencyRecovery {
+    fn new() -> Self {
+        Self {
+            degraded: false,
+            failures: 0,
+            seed: MessageId(Uuid::new_v4()),
+        }
+    }
+    fn succeeded(&mut self, metrics: &Metrics) {
+        self.failures = 0;
+        if self.degraded {
+            self.degraded = false;
+            metrics.inc(Metric::DependencyRecovered);
+            tracing::info!("database dependency recovered");
+        }
+    }
+    async fn failed(
+        &mut self,
+        error: Error,
+        limits: &Limits,
+        metrics: &Metrics,
+        stop: &CancellationToken,
+    ) -> Result<bool> {
+        if !matches!(error, Error::Storage | Error::Timeout) {
+            return Err(error);
+        }
+        if !self.degraded {
+            self.degraded = true;
+            metrics.inc(Metric::DependencyDegraded);
+            tracing::warn!(error=%error,"database dependency degraded");
+        }
+        self.failures = self.failures.saturating_add(1);
+        let delay = retry_delay(limits, self.seed, self.failures);
+        tokio::select! {
+            _ = stop.cancelled() => Ok(false),
+            _ = tokio::time::sleep(Duration::from_millis(delay)) => Ok(true),
+        }
+    }
+}
 /// Full jitter is deterministic per message/attempt, reproducible in tests.
 pub fn retry_delay(l: &Limits, id: MessageId, attempt: u32) -> u64 {
     jitter(l, id.0, attempt)
@@ -46,17 +90,33 @@ pub async fn delivery_worker(
     tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
     let mut idle = true;
     let mut last_maintenance = Instant::now();
-    loop {
+    let mut recovery = DependencyRecovery::new();
+    'worker: loop {
         if idle {
             tokio::select! {biased;_ = stop.cancelled()=>break,_=tick.tick()=>{}}
         } else {
             tokio::select! {biased;_ = stop.cancelled()=>break,_=tokio::task::yield_now()=>{}}
         }
-        let jobs = deadline(
+        let jobs = match deadline(
             ingress.limits.external_timeout_ms,
             ingress.store.claim_jobs(owner, now_ms(), 1),
         )
-        .await?;
+        .await
+        {
+            Ok(jobs) => {
+                recovery.succeeded(&ingress.metrics);
+                jobs
+            }
+            Err(error) => {
+                if recovery
+                    .failed(error, &ingress.limits, &ingress.metrics, &stop)
+                    .await?
+                {
+                    continue;
+                }
+                break;
+            }
+        };
         idle = jobs.is_empty();
         for job in jobs {
             if stop.is_cancelled() {
@@ -88,25 +148,66 @@ pub async fn delivery_worker(
                 job.message.message_id,
                 job.attempts,
             ) as i64);
-            deadline(
+            if let Err(error) = deadline(
                 ingress.limits.external_timeout_ms,
                 ingress
                     .store
                     .finish_job(&job, success, retryable, now, next),
             )
-            .await?;
+            .await
+            {
+                if recovery
+                    .failed(error, &ingress.limits, &ingress.metrics, &stop)
+                    .await?
+                {
+                    continue 'worker;
+                }
+                break 'worker;
+            }
+            recovery.succeeded(&ingress.metrics);
         }
         if idle
             || last_maintenance.elapsed()
                 >= Duration::from_millis(ingress.limits.worker_poll_interval_ms)
         {
-            deadline(
+            let cleanup_started = Instant::now();
+            let maintenance = match deadline(
                 ingress.limits.external_timeout_ms,
                 ingress
                     .store
                     .maintain(now_ms(), ingress.limits.delivery_batch),
             )
-            .await?;
+            .await
+            {
+                Ok(stats) => stats,
+                Err(error) => {
+                    if recovery
+                        .failed(error, &ingress.limits, &ingress.metrics, &stop)
+                        .await?
+                    {
+                        continue;
+                    }
+                    break;
+                }
+            };
+            recovery.succeeded(&ingress.metrics);
+            ingress.metrics.inc(Metric::CleanupRuns);
+            ingress
+                .metrics
+                .add(Metric::CleanupIngressRows, maintenance.ingress_deleted);
+            ingress.metrics.add(
+                Metric::CleanupCommandRows,
+                maintenance
+                    .commands_deleted
+                    .saturating_add(maintenance.commands_expired),
+            );
+            ingress
+                .metrics
+                .add(Metric::CleanupJobs, maintenance.jobs_terminal);
+            ingress.metrics.observe(
+                Histogram::Cleanup,
+                cleanup_started.elapsed().as_micros() as u64,
+            );
             ingress.sessions.expire_presence(now_ms())?;
             last_maintenance = Instant::now();
         }
@@ -123,20 +224,36 @@ pub async fn command_worker(
         ingress.limits.worker_poll_interval_ms,
     ));
     tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
-    loop {
+    let mut recovery = DependencyRecovery::new();
+    'worker: loop {
         tokio::select! {biased;_=stop.cancelled()=>break,_=tick.tick()=>{}}
         let active = ingress.sessions.active_devices()?;
         for batch in active.chunks(ingress.limits.delivery_batch) {
             if stop.is_cancelled() {
                 break;
             }
-            let commands = deadline(
+            let commands = match deadline(
                 ingress.limits.external_timeout_ms,
                 ingress
                     .store
                     .claim_command_batch(batch, now_ms(), ingress.limits.delivery_batch),
             )
-            .await?;
+            .await
+            {
+                Ok(commands) => {
+                    recovery.succeeded(&ingress.metrics);
+                    commands
+                }
+                Err(error) => {
+                    if recovery
+                        .failed(error, &ingress.limits, &ingress.metrics, &stop)
+                        .await?
+                    {
+                        continue 'worker;
+                    }
+                    break 'worker;
+                }
+            };
             for record in commands {
                 if let Some(auth) = identities.get(&record.command.device)
                     && let Err(e) = router.dispatch(record, auth).await
@@ -152,6 +269,42 @@ pub async fn command_worker(
 #[cfg(test)]
 mod audit {
     use super::*;
+    #[tokio::test]
+    async fn dependency_recovery_is_bounded_observable_and_cancelable() {
+        let limits = Limits {
+            retry_base_ms: 1,
+            retry_max_ms: 1,
+            ..Limits::default()
+        };
+        let metrics = Metrics::default();
+        let stop = CancellationToken::new();
+        let mut recovery = DependencyRecovery::new();
+
+        assert!(
+            recovery
+                .failed(Error::Storage, &limits, &metrics, &stop)
+                .await
+                .unwrap()
+        );
+        assert_eq!(metrics.get(Metric::DependencyDegraded), 1);
+        recovery.succeeded(&metrics);
+        assert_eq!(metrics.get(Metric::DependencyRecovered), 1);
+
+        assert!(matches!(
+            recovery
+                .failed(Error::Invalid, &limits, &metrics, &stop)
+                .await,
+            Err(Error::Invalid)
+        ));
+        stop.cancel();
+        assert!(
+            !recovery
+                .failed(Error::Timeout, &limits, &metrics, &stop)
+                .await
+                .unwrap()
+        );
+    }
+
     #[test]
     fn command_backoff_is_positive_bounded_and_spread_across_ids() {
         let l = Limits {

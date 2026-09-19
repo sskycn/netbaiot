@@ -157,6 +157,30 @@ fn main() {
             black_box(bookkeeping.acquire(&selected.device_key, 128).unwrap());
         });
     }
+    for entries in [10, 100, 1_000, 10_000] {
+        let limits = Arc::new(Limits {
+            max_devices: 10_001,
+            max_devices_per_tenant: 128,
+            requests_per_second: 1_000_000,
+            messages_per_device_second: 1_000_000,
+            messages_per_tenant_second: 1_000_000,
+            ..Limits::default()
+        });
+        let admission = Admission::new(limits);
+        let mut selected = auth.device_key.clone();
+        for i in 0..entries {
+            let device = DeviceKey {
+                tenant_id: TenantId::new(format!("quota_t{i}")).unwrap(),
+                product_id: ProductId::new("p").unwrap(),
+                device_id: DeviceId::new(format!("quota_d{i}")).unwrap(),
+            };
+            admission.check_rate(&device).unwrap();
+            selected = device;
+        }
+        measure(&format!("admission_entries_{entries}"), 10_000, || {
+            black_box(admission.check_rate(&selected).unwrap());
+        });
+    }
     println!(
         "layout_bytes: session_endpoint={} queued_command={} device_message={} command_record={}",
         std::mem::size_of::<SessionEndpoint>(),

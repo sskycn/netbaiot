@@ -181,6 +181,8 @@ pub async fn serve(socket: UdpSocket, s: Arc<Services>, stop: CancellationToken)
                         transport: Transport::Udp,
                         payload: envelope.payload,
                         require_command_ack: false,
+                        validated_at: std::time::Instant::now(),
+                        validation_us: 0,
                     },
                 )
                 .await?;
