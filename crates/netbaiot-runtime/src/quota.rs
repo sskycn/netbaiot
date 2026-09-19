@@ -10,10 +10,30 @@ use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 
 #[derive(Clone)]
 pub struct ByteBudget(Arc<Semaphore>);
+#[derive(Default)]
+pub(crate) struct WeakByteBudget(std::sync::Weak<Semaphore>);
+impl WeakByteBudget {
+    pub fn upgrade(&self) -> Option<ByteBudget> {
+        self.0.upgrade().map(ByteBudget)
+    }
+    pub fn get_or_create(&mut self, bytes: usize) -> ByteBudget {
+        if let Some(budget) = self.upgrade() {
+            return budget;
+        }
+        // The last permit may have disappeared after registry pruning. Replace
+        // the weak identity even when the tenant entry itself already exists.
+        let budget = ByteBudget::new(bytes);
+        *self = budget.downgrade();
+        budget
+    }
+}
 pub struct BytesPermit {
     _permit: OwnedSemaphorePermit,
 }
 impl ByteBudget {
+    pub(crate) fn downgrade(&self) -> WeakByteBudget {
+        WeakByteBudget(Arc::downgrade(&self.0))
+    }
     pub fn new(bytes: usize) -> Self {
         Self(Arc::new(Semaphore::new(bytes)))
     }
@@ -301,6 +321,25 @@ impl Drop for AdmissionLease {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn expired_tenant_identity_replacement_is_shared() {
+        let old = ByteBudget::new(16);
+        let mut identity = old.downgrade();
+        // register's retain saw a live budget, then the final old owner exited.
+        assert!(identity.upgrade().is_some());
+        drop(old);
+        let replacement = identity.get_or_create(16);
+        let held = replacement.reserve(16).unwrap();
+        let concurrent = identity.get_or_create(16);
+        assert!(matches!(concurrent.reserve(1), Err(Error::Overloaded)));
+        drop(replacement);
+        assert!(matches!(
+            identity.get_or_create(16).reserve(1),
+            Err(Error::Overloaded)
+        ));
+        drop(held);
+        assert!(concurrent.reserve(16).is_ok());
+    }
     fn key(tenant: &str, device: &str) -> DeviceKey {
         DeviceKey {
             tenant_id: TenantId::new(tenant).unwrap(),

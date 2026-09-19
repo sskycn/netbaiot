@@ -97,12 +97,25 @@ fn valid_utf8(bytes: &[u8]) -> Result<&str> {
     }
     Ok(s)
 }
+#[inline]
 pub fn valid_topic(topic: &str, l: &Limits, filter: bool) -> bool {
     !topic.is_empty()
         && topic.len() <= l.max_topic_bytes
         && topic.split('/').count() <= l.max_topic_depth
         && valid_utf8(topic.as_bytes()).is_ok()
-        && (filter || !topic.contains(['+', '#']))
+        && if filter {
+            valid_filter(topic)
+        } else {
+            !topic.contains(['+', '#'])
+        }
+}
+// Keep subscription grammar separate from the PUBLISH Topic Name hot path.
+fn valid_filter(topic: &str) -> bool {
+    let count = topic.split('/').count();
+    topic.split('/').enumerate().all(|(i, level)| {
+        (!level.contains('+') || level == "+")
+            && (!level.contains('#') || (level == "#" && i + 1 == count))
+    })
 }
 struct Cursor {
     bytes: Bytes,
@@ -348,6 +361,28 @@ pub fn publish(topic: &str, payload: &[u8], packet_id: Option<u16>, l: &Limits) 
 mod tests {
     use super::*;
     #[test]
+    fn audit_malformed_wildcards_are_protocol_errors() {
+        let l = Limits::default();
+        for filter in ["a+", "a/#/b", "##", "a/+b", "a/b#"] {
+            for kind in [0x82, 0xa2] {
+                let mut body = vec![0, 1];
+                body.extend_from_slice(&(filter.len() as u16).to_be_bytes());
+                body.extend_from_slice(filter.as_bytes());
+                if kind == 0x82 {
+                    body.push(1);
+                }
+                let wire = encode(kind, &body, 65536).unwrap();
+                assert!(
+                    decode(&mut BytesMut::from(wire.as_slice()), &l).is_err(),
+                    "{filter}"
+                );
+            }
+        }
+        for filter in ["+", "#", "a/+", "a/#", "/+/", "a//b"] {
+            assert!(valid_topic(filter, &l, true), "legal syntax: {filter}");
+        }
+    }
+    #[test]
     fn exact_packet_size_boundary() {
         let l = Limits {
             max_mqtt_packet_size: 256,
@@ -417,6 +452,131 @@ mod tests {
             }
             let _ = decode(&mut BytesMut::from(bytes.as_slice()), &l);
             let _ = remaining_length(&bytes, 65536);
+        }
+    }
+}
+
+#[cfg(test)]
+mod audit {
+    use super::*;
+    fn string(out: &mut Vec<u8>, value: &[u8]) {
+        out.extend_from_slice(&(value.len() as u16).to_be_bytes());
+        out.extend_from_slice(value);
+    }
+    fn connect(flags: u8) -> Vec<u8> {
+        let mut b = Vec::new();
+        string(&mut b, b"MQTT");
+        b.extend_from_slice(&[4, flags, 0, 30]);
+        string(&mut b, b"a");
+        if flags & 4 != 0 {
+            string(&mut b, b"will");
+            string(&mut b, b"data");
+        }
+        if flags & 128 != 0 {
+            string(&mut b, b"a");
+        }
+        if flags & 64 != 0 {
+            string(&mut b, &[b'0'; 64]);
+        }
+        encode(0x10, &b, 65536).unwrap()
+    }
+    #[test]
+    fn every_supported_packet_survives_every_split_and_coalescing() {
+        let l = Limits::default();
+        let mut sub = vec![0, 1];
+        string(&mut sub, b"a");
+        sub.push(1);
+        let mut unsub = vec![0, 2];
+        string(&mut unsub, b"a");
+        let packets = vec![
+            connect(0xc2),
+            publish("a", &[0; 200], None, &l).unwrap(),
+            publish("a", &[0; 16384], Some(65535), &l).unwrap(),
+            ack(0x40, 1),
+            encode(0x82, &sub, 65536).unwrap(),
+            encode(0xa2, &unsub, 65536).unwrap(),
+            vec![0xc0, 0],
+            vec![0xe0, 0],
+        ];
+        for packet in &packets {
+            for split in 0..packet.len() {
+                let mut b = BytesMut::from(&packet[..split]);
+                assert!(decode(&mut b, &l).unwrap().is_none());
+                assert_eq!(b.len(), split);
+                b.extend_from_slice(&packet[split..]);
+                assert!(decode(&mut b, &l).unwrap().is_some());
+                assert!(b.is_empty());
+            }
+            let mut b = BytesMut::new();
+            for (i, byte) in packet.iter().enumerate() {
+                b.extend_from_slice(&[*byte]);
+                assert_eq!(decode(&mut b, &l).unwrap().is_some(), i + 1 == packet.len());
+            }
+        }
+        let mut all = BytesMut::from(packets.concat().as_slice());
+        all.extend_from_slice(&[0x30]);
+        for _ in &packets {
+            assert!(decode(&mut all, &l).unwrap().is_some());
+        }
+        assert!(decode(&mut all, &l).unwrap().is_none());
+        assert_eq!(all.as_ref(), &[0x30]);
+    }
+    #[test]
+    fn remaining_length_all_widths_and_invalid_continuations() {
+        for value in [0, 127, 128, 16383, 16384, 2097151, 2097152, 268435455] {
+            let mut b = Vec::new();
+            variable(value, &mut b);
+            for i in 0..b.len() {
+                assert_eq!(remaining_length(&b[..i], value).unwrap(), None);
+            }
+            assert_eq!(remaining_length(&b, value).unwrap(), Some((value, b.len())));
+            if value > 0 {
+                assert!(remaining_length(&b, value - 1).is_err());
+            }
+        }
+        for bad in [
+            &[128, 0][..],
+            &[255, 255, 255, 128],
+            &[128, 128, 128, 128, 0],
+        ] {
+            assert!(remaining_length(bad, usize::MAX).is_err());
+        }
+    }
+    #[test]
+    fn connect_flags_utf8_and_packet_identifiers_are_strict() {
+        let l = Limits::default();
+        for flags in [0xc3, 0x42, 0xca, 0xe2, 0xde] {
+            assert!(
+                decode(&mut BytesMut::from(connect(flags).as_slice()), &l).is_err(),
+                "flags={flags:x}"
+            );
+        }
+        for flags in [0xc0, 0xc6, 0xce, 0xd6] {
+            let Packet::Connect(c) = decode(&mut BytesMut::from(connect(flags).as_slice()), &l)
+                .unwrap()
+                .unwrap()
+            else {
+                panic!()
+            };
+            assert!(!c.clean_session || c.has_will);
+        }
+        for invalid in [
+            &[0][..],
+            &[0xc0, 0x80],
+            &[0xed, 0xa0, 0x80],
+            &[0xef, 0xb7, 0x90],
+            &[0xef, 0xbf, 0xbf],
+            b"\n",
+        ] {
+            assert!(valid_utf8(invalid).is_err());
+        }
+        assert_eq!(valid_utf8(b"\xef\xbb\xbf").unwrap(), "\u{feff}");
+        for first in [0x40, 0x82, 0xa2] {
+            assert!(decode(&mut BytesMut::from(ack(first, 0).as_slice()), &l).is_err());
+        }
+        assert!(publish("a", b"b", Some(0), &l).is_err());
+        for first in [0x00, 0xf0, 0xc1, 0xe1, 0x80, 0xa0, 0x38, 0x36] {
+            assert!(fixed_header(&[first, 0], 65536).is_err());
         }
     }
 }

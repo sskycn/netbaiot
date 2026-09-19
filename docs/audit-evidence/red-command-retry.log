@@ -1,0 +1,22 @@
+   Compiling netbaiot-storage v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-storage)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4.31s
+     Running tests/semantics.rs (target/debug/deps/semantics-f90a94e0c11bec7a)
+
+running 1 test
+test audit_command_retry_uses_bounded_backoff ... FAILED
+
+failures:
+
+---- audit_command_retry_uses_bounded_backoff stdout ----
+
+thread 'audit_command_retry_uses_bounded_backoff' (2407354) panicked at crates/netbaiot-storage/tests/semantics.rs:664:5:
+lease expiry alone must not synchronize every retry
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    audit_command_retry_uses_bounded_backoff
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 12 filtered out; finished in 0.01s
+
+error: test failed, to rerun pass `-p netbaiot-storage --test semantics`

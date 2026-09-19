@@ -1,0 +1,23 @@
+   Compiling netbaiot-runtime v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-runtime)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.94s
+     Running unittests src/lib.rs (target/debug/deps/netbaiot_runtime-842a0c3387a053cc)
+
+running 10 tests
+test sessions::tests::stale_disconnect_cannot_remove_new_generation ... ok
+test quota::tests::expired_tenant_identity_replacement_is_shared ... ok
+test quota::tests::ingress_limits_isolate_devices_tenants_and_bytes ... ok
+test sessions::tests::audit_tenant_budget_survives_superseded_queue ... ok
+test quota::tests::source_rate_table_has_capacity_and_global_limit ... ok
+test sessions::audit_cleanup::cancelled_receiver_and_failed_enqueue_release_all_budgets ... ok
+test quota::tests::connection_limits_and_raii_cleanup ... ok
+test limits::tests::defaults_and_invalid ... ok
+test worker::audit::command_backoff_is_positive_bounded_and_spread_across_ids ... ok
+test sessions::tests::queue_count_and_bytes_are_bounded ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+   Doc-tests netbaiot_runtime
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s

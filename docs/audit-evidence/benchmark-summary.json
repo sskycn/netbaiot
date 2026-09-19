@@ -1,0 +1,358 @@
+{
+  "baseline": "4fcd393",
+  "method": "Median of three serial alternating before/after runs after final weak-identity repair; same extended harness; 1000 warmups; ns percentiles; no CPU frequency pinning.",
+  "before": {
+    "mqtt_decode": {
+      "iterations": 20000,
+      "ops": 6537195,
+      "p50": 125,
+      "p95": 167,
+      "p99": 167
+    },
+    "mqtt_encode": {
+      "iterations": 20000,
+      "ops": 6367991,
+      "p50": 83,
+      "p95": 125,
+      "p99": 125
+    },
+    "topic_acl": {
+      "iterations": 20000,
+      "ops": 9884475,
+      "p50": 42,
+      "p95": 125,
+      "p99": 167
+    },
+    "subscription_lookup": {
+      "iterations": 20000,
+      "ops": 21866885,
+      "p50": 41,
+      "p95": 42,
+      "p99": 42
+    },
+    "json_codec": {
+      "iterations": 20000,
+      "ops": 443586,
+      "p50": 1334,
+      "p95": 2084,
+      "p99": 2250
+    },
+    "tcp_frame": {
+      "iterations": 20000,
+      "ops": 6804360,
+      "p50": 125,
+      "p95": 125,
+      "p99": 166
+    },
+    "ingress_admission": {
+      "iterations": 20000,
+      "ops": 3999200,
+      "p50": 209,
+      "p95": 250,
+      "p99": 250
+    },
+    "mqtt_decode_small": {
+      "iterations": 10000,
+      "ops": 6108269,
+      "p50": 125,
+      "p95": 167,
+      "p99": 167
+    },
+    "mqtt_decode_medium": {
+      "iterations": 10000,
+      "ops": 2342104,
+      "p50": 375,
+      "p95": 417,
+      "p99": 417
+    },
+    "mqtt_decode_maximum": {
+      "iterations": 10000,
+      "ops": 385036,
+      "p50": 1334,
+      "p95": 2459,
+      "p99": 2833
+    },
+    "json_codec_small": {
+      "iterations": 10000,
+      "ops": 320858,
+      "p50": 1625,
+      "p95": 2792,
+      "p99": 2917
+    },
+    "json_codec_medium": {
+      "iterations": 10000,
+      "ops": 16290,
+      "p50": 32917,
+      "p95": 71292,
+      "p99": 326959
+    },
+    "json_codec_maximum": {
+      "iterations": 10000,
+      "ops": 4302,
+      "p50": 173667,
+      "p95": 348666,
+      "p99": 832625
+    },
+    "session_lookup_1": {
+      "iterations": 10000,
+      "ops": 15121913,
+      "p50": 42,
+      "p95": 83,
+      "p99": 84
+    },
+    "subscription_lookup_1": {
+      "iterations": 10000,
+      "ops": 21843982,
+      "p50": 41,
+      "p95": 42,
+      "p99": 42
+    },
+    "topic_acl_1": {
+      "iterations": 10000,
+      "ops": 8325812,
+      "p50": 84,
+      "p95": 125,
+      "p99": 125
+    },
+    "ingress_bookkeeping_1": {
+      "iterations": 10000,
+      "ops": 3995672,
+      "p50": 209,
+      "p95": 250,
+      "p99": 292
+    },
+    "session_lookup_64": {
+      "iterations": 10000,
+      "ops": 8737440,
+      "p50": 42,
+      "p95": 125,
+      "p99": 125
+    },
+    "subscription_lookup_64": {
+      "iterations": 10000,
+      "ops": 18769086,
+      "p50": 41,
+      "p95": 42,
+      "p99": 42
+    },
+    "topic_acl_64": {
+      "iterations": 10000,
+      "ops": 3759045,
+      "p50": 125,
+      "p95": 250,
+      "p99": 250
+    },
+    "ingress_bookkeeping_64": {
+      "iterations": 10000,
+      "ops": 610934,
+      "p50": 1417,
+      "p95": 2250,
+      "p99": 2250
+    },
+    "session_lookup_256": {
+      "iterations": 10000,
+      "ops": 14498889,
+      "p50": 42,
+      "p95": 83,
+      "p99": 84
+    },
+    "subscription_lookup_256": {
+      "iterations": 10000,
+      "ops": 21426674,
+      "p50": 41,
+      "p95": 42,
+      "p99": 42
+    },
+    "topic_acl_256": {
+      "iterations": 10000,
+      "ops": 6147071,
+      "p50": 125,
+      "p95": 250,
+      "p99": 250
+    },
+    "ingress_bookkeeping_256": {
+      "iterations": 10000,
+      "ops": 136144,
+      "p50": 5209,
+      "p95": 7750,
+      "p99": 16208
+    }
+  },
+  "after": {
+    "mqtt_decode": {
+      "iterations": 20000,
+      "ops": 5379177,
+      "p50": 167,
+      "p95": 167,
+      "p99": 209
+    },
+    "mqtt_encode": {
+      "iterations": 20000,
+      "ops": 7118811,
+      "p50": 125,
+      "p95": 125,
+      "p99": 208
+    },
+    "topic_acl": {
+      "iterations": 20000,
+      "ops": 13343341,
+      "p50": 42,
+      "p95": 84,
+      "p99": 84
+    },
+    "subscription_lookup": {
+      "iterations": 20000,
+      "ops": 22102500,
+      "p50": 41,
+      "p95": 42,
+      "p99": 42
+    },
+    "json_codec": {
+      "iterations": 20000,
+      "ops": 656037,
+      "p50": 1292,
+      "p95": 2083,
+      "p99": 2125
+    },
+    "tcp_frame": {
+      "iterations": 20000,
+      "ops": 6967629,
+      "p50": 125,
+      "p95": 125,
+      "p99": 167
+    },
+    "ingress_admission": {
+      "iterations": 20000,
+      "ops": 3989826,
+      "p50": 209,
+      "p95": 250,
+      "p99": 292
+    },
+    "mqtt_decode_small": {
+      "iterations": 10000,
+      "ops": 5349739,
+      "p50": 167,
+      "p95": 167,
+      "p99": 209
+    },
+    "mqtt_decode_medium": {
+      "iterations": 10000,
+      "ops": 2126905,
+      "p50": 417,
+      "p95": 459,
+      "p99": 459
+    },
+    "mqtt_decode_maximum": {
+      "iterations": 10000,
+      "ops": 465455,
+      "p50": 1125,
+      "p95": 2584,
+      "p99": 3041
+    },
+    "json_codec_small": {
+      "iterations": 10000,
+      "ops": 450599,
+      "p50": 1584,
+      "p95": 2833,
+      "p99": 3750
+    },
+    "json_codec_medium": {
+      "iterations": 10000,
+      "ops": 14948,
+      "p50": 33583,
+      "p95": 85667,
+      "p99": 336417
+    },
+    "json_codec_maximum": {
+      "iterations": 10000,
+      "ops": 2671,
+      "p50": 177917,
+      "p95": 736833,
+      "p99": 3251250
+    },
+    "session_lookup_1": {
+      "iterations": 10000,
+      "ops": 13318523,
+      "p50": 42,
+      "p95": 84,
+      "p99": 125
+    },
+    "subscription_lookup_1": {
+      "iterations": 10000,
+      "ops": 16790271,
+      "p50": 41,
+      "p95": 42,
+      "p99": 42
+    },
+    "topic_acl_1": {
+      "iterations": 10000,
+      "ops": 8082441,
+      "p50": 84,
+      "p95": 125,
+      "p99": 125
+    },
+    "ingress_bookkeeping_1": {
+      "iterations": 10000,
+      "ops": 3368847,
+      "p50": 250,
+      "p95": 500,
+      "p99": 500
+    },
+    "session_lookup_64": {
+      "iterations": 10000,
+      "ops": 15468909,
+      "p50": 42,
+      "p95": 42,
+      "p99": 84
+    },
+    "subscription_lookup_64": {
+      "iterations": 10000,
+      "ops": 22095395,
+      "p50": 41,
+      "p95": 42,
+      "p99": 42
+    },
+    "topic_acl_64": {
+      "iterations": 10000,
+      "ops": 4762376,
+      "p50": 208,
+      "p95": 250,
+      "p99": 250
+    },
+    "ingress_bookkeeping_64": {
+      "iterations": 10000,
+      "ops": 586797,
+      "p50": 1458,
+      "p95": 2250,
+      "p99": 2333
+    },
+    "session_lookup_256": {
+      "iterations": 10000,
+      "ops": 11444371,
+      "p50": 42,
+      "p95": 125,
+      "p99": 125
+    },
+    "subscription_lookup_256": {
+      "iterations": 10000,
+      "ops": 22162678,
+      "p50": 41,
+      "p95": 42,
+      "p99": 42
+    },
+    "topic_acl_256": {
+      "iterations": 10000,
+      "ops": 3665521,
+      "p50": 250,
+      "p95": 250,
+      "p99": 250
+    },
+    "ingress_bookkeeping_256": {
+      "iterations": 10000,
+      "ops": 112377,
+      "p50": 5250,
+      "p95": 7791,
+      "p99": 24458
+    }
+  }
+}

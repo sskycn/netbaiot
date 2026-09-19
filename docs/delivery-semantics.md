@@ -54,7 +54,8 @@ also count until retention, preventing a fast producer from bypassing quotas.
 
 The worker batches current stream-device lookups. HTTP independently leases one
 command at pull time. Claims create bounded attempts and delay another claim until
-lease expiry. There is no unbounded offline spool. Retry reuses command_id, so
+lease expiry plus bounded exponential full jitter. Lease expiry and retry due time
+are separate; backoff does not prolong a writer's lease. There is no unbounded offline spool. Retry reuses command_id, so
 **devices must deduplicate execution**, even if transport packet IDs differ.
 
 | Signal | Delivery state | Execution |
@@ -69,6 +70,10 @@ lease expiry. There is no unbounded offline spool. Retry reuses command_id, so
 HTTP sets Sent after the connection finishes writing its response. This still
 cannot prove receipt or execution. Command ACK ingress checks device ownership and
 expiry. Terminal execution is monotonic. Late ACKs for expired commands are rejected.
-Transport state cannot regress Received to Sent. Commands are retained through
+Transport state and attempt history cannot regress Received to Sent.
+Claims return attempt and lease_expires_at; queue and HTTP callbacks retain them.
+Store updates check the attempt and unexpired lease while holding the command lock.
+An old callback returns an explicit stale result and cannot update a newer attempt.
+Expired callbacks do not mutate completed records. Commands are retained through
 expires_at plus command_ttl_ms; attempts cascade-delete with the command. UDP has
 no command route. No shared/distributed socket routing is implemented.

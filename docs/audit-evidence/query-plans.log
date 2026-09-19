@@ -1,0 +1,149 @@
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE TABLE
+INSERT 0 10000
+INSERT 0 10000
+INSERT 0 1024
+ANALYZE
+DEDUP LOOKUP
+                                                                                     QUERY PLAN
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Index Scan using ingress_messages_tenant_id_product_id_device_id_source_mess_key on ingress_messages  (cost=0.29..8.31 rows=1 width=156) (actual time=0.006..0.006 rows=1 loops=1)
+   Index Cond: ((tenant_id = 't1'::text) AND (product_id = 'p'::text) AND (device_id = 'd1'::text) AND (source_message_id = 's1'::text))
+   Buffers: shared hit=3
+ Planning:
+   Buffers: shared hit=54
+ Planning Time: 0.184 ms
+ Execution Time: 0.014 ms
+(7 rows)
+
+OUTBOX CLAIM
+BEGIN
+                                                                       QUERY PLAN
+---------------------------------------------------------------------------------------------------------------------------------------------------------
+ Nested Loop  (cost=8.96..17.00 rows=1 width=17) (actual time=0.063..0.064 rows=1 loops=1)
+   Buffers: shared hit=20
+   CTE selected
+     ->  Limit  (cost=0.28..0.35 rows=1 width=30) (actual time=0.009..0.009 rows=1 loops=1)
+           Buffers: shared hit=4
+           ->  LockRows  (cost=0.28..421.04 rows=6428 width=30) (actual time=0.009..0.009 rows=1 loops=1)
+                 Buffers: shared hit=4
+                 ->  Index Scan using delivery_due on delivery_jobs  (cost=0.28..356.76 rows=6428 width=30) (actual time=0.007..0.007 rows=1 loops=1)
+                       Index Cond: (next_attempt_at <= 10000)
+                       Filter: ((NOT done) AND (expires_at > 10000) AND (attempts < 5) AND ((lease_expiry IS NULL) OR (lease_expiry <= 10000)))
+                       Buffers: shared hit=3
+   CTE claimed
+     ->  Update on delivery_jobs j  (cost=0.29..8.33 rows=1 width=74) (actual time=0.057..0.058 rows=1 loops=1)
+           Buffers: shared hit=17
+           ->  Nested Loop  (cost=0.29..8.33 rows=1 width=74) (actual time=0.015..0.015 rows=1 loops=1)
+                 Buffers: shared hit=7
+                 ->  CTE Scan on selected s  (cost=0.00..0.02 rows=1 width=56) (actual time=0.012..0.013 rows=1 loops=1)
+                       Buffers: shared hit=4
+                 ->  Index Scan using delivery_jobs_pkey on delivery_jobs j  (cost=0.29..8.30 rows=1 width=26) (actual time=0.002..0.002 rows=1 loops=1)
+                       Index Cond: (message_id = s.message_id)
+                       Buffers: shared hit=3
+   ->  CTE Scan on claimed c  (cost=0.00..0.02 rows=1 width=28) (actual time=0.058..0.058 rows=1 loops=1)
+         Buffers: shared hit=17
+   ->  Index Scan using ingress_messages_pkey on ingress_messages m  (cost=0.29..8.30 rows=1 width=21) (actual time=0.004..0.004 rows=1 loops=1)
+         Index Cond: (message_id = c.message_id)
+         Buffers: shared hit=3
+ Planning:
+   Buffers: shared hit=121
+ Planning Time: 0.294 ms
+ Execution Time: 0.093 ms
+(30 rows)
+
+ROLLBACK
+COMMAND BATCH CLAIM
+                                                                     QUERY PLAN
+-----------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=42.09..42.29 rows=16 width=139) (actual time=0.126..0.127 rows=2 loops=1)
+   Buffers: shared hit=14
+   ->  LockRows  (cost=42.09..43.37 rows=102 width=139) (actual time=0.125..0.127 rows=2 loops=1)
+         Buffers: shared hit=14
+         ->  Sort  (cost=42.09..42.35 rows=102 width=139) (actual time=0.123..0.124 rows=2 loops=1)
+               Sort Key: commands.next_attempt_at
+               Sort Method: quicksort  Memory: 25kB
+               Buffers: shared hit=12
+               ->  Hash Semi Join  (cost=2.75..39.54 rows=102 width=139) (actual time=0.015..0.120 rows=2 loops=1)
+                     Hash Cond: ((commands.tenant_id = d.tenant_id) AND (commands.product_id = d.product_id) AND (commands.device_id = d.device_id))
+                     Buffers: shared hit=12
+                     ->  Seq Scan on commands  (cost=0.00..27.36 rows=1024 width=28) (actual time=0.004..0.071 rows=1024 loops=1)
+                           Filter: ((NOT terminal) AND (expires_at > 10000) AND (next_attempt_at <= 10000))
+                           Buffers: shared hit=12
+                     ->  Hash  (cost=1.00..1.00 rows=100 width=216) (actual time=0.008..0.008 rows=1 loops=1)
+                           Buckets: 1024  Batches: 1  Memory Usage: 9kB
+                           ->  Function Scan on jsonb_to_recordset d  (cost=0.00..1.00 rows=100 width=216) (actual time=0.007..0.007 rows=1 loops=1)
+ Planning:
+   Buffers: shared hit=54
+ Planning Time: 0.257 ms
+ Execution Time: 0.141 ms
+(21 rows)
+
+INGRESS CLEANUP
+                                                                     QUERY PLAN
+----------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=0.29..1.38 rows=16 width=30) (actual time=0.007..0.011 rows=16 loops=1)
+   Buffers: shared hit=19
+   ->  LockRows  (cost=0.29..342.79 rows=5000 width=30) (actual time=0.007..0.010 rows=16 loops=1)
+         Buffers: shared hit=19
+         ->  Index Scan using ingress_expiry on ingress_messages  (cost=0.29..292.79 rows=5000 width=30) (actual time=0.006..0.007 rows=16 loops=1)
+               Index Cond: (expires_at <= 105000)
+               Buffers: shared hit=3
+ Planning:
+   Buffers: shared hit=3
+ Planning Time: 0.020 ms
+ Execution Time: 0.015 ms
+(11 rows)
+
+COMMAND RETENTION
+                                                                  QUERY PLAN
+-----------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=0.28..1.27 rows=16 width=30) (actual time=0.008..0.012 rows=16 loops=1)
+   Buffers: shared hit=19
+   ->  LockRows  (cost=0.28..62.77 rows=1000 width=30) (actual time=0.008..0.011 rows=16 loops=1)
+         Buffers: shared hit=19
+         ->  Index Scan using commands_retention on commands  (cost=0.28..52.77 rows=1000 width=30) (actual time=0.007..0.008 rows=16 loops=1)
+               Index Cond: (retain_until <= 201000)
+               Buffers: shared hit=3
+ Planning:
+   Buffers: shared hit=6
+ Planning Time: 0.014 ms
+ Execution Time: 0.014 ms
+(11 rows)
+
+EXPIRED COMMANDS
+                                                     QUERY PLAN
+--------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=0.00..0.56 rows=16 width=11) (actual time=0.004..0.008 rows=16 loops=1)
+   Buffers: shared hit=18
+   ->  LockRows  (cost=0.00..34.80 rows=1000 width=11) (actual time=0.004..0.007 rows=16 loops=1)
+         Buffers: shared hit=18
+         ->  Seq Scan on commands  (cost=0.00..24.80 rows=1000 width=11) (actual time=0.003..0.004 rows=16 loops=1)
+               Filter: ((NOT terminal) AND (expires_at <= 101000))
+               Buffers: shared hit=2
+ Planning Time: 0.015 ms
+ Execution Time: 0.012 ms
+(9 rows)
+
+CAPACITY ACCOUNTING
+                                                        QUERY PLAN
+---------------------------------------------------------------------------------------------------------------------------
+ Aggregate  (cost=733.01..733.03 rows=1 width=48) (actual time=2.849..2.849 rows=1 loops=1)
+   Buffers: shared hit=283
+   ->  Seq Scan on ingress_messages  (cost=0.00..383.00 rows=10000 width=17) (actual time=0.002..0.539 rows=10000 loops=1)
+         Buffers: shared hit=283
+ Planning:
+   Buffers: shared hit=15
+ Planning Time: 0.031 ms
+ Execution Time: 2.861 ms
+(8 rows)

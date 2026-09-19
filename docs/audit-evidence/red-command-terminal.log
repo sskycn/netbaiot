@@ -1,0 +1,25 @@
+   Compiling netbaiot-runtime v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-runtime)
+   Compiling netbaiot-storage v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-storage)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 8.28s
+     Running tests/semantics.rs (target/debug/deps/semantics-f90a94e0c11bec7a)
+
+running 1 test
+test audit_late_transport_update_preserves_completed_command ... FAILED
+
+failures:
+
+---- audit_late_transport_update_preserves_completed_command stdout ----
+
+thread 'audit_late_transport_update_preserves_completed_command' (2386330) panicked at crates/netbaiot-storage/tests/semantics.rs:493:5:
+assertion `left == right` failed
+  left: Expired
+ right: Received
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    audit_late_transport_update_preserves_completed_command
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.06s
+
+error: test failed, to rerun pass `-p netbaiot-storage --test semantics`

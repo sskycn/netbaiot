@@ -19,11 +19,17 @@ pub trait DeliverySink: Send + Sync {
 }
 /// Full jitter is deterministic per message/attempt, reproducible in tests.
 pub fn retry_delay(l: &Limits, id: MessageId, attempt: u32) -> u64 {
+    jitter(l, id.0, attempt)
+}
+pub fn command_retry_delay(l: &Limits, id: CommandId, attempt: u32) -> u64 {
+    jitter(l, id.0, attempt)
+}
+fn jitter(l: &Limits, id: Uuid, attempt: u32) -> u64 {
     let cap = l
         .retry_base_ms
         .saturating_mul(1u64.checked_shl(attempt.min(30)).unwrap_or(u64::MAX))
         .min(l.retry_max_ms);
-    let seed = (id.0.as_u128() as u64)
+    let seed = (id.as_u128() as u64)
         .wrapping_mul(6364136223846793005)
         .wrapping_add(u64::from(attempt).wrapping_mul(1442695040888963407));
     1 + seed % cap.max(1)
@@ -133,7 +139,7 @@ pub async fn command_worker(
             .await?;
             for record in commands {
                 if let Some(auth) = identities.get(&record.command.device)
-                    && let Err(e) = router.dispatch(record.command, auth).await
+                    && let Err(e) = router.dispatch(record, auth).await
                 {
                     tracing::debug!(error=%e,"command remains leased for bounded retry");
                 }
@@ -141,4 +147,29 @@ pub async fn command_worker(
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod audit {
+    use super::*;
+    #[test]
+    fn command_backoff_is_positive_bounded_and_spread_across_ids() {
+        let l = Limits {
+            retry_base_ms: 3,
+            retry_max_ms: 20,
+            ..Limits::default()
+        };
+        let mut first = std::collections::HashSet::new();
+        for id in 1..=64 {
+            for attempt in 1..=100 {
+                let delay = command_retry_delay(&l, CommandId(Uuid::from_u128(id)), attempt);
+                let cap = 3u64.saturating_mul(1u64 << attempt.min(30)).min(20);
+                assert!((1..=cap).contains(&delay));
+                if attempt == 1 {
+                    first.insert(delay);
+                }
+            }
+        }
+        assert!(first.len() > 1);
+    }
 }

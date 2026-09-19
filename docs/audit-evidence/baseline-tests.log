@@ -1,0 +1,140 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.21s
+     Running unittests src/lib.rs (target/debug/deps/netbaiot_codecs-f5f01d8d558017a8)
+
+running 2 tests
+test tests::all_payloads_and_bounds ... ok
+test hostile::unknown_identity_duplicate_fields_and_huge_maps_are_rejected ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/netbaiot_core-fde6234a6ab151c5)
+
+running 1 test
+test tests::identities_are_namespace_safe ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/netbaiot_runtime-26c0d053d4221041)
+
+running 6 tests
+test quota::tests::source_rate_table_has_capacity_and_global_limit ... ok
+test quota::tests::connection_limits_and_raii_cleanup ... ok
+test quota::tests::ingress_limits_isolate_devices_tenants_and_bytes ... ok
+test sessions::tests::stale_disconnect_cannot_remove_new_generation ... ok
+test sessions::tests::queue_count_and_bytes_are_bounded ... ok
+test limits::tests::defaults_and_invalid ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/netbaiot_server-a172e7a3375131e1)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (target/debug/deps/netbaiot_server-1f18d3d88f9f12d6)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/server.rs (target/debug/deps/server-ebf2fcb251029a39)
+
+running 4 tests
+test config_input_is_bounded_and_malformed_config_fails ... ok
+test public_streams_require_tls_and_volatile_store_requires_loopback ... ok
+test tls_composition_completes_verified_handshake ... ok
+test composition_root_serves_http_and_stops_all_listeners ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running unittests src/lib.rs (target/debug/deps/netbaiot_storage-8d1a6f712960b69d)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/semantics.rs (target/debug/deps/semantics-8f56d4e6c64965f9)
+
+running 6 tests
+test postgres_transaction_and_command_contract ... ignored, requires NETBAIOT_TEST_DATABASE_URL pointing at a fresh disposable PostgreSQL database
+test delivery_attempts_are_bounded_and_stale_leases_cannot_finish ... ok
+test capacity_failures_do_not_create_partial_jobs_or_commands ... ok
+test byte_quota_isolates_device_from_other_devices ... ok
+test memory_command_lifecycle_and_atomic_ack ... ok
+test memory_acceptance_outbox_dedup_lease_and_retention ... ok
+
+test result: ok. 5 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running unittests src/lib.rs (target/debug/deps/netbaiot_transports-ac7dde8ec13f7a5e)
+
+running 10 tests
+test mqtt::tests::state_rejects_double_connect ... ok
+test udp::tests::replay_reordering_and_expiry ... ok
+test tcp::tests::split_multiple_and_invalid ... ok
+test mqtt::packet::tests::exact_packet_size_boundary ... ok
+test mqtt::topics::tests::exact_acl_and_stale_cleanup ... ok
+test mqtt::packet::tests::malformed_and_boundaries ... ok
+test udp::tests::arbitrary_envelopes ... ok
+test mqtt::tests::packet_ids_reuse_only_after_ack ... ok
+test mqtt::packet::tests::incremental_and_multiple ... ok
+test mqtt::packet::tests::arbitrary_bytes_smoke ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/end_to_end.rs (target/debug/deps/end_to_end-ef74c3e74eac176e)
+
+running 15 tests
+test mqtt_control_packet_flood_is_rate_limited ... ok
+test business_api_rejects_device_credentials_and_persists_authorized_commands ... ok
+test shutdown_drains_accepted_ingress_without_leaking_owners ... ok
+test mqtt_reconnect_keeps_new_session_and_cleans_subscriptions ... ok
+test mqtt_acl_subscribe_unsubscribe_qos0_and_ping ... ok
+test mqtt_protocol_rejections ... ok
+test command_worker_routes_durable_claim_to_active_session ... ok
+test mqtt_ingress_application_ack_dedup_and_command_execution ... ok
+test tcp_split_frames_downlink_and_shutdown ... ok
+test http_acceptance_dedup_conflict_pull_ack_and_limits ... ok
+test slow_writer_is_bounded_and_disconnect_mid_frame_releases_connection ... ok
+test udp_authentication_replay_and_no_fake_session ... ok
+test mqtt_never_acknowledges_before_acceptance_and_closes_on_storage_timeout ... ok
+test delivery_worker_times_out_retries_with_bound_and_shuts_down ... ok
+test mqtt_keepalive_and_partial_frame_deadlines ... ok
+
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.60s
+
+   Doc-tests netbaiot_codecs
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests netbaiot_core
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests netbaiot_runtime
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests netbaiot_server
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests netbaiot_storage
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests netbaiot_transports
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s

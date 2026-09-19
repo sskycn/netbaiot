@@ -1,0 +1,31 @@
+   Compiling netbaiot-runtime v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-runtime)
+   Compiling netbaiot-storage v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-storage)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.39s
+     Running unittests src/lib.rs (target/debug/deps/netbaiot_storage-6ae64ce99d41423b)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/semantics.rs (target/debug/deps/semantics-f90a94e0c11bec7a)
+
+running 1 test
+test audit_stale_command_attempt_is_fenced ... FAILED
+
+failures:
+
+---- audit_stale_command_attempt_is_fenced stdout ----
+
+thread 'audit_stale_command_attempt_is_fenced' (2248840) panicked at crates/netbaiot-storage/tests/semantics.rs:49:5:
+assertion `left == right` failed
+  left: Received
+ right: Dispatching
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    audit_stale_command_attempt_is_fenced
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p netbaiot-storage --test semantics`

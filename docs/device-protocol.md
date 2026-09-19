@@ -37,7 +37,10 @@ codec needs a matching atomic batch receipt design; ingress currently requires o
 
 `POST /v1/device/messages` with `Authorization: Bearer <credential-id>:<key>`.
 Successful configured acceptance returns 202; errors map to 400/401/403/409/413/429/
-503/504. Request and header bounds are enforced by Hyper and the adapter. HTTP/1
+503/504. Request and header bounds are enforced by Hyper and the adapter. Any
+Content-Encoding header is rejected with 415; request decompression is unsupported.
+Authenticated request-stage permits cover slow bodies and command pulls at
+device, tenant and node levels. HTTP/1
 uses one request per connection in this milestone; header/body/response deadlines
 bound slow clients. `GET /v1/device/commands` leases one pending command (200) or
 returns 204. POST the JSON command ACK to `/v1/device/commands/ack`.

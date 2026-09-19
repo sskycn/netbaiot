@@ -15,3 +15,11 @@ cargo +nightly fuzz run json_codec -- -max_total_time=30 -max_len=65537
 Use `CARGO_NET_OFFLINE=true` after dependencies have been cached. Keep crashing
 inputs as regression cases. Smoke runs are not a security audit or a proof of
 memory bounds. See docs/validation.md for the runs actually performed.
+
+## Audit campaign
+
+Run `python3 fuzz/seed_corpus.py` from the repository root before the six targets.
+The MQTT target asserts forward progress/NeedMore behavior and output bounds;
+TCP asserts consumption and frame bounds; JSON asserts a single trusted-device output.
+The 2026-09-19 audit used 500,000 MQTT packet iterations and 100,000 for each other
+target with ASan. See `docs/correctness-resource-reliability-audit.md` for results.

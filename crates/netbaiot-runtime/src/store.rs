@@ -43,8 +43,9 @@ pub trait Store: Send + Sync {
         &self,
         device: &DeviceKey,
         id: CommandId,
+        attempt: u32,
         state: DeliveryState,
-    ) -> Result<()>;
+    ) -> Result<bool>;
     async fn get_command(&self, device: &DeviceKey, id: CommandId)
     -> Result<Option<CommandRecord>>;
     async fn maintain(&self, now: i64, batch: usize) -> Result<()>;

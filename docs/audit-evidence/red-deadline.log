@@ -1,0 +1,29 @@
+   Compiling netbaiot-transports v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-transports)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.65s
+     Running unittests src/lib.rs (target/debug/deps/netbaiot_transports-b4a5086358ced3f3)
+
+running 2 tests
+test common::audit_deadlines::audit_expired_packet_rejects_even_ready_socket_bytes ... FAILED
+test common::audit_deadlines::audit_partial_next_packet_keeps_original_deadline ... FAILED
+
+failures:
+
+---- common::audit_deadlines::audit_expired_packet_rejects_even_ready_socket_bytes stdout ----
+
+thread 'common::audit_deadlines::audit_expired_packet_rejects_even_ready_socket_bytes' (2358184) panicked at crates/netbaiot-transports/src/common.rs:191:9:
+assertion failed: matches!(reader.read_more(&mut stream, idle).await, Err(Error::Timeout))
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- common::audit_deadlines::audit_partial_next_packet_keeps_original_deadline stdout ----
+
+thread 'common::audit_deadlines::audit_partial_next_packet_keeps_original_deadline' (2358185) panicked at crates/netbaiot-transports/src/common.rs:205:9:
+assertion failed: matches!(reader.read_more(&mut stream, idle).await, Err(Error::Timeout))
+
+
+failures:
+    common::audit_deadlines::audit_expired_packet_rejects_even_ready_socket_bytes
+    common::audit_deadlines::audit_partial_next_packet_keeps_original_deadline
+
+test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 14 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p netbaiot-transports --lib`

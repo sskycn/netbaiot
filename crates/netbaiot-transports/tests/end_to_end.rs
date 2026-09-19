@@ -54,6 +54,14 @@ impl Fixture {
         limits: Limits,
         gate: Option<Arc<tokio::sync::Semaphore>>,
     ) -> Self {
+        Self::with_auth(transport, limits, gate, None).await
+    }
+    async fn with_auth(
+        transport: Transport,
+        limits: Limits,
+        gate: Option<Arc<tokio::sync::Semaphore>>,
+        authenticator: Option<Arc<dyn DeviceAuthenticator>>,
+    ) -> Self {
         let l = Arc::new(limits);
         let store = MemoryStore::new(l.clone());
         let credentials = ["a", "b"]
@@ -63,7 +71,8 @@ impl Fixture {
                 identity: auth(name),
             })
             .to_vec();
-        let authenticator = StaticAuthenticator::new(credentials, &l).unwrap();
+        let authenticator =
+            authenticator.unwrap_or_else(|| StaticAuthenticator::new(credentials, &l).unwrap());
         let codecs = CodecRegistry::new(vec![(
             CodecId::new("netbaiot-json").unwrap(),
             1,
@@ -76,6 +85,7 @@ impl Fixture {
             Arc::new(GatedStore {
                 inner: store.clone(),
                 gate,
+                after_commit: None,
             })
         } else {
             store.clone()
@@ -274,7 +284,7 @@ async fn mqtt_ingress_application_ack_dedup_and_command_execution() {
         .await
         .unwrap();
     assert_eq!(claimed.len(), 1);
-    f.s.router.dispatch(c.clone(), &a).await.unwrap();
+    f.s.router.dispatch(claimed[0].clone(), &a).await.unwrap();
     let raw = read_mqtt(&mut stream).await;
     let packet::Packet::Publish {
         topic,
@@ -574,7 +584,17 @@ async fn tcp_split_frames_downlink_and_shutdown() {
     let a = auth("a");
     let command = command(&a);
     f.s.router.queue(&a, command.clone()).await.unwrap();
-    f.s.router.dispatch(command.clone(), &a).await.unwrap();
+    f.s.router
+        .dispatch(
+            f.store
+                .claim_commands(Some(&a.device_key), now_ms(), 1)
+                .await
+                .unwrap()
+                .remove(0),
+            &a,
+        )
+        .await
+        .unwrap();
     let down: DeviceCommand = serde_json::from_slice(&tcp_read(&mut c).await).unwrap();
     assert_eq!(down.command_id, command.command_id);
     f.shutdown().await;
@@ -651,15 +671,23 @@ async fn slow_writer_is_bounded_and_disconnect_mid_frame_releases_connection() {
 }
 
 struct GatedStore {
-    inner: Arc<MemoryStore>,
+    inner: Arc<dyn Store>,
     gate: Arc<tokio::sync::Semaphore>,
+    after_commit: Option<std::path::PathBuf>,
 }
 #[async_trait::async_trait]
 impl Store for GatedStore {
     async fn accept(&self, input: StoredIngress) -> Result<IngressReceipt> {
         let permit = self.gate.acquire().await.map_err(|_| Error::Storage)?;
         permit.forget();
-        self.inner.accept(input).await
+        let receipt = self.inner.accept(input).await?;
+        if let Some(path) = &self.after_commit {
+            tokio::fs::write(path, serde_json::to_vec(&receipt).unwrap())
+                .await
+                .unwrap();
+            std::future::pending::<()>().await;
+        }
+        Ok(receipt)
     }
     async fn claim_jobs(&self, o: uuid::Uuid, n: i64, l: usize) -> Result<Vec<DeliveryJob>> {
         self.inner.claim_jobs(o, n, l).await
@@ -686,8 +714,14 @@ impl Store for GatedStore {
     ) -> Result<Vec<CommandRecord>> {
         self.inner.claim_command_batch(devices, now, limit).await
     }
-    async fn command_state(&self, d: &DeviceKey, id: CommandId, s: DeliveryState) -> Result<()> {
-        self.inner.command_state(d, id, s).await
+    async fn command_state(
+        &self,
+        d: &DeviceKey,
+        id: CommandId,
+        attempt: u32,
+        s: DeliveryState,
+    ) -> Result<bool> {
+        self.inner.command_state(d, id, attempt, s).await
     }
     async fn get_command(&self, d: &DeviceKey, id: CommandId) -> Result<Option<CommandRecord>> {
         self.inner.get_command(d, id).await
@@ -903,4 +937,618 @@ async fn command_worker_routes_durable_claim_to_active_session() {
         1
     );
     f.shutdown().await;
+}
+
+#[tokio::test]
+async fn audit_http_rejects_unsupported_content_encoding() {
+    let f = Fixture::new(Transport::Http, Limits::default()).await;
+    let mut c = TcpStream::connect(f.addr).await.unwrap();
+    let body = payload("encoding");
+    let request = format!(
+        "POST /v1/device/messages HTTP/1.1\r\nHost: localhost\r\nAuthorization: Bearer a:{SECRET}\r\nContent-Encoding: gzip\r\nContent-Length: {}\r\n\r\n",
+        body.len()
+    );
+    c.write_all(request.as_bytes()).await.unwrap();
+    c.write_all(&body).await.unwrap();
+    let mut response = Vec::new();
+    c.read_to_end(&mut response).await.unwrap();
+    assert!(response.starts_with(b"HTTP/1.1 415"));
+    assert_eq!(f.store.message_count().unwrap(), 0);
+    f.shutdown().await;
+}
+
+#[tokio::test]
+async fn audit_http_body_admission_respects_tenant_capacity() {
+    let f = Fixture::new(
+        Transport::Http,
+        Limits {
+            max_ingress_per_tenant: 1,
+            ..Limits::default()
+        },
+    )
+    .await;
+    // Hold the tenant's request-stage permit, as an authenticated slow body does.
+    let held =
+        f.s.protocol_admission
+            .acquire(&auth("b").device_key, 0)
+            .unwrap();
+    let response = http(&f, "POST", "/v1/device/messages", &payload("tenant-full")).await;
+    assert!(response.starts_with(b"HTTP/1.1 429"));
+    assert_eq!(f.store.message_count().unwrap(), 0);
+    drop(held);
+    assert!(
+        http(&f, "POST", "/v1/device/messages", &payload("tenant-free"))
+            .await
+            .starts_with(b"HTTP/1.1 202")
+    );
+    f.shutdown().await;
+}
+
+struct DelayedAuth {
+    entered: tokio::sync::Notify,
+    release: tokio::sync::Semaphore,
+}
+#[async_trait::async_trait]
+impl DeviceAuthenticator for DelayedAuth {
+    async fn authenticate(&self, _: AuthenticationRequest<'_>) -> Result<AuthenticatedDevice> {
+        self.entered.notify_one();
+        self.release
+            .acquire()
+            .await
+            .map_err(|_| Error::Authentication)?
+            .forget();
+        Ok(auth("a"))
+    }
+}
+#[tokio::test]
+async fn audit_shutdown_during_auth_cannot_register_session() {
+    for transport in [Transport::Mqtt, Transport::Tcp] {
+        let delayed = Arc::new(DelayedAuth {
+            entered: tokio::sync::Notify::new(),
+            release: tokio::sync::Semaphore::new(0),
+        });
+        let f = Fixture::with_auth(transport, Limits::default(), None, Some(delayed.clone())).await;
+        let mut c = TcpStream::connect(f.addr).await.unwrap();
+        let hello = if transport == Transport::Mqtt {
+            connect("a", SECRET, 30, true)
+        } else {
+            LengthPrefixFramer { maximum: 65536 }
+                .encode(format!(r#"{{"credential_id":"a","secret":"{SECRET}"}}"#).as_bytes())
+                .unwrap()
+        };
+        c.write_all(&hello).await.unwrap();
+        tokio::time::timeout(Duration::from_secs(1), delayed.entered.notified())
+            .await
+            .unwrap();
+        f.s.ingress.drain();
+        f.stop.cancel();
+        delayed.release.add_permits(1);
+        let mut received = Vec::new();
+        c.read_to_end(&mut received).await.unwrap();
+        assert!(
+            received.is_empty(),
+            "shutdown must not send successful auth reply"
+        );
+        assert!(
+            f.s.ingress
+                .sessions
+                .presence(&auth("a").device_key)
+                .unwrap()
+                .is_none()
+        );
+        f.shutdown().await;
+    }
+}
+#[tokio::test]
+async fn audit_disconnected_auth_cannot_replace_new_session() {
+    let delayed = Arc::new(DelayedAuth {
+        entered: tokio::sync::Notify::new(),
+        release: tokio::sync::Semaphore::new(0),
+    });
+    let f = Fixture::with_auth(
+        Transport::Mqtt,
+        Limits::default(),
+        None,
+        Some(delayed.clone()),
+    )
+    .await;
+    let mut c = TcpStream::connect(f.addr).await.unwrap();
+    c.write_all(&connect("a", SECRET, 30, true)).await.unwrap();
+    tokio::time::timeout(Duration::from_secs(1), delayed.entered.notified())
+        .await
+        .unwrap();
+    c.shutdown().await.unwrap();
+    drop(c);
+    // Wait for server-side EOF observation, independent of OS FIN scheduling.
+    // Before the fix this times out: the task only observes authentication.
+    tokio::time::timeout(Duration::from_secs(1), async {
+        while f.s.connections.active().unwrap()[Transport::Mqtt as usize] != 0 {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .unwrap();
+    let (new, _rx) =
+        f.s.ingress
+            .sessions
+            .register(&auth("a").device_key, Transport::Mqtt)
+            .unwrap();
+    delayed.release.add_permits(1);
+    assert!(
+        !new.cancel.is_cancelled(),
+        "disconnected authentication evicted current owner"
+    );
+    assert_eq!(
+        f.s.ingress
+            .sessions
+            .lookup(&new.device)
+            .unwrap()
+            .unwrap()
+            .generation,
+        new.generation
+    );
+    drop(new);
+    f.shutdown().await;
+}
+
+// Crash-only fixtures wrap production I/O/storage; no failpoints in production code.
+struct ReceiptFence {
+    socket: TcpStream,
+    reached: Arc<tokio::sync::Notify>,
+}
+impl tokio::io::AsyncRead for ReceiptFence {
+    fn poll_read(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+        buf: &mut tokio::io::ReadBuf<'_>,
+    ) -> std::task::Poll<std::io::Result<()>> {
+        std::pin::Pin::new(&mut self.socket).poll_read(cx, buf)
+    }
+}
+impl tokio::io::AsyncWrite for ReceiptFence {
+    fn poll_write(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+        buf: &[u8],
+    ) -> std::task::Poll<std::io::Result<usize>> {
+        if buf.first() == Some(&0x30) {
+            self.reached.notify_one();
+            return std::task::Poll::Pending;
+        }
+        std::pin::Pin::new(&mut self.socket).poll_write(cx, buf)
+    }
+    fn poll_flush(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<std::io::Result<()>> {
+        std::pin::Pin::new(&mut self.socket).poll_flush(cx)
+    }
+    fn poll_shutdown(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<std::io::Result<()>> {
+        std::pin::Pin::new(&mut self.socket).poll_shutdown(cx)
+    }
+}
+#[tokio::test]
+#[ignore = "subprocess helper, invoked only by audit_postgres_process_crash_boundaries"]
+async fn audit_crash_child() {
+    let phase = std::env::var("NETBAIOT_CRASH_PHASE").unwrap();
+    let path = std::path::PathBuf::from(std::env::var("NETBAIOT_CRASH_PATH").unwrap());
+    let l = Arc::new(Limits::default());
+    let pg = netbaiot_storage::PgStore::connect(
+        &std::env::var("NETBAIOT_TEST_DATABASE_URL").unwrap(),
+        l.clone(),
+    )
+    .await
+    .unwrap();
+    let store: Arc<dyn Store> = if phase == "b" {
+        Arc::new(GatedStore {
+            inner: pg,
+            gate: Arc::new(tokio::sync::Semaphore::new(1)),
+            after_commit: Some(path.with_extension("fence")),
+        })
+    } else {
+        pg
+    };
+    let authenticator = StaticAuthenticator::new(
+        vec![Credential {
+            credential_id: "a".into(),
+            secret_hex: SECRET.into(),
+            identity: auth("a"),
+        }],
+        &l,
+    )
+    .unwrap();
+    let ingress = Arc::new(Ingress::new(
+        l.clone(),
+        authenticator,
+        CodecRegistry::new(vec![(
+            CodecId::new("netbaiot-json").unwrap(),
+            1,
+            Arc::new(JsonV1::default()),
+        )])
+        .unwrap(),
+        store,
+        Arc::new(Metrics::default()),
+        Sessions::new(l),
+    ));
+    let services = Services::new(ingress);
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    tokio::fs::write(
+        path.with_extension("ready"),
+        listener.local_addr().unwrap().to_string(),
+    )
+    .await
+    .unwrap();
+    let (socket, peer) = listener.accept().await.unwrap();
+    let lease = services
+        .connections
+        .acquire(peer.ip(), Transport::Mqtt)
+        .unwrap();
+    let reached = Arc::new(tokio::sync::Notify::new());
+    let stream: BoxStream = if phase == "c" {
+        Box::new(ReceiptFence {
+            socket,
+            reached: reached.clone(),
+        })
+    } else {
+        Box::new(socket)
+    };
+    let connection = mqtt::connection(stream, services, lease, CancellationToken::new());
+    tokio::pin!(connection);
+    tokio::select! {
+        result = &mut connection => { result.unwrap(); },
+        _ = reached.notified() => {
+            tokio::fs::write(path.with_extension("fence"), b"PUBACK written; application receipt blocked").await.unwrap();
+            std::future::pending::<()>().await;
+        }
+    }
+}
+async fn await_file(path: &std::path::Path) -> Vec<u8> {
+    tokio::time::timeout(Duration::from_secs(10), async {
+        loop {
+            if let Ok(bytes) = tokio::fs::read(path).await {
+                return bytes;
+            }
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+    })
+    .await
+    .unwrap()
+}
+async fn crash_child(phase: &str, path: &std::path::Path) -> (tokio::process::Child, TcpStream) {
+    let child = tokio::process::Command::new(std::env::current_exe().unwrap())
+        .args(["--ignored", "--exact", "audit_crash_child", "--nocapture"])
+        .env("NETBAIOT_CRASH_PHASE", phase)
+        .env("NETBAIOT_CRASH_PATH", path)
+        .kill_on_drop(true)
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::inherit())
+        .spawn()
+        .unwrap();
+    let address = String::from_utf8(await_file(&path.with_extension("ready")).await).unwrap();
+    let mut socket = TcpStream::connect(address).await.unwrap();
+    socket
+        .write_all(&connect("a", SECRET, 30, true))
+        .await
+        .unwrap();
+    assert_eq!(read_mqtt(&mut socket).await, packet::connack(0));
+    let up_ack = topic(&auth("a").device_key, TopicKind::UpAck);
+    socket
+        .write_all(&subscribe(1, &[(&up_ack, 0)]))
+        .await
+        .unwrap();
+    assert_eq!(read_mqtt(&mut socket).await, vec![0x90, 3, 0, 1, 0]);
+    (child, socket)
+}
+#[tokio::test]
+#[ignore = "requires fresh NETBAIOT_TEST_DATABASE_URL; kills only owned test child processes"]
+async fn audit_postgres_process_crash_boundaries() {
+    let url = std::env::var("NETBAIOT_TEST_DATABASE_URL").unwrap();
+    let pg = netbaiot_storage::PgStore::connect(&url, Arc::new(Limits::default()))
+        .await
+        .unwrap();
+    pg.migrate().await.unwrap();
+    let pool = sqlx::PgPool::connect(&url).await.unwrap();
+    sqlx::raw_sql("CREATE FUNCTION audit_commit_gate() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF EXISTS (SELECT 1 FROM ingress_messages WHERE message_id=NEW.message_id AND source_message_id='crash-a') THEN PERFORM pg_advisory_xact_lock(739281); END IF; RETURN NEW; END $$; CREATE TRIGGER audit_commit_gate BEFORE INSERT ON delivery_jobs FOR EACH ROW EXECUTE FUNCTION audit_commit_gate();").execute(&pool).await.unwrap();
+    let directory = std::env::temp_dir().join(format!("netbaiot-crash-{}", uuid::Uuid::new_v4()));
+    tokio::fs::create_dir(&directory).await.unwrap();
+    for phase in ["a", "b", "c"] {
+        eprintln!("testing process crash phase {phase}");
+        let mut gate = pool.acquire().await.unwrap();
+        if phase == "a" {
+            sqlx::query("SELECT pg_advisory_lock(739281)")
+                .execute(&mut *gate)
+                .await
+                .unwrap();
+        }
+        let path = directory.join(phase);
+        let (mut child, mut socket) = crash_child(phase, &path).await;
+        let source = format!("crash-{phase}");
+        let wire = packet::publish(
+            &topic(&auth("a").device_key, TopicKind::Up),
+            &payload(&source),
+            Some(7),
+            &Limits::default(),
+        )
+        .unwrap();
+        socket.write_all(&wire).await.unwrap();
+        if phase == "a" {
+            tokio::time::timeout(Duration::from_secs(5), async {
+                loop {
+                    let waiting: i64 = sqlx::query_scalar("SELECT count(*) FROM pg_locks WHERE locktype='advisory' AND objid=739281 AND NOT granted").fetch_one(&pool).await.unwrap();
+                    if waiting == 1 { break; }
+                    tokio::time::sleep(Duration::from_millis(5)).await;
+                }
+            }).await.unwrap();
+        } else {
+            await_file(&path.with_extension("fence")).await;
+        }
+        if phase == "c" {
+            assert_eq!(read_mqtt(&mut socket).await, packet::ack(0x40, 7));
+        }
+        let mut byte = [0];
+        assert!(
+            tokio::time::timeout(Duration::from_millis(30), socket.read(&mut byte))
+                .await
+                .is_err()
+        );
+        let before: Option<uuid::Uuid> = sqlx::query_scalar(
+            "SELECT message_id FROM ingress_messages WHERE source_message_id=$1",
+        )
+        .bind(&source)
+        .fetch_optional(&pool)
+        .await
+        .unwrap();
+        assert_eq!(before.is_some(), phase != "a");
+        child.kill().await.unwrap();
+        child.wait().await.unwrap();
+        drop(socket);
+        if phase == "a" {
+            sqlx::query("SELECT pg_advisory_unlock(739281)")
+                .execute(&mut *gate)
+                .await
+                .unwrap();
+        }
+        drop(gate);
+        let recovery_path = directory.join(format!("recover-{phase}"));
+        let (mut recovery, mut socket) = crash_child("recover", &recovery_path).await;
+        socket.write_all(&wire).await.unwrap();
+        assert_eq!(read_mqtt(&mut socket).await, packet::ack(0x40, 7));
+        let packet::Packet::Publish { payload, .. } = packet::decode(
+            &mut BytesMut::from(read_mqtt(&mut socket).await.as_slice()),
+            &Limits::default(),
+        )
+        .unwrap()
+        .unwrap() else {
+            panic!()
+        };
+        let receipt: IngressReceipt = serde_json::from_slice(&payload).unwrap();
+        assert_eq!(receipt.boundary, ReceiptBoundary::Durable);
+        assert_eq!(receipt.duplicate, phase != "a");
+        if let Some(id) = before {
+            assert_eq!(receipt.message_id.0, id);
+        }
+        let counts: (i64,i64) = sqlx::query_as("SELECT count(*),count(j.message_id) FROM ingress_messages m LEFT JOIN delivery_jobs j USING(message_id) WHERE m.source_message_id=$1").bind(&source).fetch_one(&pool).await.unwrap();
+        assert_eq!(counts, (1, 1));
+        socket.write_all(&[0xe0, 0]).await.unwrap();
+        assert!(
+            tokio::time::timeout(Duration::from_secs(3), recovery.wait())
+                .await
+                .unwrap()
+                .unwrap()
+                .success()
+        );
+    }
+    sqlx::raw_sql(
+        "DROP TRIGGER audit_commit_gate ON delivery_jobs; DROP FUNCTION audit_commit_gate();",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+    tokio::fs::remove_dir_all(directory).await.unwrap();
+    pool.close().await;
+}
+
+#[tokio::test]
+async fn audit_http_chunked_limits_malformed_auth_and_slow_body() {
+    let f = Fixture::new(
+        Transport::Http,
+        Limits {
+            max_http_body_size: 1024,
+            request_timeout_ms: 80,
+            ..Limits::default()
+        },
+    )
+    .await;
+    for (headers, body, status) in [
+        (
+            "Transfer-Encoding: chunked\r\n".to_owned(),
+            format!("401\r\n{}\r\n0\r\n\r\n", "x".repeat(1025)).into_bytes(),
+            "413",
+        ),
+        ("Content-Length: 1\r\n".to_owned(), b"{".to_vec(), "400"),
+        ("".to_owned(), Vec::new(), "400"),
+    ] {
+        let mut c = TcpStream::connect(f.addr).await.unwrap();
+        let request = format!(
+            "POST /v1/device/messages HTTP/1.1\r\nHost: localhost\r\nAuthorization: Bearer a:{SECRET}\r\n{headers}\r\n"
+        );
+        c.write_all(request.as_bytes()).await.unwrap();
+        c.write_all(&body).await.unwrap();
+        let mut response = Vec::new();
+        c.read_to_end(&mut response).await.unwrap();
+        assert!(response.starts_with(format!("HTTP/1.1 {status}").as_bytes()));
+    }
+    let mut slow = TcpStream::connect(f.addr).await.unwrap();
+    slow.write_all(format!("POST /v1/device/messages HTTP/1.1\r\nHost: localhost\r\nAuthorization: Bearer a:{SECRET}\r\nTransfer-Encoding: chunked\r\n\r\n20\r\nx").as_bytes()).await.unwrap();
+    let mut response = Vec::new();
+    tokio::time::timeout(Duration::from_secs(1), slow.read_to_end(&mut response))
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(response.starts_with(b"HTTP/1.1 504"));
+    let mut c = TcpStream::connect(f.addr).await.unwrap();
+    c.write_all(b"POST /v1/device/messages HTTP/1.1\r\nHost: localhost\r\nAuthorization: Bearer a:bad\r\nContent-Length: 0\r\n\r\n").await.unwrap();
+    let mut response = Vec::new();
+    c.read_to_end(&mut response).await.unwrap();
+    assert!(response.starts_with(b"HTTP/1.1 401"));
+    assert_eq!(f.store.message_count().unwrap(), 0);
+    f.shutdown().await;
+}
+
+#[tokio::test]
+async fn audit_udp_oversize_and_failed_ingress_do_not_consume_sequence() {
+    let f = Fixture::new(Transport::Udp, Limits::default()).await;
+    let c = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+    let valid = datagram(7, now_ms(), &payload("udp-after-oversize"));
+    let mut oversize = valid.clone();
+    oversize.resize(1201, 0);
+    c.send_to(&oversize, f.addr).await.unwrap();
+    c.send_to(&datagram(7, now_ms(), b"{"), f.addr)
+        .await
+        .unwrap();
+    c.send_to(&valid, f.addr).await.unwrap();
+    tokio::time::timeout(Duration::from_secs(1), async {
+        while f.s.ingress.metrics.get(Metric::IngressAccepted) == 0 {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .unwrap();
+    assert_eq!(f.store.message_count().unwrap(), 1);
+    assert_eq!(f.s.ingress.metrics.get(Metric::IngressRejected), 1);
+    f.shutdown().await;
+}
+
+#[tokio::test]
+async fn audit_mqtt_acl_path_tricks_will_and_client_id_ownership() {
+    let f = Fixture::new(Transport::Mqtt, Limits::default()).await;
+    let mut b = f.mqtt("b", 30).await;
+    let attacks = [
+        "v1/t/t/p/p/d/a/up",
+        "v1/t/t2/p/p/d/b/up",
+        "v1/t/t/p/p/d/b2/up",
+        "v1/t/t/p/p/d/b/up/extra",
+        "v1/t/t/p/p/d/b//up",
+        "v1/t/t/p/p/d/%62/up",
+        "v1/t/t/p/p/d/b%2Fa/up",
+        "v1/t/t/p/p/d/b/down",
+        "v1/t/t/p/p/d/b/up_ack",
+    ];
+    let filters: Vec<_> = attacks
+        .iter()
+        .filter(|x| packet::valid_topic(x, &f.s.ingress.limits, true))
+        .map(|x| (*x, 1))
+        .collect();
+    b.write_all(&subscribe(1, &filters)).await.unwrap();
+    let reply = read_mqtt(&mut b).await;
+    let expected: Vec<_> = filters
+        .iter()
+        .map(|(topic, _)| {
+            if matches!(*topic, "v1/t/t/p/p/d/b/down" | "v1/t/t/p/p/d/b/up_ack") {
+                1
+            } else {
+                0x80
+            }
+        })
+        .collect();
+    assert_eq!(&reply[4..], expected.as_slice());
+    b.write_all(&[0xe0, 0]).await.unwrap();
+    closed(&mut b).await;
+    drop(b);
+    for attack in attacks {
+        let mut c = f.mqtt("b", 30).await;
+        let mut body = Vec::new();
+        string(&mut body, attack.as_bytes());
+        body.extend_from_slice(&[0, 1]);
+        body.extend_from_slice(&payload("forbidden"));
+        c.write_all(&packet::encode(0x32, &body, 65536).unwrap())
+            .await
+            .unwrap();
+        closed(&mut c).await;
+    }
+    assert_eq!(f.store.message_count().unwrap(), 0);
+    let mut a = f.mqtt("a", 30).await;
+    let mut alias = TcpStream::connect(f.addr).await.unwrap();
+    let mut bytes = connect("b", SECRET, 30, true);
+    bytes[14] = b'a'; // client ID a, username b
+    alias.write_all(&bytes).await.unwrap();
+    assert_eq!(read_mqtt(&mut alias).await, packet::connack(2));
+    a.write_all(&[0xc0, 0]).await.unwrap();
+    assert_eq!(read_mqtt(&mut a).await, vec![0xd0, 0]);
+    let mut will = TcpStream::connect(f.addr).await.unwrap();
+    let mut body = Vec::new();
+    string(&mut body, b"MQTT");
+    body.extend_from_slice(&[4, 0xc6, 0, 30]);
+    for value in [
+        b"b".as_slice(),
+        b"will",
+        b"payload",
+        b"b",
+        SECRET.as_bytes(),
+    ] {
+        string(&mut body, value);
+    }
+    will.write_all(&packet::encode(0x10, &body, 65536).unwrap())
+        .await
+        .unwrap();
+    assert_eq!(read_mqtt(&mut will).await, packet::connack(5));
+    let mut malformed = f.mqtt("b", 30).await;
+    malformed
+        .write_all(&subscribe(3, &[("a/#/b", 1)]))
+        .await
+        .unwrap();
+    closed(&mut malformed).await;
+    f.shutdown().await;
+}
+
+#[tokio::test]
+async fn audit_shutdown_during_http_body_tcp_frame_and_udp_ingress() {
+    for transport in [Transport::Http, Transport::Tcp] {
+        let f = Fixture::new(
+            transport,
+            Limits {
+                shutdown_timeout_ms: 20,
+                request_timeout_ms: 500,
+                ..Limits::default()
+            },
+        )
+        .await;
+        let mut c = TcpStream::connect(f.addr).await.unwrap();
+        if transport == Transport::Http {
+            c.write_all(format!("POST /v1/device/messages HTTP/1.1\r\nHost: localhost\r\nAuthorization: Bearer a:{SECRET}\r\nContent-Length: 100\r\n\r\nx").as_bytes()).await.unwrap();
+            tokio::time::timeout(Duration::from_secs(1), async {
+                while f.s.ingress.metrics.get(Metric::HttpRequests) == 0 {
+                    tokio::task::yield_now().await;
+                }
+            })
+            .await
+            .unwrap();
+        } else {
+            c.write_all(&[0, 0, 1]).await.unwrap();
+        }
+        f.shutdown().await;
+        closed(&mut c).await;
+    }
+    let gate = Arc::new(tokio::sync::Semaphore::new(0));
+    let f = Fixture::with_gate(Transport::Udp, Limits::default(), Some(gate.clone())).await;
+    let c = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+    c.send_to(&datagram(1, now_ms(), &payload("udp-drain")), f.addr)
+        .await
+        .unwrap();
+    tokio::time::timeout(Duration::from_secs(1), async {
+        while f.s.ingress.metrics.get(Metric::IngressBytes) == 0 {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .unwrap();
+    f.s.ingress.drain();
+    f.stop.cancel();
+    gate.add_permits(1);
+    let store = f.store.clone();
+    f.shutdown().await;
+    assert_eq!(store.message_count().unwrap(), 1);
 }

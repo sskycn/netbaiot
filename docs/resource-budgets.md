@@ -12,7 +12,7 @@ inconsistent hierarchies and invalid timeout/retention relationships at startup.
 | Stream memory reservation | 512 KiB/connection | connection quota applies | 128 MiB |
 | MQTT packet / HTTP body / TCP payload | 64 KiB | admission quota applies | reservation applies |
 | HTTP headers | 8 KiB, 32 headers | connection quota | connection quota |
-| HTTP handlers | one/connection | ingress 4 | 16 handlers |
+| HTTP handlers | one/connection; request stage 1/device | 4 throughout handler/body | 16 handlers |
 | UDP datagram | 1200 B | authenticated quotas | one sequential owner |
 | Ingress operations | 1/device | 4 | 16; 2 MiB payload bytes |
 | MQTT protocol/admission rate | 16/s | 128/s | 512/s |
@@ -42,7 +42,9 @@ Those require deployment-level disk/memory controls and load measurement. A byte
 quota may reject before a count quota is reached. Command count × max encoded
 size bounds stored command payloads; queue metadata is separately bounded by
 count. Queued commands retain encoded bytes and identifiers, not a second decoded
-command payload. Superseded connection owners retain permits until cleanup.
+command payload. Superseded connection owners retain permits until cleanup. Tenant budget identities
+remain shared across old and new sessions while any endpoint or byte permit survives;
+the weak-identity registry itself is bounded by max_devices.
 
 | Deadline / retention | Default |
 |---|---:|
@@ -73,7 +75,7 @@ command payload. Superseded connection owners retain permits until cleanup.
 | OS socket → connection owner | connection hierarchy + memory reservation | close new socket | stop accept, drain owned tasks |
 | Stream → parser | max frame/packet + fixed header; one reader | close malformed/oversized/slow stream | cancel read; RAII cleanup |
 | UDP socket → owner | one 1201-byte receive buffer | drop oversized, no response | finish one bounded operation then stop |
-| HTTP → handler | 16 permits + per-connection reservation/body limit | 429 or connection close; 413 for body | reject new work; graceful response completion |
+| HTTP → handler | 16 permits + authenticated 4/tenant, 1/device + reservation/body limit | 429 or connection close; 413 for body | reject new work; graceful response completion |
 | Packet → auth | one inline auth/owner, 5 s; source rates | refuse/close/drop | no new ingress after drain |
 | Codec → ingress | one message; device/tenant/node permits and bytes | HTTP 429; MQTT/TCP close; UDP drop | admitted operations finish with deadlines |
 | Ingress → PostgreSQL | 8 pool connections, bounded callers; storage quotas | reject, no application ACK | transaction commits or rolls back |
@@ -88,3 +90,6 @@ static and capacity-checked; no growing auth cache exists. Replay eviction only
 removes expired entries; an otherwise full cache rejects new boots. Presence and
 rate-table expirations run on bounded collections. Delivery and command attempts
 are persisted and bounded; device execution must remain idempotent across retries.
+
+The focused audit and measured physical-memory limitations are recorded in
+[correctness-resource-reliability-audit.md](correctness-resource-reliability-audit.md).

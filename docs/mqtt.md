@@ -55,8 +55,9 @@ controls and Unicode identifiers are rejected at provisioning/deserialization.
 Subscriptions have an exact-topic hash index; sending never scans all connected
 clients. Insertion checks connection/device, tenant and global counts. Stale
 session cleanup is generation-conditional. Limits also bound filters per packet,
-UTF-8 topic bytes, topic depth and packet IDs. Wildcards are rejected by ACL; no
-wildcard matcher is claimed or needed for this profile.
+UTF-8 topic bytes, topic depth and packet IDs. Syntactically valid wildcards are rejected by ACL (SUBACK 0x80); malformed filters
+(such as `a+` or `a/#/b`) close SUBSCRIBE/UNSUBSCRIBE connections. Valid unsupported
+UNSUBSCRIBE filters are no-ops with UNSUBACK. No wildcard matcher is implemented.
 
 ## State, timers and backpressure
 
@@ -71,7 +72,8 @@ Nonzero keepalive expires at 1.5 times its advertised interval, measured since t
 last complete received packet. Keepalive=0 disables the MQTT timer; the separately
 documented server idle policy still closes after 120 seconds by default. Incomplete
 packets have an independent 30-second read deadline. Auth, CONNECT and writes also
-have deadlines. Control packets count toward device/tenant/global packet rates.
+have deadlines. Authentication observes EOF and shutdown before installing a session.
+Buffered partial tails keep their original read deadline, including after cancellation. Control packets count toward device/tenant/global packet rates.
 
 Outbound commands have message and encoded-byte permits at connection, tenant and
 node levels. QoS1 commands retain permits until PUBACK or disconnect. Application
@@ -89,7 +91,8 @@ explicitly says `volatile`. Neither receipt means the business endpoint processe
 the event. Source IDs, not MQTT packet IDs, identify durable duplicates.
 
 Downlink transport writes set `Sent`; PUBACK sets `Received`; neither changes
-execution from `Unknown`. A valid device `command_ack` updates execution inside
+execution from `Unknown`. Both callbacks carry the claimed attempt; the store fences
+stale or expired leases before updating command state. A valid device `command_ack` updates execution inside
 the ingress transaction. Downlinks always have retain=false. Subscriptions must
 be restored after reconnect. A command arriving before the device subscribes is
 left for bounded store retry; no claim of offline MQTT session persistence is made.

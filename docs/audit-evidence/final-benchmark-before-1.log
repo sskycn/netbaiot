@@ -1,0 +1,28 @@
+    Finished `bench` profile [optimized] target(s) in 0.40s
+     Running ../../benches/foundation.rs (/tmp/netbaiot-audit-base/target/release/deps/foundation-e0e6e0fb6c4186e8)
+mqtt_decode: 20000 iterations, 6286343 ops/s, p50=125 ns p95=167 ns p99=167 ns
+mqtt_encode: 20000 iterations, 8944876 ops/s, p50=83 ns p95=125 ns p99=125 ns
+topic_acl: 20000 iterations, 13382778 ops/s, p50=42 ns p95=84 ns p99=84 ns
+subscription_lookup: 20000 iterations, 22026432 ops/s, p50=41 ns p95=42 ns p99=42 ns
+json_codec: 20000 iterations, 688264 ops/s, p50=1291 ns p95=2042 ns p99=2125 ns
+tcp_frame: 20000 iterations, 12366993 ops/s, p50=42 ns p95=84 ns p99=84 ns
+ingress_admission: 20000 iterations, 3863988 ops/s, p50=209 ns p95=250 ns p99=458 ns
+mqtt_decode_small: 10000 iterations, 5689227 ops/s, p50=125 ns p95=167 ns p99=292 ns
+mqtt_decode_medium: 10000 iterations, 4611748 ops/s, p50=208 ns p95=209 ns p99=209 ns
+mqtt_decode_maximum: 10000 iterations, 1010071 ops/s, p50=833 ns p95=1666 ns p99=1750 ns
+json_codec_small: 10000 iterations, 616323 ops/s, p50=1583 ns p95=1667 ns p99=1750 ns
+json_codec_medium: 10000 iterations, 29271 ops/s, p50=32333 ns p95=42791 ns p99=69167 ns
+json_codec_maximum: 10000 iterations, 5323 ops/s, p50=173167 ns p95=275958 ns p99=365334 ns
+session_lookup_1: 10000 iterations, 15326657 ops/s, p50=42 ns p95=83 ns p99=84 ns
+subscription_lookup_1: 10000 iterations, 10670457 ops/s, p50=42 ns p95=84 ns p99=84 ns
+topic_acl_1: 10000 iterations, 8338837 ops/s, p50=84 ns p95=125 ns p99=125 ns
+ingress_bookkeeping_1: 10000 iterations, 3696631 ops/s, p50=209 ns p95=333 ns p99=500 ns
+session_lookup_64: 10000 iterations, 15084867 ops/s, p50=42 ns p95=42 ns p99=84 ns
+subscription_lookup_64: 10000 iterations, 18816162 ops/s, p50=41 ns p95=42 ns p99=83 ns
+topic_acl_64: 10000 iterations, 6844430 ops/s, p50=84 ns p95=250 ns p99=250 ns
+ingress_bookkeeping_64: 10000 iterations, 663212 ops/s, p50=1417 ns p95=1500 ns p99=2250 ns
+session_lookup_256: 10000 iterations, 15440033 ops/s, p50=42 ns p95=42 ns p99=84 ns
+subscription_lookup_256: 10000 iterations, 11726189 ops/s, p50=42 ns p95=84 ns p99=84 ns
+topic_acl_256: 10000 iterations, 7778566 ops/s, p50=84 ns p95=125 ns p99=125 ns
+ingress_bookkeeping_256: 10000 iterations, 179680 ops/s, p50=5167 ns p95=7709 ns p99=13916 ns
+layout_bytes: session_endpoint=72 queued_command=96 device_message=152 command_record=128

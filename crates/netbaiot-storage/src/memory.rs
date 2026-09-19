@@ -263,6 +263,7 @@ impl Store for MemoryStore {
             delivery: DeliveryState::Queued,
             execution: ExecutionState::Unknown,
             attempts: 0,
+            lease_expires_at: None,
         };
         s.commands.insert(
             record.command.command_id,
@@ -303,7 +304,13 @@ impl Store for MemoryStore {
             }
             c.record.attempts += 1;
             c.record.delivery = advance_delivery(c.record.delivery, DeliveryState::Dispatching);
-            c.next = now.saturating_add(self.limits.lease_ms as i64);
+            let lease_until = now.saturating_add(self.limits.lease_ms as i64);
+            c.record.lease_expires_at = Some(lease_until);
+            c.next = lease_until.saturating_add(worker::command_retry_delay(
+                &self.limits,
+                c.record.command.command_id,
+                c.record.attempts,
+            ) as i64);
             out.push(c.record.clone());
         }
         Ok(out)
@@ -334,19 +341,30 @@ impl Store for MemoryStore {
         &self,
         device: &DeviceKey,
         id: CommandId,
+        attempt: u32,
         state: DeliveryState,
-    ) -> Result<()> {
+    ) -> Result<bool> {
         let mut s = lock(&self.state)?;
         let c = s.commands.get_mut(&id).ok_or(Error::Invalid)?;
         if &c.record.command.device != device {
             return Err(Error::Forbidden);
         }
         if c.record.command.expires_at <= now_ms() {
-            c.record.delivery = DeliveryState::Expired;
             return Err(Error::Invalid);
         }
+        if !matches!(state, DeliveryState::Sent | DeliveryState::Received) {
+            return Err(Error::Invalid);
+        }
+        if attempt == 0
+            || c.record.attempts != attempt
+            || c.record
+                .lease_expires_at
+                .is_none_or(|until| until <= now_ms())
+        {
+            return Ok(false);
+        }
         c.record.delivery = advance_delivery(c.record.delivery, state);
-        Ok(())
+        Ok(true)
     }
     async fn get_command(
         &self,

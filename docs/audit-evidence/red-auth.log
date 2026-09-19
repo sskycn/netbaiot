@@ -1,0 +1,28 @@
+   Compiling netbaiot-runtime v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-runtime)
+   Compiling netbaiot-storage v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-storage)
+   Compiling netbaiot-transports v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-transports)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.37s
+     Running tests/end_to_end.rs (target/debug/deps/end_to_end-6c31adebed6d2058)
+
+running 4 tests
+
+thread 'audit_shutdown_during_auth_cannot_register_session' (2277706) panicked at crates/netbaiot-transports/tests/end_to_end.rs:1005:9:
+shutdown must not send successful auth reply
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+thread 'audit_disconnected_auth_cannot_replace_new_session' (2277703) panicked at crates/netbaiot-transports/tests/end_to_end.rs:1025:5:
+disconnected authentication evicted current owner
+test audit_http_rejects_unsupported_content_encoding ... ok
+test audit_shutdown_during_auth_cannot_register_session ... FAILED
+test audit_disconnected_auth_cannot_replace_new_session ... FAILED
+test audit_http_body_admission_respects_tenant_capacity ... ok
+
+failures:
+
+failures:
+    audit_disconnected_auth_cannot_replace_new_session
+    audit_shutdown_during_auth_cannot_register_session
+
+test result: FAILED. 2 passed; 2 failed; 0 ignored; 0 measured; 15 filtered out; finished in 0.01s
+
+error: test failed, to rerun pass `-p netbaiot-transports --test end_to_end`

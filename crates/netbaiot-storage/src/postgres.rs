@@ -296,6 +296,7 @@ impl Store for PgStore {
             delivery: DeliveryState::Queued,
             execution: ExecutionState::Unknown,
             attempts: 0,
+            lease_expires_at: None,
         };
         let k = &r.command.device;
         sqlx::query("INSERT INTO commands VALUES ($1,$2,$3,$4,$5,$6,$7,$8,false)")
@@ -350,11 +351,19 @@ impl Store for PgStore {
                 continue;
             }
             r.attempts += 1;
+            r.lease_expires_at = Some(now.saturating_add(self.limits.lease_ms as i64));
             r.delivery = advance_delivery(r.delivery, DeliveryState::Dispatching);
             Self::save_command(&mut tx, &r).await?;
             sqlx::query("UPDATE commands SET next_attempt_at=$2 WHERE command_id=$1")
                 .bind(r.command.command_id.0)
-                .bind(now.saturating_add(self.limits.lease_ms as i64))
+                .bind(
+                    now.saturating_add(self.limits.lease_ms as i64)
+                        .saturating_add(worker::command_retry_delay(
+                            &self.limits,
+                            r.command.command_id,
+                            r.attempts,
+                        ) as i64),
+                )
                 .execute(&mut *tx)
                 .await
                 .map_err(db)?;
@@ -374,8 +383,9 @@ impl Store for PgStore {
         &self,
         device: &DeviceKey,
         id: CommandId,
+        attempt: u32,
         state: DeliveryState,
-    ) -> Result<()> {
+    ) -> Result<bool> {
         let mut tx = self.transaction().await?;
         let row = sqlx::query("SELECT record FROM commands WHERE command_id=$1 FOR UPDATE")
             .bind(id.0)
@@ -390,13 +400,22 @@ impl Store for PgStore {
         if r.command.expires_at <= now_ms() {
             return Err(Error::Invalid);
         }
+        if !matches!(state, DeliveryState::Sent | DeliveryState::Received) {
+            return Err(Error::Invalid);
+        }
+        if attempt == 0
+            || r.attempts != attempt
+            || r.lease_expires_at.is_none_or(|until| until <= now_ms())
+        {
+            return Ok(false);
+        }
         r.delivery = advance_delivery(r.delivery, state);
         Self::save_command(&mut tx, &r).await?;
         sqlx::query("UPDATE command_attempts SET state=$3 WHERE command_id=$1 AND attempt=$2")
             .bind(id.0)
             .bind(r.attempts as i32)
             .bind(
-                serde_json::to_value(state)
+                serde_json::to_value(r.delivery)
                     .map_err(|_| Error::Invalid)?
                     .as_str()
                     .ok_or(Error::Invalid)?,
@@ -404,7 +423,8 @@ impl Store for PgStore {
             .execute(&mut *tx)
             .await
             .map_err(db)?;
-        tx.commit().await.map_err(db)
+        tx.commit().await.map_err(db)?;
+        Ok(true)
     }
     async fn get_command(
         &self,

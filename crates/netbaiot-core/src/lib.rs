@@ -150,6 +150,9 @@ pub struct CommandRecord {
     pub delivery: DeliveryState,
     pub execution: ExecutionState,
     pub attempts: u32,
+    /// Storage claim deadline; absent on queued records and older stored JSON.
+    #[serde(default)]
+    pub lease_expires_at: Option<Timestamp>,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]

@@ -1,3 +1,8 @@
+# Historical foundation validation
+
+The results below predate the [focused audit](correctness-resource-reliability-audit.md).
+Current regression, PostgreSQL crash, load, fuzz and benchmark evidence is linked there.
+
 # Validation evidence — 2026-09-18
 
 Environment: macOS arm64; stable rustc 1.97.1 / cargo 1.97.1; local PostgreSQL

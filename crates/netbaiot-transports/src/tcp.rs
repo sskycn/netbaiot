@@ -83,13 +83,17 @@ pub async fn connection(
     {
         return Err(Error::Authentication);
     }
-    let auth = s
-        .ingress
-        .authenticate(AuthenticationRequest::Secret {
+    let auth = authenticate_stream(
+        &s,
+        AuthenticationRequest::Secret {
             credential_id: &hello.credential_id,
             secret: hello.secret.as_bytes(),
-        })
-        .await?;
+        },
+        &mut reader,
+        &mut stream,
+        &stop,
+    )
+    .await?;
     connection.authenticate(&auth.device_key)?;
     let (session, mut outbound) = s
         .ingress
@@ -109,10 +113,10 @@ pub async fn connection(
             _ = session.cancel.cancelled() => break,
             item = outbound.recv() => {
                 let Some(item) = item else { break };
-                if item.expires_at <= now_ms() { continue; }
+                if item.expires_at.min(item.lease_expires_at) <= now_ms() { continue; }
                 let frame = framer.encode(&item.bytes)?;
                 write(&mut stream, &frame, l.write_timeout_ms).await?;
-                s.router.state(&auth.device_key, item.command_id, DeliveryState::Sent).await?;
+                s.router.state(&auth.device_key, item.command_id, item.attempt, DeliveryState::Sent).await?;
             }
             frame = next(&mut reader, &mut stream, &framer, last + Duration::from_millis(l.idle_timeout_ms)) => {
                 let frame = frame?;

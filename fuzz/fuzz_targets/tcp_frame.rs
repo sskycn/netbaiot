@@ -8,6 +8,6 @@ fuzz_target!(|data: &[u8]| {
     for part in data.chunks(3) {
         if input.len()+part.len()>65540 { break; }
         input.extend_from_slice(part);
-        loop { match framer.decode(&mut input) { Ok(Some(_))=>{}, Ok(None)=>break, Err(_)=>return } }
+        loop { let before = input.len(); match framer.decode(&mut input) { Ok(Some(frame))=>{ assert!(input.len() < before); assert!(frame.len() <= 65536); }, Ok(None)=>break, Err(_)=>return } }
     }
 });

@@ -1,0 +1,45 @@
+   Compiling serde_core v1.0.229
+   Compiling smallvec v1.15.2
+   Compiling serde v1.0.229
+   Compiling syn v3.0.4
+   Compiling syn v2.0.119
+   Compiling memchr v2.8.3
+   Compiling hmac v0.12.1
+   Compiling parking_lot_core v0.9.12
+   Compiling parking_lot v0.12.5
+   Compiling thiserror-impl v2.0.20
+   Compiling tokio-macros v2.7.2
+   Compiling futures-macro v0.3.34
+   Compiling serde_derive v1.0.229
+   Compiling async-trait v0.1.92
+   Compiling tracing-attributes v0.1.31
+   Compiling tokio v1.53.1
+   Compiling futures-util v0.3.34
+   Compiling thiserror v2.0.20
+   Compiling tracing v0.1.44
+   Compiling uuid v1.25.0
+   Compiling serde_json v1.0.151
+   Compiling tokio-util v0.7.19
+   Compiling netbaiot-core v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-core)
+   Compiling netbaiot-runtime v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-runtime)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 10.73s
+     Running unittests src/lib.rs (target/debug/deps/netbaiot_runtime-842a0c3387a053cc)
+
+running 1 test
+test quota::tests::expired_tenant_identity_replacement_is_shared ... FAILED
+
+failures:
+
+---- quota::tests::expired_tenant_identity_replacement_is_shared stdout ----
+
+thread 'quota::tests::expired_tenant_identity_replacement_is_shared' (2466798) panicked at crates/netbaiot-runtime/src/quota.rs:327:9:
+assertion failed: matches!(concurrent.reserve(1), Err(Error::Overloaded))
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    quota::tests::expired_tenant_identity_replacement_is_shared
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p netbaiot-runtime --lib`

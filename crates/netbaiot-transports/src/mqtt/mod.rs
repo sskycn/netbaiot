@@ -131,18 +131,24 @@ pub async fn connection(
         return Err(Error::Authentication);
     }
     machine.transition(ConnectionState::Authenticating)?;
-    let auth = match s
-        .ingress
-        .authenticate(AuthenticationRequest::Secret {
+    let auth = match authenticate_stream(
+        &s,
+        AuthenticationRequest::Secret {
             credential_id: &connect.username,
             secret: &connect.password,
-        })
-        .await
+        },
+        &mut reader,
+        &mut stream,
+        &stop,
+    )
+    .await
     {
         Ok(auth) => auth,
         Err(e) => {
             s.ingress.metrics.inc(Metric::MqttConnectFailure);
-            send(&mut stream, &s, &connack(4)).await?;
+            if matches!(e, Error::Authentication) {
+                send(&mut stream, &s, &connack(4)).await?;
+            }
             return Err(e);
         }
     };
@@ -188,13 +194,14 @@ pub async fn connection(
                 }
                 item = outbound.recv() => {
                     let Some(item) = item else { break };
-                    if item.expires_at <= now_ms() { continue; }
+                    if item.expires_at.min(item.lease_expires_at) <= now_ms() { continue; }
                     let down = topic(&auth.device_key, TopicKind::Down);
                     let Some(qos) = s.subscriptions.lookup(&down, session.generation)? else {
                         // The durable command lease permits a later retry after SUBSCRIBE.
                         continue;
                     };
                     let command_id = item.command_id;
+                    let attempt = item.attempt;
                     if qos == 1 {
                         let id = ids.allocate(Pending {
                             command: Some(item), _ack_bytes: None, sent_at: Instant::now(),
@@ -207,7 +214,7 @@ pub async fn connection(
                         let frame = publish(&down, &item.bytes, None, l)?;
                         send(&mut stream, &s, &frame).await?;
                     }
-                    s.router.state(&auth.device_key, command_id, DeliveryState::Sent).await?;
+                    s.router.state(&auth.device_key, command_id, attempt, DeliveryState::Sent).await?;
                 }
                 packet = next(&mut reader, &mut stream, l, protocol_deadline) => {
                     let packet = packet?;
@@ -239,7 +246,7 @@ pub async fn connection(
                             s.ingress.metrics.inc(Metric::MqttPubacks);
                             if let Some(pending) = ids.entries.remove(&id)
                                 && let Some(command) = pending.command {
-                                s.router.state(&auth.device_key, command.command_id, DeliveryState::Received).await?;
+                                s.router.state(&auth.device_key, command.command_id, command.attempt, DeliveryState::Received).await?;
                             }
                         }
                         Packet::Publish { topic: requested, payload, packet_id, retain, .. } => {
@@ -296,6 +303,23 @@ mod tests {
         assert!(ids.allocate(pending()).is_err());
         ids.entries.remove(&first);
         assert!(ids.allocate(pending()).is_ok());
+    }
+    #[test]
+    fn packet_identifier_wrap_skips_live_entries() {
+        let mut ids = PacketIds::new(3);
+        let pending = || Pending {
+            command: None,
+            _ack_bytes: None,
+            sent_at: Instant::now(),
+        };
+        assert_eq!(ids.allocate(pending()).unwrap(), 1);
+        ids.next = u16::MAX;
+        assert_eq!(ids.allocate(pending()).unwrap(), u16::MAX);
+        assert_eq!(ids.allocate(pending()).unwrap(), 2);
+        assert!(ids.allocate(pending()).is_err());
+        ids.entries.remove(&1);
+        ids.next = 1;
+        assert_eq!(ids.allocate(pending()).unwrap(), 1);
     }
     #[test]
     fn state_rejects_double_connect() {

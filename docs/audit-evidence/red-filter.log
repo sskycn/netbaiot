@@ -1,0 +1,25 @@
+    Blocking waiting for file lock on build directory
+   Compiling netbaiot-runtime v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-runtime)
+   Compiling netbaiot-storage v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-storage)
+   Compiling netbaiot-transports v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-transports)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 11.68s
+     Running unittests src/lib.rs (target/debug/deps/netbaiot_transports-8898f19d9872a7e5)
+
+running 1 test
+test mqtt::packet::tests::audit_malformed_wildcards_are_protocol_errors ... FAILED
+
+failures:
+
+---- mqtt::packet::tests::audit_malformed_wildcards_are_protocol_errors stdout ----
+
+thread 'mqtt::packet::tests::audit_malformed_wildcards_are_protocol_errors' (2250706) panicked at crates/netbaiot-transports/src/mqtt/packet.rs:360:17:
+a+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    mqtt::packet::tests::audit_malformed_wildcards_are_protocol_errors
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p netbaiot-transports --lib`

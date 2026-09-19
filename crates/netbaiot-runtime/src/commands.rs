@@ -44,7 +44,18 @@ impl CommandRouter {
         self.ingress.metrics.inc(Metric::CommandQueued);
         Ok(record)
     }
-    pub async fn dispatch(&self, command: DeviceCommand, auth: &AuthenticatedDevice) -> Result<()> {
+    pub async fn dispatch(&self, record: CommandRecord, auth: &AuthenticatedDevice) -> Result<()> {
+        let command = &record.command;
+        if command.device != auth.device_key || !auth.permissions.commands {
+            return Err(Error::Forbidden);
+        }
+        if record.attempts == 0
+            || record
+                .lease_expires_at
+                .is_none_or(|until| until <= now_ms())
+        {
+            return Err(Error::Conflict);
+        }
         if self.ingress.is_draining() {
             return Err(Error::Draining);
         }
@@ -64,24 +75,29 @@ impl CommandRouter {
                 &EncodeContext {
                     device: &command.device,
                 },
-                &command,
+                command,
             )
             .map_err(|_| Error::Codec)?;
         endpoint
-            .enqueue(command, bytes)
+            .enqueue(record, bytes)
             .inspect_err(|_| self.ingress.metrics.inc(Metric::QueueRejects))
     }
     pub async fn state(
         &self,
         device: &DeviceKey,
         id: CommandId,
+        attempt: u32,
         state: DeliveryState,
     ) -> Result<()> {
-        deadline(
+        let applied = deadline(
             self.ingress.limits.external_timeout_ms,
-            self.ingress.store.command_state(device, id, state),
+            self.ingress.store.command_state(device, id, attempt, state),
         )
         .await?;
+        if !applied {
+            tracing::debug!(command_id=%id.0, attempt, "stale command transport update fenced");
+            return Ok(());
+        }
         match state {
             DeliveryState::Sent => self.ingress.metrics.inc(Metric::CommandSent),
             DeliveryState::Received => self.ingress.metrics.inc(Metric::CommandReceived),
@@ -92,7 +108,7 @@ impl CommandRouter {
         }
         Ok(())
     }
-    pub async fn pull(&self, auth: &AuthenticatedDevice) -> Result<Option<DeviceCommand>> {
+    pub async fn pull(&self, auth: &AuthenticatedDevice) -> Result<Option<CommandRecord>> {
         if self.ingress.is_draining() {
             return Err(Error::Draining);
         }
@@ -106,6 +122,6 @@ impl CommandRouter {
                 .claim_commands(Some(&auth.device_key), now_ms(), 1),
         )
         .await?;
-        Ok(records.into_iter().next().map(|r| r.command))
+        Ok(records.into_iter().next())
     }
 }

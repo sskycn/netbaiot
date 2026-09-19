@@ -1,0 +1,32 @@
+Final validation on 2026-09-19 (macOS arm64)
+
+PASS exit 0: cargo fmt --all -- --check
+  No output; fmt.log
+PASS exit 0: cargo clippy --workspace --all-targets --all-features --offline -- -D warnings
+  clippy.log
+PASS exit 0: cargo test --workspace --all-features --offline
+  67 passed, 0 failed, 7 ignored; workspace-tests.log
+  Ignored: 5 real-PostgreSQL parent/contract cases, 2 subprocess-only helper entries.
+  All 5 parent/contract cases run separately with fresh databases, passing:
+  pg-contract.log, pg-pressure.log, pg-attempt-history.log, pg-outbox-crash.log, pg-crash.log
+PASS exit 0: cargo build -p netbaiot-server --offline
+  build.log
+PASS exit 0: DATABASE_URL=<fresh local test database> python3 tests/smoke_postgres.py
+  pg-smoke.log
+PASS exit 0: DATABASE_URL=<fresh local test database> /tmp/netbaiot-audit-venv/bin/python tests/audit_load.py
+  Paho 2.1.0, bounded connection/slow-consumer/slow-delivery scenarios; load.json
+PASS exit 0: git diff --check
+PASS exit 0: PYTHONPYCACHEPREFIX=/tmp/netbaiot-audit-pycache python3 -m py_compile tests/audit_load.py fuzz/seed_corpus.py
+
+Fuzz: all six targets completed with ASAN; 1,000,000 final campaign runs, no crash.
+  fuzz-summary.json (short campaigns, no universal proof)
+Microbench: same extended harness on baseline 4fcd393 and audited sources.
+  benchmark-summary.json and raw paired logs; includes measured MQTT regressions.
+PostgreSQL plans: isolated 10,000-message/1,024-command fixture.
+  query-plans.log; quota aggregation and bounded 3N command writes remain scaling limits.
+
+Red logs intentionally contain regression-test failures. They are evidence before fixes,
+not final validation failures. red-weak-identity.log records a repair-iteration regression.
+Socket/PG tests required sandbox escalation to bind loopback; no remote services were mutated.
+
+Evidence log normalization removes trailing whitespace and extra blank lines at EOF only.

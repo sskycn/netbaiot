@@ -1,5 +1,9 @@
 # NetbaIoT implementation report
 
+This is the first-milestone historical report. The subsequent
+[correctness/resource/reliability audit](correctness-resource-reliability-audit.md)
+records confirmed defects, fixes, expanded tests, crash injection and measured limits.
+
 The first milestone now has a working shared ingestion and command path with an
 embedded MQTT server. This report describes the tested foundation and its limits;
 it does not claim production readiness or full MQTT conformance.
@@ -181,9 +185,10 @@ The temporary PostgreSQL test cluster was stopped after testing.
   logical byte reservations do not constitute an exact physical-resource guarantee.
 - Metrics provide counters, queue gauges and accumulated latency; no latency
   histogram, distributed tracing backend or dashboard is included.
-- No sustained load/RSS/allocation study, independent MQTT client compatibility
-  matrix, long fuzz campaign, full MQTT conformance suite, or independent security
-  audit has been run. The implementation is a tested foundation, not a certification.
+- A subsequent audit ran a short 64-connection RSS/load study and Paho 2.1.0
+  interoperability tests. Sustained load/allocation profiling, a broad client
+  compatibility matrix, long fuzzing and full conformance/security certification
+  remain unperformed. See the focused audit for current evidence and limits.
 
 ## Significant file inventory
 

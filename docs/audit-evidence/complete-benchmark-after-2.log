@@ -1,0 +1,28 @@
+    Finished `bench` profile [optimized] target(s) in 0.30s
+     Running ../../benches/foundation.rs (target/release/deps/foundation-225460fb663ccec6)
+mqtt_decode: 20000 iterations, 5413331 ops/s, p50=167 ns p95=167 ns p99=209 ns
+mqtt_encode: 20000 iterations, 7118811 ops/s, p50=125 ns p95=125 ns p99=208 ns
+topic_acl: 20000 iterations, 13740199 ops/s, p50=42 ns p95=84 ns p99=84 ns
+subscription_lookup: 20000 iterations, 22102500 ops/s, p50=41 ns p95=42 ns p99=42 ns
+json_codec: 20000 iterations, 761022 ops/s, p50=1291 ns p95=1375 ns p99=1542 ns
+tcp_frame: 20000 iterations, 11635795 ops/s, p50=42 ns p95=84 ns p99=125 ns
+ingress_admission: 20000 iterations, 3989826 ops/s, p50=209 ns p95=250 ns p99=292 ns
+mqtt_decode_small: 10000 iterations, 5406990 ops/s, p50=167 ns p95=167 ns p99=209 ns
+mqtt_decode_medium: 10000 iterations, 4297070 ops/s, p50=208 ns p95=250 ns p99=291 ns
+mqtt_decode_maximum: 10000 iterations, 1265062 ops/s, p50=750 ns p95=834 ns p99=917 ns
+json_codec_small: 10000 iterations, 593447 ops/s, p50=1542 ns p95=1708 ns p99=2834 ns
+json_codec_medium: 10000 iterations, 27119 ops/s, p50=32708 ns p95=61917 ns p99=110958 ns
+json_codec_maximum: 10000 iterations, 5621 ops/s, p50=173708 ns p95=196667 ns p99=300584 ns
+session_lookup_1: 10000 iterations, 13318523 ops/s, p50=42 ns p95=84 ns p99=125 ns
+subscription_lookup_1: 10000 iterations, 22344272 ops/s, p50=41 ns p95=42 ns p99=42 ns
+topic_acl_1: 10000 iterations, 6404439 ops/s, p50=84 ns p95=250 ns p99=291 ns
+ingress_bookkeeping_1: 10000 iterations, 2111765 ops/s, p50=458 ns p95=500 ns p99=542 ns
+session_lookup_64: 10000 iterations, 6352401 ops/s, p50=84 ns p95=125 ns p99=125 ns
+subscription_lookup_64: 10000 iterations, 10760394 ops/s, p50=42 ns p95=84 ns p99=84 ns
+topic_acl_64: 10000 iterations, 4762376 ops/s, p50=208 ns p95=250 ns p99=291 ns
+ingress_bookkeeping_64: 10000 iterations, 498040 ops/s, p50=1500 ns p95=2250 ns p99=2375 ns
+session_lookup_256: 10000 iterations, 7509853 ops/s, p50=84 ns p95=125 ns p99=125 ns
+subscription_lookup_256: 10000 iterations, 22162678 ops/s, p50=41 ns p95=42 ns p99=42 ns
+topic_acl_256: 10000 iterations, 4449060 ops/s, p50=125 ns p95=250 ns p99=250 ns
+ingress_bookkeeping_256: 10000 iterations, 125623 ops/s, p50=5250 ns p95=7792 ns p99=20041 ns
+layout_bytes: session_endpoint=72 queued_command=112 device_message=152 command_record=144

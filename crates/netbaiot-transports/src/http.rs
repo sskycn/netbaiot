@@ -14,7 +14,7 @@ use std::{
     time::Duration,
 };
 use tokio_util::sync::CancellationToken;
-type Sent = Arc<Mutex<Option<(DeviceKey, CommandId)>>>;
+type Sent = Arc<Mutex<Option<(DeviceKey, CommandId, u32)>>>;
 fn response(status: StatusCode, body: Vec<u8>) -> Response<Full<Bytes>> {
     let mut r = Response::new(Full::new(Bytes::from(body)));
     *r.status_mut() = status;
@@ -60,6 +60,10 @@ async fn handle(
         .ok_or(Error::Invalid)?;
     if size > l.max_http_header_bytes || req.headers().len() > l.max_http_headers {
         return Err(Error::Invalid);
+    }
+    // This profile has no decompressor. Do not interpret encoded bytes as JSON.
+    if req.headers().contains_key(hyper::header::CONTENT_ENCODING) {
+        return Ok(response(StatusCode::UNSUPPORTED_MEDIA_TYPE, b"{}".to_vec()));
     }
     if req
         .headers()
@@ -107,6 +111,8 @@ async fn handle(
         })
         .await?;
     lock(&lease)?.authenticate(&auth.device_key)?;
+    // Include slow bodies and command pulls in hierarchical request admission.
+    let _request = s.protocol_admission.acquire(&auth.device_key, 0)?;
     if method == hyper::Method::GET && path == "/metrics" {
         let mut metrics = s.ingress.metrics.render();
         let counts = s.connections.active()?;
@@ -132,8 +138,9 @@ async fn handle(
         s.ingress
             .sessions
             .touch(&auth.device_key, Transport::Http)?;
-        return if let Some(command) = command {
-            *lock(&sent)? = Some((auth.device_key.clone(), command.command_id));
+        return if let Some(record) = command {
+            let command = record.command;
+            *lock(&sent)? = Some((auth.device_key.clone(), command.command_id, record.attempts));
             Ok(response(
                 StatusCode::OK,
                 s.ingress
@@ -231,8 +238,10 @@ pub async fn connection(
     let result = tokio::select! {result=tokio::time::timeout(Duration::from_millis(s.ingress.limits.connect_timeout_ms+s.ingress.limits.request_timeout_ms+s.ingress.limits.write_timeout_ms),connection.as_mut())=>result.map_err(|_|Error::Timeout)?.map_err(|_|Error::Unavailable),_=stop.cancelled()=>{connection.as_mut().graceful_shutdown();tokio::time::timeout(Duration::from_millis(s.ingress.limits.shutdown_timeout_ms),connection).await.map_err(|_|Error::Timeout)?.map_err(|_|Error::Unavailable)}};
     result?;
     let delivered = lock(&sent)?.take();
-    if let Some((device, id)) = delivered {
-        s.router.state(&device, id, DeliveryState::Sent).await?;
+    if let Some((device, id, attempt)) = delivered {
+        s.router
+            .state(&device, id, attempt, DeliveryState::Sent)
+            .await?;
     }
     Ok(())
 }

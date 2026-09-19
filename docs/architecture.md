@@ -57,7 +57,9 @@ not evidence of MQTT 5 implementation.
 Malformed input, failed auth, ACL violations and overload reject the request or
 close the owning stream. UDP silently drops failures. Durable pending work stays
 in PostgreSQL and resumes through lease expiry. Connection failures do not kill
-other connections. A worker/listener failure causes coordinated server shutdown;
+other connections. Authentication on MQTT/TCP observes EOF/stop while preserving bounded pipelined input.
+Command callbacks carry storage attempt/lease ownership independently of session generation.
+A worker/listener failure causes coordinated server shutdown;
 a supervisor must restart the process. There are no hidden retry-forever loops.
 
 Shutdown sets ingress draining before cancelling admission/listeners and workers.
@@ -65,7 +67,9 @@ No new stream task or ingress operation is accepted. Existing ingress/store call
 can complete within their timeouts and send permitted receipts. Owners then drop
 channels, QoS state, subscriptions and session leases. HTTP uses Hyper graceful
 shutdown. Each listener drains its JoinSet; the server has an overall hard deadline
-and aborts/joins remaining tasks. Dropping a listener JoinSet aborts its children.
+and aborts/joins remaining tasks. Dropping a listener JoinSet requests abort of its children. At the top-level hard
+deadline, child destructors may complete on a subsequent runtime scheduling step;
+`run()` is not an instantaneous all-grandchild-destructors completion barrier.
 Uncompleted PostgreSQL transactions roll back; uncompleted delivery leases expire.
 The process never persists sockets or task handles.
 

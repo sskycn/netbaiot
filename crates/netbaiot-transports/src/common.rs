@@ -58,11 +58,11 @@ impl Reader {
         }
     }
     pub fn consumed(&mut self) {
-        self.started = if self.buffer.is_empty() {
-            None
-        } else {
-            Some(Instant::now())
-        };
+        // Buffered tail bytes have already arrived. Processing the preceding
+        // packet must not grant them a fresh read budget.
+        if self.buffer.is_empty() {
+            self.started = None;
+        }
     }
     pub async fn read_more(
         &mut self,
@@ -74,6 +74,11 @@ impl Reader {
             .map(|t| t + self.read_timeout)
             .unwrap_or(idle_deadline)
             .min(idle_deadline);
+        // Tokio timeout polls the I/O future first: ready bytes alone must not
+        // let an already expired incomplete packet escape the whole deadline.
+        if Instant::now() >= deadline {
+            return Err(Error::Timeout);
+        }
         let room = self
             .maximum
             .checked_sub(self.buffer.len())
@@ -106,6 +111,30 @@ pub async fn write(
         .await
         .map_err(|_| Error::Timeout)?
         .map_err(|_| Error::Unavailable)
+}
+/// Authentication does not own a session yet. Keep observing EOF and shutdown;
+/// any pipelined bytes stay in the same bounded connection reader.
+pub async fn authenticate_stream(
+    s: &Services,
+    request: AuthenticationRequest<'_>,
+    reader: &mut Reader,
+    stream: &mut BoxStream,
+    stop: &CancellationToken,
+) -> Result<netbaiot_core::AuthenticatedDevice> {
+    let auth = s.ingress.authenticate(request);
+    tokio::pin!(auth);
+    let until = Instant::now() + Duration::from_millis(s.ingress.limits.authentication_timeout_ms);
+    loop {
+        tokio::select! {
+            biased;
+            _ = stop.cancelled() => return Err(Error::Draining),
+            read = reader.read_more(stream, until) => read?,
+            result = &mut auth => {
+                if s.ingress.is_draining() { return Err(Error::Draining); }
+                return result;
+            }
+        }
+    }
 }
 pub async fn serve_stream(
     listener: TcpListener,
@@ -150,4 +179,40 @@ pub async fn serve_stream(
 }
 pub fn local_addr(listener: &TcpListener) -> Result<SocketAddr> {
     listener.local_addr().map_err(|_| Error::Unavailable)
+}
+
+#[cfg(test)]
+mod audit_deadlines {
+    use super::*;
+    #[tokio::test(start_paused = true)]
+    async fn audit_expired_packet_rejects_even_ready_socket_bytes() {
+        let (mut peer, mut stream) = tokio::io::duplex(64);
+        let mut reader = Reader::new(64, 30);
+        let idle = Instant::now() + Duration::from_secs(10);
+        peer.write_all(b"a").await.unwrap();
+        reader.read_more(&mut stream, idle).await.unwrap();
+        tokio::time::advance(Duration::from_millis(31)).await;
+        peer.write_all(b"b").await.unwrap();
+        assert!(matches!(
+            reader.read_more(&mut stream, idle).await,
+            Err(Error::Timeout)
+        ));
+    }
+    #[tokio::test(start_paused = true)]
+    async fn audit_partial_next_packet_keeps_original_deadline() {
+        let (mut peer, mut stream) = tokio::io::duplex(64);
+        let mut reader = Reader::new(64, 30);
+        let idle = Instant::now() + Duration::from_secs(10);
+        peer.write_all(&[0xc0, 0, 0x30]).await.unwrap();
+        reader.read_more(&mut stream, idle).await.unwrap();
+        let _ping = reader.buffer.split_to(2);
+        tokio::time::advance(Duration::from_millis(20)).await;
+        reader.consumed();
+        tokio::time::advance(Duration::from_millis(11)).await;
+        peer.write_all(&[0x03]).await.unwrap();
+        assert!(matches!(
+            reader.read_more(&mut stream, idle).await,
+            Err(Error::Timeout)
+        ));
+    }
 }

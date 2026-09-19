@@ -1,0 +1,30 @@
+    Blocking waiting for file lock on build directory
+   Compiling netbaiot-transports v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-transports)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.67s
+     Running tests/end_to_end.rs (target/debug/deps/end_to_end-6c31adebed6d2058)
+
+running 2 tests
+test audit_http_body_admission_respects_tenant_capacity ... FAILED
+test audit_http_rejects_unsupported_content_encoding ... FAILED
+
+failures:
+
+---- audit_http_body_admission_respects_tenant_capacity stdout ----
+
+thread 'audit_http_body_admission_respects_tenant_capacity' (2251163) panicked at crates/netbaiot-transports/tests/end_to_end.rs:931:5:
+assertion failed: response.starts_with(b"HTTP/1.1 429")
+
+---- audit_http_rejects_unsupported_content_encoding stdout ----
+
+thread 'audit_http_rejects_unsupported_content_encoding' (2251164) panicked at crates/netbaiot-transports/tests/end_to_end.rs:918:5:
+assertion failed: response.starts_with(b"HTTP/1.1 415")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    audit_http_body_admission_respects_tenant_capacity
+    audit_http_rejects_unsupported_content_encoding
+
+test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 15 filtered out; finished in 0.01s
+
+error: test failed, to rerun pass `-p netbaiot-transports --test end_to_end`

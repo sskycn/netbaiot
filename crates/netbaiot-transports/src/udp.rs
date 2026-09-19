@@ -231,3 +231,40 @@ mod tests {
         assert!(decode(b"NBI1\xff", 1200).is_err());
     }
 }
+
+#[cfg(test)]
+mod audit {
+    use super::*;
+    #[test]
+    fn full_replay_cache_never_evicts_live_entry_and_sequence_does_not_wrap() {
+        let mut w = ReplayWindow::new(Arc::new(Limits {
+            max_replay_entries: 1,
+            max_replay_entries_per_device: 1,
+            ..Limits::default()
+        }));
+        let k = DeviceKey {
+            tenant_id: TenantId::new("t").unwrap(),
+            product_id: ProductId::new("p").unwrap(),
+            device_id: DeviceId::new("d").unwrap(),
+        };
+        w.check(&k, [1; 16], u64::MAX, 1000, 1000).unwrap();
+        w.commit(k.clone(), [1; 16], u64::MAX, 1000);
+        assert!(matches!(
+            w.check(&k, [2; 16], 0, 1000, 1000),
+            Err(Error::Overloaded)
+        ));
+        assert!(matches!(
+            w.check(&k, [1; 16], u64::MAX, 1000, 1000),
+            Err(Error::Conflict)
+        ));
+        assert!(matches!(
+            w.check(&k, [1; 16], 0, 1000, 1000),
+            Err(Error::Conflict)
+        ));
+        assert!(w.check(&k, [1; 16], u64::MAX - 63, 1000, 1000).is_ok());
+        assert!(w.check(&k, [1; 16], u64::MAX - 64, 1000, 1000).is_err());
+        assert!(w.check(&k, [1; 16], 1, i64::MIN, i64::MAX).is_err());
+        w.check(&k, [2; 16], 0, 121001, 121001).unwrap();
+        assert!(w.check(&k, [1; 16], u64::MAX, 1000, 121001).is_err());
+    }
+}

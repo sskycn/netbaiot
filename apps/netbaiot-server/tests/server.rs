@@ -129,3 +129,58 @@ async fn config_input_is_bounded_and_malformed_config_fails() {
         Err(Error::Configuration)
     ));
 }
+
+#[tokio::test]
+async fn audit_tls_handshake_timeout_shutdown_and_invalid_key() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures");
+    assert!(
+        tls_acceptor(&TlsFiles {
+            certificate: root.join("localhost-cert.pem").to_str().unwrap().into(),
+            private_key: root.join("localhost-cert.pem").to_str().unwrap().into()
+        })
+        .await
+        .is_err()
+    );
+    let mut c = config();
+    c.http = "127.0.0.1:0".parse().unwrap();
+    c.tcp = c.http;
+    c.udp = c.http;
+    let reservation = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    c.mqtt = reservation.local_addr().unwrap();
+    drop(reservation);
+    let address = c.mqtt;
+    c.limits.connect_timeout_ms = 40;
+    c.limits.shutdown_timeout_ms = 100;
+    c.tls = Some(TlsFiles {
+        certificate: root.join("localhost-cert.pem").to_str().unwrap().into(),
+        private_key: root.join("localhost-key.pem").to_str().unwrap().into(),
+    });
+    let stop = CancellationToken::new();
+    let task = tokio::spawn(run(c, stop.clone()));
+    let mut socket = tokio::time::timeout(Duration::from_secs(2), async {
+        loop {
+            if let Ok(socket) = tokio::net::TcpStream::connect(address).await {
+                break socket;
+            }
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+    })
+    .await
+    .unwrap();
+    let mut b = [0];
+    assert_eq!(
+        tokio::time::timeout(Duration::from_secs(1), socket.read(&mut b))
+            .await
+            .unwrap()
+            .unwrap(),
+        0
+    );
+    let mut pending = tokio::net::TcpStream::connect(address).await.unwrap();
+    stop.cancel();
+    tokio::time::timeout(Duration::from_secs(1), task)
+        .await
+        .unwrap()
+        .unwrap()
+        .unwrap();
+    assert!(matches!(pending.read(&mut b).await, Ok(0) | Err(_)));
+}

@@ -1,0 +1,76 @@
+{
+  "interop": {
+    "client": "paho-mqtt 2.1.0",
+    "connect": true,
+    "qos0": true,
+    "qos1": true,
+    "exact_subscriptions": true,
+    "downlink_puback": true,
+    "ping": true,
+    "reconnect": true,
+    "bad_credentials": true
+  },
+  "connection_pressure": {
+    "base_rss_kib": 12080,
+    "after_close_rss_kib": 14976,
+    "stages": [
+      {
+        "clients": 8,
+        "subscriptions": 16,
+        "rss_kib": 12384,
+        "connect_subscribe_p50_ms": 0.391,
+        "connect_subscribe_max_ms": 0.583,
+        "connection_owner_tasks": 8
+      },
+      {
+        "clients": 16,
+        "subscriptions": 32,
+        "rss_kib": 12768,
+        "connect_subscribe_p50_ms": 0.235,
+        "connect_subscribe_max_ms": 0.367,
+        "connection_owner_tasks": 16
+      },
+      {
+        "clients": 32,
+        "subscriptions": 64,
+        "rss_kib": 13088,
+        "connect_subscribe_p50_ms": 0.222,
+        "connect_subscribe_max_ms": 0.272,
+        "connection_owner_tasks": 32
+      },
+      {
+        "clients": 63,
+        "subscriptions": 126,
+        "rss_kib": 13696,
+        "connect_subscribe_p50_ms": 0.199,
+        "connect_subscribe_max_ms": 0.363,
+        "connection_owner_tasks": 63
+      },
+      {
+        "clients": 64,
+        "subscriptions": 128,
+        "rss_kib": 13728,
+        "connect_subscribe_p50_ms": 0.286,
+        "connect_subscribe_max_ms": 0.286,
+        "rejected_extra": 16
+      }
+    ],
+    "active_after_close": 0
+  },
+  "slow_consumer": {
+    "commands": 12,
+    "retained_items": 4,
+    "retained_bytes": 1804,
+    "queue_rejects": 8,
+    "rss_delta_kib": 896,
+    "after_timeout_items": 0
+  },
+  "slow_delivery": {
+    "accepted": 8,
+    "rejected": 4,
+    "terminal_jobs": 8,
+    "total_attempts": 16,
+    "rss_delta_kib": 1504,
+    "in_memory_delivery_items": 1
+  }
+}

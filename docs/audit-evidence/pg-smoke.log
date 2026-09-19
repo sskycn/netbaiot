@@ -1,0 +1,1 @@
+PASS: durable HTTP/MQTT acceptance, deduplication, outbox HTTP delivery, admin command, MQTT PUBACK, execution ACK, SIGTERM shutdown

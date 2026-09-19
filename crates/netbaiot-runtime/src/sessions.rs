@@ -13,6 +13,8 @@ use tokio_util::sync::CancellationToken;
 pub struct QueuedCommand {
     pub command_id: CommandId,
     pub expires_at: Timestamp,
+    pub attempt: u32,
+    pub lease_expires_at: Timestamp,
     queued: Arc<AtomicUsize>,
     pub bytes: Vec<u8>,
     _bytes: Vec<BytesPermit>,
@@ -36,7 +38,11 @@ pub struct SessionEndpoint {
     queued: Arc<AtomicUsize>,
 }
 impl SessionEndpoint {
-    pub fn enqueue(&self, command: DeviceCommand, bytes: Vec<u8>) -> Result<()> {
+    pub fn enqueue(&self, record: CommandRecord, bytes: Vec<u8>) -> Result<()> {
+        let lease_expires_at = record.lease_expires_at.ok_or(Error::Invalid)?;
+        if record.attempts == 0 {
+            return Err(Error::Invalid);
+        }
         if self.cancel.is_cancelled() {
             return Err(Error::Unavailable);
         }
@@ -53,8 +59,10 @@ impl SessionEndpoint {
         self.queued.fetch_add(1, Ordering::Relaxed);
         self.sender
             .try_send(QueuedCommand {
-                command_id: command.command_id,
-                expires_at: command.expires_at,
+                command_id: record.command.command_id,
+                expires_at: record.command.expires_at,
+                attempt: record.attempts,
+                lease_expires_at,
                 queued: self.queued.clone(),
                 bytes,
                 _bytes: permits,
@@ -66,7 +74,8 @@ impl SessionEndpoint {
 struct SessionState {
     generation: u64,
     sessions: HashMap<DeviceKey, SessionEndpoint>,
-    tenants: HashMap<TenantId, (usize, ByteBudget)>,
+    // Weak identity survives while any endpoint OR owned byte permit is alive.
+    tenants: HashMap<TenantId, (usize, WeakByteBudget)>,
     presence: HashMap<DeviceKey, Presence>,
 }
 pub struct Sessions {
@@ -104,6 +113,8 @@ impl Sessions {
             return Err(Error::Invalid);
         }
         let mut s = lock(&self.state)?;
+        s.tenants
+            .retain(|_, (n, budget)| *n > 0 || budget.upgrade().is_some());
         let replacing = s.sessions.contains_key(device);
         if !replacing && s.sessions.len() >= self.limits.max_connections {
             return Err(Error::Overloaded);
@@ -112,22 +123,20 @@ impl Sessions {
             return Err(Error::Overloaded);
         }
         let generation = s.generation.checked_add(1).ok_or(Error::Overloaded)?;
-        let tenant = s
-            .tenants
-            .entry(device.tenant_id.clone())
-            .or_insert_with(|| {
-                (
-                    0,
-                    ByteBudget::new(self.limits.max_outbound_bytes_per_tenant),
-                )
-            });
+        if !s.tenants.contains_key(&device.tenant_id) && s.tenants.len() >= self.limits.max_devices
+        {
+            return Err(Error::Overloaded);
+        }
+        let tenant = s.tenants.entry(device.tenant_id.clone()).or_default();
         if !replacing && tenant.0 >= self.limits.max_connections_per_tenant {
             return Err(Error::Overloaded);
         }
         if !replacing {
             tenant.0 += 1;
         }
-        let tenant_bytes = tenant.1.clone();
+        let tenant_bytes = tenant
+            .1
+            .get_or_create(self.limits.max_outbound_bytes_per_tenant);
         let (sender, receiver) = mpsc::channel(self.limits.max_outbound_messages_per_connection);
         let cancel = CancellationToken::new();
         let endpoint = SessionEndpoint {
@@ -222,7 +231,7 @@ impl Drop for SessionLease {
             self.cancel.cancel();
             if let Some(t) = s.tenants.get_mut(&self.device.tenant_id) {
                 t.0 = t.0.saturating_sub(1);
-                if t.0 == 0 {
+                if t.0 == 0 && t.1.upgrade().is_none() {
                     s.tenants.remove(&self.device.tenant_id);
                 }
             }
@@ -277,6 +286,13 @@ mod tests {
                 arguments: Default::default(),
             },
         };
+        let c = CommandRecord {
+            command: c,
+            delivery: DeliveryState::Dispatching,
+            execution: ExecutionState::Unknown,
+            attempts: 1,
+            lease_expires_at: Some(100),
+        };
         assert!(ep.enqueue(c.clone(), vec![0; 17]).is_err());
         ep.enqueue(c.clone(), vec![0; 16]).unwrap();
         assert!(ep.enqueue(c.clone(), vec![0]).is_err());
@@ -284,5 +300,95 @@ mod tests {
         assert!(ep.enqueue(c.clone(), vec![0]).is_err());
         drop(queued);
         ep.enqueue(c, vec![0]).unwrap();
+    }
+
+    #[test]
+    fn audit_tenant_budget_survives_superseded_queue() {
+        let s = Sessions::new(Arc::new(Limits {
+            max_outbound_bytes_per_connection: 16,
+            max_outbound_bytes_per_tenant: 16,
+            max_outbound_bytes: 64,
+            ..Limits::default()
+        }));
+        let d = key();
+        let (old, mut rx) = s.register(&d, Transport::Mqtt).unwrap();
+        let c = DeviceCommand {
+            command_id: CommandId::generate(),
+            device: d.clone(),
+            expires_at: 100,
+            payload: DeviceCommandPayload {
+                name: "x".into(),
+                arguments: Default::default(),
+            },
+        };
+        let c = CommandRecord {
+            command: c,
+            delivery: DeliveryState::Dispatching,
+            execution: ExecutionState::Unknown,
+            attempts: 1,
+            lease_expires_at: Some(100),
+        };
+        s.lookup(&d)
+            .unwrap()
+            .unwrap()
+            .enqueue(c.clone(), vec![0; 16])
+            .unwrap();
+        let in_flight = rx.try_recv().unwrap();
+        let (replacement, replacement_rx) = s.register(&d, Transport::Mqtt).unwrap();
+        drop((replacement, replacement_rx));
+        let (_new, _new_rx) = s.register(&d, Transport::Mqtt).unwrap();
+        let ep = s.lookup(&d).unwrap().unwrap();
+        assert!(matches!(
+            ep.enqueue(c.clone(), vec![0]),
+            Err(Error::Overloaded)
+        ));
+        drop((in_flight, old, rx));
+        ep.enqueue(c, vec![0; 16]).unwrap();
+    }
+}
+
+#[cfg(test)]
+mod audit_cleanup {
+    use super::*;
+    #[tokio::test]
+    async fn cancelled_receiver_and_failed_enqueue_release_all_budgets() {
+        let s = Sessions::new(Arc::new(Limits::default()));
+        let device = DeviceKey {
+            tenant_id: TenantId::new("t").unwrap(),
+            product_id: ProductId::new("p").unwrap(),
+            device_id: DeviceId::new("d").unwrap(),
+        };
+        let (session, mut rx) = s.register(&device, Transport::Mqtt).unwrap();
+        let ep = s.lookup(&device).unwrap().unwrap();
+        let record = CommandRecord {
+            command: DeviceCommand {
+                command_id: CommandId::generate(),
+                device,
+                expires_at: now_ms() + 60000,
+                payload: DeviceCommandPayload {
+                    name: "x".into(),
+                    arguments: Default::default(),
+                },
+            },
+            delivery: DeliveryState::Dispatching,
+            execution: ExecutionState::Unknown,
+            attempts: 1,
+            lease_expires_at: Some(now_ms() + 30000),
+        };
+        ep.enqueue(record.clone(), vec![0; 1024]).unwrap();
+        let in_flight = rx.recv().await.unwrap();
+        ep.enqueue(record.clone(), vec![0; 2048]).unwrap();
+        assert_eq!(s.queued_messages(), 2);
+        assert_eq!(s.queued_bytes(), 3072);
+        drop(rx);
+        assert_eq!(s.queued_bytes(), 1024);
+        assert!(ep.enqueue(record.clone(), vec![0; 3000]).is_err());
+        assert_eq!(s.queued_bytes(), 1024);
+        assert_eq!(s.queued_messages(), 1);
+        drop(in_flight);
+        drop(session);
+        assert!(ep.enqueue(record, vec![0; 3000]).is_err());
+        assert_eq!(s.queued_messages(), 0);
+        assert_eq!(s.queued_bytes(), 0);
     }
 }
