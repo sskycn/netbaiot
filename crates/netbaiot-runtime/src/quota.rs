@@ -228,6 +228,14 @@ pub struct AdmissionLease {
     _bytes: BytesPermit,
 }
 impl Admission {
+    /// In-flight permits, not a waiting queue. The two gauges are sampled independently.
+    pub fn in_flight(&self) -> (usize, usize) {
+        (
+            self.limits.max_ingress - self.slots.available_permits(),
+            self.limits.max_ingress_bytes - self.bytes.available(),
+        )
+    }
+
     pub fn new(limits: Arc<Limits>) -> Arc<Self> {
         Arc::new(Self {
             state: Mutex::new(AdmissionState {
@@ -357,6 +365,7 @@ mod tests {
             ..Limits::default()
         });
         let a = Admission::new(l);
+        assert_eq!(a.in_flight(), (0, 0));
         let first = a.acquire(&key("t", "1"), 10).unwrap();
         assert!(a.acquire(&key("t", "1"), 1).is_err());
         let second = a.acquire(&key("t", "2"), 10).unwrap();
@@ -364,7 +373,9 @@ mod tests {
         assert!(a.acquire(&key("u", "1"), 11).is_err());
         let other = a.acquire(&key("u", "1"), 10).unwrap();
         assert!(a.acquire(&key("v", "1"), 1).is_err());
+        assert_eq!(a.in_flight(), (3, 30));
         drop((first, second, other));
+        assert_eq!(a.in_flight(), (0, 0));
         assert!(a.acquire(&key("t", "1"), 30).is_ok());
     }
     #[test]

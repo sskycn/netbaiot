@@ -1,0 +1,27 @@
+{
+  "case_records": 163,
+  "largest_server_rss": {
+    "case": "idle_8k_tls_3400_r3",
+    "phase": "after_disconnect",
+    "server_rss_kib": 101168
+  },
+  "interrupted_or_failed": [
+    {
+      "case": "config_ceiling_5000",
+      "error": "RuntimeError: server startup: Error: Configuration\n"
+    },
+    {
+      "case": "db_unavailable",
+      "error": "CalledProcessError: Command '['/opt/local/lib/pgsql/bin/psql', '-X', '-v', 'ON_ERROR_STOP=1', '-At', 'cap_db_unavailable', '-c', 'ALTER DATABASE cap_db_unavailable ALLOW_CONNECTIONS false; SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname=current_database() AND pid<>pg_backend_pid()']' returned non-zero exit status 1."
+    },
+    {
+      "case": "payload_q0_128",
+      "error": "KeyboardInterrupt: cancelled to isolate observer"
+    },
+    {
+      "case": "stable_q0_25_r2",
+      "error": "KeyboardInterrupt: experiment cancelled"
+    }
+  ],
+  "scope": "All ended raw case files, including failed/cancelled experiments; sampled server RSS including baseline/disconnect/cooldown, excluding generator/PG RSS"
+}

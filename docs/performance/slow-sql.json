@@ -1,0 +1,1400 @@
+{
+  "active_isolated_1000": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "active_isolated_2000": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [
+      {
+        "sql": "SELECT pg_advisory_xact_lock(782634291)",
+        "count": 30,
+        "max_ms": 671.051,
+        "total_ms": 11044.804
+      },
+      {
+        "sql": "INSERT INTO ingress_messages VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)",
+        "count": 5,
+        "max_ms": 665.186,
+        "total_ms": 1912.4189999999999
+      },
+      {
+        "sql": "DELETE FROM ingress_messages WHERE message_id IN (SELECT message_id FROM ingress_messages WHERE expires_at<=$1 ORDER BY expires_at LIMIT $2 FOR UPDATE SKIP LOCKED)",
+        "count": 3,
+        "max_ms": 417.705,
+        "total_ms": 926.858
+      },
+      {
+        "sql": "WITH selected AS (SELECT message_id FROM delivery_jobs WHERE NOT done AND next_attempt_at<=$1 AND expires_at>$1 AND attempts<$2 AND (lease_expiry IS NULL OR lease_expiry<=$1) ORDER BY next_attempt_at LIMIT $3 FOR UPDATE SKIP LOCKED), claimed AS (UPDATE delivery_jobs j SET attempts=attempts+1,lease_owner=$4,lease_expiry=$5 FROM selected s WHERE j.message_id=s.message_id RETURNING j.message_id,j.attempts,j.expires_at) SELECT c.attempts,c.expires_at,m.message FROM claimed c JOIN ingress_messages m USING(message_id)",
+        "count": 1,
+        "max_ms": 659.413,
+        "total_ms": 659.413
+      }
+    ],
+    "checkpoints": []
+  },
+  "bad_auth_flood": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [
+      {
+        "sql": "SELECT pg_advisory_xact_lock(782634291)",
+        "count": 10,
+        "max_ms": 291.8,
+        "total_ms": 1858.7299999999996
+      },
+      {
+        "sql": "INSERT INTO ingress_messages VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)",
+        "count": 2,
+        "max_ms": 311.341,
+        "total_ms": 513.347
+      },
+      {
+        "sql": "DELETE FROM ingress_messages WHERE message_id IN (SELECT message_id FROM ingress_messages WHERE expires_at<=$1 ORDER BY expires_at LIMIT $2 FOR UPDATE SKIP LOCKED)",
+        "count": 1,
+        "max_ms": 109.897,
+        "total_ms": 109.897
+      }
+    ],
+    "checkpoints": []
+  },
+  "churn_plain_10": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "churn_plain_100": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "churn_plain_50": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "churn_tls_10": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "churn_tls_100": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "churn_tls_50": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "cleanup_abrupt": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "cleanup_clean": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "db_exhausted": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [
+      {
+        "sql": "SELECT pg_advisory_xact_lock(782634291)",
+        "count": 8,
+        "max_ms": 2973.84,
+        "total_ms": 23191.061
+      },
+      {
+        "sql": "BEGIN; SELECT pg_advisory_xact_lock(782634291); SELECT pg_sleep(8.0); COMMIT;",
+        "count": 1,
+        "max_ms": 8002.41,
+        "total_ms": 8002.41
+      }
+    ],
+    "checkpoints": []
+  },
+  "db_lock_8s_no_restart": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [
+      {
+        "sql": "SELECT pg_advisory_xact_lock(782634291)",
+        "count": 8,
+        "max_ms": 2992.29,
+        "total_ms": 23673.010000000002
+      },
+      {
+        "sql": "BEGIN; SELECT pg_advisory_xact_lock(782634291); SELECT pg_sleep(8.0); COMMIT;",
+        "count": 1,
+        "max_ms": 8002.063,
+        "total_ms": 8002.063
+      }
+    ],
+    "checkpoints": []
+  },
+  "db_moderate": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [
+      {
+        "sql": "SELECT pg_advisory_xact_lock(782634291)",
+        "count": 8,
+        "max_ms": 239.285,
+        "total_ms": 1587.6019999999999
+      },
+      {
+        "sql": "BEGIN; SELECT pg_advisory_xact_lock(782634291); SELECT pg_sleep(0.25); COMMIT;",
+        "count": 1,
+        "max_ms": 252.737,
+        "total_ms": 252.737
+      }
+    ],
+    "checkpoints": []
+  },
+  "db_severe": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [
+      {
+        "sql": "SELECT pg_advisory_xact_lock(782634291)",
+        "count": 8,
+        "max_ms": 1994.851,
+        "total_ms": 15856.857000000002
+      },
+      {
+        "sql": "BEGIN; SELECT pg_advisory_xact_lock(782634291); SELECT pg_sleep(2.0); COMMIT;",
+        "count": 1,
+        "max_ms": 2000.785,
+        "total_ms": 2000.785
+      }
+    ],
+    "checkpoints": []
+  },
+  "db_unavailable_verified": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "downlink_25": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [
+      {
+        "sql": "SELECT pg_advisory_xact_lock(782634291)",
+        "count": 13,
+        "max_ms": 450.377,
+        "total_ms": 4483.0470000000005
+      },
+      {
+        "sql": "INSERT INTO commands VALUES ($1,$2,$3,$4,$5,$6,$7,$8,false)",
+        "count": 1,
+        "max_ms": 481.726,
+        "total_ms": 481.726
+      },
+      {
+        "sql": "SELECT record FROM commands WHERE NOT terminal AND expires_at>$1 AND next_attempt_at<=$1 AND (tenant_id,product_id,device_id) IN (SELECT d.tenant_id,d.product_id,d.device_id FROM jsonb_to_recordset($2) AS d(tenant_id text,product_id text,device_id text)) ORDER BY next_attempt_at LIMIT $3 FOR UPDATE SKIP LOCKED",
+        "count": 1,
+        "max_ms": 427.494,
+        "total_ms": 427.494
+      },
+      {
+        "sql": "INSERT INTO ingress_messages VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)",
+        "count": 1,
+        "max_ms": 384.191,
+        "total_ms": 384.191
+      }
+    ],
+    "checkpoints": []
+  },
+  "downlink_5": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [
+      {
+        "sql": "INSERT INTO ingress_messages VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)",
+        "count": 1,
+        "max_ms": 263.168,
+        "total_ms": 263.168
+      },
+      {
+        "sql": "SELECT pg_advisory_xact_lock(782634291)",
+        "count": 1,
+        "max_ms": 211.181,
+        "total_ms": 211.181
+      },
+      {
+        "sql": "UPDATE commands SET record=$2,terminal=$3 WHERE command_id=$1",
+        "count": 1,
+        "max_ms": 168.582,
+        "total_ms": 168.582
+      },
+      {
+        "sql": "DELETE FROM commands WHERE command_id IN (SELECT command_id FROM commands WHERE retain_until<=$1 ORDER BY retain_until LIMIT $2 FOR UPDATE SKIP LOCKED)",
+        "count": 1,
+        "max_ms": 168.242,
+        "total_ms": 168.242
+      },
+      {
+        "sql": "SELECT count(*) n,count(*) FILTER (WHERE tenant_id=$1) tenant,count(*) FILTER (WHERE tenant_id=$1 AND product_id=$2 AND device_id=$3) device FROM commands",
+        "count": 1,
+        "max_ms": 104.561,
+        "total_ms": 104.561
+      }
+    ],
+    "checkpoints": []
+  },
+  "downlink_sql_profile": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [
+      {
+        "sql": "SELECT pg_advisory_xact_lock(782634291)",
+        "count": 231,
+        "max_ms": 2526.01,
+        "total_ms": 42348.21700000001
+      }
+    ],
+    "checkpoints": []
+  },
+  "downlink_stable_10_r1": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "downlink_stable_10_r2": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [
+      {
+        "sql": "SELECT pg_advisory_xact_lock(782634291)",
+        "count": 5,
+        "max_ms": 295.926,
+        "total_ms": 1055.849
+      },
+      {
+        "sql": "COMMIT",
+        "count": 3,
+        "max_ms": 394.872,
+        "total_ms": 914.261
+      },
+      {
+        "sql": "INSERT INTO commands VALUES ($1,$2,$3,$4,$5,$6,$7,$8,false)",
+        "count": 2,
+        "max_ms": 345.098,
+        "total_ms": 477.577
+      },
+      {
+        "sql": "SELECT record FROM commands WHERE NOT terminal AND expires_at>$1 AND next_attempt_at<=$1 AND (tenant_id,product_id,device_id) IN (SELECT d.tenant_id,d.product_id,d.device_id FROM jsonb_to_recordset($2) AS d(tenant_id text,product_id text,device_id text)) ORDER BY next_attempt_at LIMIT $3 FOR UPDATE SKIP LOCKED",
+        "count": 1,
+        "max_ms": 284.824,
+        "total_ms": 284.824
+      }
+    ],
+    "checkpoints": []
+  },
+  "downlink_stable_10_r3": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [
+      {
+        "sql": "SELECT pg_advisory_xact_lock(782634291)",
+        "count": 3,
+        "max_ms": 276.502,
+        "total_ms": 619.807
+      },
+      {
+        "sql": "INSERT INTO ingress_messages VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)",
+        "count": 1,
+        "max_ms": 319.381,
+        "total_ms": 319.381
+      },
+      {
+        "sql": "UPDATE commands SET record=$2,terminal=$3 WHERE command_id=$1",
+        "count": 1,
+        "max_ms": 292.032,
+        "total_ms": 292.032
+      },
+      {
+        "sql": "SELECT count(*) n,count(*) FILTER (WHERE tenant_id=$1) tenant,count(*) FILTER (WHERE tenant_id=$1 AND product_id=$2 AND device_id=$3) device FROM commands",
+        "count": 1,
+        "max_ms": 245.48,
+        "total_ms": 245.48
+      }
+    ],
+    "checkpoints": []
+  },
+  "downlink_stable_25_r1": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [
+      {
+        "sql": "SELECT pg_advisory_xact_lock(782634291)",
+        "count": 22,
+        "max_ms": 447.866,
+        "total_ms": 6347.921000000001
+      },
+      {
+        "sql": "INSERT INTO ingress_messages VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)",
+        "count": 2,
+        "max_ms": 408.888,
+        "total_ms": 690.115
+      },
+      {
+        "sql": "UPDATE commands SET next_attempt_at=$2 WHERE command_id=$1",
+        "count": 1,
+        "max_ms": 131.778,
+        "total_ms": 131.778
+      },
+      {
+        "sql": "INSERT INTO commands VALUES ($1,$2,$3,$4,$5,$6,$7,$8,false)",
+        "count": 1,
+        "max_ms": 118.711,
+        "total_ms": 118.711
+      }
+    ],
+    "checkpoints": []
+  },
+  "downlink_timing": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "final_http_256_100": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "final_http_256_25": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "final_http_4096_100": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "final_http_4096_25": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "final_mixed_70_15_10_5": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "generator_calibration": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": [
+      "2026-09-19 10:48:49.090 CST [83454] LOG:  checkpoint starting: time"
+    ]
+  },
+  "healthy_fairness_control": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [
+      {
+        "sql": "SELECT pg_advisory_xact_lock(782634291)",
+        "count": 10,
+        "max_ms": 616.307,
+        "total_ms": 4422.415
+      },
+      {
+        "sql": "INSERT INTO ingress_messages VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)",
+        "count": 2,
+        "max_ms": 657.182,
+        "total_ms": 1256.443
+      },
+      {
+        "sql": "UPDATE commands SET next_attempt_at=$2 WHERE command_id=$1",
+        "count": 1,
+        "max_ms": 734.672,
+        "total_ms": 734.672
+      },
+      {
+        "sql": "DELETE FROM commands WHERE command_id IN (SELECT command_id FROM commands WHERE retain_until<=$1 ORDER BY retain_until LIMIT $2 FOR UPDATE SKIP LOCKED)",
+        "count": 1,
+        "max_ms": 730.078,
+        "total_ms": 730.078
+      },
+      {
+        "sql": "DELETE FROM ingress_messages WHERE message_id IN (SELECT message_id FROM ingress_messages WHERE expires_at<=$1 ORDER BY expires_at LIMIT $2 FOR UPDATE SKIP LOCKED)",
+        "count": 1,
+        "max_ms": 439.102,
+        "total_ms": 439.102
+      }
+    ],
+    "checkpoints": []
+  },
+  "healthy_tls_control": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [
+      {
+        "sql": "SELECT pg_advisory_xact_lock(782634291)",
+        "count": 4,
+        "max_ms": 327.201,
+        "total_ms": 1168.699
+      },
+      {
+        "sql": "COMMIT",
+        "count": 2,
+        "max_ms": 369.441,
+        "total_ms": 735.79
+      }
+    ],
+    "checkpoints": []
+  },
+  "http_256_100": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [
+      {
+        "sql": "SELECT pg_advisory_xact_lock(782634291)",
+        "count": 6,
+        "max_ms": 707.328,
+        "total_ms": 3882.1400000000003
+      },
+      {
+        "sql": "INSERT INTO ingress_messages VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)",
+        "count": 1,
+        "max_ms": 702.112,
+        "total_ms": 702.112
+      }
+    ],
+    "checkpoints": []
+  },
+  "http_256_25": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [
+      {
+        "sql": "SELECT pg_advisory_xact_lock(782634291)",
+        "count": 7,
+        "max_ms": 544.433,
+        "total_ms": 3237.588
+      },
+      {
+        "sql": "INSERT INTO ingress_messages VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)",
+        "count": 1,
+        "max_ms": 572.781,
+        "total_ms": 572.781
+      }
+    ],
+    "checkpoints": []
+  },
+  "http_4096_100": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [
+      {
+        "sql": "SELECT pg_advisory_xact_lock(782634291)",
+        "count": 6,
+        "max_ms": 1051.729,
+        "total_ms": 6026.8150000000005
+      },
+      {
+        "sql": "INSERT INTO ingress_messages VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)",
+        "count": 1,
+        "max_ms": 1059.307,
+        "total_ms": 1059.307
+      }
+    ],
+    "checkpoints": []
+  },
+  "http_4096_25": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [
+      {
+        "sql": "SELECT pg_advisory_xact_lock(782634291)",
+        "count": 3,
+        "max_ms": 380.141,
+        "total_ms": 1031.666
+      },
+      {
+        "sql": "INSERT INTO delivery_jobs(message_id,next_attempt_at,expires_at) VALUES ($1,$2,$3)",
+        "count": 1,
+        "max_ms": 413.946,
+        "total_ms": 413.946
+      },
+      {
+        "sql": "INSERT INTO ingress_messages VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)",
+        "count": 1,
+        "max_ms": 113.884,
+        "total_ms": 113.884
+      }
+    ],
+    "checkpoints": []
+  },
+  "idle_8k_plain_3400_r1": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "idle_8k_plain_3400_r2": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "idle_8k_plain_3400_r3": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "idle_8k_tls_3400_r1": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "idle_8k_tls_3400_r2": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "idle_8k_tls_3400_r3": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "idle_tls_cold_1000_r1": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "idle_tls_cold_1000_r2": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "idle_tls_cold_1000_r3": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "idle_tls_cold_100_r1": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "idle_tls_cold_100_r2": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "idle_tls_cold_100_r3": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "idle_tls_cold_2000_r1": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "idle_tls_cold_2000_r2": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "idle_tls_cold_2000_r3": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "knee_clean_q0_250": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "knee_clean_q1_250": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "mixed_70_15_10_5": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "noisy_connections": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [
+      {
+        "sql": "SELECT pg_advisory_xact_lock(782634291)",
+        "count": 7,
+        "max_ms": 726.872,
+        "total_ms": 2972.593
+      },
+      {
+        "sql": "INSERT INTO ingress_messages VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)",
+        "count": 3,
+        "max_ms": 756.199,
+        "total_ms": 1184.5079999999998
+      },
+      {
+        "sql": "DELETE FROM ingress_messages WHERE message_id IN (SELECT message_id FROM ingress_messages WHERE expires_at<=$1 ORDER BY expires_at LIMIT $2 FOR UPDATE SKIP LOCKED)",
+        "count": 2,
+        "max_ms": 755.542,
+        "total_ms": 873.743
+      }
+    ],
+    "checkpoints": []
+  },
+  "noisy_device": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [
+      {
+        "sql": "SELECT pg_advisory_xact_lock(782634291)",
+        "count": 20,
+        "max_ms": 501.482,
+        "total_ms": 6719.969
+      },
+      {
+        "sql": "INSERT INTO ingress_messages VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)",
+        "count": 4,
+        "max_ms": 444.696,
+        "total_ms": 1363.33
+      },
+      {
+        "sql": "DELETE FROM ingress_messages WHERE message_id IN (SELECT message_id FROM ingress_messages WHERE expires_at<=$1 ORDER BY expires_at LIMIT $2 FOR UPDATE SKIP LOCKED)",
+        "count": 2,
+        "max_ms": 362.938,
+        "total_ms": 557.326
+      }
+    ],
+    "checkpoints": []
+  },
+  "noisy_tenant": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [
+      {
+        "sql": "SELECT pg_advisory_xact_lock(782634291)",
+        "count": 34,
+        "max_ms": 856.567,
+        "total_ms": 17933.985
+      },
+      {
+        "sql": "INSERT INTO ingress_messages VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)",
+        "count": 5,
+        "max_ms": 831.05,
+        "total_ms": 2504.1679999999997
+      },
+      {
+        "sql": "UPDATE delivery_jobs SET done=$1,next_attempt_at=$2,lease_owner=NULL,lease_expiry=NULL,last_error=$3 WHERE message_id=$4 AND lease_owner=$5 AND attempts=$6 AND lease_expiry>$7",
+        "count": 1,
+        "max_ms": 341.741,
+        "total_ms": 341.741
+      }
+    ],
+    "checkpoints": []
+  },
+  "payload_isolated_q0_1024": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [
+      {
+        "sql": "SELECT pg_advisory_xact_lock(782634291)",
+        "count": 4,
+        "max_ms": 468.213,
+        "total_ms": 1435.2209999999998
+      },
+      {
+        "sql": "INSERT INTO ingress_messages VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)",
+        "count": 1,
+        "max_ms": 425.305,
+        "total_ms": 425.305
+      }
+    ],
+    "checkpoints": []
+  },
+  "payload_isolated_q0_128": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "payload_isolated_q0_4096": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [
+      {
+        "sql": "SELECT pg_advisory_xact_lock(782634291)",
+        "count": 6,
+        "max_ms": 507.532,
+        "total_ms": 2048.486
+      },
+      {
+        "sql": "INSERT INTO ingress_messages VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)",
+        "count": 2,
+        "max_ms": 537.752,
+        "total_ms": 803.2629999999999
+      },
+      {
+        "sql": "WITH selected AS (SELECT message_id FROM delivery_jobs WHERE NOT done AND next_attempt_at<=$1 AND expires_at>$1 AND attempts<$2 AND (lease_expiry IS NULL OR lease_expiry<=$1) ORDER BY next_attempt_at LIMIT $3 FOR UPDATE SKIP LOCKED), claimed AS (UPDATE delivery_jobs j SET attempts=attempts+1,lease_owner=$4,lease_expiry=$5 FROM selected s WHERE j.message_id=s.message_id RETURNING j.message_id,j.attempts,j.expires_at) SELECT c.attempts,c.expires_at,m.message FROM claimed c JOIN ingress_messages m USING(message_id)",
+        "count": 1,
+        "max_ms": 760.905,
+        "total_ms": 760.905
+      }
+    ],
+    "checkpoints": []
+  },
+  "payload_isolated_q0_65000": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [
+      {
+        "sql": "SELECT pg_advisory_xact_lock(782634291)",
+        "count": 9,
+        "max_ms": 510.827,
+        "total_ms": 3154.4060000000004
+      },
+      {
+        "sql": "INSERT INTO ingress_messages VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)",
+        "count": 3,
+        "max_ms": 525.39,
+        "total_ms": 1209.134
+      },
+      {
+        "sql": "DELETE FROM ingress_messages WHERE message_id IN (SELECT message_id FROM ingress_messages WHERE expires_at<=$1 ORDER BY expires_at LIMIT $2 FOR UPDATE SKIP LOCKED)",
+        "count": 1,
+        "max_ms": 440.322,
+        "total_ms": 440.322
+      }
+    ],
+    "checkpoints": []
+  },
+  "payload_isolated_q1_1024": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [
+      {
+        "sql": "SELECT pg_advisory_xact_lock(782634291)",
+        "count": 6,
+        "max_ms": 527.311,
+        "total_ms": 2244.889
+      },
+      {
+        "sql": "COMMIT",
+        "count": 2,
+        "max_ms": 330.556,
+        "total_ms": 652.875
+      },
+      {
+        "sql": "INSERT INTO ingress_messages VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)",
+        "count": 1,
+        "max_ms": 547.775,
+        "total_ms": 547.775
+      }
+    ],
+    "checkpoints": [
+      "2026-09-19 11:08:19.608 CST [83454] LOG:  checkpoint complete: wrote 6417 buffers (39.2%); 0 WAL file(s) added, 0 removed, 5 recycled; write=269.194 s, sync=0.428 s, total=269.767 s; sync files=2650, longest=0.013 s, average=0.001 s; distance=76830 kB, estimate=76830 kB; lsn=0/1E02A908, redo lsn=0/1B8692F8"
+    ]
+  },
+  "payload_isolated_q1_128": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [
+      {
+        "sql": "SELECT pg_advisory_xact_lock(782634291)",
+        "count": 3,
+        "max_ms": 278.726,
+        "total_ms": 790.214
+      },
+      {
+        "sql": "INSERT INTO ingress_messages VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)",
+        "count": 2,
+        "max_ms": 301.92,
+        "total_ms": 415.312
+      },
+      {
+        "sql": "DELETE FROM ingress_messages WHERE message_id IN (SELECT message_id FROM ingress_messages WHERE expires_at<=$1 ORDER BY expires_at LIMIT $2 FOR UPDATE SKIP LOCKED)",
+        "count": 1,
+        "max_ms": 245.759,
+        "total_ms": 245.759
+      }
+    ],
+    "checkpoints": []
+  },
+  "payload_isolated_q1_4096": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [
+      {
+        "sql": "SELECT pg_advisory_xact_lock(782634291)",
+        "count": 6,
+        "max_ms": 705.524,
+        "total_ms": 2734.751
+      },
+      {
+        "sql": "WITH selected AS (SELECT message_id FROM delivery_jobs WHERE NOT done AND next_attempt_at<=$1 AND expires_at>$1 AND attempts<$2 AND (lease_expiry IS NULL OR lease_expiry<=$1) ORDER BY next_attempt_at LIMIT $3 FOR UPDATE SKIP LOCKED), claimed AS (UPDATE delivery_jobs j SET attempts=attempts+1,lease_owner=$4,lease_expiry=$5 FROM selected s WHERE j.message_id=s.message_id RETURNING j.message_id,j.attempts,j.expires_at) SELECT c.attempts,c.expires_at,m.message FROM claimed c JOIN ingress_messages m USING(message_id)",
+        "count": 1,
+        "max_ms": 746.05,
+        "total_ms": 746.05
+      },
+      {
+        "sql": "INSERT INTO delivery_jobs(message_id,next_attempt_at,expires_at) VALUES ($1,$2,$3)",
+        "count": 1,
+        "max_ms": 742.973,
+        "total_ms": 742.973
+      }
+    ],
+    "checkpoints": [
+      "2026-09-19 11:08:49.615 CST [83454] LOG:  checkpoint starting: time"
+    ]
+  },
+  "payload_isolated_q1_65000": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [
+      {
+        "sql": "SELECT pg_advisory_xact_lock(782634291)",
+        "count": 9,
+        "max_ms": 765.326,
+        "total_ms": 3459.929
+      },
+      {
+        "sql": "INSERT INTO ingress_messages VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)",
+        "count": 2,
+        "max_ms": 781.587,
+        "total_ms": 997.396
+      },
+      {
+        "sql": "DELETE FROM ingress_messages WHERE message_id IN (SELECT message_id FROM ingress_messages WHERE expires_at<=$1 ORDER BY expires_at LIMIT $2 FOR UPDATE SKIP LOCKED)",
+        "count": 1,
+        "max_ms": 764.011,
+        "total_ms": 764.011
+      },
+      {
+        "sql": "WITH selected AS (SELECT message_id FROM delivery_jobs WHERE NOT done AND next_attempt_at<=$1 AND expires_at>$1 AND attempts<$2 AND (lease_expiry IS NULL OR lease_expiry<=$1) ORDER BY next_attempt_at LIMIT $3 FOR UPDATE SKIP LOCKED), claimed AS (UPDATE delivery_jobs j SET attempts=attempts+1,lease_owner=$4,lease_expiry=$5 FROM selected s WHERE j.message_id=s.message_id RETURNING j.message_id,j.attempts,j.expires_at) SELECT c.attempts,c.expires_at,m.message FROM claimed c JOIN ingress_messages m USING(message_id)",
+        "count": 1,
+        "max_ms": 233.019,
+        "total_ms": 233.019
+      }
+    ],
+    "checkpoints": []
+  },
+  "preload_10k_pool_1": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "preload_10k_pool_32": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "preload_10k_pool_8": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "preload_30k": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [
+      {
+        "sql": "SELECT count(*) n,coalesce(sum(charge),0)::bigint bytes,coalesce(sum(charge) FILTER (WHERE tenant_id=$1),0)::bigint tenant_bytes,coalesce(sum(charge) FILTER (WHERE tenant_id=$1 AND product_id=$2 AND device_id=$3),0)::bigint device_bytes,count(*) FILTER (WHERE tenant_id=$1) tenant,count(*) FILTER (WHERE tenant_id=$1 AND product_id=$2 AND device_id=$3) device FROM ingress_messages",
+        "count": 1,
+        "max_ms": 218.14,
+        "total_ms": 218.14
+      }
+    ],
+    "checkpoints": []
+  },
+  "profile_churn_tls": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "profile_downlink_clean": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "profile_idle_2000": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "profile_idle_tls_3400": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "profile_uplink": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "q1_spaced_ramp20_rate100_r1": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "q1_spaced_ramp20_rate50_r1": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "q1_spaced_ramp20_rate50_r2": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "q1_spaced_ramp20_rate50_r3": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "ramp_tls_cold_100": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "ramp_tls_cold_1000": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "sink_delay_200ms_verified": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "sink_failure_recovery": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "sink_slow_recovery": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "slow_consumers_1": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [
+      {
+        "sql": "SELECT pg_advisory_xact_lock(782634291)",
+        "count": 12,
+        "max_ms": 753.863,
+        "total_ms": 5341.713
+      },
+      {
+        "sql": "INSERT INTO ingress_messages VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)",
+        "count": 3,
+        "max_ms": 781.551,
+        "total_ms": 1168.753
+      },
+      {
+        "sql": "WITH selected AS (SELECT message_id FROM delivery_jobs WHERE NOT done AND next_attempt_at<=$1 AND expires_at>$1 AND attempts<$2 AND (lease_expiry IS NULL OR lease_expiry<=$1) ORDER BY next_attempt_at LIMIT $3 FOR UPDATE SKIP LOCKED), claimed AS (UPDATE delivery_jobs j SET attempts=attempts+1,lease_owner=$4,lease_expiry=$5 FROM selected s WHERE j.message_id=s.message_id RETURNING j.message_id,j.attempts,j.expires_at) SELECT c.attempts,c.expires_at,m.message FROM claimed c JOIN ingress_messages m USING(message_id)",
+        "count": 1,
+        "max_ms": 827.119,
+        "total_ms": 827.119
+      }
+    ],
+    "checkpoints": []
+  },
+  "slow_consumers_16": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [
+      {
+        "sql": "SELECT pg_advisory_xact_lock(782634291)",
+        "count": 21,
+        "max_ms": 873.555,
+        "total_ms": 12678.031000000004
+      },
+      {
+        "sql": "INSERT INTO ingress_messages VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)",
+        "count": 3,
+        "max_ms": 810.333,
+        "total_ms": 1105.777
+      },
+      {
+        "sql": "INSERT INTO delivery_jobs(message_id,next_attempt_at,expires_at) VALUES ($1,$2,$3)",
+        "count": 1,
+        "max_ms": 832.807,
+        "total_ms": 832.807
+      },
+      {
+        "sql": "DELETE FROM ingress_messages WHERE message_id IN (SELECT message_id FROM ingress_messages WHERE expires_at<=$1 ORDER BY expires_at LIMIT $2 FOR UPDATE SKIP LOCKED)",
+        "count": 1,
+        "max_ms": 116.875,
+        "total_ms": 116.875
+      }
+    ],
+    "checkpoints": []
+  },
+  "slow_consumers_byte_caps": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [
+      {
+        "sql": "SELECT pg_advisory_xact_lock(782634291)",
+        "count": 19,
+        "max_ms": 791.877,
+        "total_ms": 8454.624999999998
+      },
+      {
+        "sql": "INSERT INTO ingress_messages VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)",
+        "count": 3,
+        "max_ms": 771.912,
+        "total_ms": 1178.404
+      },
+      {
+        "sql": "UPDATE commands SET next_attempt_at=$2 WHERE command_id=$1",
+        "count": 1,
+        "max_ms": 265.446,
+        "total_ms": 265.446
+      },
+      {
+        "sql": "SELECT count(*) n,count(*) FILTER (WHERE tenant_id=$1) tenant,count(*) FILTER (WHERE tenant_id=$1 AND product_id=$2 AND device_id=$3) device FROM commands",
+        "count": 1,
+        "max_ms": 262.742,
+        "total_ms": 262.742
+      }
+    ],
+    "checkpoints": []
+  },
+  "slow_consumers_global_cap": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "soak_tls_2h": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [
+      {
+        "sql": "INSERT INTO ingress_messages VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)",
+        "count": 18,
+        "max_ms": 931.844,
+        "total_ms": 5959.635000000001
+      },
+      {
+        "sql": "SELECT pg_advisory_xact_lock(782634291)",
+        "count": 14,
+        "max_ms": 744.333,
+        "total_ms": 4423.334000000001
+      },
+      {
+        "sql": "COMMIT",
+        "count": 1,
+        "max_ms": 410.748,
+        "total_ms": 410.748
+      }
+    ],
+    "checkpoints": [
+      "2026-09-19 13:52:09.200 CST [83454] LOG:  checkpoint starting: time",
+      "2026-09-19 13:52:38.650 CST [83454] LOG:  checkpoint complete: wrote 292 buffers (1.8%); 0 WAL file(s) added, 0 removed, 0 recycled; write=29.444 s, sync=0.003 s, total=29.451 s; sync files=34, longest=0.001 s, average=0.001 s; distance=3162 kB, estimate=474337 kB; lsn=1/728C08C8, redo lsn=1/7281B018",
+      "2026-09-19 13:57:09.646 CST [83454] LOG:  checkpoint starting: time",
+      "2026-09-19 13:57:42.529 CST [83454] LOG:  checkpoint complete: wrote 326 buffers (2.0%); 0 WAL file(s) added, 0 removed, 0 recycled; write=32.769 s, sync=0.057 s, total=32.883 s; sync files=26, longest=0.008 s, average=0.003 s; distance=3626 kB, estimate=427266 kB; lsn=1/72C62E90, redo lsn=1/72BA5A38",
+      "2026-09-19 14:02:09.523 CST [83454] LOG:  checkpoint starting: time",
+      "2026-09-19 14:03:03.045 CST [83454] LOG:  checkpoint complete: wrote 531 buffers (3.2%); 0 WAL file(s) added, 0 removed, 0 recycled; write=53.464 s, sync=0.037 s, total=53.523 s; sync files=29, longest=0.005 s, average=0.002 s; distance=3838 kB, estimate=384923 kB; lsn=1/73085450, redo lsn=1/72F652F8",
+      "2026-09-19 14:07:09.044 CST [83454] LOG:  checkpoint starting: time",
+      "2026-09-19 14:08:02.181 CST [83454] LOG:  checkpoint complete: wrote 522 buffers (3.2%); 0 WAL file(s) added, 1 removed, 0 recycled; write=53.084 s, sync=0.021 s, total=53.138 s; sync files=25, longest=0.005 s, average=0.001 s; distance=3946 kB, estimate=346825 kB; lsn=1/734B3840, redo lsn=1/7333FC38",
+      "2026-09-19 14:12:09.177 CST [83454] LOG:  checkpoint starting: time",
+      "2026-09-19 14:12:58.113 CST [83454] LOG:  checkpoint complete: wrote 483 buffers (2.9%); 0 WAL file(s) added, 0 removed, 0 recycled; write=48.873 s, sync=0.046 s, total=48.936 s; sync files=28, longest=0.008 s, average=0.002 s; distance=4225 kB, estimate=312565 kB; lsn=1/73901BB8, redo lsn=1/737601B0",
+      "2026-09-19 14:17:09.112 CST [83454] LOG:  checkpoint starting: time",
+      "2026-09-19 14:18:17.576 CST [83454] LOG:  checkpoint complete: wrote 675 buffers (4.1%); 0 WAL file(s) added, 0 removed, 0 recycled; write=68.410 s, sync=0.038 s, total=68.464 s; sync files=28, longest=0.005 s, average=0.002 s; distance=4359 kB, estimate=281745 kB; lsn=1/73D87A60, redo lsn=1/73BA20E8",
+      "2026-09-19 14:22:09.574 CST [83454] LOG:  checkpoint starting: time",
+      "2026-09-19 14:23:03.720 CST [83454] LOG:  checkpoint complete: wrote 537 buffers (3.3%); 0 WAL file(s) added, 1 removed, 0 recycled; write=54.143 s, sync=0.002 s, total=54.147 s; sync files=23, longest=0.001 s, average=0.001 s; distance=4510 kB, estimate=254021 kB; lsn=1/741DF430, redo lsn=1/74009B08",
+      "2026-09-19 14:27:09.717 CST [83454] LOG:  checkpoint starting: time",
+      "2026-09-19 14:28:28.531 CST [83454] LOG:  checkpoint complete: wrote 780 buffers (4.8%); 0 WAL file(s) added, 0 removed, 0 recycled; write=78.811 s, sync=0.002 s, total=78.815 s; sync files=27, longest=0.001 s, average=0.001 s; distance=4638 kB, estimate=229083 kB; lsn=1/74707308, redo lsn=1/74491390",
+      "2026-09-19 14:32:09.550 CST [83454] LOG:  checkpoint starting: time",
+      "2026-09-19 14:33:09.082 CST [83454] LOG:  checkpoint complete: wrote 590 buffers (3.6%); 0 WAL file(s) added, 0 removed, 0 recycled; write=59.527 s, sync=0.003 s, total=59.533 s; sync files=24, longest=0.001 s, average=0.001 s; distance=4907 kB, estimate=206665 kB; lsn=1/74B59020, redo lsn=1/7495C098",
+      "2026-09-19 14:37:09.080 CST [83454] LOG:  checkpoint starting: time",
+      "2026-09-19 14:38:06.264 CST [83454] LOG:  checkpoint complete: wrote 565 buffers (3.4%); 0 WAL file(s) added, 0 removed, 0 recycled; write=57.180 s, sync=0.002 s, total=57.184 s; sync files=27, longest=0.001 s, average=0.001 s; distance=4816 kB, estimate=186480 kB; lsn=1/75023C48, redo lsn=1/74E10418",
+      "2026-09-19 14:42:09.261 CST [83454] LOG:  checkpoint starting: time",
+      "2026-09-19 14:43:45.521 CST [83454] LOG:  checkpoint complete: wrote 950 buffers (5.8%); 0 WAL file(s) added, 1 removed, 0 recycled; write=96.256 s, sync=0.002 s, total=96.260 s; sync files=19, longest=0.001 s, average=0.001 s; distance=4971 kB, estimate=168329 kB; lsn=1/7559B2F0, redo lsn=1/752EB100",
+      "2026-09-19 14:47:09.434 CST [83454] LOG:  checkpoint starting: time",
+      "2026-09-19 14:48:14.238 CST [83454] LOG:  checkpoint complete: wrote 641 buffers (3.9%); 0 WAL file(s) added, 0 removed, 0 recycled; write=64.799 s, sync=0.004 s, total=64.805 s; sync files=28, longest=0.001 s, average=0.001 s; distance=5505 kB, estimate=152047 kB; lsn=1/75AAA790, redo lsn=1/7584B590",
+      "2026-09-19 14:52:09.233 CST [83454] LOG:  checkpoint starting: time",
+      "2026-09-19 14:53:23.614 CST [83454] LOG:  checkpoint complete: wrote 734 buffers (4.5%); 0 WAL file(s) added, 0 removed, 0 recycled; write=74.377 s, sync=0.003 s, total=74.382 s; sync files=23, longest=0.001 s, average=0.001 s; distance=4955 kB, estimate=137338 kB; lsn=1/75FBC230, redo lsn=1/75D22370",
+      "2026-09-19 14:57:09.609 CST [83454] LOG:  checkpoint starting: time",
+      "2026-09-19 14:58:56.371 CST [83454] LOG:  checkpoint complete: wrote 1054 buffers (6.4%); 0 WAL file(s) added, 1 removed, 0 recycled; write=106.757 s, sync=0.002 s, total=106.762 s; sync files=26, longest=0.001 s, average=0.001 s; distance=5313 kB, estimate=124135 kB; lsn=1/765DC7D8, redo lsn=1/76252A48",
+      "2026-09-19 15:02:09.368 CST [83454] LOG:  checkpoint starting: time",
+      "2026-09-19 15:03:19.910 CST [83454] LOG:  checkpoint complete: wrote 696 buffers (4.2%); 0 WAL file(s) added, 0 removed, 0 recycled; write=70.538 s, sync=0.002 s, total=70.543 s; sync files=23, longest=0.001 s, average=0.001 s; distance=5787 kB, estimate=112301 kB; lsn=1/76A9FAE0, redo lsn=1/767F9960",
+      "2026-09-19 15:07:09.904 CST [83454] LOG:  checkpoint starting: time",
+      "2026-09-19 15:08:26.871 CST [83454] LOG:  checkpoint complete: wrote 763 buffers (4.7%); 0 WAL file(s) added, 0 removed, 0 recycled; write=76.963 s, sync=0.002 s, total=76.967 s; sync files=24, longest=0.001 s, average=0.001 s; distance=5369 kB, estimate=101607 kB; lsn=1/76FFCD48, redo lsn=1/76D37FA8",
+      "2026-09-19 15:12:09.867 CST [83454] LOG:  checkpoint starting: time",
+      "2026-09-19 15:13:32.194 CST [83454] LOG:  checkpoint complete: wrote 813 buffers (5.0%); 0 WAL file(s) added, 1 removed, 0 recycled; write=82.322 s, sync=0.002 s, total=82.328 s; sync files=25, longest=0.001 s, average=0.001 s; distance=5293 kB, estimate=91976 kB; lsn=1/775FCFB8, redo lsn=1/772636E8",
+      "2026-09-19 15:17:09.189 CST [83454] LOG:  checkpoint starting: time",
+      "2026-09-19 15:19:20.916 CST [83454] LOG:  checkpoint complete: wrote 1296 buffers (7.9%); 0 WAL file(s) added, 0 removed, 0 recycled; write=131.723 s, sync=0.003 s, total=131.728 s; sync files=21, longest=0.001 s, average=0.001 s; distance=6058 kB, estimate=83384 kB; lsn=1/77C15728, redo lsn=1/7784DF40",
+      "2026-09-19 15:22:09.915 CST [83454] LOG:  checkpoint starting: time",
+      "2026-09-19 15:23:29.391 CST [83454] LOG:  checkpoint complete: wrote 786 buffers (4.8%); 0 WAL file(s) added, 0 removed, 0 recycled; write=79.473 s, sync=0.001 s, total=79.477 s; sync files=26, longest=0.001 s, average=0.001 s; distance=5745 kB, estimate=75620 kB; lsn=1/780EA870, redo lsn=1/77DEA468",
+      "2026-09-19 15:27:09.390 CST [83454] LOG:  checkpoint starting: time",
+      "2026-09-19 15:28:20.308 CST [83454] LOG:  checkpoint complete: wrote 702 buffers (4.3%); 0 WAL file(s) added, 1 removed, 0 recycled; write=70.912 s, sync=0.003 s, total=70.918 s; sync files=18, longest=0.001 s, average=0.001 s; distance=5633 kB, estimate=68621 kB; lsn=1/7865F940, redo lsn=1/7836A9A0",
+      "2026-09-19 15:32:09.306 CST [83454] LOG:  checkpoint starting: time",
+      "2026-09-19 15:33:57.206 CST [83454] LOG:  checkpoint complete: wrote 1064 buffers (6.5%); 0 WAL file(s) added, 0 removed, 0 recycled; write=107.898 s, sync=0.001 s, total=107.901 s; sync files=28, longest=0.001 s, average=0.001 s; distance=6510 kB, estimate=62410 kB; lsn=1/78D4DE38, redo lsn=1/789C6278",
+      "2026-09-19 15:37:09.206 CST [83454] LOG:  checkpoint starting: time",
+      "2026-09-19 15:38:18.240 CST [83454] LOG:  checkpoint complete: wrote 681 buffers (4.2%); 0 WAL file(s) added, 0 removed, 0 recycled; write=69.029 s, sync=0.003 s, total=69.035 s; sync files=21, longest=0.001 s, average=0.001 s; distance=5666 kB, estimate=56736 kB; lsn=1/792510E8, redo lsn=1/78F4EB48",
+      "2026-09-19 15:42:09.240 CST [83454] LOG:  checkpoint starting: time",
+      "2026-09-19 15:44:39.584 CST [83454] LOG:  checkpoint complete: wrote 1482 buffers (9.0%); 0 WAL file(s) added, 1 removed, 0 recycled; write=150.339 s, sync=0.002 s, total=150.345 s; sync files=24, longest=0.001 s, average=0.001 s; distance=6112 kB, estimate=51673 kB; lsn=1/7997A300, redo lsn=1/79546E18",
+      "2026-09-19 15:47:09.582 CST [83454] LOG:  checkpoint starting: time"
+    ]
+  },
+  "stable_observer_isolated_q0_100_r1": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "stable_observer_isolated_q0_100_r2": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "stable_observer_isolated_q0_100_r3": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "stable_observer_isolated_q0_50_r1": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "stable_observer_isolated_q0_50_r2": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [
+      {
+        "sql": "SELECT count(*) n,coalesce(sum(charge),0)::bigint bytes,coalesce(sum(charge) FILTER (WHERE tenant_id=$1),0)::bigint tenant_bytes,coalesce(sum(charge) FILTER (WHERE tenant_id=$1 AND product_id=$2 AND device_id=$3),0)::bigint device_bytes,count(*) FILTER (WHERE tenant_id=$1) tenant,count(*) FILTER (WHERE tenant_id=$1 AND product_id=$2 AND device_id=$3) device FROM ingress_messages",
+        "count": 1,
+        "max_ms": 288.84,
+        "total_ms": 288.84
+      }
+    ],
+    "checkpoints": []
+  },
+  "stable_observer_isolated_q0_50_r3": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "stable_observer_isolated_q1_100_r1": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "stable_observer_isolated_q1_10_r1": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "stable_observer_isolated_q1_10_r2": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [
+      {
+        "sql": "SELECT pg_advisory_xact_lock(782634291)",
+        "count": 8,
+        "max_ms": 510.688,
+        "total_ms": 2298.202
+      },
+      {
+        "sql": "INSERT INTO ingress_messages VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)",
+        "count": 4,
+        "max_ms": 594.057,
+        "total_ms": 1531.198
+      },
+      {
+        "sql": "WITH selected AS (SELECT message_id FROM delivery_jobs WHERE NOT done AND next_attempt_at<=$1 AND expires_at>$1 AND attempts<$2 AND (lease_expiry IS NULL OR lease_expiry<=$1) ORDER BY next_attempt_at LIMIT $3 FOR UPDATE SKIP LOCKED), claimed AS (UPDATE delivery_jobs j SET attempts=attempts+1,lease_owner=$4,lease_expiry=$5 FROM selected s WHERE j.message_id=s.message_id RETURNING j.message_id,j.attempts,j.expires_at) SELECT c.attempts,c.expires_at,m.message FROM claimed c JOIN ingress_messages m USING(message_id)",
+        "count": 1,
+        "max_ms": 359.788,
+        "total_ms": 359.788
+      },
+      {
+        "sql": "INSERT INTO delivery_jobs(message_id,next_attempt_at,expires_at) VALUES ($1,$2,$3)",
+        "count": 1,
+        "max_ms": 109.977,
+        "total_ms": 109.977
+      }
+    ],
+    "checkpoints": []
+  },
+  "stable_observer_isolated_q1_25_r1": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "stable_observer_isolated_q1_50_r1": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "stable_q0_100_r1": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "stable_q0_100_r2": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "stable_q0_100_r3": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "stable_q0_25_r1": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "stable_q0_50_r1": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "stable_q0_50_r2": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "storage_quota_full": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "tcp_256_100": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "tcp_256_25": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "tcp_256_250": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "tcp_4096_100": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "tcp_4096_25": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "tcp_4096_250": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "tcp_idle_1000": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "tcp_partial_1000": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "udp_1024_100": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "udp_1024_25": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "udp_1024_250": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "udp_256_100": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "udp_256_25": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "udp_256_250": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "udp_overload_recovery": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "udp_oversize": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "udp_replay": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "uplink_isolated_q0_100": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": [
+      "2026-09-19 10:58:49.284 CST [83454] LOG:  checkpoint starting: time"
+    ]
+  },
+  "uplink_isolated_q0_25": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": [
+      "2026-09-19 10:58:19.283 CST [83454] LOG:  checkpoint complete: wrote 6318 buffers (38.6%); 0 WAL file(s) added, 0 removed, 4 recycled; write=269.544 s, sync=0.199 s, total=269.829 s; sync files=2554, longest=0.010 s, average=0.001 s; distance=74011 kB, estimate=74011 kB; lsn=0/16724470, redo lsn=0/14DF3420"
+    ]
+  },
+  "uplink_isolated_q0_250": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "uplink_isolated_q1_100": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "uplink_isolated_q1_25": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "uplink_isolated_q1_250": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": [
+      "2026-09-19 11:03:19.835 CST [83454] LOG:  checkpoint complete: wrote 2623 buffers (16.0%); 0 WAL file(s) added, 0 removed, 2 recycled; write=269.700 s, sync=0.633 s, total=270.552 s; sync files=2547, longest=0.014 s, average=0.001 s; distance=32184 kB, estimate=69828 kB; lsn=0/1AAC9300, redo lsn=0/16D61748",
+      "2026-09-19 11:03:49.842 CST [83454] LOG:  checkpoint starting: time"
+    ]
+  },
+  "uplink_overload_recovery": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "uplink_q0_100": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "uplink_q0_25": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "uplink_q0_250": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": [
+      "2026-09-19 10:51:31.459 CST [83454] LOG:  checkpoint complete: wrote 1483 buffers (9.1%); 0 WAL file(s) added, 0 removed, 1 recycled; write=162.341 s, sync=0.028 s, total=162.370 s; sync files=1593, longest=0.001 s, average=0.001 s; distance=9126 kB, estimate=47739 kB; lsn=0/1237EF68, redo lsn=0/105AC810"
+    ]
+  },
+  "uplink_q0_500": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "uplink_q1_100": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": []
+  },
+  "uplink_q1_25": {
+    "scope": "only statements >=100ms; cluster log slice may include background work, not total DB latency distribution",
+    "slow_queries": [],
+    "checkpoints": [
+      "2026-09-19 10:53:49.455 CST [83454] LOG:  checkpoint starting: time"
+    ]
+  }
+}

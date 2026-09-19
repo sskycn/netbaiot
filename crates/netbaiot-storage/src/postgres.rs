@@ -22,6 +22,9 @@ impl PgStore {
         let pool = PgPoolOptions::new()
             .max_connections(limits.max_database_connections)
             .acquire_timeout(Duration::from_millis(limits.external_timeout_ms))
+            // SQLx emits acquisition timing only when its debug target is enabled.
+            // This includes connection establishment/health checks, not just waiting.
+            .acquire_time_level("debug".parse().map_err(|_| Error::Configuration)?)
             .connect(url)
             .await
             .map_err(db)?;

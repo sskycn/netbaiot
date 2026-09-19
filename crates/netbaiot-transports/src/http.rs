@@ -126,6 +126,17 @@ async fn handle(
             s.ingress.sessions.queued_bytes(),
             s.ingress.sessions.queued_messages()
         ));
+        let (ingress_count, ingress_bytes) = s.ingress.admission.in_flight();
+        let (protocol_count, protocol_bytes) = s.protocol_admission.in_flight();
+        metrics.push_str(&format!(
+            "netbaiot_ingress_inflight {ingress_count}\nnetbaiot_ingress_inflight_bytes {ingress_bytes}\nnetbaiot_protocol_inflight {protocol_count}\nnetbaiot_protocol_inflight_bytes {protocol_bytes}\nnetbaiot_runtime_alive_tasks {}\n",
+            tokio::runtime::Handle::current().metrics().num_alive_tasks()
+        ));
+        let (sessions, tenants, presence) = s.ingress.sessions.registry_counts()?;
+        metrics.push_str(&format!(
+            "netbaiot_registered_sessions {sessions}\nnetbaiot_session_tenant_entries {tenants}\nnetbaiot_presence_entries {presence}\nnetbaiot_subscription_entries {}\n",
+            s.subscriptions.count()?
+        ));
         let mut r = response(StatusCode::OK, metrics.into_bytes());
         r.headers_mut().insert(
             hyper::header::CONTENT_TYPE,

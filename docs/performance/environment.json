@@ -1,0 +1,48 @@
+{
+  "os": "macOS-26.6.2-arm64-arm-64bit",
+  "cpu": "Apple M4",
+  "logical_cpus": 10,
+  "ram_bytes": 17179869184,
+  "rlimit_nofile": [
+    1048575,
+    9223372036854775807
+  ],
+  "rust": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
+  "postgres": "PostgreSQL 17.11",
+  "build": "release optimized, CARGO_PROFILE_RELEASE_DEBUG=1",
+  "baseline_commit": "053f663587632077b6c7dc1edea2a8f3f2750242",
+  "os_limits_changed": false,
+  "server_loadgen_pg_sink_colocated": true,
+  "tls": "rustls ring; localhost RSA2048 certificate; cold runs disable shared TLS resumption, original idle_tls_* runs used a shared ticket cache",
+  "pg_extensions": "pg_stat_statements unavailable; built-in stats and bounded query logging",
+  "pg_environment": {
+    "host": "127.0.0.1",
+    "port": 55432,
+    "track_io_timing": true
+  },
+  "logical_network_budget": 1073741824,
+  "kernel_limits": {
+    "maxfiles": 122880,
+    "maxfilesperproc": 61440,
+    "somaxconn": 128,
+    "ephemeral_first": 49152,
+    "ephemeral_last": 65535
+  },
+  "postgres_settings": {
+    "shared_buffers_bytes": 134217728,
+    "work_mem_bytes": 4194304,
+    "maintenance_work_mem_bytes": 67108864,
+    "effective_cache_size_bytes": 4294967296,
+    "max_connections": 100,
+    "fsync": true,
+    "synchronous_commit": "on",
+    "full_page_writes": true,
+    "autovacuum": true,
+    "checkpoint_timeout_seconds": 300,
+    "checkpoint_completion_target": 0.9,
+    "max_wal_size_MiB": 1024,
+    "wal_compression": "off",
+    "track_io_timing": true,
+    "track_wal_io_timing": false
+  }
+}
