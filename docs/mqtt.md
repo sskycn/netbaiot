@@ -74,6 +74,11 @@ documented server idle policy still closes after 120 seconds by default. Incompl
 packets have an independent 30-second read deadline. Auth, CONNECT and writes also
 have deadlines. Authentication observes EOF and shutdown before installing a session.
 Buffered partial tails keep their original read deadline, including after cancellation. Control packets count toward device/tenant/global packet rates.
+Publish parsing does not retain the short-lived protocol admission permit across
+codec, PostgreSQL, PUBACK queueing, or socket writes. Durable ingress instead uses
+its own device→tenant→node→byte permits and a bounded 16-item/2 MiB/25 ms wait.
+MQTT 3.1.1 has no negative PUBLISH ACK, so expiration or overload closes without
+PUBACK and releases every partially acquired permit through the connection owner.
 
 Outbound commands have message and encoded-byte permits at connection, tenant and
 node levels. QoS1 commands retain permits until PUBACK or disconnect. Application

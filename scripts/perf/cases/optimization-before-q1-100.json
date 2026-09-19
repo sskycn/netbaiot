@@ -1,0 +1,16 @@
+{
+  "name": "opt_before_q1_100",
+  "load": {
+    "connections": 100,
+    "tenant_width": 16,
+    "publish_rate": 100,
+    "qos": 1,
+    "duration_secs": 120,
+    "warmup_secs": 10,
+    "cooldown_secs": 10,
+    "ramp_per_sec": 20,
+    "report_every_secs": 10
+  },
+  "sample_secs": 2,
+  "cooldown_secs": 10
+}

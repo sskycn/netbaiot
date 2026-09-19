@@ -685,12 +685,12 @@ struct GatedStore {
 }
 #[async_trait::async_trait]
 impl Store for GatedStore {
-    async fn accept(&self, input: StoredIngress) -> Result<IngressReceipt> {
+    async fn accept(&self, input: StoredIngress) -> Result<StoreAcceptance> {
         let permit = self.gate.acquire().await.map_err(|_| Error::Storage)?;
         permit.forget();
         let receipt = self.inner.accept(input).await?;
         if let Some(path) = &self.after_commit {
-            tokio::fs::write(path, serde_json::to_vec(&receipt).unwrap())
+            tokio::fs::write(path, serde_json::to_vec(&receipt.receipt).unwrap())
                 .await
                 .unwrap();
             std::future::pending::<()>().await;
@@ -734,7 +734,7 @@ impl Store for GatedStore {
     async fn get_command(&self, d: &DeviceKey, id: CommandId) -> Result<Option<CommandRecord>> {
         self.inner.get_command(d, id).await
     }
-    async fn maintain(&self, n: i64, b: usize) -> Result<()> {
+    async fn maintain(&self, n: i64, b: usize) -> Result<MaintenanceStats> {
         self.inner.maintain(n, b).await
     }
 }

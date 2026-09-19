@@ -1,0 +1,215 @@
+{
+  "name": "opt_final_sql_uplink_v3",
+  "scope": "execute/simple-query counts; parse/bind excluded; BEGIN/COMMIT included; observer SELECT excluded; server duration excludes network/client scheduling; SQLx health-check Sync/Ready exchanges are not SQL statements; not physical wire RTT counts; no per-command tracing ID in PostgreSQL",
+  "queries": [
+    {
+      "sql": "INSERT INTO ingress_messages VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT (tenant_id,product_id,device_id,source_message_id) DO NOTHING RETURNING message_id",
+      "count": 5,
+      "sum_ms": 33.74699999999999,
+      "mean_ms": 6.7494,
+      "p50_ms": 0.138,
+      "p95_ms": 0.152,
+      "max_ms": 33.303
+    },
+    {
+      "sql": "INSERT INTO delivery_jobs(message_id,next_attempt_at,expires_at) VALUES ($1,$2,$3)",
+      "count": 5,
+      "sum_ms": 21.473,
+      "mean_ms": 4.2946,
+      "p50_ms": 0.195,
+      "p95_ms": 0.229,
+      "max_ms": 20.709
+    },
+    {
+      "sql": "WITH deleted AS (DELETE FROM ingress_messages WHERE message_id IN (SELECT message_id FROM ingress_messages WHERE expires_at<=$1 ORDER BY expires_at LIMIT $2 FOR UPDATE SKIP LOCKED) RETURNING tenant_id,product_id,device_id,charge), global_delta AS (SELECT count(*) messages,coalesce(sum(charge),0) bytes FROM deleted HAVING count(*)>0), global_update AS (UPDATE ingress_quota_global q SET messages=q.messages-d.messages,bytes=q.bytes-d.bytes FROM global_delta d WHERE q.singleton RETURNING 1), tenant_delta AS (SELECT tenant_id,count(*) messages,sum(charge) bytes FROM deleted GROUP BY tenant_id), tenant_update AS (UPDATE ingress_quota_tenants q SET messages=q.messages-d.messages,bytes=q.bytes-d.bytes FROM tenant_delta d WHERE q.tenant_id=d.tenant_id RETURNING 1), device_delta AS (SELECT tenant_id,product_id,device_id,count(*) messages,sum(charge) bytes FROM deleted GROUP BY tenant_id,product_id,device_id), device_update AS (UPDATE ingress_quota_devices q SET messages=q.messages-d.messages,bytes=q.bytes-d.bytes FROM device_delta d WHERE q.tenant_id=d.tenant_id AND q.product_id=d.product_id AND q.device_id=d.device_id RETURNING 1) SELECT count(*) FROM deleted",
+      "count": 103,
+      "sum_ms": 17.147000000000002,
+      "mean_ms": 0.1664757281553398,
+      "p50_ms": 0.158,
+      "p95_ms": 0.283,
+      "max_ms": 0.427
+    },
+    {
+      "sql": "WITH global_update AS (UPDATE ingress_quota_global SET messages=messages+$1,bytes=bytes+$2 WHERE singleton AND messages+$1 BETWEEN 0 AND $3 AND bytes+$2 BETWEEN 0 AND $4 RETURNING 1), tenant_update AS (INSERT INTO ingress_quota_tenants(tenant_id,messages,bytes) SELECT $5,$1,$2 FROM global_update WHERE $1 BETWEEN 0 AND $6 AND $2 BETWEEN 0 AND $7 ON CONFLICT (tenant_id) DO UPDATE SET messages=ingress_quota_tenants.messages+$1,bytes=ingress_quota_tenants.bytes+$2 WHERE ingress_quota_tenants.messages+$1 BETWEEN 0 AND $6 AND ingress_quota_tenants.bytes+$2 BETWEEN 0 AND $7 RETURNING 1), device_update AS (INSERT INTO ingress_quota_devices(tenant_id,product_id,device_id,messages,bytes) SELECT $5,$8,$9,$1,$2 FROM tenant_update WHERE $1 BETWEEN 0 AND $10 AND $2 BETWEEN 0 AND $11 ON CONFLICT (tenant_id,product_id,device_id) DO UPDATE SET messages=ingress_quota_devices.messages+$1,bytes=ingress_quota_devices.bytes+$2 WHERE ingress_quota_devices.messages+$1 BETWEEN 0 AND $10 AND ingress_quota_devices.bytes+$2 BETWEEN 0 AND $11 RETURNING 1) SELECT (SELECT count(*) FROM global_update) global_count,(SELECT count(*) FROM tenant_update) tenant_count,(SELECT count(*) FROM device_update) device_count",
+      "count": 5,
+      "sum_ms": 16.689,
+      "mean_ms": 3.3378,
+      "p50_ms": 0.162,
+      "p95_ms": 0.343,
+      "max_ms": 15.971
+    },
+    {
+      "sql": "WITH deleted AS (DELETE FROM commands WHERE command_id IN (SELECT command_id FROM commands WHERE retain_until<=$1 ORDER BY retain_until LIMIT $2 FOR UPDATE SKIP LOCKED) RETURNING tenant_id,product_id,device_id), global_delta AS (SELECT count(*) commands FROM deleted HAVING count(*)>0), global_update AS (UPDATE command_quota_global q SET commands=q.commands-d.commands FROM global_delta d WHERE q.singleton RETURNING 1), tenant_delta AS (SELECT tenant_id,count(*) commands FROM deleted GROUP BY tenant_id), tenant_update AS (UPDATE command_quota_tenants q SET commands=q.commands-d.commands FROM tenant_delta d WHERE q.tenant_id=d.tenant_id RETURNING 1), device_delta AS (SELECT tenant_id,product_id,device_id,count(*) commands FROM deleted GROUP BY tenant_id,product_id,device_id), device_update AS (UPDATE command_quota_devices q SET commands=q.commands-d.commands FROM device_delta d WHERE q.tenant_id=d.tenant_id AND q.product_id=d.product_id AND q.device_id=d.device_id RETURNING 1) SELECT count(*) FROM deleted",
+      "count": 103,
+      "sum_ms": 12.128000000000004,
+      "mean_ms": 0.11774757281553398,
+      "p50_ms": 0.106,
+      "p95_ms": 0.208,
+      "max_ms": 0.334
+    },
+    {
+      "sql": "WITH selected AS (SELECT message_id FROM delivery_jobs WHERE NOT done AND next_attempt_at<=$1 AND expires_at>$1 AND attempts<$2 AND (lease_expiry IS NULL OR lease_expiry<=$1) ORDER BY next_attempt_at LIMIT $3 FOR UPDATE SKIP LOCKED), claimed AS (UPDATE delivery_jobs j SET attempts=attempts+1,lease_owner=$4,lease_expiry=$5 FROM selected s WHERE j.message_id=s.message_id RETURNING j.message_id,j.attempts,j.expires_at) SELECT c.attempts,c.expires_at,m.message FROM claimed c JOIN ingress_messages m USING(message_id)",
+      "count": 107,
+      "sum_ms": 8.646,
+      "mean_ms": 0.08080373831775702,
+      "p50_ms": 0.072,
+      "p95_ms": 0.159,
+      "max_ms": 0.267
+    },
+    {
+      "sql": "COMMIT",
+      "count": 265,
+      "sum_ms": 7.968999999999995,
+      "mean_ms": 0.03007169811320755,
+      "p50_ms": 0.022,
+      "p95_ms": 0.053,
+      "max_ms": 1.299
+    },
+    {
+      "sql": "UPDATE delivery_jobs SET done=true,last_error='expired_or_exhausted' WHERE message_id IN (SELECT message_id FROM delivery_jobs WHERE NOT done AND (expires_at<=$1 OR (attempts>=$2 AND (lease_expiry IS NULL OR lease_expiry<=$1))) LIMIT $3 FOR UPDATE SKIP LOCKED)",
+      "count": 103,
+      "sum_ms": 6.6670000000000025,
+      "mean_ms": 0.06472815533980583,
+      "p50_ms": 0.059,
+      "p95_ms": 0.125,
+      "max_ms": 0.191
+    },
+    {
+      "sql": "SELECT set_config('statement_timeout',$1,true),set_config('lock_timeout',$1,true)",
+      "count": 266,
+      "sum_ms": 6.416999999999997,
+      "mean_ms": 0.02412406015037594,
+      "p50_ms": 0.018,
+      "p95_ms": 0.062,
+      "max_ms": 0.188
+    },
+    {
+      "sql": "BEGIN",
+      "count": 265,
+      "sum_ms": 3.4749999999999934,
+      "mean_ms": 0.013113207547169811,
+      "p50_ms": 0.013,
+      "p95_ms": 0.025,
+      "max_ms": 0.072
+    },
+    {
+      "sql": "SELECT record FROM commands WHERE NOT terminal AND expires_at>$1 AND next_attempt_at<=$1 AND (tenant_id,product_id,device_id) IN (SELECT d.tenant_id,d.product_id,d.device_id FROM jsonb_to_recordset($2) AS d(tenant_id text,product_id text,device_id text)) ORDER BY next_attempt_at LIMIT $3 FOR UPDATE SKIP LOCKED",
+      "count": 45,
+      "sum_ms": 2.656,
+      "mean_ms": 0.059022222222222226,
+      "p50_ms": 0.053,
+      "p95_ms": 0.108,
+      "max_ms": 0.145
+    },
+    {
+      "sql": "SELECT record FROM commands WHERE NOT terminal AND expires_at<=$1 LIMIT $2 FOR UPDATE SKIP LOCKED",
+      "count": 103,
+      "sum_ms": 2.627,
+      "mean_ms": 0.025504854368932038,
+      "p50_ms": 0.017,
+      "p95_ms": 0.058,
+      "max_ms": 0.249
+    },
+    {
+      "sql": "UPDATE delivery_jobs SET done=$1,next_attempt_at=$2,lease_owner=NULL,lease_expiry=NULL,last_error=$3 WHERE message_id=$4 AND lease_owner=$5 AND attempts=$6 AND lease_expiry>$7",
+      "count": 5,
+      "sum_ms": 0.51,
+      "mean_ms": 0.102,
+      "p50_ms": 0.089,
+      "p95_ms": 0.135,
+      "max_ms": 0.142
+    },
+    {
+      "sql": "DELETE FROM ingress_messages WHERE tenant_id=$1 AND product_id=$2 AND device_id=$3 AND source_message_id=$4 AND expires_at<=$5 RETURNING charge",
+      "count": 5,
+      "sum_ms": 0.255,
+      "mean_ms": 0.051000000000000004,
+      "p50_ms": 0.048,
+      "p95_ms": 0.059,
+      "max_ms": 0.085
+    },
+    {
+      "sql": "SELECT message_id,canonical,accepted_at FROM ingress_messages WHERE tenant_id=$1 AND product_id=$2 AND device_id=$3 AND source_message_id=$4",
+      "count": 5,
+      "sum_ms": 0.06,
+      "mean_ms": 0.012,
+      "p50_ms": 0.008,
+      "p95_ms": 0.018,
+      "max_ms": 0.022
+    }
+  ],
+  "transactions": {
+    "outbox_claim": {
+      "count": 107,
+      "statement_counts": {
+        "4": 107
+      },
+      "server_ms": 15.312000000000001,
+      "example": [
+        "BEGIN",
+        "SELECT set_config('statement_timeout',$1,true),set_config('lock_timeout',$1,true)",
+        "WITH selected AS (SELECT message_id FROM delivery_jobs WHERE NOT done AND next_attempt_at<=$1 AND expires_at>$1 AND attempts<$2 AND (lease_expiry IS NULL OR lease_expiry<=$1) ORDER BY next_attempt_at LIMIT $3 FOR UPDATE SKIP LOCKED), claimed AS (UPDATE delivery_jobs j SET attempts=attempts+1,lease_owner=$4,lease_expiry=$5 FROM selected s WHERE j.message_id=s.message_id RETURNING j.message_id,j.attempts,j.expires_at) SELECT c.attempts,c.expires_at,m.message FROM claimed c JOIN ingress_messages m USING(message_id)",
+        "COMMIT"
+      ]
+    },
+    "command_claim_empty": {
+      "count": 45,
+      "statement_counts": {
+        "4": 45
+      },
+      "server_ms": 5.080000000000001,
+      "example": [
+        "BEGIN",
+        "SELECT set_config('statement_timeout',$1,true),set_config('lock_timeout',$1,true)",
+        "SELECT record FROM commands WHERE NOT terminal AND expires_at>$1 AND next_attempt_at<=$1 AND (tenant_id,product_id,device_id) IN (SELECT d.tenant_id,d.product_id,d.device_id FROM jsonb_to_recordset($2) AS d(tenant_id text,product_id text,device_id text)) ORDER BY next_attempt_at LIMIT $3 FOR UPDATE SKIP LOCKED",
+        "COMMIT"
+      ]
+    },
+    "maintenance": {
+      "count": 102,
+      "statement_counts": {
+        "7": 102
+      },
+      "server_ms": 44.34599999999999,
+      "example": [
+        "BEGIN",
+        "SELECT set_config('statement_timeout',$1,true),set_config('lock_timeout',$1,true)",
+        "WITH deleted AS (DELETE FROM ingress_messages WHERE message_id IN (SELECT message_id FROM ingress_messages WHERE expires_at<=$1 ORDER BY expires_at LIMIT $2 FOR UPDATE SKIP LOCKED) RETURNING tenant_id,product_id,device_id,charge), global_delta AS (SELECT count(*) messages,coalesce(sum(charge),0) bytes FROM deleted HAVING count(*)>0), global_update AS (UPDATE ingress_quota_global q SET messages=q.messages-d.messages,bytes=q.bytes-d.bytes FROM global_delta d WHERE q.singleton RETURNING 1), tenant_delta AS (SELECT tenant_id,count(*) messages,sum(charge) bytes FROM deleted GROUP BY tenant_id), tenant_update AS (UPDATE ingress_quota_tenants q SET messages=q.messages-d.messages,bytes=q.bytes-d.bytes FROM tenant_delta d WHERE q.tenant_id=d.tenant_id RETURNING 1), device_delta AS (SELECT tenant_id,product_id,device_id,count(*) messages,sum(charge) bytes FROM deleted GROUP BY tenant_id,product_id,device_id), device_update AS (UPDATE ingress_quota_devices q SET messages=q.messages-d.messages,bytes=q.bytes-d.bytes FROM device_delta d WHERE q.tenant_id=d.tenant_id AND q.product_id=d.product_id AND q.device_id=d.device_id RETURNING 1) SELECT count(*) FROM deleted",
+        "WITH deleted AS (DELETE FROM commands WHERE command_id IN (SELECT command_id FROM commands WHERE retain_until<=$1 ORDER BY retain_until LIMIT $2 FOR UPDATE SKIP LOCKED) RETURNING tenant_id,product_id,device_id), global_delta AS (SELECT count(*) commands FROM deleted HAVING count(*)>0), global_update AS (UPDATE command_quota_global q SET commands=q.commands-d.commands FROM global_delta d WHERE q.singleton RETURNING 1), tenant_delta AS (SELECT tenant_id,count(*) commands FROM deleted GROUP BY tenant_id), tenant_update AS (UPDATE command_quota_tenants q SET commands=q.commands-d.commands FROM tenant_delta d WHERE q.tenant_id=d.tenant_id RETURNING 1), device_delta AS (SELECT tenant_id,product_id,device_id,count(*) commands FROM deleted GROUP BY tenant_id,product_id,device_id), device_update AS (UPDATE command_quota_devices q SET commands=q.commands-d.commands FROM device_delta d WHERE q.tenant_id=d.tenant_id AND q.product_id=d.product_id AND q.device_id=d.device_id RETURNING 1) SELECT count(*) FROM deleted",
+        "SELECT record FROM commands WHERE NOT terminal AND expires_at<=$1 LIMIT $2 FOR UPDATE SKIP LOCKED",
+        "UPDATE delivery_jobs SET done=true,last_error='expired_or_exhausted' WHERE message_id IN (SELECT message_id FROM delivery_jobs WHERE NOT done AND (expires_at<=$1 OR (attempts>=$2 AND (lease_expiry IS NULL OR lease_expiry<=$1))) LIMIT $3 FOR UPDATE SKIP LOCKED)",
+        "COMMIT"
+      ]
+    },
+    "telemetry_ingress": {
+      "count": 5,
+      "statement_counts": {
+        "8": 5
+      },
+      "server_ms": 74.142,
+      "example": [
+        "BEGIN",
+        "SELECT set_config('statement_timeout',$1,true),set_config('lock_timeout',$1,true)",
+        "DELETE FROM ingress_messages WHERE tenant_id=$1 AND product_id=$2 AND device_id=$3 AND source_message_id=$4 AND expires_at<=$5 RETURNING charge",
+        "SELECT message_id,canonical,accepted_at FROM ingress_messages WHERE tenant_id=$1 AND product_id=$2 AND device_id=$3 AND source_message_id=$4",
+        "INSERT INTO ingress_messages VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT (tenant_id,product_id,device_id,source_message_id) DO NOTHING RETURNING message_id",
+        "INSERT INTO delivery_jobs(message_id,next_attempt_at,expires_at) VALUES ($1,$2,$3)",
+        "WITH global_update AS (UPDATE ingress_quota_global SET messages=messages+$1,bytes=bytes+$2 WHERE singleton AND messages+$1 BETWEEN 0 AND $3 AND bytes+$2 BETWEEN 0 AND $4 RETURNING 1), tenant_update AS (INSERT INTO ingress_quota_tenants(tenant_id,messages,bytes) SELECT $5,$1,$2 FROM global_update WHERE $1 BETWEEN 0 AND $6 AND $2 BETWEEN 0 AND $7 ON CONFLICT (tenant_id) DO UPDATE SET messages=ingress_quota_tenants.messages+$1,bytes=ingress_quota_tenants.bytes+$2 WHERE ingress_quota_tenants.messages+$1 BETWEEN 0 AND $6 AND ingress_quota_tenants.bytes+$2 BETWEEN 0 AND $7 RETURNING 1), device_update AS (INSERT INTO ingress_quota_devices(tenant_id,product_id,device_id,messages,bytes) SELECT $5,$8,$9,$1,$2 FROM tenant_update WHERE $1 BETWEEN 0 AND $10 AND $2 BETWEEN 0 AND $11 ON CONFLICT (tenant_id,product_id,device_id) DO UPDATE SET messages=ingress_quota_devices.messages+$1,bytes=ingress_quota_devices.bytes+$2 WHERE ingress_quota_devices.messages+$1 BETWEEN 0 AND $10 AND ingress_quota_devices.bytes+$2 BETWEEN 0 AND $11 RETURNING 1) SELECT (SELECT count(*) FROM global_update) global_count,(SELECT count(*) FROM tenant_update) tenant_count,(SELECT count(*) FROM device_update) device_count",
+        "COMMIT"
+      ]
+    },
+    "outbox_finish": {
+      "count": 5,
+      "statement_counts": {
+        "4": 5
+      },
+      "server_ms": 1.08,
+      "example": [
+        "BEGIN",
+        "SELECT set_config('statement_timeout',$1,true),set_config('lock_timeout',$1,true)",
+        "UPDATE delivery_jobs SET done=$1,next_attempt_at=$2,lease_owner=NULL,lease_expiry=NULL,last_error=$3 WHERE message_id=$4 AND lease_owner=$5 AND attempts=$6 AND lease_expiry>$7",
+        "COMMIT"
+      ]
+    }
+  }
+}

@@ -431,8 +431,8 @@ async fn audit_postgres_concurrency_leases_pool_pressure_and_cleanup() {
         .await
         .unwrap();
     // Block admission, saturating a two-connection pool with a fixed set of callers.
-    let mut lock = pool.acquire().await.unwrap();
-    sqlx::query("SELECT pg_advisory_lock(782634291)")
+    let mut lock = pool.begin().await.unwrap();
+    sqlx::query("UPDATE ingress_quota_global SET messages=messages WHERE singleton")
         .execute(&mut *lock)
         .await
         .unwrap();
@@ -445,11 +445,7 @@ async fn audit_postgres_concurrency_leases_pool_pressure_and_cleanup() {
     while let Some(result) = tasks.join_next().await {
         assert!(result.unwrap().is_err());
     }
-    sqlx::query("SELECT pg_advisory_unlock(782634291)")
-        .execute(&mut *lock)
-        .await
-        .unwrap();
-    drop(lock);
+    lock.rollback().await.unwrap();
     // Cancelled transactions/pool waiters must release ownership and allow recovery.
     deadline(1000, store.accept(message("recovered")))
         .await
@@ -475,6 +471,20 @@ async fn audit_postgres_concurrency_leases_pool_pressure_and_cleanup() {
     assert_eq!(
         left, 18,
         "cleanup deletes exactly the requested bounded batch"
+    );
+    let accounted: (i64, i64) =
+        sqlx::query_as("SELECT messages,bytes FROM ingress_quota_global WHERE singleton")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    let actual: (i64, i64) =
+        sqlx::query_as("SELECT count(*),coalesce(sum(charge),0)::bigint FROM ingress_messages")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(
+        accounted, actual,
+        "cleanup updates quota accounting atomically"
     );
     pool.close().await;
 }

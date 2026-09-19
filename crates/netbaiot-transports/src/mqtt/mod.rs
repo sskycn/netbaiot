@@ -78,11 +78,14 @@ async fn next(
     stream: &mut BoxStream,
     l: &Limits,
     idle: Instant,
-) -> Result<Packet> {
+) -> Result<(Packet, u64, Instant)> {
     loop {
+        let validation_started = Instant::now();
         if let Some(packet) = decode(&mut reader.buffer, l)? {
+            let validation_us = validation_started.elapsed().as_micros() as u64;
+            let validated_at = Instant::now();
             reader.consumed();
-            return Ok(packet);
+            return Ok((packet, validation_us, validated_at));
         }
         reader.read_more(stream, idle).await?;
     }
@@ -104,7 +107,7 @@ pub async fn connection(
     };
     machine.transition(ConnectionState::AwaitConnect)?;
     let mut reader = Reader::new(l.max_mqtt_packet_size, l.packet_read_timeout_ms);
-    let first = tokio::select! {_=stop.cancelled()=>return Ok(()),packet=next(&mut reader,&mut stream,l,Instant::now()+Duration::from_millis(l.connect_timeout_ms))=>packet?};
+    let (first, _, _) = tokio::select! {_=stop.cancelled()=>return Ok(()),packet=next(&mut reader,&mut stream,l,Instant::now()+Duration::from_millis(l.connect_timeout_ms))=>packet?};
     s.ingress.metrics.inc(Metric::MqttPacketsReceived);
     let connect = match first {
         Packet::Connect(c) => c,
@@ -217,8 +220,21 @@ pub async fn connection(
                     s.router.state(&auth.device_key, command_id, attempt, DeliveryState::Sent).await?;
                 }
                 packet = next(&mut reader, &mut stream, l, protocol_deadline) => {
-                    let packet = packet?;
-                    let _protocol = s.protocol_admission.acquire(&auth.device_key, 1)?;
+                    let (packet, validation_us, validated_at) = packet?;
+                    if !matches!(&packet, Packet::Publish { .. }) {
+                        let (lock_wait_us, lock_hold_us) = match s
+                            .protocol_admission
+                            .check_rate(&auth.device_key)
+                        {
+                            Ok(timings) => timings,
+                            Err(error) => {
+                                s.ingress.metrics.inc(Metric::ProtocolAdmissionRejects);
+                                return Err(error);
+                            }
+                        };
+                        s.ingress.metrics.observe(Histogram::AdmissionLockWait, lock_wait_us);
+                        s.ingress.metrics.observe(Histogram::AdmissionLockHold, lock_hold_us);
+                    }
                     last = Instant::now();
                     s.ingress.metrics.inc(Metric::MqttPacketsReceived);
                     match packet {
@@ -259,18 +275,30 @@ pub async fn connection(
                             if retain { return Err(Error::Forbidden); }
                             let kind = publish_acl(&auth, &requested)?;
                             s.ingress.metrics.inc(Metric::MqttPublishes);
-                            let receipt = s.ingress.ingest(&auth, IngressEnvelope {
+                            let acceptance = s.ingress.ingest(&auth, IngressEnvelope {
                                 transport: Transport::Mqtt,
                                 payload: &payload,
                                 require_command_ack: kind == TopicKind::DownAck,
+                                validated_at: validated_at.into(),
+                                validation_us,
                             }).await?;
                             if let Some(id) = packet_id {
-                                send(&mut stream, &s, &ack(0x40, id)).await?;
+                                let frame = ack(0x40, id);
+                                s.ingress.metrics.observe(
+                                    Histogram::CommitToPubackQueue,
+                                    acceptance.persisted_at.elapsed().as_micros() as u64,
+                                );
+                                let write_started = Instant::now();
+                                send(&mut stream, &s, &frame).await?;
+                                s.ingress.metrics.observe(
+                                    Histogram::PubackWrite,
+                                    write_started.elapsed().as_micros() as u64,
+                                );
                                 s.ingress.metrics.inc(Metric::MqttPubacks);
                             }
                             let up_ack = topic(&auth.device_key, TopicKind::UpAck);
                             if let Some(qos) = s.subscriptions.lookup(&up_ack, session.generation)? {
-                                let bytes = serde_json::to_vec(&receipt).map_err(|_| Error::Internal)?;
+                                let bytes = serde_json::to_vec(&acceptance.receipt).map_err(|_| Error::Internal)?;
                                 let id = if qos == 1 {
                                     Some(ids.allocate(Pending {
                                         command: None,
