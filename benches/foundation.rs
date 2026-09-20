@@ -1,3 +1,4 @@
+use async_trait::async_trait;
 use bytes::BytesMut;
 use netbaiot_codecs::JsonV1;
 use netbaiot_core::*;
@@ -11,6 +12,21 @@ use netbaiot_transports::{
     tcp::{LengthPrefixFramer, TcpFramer},
 };
 use std::{hint::black_box, sync::Arc, time::Instant};
+
+struct BenchAuthProvider {
+    auth: AuthenticatedDevice,
+}
+
+#[async_trait]
+impl DeviceAuthenticator for BenchAuthProvider {
+    async fn authenticate(
+        &self,
+        _: AuthenticationRequest<'_>,
+    ) -> netbaiot_runtime::Result<AuthenticatedDevice> {
+        Ok(self.auth.clone())
+    }
+}
+
 fn measure(name: &str, iterations: usize, mut f: impl FnMut()) {
     for _ in 0..1000 {
         f();
@@ -54,6 +70,81 @@ fn main() {
             commands: true,
         },
     };
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_time()
+        .build()
+        .unwrap();
+    let auth_limits = Arc::new(Limits::default());
+    let auth_metrics = Arc::new(Metrics::default());
+    let hit_cache = AuthCache::new(
+        Arc::new(BenchAuthProvider { auth: auth.clone() }),
+        auth_limits.clone(),
+        auth_metrics.clone(),
+    );
+    runtime
+        .block_on(hit_cache.authenticate(AuthenticationRequest::Secret {
+            credential_id: "bench",
+            secret: b"bench-secret",
+        }))
+        .unwrap();
+    measure("auth_cache_hit", 20_000, || {
+        black_box(
+            runtime
+                .block_on(hit_cache.authenticate(AuthenticationRequest::Secret {
+                    credential_id: "bench",
+                    secret: b"bench-secret",
+                }))
+                .unwrap(),
+        );
+    });
+    let miss_cache = AuthCache::new(
+        Arc::new(BenchAuthProvider { auth: auth.clone() }),
+        auth_limits.clone(),
+        auth_metrics,
+    );
+    let mut miss_sequence = 0u64;
+    measure("auth_cache_miss_local_provider", 2_000, || {
+        miss_sequence += 1;
+        let secret = miss_sequence.to_be_bytes();
+        black_box(
+            runtime
+                .block_on(miss_cache.authenticate(AuthenticationRequest::Secret {
+                    credential_id: "bench",
+                    secret: &secret,
+                }))
+                .unwrap(),
+        );
+    });
+    let config_cache = ConfigCache::empty(auth_limits);
+    config_cache
+        .apply(ControlSnapshot {
+            revision: 1,
+            products: vec![ProductRuntimeConfig {
+                tenant_id: auth.device_key.tenant_id.clone(),
+                product_id: auth.device_key.product_id.clone(),
+                codec_id: auth.codec_id.clone(),
+                codec_version: auth.codec_version,
+                revision: 1,
+            }],
+            devices: vec![DeviceConfigSnapshot {
+                device: auth.device_key.clone(),
+                revision: ConfigRevision::new(1).unwrap(),
+                payload: Arc::new(serde_json::json!({"sample_interval_seconds": 30})),
+            }],
+            routes: Vec::new(),
+        })
+        .unwrap();
+    measure("config_cache_hit", 20_000, || {
+        black_box(config_cache.device(&auth.device_key).unwrap());
+    });
+    let missing_device = DeviceKey {
+        tenant_id: auth.device_key.tenant_id.clone(),
+        product_id: auth.device_key.product_id.clone(),
+        device_id: DeviceId::new("missing").unwrap(),
+    };
+    measure("config_cache_miss", 20_000, || {
+        black_box(config_cache.device(&missing_device).unwrap());
+    });
     let up = topic(&auth.device_key, TopicKind::Up);
     let down = topic(&auth.device_key, TopicKind::Down);
     let payload=br#"{"schema_version":1,"source_message_id":"boot:1","kind":"telemetry","data":{"temperature":25.3,"humidity":61.2}}"#;

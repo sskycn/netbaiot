@@ -6,7 +6,7 @@ use std::{
     process::Stdio,
     sync::{
         Arc, Mutex,
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicUsize, Ordering},
     },
     time::Duration,
 };
@@ -260,17 +260,28 @@ fn mqtt_packet(first: u8, body: &[u8]) -> Vec<u8> {
     packet
 }
 
-fn mqtt_connect(client_id: &str, clean: bool) -> Vec<u8> {
+fn mqtt_connect_with_credentials(
+    client_id: &str,
+    clean: bool,
+    credential_id: &str,
+    secret: &str,
+) -> Vec<u8> {
     let mut body = Vec::new();
     mqtt_text(b"MQTT", &mut body);
     body.extend_from_slice(&[4, 0xc0 | (u8::from(clean) * 2), 0, 30]);
     mqtt_text(client_id.as_bytes(), &mut body);
-    mqtt_text(b"demo-device", &mut body);
-    mqtt_text(
-        b"000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
-        &mut body,
-    );
+    mqtt_text(credential_id.as_bytes(), &mut body);
+    mqtt_text(secret.as_bytes(), &mut body);
     mqtt_packet(0x10, &body)
+}
+
+fn mqtt_connect(client_id: &str, clean: bool) -> Vec<u8> {
+    mqtt_connect_with_credentials(
+        client_id,
+        clean,
+        "demo-device",
+        "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+    )
 }
 
 fn mqtt_subscribe(packet_id: u16, filter: &str, qos: u8) -> Vec<u8> {
@@ -321,6 +332,129 @@ async fn mqtt_open(address: std::net::SocketAddr, client_id: &str, clean: bool) 
     stream
 }
 
+async fn mqtt_open_with_credentials(
+    address: std::net::SocketAddr,
+    client_id: &str,
+    credential_id: &str,
+) -> TcpStream {
+    let mut stream = TcpStream::connect(address).await.unwrap();
+    stream
+        .write_all(&mqtt_connect_with_credentials(
+            client_id,
+            true,
+            credential_id,
+            "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+        ))
+        .await
+        .unwrap();
+    stream
+}
+
+async fn read_http_request_body(stream: &mut TcpStream) -> Option<Vec<u8>> {
+    tokio::time::timeout(Duration::from_secs(2), async {
+        let mut bytes = Vec::with_capacity(1024);
+        let mut chunk = [0u8; 1024];
+        loop {
+            let read = stream.read(&mut chunk).await.ok()?;
+            if read == 0 {
+                return None;
+            }
+            if bytes.len().checked_add(read)? > 32_768 {
+                return None;
+            }
+            bytes.extend_from_slice(&chunk[..read]);
+            let Some(header_start) = bytes.windows(4).position(|window| window == b"\r\n\r\n")
+            else {
+                continue;
+            };
+            let body_start = header_start + 4;
+            let header = String::from_utf8_lossy(&bytes[..body_start]);
+            let length = header.lines().find_map(|line| {
+                line.to_ascii_lowercase()
+                    .strip_prefix("content-length:")
+                    .and_then(|value| value.trim().parse::<usize>().ok())
+            })?;
+            if length > 16_384 {
+                return None;
+            }
+            let request_end = body_start.checked_add(length)?;
+            if bytes.len() >= request_end {
+                return Some(bytes[body_start..request_end].to_vec());
+            }
+        }
+    })
+    .await
+    .ok()
+    .flatten()
+}
+
+async fn write_auth_response(stream: &mut TcpStream, status: &str, body: &[u8]) {
+    let head = format!(
+        "HTTP/1.1 {status}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+        body.len()
+    );
+    stream.write_all(head.as_bytes()).await.unwrap();
+    stream.write_all(body).await.unwrap();
+}
+
+async fn serve_test_auth_provider(
+    listener: TcpListener,
+    available: Arc<AtomicBool>,
+    calls: Arc<AtomicUsize>,
+    stop: CancellationToken,
+) {
+    loop {
+        let accepted = tokio::select! {
+            _ = stop.cancelled() => break,
+            accepted = listener.accept() => accepted,
+        };
+        let Ok((mut stream, _)) = accepted else {
+            break;
+        };
+        let Some(body) = read_http_request_body(&mut stream).await else {
+            continue;
+        };
+        calls.fetch_add(1, Ordering::Relaxed);
+        if !available.load(Ordering::Relaxed) {
+            write_auth_response(&mut stream, "503 Service Unavailable", b"{}").await;
+            continue;
+        }
+        let Ok(request) = serde_json::from_slice::<serde_json::Value>(&body) else {
+            write_auth_response(&mut stream, "400 Bad Request", b"{}").await;
+            continue;
+        };
+        let Some(credential_id) = request
+            .get("credential_id")
+            .and_then(|value| value.as_str())
+        else {
+            write_auth_response(&mut stream, "401 Unauthorized", b"{}").await;
+            continue;
+        };
+        let device_id = match credential_id {
+            "control-a" => "device-a",
+            "control-b" => "device-b",
+            _ => {
+                write_auth_response(&mut stream, "401 Unauthorized", b"{}").await;
+                continue;
+            }
+        };
+        let response = serde_json::to_vec(&serde_json::json!({
+            "device_key": {
+                "tenant_id": "demo",
+                "product_id": "sensor",
+                "device_id": device_id,
+            },
+            "credential_version": 1,
+            "auth_generation": 1,
+            "codec_id": "netbaiot-json",
+            "codec_version": 1,
+            "permissions": { "publish": true, "commands": true },
+        }))
+        .unwrap();
+        write_auth_response(&mut stream, "200 OK", &response).await;
+    }
+}
+
 async fn request_drain(client: &reqwest::Client, address: std::net::SocketAddr, admin: &str) {
     assert!(
         client
@@ -332,6 +466,97 @@ async fn request_drain(client: &reqwest::Client, address: std::net::SocketAddr, 
             .status()
             .is_success()
     );
+}
+
+#[tokio::test]
+async fn external_auth_outage_preserves_bound_session_and_recovers_new_authentication() {
+    let provider_listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let provider_address = provider_listener.local_addr().unwrap();
+    let provider_available = Arc::new(AtomicBool::new(true));
+    let provider_calls = Arc::new(AtomicUsize::new(0));
+    let provider_stop = CancellationToken::new();
+    let provider_task = tokio::spawn(serve_test_auth_provider(
+        provider_listener,
+        provider_available.clone(),
+        provider_calls.clone(),
+        provider_stop.clone(),
+    ));
+
+    let mut c = config();
+    c.device_http = free_address().await;
+    c.management_http = free_address().await;
+    c.mqtt = free_address().await;
+    c.tcp = free_address().await;
+    c.udp = free_address().await;
+    c.credentials.clear();
+    c.device_configs.clear();
+    c.auth_provider_url = Some(format!("http://{provider_address}/auth"));
+    c.limits.authentication_timeout_ms = 500;
+    c.spool_directory =
+        std::env::temp_dir().join(format!("netbaiot-auth-outage-{}", uuid::Uuid::new_v4()));
+    let spool_directory = c.spool_directory.clone();
+    let mqtt_address = c.mqtt;
+    let server_stop = CancellationToken::new();
+    let server_task = tokio::spawn(run(c, server_stop.clone()));
+    tokio::time::timeout(Duration::from_secs(5), async {
+        loop {
+            if TcpStream::connect(mqtt_address).await.is_ok() {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .unwrap();
+
+    let mut established =
+        mqtt_open_with_credentials(mqtt_address, "control-client-a", "control-a").await;
+    assert_eq!(mqtt_read(&mut established).await, (0x20, vec![0, 0]));
+    assert_eq!(provider_calls.load(Ordering::Relaxed), 1);
+
+    provider_available.store(false, Ordering::Relaxed);
+    let payload = br#"{"schema_version":1,"source_message_id":"outage:1","kind":"heartbeat","data":{"sequence":1}}"#;
+    established
+        .write_all(&mqtt_publish(
+            7,
+            "v1/t/demo/p/sensor/d/device-a/up",
+            payload,
+            1,
+            false,
+        ))
+        .await
+        .unwrap();
+    assert_eq!(mqtt_read(&mut established).await, (0x40, vec![0, 7]));
+    assert_eq!(
+        provider_calls.load(Ordering::Relaxed),
+        1,
+        "an established session must not reauthenticate per message"
+    );
+
+    let mut rejected =
+        mqtt_open_with_credentials(mqtt_address, "control-client-b-failed", "control-b").await;
+    let mut byte = [0u8; 1];
+    let closed = tokio::time::timeout(Duration::from_secs(2), rejected.read(&mut byte))
+        .await
+        .unwrap();
+    assert!(matches!(closed, Ok(0) | Err(_)));
+    assert_eq!(provider_calls.load(Ordering::Relaxed), 2);
+
+    provider_available.store(true, Ordering::Relaxed);
+    let mut recovered =
+        mqtt_open_with_credentials(mqtt_address, "control-client-b-recovered", "control-b").await;
+    assert_eq!(mqtt_read(&mut recovered).await, (0x20, vec![0, 0]));
+    assert_eq!(provider_calls.load(Ordering::Relaxed), 3);
+
+    server_stop.cancel();
+    tokio::time::timeout(Duration::from_secs(5), server_task)
+        .await
+        .unwrap()
+        .unwrap()
+        .unwrap();
+    provider_stop.cancel();
+    provider_task.await.unwrap();
+    let _ = std::fs::remove_dir_all(spool_directory);
 }
 
 #[tokio::test]
@@ -532,8 +757,7 @@ async fn subprocess_mqtt_qos2_resumes_outbound_and_inbound_restart_stages() {
     let _ = std::fs::remove_dir_all(root);
 }
 
-#[tokio::test]
-async fn subprocess_graceful_restart_spools_and_replays_every_accepted_event_id() {
+async fn exercise_graceful_restart_spool_replay(healthy_cycles: u32, dwell_per_cycle: Duration) {
     let sink_listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let sink_address = sink_listener.local_addr().unwrap();
     let healthy = Arc::new(AtomicBool::new(false));
@@ -696,7 +920,7 @@ async fn subprocess_graceful_restart_spools_and_replays_every_accepted_event_id(
 
     // Exercise multiple healthy generations after recovery. Each generation accepts new work,
     // drains it, and exits without creating a restart segment.
-    for cycle in 0..3 {
+    for cycle in 0..healthy_cycles {
         let mut child = start_child(&config_path, &admin).await;
         wait_ready(&client, c.management_http, &admin).await;
         let response = client
@@ -719,6 +943,7 @@ async fn subprocess_graceful_restart_spools_and_replays_every_accepted_event_id(
         })
         .await
         .unwrap();
+        tokio::time::sleep(dwell_per_cycle).await;
         client
             .post(format!("http://{}/api/v1/drain", c.management_http))
             .bearer_auth(&admin)
@@ -746,6 +971,17 @@ async fn subprocess_graceful_restart_spools_and_replays_every_accepted_event_id(
     sink_stop.cancel();
     sink_task.await.unwrap();
     let _ = std::fs::remove_dir_all(root);
+}
+
+#[tokio::test]
+async fn subprocess_graceful_restart_spools_and_replays_every_accepted_event_id() {
+    exercise_graceful_restart_spool_replay(3, Duration::ZERO).await;
+}
+
+#[tokio::test]
+#[ignore = "60-second multi-generation restart soak"]
+async fn subprocess_graceful_restart_sixty_second_soak() {
+    exercise_graceful_restart_spool_replay(12, Duration::from_secs(5)).await;
 }
 
 #[tokio::test]
