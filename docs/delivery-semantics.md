@@ -16,7 +16,10 @@ business application processed or durably stored the event.
 Normal operation is memory-first. Required sinks explicitly acknowledge; best-effort
 sinks may drop at their bounded overflow/failure policy. Retries preserve `event_id`,
 are count/state/rate bounded, use exponential full jitter, and do not spawn one task
-per retry.
+per retry. Once the normal attempt/age budget is exhausted, confirmed-required work
+moves to a bounded low-frequency degraded retry lane; it stays spoolable and can
+recover in-process. Delayed retries are selected by readiness rather than queue
+position, so an older backoff cannot block a later ready event.
 
 A planned restart drains required work. Any still-pending or inflight-uncertain
 delivery is fsynced into the local restart spool and replays with the same ID. This

@@ -31,6 +31,7 @@ spool relationship values.
 | Sink timeout/retry | 5 s / 5 attempts / max age 1 h |
 | Restart spool | 100,000 records / 256 MiB total |
 | Spool segment/record | 64 MiB / 1 MiB |
+| MQTT recovery image | 256 MiB; validated against session + retained ceilings |
 
 Every sink queue is independently count and byte charged. Global event accounting
 charges the shared event once; each sink charges its delivery responsibility.

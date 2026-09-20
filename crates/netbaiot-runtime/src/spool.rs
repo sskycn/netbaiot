@@ -9,12 +9,21 @@ use std::{
 use uuid::Uuid;
 
 const MAGIC: &[u8; 4] = b"NBSP";
-const VERSION: u32 = 1;
+const LEGACY_VERSION: u32 = 1;
+const VERSION: u32 = 2;
+const SNAPSHOT_NAME: &str = "eventbus-recovery.spool";
+
+#[derive(Clone, Debug)]
+pub struct CommittedSpool {
+    pub path: PathBuf,
+    pub generation: u64,
+}
 
 #[derive(Debug)]
 pub struct RecoveryBatch {
     pub records: Vec<SpoolRecord>,
-    pub committed_files: Vec<PathBuf>,
+    pub committed_files: Vec<CommittedSpool>,
+    pub generation: u64,
 }
 
 #[derive(Clone)]
@@ -51,16 +60,38 @@ impl RestartSpool {
             .map_err(|_| Error::Internal)?
     }
 
-    pub async fn remove_committed(&self, paths: Vec<PathBuf>) -> Result<()> {
+    pub async fn remove_committed(&self, files: Vec<CommittedSpool>) -> Result<()> {
         let directory = self.directory.clone();
         tokio::task::spawn_blocking(move || {
-            for path in paths {
+            for committed in files {
+                let path = committed.path;
                 if path.parent() != Some(directory.as_path())
                     || path.extension().and_then(|value| value.to_str()) != Some("spool")
                 {
                     return Err(Error::Invalid);
                 }
-                fs::remove_file(path).map_err(|_| Error::Storage)?;
+                let bytes = fs::read(&path).map_err(|_| Error::Storage)?;
+                let generation = segment_generation(&bytes)?;
+                // Never let cleanup for an older recovery batch delete a newer
+                // atomically replaced snapshot at the same path.
+                if generation == committed.generation {
+                    if path.file_name().and_then(|value| value.to_str()) == Some(SNAPSHOT_NAME) {
+                        // Remove ignored legacy generations first. If cleanup
+                        // fails, the authoritative snapshot remains intact.
+                        for entry in
+                            fs::read_dir(directory.as_path()).map_err(|_| Error::Storage)?
+                        {
+                            let stale = entry.map_err(|_| Error::Storage)?.path();
+                            if stale != path
+                                && stale.extension().and_then(|value| value.to_str())
+                                    == Some("spool")
+                            {
+                                fs::remove_file(stale).map_err(|_| Error::Storage)?;
+                            }
+                        }
+                    }
+                    fs::remove_file(path).map_err(|_| Error::Storage)?;
+                }
             }
             sync_directory(&directory)
         })
@@ -79,34 +110,21 @@ fn commit_sync(directory: &Path, limits: &Limits, records: &[SpoolRecord]) -> Re
     }
     fs::create_dir_all(directory).map_err(|_| Error::Storage)?;
     set_directory_permissions(directory)?;
-    // Include already committed segments in both configured spool budgets. This prevents
-    // repeated failed restarts from accumulating more durable state than the global cap.
     let existing = recover_sync(directory, limits)?;
-    if existing
-        .records
-        .len()
-        .checked_add(records.len())
-        .ok_or(Error::Overloaded)?
-        > limits.spool_max_records
-    {
-        return Err(Error::Overloaded);
-    }
-    let existing_bytes = existing
-        .committed_files
-        .iter()
-        .try_fold(0usize, |total, path| {
-            let bytes = usize::try_from(fs::metadata(path).map_err(|_| Error::Storage)?.len())
-                .map_err(|_| Error::Overloaded)?;
-            total.checked_add(bytes).ok_or(Error::Overloaded)
-        })?;
+    let generation = existing
+        .generation
+        .checked_add(1)
+        .ok_or(Error::Overloaded)?;
     let id = Uuid::new_v4();
     let temporary = directory.join(format!(".{id}.tmp"));
-    let committed = directory.join(format!("{id}.spool"));
+    let committed = directory.join(SNAPSHOT_NAME);
     let mut file = open_private(&temporary)?;
     file.write_all(MAGIC).map_err(|_| Error::Storage)?;
     file.write_all(&VERSION.to_be_bytes())
         .map_err(|_| Error::Storage)?;
-    let mut total = 8usize;
+    file.write_all(&generation.to_be_bytes())
+        .map_err(|_| Error::Storage)?;
+    let mut total = 16usize;
     for record in records {
         let payload = serde_json::to_vec(record).map_err(|_| Error::Invalid)?;
         if payload.len() > limits.spool_record_max_bytes {
@@ -116,9 +134,7 @@ fn commit_sync(directory: &Path, limits: &Limits, records: &[SpoolRecord]) -> Re
         total = total
             .checked_add(4 + payload.len() + 32)
             .ok_or(Error::Overloaded)?;
-        if total > limits.spool_segment_max_bytes
-            || existing_bytes.saturating_add(total) > limits.spool_max_bytes
-        {
+        if total > limits.spool_segment_max_bytes || total > limits.spool_max_bytes {
             return Err(Error::Overloaded);
         }
         file.write_all(&length.to_be_bytes())
@@ -137,6 +153,34 @@ fn recover_sync(directory: &Path, limits: &Limits) -> Result<RecoveryBatch> {
         return Ok(RecoveryBatch {
             records: Vec::new(),
             committed_files: Vec::new(),
+            generation: 0,
+        });
+    }
+    let authoritative = directory.join(SNAPSHOT_NAME);
+    if authoritative.exists() {
+        let size = usize::try_from(
+            fs::metadata(&authoritative)
+                .map_err(|_| Error::Storage)?
+                .len(),
+        )
+        .map_err(|_| Error::Overloaded)?;
+        if size > limits.spool_segment_max_bytes || size > limits.spool_max_bytes {
+            return Err(Error::Overloaded);
+        }
+        let bytes = fs::read(&authoritative).map_err(|_| Error::Storage)?;
+        if bytes.len() != size {
+            return Err(Error::Storage);
+        }
+        let generation = segment_generation(&bytes)?;
+        let mut records = Vec::new();
+        decode_segment(&bytes, limits, &mut records)?;
+        return Ok(RecoveryBatch {
+            records,
+            committed_files: vec![CommittedSpool {
+                path: authoritative,
+                generation,
+            }],
+            generation,
         });
     }
     let mut files = fs::read_dir(directory)
@@ -169,9 +213,42 @@ fn recover_sync(directory: &Path, limits: &Limits) -> Result<RecoveryBatch> {
     if records.len() > limits.spool_max_records {
         return Err(Error::Overloaded);
     }
+    // Legacy append-only segments may contain the same event after a failed
+    // repeated restart. Coalesce identical responsibility by stable EventId.
+    let mut unique = std::collections::BTreeMap::<netbaiot_core::EventId, SpoolRecord>::new();
+    for mut record in records {
+        if let Some(existing) = unique.get_mut(&record.event.event_id) {
+            if serde_json::to_vec(&existing.event).map_err(|_| Error::Invalid)?
+                != serde_json::to_vec(&record.event).map_err(|_| Error::Invalid)?
+            {
+                return Err(Error::Conflict);
+            }
+            for sink in record.pending_sinks.drain(..) {
+                if !existing.pending_sinks.contains(&sink) {
+                    existing.pending_sinks.push(sink);
+                }
+            }
+            for (sink, attempt) in record.attempts {
+                existing
+                    .attempts
+                    .entry(sink)
+                    .and_modify(|value| *value = (*value).max(attempt))
+                    .or_insert(attempt);
+            }
+        } else {
+            unique.insert(record.event.event_id, record);
+        }
+    }
     Ok(RecoveryBatch {
-        records,
-        committed_files: files,
+        records: unique.into_values().collect(),
+        committed_files: files
+            .into_iter()
+            .map(|path| CommittedSpool {
+                path,
+                generation: 0,
+            })
+            .collect(),
+        generation: 0,
     })
 }
 
@@ -180,10 +257,17 @@ fn decode_segment(input: &[u8], limits: &Limits, output: &mut Vec<SpoolRecord>) 
         return Err(Error::Invalid);
     }
     let version = u32::from_be_bytes(input[4..8].try_into().map_err(|_| Error::Invalid)?);
-    if version != VERSION {
+    if version != VERSION && version != LEGACY_VERSION {
         return Err(Error::Invalid);
     }
-    let mut at = 8usize;
+    let mut at = if version == VERSION {
+        if input.len() < 16 {
+            return Err(Error::Invalid);
+        }
+        16usize
+    } else {
+        8usize
+    };
     while at < input.len() {
         let length_end = at.checked_add(4).ok_or(Error::Invalid)?;
         let length_bytes = input.get(at..length_end).ok_or(Error::Invalid)?;
@@ -208,6 +292,20 @@ fn decode_segment(input: &[u8], limits: &Limits, output: &mut Vec<SpoolRecord>) 
         at = checksum_end;
     }
     Ok(())
+}
+
+fn segment_generation(input: &[u8]) -> Result<u64> {
+    if input.len() < 8 || input.get(..4) != Some(MAGIC) {
+        return Err(Error::Invalid);
+    }
+    let version = u32::from_be_bytes(input[4..8].try_into().map_err(|_| Error::Invalid)?);
+    match version {
+        LEGACY_VERSION => Ok(0),
+        VERSION if input.len() >= 16 => Ok(u64::from_be_bytes(
+            input[8..16].try_into().map_err(|_| Error::Invalid)?,
+        )),
+        _ => Err(Error::Invalid),
+    }
 }
 
 /// Fuzzable bounded decoder for one committed segment image.
@@ -292,6 +390,55 @@ mod tests {
         spool.commit(vec![original.clone()]).await.unwrap();
         let recovered = spool.recover().await.unwrap();
         assert_eq!(recovered.records[0].event.event_id, original.event.event_id);
+        spool
+            .remove_committed(recovered.committed_files)
+            .await
+            .unwrap();
+        let _ = fs::remove_dir(directory);
+    }
+
+    #[tokio::test]
+    async fn repeated_failed_restarts_replace_one_generation_without_duplicates() {
+        let directory =
+            std::env::temp_dir().join(format!("netbaiot-spool-generations-{}", Uuid::new_v4()));
+        let spool = RestartSpool::new(directory.clone(), Arc::new(Limits::default()));
+        let original = record();
+        for generation in 1..=3 {
+            spool.commit(vec![original.clone()]).await.unwrap();
+            let recovered = spool.recover().await.unwrap();
+            assert_eq!(recovered.generation, generation);
+            assert_eq!(recovered.records.len(), 1);
+            assert_eq!(recovered.records[0].event.event_id, original.event.event_id);
+        }
+        let committed = fs::read_dir(&directory)
+            .unwrap()
+            .filter_map(|entry| entry.ok())
+            .filter(|entry| {
+                entry.path().extension().and_then(|value| value.to_str()) == Some("spool")
+            })
+            .count();
+        assert_eq!(committed, 1);
+        let recovered = spool.recover().await.unwrap();
+        spool
+            .remove_committed(recovered.committed_files)
+            .await
+            .unwrap();
+        let _ = fs::remove_dir(directory);
+    }
+
+    #[tokio::test]
+    async fn stale_cleanup_handle_cannot_delete_newer_committed_generation() {
+        let directory =
+            std::env::temp_dir().join(format!("netbaiot-spool-cleanup-{}", Uuid::new_v4()));
+        let spool = RestartSpool::new(directory.clone(), Arc::new(Limits::default()));
+        let original = record();
+        spool.commit(vec![original.clone()]).await.unwrap();
+        let stale = spool.recover().await.unwrap();
+        spool.commit(vec![original.clone()]).await.unwrap();
+        spool.remove_committed(stale.committed_files).await.unwrap();
+        let recovered = spool.recover().await.unwrap();
+        assert_eq!(recovered.generation, 2);
+        assert_eq!(recovered.records.len(), 1);
         spool
             .remove_committed(recovered.committed_files)
             .await

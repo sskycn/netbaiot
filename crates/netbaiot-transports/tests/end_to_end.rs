@@ -28,6 +28,14 @@ impl DeviceAuthenticator for CountingProvider {
         }
         Ok(self.auth.clone())
     }
+
+    async fn resolve_verifier(&self, _: &str) -> Result<DeviceVerifier> {
+        self.calls.fetch_add(1, Ordering::Relaxed);
+        if self.delay {
+            tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+        }
+        Ok(DeviceVerifier::new(self.auth.clone(), [7; 32]))
+    }
 }
 
 struct AckSink;

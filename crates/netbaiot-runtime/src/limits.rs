@@ -115,6 +115,7 @@ pub struct Limits {
     pub spool_max_bytes: usize,
     pub spool_segment_max_bytes: usize,
     pub spool_record_max_bytes: usize,
+    pub mqtt_recovery_max_bytes: usize,
 }
 
 impl Default for Limits {
@@ -232,6 +233,7 @@ impl Default for Limits {
             spool_max_bytes: 268_435_456,
             spool_segment_max_bytes: 67_108_864,
             spool_record_max_bytes: 1_048_576,
+            mqtt_recovery_max_bytes: 268_435_456,
         }
     }
 }
@@ -303,6 +305,10 @@ impl Limits {
             || self.sink_timeout_ms > self.sink_max_age_ms
             || self.spool_record_max_bytes > self.spool_segment_max_bytes
             || self.spool_segment_max_bytes > self.spool_max_bytes
+            || self.mqtt_recovery_max_bytes
+                < self
+                    .global_mqtt_session_bytes
+                    .saturating_add(self.max_retained_bytes)
             || self.max_read_buffer_per_connection < max_frame
             || self.connection_memory_reservation < max_frame
             || self.global_connection_logical_bytes < self.connection_memory_reservation
@@ -326,6 +332,9 @@ mod tests {
         assert!(Limits::default().validate().is_ok());
         let mut limits = Limits::default();
         limits.max_fanout_per_event = limits.max_sinks + 1;
+        assert!(limits.validate().is_err());
+        let mut limits = Limits::default();
+        limits.mqtt_recovery_max_bytes = limits.global_mqtt_session_bytes;
         assert!(limits.validate().is_err());
     }
 }

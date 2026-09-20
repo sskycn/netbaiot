@@ -54,6 +54,7 @@ pub enum BrokerFrame {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum InboundQos2State {
     AwaitPubrel(BrokerMessage),
+    EventAccepted(BrokerMessage),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -252,6 +253,9 @@ struct BrokerState {
     offline_count: usize,
     offline_bytes: usize,
     retained_bytes: usize,
+    retained_reserved_count: usize,
+    retained_reserved_bytes: usize,
+    retained_reserved_tenants: HashMap<TenantId, (usize, usize)>,
 }
 
 fn tenant_session_bytes(state: &BrokerState, tenant: &TenantId) -> usize {
@@ -323,6 +327,9 @@ impl MqttBroker {
                 offline_count: 0,
                 offline_bytes: 0,
                 retained_bytes: 0,
+                retained_reserved_count: 0,
+                retained_reserved_bytes: 0,
+                retained_reserved_tenants: HashMap::new(),
             }),
         })
     }
@@ -560,31 +567,41 @@ impl MqttBroker {
     ) -> Result<bool> {
         let mut state = lock(&self.state)?;
         check_owner(&state, key, generation)?;
-        let session = state.sessions.get(key).ok_or(Error::Internal)?;
-        if let Some(existing) = session.inbound_qos2.get(&packet_id) {
-            return match existing {
-                InboundQos2State::AwaitPubrel(existing) if existing == &message => Ok(false),
-                _ => Err(Error::Invalid),
-            };
-        }
-        if session.inbound_qos2.len()
-            + session
-                .outbound
-                .values()
-                .filter(|entry| !matches!(entry, OutboundState::AwaitPuback(_)))
-                .count()
-            >= self.limits.max_inflight_qos2_per_session
-        {
-            return Err(Error::Overloaded);
-        }
+        let session_state_bytes = {
+            let session = state.sessions.get(key).ok_or(Error::Internal)?;
+            if let Some(existing) = session.inbound_qos2.get(&packet_id) {
+                return match existing {
+                    InboundQos2State::AwaitPubrel(existing)
+                    | InboundQos2State::EventAccepted(existing)
+                        if existing == &message =>
+                    {
+                        Ok(false)
+                    }
+                    _ => Err(Error::Invalid),
+                };
+            }
+            if session.inbound_qos2.len()
+                + session
+                    .outbound
+                    .values()
+                    .filter(|entry| !matches!(entry, OutboundState::AwaitPuback(_)))
+                    .count()
+                >= self.limits.max_inflight_qos2_per_session
+            {
+                return Err(Error::Overloaded);
+            }
+            session.state_bytes
+        };
         let charge = message.bytes();
-        if session.state_bytes.saturating_add(charge) > self.limits.max_mqtt_session_state_bytes
+        reserve_retained(&mut state, &key.device.tenant_id, &message, &self.limits)?;
+        if session_state_bytes.saturating_add(charge) > self.limits.max_mqtt_session_state_bytes
             || tenant_inflight(&state, &key.device.tenant_id, 2)
                 >= self.limits.max_inflight_qos2_per_tenant
             || tenant_session_bytes(&state, &key.device.tenant_id).saturating_add(charge)
                 > self.limits.max_mqtt_session_state_bytes_per_tenant
             || state.session_bytes.saturating_add(charge) > self.limits.global_mqtt_session_bytes
         {
+            release_retained_reservation(&mut state, &key.device.tenant_id, &message);
             return Err(Error::Overloaded);
         }
         {
@@ -603,7 +620,7 @@ impl MqttBroker {
         key: &SessionKey,
         generation: u64,
         packet_id: u16,
-    ) -> Result<Option<BrokerMessage>> {
+    ) -> Result<Option<(BrokerMessage, bool)>> {
         let state = lock(&self.state)?;
         check_owner(&state, key, generation)?;
         Ok(state
@@ -611,8 +628,28 @@ impl MqttBroker {
             .get(key)
             .and_then(|session| session.inbound_qos2.get(&packet_id))
             .map(|state| match state {
-                InboundQos2State::AwaitPubrel(message) => message.clone(),
+                InboundQos2State::AwaitPubrel(message) => (message.clone(), false),
+                InboundQos2State::EventAccepted(message) => (message.clone(), true),
             }))
+    }
+
+    pub fn mark_inbound_qos2_event_accepted(
+        &self,
+        key: &SessionKey,
+        generation: u64,
+        packet_id: u16,
+    ) -> Result<()> {
+        let mut state = lock(&self.state)?;
+        check_owner(&state, key, generation)?;
+        let session = state.sessions.get_mut(key).ok_or(Error::Internal)?;
+        let entry = session
+            .inbound_qos2
+            .get_mut(&packet_id)
+            .ok_or(Error::Invalid)?;
+        if let InboundQos2State::AwaitPubrel(message) = entry {
+            *entry = InboundQos2State::EventAccepted(message.clone());
+        }
+        Ok(())
     }
 
     pub fn complete_inbound_qos2(
@@ -623,19 +660,73 @@ impl MqttBroker {
     ) -> Result<()> {
         let mut state = lock(&self.state)?;
         check_owner(&state, key, generation)?;
-        let session = state.sessions.get_mut(key).ok_or(Error::Internal)?;
-        let message = session
+        let message = state
+            .sessions
+            .get_mut(key)
+            .ok_or(Error::Internal)?
             .inbound_qos2
             .remove(&packet_id)
             .map(|state| match state {
-                InboundQos2State::AwaitPubrel(message) => message,
+                InboundQos2State::AwaitPubrel(message)
+                | InboundQos2State::EventAccepted(message) => message,
             });
         if let Some(message) = &message {
+            release_retained_reservation(&mut state, &key.device.tenant_id, message);
             let charge = message.bytes();
+            let session = state.sessions.get_mut(key).ok_or(Error::Internal)?;
             session.state_bytes = session.state_bytes.saturating_sub(charge);
             state.session_bytes = state.session_bytes.saturating_sub(charge);
         }
         Ok(())
+    }
+
+    pub fn route_inbound_qos2(
+        &self,
+        key: &SessionKey,
+        generation: u64,
+        packet_id: u16,
+        owner: &DeviceKey,
+    ) -> Result<usize> {
+        let mut state = lock(&self.state)?;
+        check_owner(&state, key, generation)?;
+        let message = match state
+            .sessions
+            .get(key)
+            .and_then(|session| session.inbound_qos2.get(&packet_id))
+        {
+            Some(InboundQos2State::EventAccepted(message)) => message.clone(),
+            _ => return Err(Error::Conflict),
+        };
+        release_retained_reservation(&mut state, &key.device.tenant_id, &message);
+        if message.retain {
+            update_retained(&mut state, owner, &message, &self.limits)?;
+        }
+        let matches = state.trie.matching(&message.topic);
+        let mut delivered = 0usize;
+        for (subscriber, subscription_qos) in matches {
+            let qos = message.qos.min(subscription_qos);
+            match enqueue(
+                &mut state,
+                &subscriber,
+                BrokerMessage {
+                    qos,
+                    retain: false,
+                    ..message.clone()
+                },
+                &self.limits,
+            ) {
+                Ok(()) => delivered += 1,
+                Err(Error::Overloaded | Error::Unavailable) => {}
+                Err(error) => return Err(error),
+            }
+        }
+        let session = state.sessions.get_mut(key).ok_or(Error::Internal)?;
+        if session.inbound_qos2.remove(&packet_id).is_some() {
+            let charge = message.bytes();
+            session.state_bytes = session.state_bytes.saturating_sub(charge);
+            state.session_bytes = state.session_bytes.saturating_sub(charge);
+        }
+        Ok(delivered)
     }
 
     pub fn subscription_qos(&self, key: &SessionKey, topic: &str) -> Result<Option<u8>> {
@@ -833,6 +924,9 @@ impl MqttBroker {
             offline_count: 0,
             offline_bytes: 0,
             retained_bytes: 0,
+            retained_reserved_count: 0,
+            retained_reserved_bytes: 0,
+            retained_reserved_tenants: HashMap::new(),
         };
         for mut session in snapshot.sessions {
             session.active_generation = None;
@@ -897,7 +991,8 @@ impl MqttBroker {
                     .inbound_qos2
                     .values()
                     .try_fold(0usize, |total, inbound| match inbound {
-                        InboundQos2State::AwaitPubrel(message) => {
+                        InboundQos2State::AwaitPubrel(message)
+                        | InboundQos2State::EventAccepted(message) => {
                             total.checked_add(message.bytes()).ok_or(Error::Overloaded)
                         }
                     })?;
@@ -972,6 +1067,22 @@ impl MqttBroker {
                 .checked_add(retained.message.bytes())
                 .ok_or(Error::Overloaded)?;
             replacement.retained.insert(topic, retained);
+        }
+        let reservations = replacement
+            .sessions
+            .values()
+            .flat_map(|session| {
+                session.inbound_qos2.values().map(|entry| {
+                    let message = match entry {
+                        InboundQos2State::AwaitPubrel(message)
+                        | InboundQos2State::EventAccepted(message) => message.clone(),
+                    };
+                    (session.key.device.tenant_id.clone(), message)
+                })
+            })
+            .collect::<Vec<_>>();
+        for (tenant, message) in reservations {
+            reserve_retained(&mut replacement, &tenant, &message, &self.limits)?;
         }
         if replacement.subscription_count > self.limits.max_subscriptions
             || replacement.offline_count > self.limits.max_offline_messages
@@ -1073,6 +1184,13 @@ fn remove_session(state: &mut BrokerState, key: &SessionKey) {
         active.cancel.cancel()
     }
     if let Some(session) = state.sessions.remove(key) {
+        for entry in session.inbound_qos2.values() {
+            let message = match entry {
+                InboundQos2State::AwaitPubrel(message)
+                | InboundQos2State::EventAccepted(message) => message,
+            };
+            release_retained_reservation(state, &key.device.tenant_id, message);
+        }
         for filter in session.subscriptions.keys() {
             state.trie.remove(filter, key)
         }
@@ -1315,16 +1433,30 @@ fn update_retained(
         .sum::<usize>();
     let new_bytes = message.bytes();
     let replacing = old_bytes != 0;
-    if (!replacing && state.retained.len() >= limits.max_retained_messages)
-        || (!replacing && tenant_count >= limits.max_retained_messages_per_tenant)
+    let (tenant_reserved_count, tenant_reserved_bytes) = state
+        .retained_reserved_tenants
+        .get(&owner.tenant_id)
+        .copied()
+        .unwrap_or_default();
+    if (!replacing
+        && state
+            .retained
+            .len()
+            .saturating_add(state.retained_reserved_count)
+            >= limits.max_retained_messages)
+        || (!replacing
+            && tenant_count.saturating_add(tenant_reserved_count)
+                >= limits.max_retained_messages_per_tenant)
         || state
             .retained_bytes
             .saturating_sub(old_bytes)
             .saturating_add(new_bytes)
+            .saturating_add(state.retained_reserved_bytes)
             > limits.max_retained_bytes
         || tenant_bytes
             .saturating_sub(old_bytes)
             .saturating_add(new_bytes)
+            .saturating_add(tenant_reserved_bytes)
             > limits.max_retained_bytes_per_tenant
     {
         return Err(Error::Overloaded);
@@ -1341,6 +1473,84 @@ fn update_retained(
         },
     );
     Ok(())
+}
+
+fn reserve_retained(
+    state: &mut BrokerState,
+    tenant: &TenantId,
+    message: &BrokerMessage,
+    limits: &Limits,
+) -> Result<()> {
+    if !message.retain || message.payload.is_empty() {
+        return Ok(());
+    }
+    if message.payload.len() > limits.max_retained_message_bytes {
+        return Err(Error::Overloaded);
+    }
+    let bytes = message.bytes();
+    let tenant_count = state
+        .retained
+        .values()
+        .filter(|entry| &entry.tenant_id == tenant)
+        .count();
+    let tenant_bytes = state
+        .retained
+        .values()
+        .filter(|entry| &entry.tenant_id == tenant)
+        .map(|entry| entry.message.bytes())
+        .sum::<usize>();
+    let reserved = state
+        .retained_reserved_tenants
+        .get(tenant)
+        .copied()
+        .unwrap_or_default();
+    if state
+        .retained
+        .len()
+        .saturating_add(state.retained_reserved_count)
+        >= limits.max_retained_messages
+        || state
+            .retained_bytes
+            .saturating_add(state.retained_reserved_bytes)
+            .saturating_add(bytes)
+            > limits.max_retained_bytes
+        || tenant_count.saturating_add(reserved.0) >= limits.max_retained_messages_per_tenant
+        || tenant_bytes
+            .saturating_add(reserved.1)
+            .saturating_add(bytes)
+            > limits.max_retained_bytes_per_tenant
+    {
+        return Err(Error::Overloaded);
+    }
+    state.retained_reserved_count += 1;
+    state.retained_reserved_bytes += bytes;
+    let tenant_reserved = state
+        .retained_reserved_tenants
+        .entry(tenant.clone())
+        .or_default();
+    tenant_reserved.0 += 1;
+    tenant_reserved.1 += bytes;
+    Ok(())
+}
+
+fn release_retained_reservation(
+    state: &mut BrokerState,
+    tenant: &TenantId,
+    message: &BrokerMessage,
+) {
+    if !message.retain || message.payload.is_empty() {
+        return;
+    }
+    let bytes = message.bytes();
+    state.retained_reserved_count = state.retained_reserved_count.saturating_sub(1);
+    state.retained_reserved_bytes = state.retained_reserved_bytes.saturating_sub(bytes);
+    if let Some(reserved) = state.retained_reserved_tenants.get_mut(tenant) {
+        reserved.0 = reserved.0.saturating_sub(1);
+        reserved.1 = reserved.1.saturating_sub(bytes);
+        if *reserved == (0, 0) {
+            state.retained_reserved_tenants.remove(tenant);
+        }
+    }
 }
 
 pub fn topic_matches(filter: &str, topic: &str) -> bool {
@@ -1387,9 +1597,7 @@ fn write_recovery(
     fs::create_dir_all(directory).map_err(|_| Error::Storage)?;
     set_directory_permissions(directory)?;
     let payload = serde_json::to_vec(snapshot).map_err(|_| Error::Internal)?;
-    if payload.len() > limits.spool_record_max_bytes
-        || payload.len().saturating_add(48) > limits.spool_max_bytes
-    {
+    if payload.len().saturating_add(52) > limits.mqtt_recovery_max_bytes {
         return Err(Error::Overloaded);
     }
     let temporary = directory.join(format!(".{RECOVERY_FILE}.tmp"));
@@ -1419,7 +1627,7 @@ fn read_recovery(directory: &Path, limits: &Limits) -> Result<Option<MqttRecover
     }
     let size = usize::try_from(fs::metadata(&path).map_err(|_| Error::Storage)?.len())
         .map_err(|_| Error::Overloaded)?;
-    if size < 52 || size > limits.spool_max_bytes || size > limits.spool_segment_max_bytes {
+    if size < 52 || size > limits.mqtt_recovery_max_bytes {
         return Err(Error::Invalid);
     }
     let mut bytes = Vec::with_capacity(size);
@@ -1438,7 +1646,7 @@ fn read_recovery(directory: &Path, limits: &Limits) -> Result<Option<MqttRecover
         bytes[16..20].try_into().map_err(|_| Error::Invalid)?,
     ))
     .map_err(|_| Error::Invalid)?;
-    if length > limits.spool_record_max_bytes || length.saturating_add(52) != size {
+    if length.saturating_add(52) != size {
         return Err(Error::Invalid);
     }
     let payload_end = 20usize.checked_add(length).ok_or(Error::Invalid)?;
@@ -1583,7 +1791,7 @@ mod tests {
             broker
                 .inbound_qos2_message(&resumed.key, resumed.generation, 7)
                 .unwrap(),
-            Some(message)
+            Some((message, false))
         );
         broker
             .complete_inbound_qos2(&resumed.key, resumed.generation, 7)
@@ -1925,6 +2133,68 @@ mod tests {
                 dup: true
             }) if id == packet_id
         ));
+
+        before_pubcomp
+            .mark_inbound_qos2_event_accepted(&resumed.key, resumed.generation, 77)
+            .unwrap();
+        let accepted_stage = MqttBroker::new(Arc::new(Limits::default()));
+        accepted_stage
+            .restore(before_pubcomp.snapshot().unwrap())
+            .unwrap();
+        let accepted_owner = accepted_stage.attach(&a, "qos2".into(), false).unwrap();
+        assert!(matches!(
+            accepted_stage
+                .inbound_qos2_message(&accepted_owner.key, accepted_owner.generation, 77)
+                .unwrap(),
+            Some((_, true))
+        ));
+    }
+
+    #[tokio::test]
+    async fn recovery_file_supports_legal_state_larger_than_event_spool_record() {
+        let directory = std::env::temp_dir().join(format!(
+            "netbaiot-mqtt-large-recovery-{}-{}",
+            std::process::id(),
+            now_ms()
+        ));
+        fs::create_dir_all(&directory).unwrap();
+        let limits = Arc::new(Limits {
+            max_offline_bytes_per_session: 2_097_152,
+            max_mqtt_session_state_bytes: 4_194_304,
+            ..Limits::default()
+        });
+        let broker = MqttBroker::new(limits.clone());
+        let a = auth("large-recovery");
+        let attachment = broker.attach(&a, "persistent".into(), false).unwrap();
+        broker
+            .subscribe(
+                &attachment.key,
+                attachment.generation,
+                "v1/t/t/p/p/d/large-recovery/#",
+                1,
+            )
+            .unwrap();
+        broker
+            .detach(&attachment.key, attachment.generation, false)
+            .unwrap();
+        for sequence in 0..20u8 {
+            broker
+                .route(
+                    &a.device_key,
+                    BrokerMessage {
+                        topic: "v1/t/t/p/p/d/large-recovery/up".into(),
+                        payload: vec![sequence; 60_000],
+                        qos: 1,
+                        retain: false,
+                    },
+                )
+                .unwrap();
+        }
+        broker.commit_to(&directory).await.unwrap();
+        assert!(fs::metadata(directory.join(RECOVERY_FILE)).unwrap().len() > 1_048_576);
+        let recovered = MqttBroker::new(limits);
+        assert!(recovered.recover_from(&directory).await.unwrap());
+        fs::remove_dir_all(directory).unwrap();
     }
 
     #[tokio::test]

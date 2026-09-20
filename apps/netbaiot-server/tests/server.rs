@@ -1,6 +1,14 @@
-use netbaiot_core::EventId;
-use netbaiot_runtime::{Error, EventAcceptance};
+use async_trait::async_trait;
+use netbaiot_codecs::JsonV1;
+use netbaiot_core::{CodecId, EventId, SinkId, Transport};
+use netbaiot_protocol::RouteDefinition;
+use netbaiot_runtime::{
+    AuthCache, CodecRegistry, ConfigCache, DeliveryEnvelope, Error, EventAcceptance, EventBus,
+    EventSink, Ingress, Lifecycle, Limits, Metrics, Sessions, SinkAck, SinkDefinition,
+    SinkDeliveryMode, SinkError, StaticAuthenticator,
+};
 use netbaiot_server::{Config, TlsFiles, read_config, run, tls_acceptor};
+use netbaiot_transports::{Services, serve_stream};
 use std::{
     collections::HashSet,
     process::Stdio,
@@ -19,6 +27,57 @@ use tokio_rustls::{TlsConnector, rustls};
 use tokio_util::sync::CancellationToken;
 fn config() -> Config {
     serde_json::from_str(include_str!("../../../configs/development.json")).unwrap()
+}
+
+struct TlsTestSink;
+
+#[async_trait]
+impl EventSink for TlsTestSink {
+    async fn deliver(&self, _: DeliveryEnvelope) -> std::result::Result<SinkAck, SinkError> {
+        Ok(SinkAck)
+    }
+}
+
+fn tls_test_services(limits: Limits, stop: CancellationToken) -> (Arc<Ingress>, Arc<Services>) {
+    let limits = Arc::new(limits);
+    let metrics = Arc::new(Metrics::default());
+    let lifecycle = Arc::new(Lifecycle::starting());
+    lifecycle.mark_running().unwrap();
+    let sink_id = SinkId::new("tls-test").unwrap();
+    let events = EventBus::new(
+        limits.clone(),
+        metrics.clone(),
+        vec![SinkDefinition::bounded(
+            sink_id.clone(),
+            SinkDeliveryMode::ConfirmedRequired,
+            Arc::new(TlsTestSink),
+            &limits,
+        )],
+        vec![RouteDefinition {
+            tenant: None,
+            sinks: vec![sink_id],
+        }],
+        1,
+    )
+    .unwrap();
+    let provider = StaticAuthenticator::new(config().credentials, &limits).unwrap();
+    let ingress = Arc::new(Ingress::new(
+        limits.clone(),
+        AuthCache::new(provider, limits.clone(), metrics.clone()),
+        CodecRegistry::new(vec![(
+            CodecId::new("netbaiot-json").unwrap(),
+            1,
+            Arc::new(JsonV1::default()),
+        )])
+        .unwrap(),
+        events,
+        ConfigCache::empty(limits.clone()),
+        metrics,
+        Sessions::new(limits),
+        lifecycle,
+    ));
+    let services = Services::new(ingress.clone(), stop);
+    (ingress, services)
 }
 #[test]
 fn public_streams_require_tls_and_volatile_store_requires_loopback() {
@@ -154,44 +213,36 @@ async fn audit_tls_handshake_timeout_shutdown_and_invalid_key() {
         .await
         .is_err()
     );
-    let mut c = config();
-    let recovery =
-        std::env::temp_dir().join(format!("netbaiot-audit-tls-{}", uuid::Uuid::new_v4()));
-    c.spool_directory = recovery.clone();
-    c.device_http = "127.0.0.1:0".parse().unwrap();
-    c.management_http = "127.0.0.1:0".parse().unwrap();
-    c.tcp = c.device_http;
-    c.udp = c.device_http;
-    let reservation = TcpListener::bind("127.0.0.1:0").await.unwrap();
-    c.mqtt = reservation.local_addr().unwrap();
-    drop(reservation);
-    let address = c.mqtt;
-    c.limits.connect_timeout_ms = 40;
-    c.limits.shutdown_timeout_ms = 100;
-    c.tls = Some(TlsFiles {
+    let tls = tls_acceptor(&TlsFiles {
         certificate: root.join("localhost-cert.pem").to_str().unwrap().into(),
         private_key: root.join("localhost-key.pem").to_str().unwrap().into(),
-    });
-    let stop = CancellationToken::new();
-    let task = tokio::spawn(run(c, stop.clone()));
-    let mut socket = tokio::time::timeout(Duration::from_secs(2), async {
-        loop {
-            if let Ok(socket) = tokio::net::TcpStream::connect(address).await {
-                break socket;
-            }
-            tokio::time::sleep(Duration::from_millis(5)).await;
-        }
     })
     .await
     .unwrap();
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let limits = Limits {
+        connect_timeout_ms: 40,
+        shutdown_timeout_ms: 100,
+        ..Limits::default()
+    };
+    let stop = CancellationToken::new();
+    let (ingress, services) = tls_test_services(limits, stop.child_token());
+    let task = tokio::spawn(serve_stream(
+        listener,
+        Transport::Mqtt,
+        services,
+        Some(tls),
+        stop.child_token(),
+    ));
+    let mut socket = TcpStream::connect(address).await.unwrap();
     let mut b = [0];
-    assert_eq!(
+    assert!(matches!(
         tokio::time::timeout(Duration::from_secs(1), socket.read(&mut b))
             .await
-            .unwrap()
             .unwrap(),
-        0
-    );
+        Ok(0) | Err(_)
+    ));
     let mut pending = tokio::net::TcpStream::connect(address).await.unwrap();
     stop.cancel();
     tokio::time::timeout(Duration::from_secs(1), task)
@@ -200,7 +251,7 @@ async fn audit_tls_handshake_timeout_shutdown_and_invalid_key() {
         .unwrap()
         .unwrap();
     assert!(matches!(pending.read(&mut b).await, Ok(0) | Err(_)));
-    let _ = std::fs::remove_dir_all(recovery);
+    ingress.events.stop_workers().await.unwrap();
 }
 
 async fn free_address() -> std::net::SocketAddr {
@@ -841,6 +892,26 @@ async fn exercise_graceful_restart_spool_replay(healthy_cycles: u32, dwell_per_c
 
     let mut first = start_child(&config_path, &admin).await;
     wait_ready(&client, c.management_http, &admin).await;
+    let mqtt_topic = "v1/t/demo/p/sensor/d/device-1/up";
+    let mqtt_payload = br#"{"schema_version":1,"source_message_id":"combined-restart","kind":"heartbeat","data":{"sequence":99}}"#;
+    let mut persistent = mqtt_open(c.mqtt, "combined-restart", false).await;
+    assert_eq!(mqtt_read(&mut persistent).await, (0x20, vec![0, 0]));
+    persistent
+        .write_all(&mqtt_subscribe(1, mqtt_topic, 1))
+        .await
+        .unwrap();
+    assert_eq!(mqtt_read(&mut persistent).await, (0x90, vec![0, 1, 1]));
+    persistent.write_all(&[0xe0, 0]).await.unwrap();
+    drop(persistent);
+    let mut mqtt_publisher = mqtt_open(c.mqtt, "combined-publisher", true).await;
+    assert_eq!(mqtt_read(&mut mqtt_publisher).await, (0x20, vec![0, 0]));
+    mqtt_publisher
+        .write_all(&mqtt_publish(2, mqtt_topic, mqtt_payload, 1, true))
+        .await
+        .unwrap();
+    assert_eq!(mqtt_read(&mut mqtt_publisher).await, (0x40, vec![0, 2]));
+    mqtt_publisher.write_all(&[0xe0, 0]).await.unwrap();
+    drop(mqtt_publisher);
     let mut accepted = HashSet::new();
     for sequence in 0..3 {
         let response = client
@@ -875,9 +946,45 @@ async fn exercise_graceful_restart_spool_replay(healthy_cycles: u32, dwell_per_c
             == Some("spool")
     }));
 
+    // Two more unavailable generations must atomically replace the same
+    // authoritative snapshot rather than appending duplicate responsibilities.
+    for _ in 0..2 {
+        let mut unavailable = start_child(&config_path, &admin).await;
+        wait_ready(&client, c.management_http, &admin).await;
+        request_drain(&client, c.management_http, &admin).await;
+        assert!(
+            tokio::time::timeout(Duration::from_secs(5), unavailable.wait())
+                .await
+                .unwrap()
+                .unwrap()
+                .success()
+        );
+        let committed = std::fs::read_dir(&c.spool_directory)
+            .unwrap()
+            .filter_map(|entry| entry.ok())
+            .filter(|entry| {
+                entry.path().extension().and_then(|value| value.to_str()) == Some("spool")
+            })
+            .count();
+        assert_eq!(committed, 1);
+    }
+
     healthy.store(true, Ordering::Relaxed);
     let mut second = start_child(&config_path, &admin).await;
     wait_ready(&client, c.management_http, &admin).await;
+    let mut persistent = mqtt_open(c.mqtt, "combined-restart", false).await;
+    assert_eq!(mqtt_read(&mut persistent).await, (0x20, vec![1, 0]));
+    let (first, body) = mqtt_read(&mut persistent).await;
+    assert_eq!(first & 0xf0, 0x30);
+    assert_eq!(first & 0x08, 0);
+    let packet_id = mqtt_publish_id(&body);
+    assert!(body.ends_with(mqtt_payload));
+    persistent
+        .write_all(&[0x40, 2, (packet_id >> 8) as u8, packet_id as u8])
+        .await
+        .unwrap();
+    persistent.write_all(&[0xe0, 0]).await.unwrap();
+    drop(persistent);
     tokio::time::timeout(Duration::from_secs(5), async {
         loop {
             let found = observed
@@ -886,7 +993,7 @@ async fn exercise_graceful_restart_spool_replay(healthy_cycles: u32, dwell_per_c
                 .iter()
                 .copied()
                 .collect::<HashSet<_>>();
-            if accepted.is_subset(&found) {
+            if accepted.is_subset(&found) && found.len() > accepted.len() {
                 break;
             }
             tokio::time::sleep(Duration::from_millis(20)).await;
@@ -894,6 +1001,19 @@ async fn exercise_graceful_restart_spool_replay(healthy_cycles: u32, dwell_per_c
     })
     .await
     .unwrap();
+    assert_eq!(observed.lock().unwrap().len(), accepted.len() + 1);
+    for event_id in &accepted {
+        assert_eq!(
+            observed
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|candidate| *candidate == event_id)
+                .count(),
+            1,
+            "one durable responsibility must be delivered once after repeated unavailable restarts"
+        );
+    }
     client
         .post(format!("http://{}/api/v1/drain", c.management_http))
         .bearer_auth(&admin)

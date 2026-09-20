@@ -331,13 +331,17 @@ pub async fn connection(
                             }
                         }
                         Packet::Pubrel(id) => {
-                            if let Some(message) = services.mqtt.inbound_qos2_message(&attachment.key, attachment.generation, id)? {
-                                // EventAccepted is the MQTT receiver's application-delivery point.
-                                // Fence the packet identifier immediately afterwards so a failed
-                                // write/reconnect cannot emit a second DeviceEvent for this QoS2 flow.
-                                accept_iot_publish(&services, &auth, &message, validated_at, validation_us).await?;
-                                services.mqtt.complete_inbound_qos2(&attachment.key, attachment.generation, id)?;
-                                services.mqtt.route(&auth.device_key, message)?;
+                            if let Some((message, event_accepted)) = services.mqtt.inbound_qos2_message(&attachment.key, attachment.generation, id)? {
+                                if !event_accepted {
+                                    accept_iot_publish(&services, &auth, &message, validated_at, validation_us).await?;
+                                    services.mqtt.mark_inbound_qos2_event_accepted(&attachment.key, attachment.generation, id)?;
+                                }
+                                services.mqtt.route_inbound_qos2(
+                                    &attachment.key,
+                                    attachment.generation,
+                                    id,
+                                    &auth.device_key,
+                                )?;
                             }
                             send(&mut stream, &services, &ack(0x70, id)).await?;
                         }

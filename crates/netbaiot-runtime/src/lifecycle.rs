@@ -54,8 +54,13 @@ impl Lifecycle {
 
     pub async fn begin_quiesce(&self) -> Result<()> {
         self.transition(LifecycleState::Running, LifecycleState::Quiescing)?;
-        while self.active_admissions.load(Ordering::Acquire) != 0 {
-            self.changed.notified().await;
+        loop {
+            let notified = self.changed.notified();
+            tokio::pin!(notified);
+            if self.active_admissions.load(Ordering::Acquire) == 0 {
+                break;
+            }
+            notified.await;
         }
         self.transition(LifecycleState::Quiescing, LifecycleState::Draining)
     }
