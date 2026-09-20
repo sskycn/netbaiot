@@ -2,7 +2,7 @@
 
 ## 1. Baseline commit
 
-`ca06963eeb5291b5ae7c165ff2c86570242c1ea4`.
+`b337c1127d1640b32f0518e38e016872dede6653`.
 
 ## 2. Final commit
 
@@ -78,9 +78,10 @@ known router scaling limitation.
 ## 13. LWT
 
 Will Topic, binary payload, QoS0/1/2, retain, size and ACL are validated at CONNECT.
-EOF/error/timeout/replacement publish once. DISCONNECT and planned shutdown suppress
-Will. Paho validated retained QoS2 Will and normal-disconnect suppression; raw socket
-tests validated abnormal QoS1 Will and planned shutdown.
+EOF/error/timeout/replacement and planned server shutdown publish once. Only an MQTT
+DISCONNECT deletes the Will without publication. Raw socket tests validate abnormal,
+takeover, normal-DISCONNECT, and planned-shutdown/restart behavior; Mosquitto CLI
+validates QoS0/1/2 retained Wills.
 
 ## 14. Inbound QoS0
 
@@ -191,16 +192,22 @@ received payload with RETAIN=1. Recovery checksum/version corruption tests pass.
 
 ## 32. Interoperability results
 
-Paho MQTT 2.1.0 using MQTTv311 passed CleanSession connections, QoS0/1/2, exact,
-`+`, `#`, unsubscribe, retained wildcard replay/delete, persistent offline QoS1/2,
-retained QoS0/1/2 Wills, abrupt close, and normal DISCONNECT suppression. Mosquitto
-tools were not installed. No external broker is a runtime dependency.
+Mosquitto 2.1.2 clients, explicitly using `-V mqttv311`, passed authentication,
+QoS0/1/2, exact/`+`/`#`, unsubscribe, retained replay/replace/delete, persistent
+offline QoS1/2, and retained QoS0/1/2 Wills. Verified TLS passed with the test CA and
+an untrusted self-signed endpoint was rejected. The isolated Mosquitto 2.1.2 broker
+differential matrix passed CONNECT, session state, QoS0/1/2, subscribe/re-subscribe/
+unsubscribe, retained, Will, duplicate ClientId, keepalive, malformed flags, and
+unknown-ID classifications. Paho is not installed in the current environment; the
+historical Paho 2.1.0 evidence remains non-current. No external broker is a runtime
+dependency.
 
 ## 33. Conformance checklist
 
 The evidence-linked checklist is [mqtt-3.1.1-conformance.md](mqtt-3.1.1-conformance.md).
-All in-scope MQTT 3.1.1 control flows are supported under the documented NetbaIoT
-topic/identity profile; MQTT 5 and listed extensions remain excluded.
+All 125 applicable server normative statements are PASS under the documented
+NetbaIoT topic/identity profile. Sixteen client-only, WebSocket, bridge, or outbound-
+broker statements are NOT_APPLICABLE. MQTT 5 and listed extensions remain excluded.
 
 ## 34. Fuzz results
 

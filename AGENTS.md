@@ -170,8 +170,9 @@ spool state until the corresponding required work is acknowledged.
 
 Inflight delivery without observed ACK is uncertain and must be spooled; replay may
 duplicate it. If spool write, capacity, checksum, fsync, or rename fails while
-accepted required work remains, shutdown must return failure and must not claim a
-successful graceful exit.
+accepted required work remains, the process must remain alive and unready, retain
+ownership, and retry at a bounded cadence. It must not claim a successful graceful
+exit until the durable commit succeeds.
 
 Abrupt process/machine/power failure may lose a bounded amount of non-spooled memory
 traffic. This is intentional and must be documented honestly; do not claim crash
@@ -276,6 +277,12 @@ not EventId, and is reusable only after its lifecycle completes. MQTT QoS2 is no
 business exactly-once promise.
 
 Will topic/payload/QoS/retain and retained state are validated, authorized, and
-bounded. Planned shutdown suppresses Will and atomically snapshots required MQTT
-protocol state. Reconnect must authenticate before restoring it. Abrupt crash may
-lose recent in-memory MQTT state. No runtime broker or database is required.
+bounded. A planned shutdown publishes each live connection's Will before atomically
+snapshotting required MQTT protocol state; only MQTT DISCONNECT suppresses that
+Will. Reconnect must authenticate before restoring state. Abrupt crash may lose
+recent in-memory MQTT state. No runtime broker or database is required.
+
+MQTT 3.1.1 behavior changes require conformance regression against raw
+state-machine tests and at least one mature external MQTT client. Mosquitto is a
+test/reference implementation only and must never become a NetbaIoT runtime
+dependency.

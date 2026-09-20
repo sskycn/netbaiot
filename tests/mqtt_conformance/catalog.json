@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "protocol": "MQTT 3.1.1 with Errata 01",
+  "expected_result": "PASS",
+  "netbaiot_raw": [
+    "CONNECT-001",
+    "CONNECT-002",
+    "CONNECT-003",
+    "CONNACK-001",
+    "CONNECT-004",
+    "CONNECT-005",
+    "SEQUENCE-001",
+    "HEADER-001",
+    "FRAMING-001",
+    "REMAINING-001",
+    "UTF8-001",
+    "SESSION-001",
+    "SUB-001",
+    "SUB-002",
+    "UNSUB-001",
+    "QOS0-001",
+    "QOS1-001",
+    "QOS1-DUP-001",
+    "QOS2-IN-001",
+    "RETAIN-001",
+    "SUB-RESUB-001",
+    "SESSION-OFFLINE-001",
+    "WILL-001",
+    "WILL-TAKEOVER-001",
+    "KEEPALIVE-001",
+    "SLOWLORIS-001",
+    "SEQUENCE-002",
+    "SECURITY-ACL-001",
+    "SECURITY-SESSION-001",
+    "WILL-SHUTDOWN-001"
+  ],
+  "mosquitto_differential": [
+    "DIFF-CONNECT-001",
+    "DIFF-PING-001",
+    "DIFF-FLAGS-001",
+    "DIFF-UNKNOWN-PUBACK-001",
+    "DIFF-SESSION-001",
+    "DIFF-SUB-001",
+    "DIFF-QOS-001",
+    "DIFF-RETAIN-001",
+    "DIFF-WILL-001",
+    "DIFF-DUPLICATE-CLIENT-001",
+    "DIFF-KEEPALIVE-001"
+  ],
+  "classification_exceptions": {
+    "DIFF-UNKNOWN-PUBACK-001": "IMPLEMENTATION_DEFINED_ALLOWED"
+  }
+}

@@ -125,6 +125,9 @@ async fn process_publish(
     validated_at: Instant,
     validation_us: u64,
 ) -> Result<Option<IngressAcceptance>> {
+    // Authorization must precede every broker-visible side effect. Otherwise an unauthorized
+    // retained or routed publication could be observed before the IoT binding rejects it.
+    publish_acl(auth, &message.topic)?;
     // Broker-side retained/routing admission is the last fallible MQTT responsibility before the
     // unified event crosses EventAccepted. A later broker error must never turn an accepted QoS1
     // DeviceEvent into a producer-visible failure and retransmission.
@@ -247,13 +250,12 @@ pub async fn connection(
     };
     let mut last = Instant::now();
     let mut normal_disconnect = false;
-    let mut planned_shutdown = false;
     let result = async {
         loop {
             let idle = last + keepalive.unwrap_or(Duration::from_millis(limits.idle_timeout_ms));
             tokio::select! {
                 biased;
-                _ = stop.cancelled() => { planned_shutdown = true; break; }
+                _ = stop.cancelled() => break,
                 _ = live_session.cancel.cancelled() => break,
                 _ = attachment.cancel.cancelled() => break,
                 _ = tokio::time::sleep_until(idle) => {
@@ -347,6 +349,9 @@ pub async fn connection(
                         Packet::Publish { topic, payload, qos, packet_id, retain, dup: _ } => {
                             services.ingress.metrics.inc(Metric::MqttPublishes);
                             let message = BrokerMessage { topic, payload: payload.to_vec(), qos, retain };
+                            // QoS2 acknowledges ownership with PUBREC, so authorization must be
+                            // complete before storing the transaction or reserving retained state.
+                            publish_acl(&auth, &message.topic)?;
                             if qos == 2 {
                                 let id = packet_id.ok_or(Error::Invalid)?;
                                 services.mqtt.inbound_qos2(&attachment.key, attachment.generation, id, message)?;
@@ -376,10 +381,7 @@ pub async fn connection(
         attachment.generation,
         connect.clean_session,
     )?;
-    if !normal_disconnect
-        && !planned_shutdown
-        && let Some(will) = connect.will.take()
-    {
+    if !normal_disconnect && let Some(will) = connect.will.take() {
         let _ = publish_will(&services, &auth, will).await;
     }
     machine.transition(ConnectionState::Draining)?;

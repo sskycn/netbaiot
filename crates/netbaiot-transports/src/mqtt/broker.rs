@@ -82,6 +82,9 @@ struct StoredSession {
     offline_bytes: usize,
     inbound_qos2: HashMap<u16, InboundQos2State>,
     outbound: HashMap<u16, OutboundState>,
+    /// Original transmission order for reconnect retransmission (MQTT-4.6.0-1).
+    #[serde(default)]
+    outbound_order: VecDeque<u16>,
     next_packet_id: u16,
     state_bytes: usize,
     last_seen_ms: i64,
@@ -103,6 +106,7 @@ impl StoredSession {
             offline_bytes: 0,
             inbound_qos2: HashMap::new(),
             outbound: HashMap::new(),
+            outbound_order: VecDeque::new(),
             next_packet_id: 1,
             state_bytes,
             last_seen_ms: now_ms(),
@@ -141,6 +145,22 @@ impl StoredSession {
         } else {
             limits.max_inflight_qos2_per_session
         }
+    }
+
+    fn insert_outbound(&mut self, packet_id: u16, state: OutboundState) {
+        if !self.outbound.contains_key(&packet_id) {
+            self.outbound_order.push_back(packet_id);
+        }
+        self.outbound.insert(packet_id, state);
+    }
+
+    fn remove_outbound(&mut self, packet_id: u16) -> Option<OutboundState> {
+        let removed = self.outbound.remove(&packet_id);
+        if removed.is_some() {
+            self.outbound_order
+                .retain(|candidate| *candidate != packet_id);
+        }
+        removed
     }
 }
 
@@ -814,7 +834,7 @@ impl MqttBroker {
             } else {
                 OutboundState::AwaitPubrec(message.clone())
             };
-            session.outbound.insert(id, outbound);
+            session.insert_outbound(id, outbound);
             (
                 BrokerFrame::Publish(BrokerDelivery {
                     message,
@@ -837,27 +857,22 @@ impl MqttBroker {
         let mut state = lock(&self.state)?;
         check_owner(&state, key, generation)?;
         let session = state.sessions.get_mut(key).ok_or(Error::Internal)?;
-        match session.outbound.remove(&packet_id) {
-            Some(OutboundState::AwaitPubrec(message)) => {
-                session
-                    .outbound
-                    .insert(packet_id, OutboundState::AwaitPubcomp(message));
+        match session.outbound.get_mut(&packet_id) {
+            Some(state @ OutboundState::AwaitPubrec(_)) => {
+                let OutboundState::AwaitPubrec(message) = state.clone() else {
+                    return Err(Error::Internal);
+                };
+                *state = OutboundState::AwaitPubcomp(message);
                 Ok(BrokerFrame::Pubrel {
                     packet_id,
                     dup: false,
                 })
             }
-            Some(state @ OutboundState::AwaitPubcomp(_)) => {
-                session.outbound.insert(packet_id, state);
-                Ok(BrokerFrame::Pubrel {
-                    packet_id,
-                    dup: true,
-                })
-            }
-            Some(other) => {
-                session.outbound.insert(packet_id, other);
-                Err(Error::Invalid)
-            }
+            Some(OutboundState::AwaitPubcomp(_)) => Ok(BrokerFrame::Pubrel {
+                packet_id,
+                dup: true,
+            }),
+            Some(OutboundState::AwaitPuback(_)) => Err(Error::Invalid),
             None => Err(Error::Invalid),
         }
     }
@@ -876,14 +891,14 @@ impl MqttBroker {
         let mut state = lock(&self.state)?;
         check_owner(&state, key, generation)?;
         let session = state.sessions.get_mut(key).ok_or(Error::Internal)?;
-        let Some(outbound) = session.outbound.remove(&packet_id) else {
+        let Some(outbound) = session.outbound.get(&packet_id) else {
             return Err(Error::Invalid);
         };
         let expected = matches!(outbound, OutboundState::AwaitPubcomp(_)) == qos2;
         if !expected {
-            session.outbound.insert(packet_id, outbound);
             return Err(Error::Invalid);
         }
+        let outbound = session.remove_outbound(packet_id).ok_or(Error::Internal)?;
         let charge = outbound.bytes();
         session.state_bytes = session.state_bytes.saturating_sub(charge);
         state.session_bytes = state.session_bytes.saturating_sub(charge);
@@ -959,6 +974,25 @@ impl MqttBroker {
         };
         for mut session in snapshot.sessions {
             session.active_generation = None;
+            if session.outbound_order.is_empty() && !session.outbound.is_empty() {
+                let mut packet_ids = session.outbound.keys().copied().collect::<Vec<_>>();
+                packet_ids.sort_unstable();
+                session.outbound_order = packet_ids.into();
+            }
+            let ordered_ids = session
+                .outbound_order
+                .iter()
+                .copied()
+                .collect::<std::collections::HashSet<_>>();
+            if ordered_ids.len() != session.outbound_order.len()
+                || ordered_ids.len() != session.outbound.len()
+                || !session
+                    .outbound
+                    .keys()
+                    .all(|packet_id| ordered_ids.contains(packet_id))
+            {
+                return Err(Error::Invalid);
+            }
             if replacement.sessions.contains_key(&session.key) {
                 return Err(Error::Invalid);
             }
@@ -1243,7 +1277,8 @@ fn resume_frames(
     let mut resumed_bytes = 0usize;
     let mut promoted_qos1 = 0usize;
     let mut promoted_qos2 = 0usize;
-    for (packet_id, state) in &session.outbound {
+    for packet_id in &session.outbound_order {
+        let state = session.outbound.get(packet_id).ok_or(Error::Internal)?;
         frames.push(match state {
             OutboundState::AwaitPuback(message) | OutboundState::AwaitPubrec(message) => {
                 BrokerFrame::Publish(BrokerDelivery {
@@ -1289,7 +1324,7 @@ fn resume_frames(
         } else {
             OutboundState::AwaitPubrec(message.clone())
         };
-        session.outbound.insert(id, state);
+        session.insert_outbound(id, state);
         frames.push(BrokerFrame::Publish(BrokerDelivery {
             message,
             packet_id: Some(id),
@@ -1351,7 +1386,7 @@ fn enqueue(
             } else {
                 OutboundState::AwaitPubrec(message.clone())
             };
-            session.outbound.insert(id, outbound);
+            session.insert_outbound(id, outbound);
             session.state_bytes += charge;
             state.session_bytes += charge;
             (
@@ -1372,7 +1407,7 @@ fn enqueue(
     if let Some(id) = packet_id
         && let Some(session) = state.sessions.get_mut(key)
     {
-        session.outbound.remove(&id);
+        session.remove_outbound(id);
         session.state_bytes = session.state_bytes.saturating_sub(charge);
         state.session_bytes = state.session_bytes.saturating_sub(charge);
     }
@@ -1472,7 +1507,7 @@ fn preflight_retained_replay(
             global_offline_bytes += charge;
         } else {
             let packet_id = session.allocate_packet_id()?;
-            session.outbound.insert(
+            session.insert_outbound(
                 packet_id,
                 if message.qos == 1 {
                     OutboundState::AwaitPuback(message.clone())
@@ -1693,7 +1728,7 @@ fn release_retained_reservation(
 }
 
 pub fn topic_matches(filter: &str, topic: &str) -> bool {
-    if topic.starts_with('$') && (filter == "#" || filter.starts_with("+/")) {
+    if topic.starts_with('$') && (filter == "#" || filter == "+" || filter.starts_with("+/")) {
         return false;
     }
     let filters = filter.split('/').collect::<Vec<_>>();
@@ -1870,6 +1905,8 @@ mod tests {
         assert!(topic_matches("sport/#", "sport"));
         assert!(topic_matches("sport/#", "sport/a/b"));
         assert!(!topic_matches("#", "$SYS/status"));
+        assert!(!topic_matches("+", "$SYS"));
+        assert!(!topic_matches("+/status", "$SYS/status"));
         assert!(topic_matches("$SYS/#", "$SYS/status"));
         let mut trie = SubscriptionTrie::default();
         let a = SessionKey {
@@ -2070,6 +2107,50 @@ mod tests {
             resumed.receiver.recv().await,
             Some(BrokerFrame::Publish(_))
         ));
+    }
+
+    #[tokio::test]
+    async fn persistent_reconnect_retransmits_outbound_in_original_order() {
+        let broker = MqttBroker::new(Arc::new(Limits::default()));
+        let device = auth("a");
+        let topic = "v1/t/t/p/p/d/a/up";
+        let mut attachment = broker.attach(&device, "ordered".into(), false).unwrap();
+        broker
+            .subscribe(&attachment.key, attachment.generation, topic, 1)
+            .unwrap();
+
+        let mut expected = Vec::new();
+        for sequence in 0u8..16 {
+            broker
+                .route(
+                    &device.device_key,
+                    BrokerMessage {
+                        topic: topic.into(),
+                        payload: vec![sequence],
+                        qos: 1,
+                        retain: false,
+                    },
+                )
+                .unwrap();
+            let BrokerFrame::Publish(delivery) = attachment.receiver.recv().await.unwrap() else {
+                panic!("expected publish")
+            };
+            expected.push((delivery.packet_id.unwrap(), delivery.message.payload));
+        }
+        broker
+            .detach(&attachment.key, attachment.generation, false)
+            .unwrap();
+
+        let mut resumed = broker.attach(&device, "ordered".into(), false).unwrap();
+        assert!(resumed.session_present);
+        for (packet_id, payload) in expected {
+            let BrokerFrame::Publish(delivery) = resumed.receiver.recv().await.unwrap() else {
+                panic!("expected retransmitted publish")
+            };
+            assert_eq!(delivery.packet_id, Some(packet_id));
+            assert_eq!(delivery.message.payload, payload);
+            assert!(delivery.dup);
+        }
     }
 
     #[test]

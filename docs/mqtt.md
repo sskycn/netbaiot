@@ -47,8 +47,10 @@ simplicity is measured and listed as a scaling limitation.
 Will Topic, binary payload, QoS, retain flag, size, syntax, and authorization are
 validated during CONNECT. EOF, network/protocol error, keepalive timeout, and
 connection replacement publish the Will once. DISCONNECT and planned server
-shutdown suppress it. Intentional restart closes sockets without manufacturing a
-client failure.
+shutdown are deliberately different: MQTT DISCONNECT deletes the Will, while a
+planned server shutdown publishes the Will before the recovery snapshot. This
+follows MQTT-3.1.2-8; orderly process shutdown is not an MQTT DISCONNECT from the
+client.
 
 For regular QoS0/QoS1 canonical uplinks, retained mutation and bounded broker routing
 run before the IoT binding crosses `EventAccepted`; no later broker-side failure can
