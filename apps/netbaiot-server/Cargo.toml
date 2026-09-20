@@ -8,7 +8,6 @@ license.workspace = true
 netbaiot-core.workspace = true
 netbaiot-runtime.workspace = true
 netbaiot-codecs.workspace = true
-netbaiot-storage.workspace = true
 netbaiot-transports.workspace = true
 async-trait.workspace = true
 serde.workspace = true
@@ -20,6 +19,11 @@ tracing-subscriber.workspace = true
 tokio-rustls.workspace = true
 rustls-pemfile.workspace = true
 reqwest.workspace = true
+sha2.workspace = true
+subtle.workspace = true
 
 [lints]
 workspace = true
+
+[dev-dependencies]
+uuid.workspace = true

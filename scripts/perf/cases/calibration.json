@@ -1,1 +1,0 @@
-{"name":"generator_calibration","load":{"connections":100,"duration_secs":10,"publish_rate":10,"command_rate":4,"command_concurrency":2,"ramp_per_sec":500,"warmup_secs":2,"cooldown_secs":3,"payload_bytes":1024},"sample_secs":1,"cooldown_secs":2,"rust_log":"warn,sqlx::pool::acquire=debug,netbaiot_transports::mqtt=debug","sql_trace":true}

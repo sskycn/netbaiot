@@ -13,7 +13,6 @@ rust-version = "1.88"
 netbaiot-core = { path = "crates/netbaiot-core" }
 netbaiot-runtime = { path = "crates/netbaiot-runtime" }
 netbaiot-codecs = { path = "crates/netbaiot-codecs" }
-netbaiot-storage = { path = "crates/netbaiot-storage" }
 netbaiot-transports = { path = "crates/netbaiot-transports" }
 async-trait = "0.1"
 bytes = "1"
@@ -28,7 +27,6 @@ tokio-util = { version = "0.7", features = ["rt"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 uuid = { version = "1", features = ["v4", "serde"] }
-sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio-rustls", "postgres", "json", "uuid", "migrate", "macros"] }
 hyper = { version = "1", features = ["server", "http1"] }
 hyper-util = { version = "0.1", features = ["tokio"] }
 http-body-util = "0.1"

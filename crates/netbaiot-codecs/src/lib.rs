@@ -32,6 +32,7 @@ enum Kind {
     Telemetry,
     Event,
     Heartbeat,
+    ConfigAck,
     CommandAck,
 }
 struct UniqueFields(std::collections::BTreeMap<String, Scalar>);
@@ -130,23 +131,28 @@ fn scalar(s: &Scalar, limit: usize) -> bool {
     }
 }
 impl JsonV1 {
-    fn validate(&self, payload: &DevicePayload) -> bool {
+    fn validate(&self, payload: &DeviceEventKind) -> bool {
         let l = &self.limits;
         match payload {
-            DevicePayload::Telemetry(fields) => {
+            DeviceEventKind::Telemetry(fields) => {
                 !fields.is_empty()
                     && fields.len() <= l.fields
                     && fields.iter().all(|(k, v)| {
                         !k.is_empty() && valid_text(k, l.field_bytes) && scalar(v, l.field_bytes)
                     })
             }
-            DevicePayload::Event(e) => {
+            DeviceEventKind::DeviceEvent(e) => {
                 !e.name.is_empty()
                     && valid_text(&e.name, l.field_bytes)
                     && e.value.as_ref().is_none_or(|v| scalar(v, l.field_bytes))
             }
-            DevicePayload::Heartbeat(_) => true,
-            DevicePayload::CommandAck(a) => a.execution != ExecutionState::Unknown,
+            DeviceEventKind::Heartbeat(_) => true,
+            DeviceEventKind::ConfigAck(a) => a
+                .error
+                .as_ref()
+                .is_none_or(|value| valid_text(value, l.field_bytes)),
+            DeviceEventKind::CommandAck(a) => a.execution != ExecutionState::Unknown,
+            DeviceEventKind::Connected(_) | DeviceEventKind::Disconnected(_) => false,
         }
     }
 }
@@ -155,7 +161,7 @@ impl DeviceCodec for JsonV1 {
         &self,
         ctx: &DecodeContext<'_>,
         payload: &[u8],
-    ) -> Result<Vec<DeviceMessage>, CodecError> {
+    ) -> Result<Vec<netbaiot_core::DeviceEvent>, CodecError> {
         if payload.len() > self.limits.input_bytes
             || payload.len() > self.limits.decoded_bytes
             || self.limits.output_messages == 0
@@ -166,18 +172,21 @@ impl DeviceCodec for JsonV1 {
         check_members(payload, self.limits.fields.saturating_add(8))?;
         let wire: WireMessage<'_> = serde_json::from_slice(payload).map_err(|_| CodecError)?;
         let decoded = match wire.kind {
-            Kind::Telemetry => DevicePayload::Telemetry(
+            Kind::Telemetry => DeviceEventKind::Telemetry(
                 serde_json::from_str::<UniqueFields>(wire.data.get())
                     .map_err(|_| CodecError)?
                     .0,
             ),
-            Kind::Event => {
-                DevicePayload::Event(serde_json::from_str(wire.data.get()).map_err(|_| CodecError)?)
-            }
-            Kind::Heartbeat => DevicePayload::Heartbeat(
+            Kind::Event => DeviceEventKind::DeviceEvent(
                 serde_json::from_str(wire.data.get()).map_err(|_| CodecError)?,
             ),
-            Kind::CommandAck => DevicePayload::CommandAck(
+            Kind::Heartbeat => DeviceEventKind::Heartbeat(
+                serde_json::from_str(wire.data.get()).map_err(|_| CodecError)?,
+            ),
+            Kind::ConfigAck => DeviceEventKind::ConfigAck(
+                serde_json::from_str(wire.data.get()).map_err(|_| CodecError)?,
+            ),
+            Kind::CommandAck => DeviceEventKind::CommandAck(
                 serde_json::from_str(wire.data.get()).map_err(|_| CodecError)?,
             ),
         };
@@ -187,13 +196,13 @@ impl DeviceCodec for JsonV1 {
         {
             return Err(CodecError);
         }
-        Ok(vec![DeviceMessage {
-            message_id: MessageId::generate(),
+        Ok(vec![netbaiot_core::DeviceEvent {
+            event_id: EventId::generate(),
             source_message_id: wire.source_message_id,
             device: ctx.device.clone(),
             received_at: ctx.received_at,
             occurred_at: wire.occurred_at,
-            payload: decoded,
+            kind: decoded,
         }])
     }
     fn encode(

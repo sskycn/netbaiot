@@ -49,11 +49,14 @@ identifier!(ProductId);
 identifier!(DeviceId);
 identifier!(SourceMessageId);
 identifier!(CodecId);
+identifier!(SinkId);
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct MessageId(pub Uuid);
+pub struct EventId(pub Uuid);
+/// Compatibility name for integrations compiled against the original model.
+pub type MessageId = EventId;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct CommandId(pub Uuid);
-impl MessageId {
+impl EventId {
     pub fn generate() -> Self {
         Self(Uuid::new_v4())
     }
@@ -80,15 +83,31 @@ pub enum Scalar {
 }
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", content = "data", rename_all = "snake_case")]
-pub enum DevicePayload {
+pub enum DeviceEventKind {
     Telemetry(BTreeMap<String, Scalar>),
-    Event(DeviceEvent),
+    DeviceEvent(DeviceEventPayload),
     Heartbeat(Heartbeat),
+    Connected(DeviceConnected),
+    Disconnected(DeviceDisconnected),
+    ConfigAck(ConfigAck),
     CommandAck(CommandAck),
+}
+impl DeviceEventKind {
+    pub const fn event_type(&self) -> &'static str {
+        match self {
+            Self::Telemetry(_) => "telemetry",
+            Self::DeviceEvent(_) => "device_event",
+            Self::Heartbeat(_) => "heartbeat",
+            Self::Connected(_) => "connected",
+            Self::Disconnected(_) => "disconnected",
+            Self::ConfigAck(_) => "config_ack",
+            Self::CommandAck(_) => "command_ack",
+        }
+    }
 }
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct DeviceEvent {
+pub struct DeviceEventPayload {
     pub name: String,
     pub value: Option<Scalar>,
 }
@@ -104,14 +123,38 @@ pub struct CommandAck {
     pub execution: ExecutionState,
 }
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct DeviceMessage {
-    pub message_id: MessageId,
+#[serde(deny_unknown_fields)]
+pub struct DeviceConnected {
+    pub session_generation: u64,
+}
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct DeviceDisconnected {
+    pub session_generation: u64,
+}
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ConfigAck {
+    pub revision: u64,
+    pub status: ConfigApplyStatus,
+    pub error: Option<String>,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ConfigApplyStatus {
+    Applied,
+    Failed,
+}
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct DeviceEvent {
+    pub event_id: EventId,
     pub source_message_id: SourceMessageId,
     pub device: DeviceKey,
     pub received_at: Timestamp,
     pub occurred_at: Option<Timestamp>,
-    pub payload: DevicePayload,
+    pub kind: DeviceEventKind,
 }
+pub type DeviceMessage = DeviceEvent;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum DeliveryState {
@@ -144,30 +187,6 @@ pub struct DeviceCommand {
     pub expires_at: Timestamp,
     pub payload: DeviceCommandPayload,
 }
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct CommandRecord {
-    pub command: DeviceCommand,
-    pub delivery: DeliveryState,
-    pub execution: ExecutionState,
-    pub attempts: u32,
-    /// Storage claim deadline; absent on queued records and older stored JSON.
-    #[serde(default)]
-    pub lease_expires_at: Option<Timestamp>,
-}
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum ReceiptBoundary {
-    Durable,
-    Volatile,
-}
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct IngressReceipt {
-    pub message_id: MessageId,
-    pub source_message_id: SourceMessageId,
-    pub accepted_at: Timestamp,
-    pub boundary: ReceiptBoundary,
-    pub duplicate: bool,
-}
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Transport {
@@ -192,9 +211,14 @@ pub struct Permissions {
 pub struct AuthenticatedDevice {
     pub device_key: DeviceKey,
     pub credential_version: u32,
+    #[serde(default = "default_auth_generation")]
+    pub auth_generation: u64,
     pub codec_id: CodecId,
     pub codec_version: u16,
     pub permissions: Permissions,
+}
+fn default_auth_generation() -> u64 {
+    1
 }
 #[derive(Clone, Debug)]
 pub struct CodecLimits {
@@ -232,7 +256,7 @@ pub trait DeviceCodec: Send + Sync {
         &self,
         ctx: &DecodeContext<'_>,
         payload: &[u8],
-    ) -> Result<Vec<DeviceMessage>, CodecError>;
+    ) -> Result<Vec<DeviceEvent>, CodecError>;
     fn encode(
         &self,
         ctx: &EncodeContext<'_>,

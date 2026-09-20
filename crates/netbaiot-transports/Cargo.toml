@@ -28,9 +28,7 @@ workspace = true
 
 [dev-dependencies]
 netbaiot-codecs.workspace = true
-netbaiot-storage.workspace = true
 uuid.workspace = true
-sqlx.workspace = true
 
 [[bench]]
 name = "foundation"

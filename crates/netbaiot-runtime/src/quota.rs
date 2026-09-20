@@ -90,7 +90,7 @@ impl Connections {
         Arc::new(Self {
             counts: Mutex::new(ConnectionCounts::default()),
             slots: Arc::new(Semaphore::new(limits.max_connections)),
-            memory: ByteBudget::new(limits.max_network_bytes),
+            memory: ByteBudget::new(limits.global_connection_logical_bytes),
             limits,
             metrics,
         })
