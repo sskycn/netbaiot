@@ -4,13 +4,15 @@ use netbaiot_device_sdk::{ConfigUpdate, DeviceClient, DeviceCredentials};
 use netbaiot_protocol::*;
 use netbaiot_server::Config;
 use std::{
+    collections::BTreeMap,
     path::{Path, PathBuf},
     process::Stdio,
     sync::Arc,
     time::{Duration, Instant},
 };
 use tokio::{
-    net::{TcpListener, UdpSocket},
+    io::{AsyncReadExt, AsyncWriteExt},
+    net::{TcpListener, TcpStream, UdpSocket},
     process::{Child, Command},
 };
 
@@ -144,6 +146,46 @@ async fn official_clients_cover_event_command_config_status_and_offline_contract
     let mut server = start_server(&path, &admin, stream_token);
     let business = business_client(&config, &admin, stream_token).await;
     wait_ready(&business).await;
+
+    let mut malformed = TcpStream::connect(config.business_tcp.unwrap())
+        .await
+        .unwrap();
+    malformed.write_all(&[0, 0, 0, 1, b'{']).await.unwrap();
+    let mut response_length = [0u8; 4];
+    malformed.read_exact(&mut response_length).await.unwrap();
+    let mut response = vec![0; usize::try_from(u32::from_be_bytes(response_length)).unwrap()];
+    malformed.read_exact(&mut response).await.unwrap();
+    assert!(matches!(
+        serde_json::from_slice::<StreamServerFrame>(&response).unwrap(),
+        StreamServerFrame::Error {
+            error: ApiError {
+                code: ErrorCode::InvalidRequest,
+                ..
+            },
+            ..
+        }
+    ));
+
+    let rejected = business_client(&config, &admin, "incorrect-stream-token").await;
+    let rejected = rejected.events().subscribe(EventFilter::default()).await;
+    assert!(matches!(rejected, Err(ClientError::Unauthenticated { .. })));
+
+    let rejected_device = DeviceClient::builder()
+        .device(device_key())
+        .credentials(DeviceCredentials::new("unknown-device", DEVICE_SECRET).unwrap())
+        .mqtt_endpoint(format!("mqtt://{}", config.mqtt))
+        .client_id("official-sdk-rejected")
+        .mqtt_connect_timeout(Duration::from_secs(2))
+        .connect()
+        .await;
+    assert!(
+        matches!(
+            &rejected_device,
+            Err(netbaiot_device_sdk::DeviceSdkError::Unauthenticated)
+        ),
+        "unexpected rejected-device result: {rejected_device:?}"
+    );
+
     let mut events = business
         .events()
         .subscribe(EventFilter::default())
@@ -158,7 +200,7 @@ async fn official_clients_cover_event_command_config_status_and_offline_contract
                 .devices()
                 .connection(&device_key())
                 .await
-                .is_ok_and(|value| value.connected)
+                .is_ok_and(|value| value.connected && value.connected_at.is_some())
             {
                 break;
             }
@@ -307,6 +349,7 @@ async fn official_client_reconnects_and_replays_unacked_event_with_same_id() {
         .await
         .unwrap();
     let device = device_client(&config).await;
+    let mut commands = device.commands().unwrap();
     let accepted = device.heartbeat(9).await.unwrap();
     let first_delivery = next_event(&mut events).await;
     assert_eq!(first_delivery.event_id(), accepted.event_id);
@@ -330,6 +373,56 @@ async fn official_client_reconnects_and_replays_unacked_event_with_same_id() {
     ));
     replay.ack().await.unwrap();
 
+    tokio::time::timeout(Duration::from_secs(5), async {
+        loop {
+            if business
+                .devices()
+                .connection(&device_key())
+                .await
+                .is_ok_and(|value| value.connected && value.connected_at.is_some())
+            {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+    })
+    .await
+    .unwrap();
+    device
+        .publish_telemetry(BTreeMap::from([(
+            "restart_probe".into(),
+            Scalar::Boolean(true),
+        )]))
+        .await
+        .unwrap();
+    let after_restart = next_event(&mut events).await;
+    assert!(matches!(
+        after_restart.event().kind,
+        DeviceEventKind::Telemetry(_)
+    ));
+    after_restart.ack().await.unwrap();
+
+    let command_id = CommandId::generate();
+    business
+        .commands()
+        .send(&DeviceCommand {
+            command_id,
+            device: device_key(),
+            expires_at: None,
+            payload: DeviceCommandPayload {
+                name: "after-restart".into(),
+                arguments: Default::default(),
+            },
+        })
+        .await
+        .unwrap();
+    let command = tokio::time::timeout(Duration::from_secs(5), commands.next())
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(command.command_id, command_id);
+    assert!(device.metrics().mqtt_reconnects >= 1);
+
     device.shutdown();
     events.close();
     business.runtime().drain().await.unwrap();
@@ -340,7 +433,7 @@ async fn official_client_reconnects_and_replays_unacked_event_with_same_id() {
             .unwrap()
             .success()
     );
-    assert_eq!(business.metrics().events_received, 2);
+    assert_eq!(business.metrics().events_received, 3);
     assert!(business.metrics().reconnects >= 1);
     let _ = std::fs::remove_dir_all(root);
 }

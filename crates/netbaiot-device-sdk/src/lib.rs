@@ -6,7 +6,10 @@
 use futures_core::Stream;
 use netbaiot_protocol::*;
 use reqwest::{StatusCode, Url};
-use rumqttc::{AsyncClient, Event, Incoming, MqttOptions, QoS, Transport as MqttTransport};
+use rumqttc::{
+    AsyncClient, ConnectReturnCode, ConnectionError, Event, Incoming, MqttOptions, QoS,
+    Transport as MqttTransport,
+};
 use std::{
     collections::BTreeMap,
     fmt,
@@ -19,7 +22,7 @@ use std::{
     time::Duration,
 };
 use thiserror::Error;
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, watch};
 use tokio_util::sync::CancellationToken;
 
 const DEFAULT_MAX_PAYLOAD_BYTES: usize = 65_536;
@@ -65,6 +68,24 @@ impl fmt::Debug for DeviceCredentials {
 pub enum OfflinePublishPolicy {
     /// Reject immediately while no MQTT connection is established. This is the default.
     Reject,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// Bounded exponential retry limits for the MQTT event loop.
+pub struct DeviceReconnectPolicy {
+    /// First reconnect delay ceiling. Full jitter chooses a smaller positive delay.
+    pub initial_backoff: Duration,
+    /// Hard ceiling for every reconnect delay.
+    pub maximum_backoff: Duration,
+}
+
+impl Default for DeviceReconnectPolicy {
+    fn default() -> Self {
+        Self {
+            initial_backoff: Duration::from_millis(100),
+            maximum_backoff: Duration::from_secs(5),
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -125,8 +146,16 @@ struct Metrics {
 struct MqttState {
     client: AsyncClient,
     connected: Arc<AtomicBool>,
+    connection_state: watch::Receiver<MqttConnectionState>,
     command_receiver: Mutex<Option<mpsc::Receiver<DeviceCommand>>>,
     task: Mutex<Option<tokio::task::JoinHandle<()>>>,
+}
+
+#[derive(Clone, Debug)]
+enum MqttConnectionState {
+    Connecting,
+    Connected,
+    Terminal(DeviceSdkError),
 }
 
 struct DeviceInner {
@@ -177,11 +206,13 @@ pub struct DeviceClientBuilder {
     http_endpoint: Option<String>,
     client_id: Option<String>,
     request_timeout: Duration,
+    mqtt_connect_timeout: Duration,
     max_payload_bytes: usize,
     max_response_bytes: usize,
     mqtt_queue_items: usize,
     command_items: usize,
     offline_policy: OfflinePublishPolicy,
+    reconnect: DeviceReconnectPolicy,
 }
 
 impl fmt::Debug for DeviceClientBuilder {
@@ -205,11 +236,13 @@ impl Default for DeviceClientBuilder {
             http_endpoint: None,
             client_id: None,
             request_timeout: Duration::from_secs(10),
+            mqtt_connect_timeout: Duration::from_secs(10),
             max_payload_bytes: DEFAULT_MAX_PAYLOAD_BYTES,
             max_response_bytes: DEFAULT_RESPONSE_BYTES,
             mqtt_queue_items: DEFAULT_MQTT_QUEUE_ITEMS,
             command_items: DEFAULT_COMMAND_ITEMS,
             offline_policy: OfflinePublishPolicy::Reject,
+            reconnect: DeviceReconnectPolicy::default(),
         }
     }
 }
@@ -245,6 +278,12 @@ impl DeviceClientBuilder {
         self
     }
 
+    /// Sets how long `connect()` may wait for the initial MQTT CONNACK.
+    pub fn mqtt_connect_timeout(mut self, timeout: Duration) -> Self {
+        self.mqtt_connect_timeout = timeout;
+        self
+    }
+
     pub fn mqtt_queue_items(mut self, items: usize) -> Self {
         self.mqtt_queue_items = items;
         self
@@ -257,6 +296,12 @@ impl DeviceClientBuilder {
 
     pub fn offline_publish_policy(mut self, policy: OfflinePublishPolicy) -> Self {
         self.offline_policy = policy;
+        self
+    }
+
+    /// Configures cancellation-aware bounded MQTT reconnect delays.
+    pub fn reconnect_policy(mut self, policy: DeviceReconnectPolicy) -> Self {
+        self.reconnect = policy;
         self
     }
 
@@ -273,11 +318,14 @@ impl DeviceClientBuilder {
             ));
         }
         if self.request_timeout.is_zero()
+            || self.mqtt_connect_timeout.is_zero()
             || self.max_payload_bytes == 0
             || self.max_response_bytes == 0
             || self.mqtt_queue_items == 0
             || self.command_items == 0
             || self.max_payload_bytes > u32::MAX as usize
+            || self.reconnect.initial_backoff.is_zero()
+            || self.reconnect.initial_backoff > self.reconnect.maximum_backoff
         {
             return Err(DeviceSdkError::InvalidConfiguration(
                 "timeouts and bounds must be nonzero".into(),
@@ -350,19 +398,24 @@ impl DeviceClientBuilder {
                 options.set_transport(MqttTransport::tls_with_default_config());
             }
             let (client, mut eventloop) = AsyncClient::new(options, self.mqtt_queue_items);
+            eventloop
+                .network_options
+                .set_connection_timeout(self.mqtt_connect_timeout.as_secs().max(1));
             let down_topic = topic(&device, "down");
-            client
-                .subscribe(down_topic.clone(), QoS::AtLeastOnce)
-                .await
-                .map_err(|error| DeviceSdkError::Transport(error.to_string()))?;
             let (command_sender, command_receiver) = mpsc::channel(self.command_items);
             let connected = Arc::new(AtomicBool::new(false));
+            let (connection_sender, connection_state) =
+                watch::channel(MqttConnectionState::Connecting);
             let task_connected = connected.clone();
             let task_client = client.clone();
             let task_shutdown = shutdown.child_token();
             let task_metrics = metrics.clone();
             let task_device = device.clone();
+            let reconnect = self.reconnect;
+            let reconnect_seed = EventId::generate().0.as_u128() as u64;
             let task = tokio::spawn(async move {
+                let mut connected_once = false;
+                let mut reconnect_attempt = 0u32;
                 loop {
                     let event = tokio::select! {
                         _ = task_shutdown.cancelled() => break,
@@ -370,9 +423,32 @@ impl DeviceClientBuilder {
                     };
                     match event {
                         Ok(Event::Incoming(Incoming::ConnAck(_))) => {
-                            if task_connected.swap(true, Ordering::AcqRel) {
+                            if task_client
+                                .try_subscribe(down_topic.clone(), QoS::AtLeastOnce)
+                                .is_err()
+                            {
+                                eventloop.clean();
+                                task_connected.store(false, Ordering::Release);
+                                let _ = connection_sender.send(MqttConnectionState::Connecting);
+                                reconnect_attempt = reconnect_attempt.saturating_add(1);
+                                let delay = device_reconnect_delay(
+                                    reconnect,
+                                    reconnect_attempt,
+                                    reconnect_seed,
+                                );
+                                tokio::select! {
+                                    _ = task_shutdown.cancelled() => break,
+                                    _ = tokio::time::sleep(delay) => {}
+                                }
+                                continue;
+                            }
+                            if connected_once {
                                 task_metrics.mqtt_reconnects.fetch_add(1, Ordering::Relaxed);
                             }
+                            connected_once = true;
+                            reconnect_attempt = 0;
+                            task_connected.store(true, Ordering::Release);
+                            let _ = connection_sender.send(MqttConnectionState::Connected);
                         }
                         Ok(Event::Incoming(Incoming::Publish(publish)))
                             if publish.topic == down_topic =>
@@ -384,33 +460,57 @@ impl DeviceClientBuilder {
                                         task_metrics
                                             .commands_received
                                             .fetch_add(1, Ordering::Relaxed);
-                                        let _ = task_client.try_ack(&publish);
+                                        if task_client.try_ack(&publish).is_err() {
+                                            task_connected.store(false, Ordering::Release);
+                                            let _ = connection_sender
+                                                .send(MqttConnectionState::Connecting);
+                                            let _ = task_client.try_disconnect();
+                                        }
                                     } else {
                                         task_connected.store(false, Ordering::Release);
+                                        let _ =
+                                            connection_sender.send(MqttConnectionState::Connecting);
                                         let _ = task_client.try_disconnect();
                                     }
                                 }
                                 _ => {
                                     task_connected.store(false, Ordering::Release);
+                                    let _ = connection_sender.send(MqttConnectionState::Connecting);
                                     let _ = task_client.try_disconnect();
                                 }
                             }
                         }
                         Ok(_) => {}
-                        Err(_) => {
+                        Err(error) => {
                             task_connected.store(false, Ordering::Release);
+                            if let ConnectionError::ConnectionRefused(code) = error
+                                && let Some(error) = terminal_connect_error(code)
+                            {
+                                let _ =
+                                    connection_sender.send(MqttConnectionState::Terminal(error));
+                                return;
+                            }
+                            let _ = connection_sender.send(MqttConnectionState::Connecting);
+                            reconnect_attempt = reconnect_attempt.saturating_add(1);
+                            let delay = device_reconnect_delay(
+                                reconnect,
+                                reconnect_attempt,
+                                reconnect_seed,
+                            );
                             tokio::select! {
                                 _ = task_shutdown.cancelled() => break,
-                                _ = tokio::time::sleep(Duration::from_millis(100)) => {}
+                                _ = tokio::time::sleep(delay) => {}
                             }
                         }
                     }
                 }
                 task_connected.store(false, Ordering::Release);
+                let _ = connection_sender.send(MqttConnectionState::Connecting);
             });
             Some(MqttState {
                 client,
                 connected,
+                connection_state,
                 command_receiver: Mutex::new(Some(command_receiver)),
                 task: Mutex::new(Some(task)),
             })
@@ -418,7 +518,7 @@ impl DeviceClientBuilder {
             None
         };
         let _ = self.offline_policy;
-        Ok(DeviceClient {
+        let client = DeviceClient {
             inner: Arc::new(DeviceInner {
                 device,
                 credentials,
@@ -430,7 +530,13 @@ impl DeviceClientBuilder {
                 shutdown,
                 metrics,
             }),
-        })
+        };
+        if client.inner.mqtt.is_some() {
+            client
+                .wait_until_connected(self.mqtt_connect_timeout)
+                .await?;
+        }
+        Ok(client)
     }
 }
 
@@ -454,6 +560,44 @@ impl DeviceClient {
             commands_received: self.inner.metrics.commands_received.load(Ordering::Relaxed),
             http_requests: self.inner.metrics.http_requests.load(Ordering::Relaxed),
         }
+    }
+
+    /// Returns whether the MQTT event loop currently has an authenticated connection.
+    pub fn mqtt_connected(&self) -> bool {
+        self.inner
+            .mqtt
+            .as_ref()
+            .is_some_and(|mqtt| mqtt.connected.load(Ordering::Acquire))
+    }
+
+    /// Waits for initial or recovered MQTT connectivity without creating a task.
+    pub async fn wait_until_connected(&self, timeout: Duration) -> Result<(), DeviceSdkError> {
+        if timeout.is_zero() {
+            return Err(DeviceSdkError::InvalidConfiguration(
+                "MQTT connection wait timeout must be nonzero".into(),
+            ));
+        }
+        let mqtt = self
+            .inner
+            .mqtt
+            .as_ref()
+            .ok_or(DeviceSdkError::TransportNotConfigured)?;
+        let mut state = mqtt.connection_state.clone();
+        tokio::time::timeout(timeout, async move {
+            loop {
+                match state.borrow().clone() {
+                    MqttConnectionState::Connected => return Ok(()),
+                    MqttConnectionState::Terminal(error) => return Err(error),
+                    MqttConnectionState::Connecting => {}
+                }
+                state
+                    .changed()
+                    .await
+                    .map_err(|_| DeviceSdkError::ServerUnavailable)?;
+            }
+        })
+        .await
+        .map_err(|_| DeviceSdkError::Timeout)?
     }
 
     /// Enqueues telemetry to the bounded MQTT client at the requested QoS.
@@ -730,6 +874,36 @@ fn next_source_id() -> Result<SourceMessageId, DeviceSdkError> {
         .map_err(|_| DeviceSdkError::Protocol("failed to generate source message ID".into()))
 }
 
+fn terminal_connect_error(code: ConnectReturnCode) -> Option<DeviceSdkError> {
+    match code {
+        ConnectReturnCode::Success | ConnectReturnCode::ServiceUnavailable => None,
+        ConnectReturnCode::BadUserNamePassword | ConnectReturnCode::NotAuthorized => {
+            Some(DeviceSdkError::Unauthenticated)
+        }
+        ConnectReturnCode::BadClientId => Some(DeviceSdkError::InvalidConfiguration(
+            "MQTT broker rejected the client ID".into(),
+        )),
+        ConnectReturnCode::RefusedProtocolVersion => Some(DeviceSdkError::Protocol(
+            "MQTT broker rejected protocol version 3.1.1".into(),
+        )),
+    }
+}
+
+fn device_reconnect_delay(policy: DeviceReconnectPolicy, attempt: u32, seed: u64) -> Duration {
+    let exponent = attempt.saturating_sub(1).min(20);
+    let maximum = policy
+        .initial_backoff
+        .saturating_mul(1u32.checked_shl(exponent).unwrap_or(u32::MAX))
+        .min(policy.maximum_backoff);
+    let maximum_ms = u64::try_from(maximum.as_millis())
+        .unwrap_or(u64::MAX)
+        .max(1);
+    let mixed = seed
+        .wrapping_add(u64::from(attempt).wrapping_mul(0x9e37_79b9_7f4a_7c15))
+        .wrapping_mul(0xbf58_476d_1ce4_e5b9);
+    Duration::from_millis(1 + mixed % maximum_ms)
+}
+
 async fn read_response(
     mut response: reqwest::Response,
     maximum: usize,
@@ -809,5 +983,39 @@ mod tests {
     #[test]
     fn canonical_topics_are_identity_scoped() {
         assert_eq!(topic(&device(), "up"), "v1/t/tenant/p/product/d/device/up");
+    }
+
+    #[test]
+    fn reconnect_backoff_is_jittered_and_bounded() {
+        let policy = DeviceReconnectPolicy::default();
+        let mut previous_ceiling = policy.initial_backoff;
+        for attempt in 1..100 {
+            let delay = device_reconnect_delay(policy, attempt, 7);
+            assert!(!delay.is_zero());
+            assert!(delay <= policy.maximum_backoff);
+            if attempt <= 6 {
+                assert!(delay <= previous_ceiling);
+                previous_ceiling = previous_ceiling
+                    .saturating_mul(2)
+                    .min(policy.maximum_backoff);
+            }
+        }
+        assert_ne!(
+            device_reconnect_delay(policy, 4, 7),
+            device_reconnect_delay(policy, 4, 8)
+        );
+    }
+
+    #[test]
+    fn terminal_connack_codes_do_not_retry() {
+        assert!(terminal_connect_error(ConnectReturnCode::ServiceUnavailable).is_none());
+        assert!(matches!(
+            terminal_connect_error(ConnectReturnCode::BadUserNamePassword),
+            Some(DeviceSdkError::Unauthenticated)
+        ));
+        assert!(matches!(
+            terminal_connect_error(ConnectReturnCode::BadClientId),
+            Some(DeviceSdkError::InvalidConfiguration(_))
+        ));
     }
 }

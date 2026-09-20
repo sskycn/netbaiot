@@ -205,11 +205,13 @@ impl Sessions {
             old.cancel.cancel();
         }
         state.generation = generation;
+        let connected_at = now_ms();
         state.presence.insert(
             device.clone(),
             Presence {
                 connected: true,
-                last_seen: now_ms(),
+                connected_at: Some(connected_at),
+                last_seen: connected_at,
                 transport,
                 session_generation: Some(generation),
             },
@@ -268,6 +270,7 @@ impl Sessions {
             .and_modify(|presence| presence.last_seen = now_ms())
             .or_insert(Presence {
                 connected: false,
+                connected_at: None,
                 last_seen: now_ms(),
                 transport,
                 session_generation: None,
@@ -286,7 +289,7 @@ impl Sessions {
             device: device.clone(),
             connected: presence.is_some_and(|value| value.connected),
             transport: presence.map(|value| value.transport),
-            connected_at: None,
+            connected_at: presence.and_then(|value| value.connected_at),
             last_seen: presence.map(|value| value.last_seen),
             session_generation: presence.and_then(|value| value.session_generation),
         })
@@ -325,6 +328,7 @@ impl Drop for SessionLease {
             }
             if let Some(presence) = state.presence.get_mut(&self.device) {
                 presence.connected = false;
+                presence.connected_at = None;
                 presence.last_seen = now_ms();
                 presence.session_generation = None;
             }

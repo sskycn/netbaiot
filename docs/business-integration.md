@@ -24,6 +24,13 @@ successful socket write is not an ACK. Malformed or mismatched ACKs fail the
 delivery. The current implementation permits one active subscriber and serial
 confirmed delivery, which keeps flow control and uncertainty bounded.
 
+Hello, subscribe, event ACK reads, and writes all have hard deadlines and frame
+size limits. Malformed handshakes are isolated to that connection and do not stop
+the listener. Authentication, version, and validation failures use structured v1
+stream errors so official clients can distinguish terminal failures from outages.
+The server installs the bounded subscription before sending `ready`, so successful
+handshake completion is a real admission boundary with no post-ready routing gap.
+
 This framed RPC option is the provided high-rate streaming path. Native gRPC and
 WebSocket adapters are not implemented in this revision. WebSocket remains an
 optional future dashboard integration and must be best-effort unless it adds an

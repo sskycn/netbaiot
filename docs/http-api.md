@@ -38,6 +38,9 @@ Upload success does not mean business persistence or application processing.
 
 Connection queries are bounded. The command body contains the authoritative full
 `DeviceKey`; unavailable devices receive 503 and are not queued offline.
+The connection response includes the active transport, `connected_at`, `last_seen`,
+and session generation without exposing socket state. `connected_at` is present
+only while the current MQTT/TCP session remains connected.
 
 Errors use the stable `ApiError` JSON shape with `code`, safe `message`, optional
 `request_id`, and optional `required_scope`. In particular, an offline command uses
