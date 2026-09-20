@@ -16,8 +16,9 @@ fuzz_target!(|data: &[u8]| {
                     match packet {
                         Packet::Connect(c) => {
                             assert!(c.client_id.len() <= l.max_client_id_bytes);
-                            assert!(c.username.len() <= l.max_username_bytes);
-                            assert!(c.password.len() <= l.max_password_bytes);
+                            assert!(c.username.as_ref().is_none_or(|value| value.len() <= l.max_username_bytes));
+                            assert!(c.password.as_ref().is_none_or(|value| value.len() <= l.max_password_bytes));
+                            assert!(c.will.as_ref().is_none_or(|will| will.payload.len() <= l.max_will_payload_bytes));
                         }
                         Packet::Publish { topic, payload, .. } => {
                             assert!(topic.len() <= l.max_topic_bytes);

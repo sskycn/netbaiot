@@ -7,6 +7,7 @@ use hyper::{
 use hyper_util::rt::{TokioIo, TokioTimer};
 use netbaiot_core::*;
 use netbaiot_runtime::*;
+use serde::Deserialize;
 use std::{
     convert::Infallible,
     net::SocketAddr,
@@ -14,18 +15,19 @@ use std::{
     time::Duration,
 };
 use tokio_util::sync::CancellationToken;
-type Sent = Arc<Mutex<Option<(DeviceKey, CommandId, u32)>>>;
+
 fn response(status: StatusCode, body: Vec<u8>) -> Response<Full<Bytes>> {
-    let mut r = Response::new(Full::new(Bytes::from(body)));
-    *r.status_mut() = status;
-    r.headers_mut().insert(
+    let mut response = Response::new(Full::new(Bytes::from(body)));
+    *response.status_mut() = status;
+    response.headers_mut().insert(
         hyper::header::CONTENT_TYPE,
         hyper::header::HeaderValue::from_static("application/json"),
     );
-    r
+    response
 }
+
 fn error(error: Error) -> Response<Full<Bytes>> {
-    let code = match error {
+    let status = match error {
         Error::Authentication => StatusCode::UNAUTHORIZED,
         Error::Forbidden => StatusCode::FORBIDDEN,
         Error::Conflict => StatusCode::CONFLICT,
@@ -34,37 +36,10 @@ fn error(error: Error) -> Response<Full<Bytes>> {
         Error::Draining | Error::Storage | Error::Unavailable => StatusCode::SERVICE_UNAVAILABLE,
         _ => StatusCode::BAD_REQUEST,
     };
-    response(code, format!("{{\"error\":\"{error}\"}}").into_bytes())
+    response(status, format!("{{\"error\":\"{error}\"}}").into_bytes())
 }
-async fn handle(
-    req: Request<Incoming>,
-    peer: SocketAddr,
-    s: Arc<Services>,
-    lease: Arc<Mutex<ConnectionLease>>,
-    sent: Sent,
-) -> Result<Response<Full<Bytes>>> {
-    let _slot = s
-        .http_slots
-        .clone()
-        .try_acquire_owned()
-        .map_err(|_| Error::Overloaded)?;
-    s.ingress.metrics.inc(Metric::HttpRequests);
-    s.rates.take(peer.ip())?;
-    let l = &s.ingress.limits;
-    let size = req
-        .headers()
-        .iter()
-        .try_fold(0usize, |n, (k, v)| {
-            n.checked_add(k.as_str().len())?.checked_add(v.len() + 4)
-        })
-        .ok_or(Error::Invalid)?;
-    if size > l.max_http_header_bytes || req.headers().len() > l.max_http_headers {
-        return Err(Error::Invalid);
-    }
-    // This profile has no decompressor. Do not interpret encoded bytes as JSON.
-    if req.headers().contains_key(hyper::header::CONTENT_ENCODING) {
-        return Ok(response(StatusCode::UNSUPPORTED_MEDIA_TYPE, b"{}".to_vec()));
-    }
+
+fn authorization(req: &Request<Incoming>) -> Result<String> {
     if req
         .headers()
         .get_all(hyper::header::AUTHORIZATION)
@@ -74,143 +49,131 @@ async fn handle(
     {
         return Err(Error::Authentication);
     }
-    let authorization = req
-        .headers()
+    req.headers()
         .get(hyper::header::AUTHORIZATION)
-        .and_then(|h| h.to_str().ok())
-        .and_then(|h| h.strip_prefix("Bearer "))
-        .ok_or(Error::Authentication)?
-        .to_owned();
-    let path = req.uri().path().to_owned();
-    let method = req.method().clone();
-    if path == "/v1/admin/commands" && method == hyper::Method::POST {
-        let admin = s.admin.as_ref().ok_or(Error::Forbidden)?;
-        admin.verify(authorization.as_bytes())?;
-        let body = Limited::new(req.into_body(), l.max_command_bytes)
-            .collect()
-            .await
-            .map_err(|_| Error::Invalid)?
-            .to_bytes();
-        let command: DeviceCommand = serde_json::from_slice(&body).map_err(|_| Error::Invalid)?;
-        let auth = admin.identity(&command.device).ok_or(Error::Forbidden)?;
-        let record = s.router.queue(auth, command).await?;
-        return Ok(response(
-            StatusCode::ACCEPTED,
-            serde_json::to_vec(&record).map_err(|_| Error::Internal)?,
-        ));
+        .and_then(|header| header.to_str().ok())
+        .and_then(|header| header.strip_prefix("Bearer "))
+        .map(str::to_owned)
+        .ok_or(Error::Authentication)
+}
+
+async fn body(req: Request<Incoming>, maximum: usize) -> Result<Bytes> {
+    if req
+        .headers()
+        .get(hyper::header::CONTENT_LENGTH)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.parse::<u64>().ok())
+        .is_some_and(|length| length > maximum as u64)
+    {
+        return Err(Error::Invalid);
     }
-    let (id, secret) = authorization.split_once(':').ok_or(Error::Authentication)?;
-    if id.len() > l.max_username_bytes || secret.len() > l.max_password_bytes {
+    Limited::new(req.into_body(), maximum)
+        .collect()
+        .await
+        .map(|collected| collected.to_bytes())
+        .map_err(|_| Error::Invalid)
+}
+
+async fn handle(
+    req: Request<Incoming>,
+    peer: SocketAddr,
+    services: Arc<Services>,
+    lease: Arc<Mutex<ConnectionLease>>,
+) -> Result<Response<Full<Bytes>>> {
+    let _slot = services
+        .http_slots
+        .clone()
+        .try_acquire_owned()
+        .map_err(|_| Error::Overloaded)?;
+    services.ingress.metrics.inc(Metric::HttpRequests);
+    services.rates.take(peer.ip())?;
+    let limits = &services.ingress.limits;
+    let header_bytes = req
+        .headers()
+        .iter()
+        .try_fold(0usize, |total, (name, value)| {
+            total
+                .checked_add(name.as_str().len())?
+                .checked_add(value.len() + 4)
+        })
+        .ok_or(Error::Invalid)?;
+    if header_bytes > limits.max_http_header_bytes || req.headers().len() > limits.max_http_headers
+    {
+        return Err(Error::Invalid);
+    }
+    if req.headers().contains_key(hyper::header::CONTENT_ENCODING) {
+        return Ok(response(StatusCode::UNSUPPORTED_MEDIA_TYPE, b"{}".to_vec()));
+    }
+    match services.http_role {
+        HttpRole::Device => handle_device(req, services, lease).await,
+        HttpRole::Management => handle_management(req, services).await,
+    }
+}
+
+async fn handle_device(
+    req: Request<Incoming>,
+    services: Arc<Services>,
+    lease: Arc<Mutex<ConnectionLease>>,
+) -> Result<Response<Full<Bytes>>> {
+    let authorization = authorization(&req)?;
+    let (credential_id, secret) = authorization.split_once(':').ok_or(Error::Authentication)?;
+    let limits = &services.ingress.limits;
+    if credential_id.len() > limits.max_username_bytes || secret.len() > limits.max_password_bytes {
         return Err(Error::Authentication);
     }
-    let auth = s
+    let auth = services
         .ingress
         .authenticate(AuthenticationRequest::Secret {
-            credential_id: id,
+            credential_id,
             secret: secret.as_bytes(),
         })
         .await?;
     lock(&lease)?.authenticate(&auth.device_key)?;
-    // Include slow bodies and command pulls in hierarchical request admission.
-    let _request = s.protocol_admission.acquire(&auth.device_key, 0)?;
-    if method == hyper::Method::GET && path == "/metrics" {
-        let mut metrics = s.ingress.metrics.render();
-        let counts = s.connections.active()?;
-        for (name, count) in ["http", "mqtt", "tcp", "udp"].into_iter().zip(counts) {
-            metrics.push_str(&format!(
-                "netbaiot_active_connections{{transport=\"{name}\"}} {count}\n"
-            ));
-        }
-        metrics.push_str(&format!(
-            "netbaiot_queue_bytes {}\nnetbaiot_queue_depth {}\n",
-            s.ingress.sessions.queued_bytes(),
-            s.ingress.sessions.queued_messages()
-        ));
-        let (ingress_count, ingress_bytes) = s.ingress.admission.in_flight();
-        let (ingress_waiters, ingress_wait_bytes) = s.ingress.admission.waiting();
-        let (protocol_count, protocol_bytes) = s.protocol_admission.in_flight();
-        let store = s.ingress.store.health();
-        let degraded_workers = s
+    let _request = services.protocol_admission.acquire(&auth.device_key, 0)?;
+    let path = req.uri().path().to_owned();
+    let method = req.method().clone();
+    if method == hyper::Method::GET && path == "/v1/device/config" {
+        let config = services
             .ingress
-            .metrics
-            .get(Metric::DependencyDegraded)
-            .saturating_sub(s.ingress.metrics.get(Metric::DependencyRecovered));
-        metrics.push_str(&format!(
-            "netbaiot_ingress_inflight {ingress_count}\nnetbaiot_ingress_inflight_bytes {ingress_bytes}\nnetbaiot_ingress_waiters {ingress_waiters}\nnetbaiot_ingress_wait_bytes {ingress_wait_bytes}\nnetbaiot_protocol_inflight {protocol_count}\nnetbaiot_protocol_inflight_bytes {protocol_bytes}\nnetbaiot_database_pool_active {}\nnetbaiot_database_pool_idle {}\nnetbaiot_database_pool_waiters {}\nnetbaiot_dependency_degraded_workers {degraded_workers}\nnetbaiot_runtime_alive_tasks {}\n",
-            store.pool_active,
-            store.pool_idle,
-            store.pool_waiters,
-            tokio::runtime::Handle::current().metrics().num_alive_tasks()
-        ));
-        let (sessions, tenants, presence) = s.ingress.sessions.registry_counts()?;
-        metrics.push_str(&format!(
-            "netbaiot_registered_sessions {sessions}\nnetbaiot_session_tenant_entries {tenants}\nnetbaiot_presence_entries {presence}\nnetbaiot_subscription_entries {}\n",
-            s.subscriptions.count()?
-        ));
-        let mut r = response(StatusCode::OK, metrics.into_bytes());
-        r.headers_mut().insert(
-            hyper::header::CONTENT_TYPE,
-            hyper::header::HeaderValue::from_static("text/plain; version=0.0.4"),
+            .config
+            .device(&auth.device_key)?
+            .ok_or(Error::Unavailable)?;
+        let etag = format!("\"{}\"", config.revision);
+        if req
+            .headers()
+            .get(hyper::header::IF_NONE_MATCH)
+            .and_then(|value| value.to_str().ok())
+            == Some(etag.as_str())
+        {
+            return Ok(response(StatusCode::NOT_MODIFIED, Vec::new()));
+        }
+        let mut result = response(
+            StatusCode::OK,
+            serde_json::to_vec(&config).map_err(|_| Error::Internal)?,
         );
-        return Ok(r);
+        result.headers_mut().insert(
+            hyper::header::ETAG,
+            hyper::header::HeaderValue::from_str(&etag).map_err(|_| Error::Internal)?,
+        );
+        return Ok(result);
     }
-    if method == hyper::Method::GET && path == "/v1/device/commands" {
-        let command = s.router.pull(&auth).await?;
-        s.ingress
-            .sessions
-            .touch(&auth.device_key, Transport::Http)?;
-        return if let Some(record) = command {
-            let command = record.command;
-            *lock(&sent)? = Some((auth.device_key.clone(), command.command_id, record.attempts));
-            Ok(response(
-                StatusCode::OK,
-                s.ingress
-                    .codecs
-                    .get(&auth)?
-                    .encode(
-                        &EncodeContext {
-                            device: &auth.device_key,
-                        },
-                        &command,
-                    )
-                    .map_err(|_| Error::Codec)?,
-            ))
-        } else {
-            Ok(response(StatusCode::NO_CONTENT, Vec::new()))
-        };
-    }
-    if method != hyper::Method::POST
-        || !matches!(
-            path.as_str(),
-            "/v1/device/messages" | "/v1/device/commands/ack"
-        )
-    {
-        return Ok(response(StatusCode::NOT_FOUND, b"{}".to_vec()));
-    }
-    if req
-        .headers()
-        .get(hyper::header::CONTENT_LENGTH)
-        .and_then(|v| v.to_str().ok())
-        .and_then(|v| v.parse::<u64>().ok())
-        .is_some_and(|n| n > l.max_http_body_size as u64)
-    {
-        return Ok(response(StatusCode::PAYLOAD_TOO_LARGE, b"{}".to_vec()));
-    }
-    let body = match Limited::new(req.into_body(), l.max_http_body_size)
-        .collect()
-        .await
-    {
-        Ok(b) => b.to_bytes(),
-        Err(_) => return Ok(response(StatusCode::PAYLOAD_TOO_LARGE, b"{}".to_vec())),
+    let (require_command_ack, require_config_ack) = match (method, path.as_str()) {
+        (hyper::Method::POST, "/v1/device/data")
+        | (hyper::Method::POST, "/v1/device/heartbeat") => (false, false),
+        (hyper::Method::POST, "/v1/device/config/ack") => (false, true),
+        (hyper::Method::POST, "/v1/device/commands/ack") => (true, false),
+        _ => return Ok(response(StatusCode::NOT_FOUND, b"{}".to_vec())),
     };
-    let acceptance = s
+    let payload = body(req, limits.max_http_body_size).await?;
+    let acceptance = services
         .ingress
         .ingest(
             &auth,
             IngressEnvelope {
                 transport: Transport::Http,
-                payload: &body,
-                require_command_ack: path.ends_with("/ack"),
+                payload: &payload,
+                require_command_ack,
+                require_config_ack,
                 validated_at: std::time::Instant::now(),
                 validation_us: 0,
             },
@@ -221,50 +184,228 @@ async fn handle(
         serde_json::to_vec(&acceptance.receipt).map_err(|_| Error::Internal)?,
     ))
 }
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RoutesUpdate {
+    revision: u64,
+    routes: Vec<RouteDefinition>,
+}
+
+async fn handle_management(
+    req: Request<Incoming>,
+    services: Arc<Services>,
+) -> Result<Response<Full<Bytes>>> {
+    let authorization = authorization(&req)?;
+    services
+        .admin
+        .as_ref()
+        .ok_or(Error::Forbidden)?
+        .verify(authorization.as_bytes())?;
+    let path = req.uri().path().to_owned();
+    let method = req.method().clone();
+    match (method, path.as_str()) {
+        (hyper::Method::GET, "/api/v1/health") => {
+            Ok(response(StatusCode::OK, b"{\"live\":true}".to_vec()))
+        }
+        (hyper::Method::GET, "/api/v1/ready") => {
+            let ready = services.ingress.lifecycle.ready();
+            Ok(response(
+                if ready {
+                    StatusCode::OK
+                } else {
+                    StatusCode::SERVICE_UNAVAILABLE
+                },
+                format!("{{\"ready\":{ready}}}").into_bytes(),
+            ))
+        }
+        (hyper::Method::GET, "/api/v1/status") => {
+            let usage = services.ingress.events.usage()?;
+            let (auth_entries, auth_bytes) = services.ingress.auth_cache.usage()?;
+            let (config_entries, config_bytes) = services.ingress.config.usage()?;
+            let active_connections = services.connections.active()?;
+            Ok(response(
+                StatusCode::OK,
+                serde_json::to_vec(&serde_json::json!({
+                    "lifecycle": services.ingress.lifecycle.state(),
+                    "event_count": usage.events,
+                    "event_bytes": usage.bytes,
+                    "pending_required": usage.pending_required,
+                    "auth_cache_entries": auth_entries,
+                    "auth_cache_bytes": auth_bytes,
+                    "config_cache_entries": config_entries,
+                    "config_cache_bytes": config_bytes,
+                    "runtime_tasks": tokio::runtime::Handle::current().metrics().num_alive_tasks(),
+                    "active_connections": active_connections,
+                }))
+                .map_err(|_| Error::Internal)?,
+            ))
+        }
+        (hyper::Method::GET, "/api/v1/metrics") => {
+            let mut result = response(
+                StatusCode::OK,
+                services.ingress.metrics.render().into_bytes(),
+            );
+            result.headers_mut().insert(
+                hyper::header::CONTENT_TYPE,
+                hyper::header::HeaderValue::from_static("text/plain; version=0.0.4"),
+            );
+            Ok(result)
+        }
+        (hyper::Method::GET, "/api/v1/connections") => {
+            let query = req.uri().query().unwrap_or_default();
+            let mut offset = 0usize;
+            let mut limit = 100usize;
+            for pair in query.split('&') {
+                if let Some((key, value)) = pair.split_once('=') {
+                    match key {
+                        "offset" => offset = value.parse().map_err(|_| Error::Invalid)?,
+                        "limit" => limit = value.parse().map_err(|_| Error::Invalid)?,
+                        _ => return Err(Error::Invalid),
+                    }
+                }
+            }
+            Ok(response(
+                StatusCode::OK,
+                serde_json::to_vec(&services.ingress.sessions.list(offset, limit)?)
+                    .map_err(|_| Error::Internal)?,
+            ))
+        }
+        (hyper::Method::POST, "/api/v1/devices/commands") => {
+            let maximum = services.ingress.limits.max_command_bytes;
+            let command: DeviceCommand =
+                serde_json::from_slice(&body(req, maximum).await?).map_err(|_| Error::Invalid)?;
+            let result = services.router.send(command)?;
+            Ok(response(
+                StatusCode::ACCEPTED,
+                serde_json::to_vec(&result).map_err(|_| Error::Internal)?,
+            ))
+        }
+        (hyper::Method::POST, "/api/v1/auth/invalidate") => {
+            let invalidation: AuthInvalidation = serde_json::from_slice(
+                &body(req, services.ingress.limits.max_http_body_size).await?,
+            )
+            .map_err(|_| Error::Invalid)?;
+            let devices = services.ingress.auth_cache.invalidate(&invalidation)?;
+            for device in &devices {
+                services.ingress.sessions.disconnect(device)?;
+            }
+            Ok(response(
+                StatusCode::OK,
+                format!("{{\"disconnected\":{}}}", devices.len()).into_bytes(),
+            ))
+        }
+        (hyper::Method::POST, "/api/v1/config/invalidate") => {
+            let device: DeviceKey = serde_json::from_slice(
+                &body(req, services.ingress.limits.max_http_body_size).await?,
+            )
+            .map_err(|_| Error::Invalid)?;
+            let invalidated = services.ingress.config.invalidate_device(&device)?;
+            Ok(response(
+                StatusCode::OK,
+                format!("{{\"invalidated\":{invalidated}}}").into_bytes(),
+            ))
+        }
+        (hyper::Method::PUT, "/api/v1/control/snapshot") => {
+            let snapshot: ControlSnapshot = serde_json::from_slice(
+                &body(req, services.ingress.limits.max_http_body_size).await?,
+            )
+            .map_err(|_| Error::Invalid)?;
+            let revision = snapshot.revision;
+            let routes = snapshot.routes.clone();
+            let _mutation = services.control_lock.lock().await;
+            services
+                .ingress
+                .events
+                .validate_route_update(revision, &routes)?;
+            services.ingress.config.apply(snapshot)?;
+            services.ingress.events.replace_routes(revision, routes)?;
+            Ok(response(StatusCode::NO_CONTENT, Vec::new()))
+        }
+        (hyper::Method::PUT, "/api/v1/routes") => {
+            let update: RoutesUpdate = serde_json::from_slice(
+                &body(req, services.ingress.limits.max_http_body_size).await?,
+            )
+            .map_err(|_| Error::Invalid)?;
+            let _mutation = services.control_lock.lock().await;
+            services
+                .ingress
+                .events
+                .validate_route_update(update.revision, &update.routes)?;
+            services
+                .ingress
+                .config
+                .replace_routes(update.revision, update.routes.clone())?;
+            services
+                .ingress
+                .events
+                .replace_routes(update.revision, update.routes)?;
+            Ok(response(StatusCode::NO_CONTENT, Vec::new()))
+        }
+        (hyper::Method::POST, "/api/v1/drain") => {
+            services.shutdown.cancel();
+            Ok(response(
+                StatusCode::ACCEPTED,
+                b"{\"draining\":true}".to_vec(),
+            ))
+        }
+        _ => Ok(response(StatusCode::NOT_FOUND, b"{}".to_vec())),
+    }
+}
+
 pub async fn connection(
     stream: BoxStream,
     peer: SocketAddr,
-    s: Arc<Services>,
+    services: Arc<Services>,
     lease: ConnectionLease,
     stop: CancellationToken,
 ) -> Result<()> {
     let lease = Arc::new(Mutex::new(lease));
-    let sent: Sent = Arc::new(Mutex::new(None));
-    let handler_s = s.clone();
-    let handler_sent = sent.clone();
-    let service = service_fn(move |req| {
-        let s = handler_s.clone();
+    let handler = services.clone();
+    let service = service_fn(move |request| {
+        let services = handler.clone();
         let lease = lease.clone();
-        let sent = handler_sent.clone();
         async move {
             let result = deadline(
-                s.ingress.limits.request_timeout_ms,
-                handle(req, peer, s, lease, sent),
+                services.ingress.limits.request_timeout_ms,
+                handle(request, peer, services, lease),
             )
             .await;
             Ok::<_, Infallible>(match result {
-                Ok(r) => r,
-                Err(e) => error(e),
+                Ok(response) => response,
+                Err(error_value) => error(error_value),
             })
         }
     });
     let mut builder = http1::Builder::new();
     builder
         .keep_alive(false)
-        .max_headers(s.ingress.limits.max_http_headers)
-        .max_buf_size(s.ingress.limits.max_http_header_bytes)
+        .max_headers(services.ingress.limits.max_http_headers)
+        .max_buf_size(services.ingress.limits.max_http_header_bytes)
         .timer(TokioTimer::new())
-        .header_read_timeout(Duration::from_millis(s.ingress.limits.connect_timeout_ms));
+        .header_read_timeout(Duration::from_millis(
+            services.ingress.limits.connect_timeout_ms,
+        ));
     let connection = builder.serve_connection(TokioIo::new(stream), service);
     tokio::pin!(connection);
-    // Bound slow response consumers as well as request/body processing.
-    let result = tokio::select! {result=tokio::time::timeout(Duration::from_millis(s.ingress.limits.connect_timeout_ms+s.ingress.limits.request_timeout_ms+s.ingress.limits.write_timeout_ms),connection.as_mut())=>result.map_err(|_|Error::Timeout)?.map_err(|_|Error::Unavailable),_=stop.cancelled()=>{connection.as_mut().graceful_shutdown();tokio::time::timeout(Duration::from_millis(s.ingress.limits.shutdown_timeout_ms),connection).await.map_err(|_|Error::Timeout)?.map_err(|_|Error::Unavailable)}};
-    result?;
-    let delivered = lock(&sent)?.take();
-    if let Some((device, id, attempt)) = delivered {
-        s.router
-            .state(&device, id, attempt, DeliveryState::Sent)
-            .await?;
+    tokio::select! {
+        result = tokio::time::timeout(
+            Duration::from_millis(
+                services.ingress.limits.connect_timeout_ms
+                    + services.ingress.limits.request_timeout_ms
+                    + services.ingress.limits.write_timeout_ms,
+            ),
+            connection.as_mut(),
+        ) => result.map_err(|_| Error::Timeout)?.map_err(|_| Error::Unavailable),
+        _ = stop.cancelled() => {
+            connection.as_mut().graceful_shutdown();
+            tokio::time::timeout(
+                Duration::from_millis(services.ingress.limits.shutdown_timeout_ms),
+                connection,
+            )
+            .await
+            .map_err(|_| Error::Timeout)?
+            .map_err(|_| Error::Unavailable)
+        }
     }
-    Ok(())
 }

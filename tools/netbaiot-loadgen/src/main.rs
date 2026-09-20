@@ -28,6 +28,7 @@ struct Config {
     transport: String,
     address: String,
     http_url: String,
+    management_url: String,
     tls_ca: Option<String>,
     tls_resumption: bool,
     connections: usize,
@@ -41,6 +42,7 @@ struct Config {
     payload_bytes: usize,
     qos: u8,
     subscribe: bool,
+    mqtt_clean_session: bool,
     slow_fraction: f64,
     reconnect_every_secs: f64,
     reconnect_fraction: f64,
@@ -69,6 +71,7 @@ impl Default for Config {
             transport: "mqtt".into(),
             address: "127.0.0.1:1883".into(),
             http_url: "http://127.0.0.1:8080".into(),
+            management_url: "http://127.0.0.1:9090".into(),
             tls_ca: None,
             tls_resumption: false,
             connections: 100,
@@ -82,6 +85,7 @@ impl Default for Config {
             payload_bytes: 256,
             qos: 1,
             subscribe: true,
+            mqtt_clean_session: true,
             slow_fraction: 0.0,
             reconnect_every_secs: 0.0,
             reconnect_fraction: 1.0,
@@ -480,7 +484,7 @@ async fn mqtt_or_tcp(
     if mqtt {
         let mut b = Vec::new();
         text(&mut b, "MQTT");
-        b.extend_from_slice(&[4, 0xc2, 0, 30]);
+        b.extend_from_slice(&[4, 0xc0 | (u8::from(c.mqtt_clean_session) << 1), 0, 30]);
         text(&mut b, &format!("a{id}"));
         text(&mut b, &format!("a{id}"));
         text(&mut b, auth);
@@ -875,7 +879,7 @@ async fn stateless(
             }
         } else {
             let response = http
-                .post(format!("{}/v1/device/messages", c.http_url))
+                .post(format!("{}/v1/device/data", c.http_url))
                 .bearer_auth(format!("a{id}:{SECRET}"))
                 .body(payload)
                 .send()
@@ -932,7 +936,7 @@ async fn commands(
         let at = Instant::now();
         let command = json!({"command_id":Uuid::new_v4().to_string(),"device":{"tenant_id":format!("t{}",id/c.tenant_width),"product_id":"p","device_id":format!("d{id}")},"expires_at":now_ms()+60000,"payload":{"name":"load","arguments":{"issued_ms":now_ms(),"padding":"x".repeat(c.command_padding)}}});
         match client
-            .post(format!("{}/v1/admin/commands", c.http_url))
+            .post(format!("{}/api/v1/devices/commands", c.management_url))
             .bearer_auth(ADMIN)
             .json(&command)
             .send()

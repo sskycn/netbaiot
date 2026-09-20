@@ -384,6 +384,7 @@ dependencies = [
  "netbaiot-core",
  "netbaiot-runtime",
  "netbaiot-transports",
+ "serde_json",
 ]
 
 [[package]]

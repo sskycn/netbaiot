@@ -1,103 +1,79 @@
-# Embedded MQTT server
+# Embedded MQTT 3.1.1 broker
 
-NetbaIoT accepts MQTT connections directly. No external broker or broker crate is
-used. The internal incremental packet codec implements the intentionally limited
-IoT profile below. This is not a claim of full MQTT 3.1.1 conformance.
+NetbaIoT implements MQTT 3.1.1 directly. It does not require an external broker or
+database. The subsystem is layered as incremental packet codec, connection state
+machine, authenticated session attachment, bounded session store, topic trie,
+retained store, QoS engine, and finally the IoT binding/EventBus.
 
-Protocol reference: [OASIS MQTT 3.1.1](https://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html).
+Supported control packets are CONNECT/CONNACK, PUBLISH, PUBACK/PUBREC/PUBREL/PUBCOMP,
+SUBSCRIBE/SUBACK, UNSUBSCRIBE/UNSUBACK, PINGREQ/PINGRESP, and DISCONNECT. QoS0, QoS1,
+and explicit inbound/outbound QoS2 state machines are implemented. MQTT 5, MQTT-SN,
+WebSockets, shared subscriptions, bridge mode, and `$SYS` services are outside this
+phase. MQTT wildcard rules around `$` topics are still enforced.
 
-## Supported profile
+CONNECT authenticates once through the bounded AuthCache. The resulting
+`Arc<AuthenticatedDevice>` is bound to the connection; normal MQTT packets never
+perform remote authentication. MQTT ClientId is not trusted identity. Persistent
+sessions are keyed by `(Authenticated DeviceKey, ClientId)`, so another device or
+tenant cannot inherit or delete a session by copying ClientId. An empty ClientId is
+accepted only with CleanSession=1 and receives a connection-local generated value.
 
-| Packet | Behavior |
-|---|---|
-| CONNECT / CONNACK | MQTT protocol name, level 4; one CONNECT per connection |
-| PUBLISH | QoS 0/1 device uplink and application ACK; exact topic ACL |
-| PUBACK | QoS 1 packet lifecycle, separate from execution state |
-| SUBSCRIBE / SUBACK | Exact own `down` / `up_ack`; QoS 0/1; failed filters get 0x80 |
-| UNSUBSCRIBE / UNSUBACK | Generation-owned exact subscriptions |
-| PINGREQ / PINGRESP | Connected clients only |
-| DISCONNECT | Close and remove clean-session state |
+CleanSession=1 deletes that authenticated identity's old session and always returns
+Session Present=0. CleanSession=0 preserves subscriptions, offline QoS1/2 delivery,
+inbound QoS2, outbound QoS1/2, and packet-ID allocation after socket destruction.
+The default disconnected-session retention policy is 24 hours and is a broker
+resource policy, not MQTT 5 Session Expiry. Expiry is evaluated during new attach;
+all collections remain hard bounded meanwhile.
 
-Only CleanSession=1 is supported; Session Present is always zero. Empty client IDs
-are rejected. Client ID must equal the provisioned credential ID. This prevents
-another authenticated device from claiming somebody else's client ID.
-Username is the credential ID; password is the 64-character provisioned key.
-The credential provider, not username/topic/body parsing, produces `DeviceKey`.
+Subscriptions support exact topic filters, `+`, and final whole-level `#` using a
+topic trie. A root wildcard does not match a topic beginning with `$`. Re-subscribe
+updates the existing entry. The requested subscription QoS and publish QoS combine
+using `min(publish_qos, subscription_qos)`. Authorization permits valid filters only
+inside the bound device namespace. Publishing remains restricted to canonical `up`
+and `down_ack` topics:
 
-CleanSession=0 and any Will request are refused with CONNACK 0x05. Bad credentials
-receive 0x04, invalid client identity 0x02, and tenant connection overload 0x03.
-MQTT 5 CONNECT is refused with a v5-shaped CONNACK reason 0x84 and zero properties;
-other unsupported levels receive the 3.1.1 unsupported-version CONNACK 0x01.
-The MQTT 5 refusal is not MQTT 5 support or an interoperability claim.
-
-QoS2 PUBLISH/control packets are protocol violations and close the connection.
-QoS2 subscriptions receive SUBACK 0x80. Wildcard subscriptions, shared
-subscriptions, persistent sessions, retained messages, LWT, MQTT-over-WebSocket,
-MQTT-SN, bridges and clustering are unsupported. Retained PUBLISH closes the
-connection; NetbaIoT never accepts it and then claims retained persistence. MQTT
-3.1.1 has no negative PUBLISH ACK, so rejected publishes close without PUBACK.
-
-## Topics and authorization
-
-```
+```text
 v1/t/{tenant}/p/{product}/d/{device}/up
 v1/t/{tenant}/p/{product}/d/{device}/up_ack
 v1/t/{tenant}/p/{product}/d/{device}/down
 v1/t/{tenant}/p/{product}/d/{device}/down_ack
 ```
 
-An authenticated device may publish only its own `up` and `down_ack` (the latter
-requires command permission). It may subscribe only to its own `down` (command
-permission) and `up_ack`. `down_ack` accepts only a typed command ACK. Core
-identifiers are 1–64 ASCII bytes from `[A-Za-z0-9_.:-]`. Slash, plus, hash, NUL,
-controls and Unicode identifiers are rejected at provisioning/deserialization.
+Retained publish, replacement, wildcard replay, and zero-payload deletion are
+implemented with count/byte/message/per-tenant bounds. The retained store is bounded
+but wildcard retained replay currently scans that bounded store; this deliberate
+simplicity is measured and listed as a scaling limitation.
 
-Subscriptions have an exact-topic hash index; sending never scans all connected
-clients. Insertion checks connection/device, tenant and global counts. Stale
-session cleanup is generation-conditional. Limits also bound filters per packet,
-UTF-8 topic bytes, topic depth and packet IDs. Syntactically valid wildcards are rejected by ACL (SUBACK 0x80); malformed filters
-(such as `a+` or `a/#/b`) close SUBSCRIBE/UNSUBSCRIBE connections. Valid unsupported
-UNSUBSCRIBE filters are no-ops with UNSUBACK. No wildcard matcher is implemented.
+Will Topic, binary payload, QoS, retain flag, size, syntax, and authorization are
+validated during CONNECT. EOF, network/protocol error, keepalive timeout, and
+connection replacement publish the Will once. DISCONNECT and planned server
+shutdown suppress it. Intentional restart closes sockets without manufacturing a
+client failure.
 
-## State, timers and backpressure
+For canonical uplinks, MQTT application delivery crosses `EventAccepted` before a
+QoS1 PUBACK or QoS2 completion. `EventAccepted` means every required EventBus sink
+reserved count/bytes and was enqueued; it is not a database commit. MQTT QoS2
+prevents duplicate IoT binding for one stored MQTT flow, but it does not promise
+business exactly-once: EventBus recovery is at-least-once and consumers remain
+idempotent.
 
-`Accepted -> AwaitConnect -> Authenticating -> Connected -> Draining -> Closed`.
-No traffic is authenticated before CONNECT succeeds. The connection task owns
-incremental input, protocol state, outbound channel and QoS1 packet identifiers.
-Partial fixed headers, Remaining Length, variable headers and payloads are retained
-until complete. Invalid lengths/flags/UTF-8/zero packet IDs fail without allocating
-from an unchecked length. Each stream holds a global memory reservation.
+Persistent MQTT offline subscription delivery is separate from the command API.
+Explicit management commands still require a live device and return
+`DEVICE_OFFLINE`; they are never silently converted into stored MQTT commands.
 
-Nonzero keepalive expires at 1.5 times its advertised interval, measured since the
-last complete received packet. Keepalive=0 disables the MQTT timer; the separately
-documented server idle policy still closes after 120 seconds by default. Incomplete
-packets have an independent 30-second read deadline. Auth, CONNECT and writes also
-have deadlines. Authentication observes EOF and shutdown before installing a session.
-Buffered partial tails keep their original read deadline, including after cancellation. Control packets count toward device/tenant/global packet rates.
-Publish parsing does not retain the short-lived protocol admission permit across
-codec, PostgreSQL, PUBACK queueing, or socket writes. Durable ingress instead uses
-its own device→tenant→node→byte permits and a bounded 16-item/2 MiB/25 ms wait.
-MQTT 3.1.1 has no negative PUBLISH ACK, so expiration or overload closes without
-PUBACK and releases every partially acquired permit through the connection owner.
+Slow active consumers have a bounded sender. QoS0 is shed when that bound is full;
+QoS1/2 moves to the bounded persistent offline queue where possible. Exhausting the
+offline/session/tenant/global bound sheds that subscriber delivery without
+unbounded waiting tasks. A single subscriber cannot make already-enqueued peers be
+replayed.
 
-Outbound commands have message and encoded-byte permits at connection, tenant and
-node levels. QoS1 commands retain permits until PUBACK or disconnect. Application
-receipt QoS1 entries retain bounded packet state. Packet IDs are nonzero and never
-reused while in flight. Unknown nonzero PUBACK is ignored. QoS1 acknowledgement
-inactivity eventually closes the clean session; durable commands can be retried
-with the same command ID. No packet retransmission timer is spawned per message.
+Planned restart writes one internally consistent, versioned MQTT snapshot with
+SHA-256, restrictive permissions, file fsync, atomic rename, and directory fsync.
+It contains no password or socket/TLS/task state. Reconnect must authenticate before
+the `(DeviceKey, ClientId)` state can resume. Abrupt crash may lose mutations since
+the last successful planned snapshot; this is intentionally not a crash-durable
+broker.
 
-## Acknowledgements
-
-Uplink PUBACK is emitted only after successful configured ingress acceptance in
-this implementation. A subscribed `up_ack` carries the application receipt after
-that same boundary. PostgreSQL mode means transaction commit; development mode
-explicitly says `volatile`. Neither receipt means the business endpoint processed
-the event. Source IDs, not MQTT packet IDs, identify durable duplicates.
-
-Downlink transport writes set `Sent`; PUBACK sets `Received`; neither changes
-execution from `Unknown`. Both callbacks carry the claimed attempt; the store fences
-stale or expired leases before updating command state. A valid device `command_ack` updates execution inside
-the ingress transaction. Downlinks always have retain=false. Subscriptions must
-be restored after reconnect. A command arriving before the device subscribes is
-left for bounded store retry; no claim of offline MQTT session persistence is made.
+See [mqtt-3.1.1-conformance.md](mqtt-3.1.1-conformance.md) and
+[mqtt-session-recovery.md](mqtt-session-recovery.md) for evidence and recovery
+details.

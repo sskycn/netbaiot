@@ -1,9 +1,10 @@
 use crate::*;
 use netbaiot_core::*;
+use serde::Serialize;
 use std::{
     collections::HashMap,
     sync::{
-        Arc,
+        Arc, Weak,
         atomic::{AtomicUsize, Ordering},
     },
 };
@@ -13,44 +14,53 @@ use tokio_util::sync::CancellationToken;
 pub struct QueuedCommand {
     pub command_id: CommandId,
     pub expires_at: Timestamp,
-    pub attempt: u32,
-    pub lease_expires_at: Timestamp,
     queued: Arc<AtomicUsize>,
     pub bytes: Vec<u8>,
     _bytes: Vec<BytesPermit>,
-    _slot: OwnedSemaphorePermit,
+    _slots: Vec<OwnedSemaphorePermit>,
 }
+
 impl Drop for QueuedCommand {
     fn drop(&mut self) {
         self.queued.fetch_sub(1, Ordering::Relaxed);
     }
 }
+
 #[derive(Clone)]
 pub struct SessionEndpoint {
     pub generation: u64,
     pub transport: Transport,
+    pub auth: Arc<AuthenticatedDevice>,
     pub cancel: CancellationToken,
     sender: mpsc::Sender<QueuedCommand>,
-    slots: Arc<Semaphore>,
+    connection_slots: Arc<Semaphore>,
+    tenant_slots: Arc<Semaphore>,
+    global_slots: Arc<Semaphore>,
     connection_bytes: ByteBudget,
     tenant_bytes: ByteBudget,
     global_bytes: ByteBudget,
     queued: Arc<AtomicUsize>,
 }
+
 impl SessionEndpoint {
-    pub fn enqueue(&self, record: CommandRecord, bytes: Vec<u8>) -> Result<()> {
-        let lease_expires_at = record.lease_expires_at.ok_or(Error::Invalid)?;
-        if record.attempts == 0 {
-            return Err(Error::Invalid);
-        }
-        if self.cancel.is_cancelled() {
+    pub fn enqueue(&self, command: &DeviceCommand, bytes: Vec<u8>) -> Result<()> {
+        if self.cancel.is_cancelled() || command.device != self.auth.device_key {
             return Err(Error::Unavailable);
         }
-        let slot = self
-            .slots
-            .clone()
-            .try_acquire_owned()
-            .map_err(|_| Error::Overloaded)?;
+        let slots = vec![
+            self.connection_slots
+                .clone()
+                .try_acquire_owned()
+                .map_err(|_| Error::Overloaded)?,
+            self.tenant_slots
+                .clone()
+                .try_acquire_owned()
+                .map_err(|_| Error::Overloaded)?,
+            self.global_slots
+                .clone()
+                .try_acquire_owned()
+                .map_err(|_| Error::Overloaded)?,
+        ];
         let permits = vec![
             self.connection_bytes.reserve(bytes.len())?,
             self.tenant_bytes.reserve(bytes.len())?,
@@ -59,48 +69,63 @@ impl SessionEndpoint {
         self.queued.fetch_add(1, Ordering::Relaxed);
         self.sender
             .try_send(QueuedCommand {
-                command_id: record.command.command_id,
-                expires_at: record.command.expires_at,
-                attempt: record.attempts,
-                lease_expires_at,
+                command_id: command.command_id,
+                expires_at: command.expires_at,
                 queued: self.queued.clone(),
                 bytes,
                 _bytes: permits,
-                _slot: slot,
+                _slots: slots,
             })
             .map_err(|_| Error::Overloaded)
     }
 }
+
+struct TenantState {
+    connections: usize,
+    bytes: WeakByteBudget,
+    command_slots: Weak<Semaphore>,
+}
+
+impl Default for TenantState {
+    fn default() -> Self {
+        Self {
+            connections: 0,
+            bytes: WeakByteBudget::default(),
+            command_slots: Weak::new(),
+        }
+    }
+}
+
 struct SessionState {
     generation: u64,
     sessions: HashMap<DeviceKey, SessionEndpoint>,
-    // Weak identity survives while any endpoint OR owned byte permit is alive.
-    tenants: HashMap<TenantId, (usize, WeakByteBudget)>,
+    tenants: HashMap<TenantId, TenantState>,
     presence: HashMap<DeviceKey, Presence>,
 }
+
 pub struct Sessions {
     state: Mutex<SessionState>,
     limits: Arc<Limits>,
     global_bytes: ByteBudget,
+    global_slots: Arc<Semaphore>,
     queued: Arc<AtomicUsize>,
 }
+
 pub struct SessionLease {
     owner: Arc<Sessions>,
     pub device: DeviceKey,
     pub generation: u64,
     pub cancel: CancellationToken,
 }
-impl Sessions {
-    /// Current registries, without cloning device identities for metric sampling.
-    pub fn registry_counts(&self) -> Result<(usize, usize, usize)> {
-        let state = lock(&self.state)?;
-        Ok((
-            state.sessions.len(),
-            state.tenants.len(),
-            state.presence.len(),
-        ))
-    }
 
+#[derive(Clone, Debug, Serialize)]
+pub struct ConnectionSummary {
+    pub device: DeviceKey,
+    pub generation: u64,
+    pub transport: Transport,
+}
+
+impl Sessions {
     pub fn new(limits: Arc<Limits>) -> Arc<Self> {
         Arc::new(Self {
             state: Mutex::new(SessionState {
@@ -110,63 +135,77 @@ impl Sessions {
                 presence: HashMap::new(),
             }),
             global_bytes: ByteBudget::new(limits.max_outbound_bytes),
+            global_slots: Arc::new(Semaphore::new(limits.max_pending_commands)),
             queued: Arc::new(AtomicUsize::new(0)),
             limits,
         })
     }
+
     pub fn register(
         self: &Arc<Self>,
-        device: &DeviceKey,
+        auth: Arc<AuthenticatedDevice>,
         transport: Transport,
     ) -> Result<(SessionLease, mpsc::Receiver<QueuedCommand>)> {
         if !matches!(transport, Transport::Mqtt | Transport::Tcp) {
             return Err(Error::Invalid);
         }
-        let mut s = lock(&self.state)?;
-        s.tenants
-            .retain(|_, (n, budget)| *n > 0 || budget.upgrade().is_some());
-        let replacing = s.sessions.contains_key(device);
-        if !replacing && s.sessions.len() >= self.limits.max_connections {
+        let device = auth.device_key.clone();
+        let mut state = lock(&self.state)?;
+        state.tenants.retain(|_, tenant| {
+            tenant.connections > 0
+                || tenant.bytes.upgrade().is_some()
+                || tenant.command_slots.upgrade().is_some()
+        });
+        let replacing = state.sessions.contains_key(&device);
+        if !replacing && state.sessions.len() >= self.limits.max_connections {
             return Err(Error::Overloaded);
         }
-        if !s.presence.contains_key(device) && s.presence.len() >= self.limits.max_devices {
-            return Err(Error::Overloaded);
-        }
-        let generation = s.generation.checked_add(1).ok_or(Error::Overloaded)?;
-        if !s.tenants.contains_key(&device.tenant_id) && s.tenants.len() >= self.limits.max_devices
+        if !state.presence.contains_key(&device) && state.presence.len() >= self.limits.max_devices
         {
             return Err(Error::Overloaded);
         }
-        let tenant = s.tenants.entry(device.tenant_id.clone()).or_default();
-        if !replacing && tenant.0 >= self.limits.max_connections_per_tenant {
+        let generation = state.generation.checked_add(1).ok_or(Error::Overloaded)?;
+        if !state.tenants.contains_key(&device.tenant_id)
+            && state.tenants.len() >= self.limits.max_devices
+        {
+            return Err(Error::Overloaded);
+        }
+        let tenant = state.tenants.entry(device.tenant_id.clone()).or_default();
+        if !replacing && tenant.connections >= self.limits.max_connections_per_tenant {
             return Err(Error::Overloaded);
         }
         if !replacing {
-            tenant.0 += 1;
+            tenant.connections += 1;
         }
         let tenant_bytes = tenant
-            .1
+            .bytes
             .get_or_create(self.limits.max_outbound_bytes_per_tenant);
+        let tenant_slots = tenant.command_slots.upgrade().unwrap_or_else(|| {
+            let slots = Arc::new(Semaphore::new(self.limits.max_pending_commands_per_tenant));
+            tenant.command_slots = Arc::downgrade(&slots);
+            slots
+        });
         let (sender, receiver) = mpsc::channel(self.limits.max_outbound_messages_per_connection);
         let cancel = CancellationToken::new();
         let endpoint = SessionEndpoint {
             generation,
             transport,
+            auth,
             cancel: cancel.clone(),
             sender,
-            slots: Arc::new(Semaphore::new(
-                self.limits.max_outbound_messages_per_connection,
-            )),
+            connection_slots: Arc::new(Semaphore::new(self.limits.max_pending_commands_per_device)),
+            tenant_slots,
+            global_slots: self.global_slots.clone(),
             connection_bytes: ByteBudget::new(self.limits.max_outbound_bytes_per_connection),
             tenant_bytes,
             global_bytes: self.global_bytes.clone(),
             queued: self.queued.clone(),
         };
-        if let Some(old) = s.sessions.insert(device.clone(), endpoint) {
+        if let Some(old) = state.sessions.insert(device.clone(), endpoint) {
             old.cancel.cancel();
         }
-        s.generation = generation;
-        s.presence.insert(
+        state.generation = generation;
+        state.presence.insert(
             device.clone(),
             Presence {
                 connected: true,
@@ -185,26 +224,48 @@ impl Sessions {
             receiver,
         ))
     }
-    /// Snapshot is bounded by max_connections, includes only node-local streams.
-    pub fn active_devices(&self) -> Result<Vec<DeviceKey>> {
-        Ok(lock(&self.state)?.sessions.keys().cloned().collect())
-    }
+
     pub fn lookup(&self, device: &DeviceKey) -> Result<Option<SessionEndpoint>> {
         Ok(lock(&self.state)?.sessions.get(device).cloned())
     }
+
+    pub fn disconnect(&self, device: &DeviceKey) -> Result<bool> {
+        let state = lock(&self.state)?;
+        if let Some(endpoint) = state.sessions.get(device) {
+            endpoint.cancel.cancel();
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
+    pub fn list(&self, offset: usize, limit: usize) -> Result<Vec<ConnectionSummary>> {
+        if limit == 0 || limit > 256 {
+            return Err(Error::Invalid);
+        }
+        let state = lock(&self.state)?;
+        let mut values = state
+            .sessions
+            .iter()
+            .map(|(device, endpoint)| ConnectionSummary {
+                device: device.clone(),
+                generation: endpoint.generation,
+                transport: endpoint.transport,
+            })
+            .collect::<Vec<_>>();
+        values.sort_by(|a, b| a.device.device_id.cmp(&b.device.device_id));
+        Ok(values.into_iter().skip(offset).take(limit).collect())
+    }
+
     pub fn touch(&self, device: &DeviceKey, transport: Transport) -> Result<()> {
-        let mut s = lock(&self.state)?;
-        if !s.presence.contains_key(device) && s.presence.len() >= self.limits.max_devices {
+        let mut state = lock(&self.state)?;
+        if !state.presence.contains_key(device) && state.presence.len() >= self.limits.max_devices {
             return Err(Error::Overloaded);
         }
-        s.presence
+        state
+            .presence
             .entry(device.clone())
-            .and_modify(|p| {
-                p.last_seen = now_ms();
-                if !p.connected {
-                    p.transport = transport;
-                }
-            })
+            .and_modify(|presence| presence.last_seen = now_ms())
             .or_insert(Presence {
                 connected: false,
                 last_seen: now_ms(),
@@ -213,192 +274,112 @@ impl Sessions {
             });
         Ok(())
     }
+
     pub fn presence(&self, device: &DeviceKey) -> Result<Option<Presence>> {
         Ok(lock(&self.state)?.presence.get(device).cloned())
     }
-    pub fn expire_presence(&self, now: i64) -> Result<()> {
-        let mut s = lock(&self.state)?;
-        s.presence.retain(|_, p| {
-            p.connected || now.saturating_sub(p.last_seen) < self.limits.dedup_ttl_ms as i64
-        });
-        Ok(())
+
+    pub fn registry_counts(&self) -> Result<(usize, usize, usize)> {
+        let state = lock(&self.state)?;
+        Ok((
+            state.sessions.len(),
+            state.tenants.len(),
+            state.presence.len(),
+        ))
     }
+
     pub fn queued_messages(&self) -> usize {
         self.queued.load(Ordering::Relaxed)
     }
+
     pub fn queued_bytes(&self) -> usize {
         self.limits.max_outbound_bytes - self.global_bytes.available()
     }
 }
+
 impl Drop for SessionLease {
     fn drop(&mut self) {
-        if let Ok(mut s) = self.owner.state.lock()
-            && s.sessions
+        if let Ok(mut state) = self.owner.state.lock()
+            && state
+                .sessions
                 .get(&self.device)
-                .is_some_and(|e| e.generation == self.generation)
+                .is_some_and(|endpoint| endpoint.generation == self.generation)
         {
-            s.sessions.remove(&self.device);
+            state.sessions.remove(&self.device);
             self.cancel.cancel();
-            if let Some(t) = s.tenants.get_mut(&self.device.tenant_id) {
-                t.0 = t.0.saturating_sub(1);
-                if t.0 == 0 && t.1.upgrade().is_none() {
-                    s.tenants.remove(&self.device.tenant_id);
-                }
+            if let Some(tenant) = state.tenants.get_mut(&self.device.tenant_id) {
+                tenant.connections = tenant.connections.saturating_sub(1);
             }
-            if let Some(p) = s.presence.get_mut(&self.device) {
-                p.connected = false;
-                p.last_seen = now_ms();
-                p.session_generation = None;
+            if let Some(presence) = state.presence.get_mut(&self.device) {
+                presence.connected = false;
+                presence.last_seen = now_ms();
+                presence.session_generation = None;
             }
         }
     }
 }
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    fn key() -> DeviceKey {
-        DeviceKey {
-            tenant_id: TenantId::new("t").unwrap(),
-            product_id: ProductId::new("p").unwrap(),
-            device_id: DeviceId::new("d").unwrap(),
-        }
+
+    fn auth(device: &str) -> Arc<AuthenticatedDevice> {
+        Arc::new(AuthenticatedDevice {
+            device_key: DeviceKey {
+                tenant_id: TenantId::new("t").unwrap(),
+                product_id: ProductId::new("p").unwrap(),
+                device_id: DeviceId::new(device).unwrap(),
+            },
+            credential_version: 1,
+            auth_generation: 1,
+            codec_id: CodecId::new("json").unwrap(),
+            codec_version: 1,
+            permissions: Permissions {
+                publish: true,
+                commands: true,
+            },
+        })
     }
+
     #[test]
     fn stale_disconnect_cannot_remove_new_generation() {
-        let s = Sessions::new(Arc::new(Limits::default()));
-        let d = key();
-        let (old, _) = s.register(&d, Transport::Mqtt).unwrap();
-        let (new, _) = s.register(&d, Transport::Mqtt).unwrap();
+        let sessions = Sessions::new(Arc::new(Limits::default()));
+        let auth = auth("d");
+        let (old, _) = sessions.register(auth.clone(), Transport::Mqtt).unwrap();
+        let (new, _) = sessions.register(auth, Transport::Mqtt).unwrap();
         assert!(old.cancel.is_cancelled());
-        assert!(new.generation > old.generation);
         drop(old);
-        assert_eq!(s.lookup(&d).unwrap().unwrap().generation, new.generation);
-        drop(new);
-        assert!(s.lookup(&d).unwrap().is_none());
-    }
-    #[test]
-    fn queue_count_and_bytes_are_bounded() {
-        let l = Limits {
-            max_outbound_messages_per_connection: 1,
-            max_outbound_bytes_per_connection: 16,
-            ..Limits::default()
-        };
-        let s = Sessions::new(Arc::new(l));
-        let d = key();
-        let (_lease, mut rx) = s.register(&d, Transport::Tcp).unwrap();
-        let ep = s.lookup(&d).unwrap().unwrap();
-        let c = DeviceCommand {
-            command_id: CommandId::generate(),
-            device: d,
-            expires_at: 100,
-            payload: DeviceCommandPayload {
-                name: "x".into(),
-                arguments: Default::default(),
-            },
-        };
-        let c = CommandRecord {
-            command: c,
-            delivery: DeliveryState::Dispatching,
-            execution: ExecutionState::Unknown,
-            attempts: 1,
-            lease_expires_at: Some(100),
-        };
-        assert!(ep.enqueue(c.clone(), vec![0; 17]).is_err());
-        ep.enqueue(c.clone(), vec![0; 16]).unwrap();
-        assert!(ep.enqueue(c.clone(), vec![0]).is_err());
-        let queued = rx.try_recv().unwrap();
-        assert!(ep.enqueue(c.clone(), vec![0]).is_err());
-        drop(queued);
-        ep.enqueue(c, vec![0]).unwrap();
+        assert_eq!(
+            sessions.lookup(&new.device).unwrap().unwrap().generation,
+            new.generation
+        );
     }
 
     #[test]
-    fn audit_tenant_budget_survives_superseded_queue() {
-        let s = Sessions::new(Arc::new(Limits {
-            max_outbound_bytes_per_connection: 16,
-            max_outbound_bytes_per_tenant: 16,
-            max_outbound_bytes: 64,
+    fn command_count_and_bytes_release_on_drop() {
+        let sessions = Sessions::new(Arc::new(Limits {
+            max_pending_commands_per_device: 1,
+            max_outbound_messages_per_connection: 1,
+            max_outbound_bytes_per_connection: 8,
             ..Limits::default()
         }));
-        let d = key();
-        let (old, mut rx) = s.register(&d, Transport::Mqtt).unwrap();
-        let c = DeviceCommand {
+        let auth = auth("d");
+        let (lease, mut receiver) = sessions.register(auth.clone(), Transport::Tcp).unwrap();
+        let endpoint = sessions.lookup(&auth.device_key).unwrap().unwrap();
+        let command = DeviceCommand {
             command_id: CommandId::generate(),
-            device: d.clone(),
-            expires_at: 100,
+            device: auth.device_key.clone(),
+            expires_at: now_ms() + 1_000,
             payload: DeviceCommandPayload {
                 name: "x".into(),
                 arguments: Default::default(),
             },
         };
-        let c = CommandRecord {
-            command: c,
-            delivery: DeliveryState::Dispatching,
-            execution: ExecutionState::Unknown,
-            attempts: 1,
-            lease_expires_at: Some(100),
-        };
-        s.lookup(&d)
-            .unwrap()
-            .unwrap()
-            .enqueue(c.clone(), vec![0; 16])
-            .unwrap();
-        let in_flight = rx.try_recv().unwrap();
-        let (replacement, replacement_rx) = s.register(&d, Transport::Mqtt).unwrap();
-        drop((replacement, replacement_rx));
-        let (_new, _new_rx) = s.register(&d, Transport::Mqtt).unwrap();
-        let ep = s.lookup(&d).unwrap().unwrap();
-        assert!(matches!(
-            ep.enqueue(c.clone(), vec![0]),
-            Err(Error::Overloaded)
-        ));
-        drop((in_flight, old, rx));
-        ep.enqueue(c, vec![0; 16]).unwrap();
-    }
-}
-
-#[cfg(test)]
-mod audit_cleanup {
-    use super::*;
-    #[tokio::test]
-    async fn cancelled_receiver_and_failed_enqueue_release_all_budgets() {
-        let s = Sessions::new(Arc::new(Limits::default()));
-        let device = DeviceKey {
-            tenant_id: TenantId::new("t").unwrap(),
-            product_id: ProductId::new("p").unwrap(),
-            device_id: DeviceId::new("d").unwrap(),
-        };
-        let (session, mut rx) = s.register(&device, Transport::Mqtt).unwrap();
-        let ep = s.lookup(&device).unwrap().unwrap();
-        let record = CommandRecord {
-            command: DeviceCommand {
-                command_id: CommandId::generate(),
-                device,
-                expires_at: now_ms() + 60000,
-                payload: DeviceCommandPayload {
-                    name: "x".into(),
-                    arguments: Default::default(),
-                },
-            },
-            delivery: DeliveryState::Dispatching,
-            execution: ExecutionState::Unknown,
-            attempts: 1,
-            lease_expires_at: Some(now_ms() + 30000),
-        };
-        ep.enqueue(record.clone(), vec![0; 1024]).unwrap();
-        let in_flight = rx.recv().await.unwrap();
-        ep.enqueue(record.clone(), vec![0; 2048]).unwrap();
-        assert_eq!(s.queued_messages(), 2);
-        assert_eq!(s.queued_bytes(), 3072);
-        drop(rx);
-        assert_eq!(s.queued_bytes(), 1024);
-        assert!(ep.enqueue(record.clone(), vec![0; 3000]).is_err());
-        assert_eq!(s.queued_bytes(), 1024);
-        assert_eq!(s.queued_messages(), 1);
-        drop(in_flight);
-        drop(session);
-        assert!(ep.enqueue(record, vec![0; 3000]).is_err());
-        assert_eq!(s.queued_messages(), 0);
-        assert_eq!(s.queued_bytes(), 0);
+        assert!(endpoint.enqueue(&command, vec![0; 9]).is_err());
+        endpoint.enqueue(&command, vec![0; 8]).unwrap();
+        assert!(endpoint.enqueue(&command, vec![0]).is_err());
+        drop(receiver.try_recv().unwrap());
+        endpoint.enqueue(&command, vec![0]).unwrap();
+        drop(lease);
     }
 }

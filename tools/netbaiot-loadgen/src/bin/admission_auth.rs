@@ -91,6 +91,7 @@ fn main() -> BenchResult<()> {
         identity: AuthenticatedDevice {
             device_key: key(0, 1)?,
             credential_version: 1,
+            auth_generation: 1,
             codec_id: CodecId::new("netbaiot-json")?,
             codec_version: 1,
             permissions: Permissions {

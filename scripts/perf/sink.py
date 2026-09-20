@@ -7,7 +7,22 @@ async def main():
     stop = asyncio.Event()
     tasks = set()
     stats = dict(received=0, rejected=0, active=0, max_active=0)
+    latency_ms = [0] * 60001
+    latency_count = 0
+    def percentiles():
+        if latency_count == 0: return dict(count=0, p50_ms=0, p95_ms=0, p99_ms=0)
+        result = dict(count=latency_count)
+        for name, ratio in (("p50_ms", .50), ("p95_ms", .95), ("p99_ms", .99)):
+            target = max(1, int(latency_count * ratio + .999999))
+            seen = 0
+            for value, count in enumerate(latency_ms):
+                seen += count
+                if seen >= target:
+                    result[name] = value
+                    break
+        return result
     async def client(reader, writer):
+        nonlocal latency_count
         task = asyncio.current_task(); tasks.add(task)
         stats['active'] += 1; stats['max_active'] = max(stats['max_active'], stats['active'])
         try:
@@ -21,7 +36,15 @@ async def main():
                 fields = dict(line.split(b':', 1) for line in header.split(b'\r\n')[1:] if b':' in line)
                 size = int(next((v for k,v in fields.items() if k.lower()==b'content-length'), b'0'))
                 if not 0 <= size <= 65536: raise ValueError('body limit')
-                await asyncio.wait_for(reader.readexactly(size), 5)
+                body = await asyncio.wait_for(reader.readexactly(size), 5)
+                try:
+                    event = json.loads(body)
+                    received_at = int(event["received_at"])
+                    elapsed = max(0, min(60000, int(time.time() * 1000) - received_at))
+                    latency_ms[elapsed] += 1
+                    latency_count += 1
+                except (KeyError, TypeError, ValueError, json.JSONDecodeError):
+                    stats['rejected'] += 1
                 settings = json.loads(open(control).read())
                 await asyncio.sleep(min(float(settings.get('delay', 0)), 10))
                 status = int(settings.get('status', 204))
@@ -42,7 +65,7 @@ async def main():
     while not stop.is_set():
         try: await asyncio.wait_for(stop.wait(), 1)
         except asyncio.TimeoutError: pass
-        print(json.dumps(dict(epoch=time.time(), **stats)), flush=True)
+        print(json.dumps(dict(epoch=time.time(), latency=percentiles(), **stats)), flush=True)
     server.close(); await server.wait_closed()
     for task in list(tasks): task.cancel()
     await asyncio.gather(*list(tasks), return_exceptions=True)

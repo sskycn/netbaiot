@@ -1,4 +1,4 @@
-use crate::mqtt::topics::Subscriptions;
+use crate::mqtt::broker::MqttBroker;
 use bytes::BytesMut;
 use netbaiot_core::Transport;
 use netbaiot_runtime::*;
@@ -14,30 +14,67 @@ use tokio_util::sync::CancellationToken;
 pub trait Stream: AsyncRead + AsyncWrite + Unpin + Send {}
 impl<T: AsyncRead + AsyncWrite + Unpin + Send> Stream for T {}
 pub type BoxStream = Box<dyn Stream>;
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum HttpRole {
+    Device,
+    Management,
+}
 pub struct Services {
-    pub admin: Option<AdminAccess>,
+    pub admin: Option<Arc<AdminAccess>>,
+    pub http_role: HttpRole,
+    pub shutdown: CancellationToken,
+    pub control_lock: Arc<tokio::sync::Mutex<()>>,
     pub http_slots: Arc<tokio::sync::Semaphore>,
     pub ingress: Arc<Ingress>,
     pub router: Arc<CommandRouter>,
     pub connections: Arc<Connections>,
-    pub rates: RateLimiter,
+    pub rates: Arc<RateLimiter>,
     pub protocol_admission: Arc<Admission>,
-    pub subscriptions: Arc<Subscriptions>,
+    pub mqtt: Arc<MqttBroker>,
 }
 impl Services {
-    pub fn new(ingress: Arc<Ingress>) -> Arc<Self> {
+    pub fn new(ingress: Arc<Ingress>, shutdown: CancellationToken) -> Arc<Self> {
+        let limits = ingress.limits.clone();
+        let mqtt = MqttBroker::new(limits.clone());
+        Self::new_with_mqtt(ingress, shutdown, mqtt)
+    }
+
+    pub fn new_with_mqtt(
+        ingress: Arc<Ingress>,
+        shutdown: CancellationToken,
+        mqtt: Arc<MqttBroker>,
+    ) -> Arc<Self> {
         let limits = ingress.limits.clone();
         Arc::new(Self {
             admin: None,
+            http_role: HttpRole::Device,
+            shutdown,
+            control_lock: Arc::new(tokio::sync::Mutex::new(())),
             http_slots: Arc::new(tokio::sync::Semaphore::new(limits.max_ingress)),
             router: Arc::new(CommandRouter {
                 ingress: ingress.clone(),
             }),
             connections: Connections::new(limits.clone(), ingress.metrics.clone()),
-            rates: RateLimiter::new(limits.clone()),
+            rates: Arc::new(RateLimiter::new(limits.clone())),
             protocol_admission: Admission::new(limits.clone()),
-            subscriptions: Subscriptions::new(limits),
+            mqtt,
             ingress,
+        })
+    }
+
+    pub fn with_http_role(self: &Arc<Self>, role: HttpRole) -> Arc<Self> {
+        Arc::new(Self {
+            admin: self.admin.clone(),
+            http_role: role,
+            shutdown: self.shutdown.clone(),
+            control_lock: self.control_lock.clone(),
+            http_slots: self.http_slots.clone(),
+            ingress: self.ingress.clone(),
+            router: self.router.clone(),
+            connections: self.connections.clone(),
+            rates: self.rates.clone(),
+            protocol_admission: self.protocol_admission.clone(),
+            mqtt: self.mqtt.clone(),
         })
     }
 }
@@ -62,6 +99,11 @@ impl Reader {
         // packet must not grant them a fresh read budget.
         if self.buffer.is_empty() {
             self.started = None;
+            // A rare large frame must not pin its allocation for the lifetime of
+            // an otherwise idle connection. The threshold avoids churn for normal traffic.
+            if self.buffer.capacity() > 16 * 1024 {
+                self.buffer = BytesMut::with_capacity(self.maximum.min(4096));
+            }
         }
     }
     pub async fn read_more(
@@ -184,6 +226,16 @@ pub fn local_addr(listener: &TcpListener) -> Result<SocketAddr> {
 #[cfg(test)]
 mod audit_deadlines {
     use super::*;
+    #[test]
+    fn large_empty_read_buffer_is_replaced_with_small_initial_capacity() {
+        let mut reader = Reader::new(65_536, 30);
+        assert!(reader.buffer.capacity() <= 4_096);
+        reader.buffer.reserve(32_768);
+        reader.buffer.extend_from_slice(&[0; 32_768]);
+        reader.buffer.clear();
+        reader.consumed();
+        assert!(reader.buffer.capacity() <= 4_096);
+    }
     #[tokio::test(start_paused = true)]
     async fn audit_expired_packet_rejects_even_ready_socket_bytes() {
         let (mut peer, mut stream) = tokio::io::duplex(64);

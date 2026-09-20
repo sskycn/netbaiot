@@ -1,641 +1,225 @@
 # AGENTS.md
 
-## Project
+## Product
 
-This project is a high-performance IoT device access platform written in Rust.
+NetbaIoT is a high-performance, low-memory, database-free, event-driven IoT
+protocol gateway and real-time event router written in Rust.
 
-Supported transports:
-
-* HTTP
-* MQTT
-* TCP
-* UDP
-
-The architecture must remain extensible to additional transports and device protocols.
+Supported device transports are HTTP, embedded MQTT, generic TCP, and UDP.
+NetbaIoT implements MQTT directly; do not introduce an external broker.
 
 Priority order:
 
 > Correctness > Resource Safety > Reliability > Maintainability > Performance
 
-## Local Dependency Paths
+The runtime responsibilities are exactly:
 
-When native dependency discovery is required, use the following local library
-directories:
+```text
+CONNECT -> AUTHENTICATE -> DECODE -> NORMALIZE -> ROUTE -> SEND
+```
 
-* PostgreSQL: `/opt/local/lib/pgsql`
-* ICU: `/opt/local/lib/icu`
+Business systems own historical telemetry, business data, analytics, workflows,
+offline commands, and durable command history. The gateway runtime must not depend
+on PostgreSQL, SQLite, Redis, RocksDB, Kafka, NATS, RabbitMQ, LMDB, sled, or another
+database/message store.
 
-Do not assume PostgreSQL or ICU libraries are installed in system or Homebrew
-library paths.
-
----
+The only runtime persistence allowed is the local restart recovery spool described
+below. It is not a hot-path queue or a general event store.
 
 ## Architecture
 
-Keep transport, device protocol, and business logic strictly separated.
+Keep transport, device protocol, authentication/control state, event routing,
+business egress, command routing, and restart recovery strictly separated.
 
 ```text
 Device
   -> Transport Adapter
-  -> Authentication / Session
-  -> Codec
-  -> Unified DeviceMessage
-  -> Message Bus
-  -> Business Services
+  -> Authentication / bound AuthContext
+  -> versioned DeviceCodec
+  -> DeviceEvent
+  -> bounded EventBus / Router
+  -> independently bounded business sinks
 ```
 
-### Transport
+Transport adapters own connections, framing, network I/O, transport lifecycle,
+and transport metadata only. Vendor parsing belongs in synchronous, replaceable,
+versioned codecs. MQTT packets/topics, raw sockets, HTTP headers, and UDP socket
+state must not leak into core business events.
 
-Transport adapters handle only:
+All HTTP/MQTT/TCP/UDP uplinks converge on `DeviceEvent`. Every event has a stable
+`event_id`; retries and restart replay must preserve it.
 
-* connections
-* framing
-* network I/O
-* transport lifecycle
-* transport metadata
+## EventAccepted
 
-Business logic must not depend on whether a message came from HTTP, MQTT, TCP, or UDP.
+One exact boundary applies to every transport. An event is accepted only after:
 
-### Device Protocol
+1. authentication and authorization;
+2. protocol and codec validation;
+3. route selection;
+4. count and byte resource admission;
+5. all required sink capacity is reserved atomically; and
+6. all required sink deliveries are enqueued.
 
-Vendor/device protocol parsing belongs in codecs.
+Required-sink fanout admission is all-or-nothing and uses deterministic `SinkId`
+ordering. A QoS1 MQTT PUBACK or successful device HTTP upload response means only
+that this boundary was crossed. It does not mean business persistence or processing.
 
-Do not hardcode product-specific parsing inside gateways.
+Required sinks need explicit acknowledgement. Best-effort sinks may drop according
+to their bounded policy and do not normally block acceptance. Every sink has an
+independent count/byte queue, concurrency, timeout, retry policy, and failure policy.
+One slow sink must not create an unbounded backlog or block unrelated sinks.
 
-Codecs must be replaceable and versioned.
+At-least-once delivery and possible replay duplicates are expected. Business
+consumers must process `event_id` idempotently. Exactly-once is not claimed.
 
-```rust
-pub trait DeviceCodec: Send + Sync {
-    fn decode(
-        &self,
-        ctx: &DecodeContext,
-        payload: &[u8],
-    ) -> Result<Vec<DeviceMessage>, CodecError>;
+## Authentication and configuration
 
-    fn encode(
-        &self,
-        ctx: &EncodeContext,
-        command: &DeviceCommand,
-    ) -> Result<EncodedMessage, CodecError>;
-}
-```
+MQTT/TCP authenticate once and bind an immutable `Arc<AuthenticatedDevice>` to the
+connection. Normal packets/frames must not call an auth or control-plane service.
 
-Do not make codec methods async unless they actually perform asynchronous work.
+The auth cache and configuration cache are separate and bounded by count and bytes.
+Auth caching includes positive/negative TTLs, eviction, safe credential fingerprints,
+explicit invalidation, and bounded single-flight misses. Raw credentials must never
+be logged or used as metric labels. Cache misses fail closed when the provider is
+unavailable; valid sessions and unexpired positive entries may continue.
 
----
+Control-plane snapshots are revisioned, validated completely, and atomically
+replaced. Runtime configuration is shared through `Arc`; do not clone large product
+or device configuration per connection. Auth/config caches are rebuilt after restart
+and never written to the restart spool.
 
-## Unified Message Model
+## Embedded MQTT
 
-All uplink messages must eventually become a common `DeviceMessage`.
+The supported profile remains MQTT 3.1.1 CONNECT, QoS0/1 PUBLISH, PUBACK,
+CleanSession, and exact topic subscriptions. MQTT5, QoS2, persistent sessions,
+retained messages, LWT, wildcard routing, and broker clustering are out of scope.
 
-Prefer strong domain types over raw strings.
+Preserve incremental parsing, hard Remaining Length limits, strict UTF-8, canonical
+topic namespaces, authenticated identity checks, packet deadlines, bounded packet
+IDs, and session-generation fencing. Never trust identity parsed from a topic.
 
-```rust
-pub struct TenantId(Arc<str>);
-pub struct ProductId(Arc<str>);
-pub struct DeviceId(Arc<str>);
-pub struct MessageId(Uuid);
-pub struct CommandId(Uuid);
-```
+## TCP and UDP
 
-Avoid using `HashMap<String, Value>` as the primary domain model.
+TCP is a byte stream: framing must handle split headers/payloads, multiple frames,
+oversized/invalid frames, partial disconnects, slow readers, and bounded writes.
+Framing remains separate from `DeviceCodec`.
 
-Vendor-specific message types must not leak into core business logic.
+UDP is connectionless. Preserve hard datagram limits, HMAC authentication, timestamp
+and replay protection, and spoofing/amplification protections. Do not create a
+long-lived UDP session.
 
----
+## Commands and sessions
 
-## Rust
+Commands route only to a currently connected local MQTT/TCP session. If no live
+deliverable session exists, return `DEVICE_OFFLINE`/`Error::Unavailable`. Never
+persist or silently queue an offline command. Business systems own retry and offline
+storage.
 
-Use stable, idiomatic Rust unless the project explicitly requires otherwise.
+Every command has `command_id`. Keep transport `SENT`, device receipt, and device
+execution distinct. A socket write is not execution. Device command ACK/results
+return through the normal `DeviceEvent` path.
 
-Prefer:
+Command queues are bounded per device/connection, tenant, and process by count and
+bytes, with TTL. Old session disconnects must not invalidate a newer generation.
+Real sockets and command handles remain node-local; multi-node routing is not solved.
 
-* Tokio for async I/O
-* `bytes` for network buffers
-* `thiserror` for library errors
-* `tracing` for structured logging
+## Bounded resources
 
-Production request paths must not rely on:
+Every runtime resource needs count and byte limits where payload size varies:
+connections, buffers, admissions, queues, sinks, events, fanout, tasks, commands,
+caches, retries, subscriptions, and replay state. Waiting work is itself bounded.
 
-```rust
-unwrap()
-expect()
-panic!()
-todo!()
-unimplemented!()
-```
+Do not hide overload behind spawned tasks waiting on a semaphore/channel. Do not use
+unbounded channels. Do not preallocate maximum packet/frame or outbound queue sizes
+per idle connection. Readers start small, grow only to a hard maximum, and should
+release abnormally large retained capacity after measured need.
 
-Exceptions are acceptable only for clearly unrecoverable process initialization errors.
+Every task has an owner, lifetime, shutdown path, concurrency bound, and failure
+policy. Avoid blocking I/O on Tokio workers and locks across `.await`.
 
-Avoid `unsafe`.
+Treat all network/control/spool input as hostile. Validate lengths before allocation
+and use checked arithmetic/conversions. Production request paths must not use
+`unwrap`, `expect`, `panic!`, `todo!`, or `unimplemented!` for recoverable failures.
+Avoid `unsafe`; if unavoidable, document invariants and add targeted tests.
 
-If `unsafe` is necessary:
+## Graceful lifecycle and restart spool
 
-* keep the scope minimal
-* document invariants with `// SAFETY:`
-* add targeted tests
-* justify it with measured need
-
----
-
-## Async and Tasks
-
-Do not use unbounded concurrency.
-
-Every spawned task must have a clear:
-
-* owner
-* lifetime
-* shutdown path
-* concurrency bound
-* failure policy
-
-Never write patterns equivalent to:
-
-```rust
-loop {
-    let item = recv().await;
-    tokio::spawn(handle(item));
-}
-```
-
-without a hard concurrency limit.
-
-Prefer:
-
-* `Semaphore`
-* `JoinSet`
-* bounded worker pools
-* `buffer_unordered(n)`
-
-Do not perform blocking I/O on Tokio worker threads.
-
-Use async APIs or `spawn_blocking` where appropriate.
-
-Avoid holding locks across `.await`.
-
----
-
-## Bounded Resources
-
-All runtime resources must be bounded.
-
-This includes:
-
-* connections
-* tasks
-* queues
-* buffers
-* frames
-* packets
-* HTTP bodies
-* pending writes
-* pending commands
-* caches
-* deduplication state
-* retries
-
-Prefer bounded channels:
-
-```rust
-tokio::sync::mpsc::channel(capacity)
-```
-
-Avoid `unbounded_channel()` unless bounded growth is formally guaranteed.
-
-Every queue must define:
-
-* capacity
-* producer
-* consumer
-* overflow behavior
-* shutdown behavior
-
-Never solve overload by allowing memory to grow indefinitely.
-
----
-
-## Untrusted Input
-
-Treat all device/network input as hostile.
-
-Never allocate directly from an untrusted length.
-
-Bad:
-
-```rust
-let len = parse_len(input);
-let data = vec![0; len];
-```
-
-Required:
-
-```rust
-let len = parse_len(input)?;
-
-if len > MAX_FRAME_SIZE {
-    return Err(Error::FrameTooLarge);
-}
-```
-
-Use checked conversions and arithmetic:
-
-```rust
-usize::try_from(value)?
-checked_add(...)
-checked_mul(...)
-```
-
-All protocols must enforce hard size limits.
-
----
-
-## HTTP
-
-HTTP endpoints must define hard limits for:
-
-* body size
-* headers
-* request timeout
-* rate limits
-
-If processing is asynchronous, do not claim downstream processing completed when only ingestion succeeded.
-
-A successful HTTP response may mean only that the message was accepted for processing.
-
----
-
-## MQTT
-
-Do not implement an MQTT broker unless there is a strong project-specific reason.
-
-Prefer integrating with a mature broker.
-
-MQTT topics and ACLs must prevent one device from accessing another device's data.
-
-MQTT-specific details must not leak into downstream business services.
-
----
-
-## TCP
-
-TCP is a byte stream.
-
-Never assume:
+The lifecycle is:
 
 ```text
-one read == one message
+STARTING -> RUNNING -> QUIESCING -> DRAINING -> SPOOLING -> DRAINED -> EXIT
 ```
 
-Frame decoders must correctly handle:
+Quiesce first makes readiness false, closes the ingress admission gate, waits for
+active admission guards, stops new connections/uploads/commands/config mutation,
+then drains accepted required deliveries.
 
-* partial headers
-* partial payloads
-* multiple frames per read
-* oversized frames
-* invalid frames
-* disconnects during frames
+Before a successful planned exit, every pending required delivery must either:
 
-Per-connection memory must remain bounded.
+1. receive its sink acknowledgement; or
+2. be written to the local restart spool, fsynced, atomically renamed, and followed
+   by a directory fsync where supported.
 
-Slow consumers must not create unlimited pending writes.
+Spool records preserve the event, stable `event_id`, pending sink IDs, routing
+revision, and needed attempt metadata. The format is versioned, length bounded, and
+checksummed. Decode all spool lengths as hostile. Spool count, record, segment, and
+total bytes are hard limited. Restrict file permissions. Do not delete committed
+spool state until the corresponding required work is acknowledged.
 
-Use bounded outbound queues and write timeouts.
+Inflight delivery without observed ACK is uncertain and must be spooled; replay may
+duplicate it. If spool write, capacity, checksum, fsync, or rename fails while
+accepted required work remains, shutdown must return failure and must not claim a
+successful graceful exit.
 
----
+Abrupt process/machine/power failure may lose a bounded amount of non-spooled memory
+traffic. This is intentional and must be documented honestly; do not claim crash
+durability.
 
-## UDP
+## HTTP boundaries
 
-UDP is connectionless.
+Device HTTP and management HTTP use separately configurable listeners and separate
+authorization. Device endpoints live under `/v1/device/...`; management endpoints
+live under `/api/v1/...`. Device credentials never authorize management operations.
 
-Do not model UDP using TCP session semantics.
+HTTP bodies, headers, concurrency, response bodies, and deadlines are bounded.
+Device configuration uses explicit revision/ETag semantics. Delivering configuration
+is not the same as the device applying it; application ACK is a `ConfigAck` event.
 
-Account for:
+Webhook success is a configured 2xx ACK. Confirmed TCP/RPC streams require an
+application `ACK event_id`; a socket write alone is not confirmation.
 
-* packet loss
-* duplicates
-* reordering
-* replay
-* spoofing
-* MTU limits
+## Security and observability
 
-Prefer small datagrams and avoid IP fragmentation.
+Preserve protections against malformed/oversized packets, invalid UTF-8, topic
+spoofing, cross-device access, connection floods, slowloris, partial-frame attacks,
+UDP replay/spoofing, callback amplification, and malformed ACKs. Public stream
+transports should use TLS.
 
-Authentication should support replay protection using fields such as:
+Never log passwords, secrets, access tokens, authorization headers, HMAC keys, raw
+credentials, or full sensitive spool contents. Metrics use a closed low-cardinality
+label vocabulary; device/event/command/client IDs, revisions, and sink URLs belong
+in logs/traces, never labels.
+
+## Testing and measurement
+
+Protocol parsers cover valid, truncated, malformed, oversized, boundary, split, and
+multi-frame inputs. Arbitrary bytes must not panic or allocate without a checked
+bound. Preserve fuzz targets and add them for new spool/business framing decoders.
+
+Tests must cover auth/config caches, required admission rollback, count/byte cleanup,
+slow-sink isolation, live-session command routing, lifecycle gate races, restart
+recovery, corruption, spool failure, duplicate replay, and the invariant:
 
 ```text
-device_id
-timestamp
-sequence
-nonce
-signature
+1 successful authentication + 10,000 MQTT publishes = 1 provider call
 ```
 
----
-
-## Sessions
-
-Real MQTT/TCP connections belong to the local gateway node.
-
-Distributed session storage should contain routing metadata, not socket state.
-
-Example:
-
-```text
-device_id -> gateway_node_id
-```
-
-Handle:
-
-* reconnects
-* duplicate logins
-* stale sessions
-* node crashes
-* delayed disconnect events
-
-Use a session generation/version when needed so an old disconnect cannot invalidate a newer session.
-
-HTTP and UDP must not be given long-lived connection semantics unless explicitly implemented by the protocol design.
-
----
-
-## Commands
-
-Downlink commands must use a common command model.
-
-Every command must have a unique `command_id`.
-
-Keep transport send state separate from device acknowledgement.
-
-```text
-SENT != ACKED
-```
-
-A successful transport write does not mean the device executed the command.
-
-Pending commands must have:
-
-* TTL
-* per-device limit
-* per-tenant limit
-
-Offline commands must never accumulate without bounds.
-
----
-
-## Delivery Semantics
-
-Assume end-to-end delivery is:
-
-```text
-At-Least-Once
-```
-
-Do not rely on exactly-once delivery.
-
-Consumers must be idempotent.
-
-Use identifiers such as:
-
-* `message_id`
-* `device_id + sequence`
-* `command_id`
-
-for deduplication where appropriate.
-
-Deduplication state itself must be bounded by capacity and TTL.
-
----
-
-## Backpressure
-
-Every stage must define behavior when downstream processing is slower than upstream input.
-
-Never use unlimited in-memory buffering.
-
-Possible policies include:
-
-* wait
-* reject
-* drop permitted data
-* disconnect
-* shed load
-* persist to bounded storage
-
-Critical messages and telemetry may use different overload policies.
-
----
-
-## Retries and Timeouts
-
-Every external operation must have a timeout.
-
-This includes:
-
-* database calls
-* Redis
-* Kafka
-* HTTP
-* authentication services
-* command routing
-
-Retries must be:
-
-* bounded
-* limited to retryable errors
-* exponential backoff
-* jittered
-
-Never implement infinite retry loops.
-
----
-
-## Storage and Caches
-
-Database queries that grow with dataset size must be bounded or paginated.
-
-Avoid:
-
-* unbounded list APIs
-* loading entire tables
-* N+1 queries
-* unnecessary hot-path database calls
-
-Every cache must define:
-
-* maximum capacity
-* TTL
-* eviction policy
-* metrics
-
-Do not use permanently growing `HashMap`s as caches.
-
----
-
-## Hot Path
-
-Typical hot-path operations include:
-
-```text
-network read
-frame decode
-authentication/session lookup
-codec decode
-normalization
-queue send
-message publish
-```
-
-Avoid in the hot path:
-
-* blocking calls
-* database round trips
-* large allocations
-* large clones
-* repeated config parsing
-* excessive logging
-
-Optimize only after measurement.
-
----
-
-## Observability
-
-Use structured logging with `tracing`.
-
-Do not use `println!` or `dbg!` in production paths.
-
-Important operations should expose appropriate metrics for:
-
-* connections
-* requests
-* messages
-* bytes
-* authentication failures
-* decode failures
-* queue depth
-* queue drops
-* command latency
-* timeouts
-* dependency latency
-
-Do not use high-cardinality identifiers such as `device_id` or `message_id` as Prometheus labels.
-
-Put those in logs/traces instead.
-
----
-
-## Graceful Shutdown
-
-Long-running services must support graceful shutdown.
-
-Shutdown should:
-
-1. stop accepting new work
-2. enter draining state
-3. stop creating new tasks
-4. finish bounded in-flight work
-5. flush required data
-6. close connections
-7. terminate remaining tasks within a deadline
-
-Do not leak tasks, timers, queues, or sessions during shutdown.
-
----
-
-## Security
-
-Always consider:
-
-* malformed packets
-* oversized payloads
-* replay attacks
-* forged device identity
-* connection floods
-* slow clients
-* invalid UTF-8
-* integer overflow
-* memory amplification
-* log/credential leakage
-
-Never log:
-
-* passwords
-* secrets
-* access tokens
-* full authorization headers
-* raw credentials
-
-Public network transports should support TLS.
-
----
-
-## Testing
-
-Changes must include appropriate tests.
-
-Protocol parsers should test at least:
-
-* valid input
-* truncated input
-* invalid headers
-* invalid lengths
-* oversized input
-* boundary sizes
-* malformed input
-
-TCP framing must test:
-
-* split frames
-* multiple frames per read
-* partial frames
-* oversized frames
-
-Prefer fuzzing/property testing for binary protocol decoders.
-
-A parser receiving arbitrary bytes must not panic or allocate unbounded memory.
-
----
-
-## Performance
-
-Do not optimize based on intuition alone.
-
-Use measurement:
-
-* benchmarks
-* profiling
-* allocation data
-* P50/P95/P99 latency
-* throughput
-* CPU
-* RSS
-* queue depth
-
-Any significant performance change should provide before/after evidence when practical.
-
-Do not introduce complexity or `unsafe` for theoretical micro-optimizations.
-
----
-
-## Dependencies
-
-Before adding a crate, check:
-
-* whether existing dependencies already solve the problem
-* maintenance status
-* transitive dependency cost
-* unsafe usage
-* hot-path impact
-* license compatibility
-
-Do not add dependencies casually.
-
----
-
-## Code Quality
-
-Before completing a change, run relevant checks:
+Connection memory, throughput, latency, slow sinks, restart cycles, SIGKILL loss,
+and soak behavior require actual measurement. Never present a configured maximum,
+microbenchmark, burst, or historical database-era result as current production
+capacity.
+
+Before completing changes run:
 
 ```bash
 cargo fmt --all -- --check
@@ -643,56 +227,26 @@ cargo clippy --workspace --all-targets --all-features -- -D warnings
 cargo test --workspace --all-features
 ```
 
-Run relevant benchmarks or fuzz/property tests when changing hot paths or protocol parsers.
+Run relevant fuzz, subprocess restart, slow-sink, outage, memory, load, and soak
+tests for affected paths. State exactly what was and was not run.
 
-Do not claim tests were run unless they were actually executed.
+## MQTT 3.1.1 invariants
 
----
+MQTT 3.1.1 is implemented internally. MQTT packet/session/QoS state remains separate
+from IoT `DeviceEvent` business state. Persistent sessions, subscriptions, offline
+queues, retained messages, Will payloads, packet buffers, and QoS inflight state are
+count- and byte-bounded.
 
-## Agent Rules
+Persistent session ownership is `(Authenticated DeviceKey, ClientId)`; ClientId is
+never trusted identity. CONNECT authenticates once and binds the AuthContext. No
+normal PUBLISH, SUBSCRIBE, UNSUBSCRIBE, or QoS packet may trigger per-message remote
+authentication.
 
-Before changing code:
+QoS2 uses explicit inbound/outbound state. MQTT Packet Identifier is protocol state,
+not EventId, and is reusable only after its lifecycle completes. MQTT QoS2 is not a
+business exactly-once promise.
 
-1. Read the relevant implementation.
-2. Read related tests.
-3. Understand ownership and lifecycle.
-4. Identify resource bounds.
-5. Understand failure and shutdown paths.
-6. Reuse existing abstractions when appropriate.
-
-Do not hide root causes by:
-
-* increasing queue sizes
-* increasing timeouts
-* swallowing errors
-* adding infinite retries
-* removing failing tests
-
-Keep changes focused.
-
-Do not perform unrelated refactors unless required to fix the underlying problem.
-
----
-
-## Non-Negotiable Invariants
-
-1. Transport and device protocol are separate.
-2. HTTP, MQTT, TCP, and UDP converge on a unified message model.
-3. Device codecs are pluggable and versioned.
-4. Gateways contain minimal business logic.
-5. Long-lived connection state is node-local.
-6. All queues are bounded.
-7. All externally controlled sizes have hard limits.
-8. All background tasks have defined lifetimes.
-9. All external calls have timeouts.
-10. All retries are bounded.
-11. All caches and pending state are bounded.
-12. Slow devices cannot exhaust node resources.
-13. A single device cannot exhaust tenant resources.
-14. A single tenant cannot exhaust cluster resources.
-15. `SENT` never means `ACKED`.
-16. At-least-once delivery is assumed.
-17. Consumers must tolerate duplicates.
-18. No untrusted input may cause unbounded allocation.
-19. Resource safety takes priority over micro-optimizations.
-20. Performance claims require evidence.
+Will topic/payload/QoS/retain and retained state are validated, authorized, and
+bounded. Planned shutdown suppresses Will and atomically snapshots required MQTT
+protocol state. Reconnect must authenticate before restoring it. Abrupt crash may
+lose recent in-memory MQTT state. No runtime broker or database is required.

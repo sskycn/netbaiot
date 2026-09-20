@@ -1,5 +1,6 @@
 use std::sync::atomic::{AtomicU64, Ordering};
-/// Closed label vocabulary. Never attach client or device identifiers.
+
+/// Closed metric vocabulary: identifiers and URLs are never labels.
 #[derive(Clone, Copy)]
 #[repr(usize)]
 pub enum Metric {
@@ -18,32 +19,37 @@ pub enum Metric {
     TcpFrames,
     UdpDatagrams,
     AuthFailures,
+    AuthCacheHits,
+    AuthCacheMisses,
+    AuthNegativeHits,
+    AuthEvictions,
+    AuthInvalidations,
     CodecFailures,
     IngressAccepted,
     IngressRejected,
-    DedupHits,
+    IngressBytes,
+    ProtocolAdmissionRejects,
+    IngressAdmissionRejects,
     QueueRejects,
     CommandQueued,
     CommandSent,
-    CommandAcked,
     CommandReceived,
-    IngressBytes,
+    CommandAcked,
     CommandFailed,
-    DeliverySuccess,
-    DeliveryFailed,
-    DeliveryLatencyMs,
-    DatabaseLatencyMs,
+    EventsAccepted,
+    EventsRejected,
+    EventBytes,
+    SinkAcks,
+    SinkRetries,
+    SinkFailures,
+    SinkDrops,
+    SpoolRecords,
+    SpoolBytes,
+    RecoveryRecords,
     Timeouts,
-    ProtocolAdmissionRejects,
-    IngressAdmissionRejects,
-    DependencyDegraded,
-    DependencyRecovered,
-    CleanupRuns,
-    CleanupIngressRows,
-    CleanupCommandRows,
-    CleanupJobs,
 }
-const NAMES: [&str; 39] = [
+
+const NAMES: [&str; 43] = [
     "connections_accepted",
     "connections_rejected",
     "mqtt_connect_success",
@@ -59,30 +65,34 @@ const NAMES: [&str; 39] = [
     "tcp_frames",
     "udp_datagrams",
     "auth_failures",
+    "auth_cache_hits",
+    "auth_cache_misses",
+    "auth_negative_hits",
+    "auth_evictions",
+    "auth_invalidations",
     "codec_failures",
     "ingress_accepted",
     "ingress_rejected",
-    "dedup_hits",
+    "ingress_bytes",
+    "protocol_admission_rejects",
+    "ingress_admission_rejects",
     "queue_rejects",
     "command_queued",
     "command_sent",
-    "command_acked",
     "command_received",
-    "ingress_bytes",
+    "command_acked",
     "command_failed",
-    "delivery_success",
-    "delivery_failed",
-    "delivery_latency_ms",
-    "database_latency_ms",
+    "events_accepted",
+    "events_rejected",
+    "event_bytes",
+    "sink_acks",
+    "sink_retries",
+    "sink_failures",
+    "sink_drops",
+    "spool_records",
+    "spool_bytes",
+    "recovery_records",
     "timeouts",
-    "protocol_admission_rejects",
-    "ingress_admission_rejects",
-    "dependency_degraded",
-    "dependency_recovered",
-    "cleanup_runs",
-    "cleanup_ingress_rows",
-    "cleanup_command_rows",
-    "cleanup_jobs",
 ];
 
 #[derive(Clone, Copy)]
@@ -93,54 +103,30 @@ pub enum Histogram {
     AdmissionWait,
     AdmissionLockWait,
     AdmissionLockHold,
-    AdmissionToAuthentication,
     AuthenticationToCodec,
-    CodecToPool,
-    DatabasePoolWait,
-    TransactionStart,
-    QuotaWait,
-    QuotaAccounting,
-    QuotaLockHold,
-    Dedup,
-    PersistenceWrites,
-    Commit,
-    Transaction,
-    CommitToPubackQueue,
+    CodecToEventAccepted,
+    EventAcceptedToSinkAck,
     PubackWrite,
-    Cleanup,
 }
 
-const HISTOGRAM_NAMES: [&str; 20] = [
+const HISTOGRAM_NAMES: [&str; 9] = [
     "mqtt_protocol_validation_us",
     "validation_to_admission_us",
     "admission_wait_us",
     "admission_lock_wait_us",
     "admission_lock_hold_us",
-    "admission_to_authentication_us",
     "authentication_to_codec_us",
-    "codec_to_pool_us",
-    "database_pool_wait_us",
-    "transaction_start_us",
-    "quota_wait_us",
-    "quota_accounting_us",
-    "quota_lock_hold_us",
-    "dedup_us",
-    "persistence_writes_us",
-    "commit_us",
-    "transaction_us",
-    "commit_to_puback_queue_us",
+    "codec_to_event_accepted_us",
+    "event_accepted_to_sink_ack_us",
     "puback_write_us",
-    "cleanup_us",
 ];
-
-// Microsecond bounds cover parser work through the external-operation deadline.
-const HISTOGRAM_BOUNDS: [u64; 20] = [
-    10, 25, 50, 100, 250, 500, 1_000, 2_500, 5_000, 10_000, 25_000, 50_000, 100_000, 250_000,
-    500_000, 1_000_000, 2_500_000, 5_000_000, 10_000_000, 30_000_000,
+const BOUNDS: [u64; 16] = [
+    10, 25, 50, 100, 250, 500, 1_000, 2_500, 5_000, 10_000, 25_000, 50_000, 100_000, 500_000,
+    1_000_000, 5_000_000,
 ];
 
 struct HistogramState {
-    buckets: [AtomicU64; HISTOGRAM_BOUNDS.len() + 1],
+    buckets: [AtomicU64; BOUNDS.len() + 1],
     count: AtomicU64,
     sum: AtomicU64,
 }
@@ -154,10 +140,12 @@ impl Default for HistogramState {
         }
     }
 }
+
 pub struct Metrics {
-    values: [AtomicU64; 39],
+    values: [AtomicU64; NAMES.len()],
     histograms: [HistogramState; HISTOGRAM_NAMES.len()],
 }
+
 impl Default for Metrics {
     fn default() -> Self {
         Self {
@@ -166,19 +154,20 @@ impl Default for Metrics {
         }
     }
 }
+
 impl Metrics {
-    pub fn inc(&self, m: Metric) {
-        self.add(m, 1);
+    pub fn inc(&self, metric: Metric) {
+        self.add(metric, 1);
     }
-    pub fn add(&self, m: Metric, n: u64) {
-        self.values[m as usize].fetch_add(n, Ordering::Relaxed);
+    pub fn add(&self, metric: Metric, value: u64) {
+        self.values[metric as usize].fetch_add(value, Ordering::Relaxed);
     }
-    pub fn get(&self, m: Metric) -> u64 {
-        self.values[m as usize].load(Ordering::Relaxed)
+    pub fn get(&self, metric: Metric) -> u64 {
+        self.values[metric as usize].load(Ordering::Relaxed)
     }
     pub fn observe(&self, histogram: Histogram, micros: u64) {
         let state = &self.histograms[histogram as usize];
-        let bucket = HISTOGRAM_BOUNDS.partition_point(|bound| *bound < micros);
+        let bucket = BOUNDS.partition_point(|bound| *bound < micros);
         state.buckets[bucket].fetch_add(1, Ordering::Relaxed);
         state.count.fetch_add(1, Ordering::Relaxed);
         state.sum.fetch_add(micros, Ordering::Relaxed);
@@ -187,17 +176,19 @@ impl Metrics {
         let mut output: String = NAMES
             .iter()
             .zip(&self.values)
-            .map(|(n, v)| format!("netbaiot_{n}_total {}\n", v.load(Ordering::Relaxed)))
+            .map(|(name, value)| {
+                format!("netbaiot_{name}_total {}\n", value.load(Ordering::Relaxed))
+            })
             .collect();
         for (name, state) in HISTOGRAM_NAMES.iter().zip(&self.histograms) {
             let mut cumulative = 0;
-            for (bound, value) in HISTOGRAM_BOUNDS.iter().zip(&state.buckets) {
+            for (bound, value) in BOUNDS.iter().zip(&state.buckets) {
                 cumulative += value.load(Ordering::Relaxed);
                 output.push_str(&format!(
                     "netbaiot_{name}_bucket{{le=\"{bound}\"}} {cumulative}\n"
                 ));
             }
-            cumulative += state.buckets[HISTOGRAM_BOUNDS.len()].load(Ordering::Relaxed);
+            cumulative += state.buckets[BOUNDS.len()].load(Ordering::Relaxed);
             output.push_str(&format!(
                 "netbaiot_{name}_bucket{{le=\"+Inf\"}} {cumulative}\nnetbaiot_{name}_count {}\nnetbaiot_{name}_sum {}\n",
                 state.count.load(Ordering::Relaxed),

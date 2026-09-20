@@ -1,99 +1,60 @@
 # Resource budgets and backpressure
 
-These are engineering defaults, not a tested capacity claim. The full authoritative
-configuration snapshot is [configs/resource-limits.json](../configs/resource-limits.json).
-Generate it with `cargo run -p netbaiot-server -- --print-default-limits`.
-`Limits::validate` rejects zero/overflow-prone values, excessive packet sizes,
-inconsistent hierarchies and invalid timeout/retention relationships at startup.
+Defaults are engineering ceilings, not measured production capacity. The complete
+authoritative snapshot is [resource-limits.json](../configs/resource-limits.json).
+Startup rejects zero, inconsistent hierarchy, excessive length, invalid TTL, and
+spool relationship values.
 
-| Resource | Device / connection | Tenant | Node / global |
-|---|---:|---:|---:|
-| Stream connections | 2 authenticated/device; 32/IP | 64 | 256 |
-| Stream memory reservation | 512 KiB/connection | connection quota applies | 128 MiB |
-| MQTT packet / HTTP body / TCP payload | 64 KiB | admission quota applies | reservation applies |
-| HTTP headers | 8 KiB, 32 headers | connection quota | connection quota |
-| HTTP handlers | one/connection; request stage 1/device | 4 throughout handler/body | 16 handlers |
-| UDP datagram | 1200 B | authenticated quotas | one sequential owner |
-| Ingress operations | 1/device | 4 | 16; 2 MiB payload bytes |
-| Ingress bounded wait | existing connection owner | shared hierarchy | 16 waiters; 2 MiB; 25 ms |
-| MQTT protocol/admission rate | 16/s | 128/s | 512/s |
-| Connection/HTTP/UDP rate | 32/s/IP | authenticated admission | 512/s |
-| Subscriptions | 2/device and connection | 128 | 512 |
-| Filters per SUBSCRIBE/UNSUBSCRIBE | 16; exact own topics only | — | — |
-| Topic | 256 bytes / 8 levels | — | — |
-| In-flight MQTT QoS1 | 32 | connection quota applies | connection quota applies |
-| Command queue incl. in-flight command | 32 items / 256 KiB encoded bytes | 2 MiB | 8 MiB |
-| Retained command records | 16 × at most 16 KiB | 128 | 1024 |
-| Stored ingress records | 1000 | 10,000 | 100,000 |
-| Charged ingress storage bytes | 2 MiB | 16 MiB | 128 MiB |
-| Provisioned credentials / presence | one credential/device | 128 devices | 1024 devices |
-| UDP replay entries | 2 boots/device; 64-sequence bitmap | 256 | 1024 |
-| Source-IP rate table | one-second expiry | — | 1024 entries |
-| Codec registry | immutable | — | 64 entries |
-| PostgreSQL connections | — | — | 8 |
-| Delivery worker / command worker | — | — | one each; no per-item tasks |
-| DB maintenance / command batch | — | — | 16 records / device keys |
-| Delivery claim | — | — | one record |
-
-Storage charge is `16 * canonical_bytes + 8192` per message/outbox pair, a
-conservative service-memory reservation. It also provides a logical PostgreSQL
-capacity gate. It is not a promise about PostgreSQL physical disk, indexes, WAL,
-autovacuum, allocator fragmentation, TLS/kernel socket buffers, or process RSS.
-Those require deployment-level disk/memory controls and load measurement. A byte
-quota may reject before a count quota is reached. Command count × max encoded
-size bounds stored command payloads; queue metadata is separately bounded by
-count. Queued commands retain encoded bytes and identifiers, not a second decoded
-command payload. Superseded connection owners retain permits until cleanup. Tenant budget identities
-remain shared across old and new sessions while any endpoint or byte permit survives;
-the weak-identity registry itself is bounded by max_devices.
-
-| Deadline / retention | Default |
+| Resource | Default bound |
 |---|---:|
-| CONNECT / TLS handshake | 10 s |
-| Authentication | 5 s |
-| Incomplete packet/frame | 30 s |
-| Stream write | 10 s |
-| HTTP handler/body | 15 s |
-| HTTP full connection | CONNECT + request + write budgets |
-| MQTT nonzero keepalive | 1.5 × client interval |
-| Server idle / outbound PUBACK inactivity | 120 s |
-| External DB/business request | 5 s |
-| Worker lease | 30 s |
-| Worker idle/maintenance poll | 200 ms |
-| Delivery attempts | 5 |
-| Retry exponential full jitter | base 1 s, cap 30 s |
-| Delivery TTL | 1 h |
-| Ingress deduplication / disconnected presence | 24 h |
-| Command maximum future expiry | 5 min |
-| Command record retention | expiry + 5 min |
-| UDP clock skew / replay TTL | 30 s / 120 s |
-| Server shutdown | 30 s |
+| Connections | 256 node / 64 tenant / 32 IP / 2 device |
+| Logical connection memory | 512 KiB reservation / 128 MiB global |
+| MQTT/HTTP/TCP maximum | 64 KiB |
+| Initial stream read buffer | at most 4 KiB; grows incrementally |
+| UDP datagram | 1,200 B |
+| Ingress active | 16 / 2 MiB; tenant 4; device 1 |
+| Ingress wait | 16 / 2 MiB / 25 ms, inside existing owner task |
+| Outbound device command | 16/device, 128/tenant, 1,024/global |
+| Outbound bytes | 256 KiB/connection, 2 MiB/tenant, 8 MiB/global |
+| MQTT persistent sessions | 4,096 global / 512 tenant / 24 h idle policy |
+| MQTT subscriptions | 32/session, 64/device, 128/tenant, 512 global |
+| MQTT inflight | QoS1/QoS2 32/session and 4,096/tenant each |
+| MQTT offline queue | 128 + 1 MiB/session; 4,096 + 32 MiB/tenant; 16,384 + 128 MiB global |
+| MQTT retained | 4,096 + 64 MiB global; 512 + 8 MiB/tenant; 64 KiB/message |
+| MQTT session state | 2 MiB/session / 32 MiB/tenant / 128 MiB global |
+| MQTT Will | 64 KiB payload, charged to bounded connection input/reservation |
+| Auth cache | 4,096 / 4 MiB / 256 miss waiters |
+| Config cache | 4,096 / 16 MiB |
+| Sinks/routes/fanout | 32 sinks / 256 filters / 8 per event |
+| Global active events | 16,384 / 64 MiB |
+| Per-sink delivery | 4,096 / 16 MiB / concurrency 8 |
+| Sink timeout/retry | 5 s / 5 attempts / max age 1 h |
+| Restart spool | 100,000 records / 256 MiB total |
+| Spool segment/record | 64 MiB / 1 MiB |
 
-## Transition policies
+Every sink queue is independently count and byte charged. Global event accounting
+charges the shared event once; each sink charges its delivery responsibility.
+Required overload rejects upstream before EventAccepted. Best-effort overload drops
+with a metric. Count/byte permits release on ACK, best-effort terminal failure,
+queue failure, session replacement, receiver closure, or owner drop.
 
-| Producer → consumer | Count / byte capacity | Overflow | Shutdown |
-|---|---|---|---|
-| OS socket → connection owner | connection hierarchy + memory reservation | close new socket | stop accept, drain owned tasks |
-| Stream → parser | max frame/packet + fixed header; one reader | close malformed/oversized/slow stream | cancel read; RAII cleanup |
-| UDP socket → owner | one 1201-byte receive buffer | drop oversized, no response | finish one bounded operation then stop |
-| HTTP → handler | 16 permits + authenticated 4/tenant, 1/device + reservation/body limit | 429 or connection close; 413 for body | reject new work; graceful response completion |
-| Packet → auth | one inline auth/owner, 5 s; source rates | refuse/close/drop | no new ingress after drain |
-| Codec → ingress | one message; device→tenant→node→byte permits; 16-item/2 MiB/25 ms wait | HTTP 429; MQTT/TCP close; UDP drop | admitted operations finish with deadlines; cancellation releases all permits |
-| Ingress → PostgreSQL | 8 pool connections, bounded callers; storage quotas | reject, no application ACK | transaction commits or rolls back |
-| DB outbox → delivery worker | one leased item, TTL/attempt limits | stay durable until due/terminal/expired | finish current bounded call; recover leases after restart |
-| DB commands → session channel | 32 items and three byte permits | enqueue fails; durable retry within limits | stop claims; drop queue; preserve durable record |
-| Session channel → device | one write at a time, 10 s | disconnect on timeout; no Sent claim on failure | close/drop and release all permits |
-| Outbound QoS1 → PUBACK | 32 non-reusable IDs, bounded retained command permits | disconnect when full/timed out | clean-session protocol state discarded |
+Stream parsers allocate at most 4 KiB initially, never the maximum frame. If a
+processed large frame leaves an empty buffer above 16 KiB capacity, it is replaced
+with the small initial allocation. Idle command channels do not preallocate payload
+byte limits.
 
-No unbounded channels, background futures, retry queues, offline MQTT sessions,
-retained MQTT payloads, or replay caches are used. Authentication provisioning is
-static and capacity-checked; no growing auth cache exists. Replay eviction only
-removes expired entries; an otherwise full cache rejects new boots. Presence and
-rate-table expirations run on bounded collections. Delivery and command attempts
-are persisted and bounded; device execution must remain idempotent across retries.
-The bounded ingress wait runs inside the existing connection/HTTP request owner;
-it does not spawn one task per waiting item. The protocol parser permit is not held
-through durable ingress, database work, acknowledgement queueing, or socket writes.
+| Producer → consumer | Overflow behavior |
+|---|---|
+| OS accept → connection owner | reject/close by IP, tenant, node, logical bytes |
+| stream → incremental parser | close malformed, oversized, slow, or incomplete input |
+| HTTP → handler/body | 429/413/timeout; no hidden waiting task |
+| codec → event router | bounded wait then reject; no success ACK |
+| router → required sink | all-or-nothing reject before acceptance |
+| router → best-effort sink | drop and metric |
+| command → live session | reject overloaded/offline; never persist |
+| MQTT route → active subscriber | bounded channel; cancel/shedding on overflow |
+| MQTT route → persistent offline subscriber | bounded QoS1/2 queue; shed at limit |
+| graceful drain → spool | fail shutdown if bounded commit cannot complete |
 
-The focused audit and measured physical-memory limitations are recorded in
-[correctness-resource-reliability-audit.md](correctness-resource-reliability-audit.md).
+TLS, allocator-retained pages, Tokio, and kernel socket buffers are not exactly
+represented by logical accounting and require process-level measurement.

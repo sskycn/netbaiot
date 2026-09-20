@@ -95,10 +95,8 @@ pub async fn connection(
     )
     .await?;
     connection.authenticate(&auth.device_key)?;
-    let (session, mut outbound) = s
-        .ingress
-        .sessions
-        .register(&auth.device_key, Transport::Tcp)?;
+    let auth = Arc::new(auth);
+    let (session, mut outbound) = s.ingress.sessions.register(auth.clone(), Transport::Tcp)?;
     write(
         &mut stream,
         &framer.encode(br#"{"authenticated":true}"#)?,
@@ -113,10 +111,10 @@ pub async fn connection(
             _ = session.cancel.cancelled() => break,
             item = outbound.recv() => {
                 let Some(item) = item else { break };
-                if item.expires_at.min(item.lease_expires_at) <= now_ms() { continue; }
+                if item.expires_at <= now_ms() { continue; }
                 let frame = framer.encode(&item.bytes)?;
                 write(&mut stream, &frame, l.write_timeout_ms).await?;
-                s.router.state(&auth.device_key, item.command_id, item.attempt, DeliveryState::Sent).await?;
+                s.router.transport_state(DeliveryState::Sent);
             }
             frame = next(&mut reader, &mut stream, &framer, last + Duration::from_millis(l.idle_timeout_ms)) => {
                 let frame = frame?;
@@ -124,6 +122,7 @@ pub async fn connection(
                 s.ingress.metrics.inc(Metric::TcpFrames);
                 let acceptance = s.ingress.ingest(&auth, IngressEnvelope {
                     transport: Transport::Tcp, payload: &frame, require_command_ack: false,
+                    require_config_ack: false,
                     validated_at: std::time::Instant::now(), validation_us: 0,
                 }).await?;
                 let bytes = serde_json::to_vec(&acceptance.receipt).map_err(|_| Error::Internal)?;
