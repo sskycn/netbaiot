@@ -25,6 +25,7 @@ spool relationship values.
 | MQTT Will | 64 KiB payload, charged to bounded connection input/reservation |
 | Auth cache | 4,096 / 4 MiB / 256 miss waiters |
 | Config cache | 4,096 / 16 MiB |
+| Presence registry | bounded by configured devices / 1 h offline TTL / oldest-offline eviction |
 | Sinks/routes/fanout | 32 sinks / 256 filters / 8 per event |
 | Global active events | 16,384 / 64 MiB |
 | Per-sink delivery | 4,096 / 16 MiB / concurrency 8 |
@@ -55,7 +56,7 @@ byte limits.
 | command → live session | reject overloaded/offline; never persist |
 | MQTT route → active subscriber | bounded channel; cancel/shedding on overflow |
 | MQTT route → persistent offline subscriber | bounded QoS1/2 queue; shed at limit |
-| graceful drain → spool | fail shutdown if bounded commit cannot complete |
+| graceful drain → spool | remain alive/unready and retry bounded commits while accepted work remains |
 
 TLS, allocator-retained pages, Tokio, and kernel socket buffers are not exactly
 represented by logical accounting and require process-level measurement.

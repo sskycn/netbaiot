@@ -118,34 +118,42 @@ fn commit_sync(directory: &Path, limits: &Limits, records: &[SpoolRecord]) -> Re
     let id = Uuid::new_v4();
     let temporary = directory.join(format!(".{id}.tmp"));
     let committed = directory.join(SNAPSHOT_NAME);
-    let mut file = open_private(&temporary)?;
-    file.write_all(MAGIC).map_err(|_| Error::Storage)?;
-    file.write_all(&VERSION.to_be_bytes())
-        .map_err(|_| Error::Storage)?;
-    file.write_all(&generation.to_be_bytes())
-        .map_err(|_| Error::Storage)?;
-    let mut total = 16usize;
-    for record in records {
-        let payload = serde_json::to_vec(record).map_err(|_| Error::Invalid)?;
-        if payload.len() > limits.spool_record_max_bytes {
-            return Err(Error::Overloaded);
-        }
-        let length = u32::try_from(payload.len()).map_err(|_| Error::Overloaded)?;
-        total = total
-            .checked_add(4 + payload.len() + 32)
-            .ok_or(Error::Overloaded)?;
-        if total > limits.spool_segment_max_bytes || total > limits.spool_max_bytes {
-            return Err(Error::Overloaded);
-        }
-        file.write_all(&length.to_be_bytes())
-            .and_then(|_| file.write_all(&payload))
-            .and_then(|_| file.write_all(&Sha256::digest(&payload)))
+    let result = (|| {
+        let mut file = open_private(&temporary)?;
+        file.write_all(MAGIC).map_err(|_| Error::Storage)?;
+        file.write_all(&VERSION.to_be_bytes())
             .map_err(|_| Error::Storage)?;
+        file.write_all(&generation.to_be_bytes())
+            .map_err(|_| Error::Storage)?;
+        let mut total = 16usize;
+        for record in records {
+            let payload = serde_json::to_vec(record).map_err(|_| Error::Invalid)?;
+            if payload.len() > limits.spool_record_max_bytes {
+                return Err(Error::Overloaded);
+            }
+            let length = u32::try_from(payload.len()).map_err(|_| Error::Overloaded)?;
+            total = total
+                .checked_add(4 + payload.len() + 32)
+                .ok_or(Error::Overloaded)?;
+            if total > limits.spool_segment_max_bytes || total > limits.spool_max_bytes {
+                return Err(Error::Overloaded);
+            }
+            file.write_all(&length.to_be_bytes())
+                .and_then(|_| file.write_all(&payload))
+                .and_then(|_| file.write_all(&Sha256::digest(&payload)))
+                .map_err(|_| Error::Storage)?;
+        }
+        file.sync_all().map_err(|_| Error::Storage)?;
+        fs::rename(&temporary, &committed).map_err(|_| Error::Storage)?;
+        sync_directory(directory)?;
+        Ok(committed)
+    })();
+    if result.is_err() {
+        // Shutdown may retry after an operator repairs the directory. Failed attempts must not
+        // accumulate hidden temporary files and turn a bounded snapshot into unbounded disk use.
+        let _ = fs::remove_file(&temporary);
     }
-    file.sync_all().map_err(|_| Error::Storage)?;
-    fs::rename(&temporary, &committed).map_err(|_| Error::Storage)?;
-    sync_directory(directory)?;
-    Ok(committed)
+    result
 }
 
 fn recover_sync(directory: &Path, limits: &Limits) -> Result<RecoveryBatch> {

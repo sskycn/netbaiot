@@ -45,6 +45,7 @@ generation, checksum/length failure, or configured bound violations fail startup
 [mqtt-session-recovery.md](mqtt-session-recovery.md).
 
 The two files do not claim a cross-domain database transaction. Each responsibility
-is complete and independently replay-safe before successful shutdown; failure of
-either commit makes shutdown fail. SIGKILL, OS crash, or power loss may discard
-recent in-memory changes and must not be described as crash durability.
+is complete and independently replay-safe before successful shutdown. Failure of
+either commit keeps the process alive and unready with bounded retry; failed EventBus
+attempts remove their private temporary file. SIGKILL, OS crash, or power loss may
+discard recent in-memory changes and must not be described as crash durability.

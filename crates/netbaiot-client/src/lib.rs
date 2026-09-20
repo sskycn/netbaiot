@@ -9,7 +9,7 @@ use reqwest::{Method, StatusCode, Url};
 use serde::{Serialize, de::DeserializeOwned};
 use std::{
     fmt,
-    net::SocketAddr,
+    net::{IpAddr, SocketAddr},
     pin::Pin,
     sync::{
         Arc,
@@ -339,6 +339,18 @@ impl ClientBuilder {
         if !matches!(endpoint.scheme(), "http" | "https") || endpoint.cannot_be_a_base() {
             return Err(ClientError::InvalidRequest {
                 message: "endpoint must be an HTTP or HTTPS base URL".into(),
+                request_id: None,
+            });
+        }
+        let loopback = endpoint.host_str().is_some_and(|host| {
+            host.eq_ignore_ascii_case("localhost")
+                || host
+                    .parse::<IpAddr>()
+                    .is_ok_and(|address| address.is_loopback())
+        });
+        if endpoint.scheme() == "http" && !loopback {
+            return Err(ClientError::InvalidRequest {
+                message: "non-loopback management endpoints require HTTPS".into(),
                 request_id: None,
             });
         }
@@ -1256,6 +1268,23 @@ mod tests {
             .await
             .unwrap();
         assert!(!format!("{client:?}").contains("top-secret"));
+    }
+
+    #[tokio::test]
+    async fn management_bearer_requires_https_off_loopback() {
+        let error = NetbaIoTClient::builder()
+            .endpoint("http://192.0.2.1:8081")
+            .token("top-secret")
+            .connect()
+            .await
+            .unwrap_err();
+        assert!(matches!(error, ClientError::InvalidRequest { .. }));
+        NetbaIoTClient::builder()
+            .endpoint("http://localhost:8081")
+            .token("top-secret")
+            .connect()
+            .await
+            .unwrap();
     }
 
     #[test]

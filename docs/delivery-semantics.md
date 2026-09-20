@@ -26,6 +26,10 @@ delivery is fsynced into the local restart spool and replays with the same ID. T
 provides graceful-restart-safe, at-least-once delivery. Duplicate delivery is
 possible, including when business processed an event but its ACK was lost.
 
+If that fsync/atomic commit fails, the process remains alive and unready with worker
+and in-memory responsibility intact, and retries at bounded cadence. Planned exit is
+not permitted until required work drains or the authoritative snapshot commits.
+
 SIGKILL, process/OS crash, power failure, or hardware failure can lose the bounded
 set of accepted events still only in memory. NetbaIoT does not claim crash-durable or
 exactly-once delivery. Consumers requiring durable correctness must deduplicate

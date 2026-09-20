@@ -162,9 +162,11 @@ responsibility in the same recovery directory.
 
 ## 27. Graceful restart tests
 
-Real child processes quiesce listeners, detach owners, commit MQTT state, drain or
-spool EventBus responsibilities, exit successfully, restart and authenticate again.
-Separate tests force spool failure (non-success exit) and SIGKILL (documented loss).
+Real child processes quiesce work listeners, detach owners, commit MQTT state, drain
+or spool EventBus responsibilities, exit successfully, restart and authenticate
+again. A forced spool failure keeps the child alive and unready until the directory
+is repaired, after which restart replays the same event ID. SIGKILL while blocked is
+the separately documented abnormal-loss case.
 
 ## 28. Persistent-session restart results
 

@@ -70,6 +70,8 @@ pub struct Limits {
     pub max_command_bytes: usize,
     pub max_devices: usize,
     pub max_devices_per_tenant: usize,
+    /// Retention window for disconnected device presence. Active sessions are never evicted.
+    pub presence_ttl_ms: u64,
     pub max_replay_entries: usize,
     pub max_replay_entries_per_device: usize,
     pub max_replay_entries_per_tenant: usize,
@@ -188,6 +190,7 @@ impl Default for Limits {
             max_command_bytes: 16_384,
             max_devices: 1_024,
             max_devices_per_tenant: 128,
+            presence_ttl_ms: 3_600_000,
             max_replay_entries: 1_024,
             max_replay_entries_per_device: 2,
             max_replay_entries_per_tenant: 256,

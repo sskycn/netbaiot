@@ -173,6 +173,10 @@ impl Ingress {
         );
         self.metrics
             .add(Metric::IngressBytes, envelope.payload.len() as u64);
+        // Presence is bounded bookkeeping and may reject a new historical identity. Keep that
+        // fallible boundary before EventAccepted so a producer is never told failure after the
+        // required business responsibility has been admitted.
+        self.sessions.touch(&auth.device_key, envelope.transport)?;
         let publish_started = Instant::now();
         let receipt = self.events.publish(event)?;
         let accepted_at = Instant::now();
@@ -180,7 +184,6 @@ impl Ingress {
             Histogram::CodecToEventAccepted,
             publish_started.elapsed().as_micros() as u64,
         );
-        self.sessions.touch(&auth.device_key, envelope.transport)?;
         self.metrics.inc(Metric::IngressAccepted);
         if envelope.require_command_ack {
             self.metrics.inc(Metric::CommandAcked);
@@ -189,5 +192,142 @@ impl Ingress {
             receipt,
             accepted_at,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use async_trait::async_trait;
+
+    struct TestCodec;
+    impl DeviceCodec for TestCodec {
+        fn decode(
+            &self,
+            ctx: &DecodeContext<'_>,
+            _: &[u8],
+        ) -> std::result::Result<Vec<DeviceEvent>, CodecError> {
+            Ok(vec![DeviceEvent {
+                event_id: EventId::generate(),
+                source_message_id: SourceMessageId::new("presence-boundary").unwrap(),
+                device: ctx.device.clone(),
+                received_at: now_ms(),
+                occurred_at: None,
+                kind: DeviceEventKind::Heartbeat(Heartbeat { sequence: 1 }),
+            }])
+        }
+
+        fn encode(
+            &self,
+            _: &EncodeContext<'_>,
+            _: &DeviceCommand,
+        ) -> std::result::Result<Vec<u8>, CodecError> {
+            Ok(Vec::new())
+        }
+    }
+
+    struct TestSink;
+    #[async_trait]
+    impl EventSink for TestSink {
+        async fn deliver(&self, _: DeliveryEnvelope) -> std::result::Result<SinkAck, SinkError> {
+            Ok(SinkAck)
+        }
+    }
+
+    fn identity(device: &str) -> AuthenticatedDevice {
+        AuthenticatedDevice {
+            device_key: DeviceKey {
+                tenant_id: TenantId::new("tenant").unwrap(),
+                product_id: ProductId::new("product").unwrap(),
+                device_id: DeviceId::new(device).unwrap(),
+            },
+            credential_version: 1,
+            auth_generation: 1,
+            codec_id: CodecId::new("test").unwrap(),
+            codec_version: 1,
+            permissions: Permissions {
+                publish: true,
+                commands: true,
+            },
+        }
+    }
+
+    #[tokio::test]
+    async fn presence_capacity_failure_occurs_before_event_accepted() {
+        let limits = Arc::new(Limits {
+            max_devices: 1,
+            max_devices_per_tenant: 1,
+            max_connections: 1,
+            max_connections_per_tenant: 1,
+            ..Limits::default()
+        });
+        let metrics = Arc::new(Metrics::default());
+        let active = identity("active");
+        let candidate = identity("candidate");
+        let sessions = Sessions::new(limits.clone());
+        let (_lease, _) = sessions
+            .register(Arc::new(active.clone()), Transport::Mqtt)
+            .unwrap();
+        let sink_id = SinkId::new("required").unwrap();
+        let events = EventBus::new(
+            limits.clone(),
+            metrics.clone(),
+            vec![SinkDefinition::bounded(
+                sink_id.clone(),
+                SinkDeliveryMode::ConfirmedRequired,
+                Arc::new(TestSink),
+                &limits,
+            )],
+            vec![RouteDefinition {
+                tenant: None,
+                sinks: vec![sink_id],
+            }],
+            1,
+        )
+        .unwrap();
+        let provider = StaticAuthenticator::new(
+            vec![Credential {
+                credential_id: "candidate".into(),
+                secret_hex: "00".repeat(32),
+                identity: candidate.clone(),
+            }],
+            &limits,
+        )
+        .unwrap();
+        let lifecycle = Arc::new(Lifecycle::starting());
+        lifecycle.mark_running().unwrap();
+        let ingress = Ingress::new(
+            limits.clone(),
+            AuthCache::new(provider, limits.clone(), metrics.clone()),
+            CodecRegistry::new(vec![(
+                CodecId::new("test").unwrap(),
+                1,
+                Arc::new(TestCodec),
+            )])
+            .unwrap(),
+            events.clone(),
+            ConfigCache::empty(limits),
+            metrics,
+            sessions,
+            lifecycle,
+        );
+        assert!(
+            ingress
+                .ingest(
+                    &candidate,
+                    IngressEnvelope {
+                        transport: Transport::Http,
+                        payload: b"x",
+                        require_command_ack: false,
+                        require_config_ack: false,
+                        validated_at: Instant::now(),
+                        validation_us: 0,
+                    },
+                )
+                .await
+                .is_err()
+        );
+        assert_eq!(events.usage().unwrap().events, 0);
+        events.stop_workers().await.unwrap();
     }
 }

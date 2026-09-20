@@ -100,9 +100,7 @@ impl Config {
         {
             return Err(Error::Configuration);
         }
-        if !self.management_http.ip().is_loopback()
-            && std::env::var("NETBAIOT_ADMIN_SECRET").is_err()
-        {
+        if !self.management_http.ip().is_loopback() && self.tls.is_none() {
             return Err(Error::Configuration);
         }
         // The framed business stream currently authenticates with a bearer secret. Keep it
@@ -837,6 +835,9 @@ pub async fn run_with_credentials(
     business_stream_token: Option<String>,
 ) -> Result<()> {
     config.validate()?;
+    if !config.management_http.ip().is_loopback() && admin_secret.is_none() {
+        return Err(Error::Configuration);
+    }
     let limits = Arc::new(config.limits.clone());
     let metrics = Arc::new(Metrics::default());
     let lifecycle = Arc::new(Lifecycle::starting());
@@ -983,61 +984,77 @@ pub async fn run_with_credentials(
     };
 
     lifecycle.mark_running()?;
-    let listeners = CancellationToken::new();
-    let mut tasks = JoinSet::new();
-    tasks.spawn(serve_stream(
+    let work_listeners = CancellationToken::new();
+    let management_listener = CancellationToken::new();
+    let mut work_tasks = JoinSet::new();
+    work_tasks.spawn(serve_stream(
         device_http,
         Transport::Http,
         device_services,
         tls.clone(),
-        listeners.child_token(),
+        work_listeners.child_token(),
     ));
-    tasks.spawn(serve_stream(
+    let mut management_task = tokio::spawn(serve_stream(
         management_http,
         Transport::Http,
         management_services,
         tls.clone(),
-        listeners.child_token(),
+        management_listener.child_token(),
     ));
-    tasks.spawn(serve_stream(
+    work_tasks.spawn(serve_stream(
         mqtt,
         Transport::Mqtt,
         base_services.clone(),
         tls.clone(),
-        listeners.child_token(),
+        work_listeners.child_token(),
     ));
-    tasks.spawn(serve_stream(
+    work_tasks.spawn(serve_stream(
         tcp,
         Transport::Tcp,
         base_services.clone(),
         tls,
-        listeners.child_token(),
+        work_listeners.child_token(),
     ));
-    tasks.spawn(udp::serve(udp, base_services, listeners.child_token()));
+    work_tasks.spawn(udp::serve(udp, base_services, work_listeners.child_token()));
     if let Some((listener, sink)) = business {
         let secret = business_stream_token.ok_or(Error::Configuration)?;
         let hash: [u8; 32] = Sha256::digest(secret.as_bytes()).into();
-        tasks.spawn(serve_business_stream(
+        work_tasks.spawn(serve_business_stream(
             listener,
             sink,
             hash,
             limits.clone(),
-            listeners.child_token(),
+            work_listeners.child_token(),
         ));
     }
     tracing::info!(device_http=%config.device_http,management_http=%config.management_http,mqtt=%config.mqtt,tcp=%config.tcp,udp=%config.udp,"runtime ready");
+    let mut management_running = true;
     let failure = tokio::select! {
         _ = shutdown.cancelled() => None,
-        task = tasks.join_next() => Some(match task { Some(Ok(Err(error))) => error, _ => Error::Internal }),
+        task = work_tasks.join_next() => Some(match task { Some(Ok(Err(error))) => error, _ => Error::Internal }),
+        task = &mut management_task => {
+            management_running = false;
+            Some(match task { Ok(Err(error)) => error, _ => Error::Internal })
+        },
     };
     lifecycle.begin_quiesce().await?;
     events.close_admission()?;
-    listeners.cancel();
-    while tasks.join_next().await.is_some() {}
+    work_listeners.cancel();
+    while work_tasks.join_next().await.is_some() {}
 
     // All network owners have detached. Snapshot MQTT protocol state as one versioned,
-    // fsynced image before claiming a successful planned shutdown.
-    mqtt_broker.commit_to(&config.spool_directory).await?;
+    // fsynced image before claiming a successful planned shutdown. A storage failure blocks the
+    // voluntary shutdown: the process stays alive and unready so an operator can repair storage.
+    let retry_delay = Duration::from_millis(limits.retry_max_ms.min(1_000));
+    loop {
+        match mqtt_broker.commit_to(&config.spool_directory).await {
+            Ok(_) => break,
+            Err(error) => {
+                tracing::error!(error=%error, "MQTT recovery commit failed; shutdown remains blocked");
+                tokio::time::sleep(retry_delay).await;
+            }
+        }
+    }
 
     let drained = events
         .wait_required_drained(Duration::from_millis(limits.shutdown_drain_timeout_ms))
@@ -1048,23 +1065,50 @@ pub async fn run_with_credentials(
             spool.remove_committed(recovered_files).await?;
         }
     } else {
-        events.stop_workers().await?;
         lifecycle.mark_spooling()?;
-        let pending = events.spool_records()?;
-        let encoded_bytes = pending.iter().try_fold(0usize, |total, record| {
-            total
-                .checked_add(
-                    serde_json::to_vec(record)
-                        .map_err(|_| Error::Internal)?
-                        .len(),
-                )
-                .ok_or(Error::Overloaded)
-        })?;
-        spool.commit(pending.clone()).await?;
-        metrics.add(Metric::SpoolRecords, pending.len() as u64);
-        metrics.add(Metric::SpoolBytes, encoded_bytes as u64);
+        loop {
+            let pending = events.spool_records()?;
+            if pending.is_empty() {
+                events.stop_workers().await?;
+                if !recovered_files.is_empty() {
+                    spool.remove_committed(recovered_files.clone()).await?;
+                }
+                break;
+            }
+            let encoded_bytes = pending.iter().try_fold(0usize, |total, record| {
+                total
+                    .checked_add(
+                        serde_json::to_vec(record)
+                            .map_err(|_| Error::Internal)?
+                            .len(),
+                    )
+                    .ok_or(Error::Overloaded)
+            })?;
+            match spool.commit(pending.clone()).await {
+                Ok(_) => {
+                    events.stop_workers().await?;
+                    metrics.add(Metric::SpoolRecords, pending.len() as u64);
+                    metrics.add(Metric::SpoolBytes, encoded_bytes as u64);
+                    break;
+                }
+                Err(error) => {
+                    tracing::error!(error=%error, pending=pending.len(), "event spool commit failed; shutdown remains blocked");
+                    if events.wait_required_drained(retry_delay).await? {
+                        events.stop_workers().await?;
+                        if !recovered_files.is_empty() {
+                            spool.remove_committed(recovered_files.clone()).await?;
+                        }
+                        break;
+                    }
+                }
+            }
+        }
     }
     lifecycle.mark_drained()?;
+    management_listener.cancel();
+    if management_running {
+        let _ = management_task.await;
+    }
     tracing::info!("shutdown complete");
     failure.map_or(Ok(()), Err)
 }
@@ -1119,5 +1163,29 @@ mod reliability_tests {
         assert!(sink.active.lock().unwrap().is_some());
         sink.release(generation).unwrap();
         assert!(sink.active.lock().unwrap().is_none());
+
+        // The same already-accepted responsibility survives the filter revision and is ACKed
+        // only after a later eligible subscriber explicitly confirms it.
+        let (matching, mut requests) = mpsc::channel(1);
+        let matching_generation = sink
+            .claim(
+                matching,
+                EventFilter {
+                    tenant: Some(TenantId::new("tenant-a").unwrap()),
+                    ..EventFilter::default()
+                },
+            )
+            .unwrap();
+        let pending = delivery();
+        let expected = pending.event.event_id;
+        let sink_task = {
+            let sink = sink.clone();
+            tokio::spawn(async move { sink.deliver(pending).await })
+        };
+        let request = requests.recv().await.unwrap();
+        assert_eq!(request.delivery.event.event_id, expected);
+        request.result.send(Ok(SinkAck)).unwrap();
+        assert!(matches!(sink_task.await.unwrap(), Ok(SinkAck)));
+        sink.release(matching_generation).unwrap();
     }
 }

@@ -4,8 +4,8 @@ use netbaiot_core::{CodecId, EventId, SinkId, Transport};
 use netbaiot_protocol::RouteDefinition;
 use netbaiot_runtime::{
     AuthCache, CodecRegistry, ConfigCache, DeliveryEnvelope, Error, EventAcceptance, EventBus,
-    EventSink, Ingress, Lifecycle, Limits, Metrics, Sessions, SinkAck, SinkDefinition,
-    SinkDeliveryMode, SinkError, StaticAuthenticator,
+    EventSink, Ingress, Lifecycle, Limits, Metrics, RestartSpool, Sessions, SinkAck,
+    SinkDefinition, SinkDeliveryMode, SinkError, StaticAuthenticator,
 };
 use netbaiot_server::{Config, TlsFiles, read_config, run, tls_acceptor};
 use netbaiot_transports::{Services, serve_stream};
@@ -92,6 +92,26 @@ fn public_streams_require_tls_and_volatile_store_requires_loopback() {
         private_key: "key".into(),
     });
     assert!(c.validate().is_ok());
+}
+
+#[test]
+fn non_loopback_management_requires_tls_while_loopback_development_allows_http() {
+    let mut loopback = config();
+    loopback.management_http = "127.0.0.1:8081".parse().unwrap();
+    loopback.tls = None;
+    assert!(loopback.validate().is_ok());
+
+    let mut public = config();
+    public.development = false;
+    public.delivery_url = Some("https://example.invalid/ingress".into());
+    public.management_http = "0.0.0.0:8081".parse().unwrap();
+    public.tls = None;
+    assert!(public.validate().is_err());
+    public.tls = Some(TlsFiles {
+        certificate: "cert".into(),
+        private_key: "key".into(),
+    });
+    assert!(public.validate().is_ok());
 }
 #[tokio::test]
 async fn composition_root_serves_http_and_stops_all_listeners() {
@@ -1114,8 +1134,9 @@ async fn subprocess_sigkill_exposes_the_documented_three_event_loss_window() {
     c.udp = free_address().await;
     let unavailable_sink = free_address().await;
     c.delivery_url = Some(format!("http://{unavailable_sink}/events"));
-    c.limits.sink_max_attempts = 10;
+    c.limits.sink_max_attempts = 1;
     c.limits.sink_max_age_ms = 60_000;
+    c.limits.shutdown_drain_timeout_ms = 25;
     let root = std::env::temp_dir().join(format!("netbaiot-sigkill-{}", uuid::Uuid::new_v4()));
     std::fs::create_dir_all(&root).unwrap();
     c.spool_directory = root.join("spool");
@@ -1138,10 +1159,16 @@ async fn subprocess_sigkill_exposes_the_documented_three_event_loss_window() {
         accepted.insert(response.json::<EventAcceptance>().await.unwrap().event_id);
     }
     assert_eq!(accepted.len(), 3);
+    std::fs::create_dir_all(&c.spool_directory).unwrap();
+    std::fs::remove_dir(&c.spool_directory).unwrap();
+    std::fs::write(&c.spool_directory, b"not a directory").unwrap();
+    request_drain(&client, c.management_http, &admin).await;
+    tokio::time::sleep(Duration::from_millis(150)).await;
+    assert!(child.try_wait().unwrap().is_none());
     child.kill().await.unwrap();
     let status = child.wait().await.unwrap();
     assert!(!status.success());
-    let committed = c.spool_directory.exists()
+    let committed = c.spool_directory.is_dir()
         && std::fs::read_dir(&c.spool_directory).unwrap().any(|entry| {
             entry
                 .unwrap()
@@ -1157,7 +1184,7 @@ async fn subprocess_sigkill_exposes_the_documented_three_event_loss_window() {
 }
 
 #[tokio::test]
-async fn subprocess_graceful_shutdown_fails_if_pending_work_cannot_be_spooled() {
+async fn subprocess_spool_failure_stays_alive_until_repaired_then_replays_same_event_id() {
     let mut c = config();
     c.device_http = free_address().await;
     c.management_http = free_address().await;
@@ -1186,6 +1213,7 @@ async fn subprocess_graceful_shutdown_fails_if_pending_work_cannot_be_spooled() 
         .await
         .unwrap();
     assert_eq!(response.status(), reqwest::StatusCode::ACCEPTED);
+    let accepted = response.json::<EventAcceptance>().await.unwrap().event_id;
     std::fs::create_dir_all(&c.spool_directory).unwrap();
     std::fs::remove_dir(&c.spool_directory).unwrap();
     std::fs::write(&c.spool_directory, b"not a directory").unwrap();
@@ -1195,13 +1223,81 @@ async fn subprocess_graceful_shutdown_fails_if_pending_work_cannot_be_spooled() 
         .send()
         .await
         .unwrap();
+    tokio::time::sleep(Duration::from_millis(150)).await;
+    assert!(
+        child.try_wait().unwrap().is_none(),
+        "spool failure must keep accepted work owned by a live process"
+    );
+    let ready = client
+        .get(format!("http://{}/api/v1/ready", c.management_http))
+        .bearer_auth(&admin)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(ready.status(), reqwest::StatusCode::SERVICE_UNAVAILABLE);
+
+    std::fs::remove_file(&c.spool_directory).unwrap();
+    std::fs::create_dir_all(&c.spool_directory).unwrap();
     let status = tokio::time::timeout(Duration::from_secs(5), child.wait())
         .await
         .unwrap()
         .unwrap();
-    assert!(
-        !status.success(),
-        "spool failure must prevent a successful exit"
-    );
+    assert!(status.success());
+    let recovered = RestartSpool::new(c.spool_directory.clone(), Arc::new(c.limits.clone()))
+        .recover()
+        .await
+        .unwrap();
+    assert_eq!(recovered.records.len(), 1);
+    assert_eq!(recovered.records[0].event.event_id, accepted);
+
+    let sink_listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let sink_address = sink_listener.local_addr().unwrap();
+    let delivered = Arc::new(Mutex::new(None));
+    let delivered_task = delivered.clone();
+    let sink = tokio::spawn(async move {
+        let (mut socket, _) = sink_listener.accept().await.unwrap();
+        let mut bytes = Vec::new();
+        let mut chunk = [0u8; 4096];
+        loop {
+            let read = socket.read(&mut chunk).await.unwrap();
+            bytes.extend_from_slice(&chunk[..read]);
+            let Some(headers) = bytes.windows(4).position(|window| window == b"\r\n\r\n") else {
+                continue;
+            };
+            let header_end = headers + 4;
+            let header = String::from_utf8_lossy(&bytes[..header_end]);
+            let length = header
+                .lines()
+                .find_map(|line| {
+                    line.to_ascii_lowercase()
+                        .strip_prefix("content-length:")
+                        .and_then(|value| value.trim().parse::<usize>().ok())
+                })
+                .unwrap();
+            if bytes.len() < header_end + length {
+                continue;
+            }
+            let value: serde_json::Value =
+                serde_json::from_slice(&bytes[header_end..header_end + length]).unwrap();
+            *delivered_task.lock().unwrap() =
+                Some(serde_json::from_value(value.get("event_id").cloned().unwrap()).unwrap());
+            socket
+                .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+                .await
+                .unwrap();
+            break;
+        }
+    });
+    c.delivery_url = Some(format!("http://{sink_address}/events"));
+    std::fs::write(&config_path, serde_json::to_vec_pretty(&c).unwrap()).unwrap();
+    let mut restarted = start_child(&config_path, &admin).await;
+    wait_ready(&client, c.management_http, &admin).await;
+    tokio::time::timeout(Duration::from_secs(5), sink)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(*delivered.lock().unwrap(), Some(accepted));
+    request_drain(&client, c.management_http, &admin).await;
+    assert!(restarted.wait().await.unwrap().success());
     let _ = std::fs::remove_dir_all(root);
 }

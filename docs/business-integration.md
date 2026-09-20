@@ -24,6 +24,13 @@ successful socket write is not an ACK. Malformed or mismatched ACKs fail the
 delivery. The current implementation permits one active subscriber and serial
 confirmed delivery, which keeps flow control and uncertainty bounded.
 
+This is a global required-stream model. The subscriber filter is connection
+eligibility, not a post-accept routing decision: every accepted event remains the
+single TCP sink's required responsibility. A reconnect with a different filter
+cannot ACK an older nonmatching event; mismatch returns retryable delivery failure
+until an eligible subscriber explicitly ACKs it. No event is silently discarded
+after `EventAccepted` because a current filter changed.
+
 Hello, subscribe, event ACK reads, and writes all have hard deadlines and frame
 size limits. Malformed handshakes are isolated to that connection and do not stop
 the listener. Authentication, version, and validation failures use structured v1

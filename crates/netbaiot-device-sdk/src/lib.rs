@@ -8,7 +8,7 @@ use netbaiot_protocol::*;
 use reqwest::{StatusCode, Url};
 use rumqttc::{
     AsyncClient, ConnectReturnCode, ConnectionError, Event, Incoming, MqttOptions, QoS,
-    Transport as MqttTransport,
+    SubscribeReasonCode, Transport as MqttTransport,
 };
 use std::{
     collections::BTreeMap,
@@ -416,6 +416,7 @@ impl DeviceClientBuilder {
             let task = tokio::spawn(async move {
                 let mut connected_once = false;
                 let mut reconnect_attempt = 0u32;
+                let mut awaiting_suback = false;
                 loop {
                     let event = tokio::select! {
                         _ = task_shutdown.cancelled() => break,
@@ -423,6 +424,8 @@ impl DeviceClientBuilder {
                     };
                     match event {
                         Ok(Event::Incoming(Incoming::ConnAck(_))) => {
+                            task_connected.store(false, Ordering::Release);
+                            let _ = connection_sender.send(MqttConnectionState::Connecting);
                             if task_client
                                 .try_subscribe(down_topic.clone(), QoS::AtLeastOnce)
                                 .is_err()
@@ -442,6 +445,24 @@ impl DeviceClientBuilder {
                                 }
                                 continue;
                             }
+                            awaiting_suback = true;
+                        }
+                        Ok(Event::Incoming(Incoming::SubAck(suback))) => {
+                            if !awaiting_suback
+                                || !matches!(
+                                    suback.return_codes.as_slice(),
+                                    [SubscribeReasonCode::Success(
+                                        QoS::AtMostOnce | QoS::AtLeastOnce
+                                    )]
+                                )
+                            {
+                                task_connected.store(false, Ordering::Release);
+                                let _ = connection_sender
+                                    .send(MqttConnectionState::Terminal(DeviceSdkError::Forbidden));
+                                let _ = task_client.try_disconnect();
+                                return;
+                            }
+                            awaiting_suback = false;
                             if connected_once {
                                 task_metrics.mqtt_reconnects.fetch_add(1, Ordering::Relaxed);
                             }
@@ -482,6 +503,7 @@ impl DeviceClientBuilder {
                         }
                         Ok(_) => {}
                         Err(error) => {
+                            awaiting_suback = false;
                             task_connected.store(false, Ordering::Release);
                             if let ConnectionError::ConnectionRefused(code) = error
                                 && let Some(error) = terminal_connect_error(code)
@@ -956,6 +978,7 @@ fn status_error(status: StatusCode) -> DeviceSdkError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
     fn device() -> DeviceKey {
         DeviceKey {
@@ -1017,5 +1040,54 @@ mod tests {
             terminal_connect_error(ConnectReturnCode::BadClientId),
             Some(DeviceSdkError::InvalidConfiguration(_))
         ));
+    }
+
+    async fn read_mqtt_packet(stream: &mut tokio::net::TcpStream) -> Vec<u8> {
+        let mut first = [0u8; 1];
+        stream.read_exact(&mut first).await.unwrap();
+        let mut multiplier = 1usize;
+        let mut remaining = 0usize;
+        loop {
+            let byte = stream.read_u8().await.unwrap();
+            remaining += usize::from(byte & 0x7f) * multiplier;
+            if byte & 0x80 == 0 {
+                break;
+            }
+            multiplier *= 128;
+        }
+        let mut body = vec![0; remaining];
+        stream.read_exact(&mut body).await.unwrap();
+        let mut packet = vec![first[0]];
+        packet.extend_from_slice(&body);
+        packet
+    }
+
+    #[tokio::test]
+    async fn command_connection_waits_for_successful_suback() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let broker = tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let connect = read_mqtt_packet(&mut socket).await;
+            assert_eq!(connect[0] & 0xf0, 0x10);
+            socket.write_all(&[0x20, 0x02, 0x00, 0x00]).await.unwrap();
+            let subscribe = read_mqtt_packet(&mut socket).await;
+            assert_eq!(subscribe[0], 0x82);
+            let packet_id = &subscribe[1..3];
+            socket
+                .write_all(&[0x90, 0x03, packet_id[0], packet_id[1], 0x80])
+                .await
+                .unwrap();
+            tokio::time::sleep(Duration::from_millis(200)).await;
+        });
+        let result = DeviceClient::builder()
+            .device(device())
+            .credentials(DeviceCredentials::new("credential", "secret").unwrap())
+            .mqtt_endpoint(format!("mqtt://{address}"))
+            .mqtt_connect_timeout(Duration::from_secs(1))
+            .connect()
+            .await;
+        assert!(matches!(result, Err(DeviceSdkError::Forbidden)));
+        broker.await.unwrap();
     }
 }

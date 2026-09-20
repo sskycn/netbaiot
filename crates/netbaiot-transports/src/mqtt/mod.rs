@@ -125,9 +125,12 @@ async fn process_publish(
     validated_at: Instant,
     validation_us: u64,
 ) -> Result<Option<IngressAcceptance>> {
+    // Broker-side retained/routing admission is the last fallible MQTT responsibility before the
+    // unified event crosses EventAccepted. A later broker error must never turn an accepted QoS1
+    // DeviceEvent into a producer-visible failure and retransmission.
+    services.mqtt.route(&auth.device_key, message.clone())?;
     let acceptance =
         accept_iot_publish(services, auth, message, validated_at, validation_us).await?;
-    services.mqtt.route(&auth.device_key, message.clone())?;
     Ok(acceptance)
 }
 
@@ -138,14 +141,10 @@ async fn publish_will(services: &Services, auth: &AuthenticatedDevice, will: Wil
         qos: will.qos,
         retain: will.retain,
     };
-    // A Will must still be routed at the MQTT layer if its canonical IoT payload is malformed.
-    // The IoT binding failure is observable but does not retroactively invalidate CONNECT.
-    if process_publish(services, auth, &message, Instant::now(), 0)
-        .await
-        .is_err()
-    {
-        services.mqtt.route(&auth.device_key, message)?;
-    }
+    // Route once before attempting the optional IoT binding. A malformed canonical payload does
+    // not suppress the MQTT Will, and must not cause duplicate broker delivery.
+    services.mqtt.route(&auth.device_key, message.clone())?;
+    let _ = accept_iot_publish(services, auth, &message, Instant::now(), 0).await;
     Ok(())
 }
 

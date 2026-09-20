@@ -90,9 +90,11 @@ and never written to the restart spool.
 
 ## Embedded MQTT
 
-The supported profile remains MQTT 3.1.1 CONNECT, QoS0/1 PUBLISH, PUBACK,
-CleanSession, and exact topic subscriptions. MQTT5, QoS2, persistent sessions,
-retained messages, LWT, wildcard routing, and broker clustering are out of scope.
+The supported broker profile is MQTT 3.1.1 with QoS0/1/2, CleanSession 0/1,
+persistent sessions, retained messages, LWT, exact/`+`/`#` subscriptions, and
+planned-restart recovery. MQTT 5, MQTT-SN, shared subscriptions, and broker
+clustering remain out of scope. Do not remove implemented MQTT 3.1.1 behavior as
+though it were unsupported.
 
 Preserve incremental parsing, hard Remaining Length limits, strict UTF-8, canonical
 topic namespaces, authenticated identity checks, packet deadlines, bounded packet
