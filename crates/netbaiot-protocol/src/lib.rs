@@ -119,15 +119,35 @@ uuid_identifier!(DeliveryId);
 uuid_identifier!(SubscriptionId);
 pub type MessageId = EventId;
 
-#[derive(
-    Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
-)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
 #[serde(transparent)]
-pub struct ConfigRevision(pub u64);
+pub struct ConfigRevision(u64);
 
 impl ConfigRevision {
     pub const fn new(value: u64) -> Option<Self> {
         if value == 0 { None } else { Some(Self(value)) }
+    }
+
+    pub const fn get(self) -> u64 {
+        self.0
+    }
+}
+
+impl TryFrom<u64> for ConfigRevision {
+    type Error = ProtocolError;
+
+    fn try_from(value: u64) -> Result<Self, Self::Error> {
+        Self::new(value).ok_or(ProtocolError)
+    }
+}
+
+impl<'de> Deserialize<'de> for ConfigRevision {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = u64::deserialize(deserializer)?;
+        Self::new(value).ok_or_else(|| serde::de::Error::custom("revision must be non-zero"))
     }
 }
 
@@ -340,7 +360,6 @@ pub enum CommandDeliveryStatus {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct CommandDispatch {
     pub command_id: CommandId,
     pub state: DeliveryState,
@@ -358,7 +377,6 @@ pub enum TransportKind {
 pub type Transport = TransportKind;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct DeviceConnectionInfo {
     pub device: DeviceKey,
     pub connected: bool,
@@ -429,7 +447,6 @@ impl EventFilter {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct EventDelivery {
     pub delivery_id: DeliveryId,
     pub subscription_id: SubscriptionId,
@@ -446,7 +463,7 @@ pub struct EventAck {
 }
 
 #[derive(Clone, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
+#[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 pub enum StreamClientFrame {
     Hello {
         version: u16,
@@ -499,7 +516,6 @@ pub enum ErrorCode {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct ApiError {
     pub code: ErrorCode,
     pub message: String,
@@ -532,7 +548,6 @@ pub enum AuthInvalidation {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct InvalidationResult {
     pub invalidated: usize,
     pub disconnected: usize,
@@ -550,7 +565,6 @@ pub enum LifecycleState {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct RuntimeStatus {
     pub lifecycle: LifecycleState,
     pub event_count: usize,
@@ -565,7 +579,6 @@ pub struct RuntimeStatus {
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct ConnectionCounts {
     pub http: usize,
     pub mqtt: usize,
@@ -580,7 +593,6 @@ impl ConnectionCounts {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct EventAccepted {
     pub event_id: EventId,
     pub accepted_at: Timestamp,
@@ -669,5 +681,31 @@ mod tests {
             kind: DeviceEventKind::Heartbeat(Heartbeat { sequence: 1 }),
         };
         assert!(filter.matches(&event));
+    }
+
+    #[test]
+    fn revision_rejects_zero_and_response_types_accept_additive_fields() {
+        assert!(serde_json::from_str::<ConfigRevision>("0").is_err());
+        assert_eq!(
+            serde_json::from_str::<ConfigRevision>("7").unwrap().get(),
+            7
+        );
+
+        let accepted = serde_json::json!({
+            "event_id": Uuid::nil(),
+            "accepted_at": 1,
+            "required_deliveries": 1,
+            "best_effort_deliveries": 0,
+            "future_server_field": {"enabled": true}
+        });
+        assert!(serde_json::from_value::<EventAccepted>(accepted).is_ok());
+
+        let strict_client = serde_json::json!({
+            "type": "hello",
+            "version": PROTOCOL_VERSION,
+            "token": "x",
+            "future_client_field": true
+        });
+        assert!(serde_json::from_value::<StreamClientFrame>(strict_client).is_err());
     }
 }

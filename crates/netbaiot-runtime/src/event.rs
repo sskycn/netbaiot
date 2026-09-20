@@ -419,20 +419,22 @@ impl EventBus {
         Ok(records)
     }
 
-    pub async fn wait_required_drained(&self, timeout: Duration) -> bool {
-        tokio::time::timeout(timeout, async {
+    pub async fn wait_required_drained(&self, timeout: Duration) -> Result<bool> {
+        match tokio::time::timeout(timeout, async {
             loop {
-                if self
-                    .usage()
-                    .map_or(true, |usage| usage.pending_required == 0)
-                {
-                    break;
+                let notified = self.changed.notified();
+                tokio::pin!(notified);
+                if self.usage()?.pending_required == 0 {
+                    return Ok::<(), Error>(());
                 }
-                self.changed.notified().await;
+                notified.await;
             }
         })
         .await
-        .is_ok()
+        {
+            Ok(result) => result.map(|()| true),
+            Err(_) => Ok(false),
+        }
     }
 
     pub async fn stop_workers(&self) -> Result<()> {
@@ -486,13 +488,23 @@ impl EventBus {
                 break;
             }
             if inflight.is_empty() {
+                let delay = self
+                    .next_ready_delay(&id)
+                    .ok()
+                    .flatten()
+                    .unwrap_or(Duration::from_secs(3_600));
                 tokio::select! {
                     biased;
                     _ = self.stop.cancelled() => continue,
                     _ = notify.notified() => {},
-                    _ = tokio::time::sleep(Duration::from_millis(10)) => {},
+                    _ = tokio::time::sleep(delay) => {},
                 }
             } else {
+                let delay = self
+                    .next_ready_delay(&id)
+                    .ok()
+                    .flatten()
+                    .unwrap_or(Duration::from_secs(3_600));
                 tokio::select! {
                     biased;
                     _ = self.stop.cancelled() => continue,
@@ -502,6 +514,7 @@ impl EventBus {
                         }
                     }
                     _ = notify.notified() => {},
+                    _ = tokio::time::sleep(delay) => {},
                 }
             }
         }
@@ -510,15 +523,31 @@ impl EventBus {
     fn take_ready(&self, id: &SinkId) -> Result<Option<DeliveryRecord>> {
         let mut state = lock(&self.state)?;
         let sink = state.sinks.get_mut(id).ok_or(Error::Internal)?;
-        let Some(front) = sink.queue.front() else {
+        let now = Instant::now();
+        let Some(position) = sink
+            .queue
+            .iter()
+            .enumerate()
+            .filter(|(_, record)| record.next_attempt <= now)
+            .min_by_key(|(_, record)| record.next_attempt)
+            .map(|(position, _)| position)
+        else {
             return Ok(None);
         };
-        if front.next_attempt > Instant::now() {
-            return Ok(None);
-        }
-        let record = sink.queue.pop_front().ok_or(Error::Internal)?;
+        let record = sink.queue.remove(position).ok_or(Error::Internal)?;
         sink.inflight += 1;
         Ok(Some(record))
+    }
+
+    fn next_ready_delay(&self, id: &SinkId) -> Result<Option<Duration>> {
+        let state = lock(&self.state)?;
+        let sink = state.sinks.get(id).ok_or(Error::Internal)?;
+        let now = Instant::now();
+        Ok(sink
+            .queue
+            .iter()
+            .map(|record| record.next_attempt.saturating_duration_since(now))
+            .min())
     }
 
     fn complete(
@@ -558,9 +587,12 @@ impl EventBus {
         }
         let required = definition.mode == SinkDeliveryMode::ConfirmedRequired;
         if result.is_err() && required {
-            // Exhausted confirmed work stays owned and is included in restart spool.
+            record.next_attempt =
+                Instant::now() + Duration::from_millis(self.limits.retry_max_ms.max(1));
+            let sink = state.sinks.get_mut(id).ok_or(Error::Internal)?;
+            sink.queue.push_back(record);
+            sink.notify.notify_one();
             self.metrics.inc(Metric::SinkFailures);
-            self.changed.notify_waiters();
             return Ok(());
         }
         {
@@ -628,6 +660,68 @@ mod tests {
         calls: AtomicUsize,
         block: Option<Arc<tokio::sync::Notify>>,
     }
+
+    struct FailFirst {
+        calls: AtomicUsize,
+        delivered: Mutex<Vec<String>>,
+    }
+
+    #[async_trait]
+    impl EventSink for FailFirst {
+        async fn deliver(
+            &self,
+            delivery: DeliveryEnvelope,
+        ) -> std::result::Result<SinkAck, SinkError> {
+            let source = delivery.event.source_message_id.as_str().to_owned();
+            self.delivered.lock().unwrap().push(source.clone());
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            if source == "a" && delivery.attempt == 1 {
+                Err(SinkError::Retryable)
+            } else {
+                Ok(SinkAck)
+            }
+        }
+    }
+
+    struct Recovering {
+        fail: std::sync::atomic::AtomicBool,
+        calls: AtomicUsize,
+    }
+
+    struct RetryBesideBlocked {
+        delivered: Mutex<Vec<String>>,
+        release: Arc<tokio::sync::Notify>,
+    }
+
+    #[async_trait]
+    impl EventSink for RetryBesideBlocked {
+        async fn deliver(
+            &self,
+            delivery: DeliveryEnvelope,
+        ) -> std::result::Result<SinkAck, SinkError> {
+            let source = delivery.event.source_message_id.as_str().to_owned();
+            self.delivered.lock().unwrap().push(source.clone());
+            if source == "a" && delivery.attempt == 1 {
+                return Err(SinkError::Retryable);
+            }
+            if source == "blocked" {
+                self.release.notified().await;
+            }
+            Ok(SinkAck)
+        }
+    }
+
+    #[async_trait]
+    impl EventSink for Recovering {
+        async fn deliver(&self, _: DeliveryEnvelope) -> std::result::Result<SinkAck, SinkError> {
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            if self.fail.load(Ordering::SeqCst) {
+                Err(SinkError::Retryable)
+            } else {
+                Ok(SinkAck)
+            }
+        }
+    }
     #[async_trait]
     impl EventSink for Signal {
         async fn deliver(&self, _: DeliveryEnvelope) -> std::result::Result<SinkAck, SinkError> {
@@ -655,6 +749,12 @@ mod tests {
                 value: None,
             }),
         }
+    }
+
+    fn named_event(source: &str) -> DeviceEvent {
+        let mut event = event(1);
+        event.source_message_id = SourceMessageId::new(source).unwrap();
+        event
     }
 
     #[tokio::test]
@@ -748,7 +848,11 @@ mod tests {
         assert_eq!(slow.calls.load(Ordering::Relaxed), 1);
         assert_eq!(bus.usage().unwrap().pending_required, 1);
         release.notify_one();
-        assert!(bus.wait_required_drained(Duration::from_secs(1)).await);
+        assert!(
+            bus.wait_required_drained(Duration::from_secs(1))
+                .await
+                .unwrap()
+        );
         assert_eq!(bus.usage().unwrap(), EventBusUsage::default());
         bus.stop_workers().await.unwrap();
     }
@@ -785,7 +889,170 @@ mod tests {
         let accepted = bus.publish(event(8)).unwrap();
         assert_eq!(accepted.required_deliveries, 1);
         assert_eq!(accepted.best_effort_deliveries, 0);
-        assert!(bus.wait_required_drained(Duration::from_secs(1)).await);
+        assert!(
+            bus.wait_required_drained(Duration::from_secs(1))
+                .await
+                .unwrap()
+        );
+        bus.stop_workers().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn delayed_retry_does_not_block_later_ready_delivery() {
+        let limits = Arc::new(Limits {
+            sink_delivery_concurrency: 1,
+            retry_base_ms: 500,
+            retry_max_ms: 500,
+            ..Limits::default()
+        });
+        let sink = Arc::new(FailFirst {
+            calls: AtomicUsize::new(0),
+            delivered: Mutex::new(Vec::new()),
+        });
+        let id = SinkId::new("required").unwrap();
+        let bus = EventBus::new(
+            limits.clone(),
+            Arc::new(Metrics::default()),
+            vec![SinkDefinition::bounded(
+                id.clone(),
+                SinkDeliveryMode::ConfirmedRequired,
+                sink.clone(),
+                &limits,
+            )],
+            vec![RouteDefinition {
+                tenant: None,
+                sinks: vec![id],
+            }],
+            1,
+        )
+        .unwrap();
+        bus.publish(named_event("a")).unwrap();
+        while sink.calls.load(Ordering::SeqCst) == 0 {
+            tokio::task::yield_now().await;
+        }
+        bus.publish(named_event("b")).unwrap();
+        tokio::time::timeout(Duration::from_millis(200), async {
+            loop {
+                if sink
+                    .delivered
+                    .lock()
+                    .unwrap()
+                    .iter()
+                    .any(|value| value == "b")
+                {
+                    break;
+                }
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        bus.stop_workers().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn delayed_retry_wakes_with_another_delivery_inflight() {
+        let limits = Arc::new(Limits {
+            sink_delivery_concurrency: 2,
+            retry_base_ms: 100,
+            retry_max_ms: 100,
+            ..Limits::default()
+        });
+        let release = Arc::new(tokio::sync::Notify::new());
+        let sink = Arc::new(RetryBesideBlocked {
+            delivered: Mutex::new(Vec::new()),
+            release: release.clone(),
+        });
+        let id = SinkId::new("required").unwrap();
+        let bus = EventBus::new(
+            limits.clone(),
+            Arc::new(Metrics::default()),
+            vec![SinkDefinition::bounded(
+                id.clone(),
+                SinkDeliveryMode::ConfirmedRequired,
+                sink.clone(),
+                &limits,
+            )],
+            vec![RouteDefinition {
+                tenant: None,
+                sinks: vec![id],
+            }],
+            1,
+        )
+        .unwrap();
+        bus.publish(named_event("a")).unwrap();
+        while sink.delivered.lock().unwrap().is_empty() {
+            tokio::task::yield_now().await;
+        }
+        bus.publish(named_event("blocked")).unwrap();
+        tokio::time::timeout(Duration::from_millis(400), async {
+            loop {
+                if sink
+                    .delivered
+                    .lock()
+                    .unwrap()
+                    .iter()
+                    .filter(|source| source.as_str() == "a")
+                    .count()
+                    >= 2
+                {
+                    break;
+                }
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        release.notify_one();
+        assert!(
+            bus.wait_required_drained(Duration::from_secs(1))
+                .await
+                .unwrap()
+        );
+        bus.stop_workers().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn required_delivery_recovers_after_normal_retry_exhaustion() {
+        let limits = Arc::new(Limits {
+            sink_delivery_concurrency: 1,
+            sink_max_attempts: 1,
+            retry_base_ms: 5,
+            retry_max_ms: 10,
+            ..Limits::default()
+        });
+        let sink = Arc::new(Recovering {
+            fail: std::sync::atomic::AtomicBool::new(true),
+            calls: AtomicUsize::new(0),
+        });
+        let id = SinkId::new("required").unwrap();
+        let bus = EventBus::new(
+            limits.clone(),
+            Arc::new(Metrics::default()),
+            vec![SinkDefinition::bounded(
+                id.clone(),
+                SinkDeliveryMode::ConfirmedRequired,
+                sink.clone(),
+                &limits,
+            )],
+            vec![RouteDefinition {
+                tenant: None,
+                sinks: vec![id],
+            }],
+            1,
+        )
+        .unwrap();
+        bus.publish(named_event("parked")).unwrap();
+        tokio::time::sleep(Duration::from_millis(35)).await;
+        assert_eq!(bus.usage().unwrap().pending_required, 1);
+        assert!(sink.calls.load(Ordering::SeqCst) < 10);
+        sink.fail.store(false, Ordering::SeqCst);
+        assert!(
+            bus.wait_required_drained(Duration::from_secs(1))
+                .await
+                .unwrap()
+        );
+        assert_eq!(bus.usage().unwrap(), EventBusUsage::default());
         bus.stop_workers().await.unwrap();
     }
 }

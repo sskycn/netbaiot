@@ -32,6 +32,12 @@ The public contract is explicitly versioned as protocol v1. HTTP paths remain be
 uses bounded JSON frames prefixed by a four-byte network-order length and versioned
 `hello`, `subscribe`, `ready`, `event`, and `ack` messages. The client sends the
 authenticated `hello` followed by `subscribe`; the server responds with `ready`.
+Client-to-server request frames and mutation bodies reject unknown fields. Server
+responses and server stream payloads ignore additive unknown fields so an older SDK
+can consume a backward-compatible newer server response. Discriminants, required
+fields, and protocol versions remain strict. `ConfigRevision` is a non-zero value
+type with validated construction and deserialization; revision zero is not
+representable through the public API.
 
 The protocol crate owns the stable public shapes, including:
 
@@ -224,6 +230,11 @@ startup time were not separately benchmarked in this revision.
 
 - The server confirmed stream currently permits one active subscriber and one
   serial outstanding delivery; logical subscription multiplexing is not available.
+  A second authenticated subscriber is deterministically rejected with `Conflict`.
+  The owner observes idle EOF even when there are no events, and generation-fenced
+  cleanup prevents an old connection from clearing a newer owner. A filter mismatch
+  is not treated as an ACK of required work; the stable required sink responsibility
+  remains pending for a later matching subscriber.
 - The business stream is a loopback-only plaintext listener today. HTTP and device
   transports use their existing TLS support, but stream TLS is not yet exposed.
 - Management authentication remains the server's static all-or-nothing token.

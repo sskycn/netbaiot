@@ -25,43 +25,69 @@ pub enum AuthenticationRequest<'a> {
         credential_id: &'a str,
         secret: &'a [u8],
     },
-    Signed {
-        credential_id: &'a str,
-        message: &'a [u8],
-        tag: &'a [u8],
-    },
 }
+
+/// Identity plus HMAC verification material cached by the gateway. The key is
+/// intentionally opaque and this type does not implement `Debug` or serialization.
+#[derive(Clone)]
+pub struct DeviceVerifier {
+    identity: AuthenticatedDevice,
+    key: [u8; 32],
+}
+
+impl DeviceVerifier {
+    pub fn new(identity: AuthenticatedDevice, key: [u8; 32]) -> Self {
+        Self { identity, key }
+    }
+
+    pub fn identity(&self) -> &AuthenticatedDevice {
+        &self.identity
+    }
+
+    pub fn verify(&self, message: &[u8], tag: &[u8]) -> Result<()> {
+        let mut mac =
+            Hmac::<Sha256>::new_from_slice(&self.key).map_err(|_| Error::Authentication)?;
+        mac.update(message);
+        mac.verify_slice(tag).map_err(|_| Error::Authentication)
+    }
+}
+
 #[async_trait]
 pub trait DeviceAuthenticator: Send + Sync {
     async fn authenticate(&self, request: AuthenticationRequest<'_>)
     -> Result<AuthenticatedDevice>;
+
+    /// Resolve stable verifier material once; UDP signatures are verified locally
+    /// for every datagram after this bounded lookup.
+    async fn resolve_verifier(&self, credential_id: &str) -> Result<DeviceVerifier>;
 }
 
 #[derive(Clone, Eq)]
 struct AuthCacheKey {
     credential_id: Arc<str>,
     fingerprint: [u8; 32],
-    signed: bool,
+    verifier: bool,
 }
 
 impl PartialEq for AuthCacheKey {
     fn eq(&self, other: &Self) -> bool {
         self.credential_id == other.credential_id
             && self.fingerprint == other.fingerprint
-            && self.signed == other.signed
+            && self.verifier == other.verifier
     }
 }
 impl Hash for AuthCacheKey {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.credential_id.hash(state);
         self.fingerprint.hash(state);
-        self.signed.hash(state);
+        self.verifier.hash(state);
     }
 }
 
 #[derive(Clone)]
 enum CachedAuth {
     Positive(AuthenticatedDevice),
+    Verifier(DeviceVerifier),
     Negative,
 }
 
@@ -75,7 +101,38 @@ struct AuthCacheState {
     entries: HashMap<AuthCacheKey, CacheEntry>,
     order: VecDeque<AuthCacheKey>,
     bytes: usize,
-    inflight: HashMap<AuthCacheKey, tokio::sync::watch::Sender<bool>>,
+    inflight: HashMap<AuthCacheKey, Inflight>,
+    epoch: u64,
+    next_inflight_id: u64,
+}
+
+struct Inflight {
+    completed: tokio::sync::watch::Sender<bool>,
+    epoch: u64,
+    id: u64,
+}
+
+struct InflightLeader<'a> {
+    cache: &'a AuthCache,
+    key: Option<AuthCacheKey>,
+    id: u64,
+}
+
+impl Drop for InflightLeader<'_> {
+    fn drop(&mut self) {
+        let Some(key) = self.key.take() else { return };
+        let Ok(mut state) = self.cache.state.lock() else {
+            return;
+        };
+        if state
+            .inflight
+            .get(&key)
+            .is_some_and(|entry| entry.id == self.id)
+            && let Some(entry) = state.inflight.remove(&key)
+        {
+            let _ = entry.completed.send(true);
+        }
+    }
 }
 
 /// Bounded positive/negative cache with coalesced identical misses.
@@ -103,6 +160,8 @@ impl AuthCache {
                 order: VecDeque::new(),
                 bytes: 0,
                 inflight: HashMap::new(),
+                epoch: 1,
+                next_inflight_id: 1,
             }),
         })
     }
@@ -126,13 +185,24 @@ impl AuthCache {
                             self.metrics.inc(Metric::AuthNegativeHits);
                             return Err(Error::Authentication);
                         }
+                        CachedAuth::Verifier(_) => return Err(Error::Internal),
                     }
                 }
-                if let Some(completed) = state.inflight.get(&key) {
-                    Some(completed.subscribe())
+                if let Some(inflight) = state.inflight.get(&key) {
+                    Some(inflight.completed.subscribe())
                 } else {
                     let (completed, _) = tokio::sync::watch::channel(false);
-                    state.inflight.insert(key.clone(), completed);
+                    let id = state.next_inflight_id;
+                    state.next_inflight_id = state.next_inflight_id.wrapping_add(1).max(1);
+                    let epoch = state.epoch;
+                    state.inflight.insert(
+                        key.clone(),
+                        Inflight {
+                            completed,
+                            epoch,
+                            id,
+                        },
+                    );
                     None
                 }
             };
@@ -146,7 +216,9 @@ impl AuthCache {
                     Duration::from_millis(self.limits.authentication_timeout_ms),
                     async {
                         if !*completed.borrow() {
-                            completed.changed().await.map_err(|_| Error::Internal)?;
+                            // A closed channel means the leader was cancelled or
+                            // panicked. Loop and elect a replacement leader.
+                            let _ = completed.changed().await;
                         }
                         Ok::<(), Error>(())
                     },
@@ -156,6 +228,16 @@ impl AuthCache {
                 continue;
             }
             self.metrics.inc(Metric::AuthCacheMisses);
+            let (leader_id, leader_epoch) = {
+                let state = lock(&self.state)?;
+                let inflight = state.inflight.get(&key).ok_or(Error::Internal)?;
+                (inflight.id, inflight.epoch)
+            };
+            let mut leader = InflightLeader {
+                cache: self,
+                key: Some(key.clone()),
+                id: leader_id,
+            };
             let result = deadline(
                 self.limits.authentication_timeout_ms,
                 self.provider.authenticate(request),
@@ -163,17 +245,23 @@ impl AuthCache {
             .await;
             let mut state = lock(&self.state)?;
             let completed = state.inflight.remove(&key).ok_or(Error::Internal)?;
+            leader.key = None;
+            if state.epoch != leader_epoch {
+                let _ = completed.completed.send(true);
+                return Err(Error::Authentication);
+            }
             let value = match &result {
                 Ok(auth) => CachedAuth::Positive(auth.clone()),
                 Err(Error::Authentication | Error::Forbidden) => CachedAuth::Negative,
                 Err(_) => {
-                    let _ = completed.send(true);
+                    let _ = completed.completed.send(true);
                     return result;
                 }
             };
             let ttl = match value {
                 CachedAuth::Positive(_) => self.limits.auth_positive_ttl_ms,
                 CachedAuth::Negative => self.limits.auth_negative_ttl_ms,
+                CachedAuth::Verifier(_) => return Err(Error::Internal),
             };
             let bytes = key.credential_id.len()
                 + std::mem::size_of::<AuthCacheKey>()
@@ -184,6 +272,13 @@ impl AuthCache {
                             + auth.device_key.device_id.as_str().len()
                             + auth.codec_id.as_str().len()
                             + 64
+                    }
+                    CachedAuth::Verifier(verifier) => {
+                        verifier.identity.device_key.tenant_id.as_str().len()
+                            + verifier.identity.device_key.product_id.as_str().len()
+                            + verifier.identity.device_key.device_id.as_str().len()
+                            + verifier.identity.codec_id.as_str().len()
+                            + 96
                     }
                     CachedAuth::Negative => 1,
                 };
@@ -210,17 +305,148 @@ impl AuthCache {
                     },
                 );
             }
-            let _ = completed.send(true);
+            let _ = completed.completed.send(true);
             return result;
+        }
+    }
+
+    pub async fn verify_signed(
+        &self,
+        credential_id: &str,
+        message: &[u8],
+        tag: &[u8],
+    ) -> Result<AuthenticatedDevice> {
+        let key = verifier_cache_key(credential_id)?;
+        loop {
+            let follower = {
+                let mut state = lock(&self.state)?;
+                prune_expired(&mut state);
+                if let Some(entry) = state.entries.get(&key) {
+                    match &entry.value {
+                        CachedAuth::Verifier(verifier) => {
+                            verifier.verify(message, tag)?;
+                            self.metrics.inc(Metric::AuthCacheHits);
+                            return Ok(verifier.identity().clone());
+                        }
+                        CachedAuth::Negative => {
+                            self.metrics.inc(Metric::AuthNegativeHits);
+                            return Err(Error::Authentication);
+                        }
+                        CachedAuth::Positive(_) => return Err(Error::Internal),
+                    }
+                }
+                if let Some(inflight) = state.inflight.get(&key) {
+                    Some(inflight.completed.subscribe())
+                } else {
+                    let (completed, _) = tokio::sync::watch::channel(false);
+                    let id = state.next_inflight_id;
+                    state.next_inflight_id = state.next_inflight_id.wrapping_add(1).max(1);
+                    let epoch = state.epoch;
+                    state.inflight.insert(
+                        key.clone(),
+                        Inflight {
+                            completed,
+                            epoch,
+                            id,
+                        },
+                    );
+                    None
+                }
+            };
+            if let Some(mut completed) = follower {
+                let _waiter = self
+                    .waiters
+                    .clone()
+                    .try_acquire_owned()
+                    .map_err(|_| Error::Overloaded)?;
+                tokio::time::timeout(
+                    Duration::from_millis(self.limits.authentication_timeout_ms),
+                    async {
+                        if !*completed.borrow() {
+                            let _ = completed.changed().await;
+                        }
+                    },
+                )
+                .await
+                .map_err(|_| Error::Timeout)?;
+                continue;
+            }
+            self.metrics.inc(Metric::AuthCacheMisses);
+            let (leader_id, leader_epoch) = {
+                let state = lock(&self.state)?;
+                let inflight = state.inflight.get(&key).ok_or(Error::Internal)?;
+                (inflight.id, inflight.epoch)
+            };
+            let mut leader = InflightLeader {
+                cache: self,
+                key: Some(key.clone()),
+                id: leader_id,
+            };
+            let result = deadline(
+                self.limits.authentication_timeout_ms,
+                self.provider.resolve_verifier(credential_id),
+            )
+            .await;
+            let mut state = lock(&self.state)?;
+            let completed = state.inflight.remove(&key).ok_or(Error::Internal)?;
+            leader.key = None;
+            if state.epoch != leader_epoch {
+                let _ = completed.completed.send(true);
+                return Err(Error::Authentication);
+            }
+            let (value, verifier) = match result {
+                Ok(verifier) => (CachedAuth::Verifier(verifier.clone()), Some(verifier)),
+                Err(Error::Authentication | Error::Forbidden) => (CachedAuth::Negative, None),
+                Err(error) => {
+                    let _ = completed.completed.send(true);
+                    return Err(error);
+                }
+            };
+            let ttl = match value {
+                CachedAuth::Verifier(_) => self.limits.auth_positive_ttl_ms,
+                CachedAuth::Negative => self.limits.auth_negative_ttl_ms,
+                CachedAuth::Positive(_) => return Err(Error::Internal),
+            };
+            let bytes = key.credential_id.len()
+                + std::mem::size_of::<AuthCacheKey>()
+                + match &value {
+                    CachedAuth::Verifier(verifier) => {
+                        verifier.identity.device_key.tenant_id.as_str().len()
+                            + verifier.identity.device_key.product_id.as_str().len()
+                            + verifier.identity.device_key.device_id.as_str().len()
+                            + verifier.identity.codec_id.as_str().len()
+                            + 96
+                    }
+                    CachedAuth::Negative => 1,
+                    CachedAuth::Positive(_) => return Err(Error::Internal),
+                };
+            insert_cache_entry(
+                &mut state,
+                &self.limits,
+                &self.metrics,
+                key.clone(),
+                value,
+                ttl,
+                bytes,
+            );
+            let _ = completed.completed.send(true);
+            if let Some(verifier) = verifier {
+                verifier.verify(message, tag)?;
+                return Ok(verifier.identity().clone());
+            }
+            return Err(Error::Authentication);
         }
     }
 
     pub fn invalidate(&self, invalidation: &AuthInvalidation) -> Result<Vec<DeviceKey>> {
         let mut state = lock(&self.state)?;
-        let mut devices = Vec::new();
+        state.epoch = state.epoch.wrapping_add(1).max(1);
+        let mut devices = std::collections::HashSet::new();
         state.entries.retain(|_, entry| {
-            let CachedAuth::Positive(auth) = &entry.value else {
-                return !matches!(invalidation, AuthInvalidation::All);
+            let auth = match &entry.value {
+                CachedAuth::Positive(auth) => auth,
+                CachedAuth::Verifier(verifier) => verifier.identity(),
+                CachedAuth::Negative => return !matches!(invalidation, AuthInvalidation::All),
             };
             let remove = match invalidation {
                 AuthInvalidation::Device { device } => &auth.device_key == device,
@@ -241,7 +467,7 @@ impl AuthCache {
                 AuthInvalidation::All => true,
             };
             if remove {
-                devices.push(auth.device_key.clone());
+                devices.insert(auth.device_key.clone());
             }
             !remove
         });
@@ -253,31 +479,28 @@ impl AuthCache {
             .collect::<std::collections::HashSet<_>>();
         state.order.retain(|key| live.contains(key));
         self.metrics.inc(Metric::AuthInvalidations);
-        Ok(devices)
+        Ok(devices.into_iter().collect())
     }
 
     pub fn usage(&self) -> Result<(usize, usize)> {
         let state = lock(&self.state)?;
         Ok((state.entries.len(), state.bytes))
     }
+
+    pub fn inflight_usage(&self) -> Result<(usize, usize)> {
+        Ok((
+            lock(&self.state)?.inflight.len(),
+            self.waiters.available_permits(),
+        ))
+    }
 }
 
 fn cache_key(request: &AuthenticationRequest<'_>) -> Result<AuthCacheKey> {
-    let (credential_id, fingerprint, signed) = match request {
+    let (credential_id, fingerprint) = match request {
         AuthenticationRequest::Secret {
             credential_id,
             secret,
-        } => (*credential_id, Sha256::digest(secret).into(), false),
-        AuthenticationRequest::Signed {
-            credential_id,
-            message,
-            tag,
-        } => {
-            let mut digest = Sha256::new();
-            digest.update(message);
-            digest.update(tag);
-            (*credential_id, digest.finalize().into(), true)
-        }
+        } => (*credential_id, Sha256::digest(secret).into()),
     };
     if credential_id.is_empty() || credential_id.len() > 64 {
         return Err(Error::Authentication);
@@ -285,8 +508,53 @@ fn cache_key(request: &AuthenticationRequest<'_>) -> Result<AuthCacheKey> {
     Ok(AuthCacheKey {
         credential_id: Arc::from(credential_id),
         fingerprint,
-        signed,
+        verifier: false,
     })
+}
+
+fn verifier_cache_key(credential_id: &str) -> Result<AuthCacheKey> {
+    if credential_id.is_empty() || credential_id.len() > 64 {
+        return Err(Error::Authentication);
+    }
+    Ok(AuthCacheKey {
+        credential_id: Arc::from(credential_id),
+        fingerprint: [0; 32],
+        verifier: true,
+    })
+}
+
+fn insert_cache_entry(
+    state: &mut AuthCacheState,
+    limits: &Limits,
+    metrics: &Metrics,
+    key: AuthCacheKey,
+    value: CachedAuth,
+    ttl: u64,
+    bytes: usize,
+) {
+    while (state.entries.len() >= limits.auth_cache_max_entries
+        || state.bytes.saturating_add(bytes) > limits.auth_cache_max_bytes)
+        && !state.entries.is_empty()
+    {
+        if let Some(old) = state.order.pop_front()
+            && let Some(entry) = state.entries.remove(&old)
+        {
+            state.bytes = state.bytes.saturating_sub(entry.bytes);
+            metrics.inc(Metric::AuthEvictions);
+        }
+    }
+    if bytes <= limits.auth_cache_max_bytes {
+        state.bytes += bytes;
+        state.order.push_back(key.clone());
+        state.entries.insert(
+            key,
+            CacheEntry {
+                value,
+                expires: Instant::now() + Duration::from_millis(ttl),
+                bytes,
+            },
+        );
+    }
 }
 
 fn prune_expired(state: &mut AuthCacheState) {
@@ -377,8 +645,7 @@ impl DeviceAuthenticator for StaticAuthenticator {
         request: AuthenticationRequest<'_>,
     ) -> Result<AuthenticatedDevice> {
         let id = match request {
-            AuthenticationRequest::Secret { credential_id, .. }
-            | AuthenticationRequest::Signed { credential_id, .. } => credential_id,
+            AuthenticationRequest::Secret { credential_id, .. } => credential_id,
         };
         let entry = self.credentials.get(id).ok_or(Error::Authentication)?;
         match request {
@@ -389,14 +656,16 @@ impl DeviceAuthenticator for StaticAuthenticator {
                     return Err(Error::Authentication);
                 }
             }
-            AuthenticationRequest::Signed { message, tag, .. } => {
-                let mut mac = Hmac::<Sha256>::new_from_slice(&entry.key)
-                    .map_err(|_| Error::Authentication)?;
-                mac.update(message);
-                mac.verify_slice(tag).map_err(|_| Error::Authentication)?;
-            }
         }
         Ok(entry.identity.clone())
+    }
+
+    async fn resolve_verifier(&self, credential_id: &str) -> Result<DeviceVerifier> {
+        let entry = self
+            .credentials
+            .get(credential_id)
+            .ok_or(Error::Authentication)?;
+        Ok(DeviceVerifier::new(entry.identity.clone(), entry.key))
     }
 }
 
@@ -445,12 +714,46 @@ mod cache_tests {
         identity: AuthenticatedDevice,
     }
 
+    struct BlockingProvider {
+        calls: AtomicUsize,
+        block: std::sync::atomic::AtomicBool,
+        started: tokio::sync::Notify,
+        release: tokio::sync::Notify,
+        identity: AuthenticatedDevice,
+    }
+
+    #[async_trait]
+    impl DeviceAuthenticator for BlockingProvider {
+        async fn authenticate(&self, _: AuthenticationRequest<'_>) -> Result<AuthenticatedDevice> {
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            self.started.notify_waiters();
+            if self.block.load(Ordering::SeqCst) {
+                self.release.notified().await;
+            }
+            Ok(self.identity.clone())
+        }
+
+        async fn resolve_verifier(&self, _: &str) -> Result<DeviceVerifier> {
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            Ok(DeviceVerifier::new(self.identity.clone(), [7; 32]))
+        }
+    }
+
     #[async_trait]
     impl DeviceAuthenticator for Provider {
         async fn authenticate(&self, _: AuthenticationRequest<'_>) -> Result<AuthenticatedDevice> {
             self.calls.fetch_add(1, Ordering::Relaxed);
             match self.mode.load(Ordering::Relaxed) {
                 0 => Ok(self.identity.clone()),
+                1 => Err(Error::Authentication),
+                _ => Err(Error::Unavailable),
+            }
+        }
+
+        async fn resolve_verifier(&self, _: &str) -> Result<DeviceVerifier> {
+            self.calls.fetch_add(1, Ordering::Relaxed);
+            match self.mode.load(Ordering::Relaxed) {
+                0 => Ok(DeviceVerifier::new(self.identity.clone(), [7; 32])),
                 1 => Err(Error::Authentication),
                 _ => Err(Error::Unavailable),
             }
@@ -535,5 +838,155 @@ mod cache_tests {
         assert_eq!(invalidated, vec![identity().device_key]);
         tokio::time::sleep(Duration::from_millis(6)).await;
         cache.authenticate(request("one")).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn cancelled_leader_releases_followers_and_all_inflight_resources() {
+        let provider = Arc::new(BlockingProvider {
+            calls: AtomicUsize::new(0),
+            block: std::sync::atomic::AtomicBool::new(true),
+            started: tokio::sync::Notify::new(),
+            release: tokio::sync::Notify::new(),
+            identity: identity(),
+        });
+        let limits = Arc::new(Limits {
+            authentication_timeout_ms: 1_000,
+            auth_cache_max_waiters: 16,
+            ..Limits::default()
+        });
+        let cache = AuthCache::new(
+            provider.clone(),
+            limits.clone(),
+            Arc::new(Metrics::default()),
+        );
+        let leader_cache = cache.clone();
+        let leader = tokio::spawn(async move { leader_cache.authenticate(request("same")).await });
+        while provider.calls.load(Ordering::SeqCst) == 0 {
+            tokio::task::yield_now().await;
+        }
+        let mut followers = Vec::new();
+        for _ in 0..8 {
+            let cache = cache.clone();
+            followers.push(tokio::spawn(async move {
+                cache.authenticate(request("same")).await
+            }));
+        }
+        tokio::task::yield_now().await;
+        provider.block.store(false, Ordering::SeqCst);
+        leader.abort();
+        let _ = leader.await;
+        for follower in followers {
+            tokio::time::timeout(Duration::from_secs(1), follower)
+                .await
+                .unwrap()
+                .unwrap()
+                .unwrap();
+        }
+        assert_eq!(
+            cache.inflight_usage().unwrap(),
+            (0, limits.auth_cache_max_waiters)
+        );
+        assert_eq!(provider.calls.load(Ordering::SeqCst), 2);
+    }
+
+    #[tokio::test]
+    async fn invalidation_fences_delayed_success_and_retry_uses_new_generation() {
+        let provider = Arc::new(BlockingProvider {
+            calls: AtomicUsize::new(0),
+            block: std::sync::atomic::AtomicBool::new(true),
+            started: tokio::sync::Notify::new(),
+            release: tokio::sync::Notify::new(),
+            identity: identity(),
+        });
+        let limits = Arc::new(Limits::default());
+        let cache = AuthCache::new(
+            provider.clone(),
+            limits.clone(),
+            Arc::new(Metrics::default()),
+        );
+        let first_cache = cache.clone();
+        let first = tokio::spawn(async move { first_cache.authenticate(request("same")).await });
+        while provider.calls.load(Ordering::SeqCst) == 0 {
+            tokio::task::yield_now().await;
+        }
+        cache.invalidate(&AuthInvalidation::All).unwrap();
+        provider.block.store(false, Ordering::SeqCst);
+        provider.release.notify_waiters();
+        assert!(matches!(first.await.unwrap(), Err(Error::Authentication)));
+        cache.authenticate(request("same")).await.unwrap();
+        assert_eq!(provider.calls.load(Ordering::SeqCst), 2);
+        assert_eq!(
+            cache.inflight_usage().unwrap(),
+            (0, limits.auth_cache_max_waiters)
+        );
+    }
+
+    #[tokio::test]
+    async fn timed_out_leader_does_not_poison_retry() {
+        let provider = Arc::new(BlockingProvider {
+            calls: AtomicUsize::new(0),
+            block: std::sync::atomic::AtomicBool::new(true),
+            started: tokio::sync::Notify::new(),
+            release: tokio::sync::Notify::new(),
+            identity: identity(),
+        });
+        let limits = Arc::new(Limits {
+            authentication_timeout_ms: 5,
+            ..Limits::default()
+        });
+        let cache = AuthCache::new(
+            provider.clone(),
+            limits.clone(),
+            Arc::new(Metrics::default()),
+        );
+        assert!(matches!(
+            cache.authenticate(request("same")).await,
+            Err(Error::Timeout)
+        ));
+        provider.block.store(false, Ordering::SeqCst);
+        cache.authenticate(request("same")).await.unwrap();
+        assert_eq!(provider.calls.load(Ordering::SeqCst), 2);
+        assert_eq!(
+            cache.inflight_usage().unwrap(),
+            (0, limits.auth_cache_max_waiters)
+        );
+    }
+
+    #[tokio::test]
+    async fn ten_thousand_signed_packets_use_one_verifier_lookup() {
+        let provider = Arc::new(Provider {
+            calls: AtomicUsize::new(0),
+            mode: AtomicU8::new(0),
+            identity: identity(),
+        });
+        let cache = AuthCache::new(
+            provider.clone(),
+            Arc::new(Limits::default()),
+            Arc::new(Metrics::default()),
+        );
+        for sequence in 0..10_000u64 {
+            let message = sequence.to_be_bytes();
+            let mut mac = Hmac::<Sha256>::new_from_slice(&[7; 32]).unwrap();
+            mac.update(&message);
+            let tag = mac.finalize().into_bytes();
+            cache.verify_signed("signed", &message, &tag).await.unwrap();
+        }
+        assert_eq!(provider.calls.load(Ordering::Relaxed), 1);
+        assert!(matches!(
+            cache.verify_signed("signed", b"wrong", &[0; 32]).await,
+            Err(Error::Authentication)
+        ));
+        assert_eq!(provider.calls.load(Ordering::Relaxed), 1);
+        provider.mode.store(2, Ordering::Relaxed);
+        let message = 10_001u64.to_be_bytes();
+        let mut mac = Hmac::<Sha256>::new_from_slice(&[7; 32]).unwrap();
+        mac.update(&message);
+        let tag = mac.finalize().into_bytes();
+        cache.verify_signed("signed", &message, &tag).await.unwrap();
+        assert!(matches!(
+            cache.verify_signed("uncached", &message, &tag).await,
+            Err(Error::Unavailable)
+        ));
+        assert_eq!(provider.calls.load(Ordering::Relaxed), 2);
     }
 }

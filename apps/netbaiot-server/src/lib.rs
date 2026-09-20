@@ -15,7 +15,10 @@ use std::{
     collections::HashMap,
     net::SocketAddr,
     path::PathBuf,
-    sync::{Arc, Mutex},
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicU64, Ordering},
+    },
     time::Duration,
 };
 use subtle::ConstantTimeEq;
@@ -245,28 +248,83 @@ struct StreamRequest {
 }
 
 struct TcpStreamSink {
-    active: Mutex<Option<mpsc::Sender<StreamRequest>>>,
+    active: Mutex<Option<ActiveStream>>,
+    generation: AtomicU64,
+}
+
+#[derive(Clone)]
+struct ActiveStream {
+    generation: u64,
+    sender: mpsc::Sender<StreamRequest>,
+    filter: EventFilter,
+}
+
+struct ActiveStreamLease {
+    sink: Arc<TcpStreamSink>,
+    generation: u64,
+}
+
+impl Drop for ActiveStreamLease {
+    fn drop(&mut self) {
+        let _ = self.sink.release(self.generation);
+    }
 }
 
 impl TcpStreamSink {
     fn new() -> Arc<Self> {
         Arc::new(Self {
             active: Mutex::new(None),
+            generation: AtomicU64::new(0),
         })
+    }
+
+    fn claim(&self, sender: mpsc::Sender<StreamRequest>, filter: EventFilter) -> Result<u64> {
+        let mut active = self.active.lock().map_err(|_| Error::Internal)?;
+        if active.is_some() {
+            return Err(Error::Conflict);
+        }
+        let generation = self
+            .generation
+            .fetch_add(1, Ordering::Relaxed)
+            .wrapping_add(1)
+            .max(1);
+        *active = Some(ActiveStream {
+            generation,
+            sender,
+            filter,
+        });
+        Ok(generation)
+    }
+
+    fn release(&self, generation: u64) -> Result<()> {
+        let mut active = self.active.lock().map_err(|_| Error::Internal)?;
+        if active
+            .as_ref()
+            .is_some_and(|owner| owner.generation == generation)
+        {
+            *active = None;
+        }
+        Ok(())
     }
 }
 
 #[async_trait]
 impl EventSink for TcpStreamSink {
     async fn deliver(&self, delivery: DeliveryEnvelope) -> std::result::Result<SinkAck, SinkError> {
-        let sender = self
+        let active = self
             .active
             .lock()
             .map_err(|_| SinkError::Permanent)?
             .clone()
             .ok_or(SinkError::Retryable)?;
+        // A filter mismatch is not an ACK of required work. The logical sink
+        // retains responsibility until a matching subscriber confirms it.
+        if !active.filter.matches(&delivery.event) {
+            return Err(SinkError::Retryable);
+        }
         let (result, receive) = oneshot::channel();
-        sender
+        active
+            .sender
             .try_send(StreamRequest { delivery, result })
             .map_err(|_| SinkError::Retryable)?;
         receive.await.map_err(|_| SinkError::Retryable)?
@@ -459,21 +517,55 @@ async fn serve_business_stream(
     limits: Arc<Limits>,
     stop: CancellationToken,
 ) -> Result<()> {
+    let mut tasks = JoinSet::new();
     loop {
-        let (mut stream, _) = tokio::select! {
+        let accepted = tokio::select! {
             _ = stop.cancelled() => break,
+            completed = tasks.join_next(), if !tasks.is_empty() => {
+                if let Some(Err(error)) = completed {
+                    tracing::warn!(error=%error, "business stream task failed");
+                }
+                continue;
+            }
             accepted = listener.accept() => accepted.map_err(|_| Error::Unavailable)?,
         };
+        if tasks.len() >= limits.max_ingress {
+            drop(accepted.0);
+            continue;
+        }
+        let (mut stream, _) = accepted;
+        let sink = sink.clone();
+        let limits = limits.clone();
+        let stop = stop.child_token();
+        tasks.spawn(async move {
         let framer = LengthPrefixFramer {
             maximum: limits.max_tcp_frame_size,
         };
         let Ok((subscription_id, filter)) =
             business_handshake(&mut stream, &framer, &token_hash, &limits).await
         else {
-            continue;
+            return Ok::<(), Error>(());
         };
         let (sender, mut receiver) = mpsc::channel(limits.sink_delivery_concurrency);
-        *sink.active.lock().map_err(|_| Error::Internal)? = Some(sender);
+        let generation = match sink.claim(sender, filter) {
+            Ok(generation) => generation,
+            Err(Error::Conflict) => {
+                write_stream_error(
+                    &mut stream,
+                    &framer,
+                    &limits,
+                    ErrorCode::Conflict,
+                    "an active business subscriber already owns the required sink",
+                )
+                .await;
+                return Ok(());
+            }
+            Err(error) => return Err(error),
+        };
+        let _lease = ActiveStreamLease {
+            sink: sink.clone(),
+            generation,
+        };
         if write_frame(
             &mut stream,
             &framer,
@@ -486,17 +578,25 @@ async fn serve_business_stream(
         .await
         .is_err()
         {
-            *sink.active.lock().map_err(|_| Error::Internal)? = None;
-            continue;
+            sink.release(generation)?;
+            return Ok(());
         }
-        while let Some(request) = tokio::select! {
-            _ = stop.cancelled() => None,
-            request = receiver.recv() => request,
-        } {
-            if !filter.matches(&request.delivery.event) {
-                let _ = request.result.send(Ok(SinkAck));
-                continue;
-            }
+        loop {
+            let request = tokio::select! {
+                _ = stop.cancelled() => None,
+                request = receiver.recv() => request,
+                ready = stream.readable() => {
+                    ready.map_err(|_| Error::Unavailable)?;
+                    let mut unexpected = [0u8; 1];
+                    match stream.try_read(&mut unexpected) {
+                        Ok(0) => None,
+                        Ok(_) => return Err(Error::Invalid),
+                        Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => continue,
+                        Err(_) => return Err(Error::Unavailable),
+                    }
+                }
+            };
+            let Some(request) = request else { break };
             let delivery_id = DeliveryId::generate();
             let event_id = request.delivery.event.event_id;
             let frame = StreamServerFrame::Event {
@@ -544,8 +644,11 @@ async fn serve_business_stream(
                 break;
             }
         }
-        *sink.active.lock().map_err(|_| Error::Internal)? = None;
+        sink.release(generation)?;
+        Ok(())
+        });
     }
+    while tasks.join_next().await.is_some() {}
     Ok(())
 }
 
@@ -553,6 +656,13 @@ struct HttpAuthProvider {
     client: reqwest::Client,
     url: reqwest::Url,
     slots: Arc<tokio::sync::Semaphore>,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct VerifierResponse {
+    identity: AuthenticatedDevice,
+    verifier_key_hex: String,
 }
 
 impl HttpAuthProvider {
@@ -600,14 +710,6 @@ impl DeviceAuthenticator for HttpAuthProvider {
             } => serde_json::json!({
                 "kind": "secret", "credential_id": credential_id, "secret_hex": encode_hex(secret),
             }),
-            AuthenticationRequest::Signed {
-                credential_id,
-                message,
-                tag,
-            } => serde_json::json!({
-                "kind": "signed", "credential_id": credential_id,
-                "message_hex": encode_hex(message), "tag_hex": encode_hex(tag),
-            }),
         };
         let response = self
             .client
@@ -640,6 +742,51 @@ impl DeviceAuthenticator for HttpAuthProvider {
             bytes.extend_from_slice(&chunk);
         }
         serde_json::from_slice(&bytes).map_err(|_| Error::Invalid)
+    }
+
+    async fn resolve_verifier(&self, credential_id: &str) -> Result<DeviceVerifier> {
+        let _slot = self
+            .slots
+            .clone()
+            .try_acquire_owned()
+            .map_err(|_| Error::Overloaded)?;
+        let response = self
+            .client
+            .post(self.url.clone())
+            .json(&serde_json::json!({
+                "kind": "verifier", "credential_id": credential_id,
+            }))
+            .send()
+            .await
+            .map_err(|_| Error::Unavailable)?;
+        if matches!(
+            response.status(),
+            reqwest::StatusCode::UNAUTHORIZED | reqwest::StatusCode::FORBIDDEN
+        ) {
+            return Err(Error::Authentication);
+        }
+        if !response.status().is_success()
+            || response
+                .content_length()
+                .is_some_and(|length| length > 16_384)
+        {
+            return Err(Error::Unavailable);
+        }
+        let mut response = response;
+        let mut bytes = Vec::new();
+        while let Some(chunk) = response.chunk().await.map_err(|_| Error::Unavailable)? {
+            let length = bytes.len().checked_add(chunk.len()).ok_or(Error::Invalid)?;
+            if length > 16_384 {
+                return Err(Error::Invalid);
+            }
+            bytes.extend_from_slice(&chunk);
+        }
+        let response: VerifierResponse =
+            serde_json::from_slice(&bytes).map_err(|_| Error::Invalid)?;
+        let key: [u8; 32] = decode_hex(&response.verifier_key_hex)?
+            .try_into()
+            .map_err(|_| Error::Invalid)?;
+        Ok(DeviceVerifier::new(response.identity, key))
     }
 }
 
@@ -894,7 +1041,7 @@ pub async fn run_with_credentials(
 
     let drained = events
         .wait_required_drained(Duration::from_millis(limits.shutdown_drain_timeout_ms))
-        .await;
+        .await?;
     if drained {
         events.stop_workers().await?;
         if !recovered_files.is_empty() {
@@ -920,4 +1067,57 @@ pub async fn run_with_credentials(
     lifecycle.mark_drained()?;
     tracing::info!("shutdown complete");
     failure.map_or(Ok(()), Err)
+}
+
+#[cfg(test)]
+mod reliability_tests {
+    use super::*;
+
+    fn delivery() -> DeliveryEnvelope {
+        DeliveryEnvelope {
+            event: Arc::new(DeviceEvent {
+                event_id: EventId::generate(),
+                source_message_id: SourceMessageId::new("business-filter").unwrap(),
+                device: DeviceKey {
+                    tenant_id: TenantId::new("tenant-a").unwrap(),
+                    product_id: ProductId::new("product").unwrap(),
+                    device_id: DeviceId::new("device").unwrap(),
+                },
+                received_at: 1,
+                occurred_at: None,
+                kind: DeviceEventKind::Heartbeat(Heartbeat { sequence: 1 }),
+            }),
+            sink_id: SinkId::new("tcp-rpc").unwrap(),
+            attempt: 1,
+            accepted_at: 1,
+        }
+    }
+
+    #[tokio::test]
+    async fn active_subscriber_is_rejected_and_filter_mismatch_is_not_acknowledged() {
+        let sink = TcpStreamSink::new();
+        let (sender, _receiver) = mpsc::channel(1);
+        let generation = sink
+            .claim(
+                sender,
+                EventFilter {
+                    tenant: Some(TenantId::new("tenant-b").unwrap()),
+                    ..EventFilter::default()
+                },
+            )
+            .unwrap();
+        let (other, _other_receiver) = mpsc::channel(1);
+        assert!(matches!(
+            sink.claim(other, EventFilter::default()),
+            Err(Error::Conflict)
+        ));
+        assert!(matches!(
+            sink.deliver(delivery()).await,
+            Err(SinkError::Retryable)
+        ));
+        sink.release(generation.wrapping_add(1)).unwrap();
+        assert!(sink.active.lock().unwrap().is_some());
+        sink.release(generation).unwrap();
+        assert!(sink.active.lock().unwrap().is_none());
+    }
 }

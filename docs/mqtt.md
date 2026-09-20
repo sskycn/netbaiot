@@ -51,7 +51,11 @@ shutdown suppress it. Intentional restart closes sockets without manufacturing a
 client failure.
 
 For canonical uplinks, MQTT application delivery crosses `EventAccepted` before a
-QoS1 PUBACK or QoS2 completion. `EventAccepted` means every required EventBus sink
+QoS1 PUBACK or QoS2 completion. Inbound QoS2 stores a separate `EventAccepted`
+pending-route stage, including across planned restart, so retained/subscriber
+responsibility can finish without re-emitting the business event. Retained capacity
+is reserved before PUBREC for a retained QoS2 flow and released atomically during
+routing. `EventAccepted` means every required EventBus sink
 reserved count/bytes and was enqueued; it is not a database commit. MQTT QoS2
 prevents duplicate IoT binding for one stored MQTT flow, but it does not promise
 business exactly-once: EventBus recovery is at-least-once and consumers remain

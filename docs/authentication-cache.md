@@ -12,9 +12,25 @@ exceeded. Raw secrets/tags are not retained: keys use credential ID plus SHA-256
 fingerprints and are never logged or labeled.
 
 Identical simultaneous misses share one provider operation through a race-safe watch
-completion channel. Provider calls have a five-second default timeout and bounded
-concurrency. Provider outage behavior is fail closed for an unknown/expired miss;
-an unexpired positive entry or already-bound long-lived session continues.
+completion channel. A leader owns an RAII inflight lease: timeout, task cancellation,
+panic unwind, or any early return removes the inflight entry and wakes followers so
+one of them can retry. Miss wait permits are released on every exit. Provider calls
+have a five-second default timeout and bounded concurrency. Provider outage behavior
+is fail closed for an unknown/expired miss; an unexpired positive entry or
+already-bound long-lived session continues.
+
+UDP uses a distinct positive cache entry keyed by credential identity. A provider
+lookup returns an opaque `DeviceVerifier` containing the authenticated identity and
+256-bit HMAC verification material. Every datagram is still signature-checked
+locally, then credential version and replay window are checked; the signed message
+and tag are not used as the remote-cache key. Thus 10,000 valid packets within TTL
+perform one provider lookup, not 10,000. The external provider contract uses
+`{"kind":"verifier","credential_id":...}` and returns
+`{"identity":...,"verifier_key_hex":...}` over the already-required HTTPS (or
+loopback HTTP) channel. Verification keys are never serialized to recovery files,
+logged, or exposed through `Debug`.
 
 Management invalidation supports device, product, tenant, credential version, auth
-generation, or all entries. Affected active sessions are canceled immediately.
+generation, or all entries. Every invalidation advances an auth epoch. A provider
+result begun in an older epoch is rejected and cannot repopulate the cache after
+invalidation. Affected active sessions are canceled immediately.

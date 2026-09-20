@@ -34,8 +34,16 @@ impl ControlPlaneProvider for StaticControlPlane {
 struct SnapshotIndex {
     revision: u64,
     products: HashMap<(TenantId, ProductId), Arc<ProductRuntimeConfig>>,
-    devices: HashMap<DeviceKey, Arc<DeviceConfigSnapshot>>,
+    devices: HashMap<DeviceKey, DeviceEntry>,
     routes: Arc<Vec<RouteDefinition>>,
+    bytes: usize,
+    product_bytes: usize,
+    route_bytes: usize,
+}
+
+#[derive(Clone)]
+struct DeviceEntry {
+    value: Arc<DeviceConfigSnapshot>,
     bytes: usize,
 }
 
@@ -57,6 +65,8 @@ impl ConfigCache {
                 devices: HashMap::new(),
                 routes: Arc::new(Vec::new()),
                 bytes: 0,
+                product_bytes: 0,
+                route_bytes: 0,
             })),
             stats: Mutex::new((0, 0, 0)),
         })
@@ -94,35 +104,44 @@ impl ConfigCache {
         let mut devices = HashMap::new();
         let mut bytes = 0usize;
         for device in snapshot.devices {
-            if device.revision.0 == 0
-                || !products.contains_key(&(
-                    device.device.tenant_id.clone(),
-                    device.device.product_id.clone(),
-                ))
-            {
+            if !products.contains_key(&(
+                device.device.tenant_id.clone(),
+                device.device.product_id.clone(),
+            )) {
                 return Err(Error::Configuration);
             }
-            bytes = bytes
-                .checked_add(
-                    serde_json::to_vec(&device)
-                        .map_err(|_| Error::Configuration)?
-                        .len(),
-                )
-                .ok_or(Error::Overloaded)?;
+            let device_bytes = serde_json::to_vec(&device)
+                .map_err(|_| Error::Configuration)?
+                .len();
+            bytes = bytes.checked_add(device_bytes).ok_or(Error::Overloaded)?;
             if devices
-                .insert(device.device.clone(), Arc::new(device))
+                .insert(
+                    device.device.clone(),
+                    DeviceEntry {
+                        value: Arc::new(device),
+                        bytes: device_bytes,
+                    },
+                )
                 .is_some()
             {
                 return Err(Error::Configuration);
             }
         }
+        let product_bytes = products.values().try_fold(0usize, |total, product| {
+            total
+                .checked_add(
+                    serde_json::to_vec(product.as_ref())
+                        .map_err(|_| Error::Configuration)?
+                        .len(),
+                )
+                .ok_or(Error::Overloaded)
+        })?;
+        let route_bytes = serde_json::to_vec(&snapshot.routes)
+            .map_err(|_| Error::Configuration)?
+            .len();
         bytes = bytes
-            .checked_add(
-                products
-                    .values()
-                    .map(|product| serde_json::to_vec(product).map_or(usize::MAX, |v| v.len()))
-                    .sum::<usize>(),
-            )
+            .checked_add(product_bytes)
+            .and_then(|value| value.checked_add(route_bytes))
             .ok_or(Error::Overloaded)?;
         if bytes > self.limits.config_cache_max_bytes {
             return Err(Error::Overloaded);
@@ -133,6 +152,8 @@ impl ConfigCache {
             devices,
             routes: Arc::new(snapshot.routes),
             bytes,
+            product_bytes,
+            route_bytes,
         });
         *self.snapshot.write().map_err(|_| Error::Internal)? = next;
         Ok(())
@@ -145,7 +166,7 @@ impl ConfigCache {
             .map_err(|_| Error::Internal)?
             .devices
             .get(key)
-            .cloned();
+            .map(|entry| entry.value.clone());
         let mut stats = lock(&self.stats)?;
         if value.is_some() {
             stats.0 += 1;
@@ -158,9 +179,6 @@ impl ConfigCache {
     /// Atomically replaces one public device configuration. The caller serializes
     /// this with other control-plane mutations.
     pub fn upsert_device(&self, config: DeviceConfigSnapshot) -> Result<()> {
-        if config.revision.0 == 0 {
-            return Err(Error::Configuration);
-        }
         let current = self.snapshot.read().map_err(|_| Error::Internal)?.clone();
         if !current.products.contains_key(&(
             config.device.tenant_id.clone(),
@@ -171,7 +189,7 @@ impl ConfigCache {
         if current
             .devices
             .get(&config.device)
-            .is_some_and(|old| old.revision >= config.revision)
+            .is_some_and(|old| old.value.revision >= config.revision)
         {
             return Err(Error::Conflict);
         }
@@ -181,29 +199,22 @@ impl ConfigCache {
         {
             return Err(Error::Overloaded);
         }
+        let entry_bytes = serde_json::to_vec(&config)
+            .map_err(|_| Error::Configuration)?
+            .len();
         let mut devices = current.devices.clone();
-        devices.insert(config.device.clone(), Arc::new(config));
-        let product_bytes = current
-            .products
-            .values()
-            .try_fold(0usize, |total, product| {
-                total
-                    .checked_add(
-                        serde_json::to_vec(product.as_ref())
-                            .map_err(|_| Error::Configuration)?
-                            .len(),
-                    )
-                    .ok_or(Error::Overloaded)
-            })?;
-        let bytes = devices.values().try_fold(product_bytes, |total, device| {
-            total
-                .checked_add(
-                    serde_json::to_vec(device.as_ref())
-                        .map_err(|_| Error::Configuration)?
-                        .len(),
-                )
-                .ok_or(Error::Overloaded)
-        })?;
+        let previous = devices.insert(
+            config.device.clone(),
+            DeviceEntry {
+                value: Arc::new(config),
+                bytes: entry_bytes,
+            },
+        );
+        let bytes = current
+            .bytes
+            .checked_sub(previous.as_ref().map_or(0, |entry| entry.bytes))
+            .and_then(|value| value.checked_add(entry_bytes))
+            .ok_or(Error::Overloaded)?;
         if bytes > self.limits.config_cache_max_bytes {
             return Err(Error::Overloaded);
         }
@@ -213,6 +224,8 @@ impl ConfigCache {
             devices,
             routes: current.routes.clone(),
             bytes,
+            product_bytes: current.product_bytes,
+            route_bytes: current.route_bytes,
         });
         *self.snapshot.write().map_err(|_| Error::Internal)? = next;
         Ok(())
@@ -238,13 +251,15 @@ impl ConfigCache {
             return Ok(false);
         }
         let mut devices = current.devices.clone();
-        devices.remove(key);
+        let removed = devices.remove(key).ok_or(Error::Internal)?;
         let next = Arc::new(SnapshotIndex {
             revision: current.revision,
             products: current.products.clone(),
             devices,
             routes: current.routes.clone(),
-            bytes: current.bytes,
+            bytes: current.bytes.saturating_sub(removed.bytes),
+            product_bytes: current.product_bytes,
+            route_bytes: current.route_bytes,
         });
         *self.snapshot.write().map_err(|_| Error::Internal)? = next;
         lock(&self.stats)?.2 += 1;
@@ -259,12 +274,25 @@ impl ConfigCache {
         if revision <= current.revision {
             return Err(Error::Conflict);
         }
+        let route_bytes = serde_json::to_vec(&routes)
+            .map_err(|_| Error::Configuration)?
+            .len();
+        let bytes = current
+            .bytes
+            .checked_sub(current.route_bytes)
+            .and_then(|value| value.checked_add(route_bytes))
+            .ok_or(Error::Overloaded)?;
+        if bytes > self.limits.config_cache_max_bytes {
+            return Err(Error::Overloaded);
+        }
         let next = Arc::new(SnapshotIndex {
             revision,
             products: current.products.clone(),
             devices: current.devices.clone(),
             routes: Arc::new(routes),
-            bytes: current.bytes,
+            bytes,
+            product_bytes: current.product_bytes,
+            route_bytes,
         });
         *self.snapshot.write().map_err(|_| Error::Internal)? = next;
         Ok(())
@@ -315,7 +343,7 @@ mod tests {
                     product_id: product,
                     device_id: DeviceId::new("d").unwrap(),
                 },
-                revision: ConfigRevision(revision),
+                revision: ConfigRevision::new(revision).unwrap(),
                 payload: Arc::new(serde_json::json!({"sample": 1})),
             }],
             routes: vec![RouteDefinition {
@@ -335,7 +363,29 @@ mod tests {
         let first = cache.device(&device).unwrap().unwrap();
         cache.apply(snapshot(2)).unwrap();
         let second = cache.device(&device).unwrap().unwrap();
-        assert_eq!(first.revision, ConfigRevision(1));
-        assert_eq!(second.revision, ConfigRevision(2));
+        assert_eq!(first.revision, ConfigRevision::new(1).unwrap());
+        assert_eq!(second.revision, ConfigRevision::new(2).unwrap());
+    }
+
+    #[test]
+    fn invalidation_releases_exact_byte_charge_across_reinsert_cycles() {
+        let cache = ConfigCache::empty(Arc::new(Limits::default()));
+        cache.apply(snapshot(1)).unwrap();
+        let key = snapshot(2).devices.remove(0).device;
+        let (_, populated_bytes) = cache.usage().unwrap();
+        assert!(cache.invalidate_device(&key).unwrap());
+        let (_, invalidated_bytes) = cache.usage().unwrap();
+        assert!(invalidated_bytes < populated_bytes);
+        assert!(!cache.invalidate_device(&key).unwrap());
+        assert_eq!(cache.usage().unwrap().1, invalidated_bytes);
+
+        for revision in 2..=20 {
+            let mut config = snapshot(revision).devices.remove(0);
+            config.payload = Arc::new(serde_json::json!({"revision": revision}));
+            cache.upsert_device(config).unwrap();
+            assert!(cache.usage().unwrap().1 <= populated_bytes + 64);
+            assert!(cache.invalidate_device(&key).unwrap());
+            assert_eq!(cache.usage().unwrap().1, invalidated_bytes);
+        }
     }
 }

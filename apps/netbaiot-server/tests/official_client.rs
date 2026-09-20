@@ -251,7 +251,7 @@ async fn official_clients_cover_event_command_config_status_and_offline_contract
 
     let config_value = DeviceConfig {
         device: device_key(),
-        revision: ConfigRevision(42),
+        revision: ConfigRevision::new(42).unwrap(),
         payload: Arc::new(serde_json::json!({"sample_interval_seconds": 5})),
     };
     business
@@ -264,24 +264,26 @@ async fn official_clients_cover_event_command_config_status_and_offline_contract
         .get_device_config(&device_key())
         .await
         .unwrap();
-    assert_eq!(read_back.revision, ConfigRevision(42));
+    assert_eq!(read_back.revision, ConfigRevision::new(42).unwrap());
     let ConfigUpdate::Updated(device_config) = device.config().check(None).await.unwrap() else {
         panic!("expected updated config");
     };
-    assert_eq!(device_config.revision, ConfigRevision(42));
+    assert_eq!(device_config.revision, ConfigRevision::new(42).unwrap());
     device
         .config()
-        .ack(ConfigRevision(42), ConfigApplyStatus::Applied, None)
+        .ack(
+            ConfigRevision::new(42).unwrap(),
+            ConfigApplyStatus::Applied,
+            None,
+        )
         .await
         .unwrap();
     let delivery = next_event(&mut events).await;
     assert!(matches!(
-        delivery.event().kind,
-        DeviceEventKind::ConfigAck(ConfigAck {
-            revision: ConfigRevision(42),
-            status: ConfigApplyStatus::Applied,
-            ..
-        })
+        &delivery.event().kind,
+        DeviceEventKind::ConfigAck(ack)
+            if ack.revision == ConfigRevision::new(42).unwrap()
+                && ack.status == ConfigApplyStatus::Applied
     ));
     delivery.ack().await.unwrap();
     assert_eq!(

@@ -158,11 +158,8 @@ pub async fn serve(socket: UdpSocket, s: Arc<Services>, stop: CancellationToken)
             let envelope = decode(&input[..len], l.max_udp_datagram_size)?;
             let auth = s
                 .ingress
-                .authenticate(AuthenticationRequest::Signed {
-                    credential_id: envelope.credential_id,
-                    message: envelope.signed,
-                    tag: envelope.tag,
-                })
+                .auth_cache
+                .verify_signed(envelope.credential_id, envelope.signed, envelope.tag)
                 .await?;
             if auth.credential_version != envelope.credential_version {
                 return Err(Error::Authentication);

@@ -123,14 +123,9 @@ fn main() -> BenchResult<()> {
     let mut mac = Hmac::<Sha256>::new_from_slice(&decode_hex(&credential.secret_hex)?)?;
     mac.update(&message);
     let tag = mac.finalize().into_bytes();
+    let verifier = rt.block_on(auth.resolve_verifier("a0"))?;
     measure("auth_hmac_1024", || {
-        black_box(
-            rt.block_on(auth.authenticate(AuthenticationRequest::Signed {
-                credential_id: "a0",
-                message: &message,
-                tag: &tag,
-            }))?,
-        );
+        black_box(verifier.verify(&message, &tag)?);
         Ok(())
     })?;
     Ok(())

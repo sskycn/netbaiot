@@ -1,20 +1,31 @@
 use async_trait::async_trait;
 use bytes::BytesMut;
+use hmac::{Hmac, Mac};
 use netbaiot_codecs::JsonV1;
 use netbaiot_core::*;
 use netbaiot_runtime::*;
 use netbaiot_transports::{
     mqtt::{
-        broker::{BrokerMessage, MqttBroker},
+        broker::{BrokerFrame, BrokerMessage, MqttBroker},
         packet,
         topics::{TopicKind, publish_acl, topic},
     },
     tcp::{LengthPrefixFramer, TcpFramer},
 };
+use sha2::Sha256;
 use std::{hint::black_box, sync::Arc, time::Instant};
 
 struct BenchAuthProvider {
     auth: AuthenticatedDevice,
+}
+
+struct BenchSink;
+
+#[async_trait]
+impl EventSink for BenchSink {
+    async fn deliver(&self, _: DeliveryEnvelope) -> std::result::Result<SinkAck, SinkError> {
+        Ok(SinkAck)
+    }
 }
 
 #[async_trait]
@@ -24,6 +35,10 @@ impl DeviceAuthenticator for BenchAuthProvider {
         _: AuthenticationRequest<'_>,
     ) -> netbaiot_runtime::Result<AuthenticatedDevice> {
         Ok(self.auth.clone())
+    }
+
+    async fn resolve_verifier(&self, _: &str) -> netbaiot_runtime::Result<DeviceVerifier> {
+        Ok(DeviceVerifier::new(self.auth.clone(), [7; 32]))
     }
 }
 
@@ -97,6 +112,20 @@ fn main() {
                 .unwrap(),
         );
     });
+    let signed_message = [3u8; 256];
+    let mut mac = Hmac::<Sha256>::new_from_slice(&[7; 32]).unwrap();
+    mac.update(&signed_message);
+    let signed_tag = mac.finalize().into_bytes();
+    runtime
+        .block_on(hit_cache.verify_signed("udp-bench", &signed_message, &signed_tag))
+        .unwrap();
+    measure("udp_verifier_cache_hit_hmac_256", 20_000, || {
+        black_box(
+            runtime
+                .block_on(hit_cache.verify_signed("udp-bench", &signed_message, &signed_tag))
+                .unwrap(),
+        );
+    });
     let miss_cache = AuthCache::new(
         Arc::new(BenchAuthProvider { auth: auth.clone() }),
         auth_limits.clone(),
@@ -145,6 +174,52 @@ fn main() {
     measure("config_cache_miss", 20_000, || {
         black_box(config_cache.device(&missing_device).unwrap());
     });
+    let event_limits = Arc::new(Limits {
+        sink_queue_max_count: 16_000,
+        sink_queue_max_bytes: 32 * 1024 * 1024,
+        global_event_max_count: 16_000,
+        global_event_max_bytes: 32 * 1024 * 1024,
+        ..Limits::default()
+    });
+    let sink_id = SinkId::new("bench").unwrap();
+    let event_bus = runtime.block_on(async {
+        EventBus::new(
+            event_limits.clone(),
+            Arc::new(Metrics::default()),
+            vec![SinkDefinition::bounded(
+                sink_id.clone(),
+                SinkDeliveryMode::ConfirmedRequired,
+                Arc::new(BenchSink),
+                &event_limits,
+            )],
+            vec![RouteDefinition {
+                tenant: None,
+                sinks: vec![sink_id],
+            }],
+            1,
+        )
+        .unwrap()
+    });
+    let mut event_sequence = 0u64;
+    measure("event_bus_publish", 10_000, || {
+        event_sequence += 1;
+        black_box(
+            event_bus
+                .publish(DeviceEvent {
+                    event_id: EventId::generate(),
+                    source_message_id: SourceMessageId::new(format!("bench:{event_sequence}"))
+                        .unwrap(),
+                    device: auth.device_key.clone(),
+                    received_at: 1,
+                    occurred_at: None,
+                    kind: DeviceEventKind::Heartbeat(Heartbeat {
+                        sequence: event_sequence,
+                    }),
+                })
+                .unwrap(),
+        );
+    });
+    runtime.block_on(event_bus.stop_workers()).unwrap();
     let up = topic(&auth.device_key, TopicKind::Up);
     let down = topic(&auth.device_key, TopicKind::Down);
     let payload=br#"{"schema_version":1,"source_message_id":"boot:1","kind":"telemetry","data":{"temperature":25.3,"humidity":61.2}}"#;
@@ -169,6 +244,60 @@ fn main() {
                 .subscription_qos(&attachment.key, &down)
                 .unwrap(),
         );
+    });
+    let qos1 = MqttBroker::new(Arc::new(Limits::default()));
+    let mut qos1_attachment = qos1.attach(&auth, "qos1-bench".into(), false).unwrap();
+    qos1.subscribe(&qos1_attachment.key, qos1_attachment.generation, &down, 1)
+        .unwrap();
+    let qos1_message = BrokerMessage {
+        topic: down.clone(),
+        payload: vec![7; 128],
+        qos: 1,
+        retain: false,
+    };
+    measure("mqtt_qos1_route_ack", 10_000, || {
+        qos1.route(&auth.device_key, qos1_message.clone()).unwrap();
+        let BrokerFrame::Publish(delivery) = qos1_attachment.receiver.try_recv().unwrap() else {
+            unreachable!()
+        };
+        qos1.puback(
+            &qos1_attachment.key,
+            qos1_attachment.generation,
+            delivery.packet_id.unwrap(),
+        )
+        .unwrap();
+    });
+    let qos2 = MqttBroker::new(Arc::new(Limits::default()));
+    let qos2_attachment = qos2.attach(&auth, "qos2-bench".into(), false).unwrap();
+    let qos2_message = BrokerMessage {
+        topic: up.clone(),
+        payload: vec![9; 128],
+        qos: 2,
+        retain: false,
+    };
+    let mut qos2_packet_id = 0u16;
+    measure("mqtt_qos2_inbound_accept_route", 10_000, || {
+        qos2_packet_id = qos2_packet_id.wrapping_add(1).max(1);
+        qos2.inbound_qos2(
+            &qos2_attachment.key,
+            qos2_attachment.generation,
+            qos2_packet_id,
+            qos2_message.clone(),
+        )
+        .unwrap();
+        qos2.mark_inbound_qos2_event_accepted(
+            &qos2_attachment.key,
+            qos2_attachment.generation,
+            qos2_packet_id,
+        )
+        .unwrap();
+        qos2.route_inbound_qos2(
+            &qos2_attachment.key,
+            qos2_attachment.generation,
+            qos2_packet_id,
+            &auth.device_key,
+        )
+        .unwrap();
     });
     let codec = JsonV1::default();
     let ctx = DecodeContext {

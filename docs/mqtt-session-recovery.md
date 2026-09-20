@@ -22,7 +22,7 @@ tenant count/byte ceilings always providing a hard bound.
 - persistent SessionKey and last-seen time;
 - subscription filter and granted QoS;
 - bounded offline QoS1/2 messages;
-- inbound QoS2 AwaitPubrel records;
+- inbound QoS2 AwaitPubrel and EventAccepted/pending-route records;
 - outbound AwaitPuback/AwaitPubrec/AwaitPubcomp records;
 - next packet identifier;
 - retained topic/payload/QoS/owner state.
@@ -56,8 +56,11 @@ shutdown fails.
 - AwaitPuback: resend QoS1 PUBLISH with the same ID and DUP=1.
 - AwaitPubrec: resend QoS2 PUBLISH with the same ID and DUP=1.
 - AwaitPubcomp: resend PUBREL using mandatory fixed flags `0010`.
-- AwaitPubrel inbound: accept duplicate PUBLISH as the same flow; PUBREL crosses the
-  IoT acceptance point once, releases state, and returns PUBCOMP.
+- AwaitPubrel inbound: accept duplicate PUBLISH as the same flow. PUBREL crosses the
+  IoT acceptance point once, persists `EventAccepted`, then atomically consumes the
+  retained-capacity reservation, routes subscriber responsibility, and releases the
+  packet state before PUBCOMP. A restart from `EventAccepted` skips IoT ingestion and
+  resumes broker routing, preventing a duplicate `DeviceEvent`.
 - Offline QoS1/2: promote messages into bounded inflight slots as ACKs complete.
 - Subscriptions and retained state are restored before readiness.
 

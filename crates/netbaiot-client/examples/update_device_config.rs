@@ -17,7 +17,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 product_id: ProductId::new("sensor")?,
                 device_id: DeviceId::new("device-1")?,
             },
-            revision: ConfigRevision(42),
+            revision: ConfigRevision::new(42).expect("non-zero example revision"),
             payload: Arc::new(serde_json::json!({"interval_seconds": 30})),
         })
         .await?;
