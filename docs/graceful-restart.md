@@ -16,13 +16,16 @@ persistent sessions, subscriptions, offline messages, inbound/outbound QoS state
 packet allocator position, and retained messages. The snapshot must commit before a
 successful exit.
 Required sink workers continue during the drain window. If pending required count
-reaches zero, the process exits without a new spool. Otherwise workers are stopped,
-so inflight uncertainty remains pending, and the exact pending responsibility is
-committed to the restart spool before successful exit.
+reaches zero, the process exits without a new spool. Otherwise the process enters
+`SPOOLING` while workers retain ownership and may still recover. Only after the exact
+pending responsibility is durably committed are workers stopped and graceful exit
+allowed.
 
-Spool failure makes `run` return an error; it never logs `shutdown complete` and the
-process does not claim graceful success. A supervisor may still force-kill it, which
-falls under the explicitly lossy abnormal-crash contract.
+An MQTT snapshot or EventBus spool failure blocks voluntary shutdown. The process
+stays alive and unready, keeps accepted in-memory responsibility, leaves the
+management health/readiness surface available, and retries at a bounded cadence.
+Repairing storage or restoring the required sink lets shutdown finish. An external
+SIGKILL while blocked remains part of the explicitly lossy abnormal-crash contract.
 
 At startup the MQTT broker first validates/restores its snapshot, then EventBus spool
 segments are restored with their original IDs, sinks/listeners are initialized, and

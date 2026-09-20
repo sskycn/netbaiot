@@ -23,7 +23,7 @@ the tenant/device namespace. This is not an MQTT 5 implementation.
 | QoS2 outbound | Supported | Paho, explicit broker stage test, restart before PUBREC and before PUBCOMP |
 | Packet Identifier lifecycle | Supported | zero rejected; bounded allocator skips active outbound IDs; restart tests retain ID |
 | DUP retransmission | Supported | QoS1/QoS2 PUBLISH restart asserts DUP; PUBREL uses mandatory fixed flags and stored retransmission state |
-| SUBSCRIBE with multiple filters | Supported | parser validates nonempty/filter count/QoS; broker updates each filter and returns per-filter grant/failure |
+| SUBSCRIBE with multiple filters | Supported | parser validates nonempty/filter count/QoS; retained replay is fully preflighted before each subscription/trie commit; forced-capacity failure leaves no hidden subscription |
 | Exact subscription | Supported (profile) | Paho exact subscribe/unsubscribe; bound namespace ACL |
 | `+` wildcard | Supported (profile) | trie unit test and Paho test |
 | `#` wildcard | Supported (profile) | trie unit test and Paho test |
@@ -42,6 +42,7 @@ the tenant/device namespace. This is not an MQTT 5 implementation.
 | Keep Alive / PING | Supported | PING round trip in restart test; 1.5× inactivity timeout; separate whole-frame deadline |
 | Slow consumer bounds | Supported with shedding policy | bounded sender/inflight/offline count+bytes; overflowing subscriber is cancelled/shed, not allowed to grow |
 | Planned restart recovery | Supported | atomic versioned snapshot; real QoS1/QoS2/retained/session subprocess tests |
+| QoS0/QoS1 IoT/broker ordering | Supported | retained/routing admission precedes EventAccepted; no fallible broker side effect follows producer acceptance |
 | Abrupt crash durability | Not promised | recent memory state can be lost; no continuous disk persistence |
 | MQTT 5 packets/properties | Intentionally unsupported | connection closes on unsupported packet/version; no MQTT 5 semantics |
 
@@ -49,3 +50,11 @@ The Paho matrix lives at `tests/mqtt_paho_interop.py`. It is deliberately not a
 Cargo dependency: install a mature client in an isolated test environment and run
 it against a local server. The recorded validation used `paho-mqtt 2.1.0` with
 protocol `MQTTv311`.
+
+The reusable real-CLI matrix is `tests/run_mosquitto_cli_interop.py`; it starts only
+the embedded NetbaIoT broker and drives `mosquitto_pub`/`mosquitto_sub` with explicit
+`-V mqttv311`. It covers auth success/failure, QoS0/1/2, exact/`+`/`#`, unsubscribe,
+retained replace/delete/replay, persistent offline QoS1/2, and Will QoS0/1/2 retain
+and normal-disconnect suppression. The Session Present bit itself remains asserted
+by deterministic raw-socket restart tests because mosquitto_sub does not expose it
+as machine-readable output.

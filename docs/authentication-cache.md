@@ -33,4 +33,6 @@ logged, or exposed through `Debug`.
 Management invalidation supports device, product, tenant, credential version, auth
 generation, or all entries. Every invalidation advances an auth epoch. A provider
 result begun in an older epoch is rejected and cannot repopulate the cache after
-invalidation. Affected active sessions are canceled immediately.
+invalidation. Active sessions are matched against their bounded, immutable bound
+identity and canceled independently of positive-cache contents, so TTL expiry or
+eviction cannot defeat revocation.

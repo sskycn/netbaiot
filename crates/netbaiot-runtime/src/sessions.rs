@@ -151,6 +151,7 @@ impl Sessions {
         }
         let device = auth.device_key.clone();
         let mut state = lock(&self.state)?;
+        self.prune_presence(&mut state);
         state.tenants.retain(|_, tenant| {
             tenant.connections > 0
                 || tenant.bytes.upgrade().is_some()
@@ -160,10 +161,7 @@ impl Sessions {
         if !replacing && state.sessions.len() >= self.limits.max_connections {
             return Err(Error::Overloaded);
         }
-        if !state.presence.contains_key(&device) && state.presence.len() >= self.limits.max_devices
-        {
-            return Err(Error::Overloaded);
-        }
+        self.ensure_presence_slot(&mut state, &device)?;
         let generation = state.generation.checked_add(1).ok_or(Error::Overloaded)?;
         if !state.tenants.contains_key(&device.tenant_id)
             && state.tenants.len() >= self.limits.max_devices
@@ -241,6 +239,40 @@ impl Sessions {
         }
     }
 
+    /// Cancels active sessions from their bound authenticated identity. This is intentionally
+    /// independent of AuthCache contents: an evicted cache entry must not make revocation miss a
+    /// live socket.
+    pub fn disconnect_matching(&self, invalidation: &AuthInvalidation) -> Result<usize> {
+        let state = lock(&self.state)?;
+        let mut disconnected = 0usize;
+        for endpoint in state.sessions.values() {
+            let auth = endpoint.auth.as_ref();
+            let matches = match invalidation {
+                AuthInvalidation::Device { device } => &auth.device_key == device,
+                AuthInvalidation::Product {
+                    tenant_id,
+                    product_id,
+                } => {
+                    &auth.device_key.tenant_id == tenant_id
+                        && &auth.device_key.product_id == product_id
+                }
+                AuthInvalidation::Tenant { tenant_id } => &auth.device_key.tenant_id == tenant_id,
+                AuthInvalidation::CredentialVersion { version } => {
+                    auth.credential_version == *version
+                }
+                AuthInvalidation::AuthGeneration { generation } => {
+                    auth.auth_generation == *generation
+                }
+                AuthInvalidation::All => true,
+            };
+            if matches && !endpoint.cancel.is_cancelled() {
+                endpoint.cancel.cancel();
+                disconnected += 1;
+            }
+        }
+        Ok(disconnected)
+    }
+
     pub fn list(&self, offset: usize, limit: usize) -> Result<Vec<ConnectionSummary>> {
         if limit == 0 || limit > 256 {
             return Err(Error::Invalid);
@@ -261,17 +293,17 @@ impl Sessions {
 
     pub fn touch(&self, device: &DeviceKey, transport: Transport) -> Result<()> {
         let mut state = lock(&self.state)?;
-        if !state.presence.contains_key(device) && state.presence.len() >= self.limits.max_devices {
-            return Err(Error::Overloaded);
-        }
+        self.prune_presence(&mut state);
+        self.ensure_presence_slot(&mut state, device)?;
+        let now = now_ms();
         state
             .presence
             .entry(device.clone())
-            .and_modify(|presence| presence.last_seen = now_ms())
+            .and_modify(|presence| presence.last_seen = now)
             .or_insert(Presence {
                 connected: false,
                 connected_at: None,
-                last_seen: now_ms(),
+                last_seen: now,
                 transport,
                 session_generation: None,
             });
@@ -279,11 +311,14 @@ impl Sessions {
     }
 
     pub fn presence(&self, device: &DeviceKey) -> Result<Option<Presence>> {
-        Ok(lock(&self.state)?.presence.get(device).cloned())
+        let mut state = lock(&self.state)?;
+        self.prune_presence(&mut state);
+        Ok(state.presence.get(device).cloned())
     }
 
     pub fn connection(&self, device: &DeviceKey) -> Result<DeviceConnectionInfo> {
-        let state = lock(&self.state)?;
+        let mut state = lock(&self.state)?;
+        self.prune_presence(&mut state);
         let presence = state.presence.get(device);
         Ok(DeviceConnectionInfo {
             device: device.clone(),
@@ -296,7 +331,8 @@ impl Sessions {
     }
 
     pub fn registry_counts(&self) -> Result<(usize, usize, usize)> {
-        let state = lock(&self.state)?;
+        let mut state = lock(&self.state)?;
+        self.prune_presence(&mut state);
         Ok((
             state.sessions.len(),
             state.tenants.len(),
@@ -310,6 +346,32 @@ impl Sessions {
 
     pub fn queued_bytes(&self) -> usize {
         self.limits.max_outbound_bytes - self.global_bytes.available()
+    }
+
+    fn prune_presence(&self, state: &mut SessionState) {
+        let cutoff =
+            now_ms().saturating_sub(i64::try_from(self.limits.presence_ttl_ms).unwrap_or(i64::MAX));
+        state
+            .presence
+            .retain(|_, presence| presence.connected || presence.last_seen >= cutoff);
+    }
+
+    fn ensure_presence_slot(&self, state: &mut SessionState, device: &DeviceKey) -> Result<()> {
+        if state.presence.contains_key(device) || state.presence.len() < self.limits.max_devices {
+            return Ok(());
+        }
+        let oldest_offline = state
+            .presence
+            .iter()
+            .filter(|(_, presence)| !presence.connected)
+            .min_by_key(|(_, presence)| presence.last_seen)
+            .map(|(key, _)| key.clone());
+        if let Some(oldest) = oldest_offline {
+            state.presence.remove(&oldest);
+            Ok(())
+        } else {
+            Err(Error::Overloaded)
+        }
     }
 }
 
@@ -356,6 +418,67 @@ mod tests {
                 commands: true,
             },
         })
+    }
+
+    #[test]
+    fn active_revocation_uses_bound_identity_not_auth_cache_membership() {
+        let sessions = Sessions::new(Arc::new(Limits::default()));
+        let first = auth("one");
+        let second = auth("two");
+        let (first_lease, _) = sessions.register(first.clone(), Transport::Mqtt).unwrap();
+        let (second_lease, _) = sessions.register(second.clone(), Transport::Tcp).unwrap();
+        assert_eq!(
+            sessions
+                .disconnect_matching(&AuthInvalidation::CredentialVersion { version: 1 })
+                .unwrap(),
+            2
+        );
+        assert!(first_lease.cancel.is_cancelled());
+        assert!(second_lease.cancel.is_cancelled());
+
+        let third = auth("three");
+        let (third_lease, _) = sessions.register(third.clone(), Transport::Mqtt).unwrap();
+        assert_eq!(
+            sessions
+                .disconnect_matching(&AuthInvalidation::Device {
+                    device: third.device_key.clone(),
+                })
+                .unwrap(),
+            1
+        );
+        assert!(third_lease.cancel.is_cancelled());
+    }
+
+    #[test]
+    fn offline_presence_is_lru_bounded_and_active_presence_is_never_evicted() {
+        let sessions = Sessions::new(Arc::new(Limits {
+            max_devices: 2,
+            max_devices_per_tenant: 2,
+            max_connections: 2,
+            max_connections_per_tenant: 2,
+            ..Limits::default()
+        }));
+        for index in 0..100 {
+            let (lease, _) = sessions
+                .register(auth(&format!("offline-{index}")), Transport::Mqtt)
+                .unwrap();
+            drop(lease);
+            assert!(sessions.registry_counts().unwrap().2 <= 2);
+        }
+
+        let (one, _) = sessions
+            .register(auth("active-one"), Transport::Mqtt)
+            .unwrap();
+        let (two, _) = sessions
+            .register(auth("active-two"), Transport::Tcp)
+            .unwrap();
+        assert!(
+            sessions
+                .register(auth("cannot-evict-active"), Transport::Mqtt)
+                .is_err()
+        );
+        assert!(sessions.presence(&one.device).unwrap().unwrap().connected);
+        assert!(sessions.presence(&two.device).unwrap().unwrap().connected);
     }
 
     #[test]

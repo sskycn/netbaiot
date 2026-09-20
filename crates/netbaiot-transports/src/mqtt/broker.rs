@@ -430,6 +430,16 @@ impl MqttBroker {
         }
         let mut state = lock(&self.state)?;
         check_owner(&state, key, generation)?;
+        let retained = state
+            .retained
+            .values()
+            .filter(|retained| topic_matches(filter, &retained.message.topic))
+            .map(|retained| BrokerMessage {
+                qos: retained.message.qos.min(qos),
+                retain: true,
+                ..retained.message.clone()
+            })
+            .collect::<Vec<_>>();
         let replacement = state
             .sessions
             .get(key)
@@ -460,6 +470,27 @@ impl MqttBroker {
                 return Err(Error::Overloaded);
             }
         }
+        // Simulate every retained enqueue against target-session accounting before exposing the
+        // subscription in either the session map or trie. This avoids copying global MQTT state.
+        let subscription_charge = if replacement {
+            0
+        } else {
+            filter.len() + STATE_OVERHEAD
+        };
+        let live_frames =
+            preflight_retained_replay(&state, key, &retained, subscription_charge, &self.limits)?;
+        if state
+            .active
+            .get(key)
+            .is_some_and(|active| active.sender.capacity() < live_frames)
+        {
+            return Err(Error::Overloaded);
+        }
+        let before_session = state.sessions.get(key).cloned().ok_or(Error::Internal)?;
+        let before_subscription_count = state.subscription_count;
+        let before_session_bytes = state.session_bytes;
+        let before_offline_count = state.offline_count;
+        let before_offline_bytes = state.offline_bytes;
         if !replacement {
             let charge = filter.len() + STATE_OVERHEAD;
             if tenant_session_bytes(&state, &key.device.tenant_id).saturating_add(charge)
@@ -484,24 +515,22 @@ impl MqttBroker {
             .subscriptions
             .insert(filter.to_owned(), qos);
         state.trie.insert(filter, key.clone(), qos);
-        let retained = state
-            .retained
-            .values()
-            .filter(|retained| topic_matches(filter, &retained.message.topic))
-            .map(|retained| retained.message.clone())
-            .collect::<Vec<_>>();
         for message in retained {
-            let outgoing = message.qos.min(qos);
-            enqueue(
-                &mut state,
-                key,
-                BrokerMessage {
-                    qos: outgoing,
-                    retain: true,
-                    ..message
-                },
-                &self.limits,
-            )?;
+            if let Err(error) = enqueue(&mut state, key, message, &self.limits) {
+                // A concurrently closed receiver is the only expected post-preflight failure.
+                // Restore all broker metadata; frames queued to a now-closed receiver are dropped
+                // with that receiver and cannot create a hidden live subscription.
+                state.sessions.insert(key.clone(), before_session.clone());
+                state.subscription_count = before_subscription_count;
+                state.session_bytes = before_session_bytes;
+                state.offline_count = before_offline_count;
+                state.offline_bytes = before_offline_bytes;
+                state.trie.remove(filter, key);
+                if let Some(previous_qos) = before_session.subscriptions.get(filter) {
+                    state.trie.insert(filter, key.clone(), *previous_qos);
+                }
+                return Err(error);
+            }
         }
         Ok(qos)
     }
@@ -1355,6 +1384,116 @@ fn enqueue(
     }
 }
 
+/// Applies the same bounded-state decisions as `enqueue` to a target-session accounting copy,
+/// without touching the global broker or an active connection channel.
+fn preflight_retained_replay(
+    state: &BrokerState,
+    key: &SessionKey,
+    messages: &[BrokerMessage],
+    subscription_charge: usize,
+    limits: &Limits,
+) -> Result<usize> {
+    let mut session = state.sessions.get(key).cloned().ok_or(Error::Internal)?;
+    session.state_bytes = session
+        .state_bytes
+        .checked_add(subscription_charge)
+        .ok_or(Error::Overloaded)?;
+    let mut tenant_state_bytes = tenant_session_bytes(state, &key.device.tenant_id)
+        .checked_add(subscription_charge)
+        .ok_or(Error::Overloaded)?;
+    let mut global_state_bytes = state
+        .session_bytes
+        .checked_add(subscription_charge)
+        .ok_or(Error::Overloaded)?;
+    if session.state_bytes > limits.max_mqtt_session_state_bytes
+        || tenant_state_bytes > limits.max_mqtt_session_state_bytes_per_tenant
+        || global_state_bytes > limits.global_mqtt_session_bytes
+    {
+        return Err(Error::Overloaded);
+    }
+    let mut tenant_qos1 = tenant_inflight(state, &key.device.tenant_id, 1);
+    let mut tenant_qos2 = tenant_inflight(state, &key.device.tenant_id, 2);
+    let mut tenant_offline_count = state
+        .sessions
+        .values()
+        .filter(|candidate| candidate.key.device.tenant_id == key.device.tenant_id)
+        .map(|candidate| candidate.offline.len())
+        .sum::<usize>();
+    let mut tenant_offline_bytes = state
+        .sessions
+        .values()
+        .filter(|candidate| candidate.key.device.tenant_id == key.device.tenant_id)
+        .map(|candidate| candidate.offline_bytes)
+        .sum::<usize>();
+    let mut global_offline_count = state.offline_count;
+    let mut global_offline_bytes = state.offline_bytes;
+    let mut live_frames = 0usize;
+    for message in messages {
+        if message.qos == 0 {
+            live_frames = live_frames.checked_add(1).ok_or(Error::Overloaded)?;
+            continue;
+        }
+        let current_tenant_inflight = if message.qos == 1 {
+            tenant_qos1
+        } else {
+            tenant_qos2
+        };
+        let tenant_limit = if message.qos == 1 {
+            limits.max_inflight_qos1_per_tenant
+        } else {
+            limits.max_inflight_qos2_per_tenant
+        };
+        let use_offline = current_tenant_inflight >= tenant_limit
+            || !session.has_outbound_capacity(message.qos, limits);
+        let charge = message.bytes();
+        if session.state_bytes.saturating_add(charge) > limits.max_mqtt_session_state_bytes
+            || tenant_state_bytes.saturating_add(charge)
+                > limits.max_mqtt_session_state_bytes_per_tenant
+            || global_state_bytes.saturating_add(charge) > limits.global_mqtt_session_bytes
+        {
+            return Err(Error::Overloaded);
+        }
+        if use_offline {
+            if session.offline.len() >= limits.max_offline_messages_per_session
+                || session.offline_bytes.saturating_add(charge)
+                    > limits.max_offline_bytes_per_session
+                || tenant_offline_count >= limits.max_offline_messages_per_tenant
+                || tenant_offline_bytes.saturating_add(charge) > limits.max_offline_bytes_per_tenant
+                || global_offline_count >= limits.max_offline_messages
+                || global_offline_bytes.saturating_add(charge) > limits.max_offline_bytes
+            {
+                return Err(Error::Overloaded);
+            }
+            session.offline.push_back(message.clone());
+            session.offline_bytes += charge;
+            tenant_offline_count += 1;
+            tenant_offline_bytes += charge;
+            global_offline_count += 1;
+            global_offline_bytes += charge;
+        } else {
+            let packet_id = session.allocate_packet_id()?;
+            session.outbound.insert(
+                packet_id,
+                if message.qos == 1 {
+                    OutboundState::AwaitPuback(message.clone())
+                } else {
+                    OutboundState::AwaitPubrec(message.clone())
+                },
+            );
+            if message.qos == 1 {
+                tenant_qos1 += 1;
+            } else {
+                tenant_qos2 += 1;
+            }
+            live_frames = live_frames.checked_add(1).ok_or(Error::Overloaded)?;
+        }
+        session.state_bytes += charge;
+        tenant_state_bytes += charge;
+        global_state_bytes += charge;
+    }
+    Ok(live_frames)
+}
+
 fn queue_offline(
     state: &mut BrokerState,
     key: &SessionKey,
@@ -1931,6 +2070,54 @@ mod tests {
             resumed.receiver.recv().await,
             Some(BrokerFrame::Publish(_))
         ));
+    }
+
+    #[test]
+    fn retained_replay_capacity_failure_does_not_commit_subscription_or_trie() {
+        let broker = MqttBroker::new(Arc::new(Limits {
+            max_outbound_messages_per_connection: 1,
+            ..Limits::default()
+        }));
+        let owner = auth("publisher");
+        for suffix in ["one", "two"] {
+            broker
+                .route(
+                    &owner.device_key,
+                    BrokerMessage {
+                        topic: format!("v1/t/t/p/p/d/publisher/{suffix}"),
+                        payload: suffix.as_bytes().to_vec(),
+                        qos: 0,
+                        retain: true,
+                    },
+                )
+                .unwrap();
+        }
+        let subscriber = auth("subscriber");
+        let mut attachment = broker
+            .attach(&subscriber, "transactional-subscribe".into(), true)
+            .unwrap();
+        let filter = "v1/t/t/p/p/d/publisher/#";
+        assert!(
+            broker
+                .subscribe(&attachment.key, attachment.generation, filter, 0)
+                .is_err()
+        );
+        assert_eq!(
+            broker.subscription_qos(&attachment.key, filter).unwrap(),
+            None
+        );
+        broker
+            .route(
+                &owner.device_key,
+                BrokerMessage {
+                    topic: "v1/t/t/p/p/d/publisher/future".into(),
+                    payload: b"future".to_vec(),
+                    qos: 0,
+                    retain: false,
+                },
+            )
+            .unwrap();
+        assert!(attachment.receiver.try_recv().is_err());
     }
 
     #[tokio::test]

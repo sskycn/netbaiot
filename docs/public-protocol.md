@@ -27,6 +27,14 @@ Management errors use `ApiError { code, message, request_id, required_scope }`.
 Stable codes include authentication, authorization, invalid request/version,
 device offline, overload, draining, timeout, connection loss, not found, conflict,
 server unavailable, and internal error. Clients never need to parse error strings.
+Server responses and event models intentionally tolerate harmless additional JSON
+fields within wire v1; request parsing may remain strict where rejecting ambiguity
+protects the server. The official management client permits plaintext HTTP only for
+`localhost` or loopback IP endpoints and requires HTTPS off-loopback.
+
+Control-plane snapshots and mutations share one serialization lock. Each accepted
+mutation therefore observes the latest committed state and advances revision
+semantics deterministically instead of racing an invalidate or replacement.
 
 Device JSON v1 is represented by `DeviceUplink`. Its stable fields are
 `schema_version`, `source_message_id`, optional `occurred_at`, `kind`, and `data`.

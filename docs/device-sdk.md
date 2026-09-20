@@ -10,8 +10,10 @@ and enables TLS verification for `mqtts`/`https` endpoints. MQTT uses the mainta
 `rumqttc` 0.25 client (Apache-2.0), a bounded request channel, MQTT 3.1.1, and manual
 broker acknowledgement for commands admitted to the bounded application channel.
 When MQTT is configured, `connect().await` does not return until the initial
-CONNACK and command resubscription have been admitted, or the configured connect
-timeout expires. This makes immediate publication after a successful connect safe.
+CONNACK and a successful command-topic SUBACK have been received, or the configured
+connect timeout expires. SUBACK `0x80` is terminal authorization failure and is
+never exposed as Connected. This makes immediate publication after a successful
+connect safe.
 
 Supported workflows are QoS0/QoS1 event publish, QoS1 telemetry, command receive,
 command execution ACK, HTTP data/heartbeat upload, conditional config GET, and

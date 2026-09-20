@@ -50,8 +50,11 @@ connection replacement publish the Will once. DISCONNECT and planned server
 shutdown suppress it. Intentional restart closes sockets without manufacturing a
 client failure.
 
-For canonical uplinks, MQTT application delivery crosses `EventAccepted` before a
-QoS1 PUBACK or QoS2 completion. Inbound QoS2 stores a separate `EventAccepted`
+For regular QoS0/QoS1 canonical uplinks, retained mutation and bounded broker routing
+run before the IoT binding crosses `EventAccepted`; no later broker-side failure can
+turn that accepted event into a producer-visible failure. A pre-accept IoT failure
+can leave an MQTT delivery that is replayable under normal at-least-once semantics.
+Inbound QoS2 stores a separate `EventAccepted`
 pending-route stage, including across planned restart, so retained/subscriber
 responsibility can finish without re-emitting the business event. Retained capacity
 is reserved before PUBREC for a retained QoS2 flow and released atomically during
@@ -60,6 +63,11 @@ reserved count/bytes and was enqueued; it is not a database commit. MQTT QoS2
 prevents duplicate IoT binding for one stored MQTT flow, but it does not promise
 business exactly-once: EventBus recovery is at-least-once and consumers remain
 idempotent.
+
+SUBSCRIBE validates and preflights the complete retained replay against session,
+tenant, global, offline, and active-channel bounds before inserting either the
+subscription map entry or trie node. A failed SUBACK therefore cannot leave a hidden
+subscription that receives future live publications.
 
 Persistent MQTT offline subscription delivery is separate from the command API.
 Explicit management commands still require a live device and return

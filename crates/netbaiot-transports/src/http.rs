@@ -375,10 +375,10 @@ async fn handle_management(
             .map_err(|_| Error::Invalid)?;
             let devices = services.ingress.auth_cache.invalidate(&invalidation)?;
             let invalidated = devices.len();
-            let mut disconnected = 0usize;
-            for device in &devices {
-                disconnected += usize::from(services.ingress.sessions.disconnect(device)?);
-            }
+            let disconnected = services
+                .ingress
+                .sessions
+                .disconnect_matching(&invalidation)?;
             Ok(response(
                 StatusCode::OK,
                 serde_json::to_vec(&InvalidationResult {
@@ -393,6 +393,7 @@ async fn handle_management(
                 &body(req, services.ingress.limits.max_http_body_size).await?,
             )
             .map_err(|_| Error::Invalid)?;
+            let _mutation = services.control_lock.lock().await;
             let invalidated = services.ingress.config.invalidate_device(&device)?;
             Ok(response(
                 StatusCode::OK,
