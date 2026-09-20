@@ -26,7 +26,10 @@ Upload success does not mean business persistence or application processing.
 | `GET /api/v1/status` | Lifecycle and bounded cache/event usage |
 | `GET /api/v1/metrics` | Low-cardinality Prometheus text |
 | `GET /api/v1/connections?offset=&limit=` | Paginated local live sessions; max 256 |
+| `POST /api/v1/devices/connection` | Query non-sensitive connection/presence by `DeviceKey` |
 | `POST /api/v1/devices/commands` | Send immediately to a live local session |
+| `POST /api/v1/devices/config` | Read one typed device configuration |
+| `PUT /api/v1/devices/config` | Set a newer typed device configuration revision |
 | `POST /api/v1/auth/invalidate` | Invalidate scope and disconnect affected sessions |
 | `POST /api/v1/config/invalidate` | Remove one cached device config |
 | `PUT /api/v1/control/snapshot` | Validate and atomically replace revisioned snapshot |
@@ -35,3 +38,9 @@ Upload success does not mean business persistence or application processing.
 
 Connection queries are bounded. The command body contains the authoritative full
 `DeviceKey`; unavailable devices receive 503 and are not queued offline.
+
+Errors use the stable `ApiError` JSON shape with `code`, safe `message`, optional
+`request_id`, and optional `required_scope`. In particular, an offline command uses
+`device_offline`, not an opaque internal 500. Device and management authorization
+remain separate; the current static management token is all-or-nothing, while the
+public error model reserves scope detail for a future scoped provider.

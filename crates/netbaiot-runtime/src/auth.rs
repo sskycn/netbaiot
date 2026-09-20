@@ -78,28 +78,6 @@ struct AuthCacheState {
     inflight: HashMap<AuthCacheKey, tokio::sync::watch::Sender<bool>>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(tag = "scope", rename_all = "snake_case")]
-pub enum AuthInvalidation {
-    Device {
-        device: DeviceKey,
-    },
-    Product {
-        tenant_id: TenantId,
-        product_id: ProductId,
-    },
-    Tenant {
-        tenant_id: TenantId,
-    },
-    CredentialVersion {
-        version: u32,
-    },
-    AuthGeneration {
-        generation: u64,
-    },
-    All,
-}
-
 /// Bounded positive/negative cache with coalesced identical misses.
 pub struct AuthCache {
     provider: Arc<dyn DeviceAuthenticator>,

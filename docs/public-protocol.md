@@ -1,0 +1,33 @@
+# Public protocol v1
+
+`netbaiot-protocol` is the authoritative, runtime-independent Rust model for the
+public NetbaIoT wire contract. It depends only on serialization, JSON, UUID, and
+error-model crates. It does not depend on Tokio, HTTP, MQTT, the server, or runtime
+internals. Crate SemVer and wire `PROTOCOL_VERSION` are separate compatibility
+dimensions; the current wire version is `1`.
+
+Strong public identifiers include `TenantId`, `ProductId`, `DeviceId`, `DeviceKey`,
+`EventId`, `DeliveryId`, `CommandId`, `ConfigRevision`, `SinkId`, and
+`SubscriptionId`. IDs are validated before use. UTC timestamps are Unix
+milliseconds.
+
+`DeviceEvent` contains a stable `event_id`, source message ID, authoritative device
+identity, receive/occurrence times, and one typed event kind: telemetry, heartbeat,
+device event, connect/disconnect, config ACK, or command ACK. Restart replay retains
+the event ID. `DeliveryId` instead identifies one stream delivery attempt and may
+change after reconnect.
+
+The confirmed stream uses four-byte big-endian length framing around bounded JSON.
+The client sends `hello` with version/authentication, then `subscribe` with a bounded
+`EventFilter`. The server responds `ready`, then sends `event` frames containing an
+`EventDelivery`. The client confirms processing with `ack` containing all of
+`delivery_id`, `subscription_id`, and `event_id`. A write or decode is not an ACK.
+
+Management errors use `ApiError { code, message, request_id, required_scope }`.
+Stable codes include authentication, authorization, invalid request/version,
+device offline, overload, draining, timeout, connection loss, not found, conflict,
+server unavailable, and internal error. Clients never need to parse error strings.
+
+Device JSON v1 is represented by `DeviceUplink`. Its stable fields are
+`schema_version`, `source_message_id`, optional `occurred_at`, `kind`, and `data`.
+HTTP 202 and MQTT QoS acknowledgement mean only `EventAccepted`.

@@ -230,6 +230,33 @@ cargo test --workspace --all-features
 Run relevant fuzz, subprocess restart, slow-sink, outage, memory, load, and soak
 tests for affected paths. State exactly what was and was not run.
 
+## Public protocol and SDK invariants
+
+`netbaiot-protocol` contains public protocol types only. It must not depend on
+Tokio, HTTP clients/servers, the broker, sessions, runtime, or server composition.
+Wire protocol versioning is explicit and distinct from crate SemVer. Public API and
+wire changes require compatibility review and focused serialization tests.
+
+`netbaiot-client` must not depend on server/runtime internals. `netbaiot-cli` must
+use `netbaiot-client` instead of duplicating HTTP or stream implementations.
+`netbaiot-device-sdk` is optional and uses standard MQTT/device HTTP; ordinary MQTT
+3.1.1 clients remain first-class and must never require the SDK.
+
+Public clients expose structured errors. Tokens and device credentials never appear
+in `Debug`, logs, or error messages. Event ACK occurs only after the application
+chooses to ACK unless it explicitly requests immediate mode. Duplicate replay is
+expected: `event_id` remains stable while `delivery_id` may change.
+
+Client buffers are bounded by count and bytes. The confirmed stream has a bounded
+ACK path and never creates a task per event or ACK. Reconnect loops use bounded
+backoff, preserve subscription semantics, honor cancellation, and do not create
+unlimited queued work. Dropping/shutting down a client must stop its owned tasks.
+
+Command clients preserve caller-supplied `command_id`, do not blindly retry, and
+report offline devices explicitly. Config revisions are first-class; configuration
+download is distinct from application ACK. Client libraries create no hidden
+runtime, database, or unbounded offline queue.
+
 ## MQTT 3.1.1 invariants
 
 MQTT 3.1.1 is implemented internally. MQTT packet/session/QoS state remains separate

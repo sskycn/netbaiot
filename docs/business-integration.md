@@ -11,9 +11,16 @@ optional bearer token comes from `NETBAIOT_DELIVERY_TOKEN` and is never logged.
 ## Framed TCP/RPC stream
 
 The optional business listener is a long-lived application-ACK stream. Frames use a
-four-byte network-order length followed by bounded JSON. The client sends `AUTH`,
-then `SUBSCRIBE`; NetbaIoT sends `EVENT` containing the stable `event_id`; the client
-must return matching `ACK`. A write is not an ACK. Malformed/mismatched ACKs fail the
+four-byte network-order length followed by bounded JSON. The public v1 contract uses
+versioned `hello`, `subscribe`, `ready`, `event`, and `ack` frames from
+`netbaiot-protocol`. The client authenticates with `hello`, sends its filter in
+`subscribe`, and waits for the server's `ready` before receiving events. Every
+delivery has a `delivery_id` distinct from stable `event_id`, plus a
+`subscription_id` and attempt. Use `netbaiot-client` for automatic reconnect,
+resubscription, bounded buffering, and explicit application ACK.
+
+The client must return the matching `ack` only after application processing. A
+successful socket write is not an ACK. Malformed or mismatched ACKs fail the
 delivery. The current implementation permits one active subscriber and serial
 confirmed delivery, which keeps flow control and uncertainty bounded.
 

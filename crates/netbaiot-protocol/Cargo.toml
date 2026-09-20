@@ -1,13 +1,13 @@
 [package]
-name = "netbaiot-core"
+name = "netbaiot-protocol"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-netbaiot-protocol.workspace = true
 serde.workspace = true
+serde_json.workspace = true
 thiserror.workspace = true
 uuid.workspace = true
 
