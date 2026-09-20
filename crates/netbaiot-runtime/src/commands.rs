@@ -1,13 +1,6 @@
 use crate::*;
 use netbaiot_core::*;
-use serde::Serialize;
 use std::sync::Arc;
-
-#[derive(Clone, Debug, Serialize)]
-pub struct CommandDispatch {
-    pub command_id: CommandId,
-    pub state: DeliveryState,
-}
 
 pub struct CommandRouter {
     pub ingress: Arc<Ingress>,
@@ -16,14 +9,15 @@ pub struct CommandRouter {
 impl CommandRouter {
     /// Commands are admitted only to a currently live local session. There is no
     /// offline queue and no persistence fallback.
-    pub fn send(&self, command: DeviceCommand) -> Result<CommandDispatch> {
+    pub fn send(&self, mut command: DeviceCommand) -> Result<CommandDispatch> {
         let _gate = self.ingress.lifecycle.begin_admission()?;
         let now = now_ms();
-        if command.expires_at <= now
-            || command.expires_at.saturating_sub(now) > self.ingress.limits.command_ttl_ms as i64
-        {
+        let maximum = now.saturating_add(self.ingress.limits.command_ttl_ms as i64);
+        let expires_at = command.expires_at.unwrap_or(maximum);
+        if expires_at <= now || expires_at > maximum {
             return Err(Error::Invalid);
         }
+        command.expires_at = Some(expires_at);
         let endpoint = self
             .ingress
             .sessions

@@ -7,7 +7,6 @@ use hyper::{
 use hyper_util::rt::{TokioIo, TokioTimer};
 use netbaiot_core::*;
 use netbaiot_runtime::*;
-use serde::Deserialize;
 use std::{
     convert::Infallible,
     net::SocketAddr,
@@ -15,6 +14,7 @@ use std::{
     time::Duration,
 };
 use tokio_util::sync::CancellationToken;
+use uuid::Uuid;
 
 fn response(status: StatusCode, body: Vec<u8>) -> Response<Full<Bytes>> {
     let mut response = Response::new(Full::new(Bytes::from(body)));
@@ -26,8 +26,45 @@ fn response(status: StatusCode, body: Vec<u8>) -> Response<Full<Bytes>> {
     response
 }
 
-fn error(error: Error) -> Response<Full<Bytes>> {
-    let status = match error {
+fn error_code(error: &Error) -> ErrorCode {
+    match error {
+        Error::Authentication => ErrorCode::Unauthenticated,
+        Error::Forbidden => ErrorCode::Forbidden,
+        Error::Conflict => ErrorCode::Conflict,
+        Error::Overloaded => ErrorCode::Overloaded,
+        Error::Timeout => ErrorCode::Timeout,
+        Error::Draining => ErrorCode::ServiceDraining,
+        Error::Unavailable => ErrorCode::ServerUnavailable,
+        Error::Storage => ErrorCode::ServerUnavailable,
+        Error::Internal => ErrorCode::Internal,
+        Error::Configuration | Error::Invalid | Error::Codec => ErrorCode::InvalidRequest,
+    }
+}
+
+fn api_error(
+    status: StatusCode,
+    code: ErrorCode,
+    message: &str,
+    request_id: &str,
+) -> Response<Full<Bytes>> {
+    let payload = ApiError {
+        code,
+        message: message.to_owned(),
+        request_id: Some(request_id.to_owned()),
+        required_scope: None,
+    };
+    let mut result = response(
+        status,
+        serde_json::to_vec(&payload).unwrap_or_else(|_| b"{}".to_vec()),
+    );
+    if let Ok(value) = hyper::header::HeaderValue::from_str(request_id) {
+        result.headers_mut().insert("x-request-id", value);
+    }
+    result
+}
+
+fn error(error: Error, request_id: &str) -> Response<Full<Bytes>> {
+    let status = match &error {
         Error::Authentication => StatusCode::UNAUTHORIZED,
         Error::Forbidden => StatusCode::FORBIDDEN,
         Error::Conflict => StatusCode::CONFLICT,
@@ -36,7 +73,7 @@ fn error(error: Error) -> Response<Full<Bytes>> {
         Error::Draining | Error::Storage | Error::Unavailable => StatusCode::SERVICE_UNAVAILABLE,
         _ => StatusCode::BAD_REQUEST,
     };
-    response(status, format!("{{\"error\":\"{error}\"}}").into_bytes())
+    api_error(status, error_code(&error), &error.to_string(), request_id)
 }
 
 fn authorization(req: &Request<Incoming>) -> Result<String> {
@@ -185,13 +222,6 @@ async fn handle_device(
     ))
 }
 
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct RoutesUpdate {
-    revision: u64,
-    routes: Vec<RouteDefinition>,
-}
-
 async fn handle_management(
     req: Request<Incoming>,
     services: Arc<Services>,
@@ -223,7 +253,13 @@ async fn handle_management(
             let usage = services.ingress.events.usage()?;
             let (auth_entries, auth_bytes) = services.ingress.auth_cache.usage()?;
             let (config_entries, config_bytes) = services.ingress.config.usage()?;
-            let active_connections = services.connections.active()?;
+            let active = services.connections.active()?;
+            let active_connections = ConnectionCounts {
+                http: active[0],
+                mqtt: active[1],
+                tcp: active[2],
+                udp: active[3],
+            };
             Ok(response(
                 StatusCode::OK,
                 serde_json::to_vec(&serde_json::json!({
@@ -275,11 +311,62 @@ async fn handle_management(
             let maximum = services.ingress.limits.max_command_bytes;
             let command: DeviceCommand =
                 serde_json::from_slice(&body(req, maximum).await?).map_err(|_| Error::Invalid)?;
-            let result = services.router.send(command)?;
+            let result = match services.router.send(command) {
+                Ok(result) => result,
+                Err(Error::Unavailable) => {
+                    let request_id = Uuid::new_v4().to_string();
+                    return Ok(api_error(
+                        StatusCode::SERVICE_UNAVAILABLE,
+                        ErrorCode::DeviceOffline,
+                        "device is not currently connected",
+                        &request_id,
+                    ));
+                }
+                Err(error) => return Err(error),
+            };
             Ok(response(
                 StatusCode::ACCEPTED,
                 serde_json::to_vec(&result).map_err(|_| Error::Internal)?,
             ))
+        }
+        (hyper::Method::POST, "/api/v1/devices/connection") => {
+            let device: DeviceKey = serde_json::from_slice(
+                &body(req, services.ingress.limits.max_http_body_size).await?,
+            )
+            .map_err(|_| Error::Invalid)?;
+            Ok(response(
+                StatusCode::OK,
+                serde_json::to_vec(&services.ingress.sessions.connection(&device)?)
+                    .map_err(|_| Error::Internal)?,
+            ))
+        }
+        (hyper::Method::POST, "/api/v1/devices/config") => {
+            let device: DeviceKey = serde_json::from_slice(
+                &body(req, services.ingress.limits.max_http_body_size).await?,
+            )
+            .map_err(|_| Error::Invalid)?;
+            let Some(config) = services.ingress.config.device(&device)? else {
+                let request_id = Uuid::new_v4().to_string();
+                return Ok(api_error(
+                    StatusCode::NOT_FOUND,
+                    ErrorCode::NotFound,
+                    "device configuration was not found",
+                    &request_id,
+                ));
+            };
+            Ok(response(
+                StatusCode::OK,
+                serde_json::to_vec(config.as_ref()).map_err(|_| Error::Internal)?,
+            ))
+        }
+        (hyper::Method::PUT, "/api/v1/devices/config") => {
+            let config: DeviceConfig = serde_json::from_slice(
+                &body(req, services.ingress.limits.max_http_body_size).await?,
+            )
+            .map_err(|_| Error::Invalid)?;
+            let _mutation = services.control_lock.lock().await;
+            services.ingress.config.upsert_device(config)?;
+            Ok(response(StatusCode::NO_CONTENT, Vec::new()))
         }
         (hyper::Method::POST, "/api/v1/auth/invalidate") => {
             let invalidation: AuthInvalidation = serde_json::from_slice(
@@ -287,12 +374,18 @@ async fn handle_management(
             )
             .map_err(|_| Error::Invalid)?;
             let devices = services.ingress.auth_cache.invalidate(&invalidation)?;
+            let invalidated = devices.len();
+            let mut disconnected = 0usize;
             for device in &devices {
-                services.ingress.sessions.disconnect(device)?;
+                disconnected += usize::from(services.ingress.sessions.disconnect(device)?);
             }
             Ok(response(
                 StatusCode::OK,
-                format!("{{\"disconnected\":{}}}", devices.len()).into_bytes(),
+                serde_json::to_vec(&InvalidationResult {
+                    invalidated,
+                    disconnected,
+                })
+                .map_err(|_| Error::Internal)?,
             ))
         }
         (hyper::Method::POST, "/api/v1/config/invalidate") => {
@@ -366,6 +459,7 @@ pub async fn connection(
         let services = handler.clone();
         let lease = lease.clone();
         async move {
+            let request_id = Uuid::new_v4().to_string();
             let result = deadline(
                 services.ingress.limits.request_timeout_ms,
                 handle(request, peer, services, lease),
@@ -373,7 +467,7 @@ pub async fn connection(
             .await;
             Ok::<_, Infallible>(match result {
                 Ok(response) => response,
-                Err(error_value) => error(error_value),
+                Err(error_value) => error(error_value, &request_id),
             })
         }
     });

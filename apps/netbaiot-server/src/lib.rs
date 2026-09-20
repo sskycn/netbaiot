@@ -273,21 +273,6 @@ impl EventSink for TcpStreamSink {
     }
 }
 
-#[derive(Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
-enum BusinessFrame {
-    Auth { token: String },
-    Subscribe,
-    Ack { event_id: EventId },
-}
-
-#[derive(Serialize)]
-struct EventFrame<'a> {
-    #[serde(rename = "type")]
-    kind: &'static str,
-    event: &'a DeviceEvent,
-}
-
 async fn read_frame(stream: &mut TcpStream, framer: &LengthPrefixFramer) -> Result<Vec<u8>> {
     let mut length = [0u8; 4];
     stream
@@ -306,6 +291,20 @@ async fn read_frame(stream: &mut TcpStream, framer: &LengthPrefixFramer) -> Resu
     Ok(payload)
 }
 
+async fn write_frame(
+    stream: &mut TcpStream,
+    framer: &LengthPrefixFramer,
+    frame: &StreamServerFrame,
+    timeout_ms: u64,
+) -> Result<()> {
+    let payload = serde_json::to_vec(frame).map_err(|_| Error::Internal)?;
+    let wire = framer.encode(&payload)?;
+    tokio::time::timeout(Duration::from_millis(timeout_ms), stream.write_all(&wire))
+        .await
+        .map_err(|_| Error::Timeout)?
+        .map_err(|_| Error::Unavailable)
+}
+
 async fn serve_business_stream(
     listener: TcpListener,
     sink: Arc<TcpStreamSink>,
@@ -321,11 +320,30 @@ async fn serve_business_stream(
         let framer = LengthPrefixFramer {
             maximum: limits.max_tcp_frame_size,
         };
-        let auth: BusinessFrame = serde_json::from_slice(&read_frame(&mut stream, &framer).await?)
-            .map_err(|_| Error::Invalid)?;
-        let BusinessFrame::Auth { token } = auth else {
+        let hello: StreamClientFrame =
+            serde_json::from_slice(&read_frame(&mut stream, &framer).await?)
+                .map_err(|_| Error::Invalid)?;
+        let StreamClientFrame::Hello { version, token } = hello else {
             continue;
         };
+        if version != PROTOCOL_VERSION {
+            let _ = write_frame(
+                &mut stream,
+                &framer,
+                &StreamServerFrame::Error {
+                    version: PROTOCOL_VERSION,
+                    error: ApiError {
+                        code: ErrorCode::InvalidProtocolVersion,
+                        message: "unsupported business stream protocol version".into(),
+                        request_id: None,
+                        required_scope: None,
+                    },
+                },
+                limits.write_timeout_ms,
+            )
+            .await;
+            continue;
+        }
         if !bool::from(
             Sha256::digest(token.as_bytes())
                 .as_slice()
@@ -333,45 +351,71 @@ async fn serve_business_stream(
         ) {
             continue;
         }
-        if !matches!(
-            serde_json::from_slice::<BusinessFrame>(&read_frame(&mut stream, &framer).await?),
-            Ok(BusinessFrame::Subscribe)
-        ) {
+        let subscribe: StreamClientFrame =
+            serde_json::from_slice(&read_frame(&mut stream, &framer).await?)
+                .map_err(|_| Error::Invalid)?;
+        let StreamClientFrame::Subscribe {
+            version,
+            subscription_id,
+            filter,
+        } = subscribe
+        else {
+            continue;
+        };
+        if version != PROTOCOL_VERSION || filter.validate().is_err() {
             continue;
         }
+        write_frame(
+            &mut stream,
+            &framer,
+            &StreamServerFrame::Ready {
+                version: PROTOCOL_VERSION,
+                subscription_id,
+            },
+            limits.write_timeout_ms,
+        )
+        .await?;
         let (sender, mut receiver) = mpsc::channel(limits.sink_delivery_concurrency);
         *sink.active.lock().map_err(|_| Error::Internal)? = Some(sender);
         while let Some(request) = tokio::select! {
             _ = stop.cancelled() => None,
             request = receiver.recv() => request,
         } {
-            let payload = serde_json::to_vec(&EventFrame {
-                kind: "event",
-                event: &request.delivery.event,
-            })
-            .map_err(|_| Error::Internal)?;
-            let wire = framer.encode(&payload)?;
-            let delivered = async {
-                tokio::time::timeout(
-                    Duration::from_millis(limits.write_timeout_ms),
-                    stream.write_all(&wire),
-                )
-                .await
-                .map_err(|_| Error::Timeout)?
-                .map_err(|_| Error::Unavailable)?;
-                let ack: BusinessFrame =
-                    serde_json::from_slice(&read_frame(&mut stream, &framer).await?)
-                        .map_err(|_| Error::Invalid)?;
-                match ack {
-                    BusinessFrame::Ack { event_id }
-                        if event_id == request.delivery.event.event_id =>
-                    {
-                        Ok(SinkAck)
-                    }
-                    _ => Err(Error::Invalid),
-                }
+            if !filter.matches(&request.delivery.event) {
+                let _ = request.result.send(Ok(SinkAck));
+                continue;
             }
-            .await;
+            let delivery_id = DeliveryId::generate();
+            let event_id = request.delivery.event.event_id;
+            let frame = StreamServerFrame::Event {
+                version: PROTOCOL_VERSION,
+                delivery: EventDelivery {
+                    delivery_id,
+                    subscription_id,
+                    event: (*request.delivery.event).clone(),
+                    attempt: request.delivery.attempt,
+                },
+            };
+            let delivered = tokio::select! {
+                _ = stop.cancelled() => Err(Error::Draining),
+                result = async {
+                    write_frame(&mut stream, &framer, &frame, limits.write_timeout_ms).await?;
+                    let ack: StreamClientFrame =
+                        serde_json::from_slice(&read_frame(&mut stream, &framer).await?)
+                            .map_err(|_| Error::Invalid)?;
+                    match ack {
+                        StreamClientFrame::Ack { version, ack }
+                            if version == PROTOCOL_VERSION
+                                && ack.delivery_id == delivery_id
+                                && ack.subscription_id == subscription_id
+                                && ack.event_id == event_id =>
+                        {
+                            Ok(SinkAck)
+                        }
+                        _ => Err(Error::Invalid),
+                    }
+                } => result,
+            };
             let failed = delivered.is_err();
             let _ = request.result.send(delivered.map_err(|error| {
                 if matches!(error, Error::Invalid) {
@@ -503,6 +547,23 @@ fn bootstrap_snapshot(config: &Config, sink_id: SinkId) -> Result<ControlSnapsho
 }
 
 pub async fn run(config: Config, stop: CancellationToken) -> Result<()> {
+    run_with_credentials(
+        config,
+        stop,
+        std::env::var("NETBAIOT_ADMIN_SECRET").ok(),
+        std::env::var("NETBAIOT_BUSINESS_STREAM_TOKEN").ok(),
+    )
+    .await
+}
+
+/// Composition entry point for embedded/test hosts that inject secrets without
+/// mutating process-global environment state.
+pub async fn run_with_credentials(
+    config: Config,
+    stop: CancellationToken,
+    admin_secret: Option<String>,
+    business_stream_token: Option<String>,
+) -> Result<()> {
     config.validate()?;
     let limits = Arc::new(config.limits.clone());
     let metrics = Arc::new(Metrics::default());
@@ -609,7 +670,7 @@ pub async fn run(config: Config, stop: CancellationToken) -> Result<()> {
     let shutdown = stop.child_token();
     let mut base_services =
         Services::new_with_mqtt(ingress.clone(), shutdown.clone(), mqtt_broker.clone());
-    if let Ok(secret) = std::env::var("NETBAIOT_ADMIN_SECRET") {
+    if let Some(secret) = admin_secret {
         let admin = Arc::new(AdminAccess::new(&secret, identities, &limits)?);
         Arc::get_mut(&mut base_services)
             .ok_or(Error::Internal)?
@@ -682,8 +743,7 @@ pub async fn run(config: Config, stop: CancellationToken) -> Result<()> {
     ));
     tasks.spawn(udp::serve(udp, base_services, listeners.child_token()));
     if let Some((listener, sink)) = business {
-        let secret =
-            std::env::var("NETBAIOT_BUSINESS_STREAM_TOKEN").map_err(|_| Error::Configuration)?;
+        let secret = business_stream_token.ok_or(Error::Configuration)?;
         let hash: [u8; 32] = Sha256::digest(secret.as_bytes()).into();
         tasks.spawn(serve_business_stream(
             listener,

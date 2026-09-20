@@ -1,18 +1,6 @@
 use crate::{Error, Result};
-use serde::Serialize;
+use netbaiot_core::LifecycleState;
 use std::sync::atomic::{AtomicU8, AtomicUsize, Ordering};
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "snake_case")]
-#[repr(u8)]
-pub enum LifecycleState {
-    Starting,
-    Running,
-    Quiescing,
-    Draining,
-    Spooling,
-    Drained,
-}
 
 pub struct Lifecycle {
     state: AtomicU8,
@@ -27,7 +15,7 @@ pub struct AdmissionGuard<'a> {
 impl Lifecycle {
     pub fn starting() -> Self {
         Self {
-            state: AtomicU8::new(LifecycleState::Starting as u8),
+            state: AtomicU8::new(0),
             active_admissions: AtomicUsize::new(0),
             changed: tokio::sync::Notify::new(),
         }
@@ -83,8 +71,8 @@ impl Lifecycle {
         }
         self.state
             .compare_exchange(
-                current as u8,
-                LifecycleState::Drained as u8,
+                lifecycle_code(current),
+                lifecycle_code(LifecycleState::Drained),
                 Ordering::AcqRel,
                 Ordering::Acquire,
             )
@@ -95,7 +83,12 @@ impl Lifecycle {
 
     fn transition(&self, from: LifecycleState, to: LifecycleState) -> Result<()> {
         self.state
-            .compare_exchange(from as u8, to as u8, Ordering::AcqRel, Ordering::Acquire)
+            .compare_exchange(
+                lifecycle_code(from),
+                lifecycle_code(to),
+                Ordering::AcqRel,
+                Ordering::Acquire,
+            )
             .map_err(|_| Error::Conflict)?;
         self.changed.notify_waiters();
         Ok(())
@@ -105,6 +98,17 @@ impl Lifecycle {
         if self.active_admissions.fetch_sub(1, Ordering::AcqRel) == 1 {
             self.changed.notify_waiters();
         }
+    }
+}
+
+const fn lifecycle_code(state: LifecycleState) -> u8 {
+    match state {
+        LifecycleState::Starting => 0,
+        LifecycleState::Running => 1,
+        LifecycleState::Quiescing => 2,
+        LifecycleState::Draining => 3,
+        LifecycleState::Spooling => 4,
+        LifecycleState::Drained => 5,
     }
 }
 

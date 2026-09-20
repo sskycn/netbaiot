@@ -54,6 +54,9 @@ the bounded non-spooled memory window and recent MQTT mutations.
 
 Workspace responsibilities:
 
+- `netbaiot-protocol`: public wire/domain types, stable errors, paths, and versioning.
+- `netbaiot-client`: business HTTP APIs and confirmed event-stream ownership.
+- `netbaiot-device-sdk`: optional standard MQTT/device-HTTP convenience client.
 - `netbaiot-core`: strong domain/event/command types and synchronous codec trait.
 - `netbaiot-codecs`: bounded vendor/device protocol codecs.
 - `netbaiot-runtime`: caches, resource admission, event bus, sessions, lifecycle,
@@ -62,6 +65,11 @@ Workspace responsibilities:
   owners.
 - `netbaiot-server`: validated composition, webhook/TCP business sinks, listeners,
   recovery, and graceful shutdown.
+- `netbaiot-cli`: operator interface implemented through `netbaiot-client` only.
+
+The public client crates point inward only to `netbaiot-protocol` and network
+dependencies; they never depend on runtime, transport, broker, session, or server
+implementation crates.
 
 There is deliberately no storage crate, SQL migration, database pool, durable
 outbox, persistent command state, or runtime message history.

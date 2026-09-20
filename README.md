@@ -43,3 +43,34 @@ replay can duplicate delivery.
 See [architecture](docs/architecture.md), [delivery semantics](docs/delivery-semantics.md),
 [HTTP API](docs/http-api.md), [MQTT profile](docs/mqtt.md), and the
 [refactor report](docs/pure-event-bus-refactor.md).
+
+## Official Rust clients
+
+Business systems use `netbaiot-client`; event ACK is explicit and occurs after
+application processing:
+
+```rust
+let client = NetbaIoTClient::builder()
+    .endpoint(endpoint)
+    .token(token)
+    .event_address(event_address)
+    .connect()
+    .await?;
+let mut events = client.events().subscribe(EventFilter::default()).await?;
+while let Some(delivery) = events.next().await {
+    let delivery = delivery?;
+    handle(delivery.event()).await?;
+    delivery.ack().await?;
+}
+```
+
+Commands use `client.commands().send(&command)`, configuration uses
+`client.configs()`, and operations use `client.runtime()`. An offline device returns
+typed `ClientError::DeviceOffline`; commands are never stored by NetbaIoT.
+
+The optional `netbaiot-device-sdk` supports standard MQTT telemetry/commands and
+device HTTP upload/config without lock-in. Standard MQTT 3.1.1 clients remain
+first-class. The `netbaiot` CLI exposes status, event subscribe, command, config,
+cache invalidation, and explicit drain operations. See [SDK overview](docs/sdk.md),
+[business client](docs/client.md), [device SDK](docs/device-sdk.md), and
+[CLI](docs/cli.md).

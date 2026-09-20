@@ -1,5 +1,5 @@
 [workspace]
-members = ["apps/netbaiot-server", "crates/*", "tools/netbaiot-loadgen"]
+members = ["apps/netbaiot-server", "apps/netbaiot-cli", "crates/*", "tools/netbaiot-loadgen"]
 exclude = ["fuzz"]
 resolver = "2"
 
@@ -10,7 +10,10 @@ license = "AGPL-3.0-or-later"
 rust-version = "1.88"
 
 [workspace.dependencies]
+netbaiot-protocol = { path = "crates/netbaiot-protocol" }
 netbaiot-core = { path = "crates/netbaiot-core" }
+netbaiot-client = { path = "crates/netbaiot-client" }
+netbaiot-device-sdk = { path = "crates/netbaiot-device-sdk" }
 netbaiot-runtime = { path = "crates/netbaiot-runtime" }
 netbaiot-codecs = { path = "crates/netbaiot-codecs" }
 netbaiot-transports = { path = "crates/netbaiot-transports" }
@@ -33,6 +36,9 @@ http-body-util = "0.1"
 tokio-rustls = { version = "0.26", default-features = false, features = ["ring", "tls12"] }
 rustls-pemfile = "2"
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
+futures-core = "0.3"
+futures-util = "0.3"
+rumqttc = { version = "0.25.1", default-features = false, features = ["use-rustls"] }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

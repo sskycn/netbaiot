@@ -1,6 +1,6 @@
 use crate::{Error, Limits, Metric, Metrics, Result, lock, now_ms};
 use async_trait::async_trait;
-use netbaiot_core::{DeviceEvent, EventId, SinkId};
+use netbaiot_core::{DeviceEvent, EventAccepted, EventId, RouteDefinition, SinkId};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap, VecDeque},
@@ -74,12 +74,6 @@ impl SinkDefinition {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct RouteDefinition {
-    pub tenant: Option<netbaiot_core::TenantId>,
-    pub sinks: Vec<SinkId>,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SpoolRecord {
     pub event: DeviceEvent,
     pub pending_sinks: Vec<SinkId>,
@@ -88,13 +82,7 @@ pub struct SpoolRecord {
     pub attempts: BTreeMap<SinkId, u32>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct EventAcceptance {
-    pub event_id: EventId,
-    pub accepted_at: i64,
-    pub required_deliveries: usize,
-    pub best_effort_deliveries: usize,
-}
+pub type EventAcceptance = EventAccepted;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct EventBusUsage {

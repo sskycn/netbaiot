@@ -70,7 +70,7 @@ impl SessionEndpoint {
         self.sender
             .try_send(QueuedCommand {
                 command_id: command.command_id,
-                expires_at: command.expires_at,
+                expires_at: command.expires_at.ok_or(Error::Invalid)?,
                 queued: self.queued.clone(),
                 bytes,
                 _bytes: permits,
@@ -279,6 +279,19 @@ impl Sessions {
         Ok(lock(&self.state)?.presence.get(device).cloned())
     }
 
+    pub fn connection(&self, device: &DeviceKey) -> Result<DeviceConnectionInfo> {
+        let state = lock(&self.state)?;
+        let presence = state.presence.get(device);
+        Ok(DeviceConnectionInfo {
+            device: device.clone(),
+            connected: presence.is_some_and(|value| value.connected),
+            transport: presence.map(|value| value.transport),
+            connected_at: None,
+            last_seen: presence.map(|value| value.last_seen),
+            session_generation: presence.and_then(|value| value.session_generation),
+        })
+    }
+
     pub fn registry_counts(&self) -> Result<(usize, usize, usize)> {
         let state = lock(&self.state)?;
         Ok((
@@ -369,7 +382,7 @@ mod tests {
         let command = DeviceCommand {
             command_id: CommandId::generate(),
             device: auth.device_key.clone(),
-            expires_at: now_ms() + 1_000,
+            expires_at: Some(now_ms() + 1_000),
             payload: DeviceCommandPayload {
                 name: "x".into(),
                 arguments: Default::default(),

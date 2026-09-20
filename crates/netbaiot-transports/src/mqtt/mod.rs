@@ -265,7 +265,13 @@ pub async fn connection(
                     let Some(command) = command else { break };
                     if command.expires_at <= now_ms() { continue }
                     let down = topic(&auth.device_key, TopicKind::Down);
-                    let Some(qos) = services.mqtt.subscription_qos(&attachment.key, &down)? else { continue };
+                    // Management commands target this authenticated live connection directly.
+                    // A missing broker subscription must not turn an accepted command into a
+                    // silent drop; QoS1 supplies transport receipt independently of execution ACK.
+                    let qos = services
+                        .mqtt
+                        .subscription_qos(&attachment.key, &down)?
+                        .unwrap_or(1);
                     services.mqtt.send_live(&attachment.key, BrokerMessage {
                         topic: down, payload: command.bytes.to_vec(), qos, retain: false,
                     })?;

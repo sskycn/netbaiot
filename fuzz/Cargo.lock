@@ -369,6 +369,7 @@ dependencies = [
 name = "netbaiot-core"
 version = "0.1.0"
 dependencies = [
+ "netbaiot-protocol",
  "serde",
  "thiserror",
  "uuid",
@@ -385,6 +386,16 @@ dependencies = [
  "netbaiot-runtime",
  "netbaiot-transports",
  "serde_json",
+]
+
+[[package]]
+name = "netbaiot-protocol"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror",
+ "uuid",
 ]
 
 [[package]]
@@ -426,6 +437,7 @@ dependencies = [
  "tokio-rustls",
  "tokio-util",
  "tracing",
+ "uuid",
 ]
 
 [[package]]

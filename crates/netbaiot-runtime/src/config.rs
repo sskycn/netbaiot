@@ -1,38 +1,13 @@
-use crate::{Error, Limits, Result, RouteDefinition, lock};
+use crate::{Error, Limits, Result, lock};
 use async_trait::async_trait;
-use netbaiot_core::{CodecId, DeviceKey, ProductId, TenantId};
-use serde::{Deserialize, Serialize};
+use netbaiot_core::{
+    ControlSnapshot, DeviceConfigSnapshot, DeviceKey, ProductId, ProductRuntimeConfig,
+    RouteDefinition, TenantId,
+};
 use std::{
     collections::HashMap,
     sync::{Arc, Mutex, RwLock},
 };
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct ProductRuntimeConfig {
-    pub tenant_id: TenantId,
-    pub product_id: ProductId,
-    pub codec_id: CodecId,
-    pub codec_version: u16,
-    pub revision: u64,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct DeviceConfigSnapshot {
-    pub device: DeviceKey,
-    pub revision: u64,
-    pub payload: Arc<serde_json::Value>,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct ControlSnapshot {
-    pub revision: u64,
-    pub products: Vec<ProductRuntimeConfig>,
-    pub devices: Vec<DeviceConfigSnapshot>,
-    pub routes: Vec<RouteDefinition>,
-}
 
 #[async_trait]
 pub trait ControlPlaneProvider: Send + Sync {
@@ -119,7 +94,7 @@ impl ConfigCache {
         let mut devices = HashMap::new();
         let mut bytes = 0usize;
         for device in snapshot.devices {
-            if device.revision == 0
+            if device.revision.0 == 0
                 || !products.contains_key(&(
                     device.device.tenant_id.clone(),
                     device.device.product_id.clone(),
@@ -178,6 +153,69 @@ impl ConfigCache {
             stats.1 += 1;
         }
         Ok(value)
+    }
+
+    /// Atomically replaces one public device configuration. The caller serializes
+    /// this with other control-plane mutations.
+    pub fn upsert_device(&self, config: DeviceConfigSnapshot) -> Result<()> {
+        if config.revision.0 == 0 {
+            return Err(Error::Configuration);
+        }
+        let current = self.snapshot.read().map_err(|_| Error::Internal)?.clone();
+        if !current.products.contains_key(&(
+            config.device.tenant_id.clone(),
+            config.device.product_id.clone(),
+        )) {
+            return Err(Error::Configuration);
+        }
+        if current
+            .devices
+            .get(&config.device)
+            .is_some_and(|old| old.revision >= config.revision)
+        {
+            return Err(Error::Conflict);
+        }
+        if !current.devices.contains_key(&config.device)
+            && current.products.len().saturating_add(current.devices.len())
+                >= self.limits.config_cache_max_entries
+        {
+            return Err(Error::Overloaded);
+        }
+        let mut devices = current.devices.clone();
+        devices.insert(config.device.clone(), Arc::new(config));
+        let product_bytes = current
+            .products
+            .values()
+            .try_fold(0usize, |total, product| {
+                total
+                    .checked_add(
+                        serde_json::to_vec(product.as_ref())
+                            .map_err(|_| Error::Configuration)?
+                            .len(),
+                    )
+                    .ok_or(Error::Overloaded)
+            })?;
+        let bytes = devices.values().try_fold(product_bytes, |total, device| {
+            total
+                .checked_add(
+                    serde_json::to_vec(device.as_ref())
+                        .map_err(|_| Error::Configuration)?
+                        .len(),
+                )
+                .ok_or(Error::Overloaded)
+        })?;
+        if bytes > self.limits.config_cache_max_bytes {
+            return Err(Error::Overloaded);
+        }
+        let next = Arc::new(SnapshotIndex {
+            revision: current.revision.checked_add(1).ok_or(Error::Overloaded)?,
+            products: current.products.clone(),
+            devices,
+            routes: current.routes.clone(),
+            bytes,
+        });
+        *self.snapshot.write().map_err(|_| Error::Internal)? = next;
+        Ok(())
     }
 
     pub fn product(
@@ -257,7 +295,7 @@ impl ConfigCache {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use netbaiot_core::{DeviceId, SinkId};
+    use netbaiot_core::{CodecId, ConfigRevision, DeviceId, SinkId};
 
     fn snapshot(revision: u64) -> ControlSnapshot {
         let tenant = TenantId::new("t").unwrap();
@@ -277,7 +315,7 @@ mod tests {
                     product_id: product,
                     device_id: DeviceId::new("d").unwrap(),
                 },
-                revision,
+                revision: ConfigRevision(revision),
                 payload: Arc::new(serde_json::json!({"sample": 1})),
             }],
             routes: vec![RouteDefinition {
@@ -297,7 +335,7 @@ mod tests {
         let first = cache.device(&device).unwrap().unwrap();
         cache.apply(snapshot(2)).unwrap();
         let second = cache.device(&device).unwrap().unwrap();
-        assert_eq!(first.revision, 1);
-        assert_eq!(second.revision, 2);
+        assert_eq!(first.revision, ConfigRevision(1));
+        assert_eq!(second.revision, ConfigRevision(2));
     }
 }
