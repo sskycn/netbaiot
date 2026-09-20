@@ -273,22 +273,30 @@ impl EventSink for TcpStreamSink {
     }
 }
 
-async fn read_frame(stream: &mut TcpStream, framer: &LengthPrefixFramer) -> Result<Vec<u8>> {
-    let mut length = [0u8; 4];
-    stream
-        .read_exact(&mut length)
-        .await
-        .map_err(|_| Error::Unavailable)?;
-    let length = usize::try_from(u32::from_be_bytes(length)).map_err(|_| Error::Invalid)?;
-    if length == 0 || length > framer.maximum {
-        return Err(Error::Invalid);
-    }
-    let mut payload = vec![0; length];
-    stream
-        .read_exact(&mut payload)
-        .await
-        .map_err(|_| Error::Unavailable)?;
-    Ok(payload)
+async fn read_frame(
+    stream: &mut TcpStream,
+    framer: &LengthPrefixFramer,
+    timeout_ms: u64,
+) -> Result<Vec<u8>> {
+    tokio::time::timeout(Duration::from_millis(timeout_ms), async {
+        let mut length = [0u8; 4];
+        stream
+            .read_exact(&mut length)
+            .await
+            .map_err(|_| Error::Unavailable)?;
+        let length = usize::try_from(u32::from_be_bytes(length)).map_err(|_| Error::Invalid)?;
+        if length == 0 || length > framer.maximum {
+            return Err(Error::Invalid);
+        }
+        let mut payload = vec![0; length];
+        stream
+            .read_exact(&mut payload)
+            .await
+            .map_err(|_| Error::Unavailable)?;
+        Ok(payload)
+    })
+    .await
+    .map_err(|_| Error::Timeout)?
 }
 
 async fn write_frame(
@@ -303,6 +311,145 @@ async fn write_frame(
         .await
         .map_err(|_| Error::Timeout)?
         .map_err(|_| Error::Unavailable)
+}
+
+async fn write_stream_error(
+    stream: &mut TcpStream,
+    framer: &LengthPrefixFramer,
+    limits: &Limits,
+    code: ErrorCode,
+    message: &str,
+) {
+    let _ = write_frame(
+        stream,
+        framer,
+        &StreamServerFrame::Error {
+            version: PROTOCOL_VERSION,
+            error: ApiError {
+                code,
+                message: message.to_owned(),
+                request_id: Some(EventId::generate().to_string()),
+                required_scope: None,
+            },
+        },
+        limits.write_timeout_ms,
+    )
+    .await;
+}
+
+async fn business_handshake(
+    stream: &mut TcpStream,
+    framer: &LengthPrefixFramer,
+    token_hash: &[u8; 32],
+    limits: &Limits,
+) -> Result<(SubscriptionId, EventFilter)> {
+    let payload = read_frame(stream, framer, limits.connect_timeout_ms).await?;
+    let hello = match serde_json::from_slice::<StreamClientFrame>(&payload) {
+        Ok(frame) => frame,
+        Err(_) => {
+            write_stream_error(
+                stream,
+                framer,
+                limits,
+                ErrorCode::InvalidRequest,
+                "invalid business stream hello",
+            )
+            .await;
+            return Err(Error::Invalid);
+        }
+    };
+    let StreamClientFrame::Hello { version, token } = hello else {
+        write_stream_error(
+            stream,
+            framer,
+            limits,
+            ErrorCode::InvalidRequest,
+            "hello must be the first business stream frame",
+        )
+        .await;
+        return Err(Error::Invalid);
+    };
+    if version != PROTOCOL_VERSION {
+        write_stream_error(
+            stream,
+            framer,
+            limits,
+            ErrorCode::InvalidProtocolVersion,
+            "unsupported business stream protocol version",
+        )
+        .await;
+        return Err(Error::Invalid);
+    }
+    if !bool::from(
+        Sha256::digest(token.as_bytes())
+            .as_slice()
+            .ct_eq(token_hash),
+    ) {
+        write_stream_error(
+            stream,
+            framer,
+            limits,
+            ErrorCode::Unauthenticated,
+            "business stream authentication failed",
+        )
+        .await;
+        return Err(Error::Authentication);
+    }
+
+    let payload = read_frame(stream, framer, limits.connect_timeout_ms).await?;
+    let subscribe = match serde_json::from_slice::<StreamClientFrame>(&payload) {
+        Ok(frame) => frame,
+        Err(_) => {
+            write_stream_error(
+                stream,
+                framer,
+                limits,
+                ErrorCode::InvalidRequest,
+                "invalid business stream subscription",
+            )
+            .await;
+            return Err(Error::Invalid);
+        }
+    };
+    let StreamClientFrame::Subscribe {
+        version,
+        subscription_id,
+        filter,
+    } = subscribe
+    else {
+        write_stream_error(
+            stream,
+            framer,
+            limits,
+            ErrorCode::InvalidRequest,
+            "subscribe must follow the business stream hello",
+        )
+        .await;
+        return Err(Error::Invalid);
+    };
+    if version != PROTOCOL_VERSION {
+        write_stream_error(
+            stream,
+            framer,
+            limits,
+            ErrorCode::InvalidProtocolVersion,
+            "unsupported business stream protocol version",
+        )
+        .await;
+        return Err(Error::Invalid);
+    }
+    if filter.validate().is_err() {
+        write_stream_error(
+            stream,
+            framer,
+            limits,
+            ErrorCode::InvalidRequest,
+            "business stream filter exceeds protocol bounds",
+        )
+        .await;
+        return Err(Error::Invalid);
+    }
+    Ok((subscription_id, filter))
 }
 
 async fn serve_business_stream(
@@ -320,52 +467,14 @@ async fn serve_business_stream(
         let framer = LengthPrefixFramer {
             maximum: limits.max_tcp_frame_size,
         };
-        let hello: StreamClientFrame =
-            serde_json::from_slice(&read_frame(&mut stream, &framer).await?)
-                .map_err(|_| Error::Invalid)?;
-        let StreamClientFrame::Hello { version, token } = hello else {
-            continue;
-        };
-        if version != PROTOCOL_VERSION {
-            let _ = write_frame(
-                &mut stream,
-                &framer,
-                &StreamServerFrame::Error {
-                    version: PROTOCOL_VERSION,
-                    error: ApiError {
-                        code: ErrorCode::InvalidProtocolVersion,
-                        message: "unsupported business stream protocol version".into(),
-                        request_id: None,
-                        required_scope: None,
-                    },
-                },
-                limits.write_timeout_ms,
-            )
-            .await;
-            continue;
-        }
-        if !bool::from(
-            Sha256::digest(token.as_bytes())
-                .as_slice()
-                .ct_eq(&token_hash),
-        ) {
-            continue;
-        }
-        let subscribe: StreamClientFrame =
-            serde_json::from_slice(&read_frame(&mut stream, &framer).await?)
-                .map_err(|_| Error::Invalid)?;
-        let StreamClientFrame::Subscribe {
-            version,
-            subscription_id,
-            filter,
-        } = subscribe
+        let Ok((subscription_id, filter)) =
+            business_handshake(&mut stream, &framer, &token_hash, &limits).await
         else {
             continue;
         };
-        if version != PROTOCOL_VERSION || filter.validate().is_err() {
-            continue;
-        }
-        write_frame(
+        let (sender, mut receiver) = mpsc::channel(limits.sink_delivery_concurrency);
+        *sink.active.lock().map_err(|_| Error::Internal)? = Some(sender);
+        if write_frame(
             &mut stream,
             &framer,
             &StreamServerFrame::Ready {
@@ -374,9 +483,12 @@ async fn serve_business_stream(
             },
             limits.write_timeout_ms,
         )
-        .await?;
-        let (sender, mut receiver) = mpsc::channel(limits.sink_delivery_concurrency);
-        *sink.active.lock().map_err(|_| Error::Internal)? = Some(sender);
+        .await
+        .is_err()
+        {
+            *sink.active.lock().map_err(|_| Error::Internal)? = None;
+            continue;
+        }
         while let Some(request) = tokio::select! {
             _ = stop.cancelled() => None,
             request = receiver.recv() => request,
@@ -401,7 +513,11 @@ async fn serve_business_stream(
                 result = async {
                     write_frame(&mut stream, &framer, &frame, limits.write_timeout_ms).await?;
                     let ack: StreamClientFrame =
-                        serde_json::from_slice(&read_frame(&mut stream, &framer).await?)
+                        serde_json::from_slice(&read_frame(
+                            &mut stream,
+                            &framer,
+                            limits.sink_timeout_ms,
+                        ).await?)
                             .map_err(|_| Error::Invalid)?;
                     match ack {
                         StreamClientFrame::Ack { version, ack }

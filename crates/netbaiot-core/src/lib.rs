@@ -10,6 +10,8 @@ pub type DomainError = ProtocolError;
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Presence {
     pub connected: bool,
+    #[serde(default)]
+    pub connected_at: Option<Timestamp>,
     pub last_seen: Timestamp,
     pub transport: Transport,
     pub session_generation: Option<u64>,

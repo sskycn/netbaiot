@@ -111,6 +111,9 @@ or ambiguous public contracts:
 - the confirmed stream implements the public versioned handshake, filter
   validation, stable event identity, attempt-specific delivery identity, and exact
   ACK matching;
+- handshake/ACK reads have hard deadlines; malformed clients are isolated and
+  authentication, version, and validation failures return structured stream errors
+  without terminating the listener;
 - confirmed-stream waits are shutdown-aware so an unacknowledged event cannot block
   graceful restart indefinitely;
 - MQTT management commands use direct QoS 1 delivery to a live authenticated
@@ -146,6 +149,12 @@ broker-ACKed only after admission to the bounded application queue. Malformed or
 overflowing commands cause disconnect without broker ACK so a persistent session
 can redeliver them.
 
+An MQTT-configured `connect().await` waits for initial broker readiness rather than
+returning a client that immediately reports `Offline`. Later connection loss uses
+bounded exponential full-jitter retry and every successful connection explicitly
+resubscribes the command topic. Authentication, authorization, client-ID, and
+protocol-version CONNACK failures are terminal instead of entering a retry storm.
+
 The only current offline publish policy is the explicit default `Reject`; there is
 no hidden RAM backlog. MQTT publish success means bounded client admission, not
 business persistence.
@@ -174,7 +183,8 @@ cover:
 - device connection query, runtime status, routes/auth contracts, and shutdown;
 - graceful restart with an outstanding unacknowledged event, automatic reconnect
   and resubscription, replay with the same `event_id`, a new `delivery_id`, and zero
-  missing accepted IDs;
+  missing accepted IDs; the same test also verifies device-SDK MQTT reconnect,
+  telemetry publication, and command reception after the new server starts;
 - a real `netbaiot` CLI smoke run covering status, device status, event subscribe,
   command, config get/set, auth invalidation, and drain;
 - existing standard MQTT interoperability and the realistic authentication-cache
@@ -194,15 +204,15 @@ events in a debug test build:
 
 | Measurement | Result |
 | --- | ---: |
-| Throughput | 2,441.18 events/s |
-| HTTP `EventAccepted` return to stream delivery P50/P95/P99 | 59 / 92 / 125 µs |
-| `Delivery::ack` call P50/P95/P99 | 30 / 45 / 68 µs |
-| Test process RSS before clients | 9,232 KiB |
-| Test process RSS with business client | 12,208 KiB |
-| Approximate incremental business-client RSS | 2,976 KiB |
-| Test process RSS with business and device clients | 12,704 KiB |
-| Approximate incremental device-SDK RSS | 496 KiB |
-| Server process RSS | 8,832 KiB |
+| Throughput | 2,696.79 events/s |
+| HTTP `EventAccepted` return to stream delivery P50/P95/P99 | 59 / 88 / 100 µs |
+| `Delivery::ack` call P50/P95/P99 | 28 / 44 / 58 µs |
+| Test process RSS before clients | 12,464 KiB |
+| Test process RSS with business client | 13,600 KiB |
+| Approximate incremental business-client RSS | 1,136 KiB |
+| Test process RSS with business and device clients | 13,840 KiB |
+| Approximate incremental device-SDK RSS | 240 KiB |
+| Server process RSS | 9,168 KiB |
 
 These are reproducible engineering measurements, not production capacity claims.
 They use a small sequential loopback sample, debug binaries, and process RSS. The
@@ -226,8 +236,6 @@ startup time were not separately benchmarked in this revision.
 - Product-level direct config get/set is not exposed because the current server API
   supports device configuration, while product runtime configuration remains part
   of the control snapshot.
-- `DeviceConnectionInfo.connected_at` is currently `None` because the session
-  registry does not retain that timestamp. `last_seen` and transport are reported.
 - The business client does not automatically retry HTTP reads. This avoids hidden
   retry behavior; callers can retry idempotent operations explicitly.
 - The performance sample is debug/loopback and too small for a production capacity
