@@ -558,11 +558,20 @@ struct HttpAuthProvider {
 impl HttpAuthProvider {
     fn new(url: &str, limits: &Limits) -> Result<Arc<Self>> {
         let url = reqwest::Url::parse(url).map_err(|_| Error::Configuration)?;
-        if url.scheme() != "https" && !url.host_str().is_some_and(|host| host == "localhost") {
+        if url.scheme() != "https"
+            && !(url.scheme() == "http"
+                && url.host_str().is_some_and(|host| {
+                    host == "localhost"
+                        || host
+                            .parse::<std::net::IpAddr>()
+                            .is_ok_and(|address| address.is_loopback())
+                }))
+        {
             return Err(Error::Configuration);
         }
         Ok(Arc::new(Self {
             client: reqwest::Client::builder()
+                .no_proxy()
                 .timeout(Duration::from_millis(limits.authentication_timeout_ms))
                 .redirect(reqwest::redirect::Policy::none())
                 .build()

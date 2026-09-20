@@ -199,6 +199,11 @@ def main():
             loaded_status = status(management, args.tls)
             loaded_rss = rss_kib(server.pid)
             loaded_fds = fd_count(server.pid)
+            active_connections = loaded_status.get("active_connections", {})
+            if isinstance(active_connections, dict):
+                active_connection_count = sum(active_connections.values())
+            else:
+                active_connection_count = sum(active_connections)
             result = {
                 "transport": args.transport,
                 "tls": args.tls,
@@ -207,7 +212,7 @@ def main():
                 "measurement_state": "disconnected" if args.disconnected else "active",
                 "connections_requested": args.connections,
                 # The status request itself holds one short-lived management HTTP lease.
-                "connections_active": max(0, sum(loaded_status.get("active_connections", [])) - 1),
+                "connections_active": max(0, active_connection_count - 1),
                 "rss_base_kib": base_rss,
                 "rss_loaded_kib": loaded_rss,
                 "rss_delta_kib": loaded_rss - base_rss,

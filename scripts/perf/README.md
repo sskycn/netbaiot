@@ -31,12 +31,20 @@ python3 scripts/perf/connection_memory.py --transport mqtt --connections 1000 --
 python3 scripts/perf/connection_memory.py --transport mqtt --connections 1000 --persistent
 python3 scripts/perf/connection_memory.py --transport mqtt --connections 1000 --persistent --subscribe
 python3 scripts/perf/connection_memory.py --transport mqtt --connections 10000 --persistent --disconnected
+python3 scripts/perf/connection_memory.py --transport tcp --connections 1000
+python3 scripts/perf/connection_memory.py --transport tcp --connections 3000
 python3 scripts/perf/event_load.py --rate 10000 --duration 20 --connections 64
 python3 scripts/perf/event_load.py --rate 1000 --duration 15 --connections 32 --sink-delay-ms 10
 cargo bench --bench foundation
+cargo test -p netbaiot-server --test server subprocess_graceful_restart_sixty_second_soak -- --ignored --nocapture
 ```
 
 `--disconnected` measures RSS after every socket/task/FD has gone while persistent
 MQTT and auth-cache state remains. Broker logical session bytes are printed by the
 foundation benchmark; RSS additionally includes hash tables, allocator capacity,
 credentials/auth cache, metrics, runtime, and process overhead.
+
+The ignored restart soak runs 12 healthy process generations with a five-second
+dwell per generation after the initial forced-spool/recovery pair. Each generation
+waits for the accepted `event_id` at the confirmed webhook, drains, exits, and
+verifies that no committed EventBus spool segment remains.
