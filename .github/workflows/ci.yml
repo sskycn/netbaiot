@@ -16,3 +16,5 @@ jobs:
       - run: cargo fmt --all -- --check
       - run: cargo clippy --workspace --all-targets --all-features -- -D warnings
       - run: cargo test --workspace --all-features
+      - if: matrix.toolchain == 'stable'
+        run: python3 tests/mqtt_conformance/run.py --netbaiot-only

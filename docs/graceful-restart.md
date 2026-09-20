@@ -10,8 +10,9 @@ Therefore work racing with shutdown either completes the `EventAccepted` boundar
 and is tracked, or fails without a success acknowledgement.
 
 Quiesce rejects new device events and commands and stops listeners/connections.
-MQTT connection owners detach without publishing Will because this is an intentional
-server shutdown. After all owners detach, one consistent broker snapshot records
+MQTT connection owners publish their Will unless the client sent MQTT DISCONNECT;
+the MQTT 3.1.1 Will contract applies when the server closes the Network Connection.
+After all owners detach, one consistent broker snapshot records
 persistent sessions, subscriptions, offline messages, inbound/outbound QoS state,
 packet allocator position, and retained messages. The snapshot must commit before a
 successful exit.

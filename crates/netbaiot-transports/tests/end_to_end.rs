@@ -375,7 +375,7 @@ async fn inbound_qos2_duplicate_sequence_emits_one_device_event() {
 }
 
 #[tokio::test]
-async fn abrupt_disconnect_publishes_will_but_planned_stop_does_not() {
+async fn disconnect_without_mqtt_disconnect_publishes_will_including_server_stop() {
     let provider = Arc::new(CountingProvider {
         calls: AtomicUsize::new(0),
         auth: auth(),
@@ -422,7 +422,56 @@ async fn abrupt_disconnect_publishes_will_but_planned_stop_does_not() {
     planned.read_exact(&mut connack).await.unwrap();
     stop.cancel();
     task.await.unwrap().unwrap();
-    assert_eq!(sink.0.load(Ordering::Relaxed), 1);
+    assert_eq!(sink.0.load(Ordering::Relaxed), 2);
+}
+
+#[tokio::test]
+async fn unauthorized_publish_is_rejected_before_broker_side_effects() {
+    let provider = Arc::new(CountingProvider {
+        calls: AtomicUsize::new(0),
+        auth: auth(),
+        delay: false,
+    });
+    let (_, services, stop) = runtime(Limits::default(), provider);
+    let broker = services.mqtt.clone();
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let task = tokio::spawn(serve_stream(
+        listener,
+        Transport::Mqtt,
+        services,
+        None,
+        stop.clone(),
+    ));
+    let unauthorized_topic = "v1/t/t/p/p/d/b/up";
+
+    for qos in [1, 2] {
+        let mut stream = TcpStream::connect(address).await.unwrap();
+        stream.write_all(&connect_packet()).await.unwrap();
+        let mut connack = [0u8; 4];
+        stream.read_exact(&mut connack).await.unwrap();
+        assert_eq!(connack, [0x20, 2, 0, 0]);
+
+        let mut body = Vec::new();
+        mqtt_string(unauthorized_topic.as_bytes(), &mut body);
+        body.extend_from_slice(&7u16.to_be_bytes());
+        body.extend_from_slice(&payload(700 + usize::from(qos)));
+        let first = 0x30 | (qos << 1) | 1;
+        let mut wire = vec![first, u8::try_from(body.len()).unwrap()];
+        wire.extend_from_slice(&body);
+        stream.write_all(&wire).await.unwrap();
+
+        let mut byte = [0u8; 1];
+        let closed =
+            tokio::time::timeout(std::time::Duration::from_secs(2), stream.read(&mut byte))
+                .await
+                .unwrap();
+        assert!(matches!(closed, Ok(0) | Err(_)));
+        assert!(!broker.has_retained_topic(unauthorized_topic).unwrap());
+    }
+
+    stop.cancel();
+    task.await.unwrap().unwrap();
 }
 
 #[tokio::test]

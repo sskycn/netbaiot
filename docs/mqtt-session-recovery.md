@@ -27,9 +27,11 @@ tenant count/byte ceilings always providing a hard bound.
 - next packet identifier;
 - retained topic/payload/QoS/owner state.
 
-Will belongs to the active Network Connection. Planned restart intentionally closes
-that connection without publishing Will and does not restore a dead connection's
-Will. A client reconnects with a new CONNECT and new Will contract.
+Will belongs to the active Network Connection. Before a planned restart snapshots
+broker state, closing a live Network Connection publishes its Will unless that
+client already sent DISCONNECT. The published message (including retained state or
+offline subscriber delivery) is part of the snapshot; the dead connection's Will
+itself is not restored. A reconnect creates a new Will contract.
 
 ## Atomicity and validation
 
