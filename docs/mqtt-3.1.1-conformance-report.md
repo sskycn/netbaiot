@@ -21,7 +21,7 @@ Normative source: [OASIS MQTT Version 3.1.1 Plus Errata 01](https://docs.oasis-o
 | Paho | unavailable in the current Python environment; no package was installed |
 | Broker profile | authenticated DeviceKey, canonical IoT topics, bounded in-memory state, planned-restart snapshot |
 | Raw artifact | `target/mqtt-conformance/results.json` |
-| Stable catalog | `tests/mqtt_conformance/catalog.json` (125 exact normative mappings plus 10 named Rust fault invariants) |
+| Stable catalog | `tests/mqtt_conformance/catalog.json` (125 exact normative mappings plus 20 named Rust fault invariants) |
 
 ## Normative traceability summary
 
@@ -118,8 +118,8 @@ the packet encoder/decoder or state transition was inspected in addition to test
   QoS1, outbound/inbound QoS2 stages, >1 MiB legal state, and repeated generations.
 - Resource/failure: PASS for retained subscription transaction rollback, QoS2
   pending-route/recovery, count/byte quotas, slow packet deadline and malformed fuzz.
-- Final remediation release gate: 55/55 PASS. This includes raw and differential
-  cases, Mosquitto client/TLS, restart, the ten stable audit IDs, and
+- Correctness-freeze release gate: 65/65 PASS. This includes raw and differential
+  cases, Mosquitto client/TLS, restart, the twenty stable audit IDs, and
   `NORMATIVE-COVERAGE-001` proving 125/125 current PASS evidence. Unknown `--only`
   fails before build; missing release dependencies are `SKIPPED_REQUIRED` and make
   the process nonzero.

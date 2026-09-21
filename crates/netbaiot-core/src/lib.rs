@@ -17,7 +17,7 @@ pub struct Presence {
     pub session_generation: Option<u64>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Permissions {
     pub publish: bool,
     pub commands: bool,

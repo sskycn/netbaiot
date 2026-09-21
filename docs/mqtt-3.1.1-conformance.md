@@ -43,12 +43,23 @@ IDs and the exact 125-requirement evidence map are in
 `tests/mqtt_conformance/catalog.json`. Each run writes diagnostic results to
 `target/mqtt-conformance/results.json`. Developer core mode has 30 NetbaIoT raw
 cases. `--release-gate` requires Mosquitto clients, TLS, the isolated 11-case broker
-differential, restart evidence, and ten named Rust fault invariants; missing required
+differential, restart evidence, and twenty named Rust fault invariants; missing required
 dependencies are `SKIPPED_REQUIRED` and fail the gate. The current release run is
-55/55 PASS, including `NORMATIVE-COVERAGE-001` at 125/125.
+65/65 PASS, including `NORMATIVE-COVERAGE-001` at 125/125.
 
 The real-client suite is `tests/run_mosquitto_cli_interop.py`, which forces
 `-V mqttv311`. It covers authentication, QoS0/1/2, exact/`+`/`#`, unsubscribe,
 retained replace/delete/replay, persistent offline QoS1/2, and Will QoS0/1/2.
 Paho is optional and was unavailable in the current environment; historical Paho
 2.1.0 output is not counted as current release-gate evidence.
+
+## Correctness freeze classifications
+
+- Functional MQTT 3.1.1 conformance: PASS through the raw, Mosquitto client,
+  differential, TLS, and normative matrices.
+- Resource-pressure conformance: PASS for atomic multi-subscriber QoS1/QoS2 route
+  admission, retained replacement reservation, bounded queues/state, and source ACK
+  suppression on failed ownership.
+- Restart-state conformance: PASS for NBMQ v2 round trip, NBMQ v1 compatibility,
+  semantic corruption rejection, session incarnation persistence, and interrupted
+  QoS2 delivery normalization.

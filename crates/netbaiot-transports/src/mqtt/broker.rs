@@ -1,12 +1,14 @@
 use super::packet::valid_topic;
-use netbaiot_core::{AuthenticatedDevice, DeviceKey, TenantId};
+use netbaiot_core::{
+    AuthInvalidation, AuthenticatedDevice, DeviceId, DeviceKey, Permissions, ProductId, TenantId,
+};
 use netbaiot_runtime::{Error, Limits, Result, lock, now_ms};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
     collections::{HashMap, HashSet, VecDeque},
     fs,
-    io::{Read, Write},
+    io::{BufReader, Cursor, Read, Write},
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
 };
@@ -15,7 +17,8 @@ use tokio_util::sync::CancellationToken;
 
 const STATE_OVERHEAD: usize = 64;
 const RECOVERY_MAGIC: &[u8; 4] = b"NBMQ";
-const RECOVERY_VERSION: u32 = 1;
+const RECOVERY_VERSION_V1: u32 = 1;
+const RECOVERY_VERSION: u32 = 2;
 const RECOVERY_FILE: &str = "mqtt-runtime.state";
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq, Serialize, Deserialize)]
@@ -65,9 +68,13 @@ pub enum InboundQos2State {
 pub enum InboundQos2Action {
     Deliver {
         message: BrokerMessage,
+        session_incarnation: u64,
         operation_id: u64,
     },
-    EventAccepted,
+    EventAccepted {
+        session_incarnation: u64,
+        operation_id: u64,
+    },
     DeliveryInProgress,
     Unknown,
 }
@@ -98,10 +105,18 @@ impl OutboundState {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct StoredSession {
     key: SessionKey,
+    #[serde(default)]
+    incarnation: u64,
+    #[serde(default)]
+    authorization: Option<SessionAuthorization>,
     subscriptions: HashMap<String, u8>,
     offline: VecDeque<BrokerMessage>,
     offline_bytes: usize,
     inbound_qos2: HashMap<u16, InboundQos2State>,
+    #[serde(skip)]
+    inbound_operations: HashMap<u16, u64>,
+    #[serde(default)]
+    inbound_reservations: HashMap<u16, RetainedReservation>,
     outbound: HashMap<u16, OutboundState>,
     /// Original transmission order for reconnect retransmission (MQTT-4.6.0-1).
     #[serde(default)]
@@ -114,7 +129,7 @@ struct StoredSession {
 }
 
 impl StoredSession {
-    fn new(key: SessionKey) -> Self {
+    fn new(key: SessionKey, incarnation: u64, authorization: SessionAuthorization) -> Self {
         let state_bytes = key.client_id.len()
             + key.device.tenant_id.as_str().len()
             + key.device.product_id.as_str().len()
@@ -122,10 +137,14 @@ impl StoredSession {
             + STATE_OVERHEAD;
         Self {
             key,
+            incarnation,
+            authorization: Some(authorization),
             subscriptions: HashMap::new(),
             offline: VecDeque::new(),
             offline_bytes: 0,
             inbound_qos2: HashMap::new(),
+            inbound_operations: HashMap::new(),
+            inbound_reservations: HashMap::new(),
             outbound: HashMap::new(),
             outbound_order: VecDeque::new(),
             next_packet_id: 1,
@@ -183,6 +202,31 @@ impl StoredSession {
         }
         removed
     }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+struct SessionAuthorization {
+    credential_version: u32,
+    auth_generation: u64,
+    permissions: Permissions,
+}
+
+impl From<&AuthenticatedDevice> for SessionAuthorization {
+    fn from(auth: &AuthenticatedDevice) -> Self {
+        Self {
+            credential_version: auth.credential_version,
+            auth_generation: auth.auth_generation,
+            permissions: auth.permissions.clone(),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+struct RetainedReservation {
+    global_count: usize,
+    global_bytes: usize,
+    tenant_count: usize,
+    tenant_bytes: usize,
 }
 
 #[derive(Clone)]
@@ -346,6 +390,7 @@ pub struct MqttRecoverySnapshot {
 pub struct Attachment {
     pub key: SessionKey,
     pub generation: u64,
+    pub session_incarnation: u64,
     pub session_present: bool,
     pub receiver: mpsc::Receiver<BrokerFrame>,
     pub cancel: CancellationToken,
@@ -358,7 +403,7 @@ pub struct WillGuard {
     broker: Arc<MqttBroker>,
     owner: DeviceKey,
     message: BrokerMessage,
-    reserved: bool,
+    reservation: RetainedReservation,
     armed: bool,
     finished: bool,
 }
@@ -372,9 +417,9 @@ impl WillGuard {
         if self.finished {
             return Err(Error::Conflict);
         }
-        let result = self
-            .broker
-            .publish_reserved_will(&self.owner, &self.message, self.reserved);
+        let result =
+            self.broker
+                .publish_reserved_will(&self.owner, &self.message, self.reservation);
         // Never retry publication from Drop after a partially observed routing failure.
         self.finished = true;
         result?;
@@ -383,11 +428,8 @@ impl WillGuard {
 
     pub fn suppress(&mut self) -> Result<()> {
         if !self.finished {
-            self.broker.release_will_reservation(
-                &self.owner.tenant_id,
-                &self.message,
-                self.reserved,
-            )?;
+            self.broker
+                .release_will_reservation(&self.owner.tenant_id, self.reservation)?;
             self.finished = true;
         }
         Ok(())
@@ -401,14 +443,11 @@ impl Drop for WillGuard {
         }
         let result = if self.armed {
             self.broker
-                .publish_reserved_will(&self.owner, &self.message, self.reserved)
+                .publish_reserved_will(&self.owner, &self.message, self.reservation)
                 .map(|_| ())
         } else {
-            self.broker.release_will_reservation(
-                &self.owner.tenant_id,
-                &self.message,
-                self.reserved,
-            )
+            self.broker
+                .release_will_reservation(&self.owner.tenant_id, self.reservation)
         };
         if let Err(error) = result {
             tracing::error!(%error, "failed to settle accepted MQTT Will responsibility");
@@ -484,12 +523,22 @@ impl MqttBroker {
         };
         let mut state = lock(&self.state)?;
         self.prune_expired(&mut state);
+        let authorization = SessionAuthorization::from(auth);
         if clean_session {
+            remove_session(&mut state, &key);
+        } else if state
+            .sessions
+            .get(&key)
+            .is_some_and(|session| session.authorization.as_ref() != Some(&authorization))
+        {
+            // A persistent session is valid only under the authorization profile that created
+            // it. Reauthentication with changed provenance starts a fresh MQTT session.
             remove_session(&mut state, &key);
         }
         let session_present = !clean_session && state.sessions.contains_key(&key);
         if !state.sessions.contains_key(&key) {
-            let session = StoredSession::new(key.clone());
+            state.generation = state.generation.wrapping_add(1).max(1);
+            let session = StoredSession::new(key.clone(), state.generation, authorization);
             self.check_new_session(&state, &key, session.state_bytes)?;
             state.session_bytes = state.session_bytes.saturating_add(session.state_bytes);
             state.sessions.insert(key.clone(), session);
@@ -545,10 +594,12 @@ impl MqttBroker {
         {
             mark_pending(&mut state, &key);
         }
+        let session_incarnation = state.sessions.get(&key).ok_or(Error::Internal)?.incarnation;
         drop(state);
         let attachment = Attachment {
             key: key.clone(),
             generation,
+            session_incarnation,
             session_present,
             receiver,
             cancel,
@@ -735,16 +786,17 @@ impl MqttBroker {
         if message.qos > 2 || !valid_topic(&message.topic, &self.limits, false) {
             return Err(Error::Invalid);
         }
-        let reserved = message.retain && !message.payload.is_empty();
-        if reserved {
+        let reservation = if message.retain && !message.payload.is_empty() {
             let mut state = lock(&self.state)?;
-            reserve_retained(&mut state, &owner.tenant_id, &message, &self.limits)?;
-        }
+            reserve_retained(&mut state, &owner.tenant_id, &message, &self.limits)?
+        } else {
+            RetainedReservation::default()
+        };
         Ok(WillGuard {
             broker: self.clone(),
             owner,
             message,
-            reserved,
+            reservation,
             armed: false,
             finished: false,
         })
@@ -753,12 +805,11 @@ impl MqttBroker {
     fn release_will_reservation(
         &self,
         tenant: &TenantId,
-        message: &BrokerMessage,
-        reserved: bool,
+        reservation: RetainedReservation,
     ) -> Result<()> {
-        if reserved {
+        if reservation != RetainedReservation::default() {
             let mut state = lock(&self.state)?;
-            release_retained_reservation(&mut state, tenant, message);
+            release_retained_reservation(&mut state, tenant, reservation);
         }
         Ok(())
     }
@@ -767,11 +818,11 @@ impl MqttBroker {
         &self,
         owner: &DeviceKey,
         message: &BrokerMessage,
-        reserved: bool,
+        reservation: RetainedReservation,
     ) -> Result<usize> {
         let mut state = lock(&self.state)?;
-        if reserved {
-            release_retained_reservation(&mut state, &owner.tenant_id, message);
+        if reservation != RetainedReservation::default() {
+            release_retained_reservation(&mut state, &owner.tenant_id, reservation);
         }
         route_locked(&mut state, owner, message, &self.limits)
     }
@@ -814,7 +865,8 @@ impl MqttBroker {
             session.state_bytes
         };
         let charge = message.bytes();
-        reserve_retained(&mut state, &key.device.tenant_id, &message, &self.limits)?;
+        let reservation =
+            reserve_retained(&mut state, &key.device.tenant_id, &message, &self.limits)?;
         if session_state_bytes.saturating_add(charge) > self.limits.max_mqtt_session_state_bytes
             || tenant_inflight(&state, &key.device.tenant_id, 2)
                 >= self.limits.max_inflight_qos2_per_tenant
@@ -822,7 +874,7 @@ impl MqttBroker {
                 > self.limits.max_mqtt_session_state_bytes_per_tenant
             || state.session_bytes.saturating_add(charge) > self.limits.global_mqtt_session_bytes
         {
-            release_retained_reservation(&mut state, &key.device.tenant_id, &message);
+            release_retained_reservation(&mut state, &key.device.tenant_id, reservation);
             return Err(Error::Overloaded);
         }
         {
@@ -831,6 +883,9 @@ impl MqttBroker {
             session
                 .inbound_qos2
                 .insert(packet_id, InboundQos2State::AwaitPubrel(message));
+            if reservation != RetainedReservation::default() {
+                session.inbound_reservations.insert(packet_id, reservation);
+            }
         }
         state.session_bytes += charge;
         Ok(true)
@@ -847,6 +902,7 @@ impl MqttBroker {
         state.operation_id = state.operation_id.wrapping_add(1).max(1);
         let operation_id = state.operation_id;
         let session = state.sessions.get_mut(key).ok_or(Error::Internal)?;
+        let session_incarnation = session.incarnation;
         let Some(entry) = session.inbound_qos2.get_mut(&packet_id) else {
             return Ok(InboundQos2Action::Unknown);
         };
@@ -859,11 +915,21 @@ impl MqttBroker {
                 };
                 InboundQos2Action::Deliver {
                     message,
+                    session_incarnation,
                     operation_id,
                 }
             }
             InboundQos2State::Delivering { .. } => InboundQos2Action::DeliveryInProgress,
-            InboundQos2State::EventAccepted(_) => InboundQos2Action::EventAccepted,
+            InboundQos2State::EventAccepted(_) => {
+                let operation_id = *session
+                    .inbound_operations
+                    .entry(packet_id)
+                    .or_insert(operation_id);
+                InboundQos2Action::EventAccepted {
+                    session_incarnation,
+                    operation_id,
+                }
+            }
         })
     }
 
@@ -890,11 +956,15 @@ impl MqttBroker {
     pub fn finish_inbound_qos2_delivery(
         &self,
         key: &SessionKey,
+        session_incarnation: u64,
         packet_id: u16,
         operation_id: u64,
     ) -> Result<()> {
         let mut state = lock(&self.state)?;
         let session = state.sessions.get_mut(key).ok_or(Error::Internal)?;
+        if session.incarnation != session_incarnation {
+            return Err(Error::Conflict);
+        }
         let entry = session
             .inbound_qos2
             .get_mut(&packet_id)
@@ -905,9 +975,14 @@ impl MqttBroker {
                 operation_id: current,
             } if *current == operation_id => {
                 *entry = InboundQos2State::EventAccepted(message.clone());
+                session.inbound_operations.insert(packet_id, operation_id);
                 Ok(())
             }
-            InboundQos2State::EventAccepted(_) => Ok(()),
+            InboundQos2State::EventAccepted(_)
+                if session.inbound_operations.get(&packet_id) == Some(&operation_id) =>
+            {
+                Ok(())
+            }
             _ => Err(Error::Conflict),
         }
     }
@@ -915,11 +990,15 @@ impl MqttBroker {
     pub fn abandon_inbound_qos2_delivery(
         &self,
         key: &SessionKey,
+        session_incarnation: u64,
         packet_id: u16,
         operation_id: u64,
     ) -> Result<()> {
         let mut state = lock(&self.state)?;
         let session = state.sessions.get_mut(key).ok_or(Error::Internal)?;
+        if session.incarnation != session_incarnation {
+            return Err(Error::Conflict);
+        }
         let entry = session
             .inbound_qos2
             .get_mut(&packet_id)
@@ -955,8 +1034,16 @@ impl MqttBroker {
                 | InboundQos2State::Delivering { message, .. }
                 | InboundQos2State::EventAccepted(message) => message,
             });
+        if let Some(session) = state.sessions.get_mut(key) {
+            session.inbound_operations.remove(&packet_id);
+        }
         if let Some(message) = &message {
-            release_retained_reservation(&mut state, &key.device.tenant_id, message);
+            let reservation = state
+                .sessions
+                .get_mut(key)
+                .and_then(|session| session.inbound_reservations.remove(&packet_id))
+                .unwrap_or_default();
+            release_retained_reservation(&mut state, &key.device.tenant_id, reservation);
             let charge = message.bytes();
             let session = state.sessions.get_mut(key).ok_or(Error::Internal)?;
             session.state_bytes = session.state_bytes.saturating_sub(charge);
@@ -968,43 +1055,54 @@ impl MqttBroker {
     pub fn route_inbound_qos2(
         &self,
         key: &SessionKey,
+        session_incarnation: u64,
         packet_id: u16,
+        operation_id: u64,
         owner: &DeviceKey,
     ) -> Result<usize> {
         let mut state = lock(&self.state)?;
         let message = match state
             .sessions
             .get(key)
+            .filter(|session| session.incarnation == session_incarnation)
             .and_then(|session| session.inbound_qos2.get(&packet_id))
         {
-            Some(InboundQos2State::EventAccepted(message)) => message.clone(),
+            Some(InboundQos2State::EventAccepted(message))
+                if state
+                    .sessions
+                    .get(key)
+                    .and_then(|session| session.inbound_operations.get(&packet_id))
+                    == Some(&operation_id) =>
+            {
+                message.clone()
+            }
             _ => return Err(Error::Conflict),
         };
-        release_retained_reservation(&mut state, &key.device.tenant_id, &message);
-        if message.retain {
-            update_retained(&mut state, owner, &message, &self.limits)?;
-        }
-        let matches = state.trie.matching(&message.topic);
-        let mut delivered = 0usize;
-        for (subscriber, subscription_qos) in matches {
-            let qos = message.qos.min(subscription_qos);
-            match enqueue(
-                &mut state,
-                &subscriber,
-                BrokerMessage {
-                    qos,
-                    retain: false,
-                    ..message.clone()
-                },
-                &self.limits,
-            ) {
-                Ok(()) => delivered += 1,
-                Err(Error::Overloaded | Error::Unavailable) => {}
-                Err(error) => return Err(error),
+        let reservation = state
+            .sessions
+            .get_mut(key)
+            .and_then(|session| session.inbound_reservations.remove(&packet_id))
+            .unwrap_or_default();
+        release_retained_reservation(&mut state, &key.device.tenant_id, reservation);
+        let delivered = match route_locked(&mut state, owner, &message, &self.limits) {
+            Ok(delivered) => delivered,
+            Err(error) => {
+                let restored =
+                    reserve_retained(&mut state, &key.device.tenant_id, &message, &self.limits)?;
+                if restored != RetainedReservation::default() {
+                    state
+                        .sessions
+                        .get_mut(key)
+                        .ok_or(Error::Internal)?
+                        .inbound_reservations
+                        .insert(packet_id, restored);
+                }
+                return Err(error);
             }
-        }
+        };
         let session = state.sessions.get_mut(key).ok_or(Error::Internal)?;
         if session.inbound_qos2.remove(&packet_id).is_some() {
+            session.inbound_operations.remove(&packet_id);
             let charge = message.bytes();
             session.state_bytes = session.state_bytes.saturating_sub(charge);
             state.session_bytes = state.session_bytes.saturating_sub(charge);
@@ -1125,7 +1223,7 @@ impl MqttBroker {
     pub fn snapshot(&self) -> Result<MqttRecoverySnapshot> {
         let state = lock(&self.state)?;
         Ok(MqttRecoverySnapshot {
-            format_version: 1,
+            format_version: RECOVERY_VERSION,
             snapshot_generation: state.generation,
             sessions: state
                 .sessions
@@ -1133,6 +1231,8 @@ impl MqttBroker {
                 .cloned()
                 .map(|mut session| {
                     session.active_generation = None;
+                    session.inbound_operations.clear();
+                    session.inbound_reservations.clear();
                     session
                 })
                 .collect(),
@@ -1158,18 +1258,20 @@ impl MqttBroker {
         }
     }
 
-    pub async fn commit_to(&self, directory: &Path) -> Result<PathBuf> {
-        let snapshot = self.snapshot()?;
+    pub async fn commit_to(self: &Arc<Self>, directory: &Path) -> Result<PathBuf> {
         let directory = directory.to_path_buf();
         let limits = self.limits.clone();
-        tokio::task::spawn_blocking(move || write_recovery(&directory, &limits, &snapshot))
+        let broker = self.clone();
+        tokio::task::spawn_blocking(move || write_recovery(&directory, &limits, &broker))
             .await
             .map_err(|_| Error::Internal)?
     }
 
     pub fn restore(&self, snapshot: MqttRecoverySnapshot) -> Result<()> {
-        if snapshot.format_version != 1
-            || snapshot.sessions.len() > self.limits.max_persistent_sessions
+        if !matches!(
+            snapshot.format_version,
+            RECOVERY_VERSION_V1 | RECOVERY_VERSION
+        ) || snapshot.sessions.len() > self.limits.max_persistent_sessions
             || snapshot.retained.len() > self.limits.max_retained_messages
         {
             return Err(Error::Configuration);
@@ -1194,6 +1296,12 @@ impl MqttBroker {
         };
         for mut session in snapshot.sessions {
             session.active_generation = None;
+            session.inbound_operations.clear();
+            session.inbound_reservations.clear();
+            if session.incarnation == 0 {
+                replacement.generation = replacement.generation.wrapping_add(1).max(1);
+                session.incarnation = replacement.generation;
+            }
             for entry in session.inbound_qos2.values_mut() {
                 if let InboundQos2State::Delivering { message, .. } = entry {
                     *entry = InboundQos2State::AwaitPubrel(message.clone());
@@ -1215,6 +1323,35 @@ impl MqttBroker {
                     .outbound
                     .keys()
                     .all(|packet_id| ordered_ids.contains(packet_id))
+            {
+                return Err(Error::Invalid);
+            }
+            if session.next_packet_id == 0
+                || session.offline.iter().any(|message| {
+                    !matches!(message.qos, 1 | 2) || !valid_broker_message(message, &self.limits)
+                })
+                || session.inbound_qos2.iter().any(|(packet_id, inbound)| {
+                    *packet_id == 0
+                        || match inbound {
+                            InboundQos2State::AwaitPubrel(message)
+                            | InboundQos2State::Delivering { message, .. }
+                            | InboundQos2State::EventAccepted(message) => {
+                                message.qos != 2 || !valid_broker_message(message, &self.limits)
+                            }
+                        }
+                })
+                || session.outbound.iter().any(|(packet_id, outbound)| {
+                    *packet_id == 0
+                        || match outbound {
+                            OutboundState::AwaitPuback(message) => {
+                                message.qos != 1 || !valid_broker_message(message, &self.limits)
+                            }
+                            OutboundState::AwaitPubrec(message)
+                            | OutboundState::AwaitPubcomp(message) => {
+                                message.qos != 2 || !valid_broker_message(message, &self.limits)
+                            }
+                        }
+                })
             {
                 return Err(Error::Invalid);
             }
@@ -1323,7 +1460,18 @@ impl MqttBroker {
                 .checked_add(session.state_bytes)
                 .ok_or(Error::Overloaded)?;
             for (filter, qos) in &session.subscriptions {
-                if !valid_topic(filter, &self.limits, true) || *qos > 2 {
+                if !valid_topic(filter, &self.limits, true)
+                    || *qos > 2
+                    || session.authorization.as_ref().is_some_and(|authorization| {
+                        !authorization.permissions.commands
+                            || !filter.starts_with(&format!(
+                                "v1/t/{}/p/{}/d/{}/",
+                                session.key.device.tenant_id.as_str(),
+                                session.key.device.product_id.as_str(),
+                                session.key.device.device_id.as_str()
+                            ))
+                    })
+                {
                     return Err(Error::Invalid);
                 }
                 replacement.trie.insert(filter, session.key.clone(), *qos);
@@ -1331,7 +1479,12 @@ impl MqttBroker {
             replacement.sessions.insert(session.key.clone(), session);
         }
         for (topic, retained) in snapshot.retained {
-            if topic != retained.message.topic || !valid_topic(&topic, &self.limits, false) {
+            if topic != retained.message.topic
+                || !valid_broker_message(&retained.message, &self.limits)
+                || !retained.message.retain
+                || retained.message.payload.is_empty()
+                || retained.message.payload.len() > self.limits.max_retained_message_bytes
+            {
                 return Err(Error::Invalid);
             }
             let tenant_count = replacement
@@ -1361,18 +1514,37 @@ impl MqttBroker {
             .sessions
             .values()
             .flat_map(|session| {
-                session.inbound_qos2.values().map(|entry| {
-                    let message = match entry {
-                        InboundQos2State::AwaitPubrel(message)
-                        | InboundQos2State::Delivering { message, .. }
-                        | InboundQos2State::EventAccepted(message) => message.clone(),
-                    };
-                    (session.key.device.tenant_id.clone(), message)
-                })
+                session
+                    .inbound_qos2
+                    .keys()
+                    .map(|packet_id| (session.key.clone(), *packet_id))
             })
             .collect::<Vec<_>>();
-        for (tenant, message) in reservations {
-            reserve_retained(&mut replacement, &tenant, &message, &self.limits)?;
+        for (key, packet_id) in reservations {
+            let message = match replacement
+                .sessions
+                .get(&key)
+                .and_then(|session| session.inbound_qos2.get(&packet_id))
+                .ok_or(Error::Internal)?
+            {
+                InboundQos2State::AwaitPubrel(message)
+                | InboundQos2State::Delivering { message, .. }
+                | InboundQos2State::EventAccepted(message) => message.clone(),
+            };
+            let reservation = reserve_retained(
+                &mut replacement,
+                &key.device.tenant_id,
+                &message,
+                &self.limits,
+            )?;
+            if reservation != RetainedReservation::default() {
+                replacement
+                    .sessions
+                    .get_mut(&key)
+                    .ok_or(Error::Internal)?
+                    .inbound_reservations
+                    .insert(packet_id, reservation);
+            }
         }
         if replacement.subscription_count > self.limits.max_subscriptions
             || replacement.offline_count > self.limits.max_offline_messages
@@ -1395,6 +1567,43 @@ impl MqttBroker {
             state.retained.len(),
             state.retained_bytes,
         ))
+    }
+
+    /// Invalidates bounded persistent MQTT state together with the authentication cache/session
+    /// boundary. No credentials are retained; only authorization provenance is matched.
+    pub fn invalidate_sessions(&self, invalidation: &AuthInvalidation) -> Result<usize> {
+        let mut state = lock(&self.state)?;
+        let keys = state
+            .sessions
+            .values()
+            .filter(|session| match invalidation {
+                AuthInvalidation::Device { device } => &session.key.device == device,
+                AuthInvalidation::Product {
+                    tenant_id,
+                    product_id,
+                } => {
+                    &session.key.device.tenant_id == tenant_id
+                        && &session.key.device.product_id == product_id
+                }
+                AuthInvalidation::Tenant { tenant_id } => {
+                    &session.key.device.tenant_id == tenant_id
+                }
+                AuthInvalidation::CredentialVersion { version } => session
+                    .authorization
+                    .as_ref()
+                    .is_none_or(|authorization| authorization.credential_version == *version),
+                AuthInvalidation::AuthGeneration { generation } => session
+                    .authorization
+                    .as_ref()
+                    .is_none_or(|authorization| authorization.auth_generation == *generation),
+                AuthInvalidation::All => true,
+            })
+            .map(|session| session.key.clone())
+            .collect::<Vec<_>>();
+        for key in &keys {
+            remove_session(&mut state, key);
+        }
+        Ok(keys.len())
     }
 
     /// Read-only diagnostics used by benchmarks and operational capacity probes.
@@ -1586,13 +1795,8 @@ fn remove_session(state: &mut BrokerState, key: &SessionKey) {
         active.cancel.cancel()
     }
     if let Some(session) = state.sessions.remove(key) {
-        for entry in session.inbound_qos2.values() {
-            let message = match entry {
-                InboundQos2State::AwaitPubrel(message)
-                | InboundQos2State::Delivering { message, .. }
-                | InboundQos2State::EventAccepted(message) => message,
-            };
-            release_retained_reservation(state, &key.device.tenant_id, message);
+        for reservation in session.inbound_reservations.values() {
+            release_retained_reservation(state, &key.device.tenant_id, *reservation);
         }
         for filter in session.subscriptions.keys() {
             state.trie.remove(filter, key)
@@ -1744,6 +1948,12 @@ fn enqueue(
         return Ok(());
     }
     active.cancel.cancel();
+    if packet_id.is_some() {
+        // The protocol state is already durable in this session. A receiver can close between
+        // preflight and try_send; retaining the outbound entry preserves responsibility for a
+        // persistent reconnect and avoids a second fallible queue transition.
+        return Ok(());
+    }
     if let Some(id) = packet_id
         && let Some(session) = state.sessions.get_mut(key)
     {
@@ -1922,6 +2132,7 @@ fn route_locked(
     message: &BrokerMessage,
     limits: &Limits,
 ) -> Result<usize> {
+    preflight_route(state, owner, message, limits)?;
     if message.retain {
         update_retained(state, owner, message, limits)?;
     }
@@ -1940,13 +2151,186 @@ fn route_locked(
             limits,
         ) {
             Ok(()) => delivered += 1,
-            // A bounded slow/offline subscriber is isolated and shed. It must not make a
-            // publication fail after another subscriber already received it.
-            Err(Error::Overloaded | Error::Unavailable) => {}
+            Err(Error::Overloaded | Error::Unavailable) if qos == 0 => {}
             Err(error) => return Err(error),
         }
     }
     Ok(delivered)
+}
+
+fn preflight_route(
+    state: &BrokerState,
+    owner: &DeviceKey,
+    message: &BrokerMessage,
+    limits: &Limits,
+) -> Result<()> {
+    if message.retain {
+        check_retained_update(state, owner, message, limits)?;
+    }
+    let matches = state.trie.matching(&message.topic);
+    let mut sessions = HashMap::<SessionKey, StoredSession>::new();
+    let mut global_state_bytes = state.session_bytes;
+    let mut global_offline_count = state.offline_count;
+    let mut global_offline_bytes = state.offline_bytes;
+    let mut tenant_state_delta = HashMap::<TenantId, usize>::new();
+    let mut tenant_offline_count_delta = HashMap::<TenantId, usize>::new();
+    let mut tenant_offline_bytes_delta = HashMap::<TenantId, usize>::new();
+    let mut tenant_inflight_delta = HashMap::<(TenantId, u8), usize>::new();
+
+    for (key, subscription_qos) in matches {
+        let qos = message.qos.min(subscription_qos);
+        if qos == 0 {
+            continue;
+        }
+        let Some(original) = state.sessions.get(&key) else {
+            return Err(Error::Internal);
+        };
+        let session = sessions
+            .entry(key.clone())
+            .or_insert_with(|| original.clone());
+        let charge = message.bytes();
+        let tenant = key.device.tenant_id.clone();
+        let active_live = state
+            .active
+            .get(&key)
+            .is_some_and(|active| !active.sender.is_closed() && active.sender.capacity() > 0);
+        let inflight = tenant_inflight(state, &tenant, qos).saturating_add(
+            *tenant_inflight_delta
+                .get(&(tenant.clone(), qos))
+                .unwrap_or(&0),
+        );
+        let inflight_limit = if qos == 1 {
+            limits.max_inflight_qos1_per_tenant
+        } else {
+            limits.max_inflight_qos2_per_tenant
+        };
+        let use_live =
+            active_live && inflight < inflight_limit && session.has_outbound_capacity(qos, limits);
+        let tenant_state = tenant_session_bytes(state, &tenant)
+            .saturating_add(*tenant_state_delta.get(&tenant).unwrap_or(&0));
+        if session.state_bytes.saturating_add(charge) > limits.max_mqtt_session_state_bytes
+            || tenant_state.saturating_add(charge) > limits.max_mqtt_session_state_bytes_per_tenant
+            || global_state_bytes.saturating_add(charge) > limits.global_mqtt_session_bytes
+        {
+            return Err(Error::Overloaded);
+        }
+        if use_live {
+            let packet_id = session.allocate_packet_id()?;
+            let routed = BrokerMessage {
+                qos,
+                retain: false,
+                ..message.clone()
+            };
+            session.insert_outbound(
+                packet_id,
+                if qos == 1 {
+                    OutboundState::AwaitPuback(routed)
+                } else {
+                    OutboundState::AwaitPubrec(routed)
+                },
+            );
+            *tenant_inflight_delta
+                .entry((tenant.clone(), qos))
+                .or_default() += 1;
+        } else {
+            let tenant_count = state
+                .sessions
+                .values()
+                .filter(|candidate| candidate.key.device.tenant_id == tenant)
+                .map(|candidate| candidate.offline.len())
+                .sum::<usize>()
+                .saturating_add(*tenant_offline_count_delta.get(&tenant).unwrap_or(&0));
+            let tenant_bytes = state
+                .sessions
+                .values()
+                .filter(|candidate| candidate.key.device.tenant_id == tenant)
+                .map(|candidate| candidate.offline_bytes)
+                .sum::<usize>()
+                .saturating_add(*tenant_offline_bytes_delta.get(&tenant).unwrap_or(&0));
+            if session.offline.len() >= limits.max_offline_messages_per_session
+                || session.offline_bytes.saturating_add(charge)
+                    > limits.max_offline_bytes_per_session
+                || tenant_count >= limits.max_offline_messages_per_tenant
+                || tenant_bytes.saturating_add(charge) > limits.max_offline_bytes_per_tenant
+                || global_offline_count >= limits.max_offline_messages
+                || global_offline_bytes.saturating_add(charge) > limits.max_offline_bytes
+            {
+                return Err(Error::Overloaded);
+            }
+            session.offline.push_back(message.clone());
+            session.offline_bytes += charge;
+            global_offline_count += 1;
+            global_offline_bytes += charge;
+            *tenant_offline_count_delta
+                .entry(tenant.clone())
+                .or_default() += 1;
+            *tenant_offline_bytes_delta
+                .entry(tenant.clone())
+                .or_default() += charge;
+        }
+        session.state_bytes += charge;
+        global_state_bytes += charge;
+        *tenant_state_delta.entry(tenant).or_default() += charge;
+    }
+    Ok(())
+}
+
+fn check_retained_update(
+    state: &BrokerState,
+    owner: &DeviceKey,
+    message: &BrokerMessage,
+    limits: &Limits,
+) -> Result<()> {
+    if message.payload.is_empty() {
+        return Ok(());
+    }
+    if message.payload.len() > limits.max_retained_message_bytes {
+        return Err(Error::Overloaded);
+    }
+    let existing = state.retained.get(&message.topic);
+    let old_bytes = existing.map_or(0, |old| old.message.bytes());
+    let old_same_tenant = existing.is_some_and(|old| old.tenant_id == owner.tenant_id);
+    let tenant_count = state
+        .retained
+        .values()
+        .filter(|entry| entry.tenant_id == owner.tenant_id)
+        .count();
+    let tenant_bytes = state
+        .retained
+        .values()
+        .filter(|entry| entry.tenant_id == owner.tenant_id)
+        .map(|entry| entry.message.bytes())
+        .sum::<usize>();
+    let new_bytes = message.bytes();
+    let (reserved_count, reserved_bytes) = state
+        .retained_reserved_tenants
+        .get(&owner.tenant_id)
+        .copied()
+        .unwrap_or_default();
+    if (existing.is_none()
+        && state
+            .retained
+            .len()
+            .saturating_add(state.retained_reserved_count)
+            >= limits.max_retained_messages)
+        || (!old_same_tenant
+            && tenant_count.saturating_add(reserved_count)
+                >= limits.max_retained_messages_per_tenant)
+        || state
+            .retained_bytes
+            .saturating_sub(old_bytes)
+            .saturating_add(new_bytes)
+            .saturating_add(state.retained_reserved_bytes)
+            > limits.max_retained_bytes
+        || tenant_bytes
+            .saturating_sub(if old_same_tenant { old_bytes } else { 0 })
+            .saturating_add(new_bytes)
+            .saturating_add(reserved_bytes)
+            > limits.max_retained_bytes_per_tenant
+    {
+        return Err(Error::Overloaded);
+    }
+    Ok(())
 }
 
 fn update_retained(
@@ -1961,53 +2345,12 @@ fn update_retained(
         }
         return Ok(());
     }
-    if message.payload.len() > limits.max_retained_message_bytes {
-        return Err(Error::Overloaded);
-    }
+    check_retained_update(state, owner, message, limits)?;
     let old_bytes = state
         .retained
         .get(&message.topic)
         .map_or(0, |old| old.message.bytes());
-    let tenant_count = state
-        .retained
-        .values()
-        .filter(|entry| entry.tenant_id == owner.tenant_id)
-        .count();
-    let tenant_bytes = state
-        .retained
-        .values()
-        .filter(|entry| entry.tenant_id == owner.tenant_id)
-        .map(|entry| entry.message.bytes())
-        .sum::<usize>();
     let new_bytes = message.bytes();
-    let replacing = old_bytes != 0;
-    let (tenant_reserved_count, tenant_reserved_bytes) = state
-        .retained_reserved_tenants
-        .get(&owner.tenant_id)
-        .copied()
-        .unwrap_or_default();
-    if (!replacing
-        && (state
-            .retained
-            .len()
-            .saturating_add(state.retained_reserved_count)
-            >= limits.max_retained_messages
-            || tenant_count.saturating_add(tenant_reserved_count)
-                >= limits.max_retained_messages_per_tenant))
-        || state
-            .retained_bytes
-            .saturating_sub(old_bytes)
-            .saturating_add(new_bytes)
-            .saturating_add(state.retained_reserved_bytes)
-            > limits.max_retained_bytes
-        || tenant_bytes
-            .saturating_sub(old_bytes)
-            .saturating_add(new_bytes)
-            .saturating_add(tenant_reserved_bytes)
-            > limits.max_retained_bytes_per_tenant
-    {
-        return Err(Error::Overloaded);
-    }
     state.retained_bytes = state
         .retained_bytes
         .saturating_sub(old_bytes)
@@ -2027,14 +2370,27 @@ fn reserve_retained(
     tenant: &TenantId,
     message: &BrokerMessage,
     limits: &Limits,
-) -> Result<()> {
+) -> Result<RetainedReservation> {
     if !message.retain || message.payload.is_empty() {
-        return Ok(());
+        return Ok(RetainedReservation::default());
     }
     if message.payload.len() > limits.max_retained_message_bytes {
         return Err(Error::Overloaded);
     }
     let bytes = message.bytes();
+    let existing = state.retained.get(&message.topic);
+    let old_bytes = existing.map_or(0, |entry| entry.message.bytes());
+    let same_tenant = existing.is_some_and(|entry| &entry.tenant_id == tenant);
+    let reservation = RetainedReservation {
+        global_count: usize::from(existing.is_none()),
+        global_bytes: bytes.saturating_sub(old_bytes),
+        tenant_count: usize::from(existing.is_none() || !same_tenant),
+        tenant_bytes: if same_tenant {
+            bytes.saturating_sub(old_bytes)
+        } else {
+            bytes
+        },
+    };
     let tenant_count = state
         .retained
         .values()
@@ -2055,45 +2411,56 @@ fn reserve_retained(
         .retained
         .len()
         .saturating_add(state.retained_reserved_count)
-        >= limits.max_retained_messages
+        .saturating_add(reservation.global_count)
+        > limits.max_retained_messages
         || state
             .retained_bytes
             .saturating_add(state.retained_reserved_bytes)
-            .saturating_add(bytes)
+            .saturating_add(reservation.global_bytes)
             > limits.max_retained_bytes
-        || tenant_count.saturating_add(reserved.0) >= limits.max_retained_messages_per_tenant
+        || tenant_count
+            .saturating_add(reserved.0)
+            .saturating_add(reservation.tenant_count)
+            > limits.max_retained_messages_per_tenant
         || tenant_bytes
             .saturating_add(reserved.1)
-            .saturating_add(bytes)
+            .saturating_add(reservation.tenant_bytes)
             > limits.max_retained_bytes_per_tenant
     {
         return Err(Error::Overloaded);
     }
-    state.retained_reserved_count += 1;
-    state.retained_reserved_bytes += bytes;
+    state.retained_reserved_count += reservation.global_count;
+    state.retained_reserved_bytes += reservation.global_bytes;
     let tenant_reserved = state
         .retained_reserved_tenants
         .entry(tenant.clone())
         .or_default();
-    tenant_reserved.0 += 1;
-    tenant_reserved.1 += bytes;
-    Ok(())
+    tenant_reserved.0 += reservation.tenant_count;
+    tenant_reserved.1 += reservation.tenant_bytes;
+    Ok(reservation)
 }
 
 fn release_retained_reservation(
     state: &mut BrokerState,
     tenant: &TenantId,
-    message: &BrokerMessage,
+    reservation: RetainedReservation,
 ) {
-    if !message.retain || message.payload.is_empty() {
+    if reservation == RetainedReservation::default() {
         return;
     }
-    let bytes = message.bytes();
-    state.retained_reserved_count = state.retained_reserved_count.saturating_sub(1);
-    state.retained_reserved_bytes = state.retained_reserved_bytes.saturating_sub(bytes);
+    debug_assert!(state.retained_reserved_count >= reservation.global_count);
+    debug_assert!(state.retained_reserved_bytes >= reservation.global_bytes);
+    state.retained_reserved_count = state
+        .retained_reserved_count
+        .saturating_sub(reservation.global_count);
+    state.retained_reserved_bytes = state
+        .retained_reserved_bytes
+        .saturating_sub(reservation.global_bytes);
     if let Some(reserved) = state.retained_reserved_tenants.get_mut(tenant) {
-        reserved.0 = reserved.0.saturating_sub(1);
-        reserved.1 = reserved.1.saturating_sub(bytes);
+        debug_assert!(reserved.0 >= reservation.tenant_count);
+        debug_assert!(reserved.1 >= reservation.tenant_bytes);
+        reserved.0 = reserved.0.saturating_sub(reservation.tenant_count);
+        reserved.1 = reserved.1.saturating_sub(reservation.tenant_bytes);
         if *reserved == (0, 0) {
             state.retained_reserved_tenants.remove(tenant);
         }
@@ -2119,6 +2486,12 @@ pub fn topic_matches(filter: &str, topic: &str) -> bool {
     at == topics.len()
 }
 
+fn valid_broker_message(message: &BrokerMessage, limits: &Limits) -> bool {
+    message.qos <= 2
+        && message.payload.len() <= limits.max_mqtt_packet_size
+        && valid_topic(&message.topic, limits, false)
+}
+
 pub fn subscribe_acl(auth: &AuthenticatedDevice, filter: &str, limits: &Limits) -> bool {
     if !valid_topic(filter, limits, true) {
         return false;
@@ -2136,31 +2509,97 @@ pub fn subscribe_acl(auth: &AuthenticatedDevice, filter: &str, limits: &Limits) 
     auth.permissions.commands && !suffix.is_empty()
 }
 
-fn write_recovery(
-    directory: &Path,
-    limits: &Limits,
-    snapshot: &MqttRecoverySnapshot,
-) -> Result<PathBuf> {
+const RECORD_SESSION: u8 = 1;
+const RECORD_SUBSCRIPTION: u8 = 2;
+const RECORD_OFFLINE: u8 = 3;
+const RECORD_INBOUND_QOS2: u8 = 4;
+const RECORD_OUTBOUND: u8 = 5;
+const RECORD_RETAINED: u8 = 6;
+const RECOVERY_PREFIX_BYTES: usize = 16;
+const RECOVERY_HEADER_BYTES: usize = RECOVERY_PREFIX_BYTES + 32;
+const RECORD_HEADER_BYTES: usize = 5;
+const RECORD_CHECKSUM_BYTES: usize = 32;
+
+fn write_recovery(directory: &Path, limits: &Limits, broker: &MqttBroker) -> Result<PathBuf> {
     fs::create_dir_all(directory).map_err(|_| Error::Storage)?;
     set_directory_permissions(directory)?;
-    let payload = serde_json::to_vec(snapshot).map_err(|_| Error::Internal)?;
-    if payload.len().saturating_add(52) > limits.mqtt_recovery_max_bytes {
-        return Err(Error::Overloaded);
-    }
     let temporary = directory.join(format!(".{RECOVERY_FILE}.tmp"));
     let committed = directory.join(RECOVERY_FILE);
     let mut file = open_private_replace(&temporary)?;
-    file.write_all(RECOVERY_MAGIC)
-        .and_then(|_| file.write_all(&RECOVERY_VERSION.to_be_bytes()))
-        .and_then(|_| file.write_all(&snapshot.snapshot_generation.to_be_bytes()))
-        .and_then(|_| {
-            let length =
-                u32::try_from(payload.len()).map_err(|_| std::io::ErrorKind::InvalidData)?;
-            file.write_all(&length.to_be_bytes())
-        })
-        .and_then(|_| file.write_all(&payload))
-        .and_then(|_| file.write_all(&Sha256::digest(&payload)))
+    let state = lock(&broker.state)?;
+    let mut header = [0u8; RECOVERY_PREFIX_BYTES];
+    header[..4].copy_from_slice(RECOVERY_MAGIC);
+    header[4..8].copy_from_slice(&RECOVERY_VERSION.to_be_bytes());
+    header[8..16].copy_from_slice(&state.generation.to_be_bytes());
+    let mut written = RECOVERY_HEADER_BYTES;
+    file.write_all(&header)
+        .and_then(|_| file.write_all(&Sha256::digest(header)))
         .map_err(|_| Error::Storage)?;
+    for session in state.sessions.values() {
+        let mut record = Vec::with_capacity(384);
+        encode_session_meta(&mut record, session)?;
+        write_record(&mut file, RECORD_SESSION, &record, limits, &mut written)?;
+        for (filter, qos) in &session.subscriptions {
+            record.clear();
+            put_string(&mut record, filter)?;
+            record.push(*qos);
+            write_record(
+                &mut file,
+                RECORD_SUBSCRIPTION,
+                &record,
+                limits,
+                &mut written,
+            )?;
+        }
+        for message in &session.offline {
+            record.clear();
+            encode_message(&mut record, message)?;
+            write_record(&mut file, RECORD_OFFLINE, &record, limits, &mut written)?;
+        }
+        for (packet_id, inbound) in &session.inbound_qos2 {
+            record.clear();
+            record.extend_from_slice(&packet_id.to_be_bytes());
+            match inbound {
+                InboundQos2State::EventAccepted(message) => {
+                    record.push(1);
+                    encode_message(&mut record, message)?;
+                }
+                InboundQos2State::AwaitPubrel(message)
+                | InboundQos2State::Delivering { message, .. } => {
+                    // Delivery ownership is process-local; restart safely retries PUBREL work.
+                    record.push(0);
+                    encode_message(&mut record, message)?;
+                }
+            }
+            write_record(
+                &mut file,
+                RECORD_INBOUND_QOS2,
+                &record,
+                limits,
+                &mut written,
+            )?;
+        }
+        for packet_id in &session.outbound_order {
+            let outbound = session.outbound.get(packet_id).ok_or(Error::Invalid)?;
+            record.clear();
+            record.extend_from_slice(&packet_id.to_be_bytes());
+            let (kind, message) = match outbound {
+                OutboundState::AwaitPuback(message) => (0, message),
+                OutboundState::AwaitPubrec(message) => (1, message),
+                OutboundState::AwaitPubcomp(message) => (2, message),
+            };
+            record.push(kind);
+            encode_message(&mut record, message)?;
+            write_record(&mut file, RECORD_OUTBOUND, &record, limits, &mut written)?;
+        }
+    }
+    for retained in state.retained.values() {
+        let mut record = Vec::with_capacity(retained.message.payload.len().saturating_add(384));
+        put_string(&mut record, retained.tenant_id.as_str())?;
+        encode_message(&mut record, &retained.message)?;
+        write_record(&mut file, RECORD_RETAINED, &record, limits, &mut written)?;
+    }
+    drop(state);
     file.sync_all().map_err(|_| Error::Storage)?;
     fs::rename(&temporary, &committed).map_err(|_| Error::Storage)?;
     sync_directory(directory)?;
@@ -2174,42 +2613,507 @@ fn read_recovery(directory: &Path, limits: &Limits) -> Result<Option<MqttRecover
     }
     let size = usize::try_from(fs::metadata(&path).map_err(|_| Error::Storage)?.len())
         .map_err(|_| Error::Overloaded)?;
-    if size < 52 || size > limits.mqtt_recovery_max_bytes {
+    if size < RECOVERY_PREFIX_BYTES || size > limits.mqtt_recovery_max_bytes {
         return Err(Error::Invalid);
     }
-    let mut bytes = Vec::with_capacity(size);
-    fs::File::open(path)
-        .and_then(|mut file| file.read_to_end(&mut bytes))
-        .map_err(|_| Error::Storage)?;
-    if bytes.len() != size || bytes.get(..4) != Some(RECOVERY_MAGIC) {
+    let file = fs::File::open(path).map_err(|_| Error::Storage)?;
+    decode_recovery_reader(BufReader::new(file), size, limits).map(Some)
+}
+
+/// Pure, bounded decoder used by fuzzing. Production uses the same decoder over a buffered file.
+pub fn decode_mqtt_recovery(input: &[u8], limits: &Limits) -> Result<MqttRecoverySnapshot> {
+    if input.len() > limits.mqtt_recovery_max_bytes {
         return Err(Error::Invalid);
     }
-    let version = u32::from_be_bytes(bytes[4..8].try_into().map_err(|_| Error::Invalid)?);
+    decode_recovery_reader(Cursor::new(input), input.len(), limits)
+}
+
+fn decode_recovery_reader(
+    mut reader: impl Read,
+    size: usize,
+    limits: &Limits,
+) -> Result<MqttRecoverySnapshot> {
+    let mut header = [0u8; RECOVERY_PREFIX_BYTES];
+    reader.read_exact(&mut header).map_err(|_| Error::Invalid)?;
+    if &header[..4] != RECOVERY_MAGIC {
+        return Err(Error::Invalid);
+    }
+    let version = u32::from_be_bytes(header[4..8].try_into().map_err(|_| Error::Invalid)?);
+    let generation = u64::from_be_bytes(header[8..16].try_into().map_err(|_| Error::Invalid)?);
+    if version == RECOVERY_VERSION_V1 {
+        return decode_v1(reader, size, generation, limits);
+    }
     if version != RECOVERY_VERSION {
         return Err(Error::Invalid);
     }
-    let generation = u64::from_be_bytes(bytes[8..16].try_into().map_err(|_| Error::Invalid)?);
-    let length = usize::try_from(u32::from_be_bytes(
-        bytes[16..20].try_into().map_err(|_| Error::Invalid)?,
-    ))
-    .map_err(|_| Error::Invalid)?;
-    if length.saturating_add(52) != size {
+    let mut header_checksum = [0u8; 32];
+    reader
+        .read_exact(&mut header_checksum)
+        .map_err(|_| Error::Invalid)?;
+    if Sha256::digest(header).as_slice() != header_checksum {
         return Err(Error::Invalid);
     }
-    let payload_end = 20usize.checked_add(length).ok_or(Error::Invalid)?;
-    let payload = bytes.get(20..payload_end).ok_or(Error::Invalid)?;
-    let checksum = bytes
-        .get(payload_end..payload_end + 32)
-        .ok_or(Error::Invalid)?;
-    if Sha256::digest(payload).as_slice() != checksum {
+    let mut consumed = RECOVERY_HEADER_BYTES;
+    let mut snapshot = MqttRecoverySnapshot {
+        format_version: RECOVERY_VERSION,
+        snapshot_generation: generation,
+        sessions: Vec::new(),
+        retained: Vec::new(),
+    };
+    let mut retained_phase = false;
+    while consumed < size {
+        let mut record_header = [0u8; RECORD_HEADER_BYTES];
+        reader
+            .read_exact(&mut record_header)
+            .map_err(|_| Error::Invalid)?;
+        consumed = consumed
+            .checked_add(RECORD_HEADER_BYTES)
+            .ok_or(Error::Invalid)?;
+        let kind = record_header[0];
+        if kind == RECORD_RETAINED {
+            retained_phase = true;
+        } else if retained_phase {
+            return Err(Error::Invalid);
+        }
+        let length = usize::try_from(u32::from_be_bytes(
+            record_header[1..5].try_into().map_err(|_| Error::Invalid)?,
+        ))
+        .map_err(|_| Error::Invalid)?;
+        if length > recovery_record_max(limits)?
+            || consumed
+                .checked_add(length)
+                .and_then(|value| value.checked_add(RECORD_CHECKSUM_BYTES))
+                .is_none_or(|end| end > size)
+        {
+            return Err(Error::Invalid);
+        }
+        let mut payload = vec![0u8; length];
+        reader
+            .read_exact(&mut payload)
+            .map_err(|_| Error::Invalid)?;
+        let mut checksum = [0u8; RECORD_CHECKSUM_BYTES];
+        reader
+            .read_exact(&mut checksum)
+            .map_err(|_| Error::Invalid)?;
+        if Sha256::digest(&payload).as_slice() != checksum {
+            return Err(Error::Invalid);
+        }
+        consumed += length + RECORD_CHECKSUM_BYTES;
+        decode_record(kind, &payload, &mut snapshot, limits)?;
+    }
+    if consumed != size {
+        return Err(Error::Invalid);
+    }
+    Ok(snapshot)
+}
+
+fn decode_v1(
+    mut reader: impl Read,
+    size: usize,
+    generation: u64,
+    limits: &Limits,
+) -> Result<MqttRecoverySnapshot> {
+    if size < 52 {
+        return Err(Error::Invalid);
+    }
+    let mut length_bytes = [0u8; 4];
+    reader
+        .read_exact(&mut length_bytes)
+        .map_err(|_| Error::Invalid)?;
+    let length = usize::try_from(u32::from_be_bytes(length_bytes)).map_err(|_| Error::Invalid)?;
+    if length.saturating_add(52) != size || length > limits.mqtt_recovery_max_bytes {
+        return Err(Error::Invalid);
+    }
+    let mut payload = vec![0u8; length];
+    reader
+        .read_exact(&mut payload)
+        .map_err(|_| Error::Invalid)?;
+    let mut checksum = [0u8; 32];
+    reader
+        .read_exact(&mut checksum)
+        .map_err(|_| Error::Invalid)?;
+    if Sha256::digest(&payload).as_slice() != checksum {
         return Err(Error::Invalid);
     }
     let snapshot: MqttRecoverySnapshot =
-        serde_json::from_slice(payload).map_err(|_| Error::Invalid)?;
-    if snapshot.snapshot_generation != generation || snapshot.format_version != version {
+        serde_json::from_slice(&payload).map_err(|_| Error::Invalid)?;
+    if snapshot.snapshot_generation != generation || snapshot.format_version != version_one() {
         return Err(Error::Invalid);
     }
-    Ok(Some(snapshot))
+    Ok(snapshot)
+}
+
+const fn version_one() -> u32 {
+    RECOVERY_VERSION_V1
+}
+
+fn recovery_record_max(limits: &Limits) -> Result<usize> {
+    limits
+        .max_mqtt_packet_size
+        .checked_add(limits.max_topic_bytes.saturating_mul(2))
+        .and_then(|value| value.checked_add(1_024))
+        .ok_or(Error::Configuration)
+}
+
+fn write_record(
+    file: &mut fs::File,
+    kind: u8,
+    payload: &[u8],
+    limits: &Limits,
+    written: &mut usize,
+) -> Result<()> {
+    if payload.len() > recovery_record_max(limits)? {
+        return Err(Error::Overloaded);
+    }
+    let record_bytes = RECORD_HEADER_BYTES
+        .checked_add(payload.len())
+        .and_then(|value| value.checked_add(RECORD_CHECKSUM_BYTES))
+        .ok_or(Error::Overloaded)?;
+    *written = written.checked_add(record_bytes).ok_or(Error::Overloaded)?;
+    if *written > limits.mqtt_recovery_max_bytes {
+        return Err(Error::Overloaded);
+    }
+    let length = u32::try_from(payload.len()).map_err(|_| Error::Overloaded)?;
+    file.write_all(&[kind])
+        .and_then(|_| file.write_all(&length.to_be_bytes()))
+        .and_then(|_| file.write_all(payload))
+        .and_then(|_| file.write_all(&Sha256::digest(payload)))
+        .map_err(|_| Error::Storage)
+}
+
+fn put_string(output: &mut Vec<u8>, value: &str) -> Result<()> {
+    let length = u16::try_from(value.len()).map_err(|_| Error::Overloaded)?;
+    output.extend_from_slice(&length.to_be_bytes());
+    output.extend_from_slice(value.as_bytes());
+    Ok(())
+}
+
+fn put_bytes(output: &mut Vec<u8>, value: &[u8]) -> Result<()> {
+    let length = u32::try_from(value.len()).map_err(|_| Error::Overloaded)?;
+    output.extend_from_slice(&length.to_be_bytes());
+    output.extend_from_slice(value);
+    Ok(())
+}
+
+fn encode_message(output: &mut Vec<u8>, message: &BrokerMessage) -> Result<()> {
+    put_string(output, &message.topic)?;
+    put_bytes(output, &message.payload)?;
+    output.push(message.qos);
+    output.push(u8::from(message.retain));
+    Ok(())
+}
+
+fn encode_session_meta(output: &mut Vec<u8>, session: &StoredSession) -> Result<()> {
+    put_string(output, session.key.device.tenant_id.as_str())?;
+    put_string(output, session.key.device.product_id.as_str())?;
+    put_string(output, session.key.device.device_id.as_str())?;
+    put_string(output, &session.key.client_id)?;
+    output.extend_from_slice(&session.incarnation.to_be_bytes());
+    if let Some(authorization) = &session.authorization {
+        output.push(1);
+        output.extend_from_slice(&authorization.credential_version.to_be_bytes());
+        output.extend_from_slice(&authorization.auth_generation.to_be_bytes());
+        output.push(u8::from(authorization.permissions.publish));
+        output.push(u8::from(authorization.permissions.commands));
+    } else {
+        output.push(0);
+    }
+    output.extend_from_slice(&session.next_packet_id.to_be_bytes());
+    output.extend_from_slice(&session.last_seen_ms.to_be_bytes());
+    Ok(())
+}
+
+struct RecordReader<'a> {
+    input: &'a [u8],
+    at: usize,
+}
+
+impl<'a> RecordReader<'a> {
+    fn new(input: &'a [u8]) -> Self {
+        Self { input, at: 0 }
+    }
+
+    fn take(&mut self, length: usize) -> Result<&'a [u8]> {
+        let end = self.at.checked_add(length).ok_or(Error::Invalid)?;
+        let value = self.input.get(self.at..end).ok_or(Error::Invalid)?;
+        self.at = end;
+        Ok(value)
+    }
+
+    fn u8(&mut self) -> Result<u8> {
+        Ok(*self.take(1)?.first().ok_or(Error::Invalid)?)
+    }
+
+    fn u16(&mut self) -> Result<u16> {
+        Ok(u16::from_be_bytes(
+            self.take(2)?.try_into().map_err(|_| Error::Invalid)?,
+        ))
+    }
+
+    fn u32(&mut self) -> Result<u32> {
+        Ok(u32::from_be_bytes(
+            self.take(4)?.try_into().map_err(|_| Error::Invalid)?,
+        ))
+    }
+
+    fn u64(&mut self) -> Result<u64> {
+        Ok(u64::from_be_bytes(
+            self.take(8)?.try_into().map_err(|_| Error::Invalid)?,
+        ))
+    }
+
+    fn i64(&mut self) -> Result<i64> {
+        Ok(i64::from_be_bytes(
+            self.take(8)?.try_into().map_err(|_| Error::Invalid)?,
+        ))
+    }
+
+    fn string(&mut self, maximum: usize) -> Result<String> {
+        let length = usize::from(self.u16()?);
+        if length == 0 || length > maximum {
+            return Err(Error::Invalid);
+        }
+        String::from_utf8(self.take(length)?.to_vec()).map_err(|_| Error::Invalid)
+    }
+
+    fn bytes(&mut self, maximum: usize) -> Result<Vec<u8>> {
+        let length = usize::try_from(self.u32()?).map_err(|_| Error::Invalid)?;
+        if length > maximum {
+            return Err(Error::Invalid);
+        }
+        Ok(self.take(length)?.to_vec())
+    }
+
+    fn finish(self) -> Result<()> {
+        if self.at == self.input.len() {
+            Ok(())
+        } else {
+            Err(Error::Invalid)
+        }
+    }
+}
+
+fn decode_message(reader: &mut RecordReader<'_>, limits: &Limits) -> Result<BrokerMessage> {
+    let topic = reader.string(limits.max_topic_bytes)?;
+    let payload = reader.bytes(limits.max_mqtt_packet_size)?;
+    let qos = reader.u8()?;
+    let retain = match reader.u8()? {
+        0 => false,
+        1 => true,
+        _ => return Err(Error::Invalid),
+    };
+    if qos > 2 || !valid_topic(&topic, limits, false) {
+        return Err(Error::Invalid);
+    }
+    Ok(BrokerMessage {
+        topic,
+        payload,
+        qos,
+        retain,
+    })
+}
+
+fn decode_record(
+    kind: u8,
+    payload: &[u8],
+    snapshot: &mut MqttRecoverySnapshot,
+    limits: &Limits,
+) -> Result<()> {
+    let mut reader = RecordReader::new(payload);
+    match kind {
+        RECORD_SESSION => {
+            if snapshot.sessions.len() >= limits.max_persistent_sessions {
+                return Err(Error::Overloaded);
+            }
+            let tenant_id = TenantId::new(reader.string(64)?).map_err(|_| Error::Invalid)?;
+            let product_id = ProductId::new(reader.string(64)?).map_err(|_| Error::Invalid)?;
+            let device_id = DeviceId::new(reader.string(64)?).map_err(|_| Error::Invalid)?;
+            let client_id = reader.string(limits.max_client_id_bytes)?;
+            let incarnation = reader.u64()?;
+            if incarnation == 0 {
+                return Err(Error::Invalid);
+            }
+            let authorization = match reader.u8()? {
+                0 => None,
+                1 => Some(SessionAuthorization {
+                    credential_version: reader.u32()?,
+                    auth_generation: reader.u64()?,
+                    permissions: Permissions {
+                        publish: match reader.u8()? {
+                            0 => false,
+                            1 => true,
+                            _ => return Err(Error::Invalid),
+                        },
+                        commands: match reader.u8()? {
+                            0 => false,
+                            1 => true,
+                            _ => return Err(Error::Invalid),
+                        },
+                    },
+                }),
+                _ => return Err(Error::Invalid),
+            };
+            let next_packet_id = reader.u16()?;
+            if next_packet_id == 0 {
+                return Err(Error::Invalid);
+            }
+            let last_seen_ms = reader.i64()?;
+            reader.finish()?;
+            let key = SessionKey {
+                device: DeviceKey {
+                    tenant_id,
+                    product_id,
+                    device_id,
+                },
+                client_id,
+            };
+            let mut session = StoredSession::new(
+                key,
+                incarnation,
+                authorization.clone().unwrap_or(SessionAuthorization {
+                    credential_version: 0,
+                    auth_generation: 0,
+                    permissions: Permissions {
+                        publish: false,
+                        commands: false,
+                    },
+                }),
+            );
+            session.authorization = authorization;
+            session.next_packet_id = next_packet_id;
+            session.last_seen_ms = last_seen_ms;
+            snapshot.sessions.push(session);
+        }
+        RECORD_SUBSCRIPTION => {
+            let filter = reader.string(limits.max_topic_bytes)?;
+            let qos = reader.u8()?;
+            reader.finish()?;
+            if qos > 2 || !valid_topic(&filter, limits, true) {
+                return Err(Error::Invalid);
+            }
+            let session = snapshot.sessions.last_mut().ok_or(Error::Invalid)?;
+            if session.subscriptions.len() >= limits.max_subscriptions_per_session {
+                return Err(Error::Overloaded);
+            }
+            if session.subscriptions.insert(filter, qos).is_some() {
+                return Err(Error::Invalid);
+            }
+        }
+        RECORD_OFFLINE => {
+            let message = decode_message(&mut reader, limits)?;
+            reader.finish()?;
+            if !matches!(message.qos, 1 | 2) {
+                return Err(Error::Invalid);
+            }
+            let session = snapshot.sessions.last_mut().ok_or(Error::Invalid)?;
+            if session.offline.len() >= limits.max_offline_messages_per_session {
+                return Err(Error::Overloaded);
+            }
+            session.offline_bytes = session
+                .offline_bytes
+                .checked_add(message.bytes())
+                .ok_or(Error::Overloaded)?;
+            session.offline.push_back(message);
+        }
+        RECORD_INBOUND_QOS2 => {
+            let packet_id = reader.u16()?;
+            let stage = reader.u8()?;
+            let message = decode_message(&mut reader, limits)?;
+            reader.finish()?;
+            if packet_id == 0 || message.qos != 2 {
+                return Err(Error::Invalid);
+            }
+            let state = match stage {
+                0 => InboundQos2State::AwaitPubrel(message),
+                1 => InboundQos2State::EventAccepted(message),
+                _ => return Err(Error::Invalid),
+            };
+            let session = snapshot.sessions.last_mut().ok_or(Error::Invalid)?;
+            if session.inbound_qos2.len()
+                + session
+                    .outbound
+                    .values()
+                    .filter(|state| !matches!(state, OutboundState::AwaitPuback(_)))
+                    .count()
+                >= limits.max_inflight_qos2_per_session
+            {
+                return Err(Error::Overloaded);
+            }
+            if session.inbound_qos2.insert(packet_id, state).is_some() {
+                return Err(Error::Invalid);
+            }
+        }
+        RECORD_OUTBOUND => {
+            let packet_id = reader.u16()?;
+            let stage = reader.u8()?;
+            let message = decode_message(&mut reader, limits)?;
+            reader.finish()?;
+            if packet_id == 0
+                || (stage == 0 && message.qos != 1)
+                || (matches!(stage, 1 | 2) && message.qos != 2)
+            {
+                return Err(Error::Invalid);
+            }
+            let state = match stage {
+                0 => OutboundState::AwaitPuback(message),
+                1 => OutboundState::AwaitPubrec(message),
+                2 => OutboundState::AwaitPubcomp(message),
+                _ => return Err(Error::Invalid),
+            };
+            let session = snapshot.sessions.last_mut().ok_or(Error::Invalid)?;
+            let same_qos = session
+                .outbound
+                .values()
+                .filter(|state| {
+                    if stage == 0 {
+                        matches!(state, OutboundState::AwaitPuback(_))
+                    } else {
+                        !matches!(state, OutboundState::AwaitPuback(_))
+                    }
+                })
+                .count();
+            let limit = if stage == 0 {
+                limits.max_inflight_qos1_per_session
+            } else {
+                limits.max_inflight_qos2_per_session
+            };
+            if same_qos >= limit {
+                return Err(Error::Overloaded);
+            }
+            if session.outbound.insert(packet_id, state).is_some() {
+                return Err(Error::Invalid);
+            }
+            session.outbound_order.push_back(packet_id);
+        }
+        RECORD_RETAINED => {
+            if snapshot.retained.len() >= limits.max_retained_messages {
+                return Err(Error::Overloaded);
+            }
+            let tenant = TenantId::new(reader.string(64)?).map_err(|_| Error::Invalid)?;
+            let message = decode_message(&mut reader, limits)?;
+            reader.finish()?;
+            if !message.retain || message.payload.is_empty() {
+                return Err(Error::Invalid);
+            }
+            let topic = message.topic.clone();
+            if snapshot
+                .retained
+                .iter()
+                .any(|(existing, _)| existing == &topic)
+            {
+                return Err(Error::Invalid);
+            }
+            snapshot.retained.push((
+                topic,
+                RetainedMessage {
+                    tenant_id: tenant,
+                    message,
+                },
+            ));
+        }
+        _ => return Err(Error::Invalid),
+    }
+    Ok(())
 }
 
 #[cfg(unix)]
@@ -2573,32 +3477,324 @@ mod tests {
                 },
             )
             .unwrap();
-        let InboundQos2Action::Deliver { operation_id, .. } = broker
+        let InboundQos2Action::Deliver {
+            session_incarnation,
+            operation_id,
+            ..
+        } = broker
             .begin_inbound_qos2_delivery(&old.key, old.generation, 7)
             .unwrap()
         else {
             panic!("old connection must own delivery")
         };
         let replacement = broker.attach(&device, "takeover".into(), false).unwrap();
+        assert_eq!(old.session_incarnation, replacement.session_incarnation);
         broker
-            .finish_inbound_qos2_delivery(&old.key, 7, operation_id)
+            .finish_inbound_qos2_delivery(&old.key, session_incarnation, 7, operation_id)
             .unwrap();
-        assert_eq!(
-            broker
-                .begin_inbound_qos2_delivery(&replacement.key, replacement.generation, 7)
-                .unwrap(),
-            InboundQos2Action::EventAccepted
-        );
+        let InboundQos2Action::EventAccepted {
+            session_incarnation,
+            operation_id,
+        } = broker
+            .begin_inbound_qos2_delivery(&replacement.key, replacement.generation, 7)
+            .unwrap()
+        else {
+            panic!("takeover must observe accepted transaction")
+        };
         broker
-            .route_inbound_qos2(&replacement.key, 7, &device.device_key)
+            .route_inbound_qos2(
+                &replacement.key,
+                session_incarnation,
+                7,
+                operation_id,
+                &device.device_key,
+            )
             .unwrap();
         assert!(
             broker
-                .route_inbound_qos2(&replacement.key, 7, &device.device_key)
+                .route_inbound_qos2(
+                    &replacement.key,
+                    session_incarnation,
+                    7,
+                    operation_id,
+                    &device.device_key,
+                )
                 .is_err()
         );
         let state = broker.state.lock().unwrap();
         assert!(state.sessions[&replacement.key].inbound_qos2.is_empty());
+    }
+
+    #[test]
+    fn qos2_clean_session_incarnation_001() {
+        let broker = MqttBroker::new(Arc::new(Limits::default()));
+        let device = auth("clean-incarnation");
+        let old = broker.attach(&device, "same".into(), false).unwrap();
+        broker
+            .inbound_qos2(
+                &old.key,
+                old.generation,
+                7,
+                BrokerMessage {
+                    topic: "clean/incarnation".into(),
+                    payload: b"old".to_vec(),
+                    qos: 2,
+                    retain: false,
+                },
+            )
+            .unwrap();
+        let InboundQos2Action::Deliver {
+            session_incarnation: old_incarnation,
+            operation_id: old_operation,
+            ..
+        } = broker
+            .begin_inbound_qos2_delivery(&old.key, old.generation, 7)
+            .unwrap()
+        else {
+            panic!("old delivery must start")
+        };
+        let replacement = broker.attach(&device, "same".into(), true).unwrap();
+        assert_ne!(old_incarnation, replacement.session_incarnation);
+        broker
+            .inbound_qos2(
+                &replacement.key,
+                replacement.generation,
+                7,
+                BrokerMessage {
+                    topic: "clean/incarnation".into(),
+                    payload: b"new".to_vec(),
+                    qos: 2,
+                    retain: false,
+                },
+            )
+            .unwrap();
+        let InboundQos2Action::Deliver {
+            session_incarnation: new_incarnation,
+            operation_id: new_operation,
+            ..
+        } = broker
+            .begin_inbound_qos2_delivery(&replacement.key, replacement.generation, 7)
+            .unwrap()
+        else {
+            panic!("new delivery must start")
+        };
+        assert!(
+            broker
+                .finish_inbound_qos2_delivery(&old.key, old_incarnation, 7, old_operation,)
+                .is_err()
+        );
+        broker
+            .finish_inbound_qos2_delivery(&replacement.key, new_incarnation, 7, new_operation)
+            .unwrap();
+        broker
+            .route_inbound_qos2(
+                &replacement.key,
+                new_incarnation,
+                7,
+                new_operation,
+                &device.device_key,
+            )
+            .unwrap();
+    }
+
+    #[test]
+    fn mqtt_persistent_overload_qos1_001_is_atomic() {
+        persistent_route_overload_is_atomic(1);
+    }
+
+    #[test]
+    fn mqtt_persistent_overload_qos2_001_is_atomic() {
+        persistent_route_overload_is_atomic(2);
+    }
+
+    fn persistent_route_overload_is_atomic(qos: u8) {
+        let limits = Arc::new(Limits {
+            max_offline_messages_per_session: 1,
+            max_offline_messages_per_tenant: 8,
+            max_offline_messages: 8,
+            ..Limits::default()
+        });
+        let broker = MqttBroker::new(limits);
+        let device = auth("atomic-route");
+        let a = broker.attach(&device, "a".into(), false).unwrap();
+        let b = broker.attach(&device, "b".into(), false).unwrap();
+        broker
+            .subscribe(&a.key, a.generation, "atomic/shared", qos)
+            .unwrap();
+        broker
+            .subscribe(&b.key, b.generation, "atomic/shared", qos)
+            .unwrap();
+        broker
+            .subscribe(&b.key, b.generation, "atomic/b-only", qos)
+            .unwrap();
+        broker.detach(&a.key, a.generation, false).unwrap();
+        broker.detach(&b.key, b.generation, false).unwrap();
+        broker
+            .route(
+                &device.device_key,
+                BrokerMessage {
+                    topic: "atomic/b-only".into(),
+                    payload: vec![1],
+                    qos,
+                    retain: false,
+                },
+            )
+            .unwrap();
+        assert!(matches!(
+            broker.route(
+                &device.device_key,
+                BrokerMessage {
+                    topic: "atomic/shared".into(),
+                    payload: vec![2],
+                    qos,
+                    retain: false,
+                },
+            ),
+            Err(Error::Overloaded)
+        ));
+        let state = broker.state.lock().unwrap();
+        assert!(state.sessions[&a.key].offline.is_empty());
+        assert_eq!(state.sessions[&b.key].offline.len(), 1);
+    }
+
+    #[test]
+    fn mqtt_authz_persistent_reset_001() {
+        let broker = MqttBroker::new(Arc::new(Limits::default()));
+        let mut allowed = auth("auth-reset");
+        let first = broker.attach(&allowed, "persistent".into(), false).unwrap();
+        broker
+            .subscribe(
+                &first.key,
+                first.generation,
+                "v1/t/t/p/p/d/auth-reset/down",
+                1,
+            )
+            .unwrap();
+        broker.detach(&first.key, first.generation, false).unwrap();
+        allowed.permissions.commands = false;
+        let replacement = broker.attach(&allowed, "persistent".into(), false).unwrap();
+        assert!(!replacement.session_present);
+        assert_eq!(
+            broker
+                .subscription_qos(&replacement.key, "v1/t/t/p/p/d/auth-reset/down")
+                .unwrap(),
+            None
+        );
+        drop(replacement);
+        let mut rotated = allowed.clone();
+        rotated.credential_version += 1;
+        let credential_reset = broker.attach(&rotated, "persistent".into(), false).unwrap();
+        assert!(!credential_reset.session_present);
+        drop(credential_reset);
+        rotated.auth_generation += 1;
+        let generation_reset = broker.attach(&rotated, "persistent".into(), false).unwrap();
+        assert!(!generation_reset.session_present);
+        drop(generation_reset);
+        let unrelated_auth = auth("auth-unrelated");
+        let unrelated = broker
+            .attach(&unrelated_auth, "persistent".into(), false)
+            .unwrap();
+        drop(unrelated);
+        assert_eq!(
+            broker
+                .invalidate_sessions(&AuthInvalidation::Device {
+                    device: allowed.device_key.clone(),
+                })
+                .unwrap(),
+            1
+        );
+        assert!(
+            broker
+                .attach(&unrelated_auth, "persistent".into(), false)
+                .unwrap()
+                .session_present
+        );
+    }
+
+    #[test]
+    fn retain_replacement_reservation_001() {
+        let limits = Arc::new(Limits {
+            max_retained_messages: 1,
+            max_retained_messages_per_tenant: 1,
+            ..Limits::default()
+        });
+        let broker = MqttBroker::new(limits);
+        let device = auth("retain-replace");
+        let topic = "retained/replacement";
+        broker
+            .route(
+                &device.device_key,
+                BrokerMessage {
+                    topic: topic.into(),
+                    payload: b"one".to_vec(),
+                    qos: 1,
+                    retain: true,
+                },
+            )
+            .unwrap();
+        broker
+            .route(
+                &device.device_key,
+                BrokerMessage {
+                    topic: topic.into(),
+                    payload: b"qos1-replacement".to_vec(),
+                    qos: 1,
+                    retain: true,
+                },
+            )
+            .unwrap();
+        let attachment = broker.attach(&device, "qos2".into(), false).unwrap();
+        broker
+            .inbound_qos2(
+                &attachment.key,
+                attachment.generation,
+                9,
+                BrokerMessage {
+                    topic: topic.into(),
+                    payload: b"two".to_vec(),
+                    qos: 2,
+                    retain: true,
+                },
+            )
+            .unwrap();
+        let InboundQos2Action::Deliver {
+            session_incarnation,
+            operation_id,
+            ..
+        } = broker
+            .begin_inbound_qos2_delivery(&attachment.key, attachment.generation, 9)
+            .unwrap()
+        else {
+            panic!("QoS2 replacement must be deliverable")
+        };
+        broker
+            .finish_inbound_qos2_delivery(&attachment.key, session_incarnation, 9, operation_id)
+            .unwrap();
+        broker
+            .route_inbound_qos2(
+                &attachment.key,
+                session_incarnation,
+                9,
+                operation_id,
+                &device.device_key,
+            )
+            .unwrap();
+        let mut guard = broker
+            .reserve_will(
+                device.device_key.clone(),
+                BrokerMessage {
+                    topic: topic.into(),
+                    payload: b"will".to_vec(),
+                    qos: 1,
+                    retain: true,
+                },
+            )
+            .unwrap();
+        guard.publish().unwrap();
+        assert!(broker.has_retained_topic(topic).unwrap());
+        let state = broker.state.lock().unwrap();
+        assert_eq!(state.retained_reserved_count, 0);
+        assert_eq!(state.retained_reserved_bytes, 0);
     }
 
     #[test]
@@ -3016,7 +4212,82 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn mqtt_recovery_bound_accepts_worst_case_binary_json_expansion() {
+    async fn mqtt_recovery_v1_compat_001() {
+        let directory = std::env::temp_dir().join(format!(
+            "netbaiot-mqtt-v1-{}-{}",
+            std::process::id(),
+            now_ms()
+        ));
+        fs::create_dir_all(&directory).unwrap();
+        let broker = MqttBroker::new(Arc::new(Limits::default()));
+        let device = auth("v1-compatible");
+        let attachment = broker.attach(&device, "persistent".into(), false).unwrap();
+        broker
+            .subscribe(
+                &attachment.key,
+                attachment.generation,
+                "v1/t/t/p/p/d/v1-compatible/#",
+                1,
+            )
+            .unwrap();
+        broker
+            .detach(&attachment.key, attachment.generation, false)
+            .unwrap();
+        let mut snapshot = broker.snapshot().unwrap();
+        snapshot.format_version = RECOVERY_VERSION_V1;
+        let payload = serde_json::to_vec(&snapshot).unwrap();
+        let mut image = Vec::new();
+        image.extend_from_slice(RECOVERY_MAGIC);
+        image.extend_from_slice(&RECOVERY_VERSION_V1.to_be_bytes());
+        image.extend_from_slice(&snapshot.snapshot_generation.to_be_bytes());
+        image.extend_from_slice(&u32::try_from(payload.len()).unwrap().to_be_bytes());
+        image.extend_from_slice(&payload);
+        image.extend_from_slice(&Sha256::digest(&payload));
+        fs::write(directory.join(RECOVERY_FILE), image).unwrap();
+        let restored = MqttBroker::new(Arc::new(Limits::default()));
+        assert!(restored.recover_from(&directory).await.unwrap());
+        assert!(
+            restored
+                .attach(&device, "persistent".into(), false)
+                .unwrap()
+                .session_present
+        );
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn mqtt_recovery_semantic_invalid_001() {
+        let broker = MqttBroker::new(Arc::new(Limits::default()));
+        let device = auth("semantic-invalid");
+        let attachment = broker.attach(&device, "persistent".into(), false).unwrap();
+        broker
+            .inbound_qos2(
+                &attachment.key,
+                attachment.generation,
+                5,
+                BrokerMessage {
+                    topic: "semantic/invalid".into(),
+                    payload: vec![1],
+                    qos: 2,
+                    retain: false,
+                },
+            )
+            .unwrap();
+        let mut snapshot = broker.snapshot().unwrap();
+        snapshot.sessions[0].inbound_qos2.insert(
+            5,
+            InboundQos2State::AwaitPubrel(BrokerMessage {
+                topic: "semantic/invalid".into(),
+                payload: vec![1],
+                qos: 1,
+                retain: false,
+            }),
+        );
+        assert!(matches!(broker.restore(snapshot), Err(Error::Invalid)));
+    }
+
+    #[tokio::test]
+    async fn mqtt_recovery_v2_raw_binary_round_trip_bound() {
         let limits = Arc::new(Limits::default());
         limits.validate().unwrap();
         let broker = MqttBroker::new(limits.clone());
@@ -3034,16 +4305,19 @@ mod tests {
                 )
                 .unwrap();
         }
-        let snapshot = broker.snapshot().unwrap();
-        let encoded = serde_json::to_vec(&snapshot).unwrap();
-        assert!(encoded.len().saturating_add(52) <= limits.mqtt_recovery_upper_bound().unwrap());
-        assert!(encoded.windows(3).any(|window| window == b"255"));
         let directory = std::env::temp_dir().join(format!(
             "netbaiot-mqtt-binary-recovery-{}-{}",
             std::process::id(),
             now_ms()
         ));
         broker.commit_to(&directory).await.unwrap();
+        let encoded = fs::read(directory.join(RECOVERY_FILE)).unwrap();
+        assert!(encoded.len() <= limits.mqtt_recovery_upper_bound().unwrap());
+        assert!(
+            encoded
+                .windows(1024)
+                .any(|window| window.iter().all(|byte| *byte == 0xff))
+        );
         let recovered = MqttBroker::new(limits);
         assert!(recovered.recover_from(&directory).await.unwrap());
         assert_eq!(recovered.usage().unwrap().3, 4);
@@ -3124,14 +4398,18 @@ mod tests {
             }) if id == packet_id
         ));
 
-        let InboundQos2Action::Deliver { operation_id, .. } = before_pubcomp
+        let InboundQos2Action::Deliver {
+            session_incarnation,
+            operation_id,
+            ..
+        } = before_pubcomp
             .begin_inbound_qos2_delivery(&resumed.key, resumed.generation, 77)
             .unwrap()
         else {
             panic!("expected inbound QoS2 delivery ownership")
         };
         before_pubcomp
-            .finish_inbound_qos2_delivery(&resumed.key, 77, operation_id)
+            .finish_inbound_qos2_delivery(&resumed.key, session_incarnation, 77, operation_id)
             .unwrap();
         let accepted_stage = MqttBroker::new(Arc::new(Limits::default()));
         accepted_stage
@@ -3191,6 +4469,63 @@ mod tests {
         let recovered = MqttBroker::new(limits);
         assert!(recovered.recover_from(&directory).await.unwrap());
         fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[tokio::test]
+    #[ignore = "manual 10/50/100 MiB recovery benchmark"]
+    async fn mqtt_recovery_streaming_benchmark_manual() {
+        let limits = Arc::new(Limits {
+            max_retained_messages: 3_000,
+            max_retained_messages_per_tenant: 3_000,
+            max_retained_bytes: 125_829_120,
+            max_retained_bytes_per_tenant: 125_829_120,
+            mqtt_recovery_max_bytes: 335_544_320,
+            ..Limits::default()
+        });
+        limits.validate().unwrap();
+        let device = auth("recovery-benchmark");
+        for logical_mib in [10usize, 50, 100] {
+            let directory = std::env::temp_dir().join(format!(
+                "netbaiot-mqtt-bench-{}-{}-{logical_mib}",
+                std::process::id(),
+                now_ms()
+            ));
+            let broker = MqttBroker::new(limits.clone());
+            let target = logical_mib * 1_048_576;
+            let mut payload_bytes = 0usize;
+            let mut index = 0usize;
+            while payload_bytes < target {
+                let length = (target - payload_bytes).min(60_000);
+                broker
+                    .route(
+                        &device.device_key,
+                        BrokerMessage {
+                            topic: format!("bench/{index}"),
+                            payload: vec![index as u8; length],
+                            qos: 0,
+                            retain: true,
+                        },
+                    )
+                    .unwrap();
+                payload_bytes += length;
+                index += 1;
+            }
+            let encode_started = std::time::Instant::now();
+            broker.commit_to(&directory).await.unwrap();
+            let encode_elapsed = encode_started.elapsed();
+            let file_bytes = fs::metadata(directory.join(RECOVERY_FILE)).unwrap().len();
+            let restored = MqttBroker::new(limits.clone());
+            let decode_started = std::time::Instant::now();
+            assert!(restored.recover_from(&directory).await.unwrap());
+            let decode_elapsed = decode_started.elapsed();
+            println!(
+                "logical_mib={logical_mib} logical_bytes={payload_bytes} file_bytes={file_bytes} encode_ms={} decode_ms={} max_record_bytes={}",
+                encode_elapsed.as_millis(),
+                decode_elapsed.as_millis(),
+                recovery_record_max(&limits).unwrap()
+            );
+            fs::remove_dir_all(directory).unwrap();
+        }
     }
 
     #[tokio::test]

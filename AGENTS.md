@@ -283,6 +283,13 @@ packet-ID order. Inbound QoS2 EventAccepted ownership uses an operation token th
 survives same-session connection takeover; connection generation alone is not a
 valid fence for finishing already accepted work.
 
+Persistent MQTT state also carries a monotonic session incarnation and authorization
+provenance. CleanSession=1 creates a new incarnation; stale work must match the
+session incarnation, packet identifier, and operation token. CleanSession=0 takeover
+keeps the incarnation. Any credential version, auth generation, or permission change
+resets the old persistent session, and management invalidation removes matching
+bounded persistent sessions as well as live sessions.
+
 Authentication invalidation and live-session registration share one synchronization
 boundary. A result returned before any device/product/tenant/version/generation/all
 invalidation may not register afterward. MQTT attachment and Will responsibility
@@ -290,10 +297,16 @@ are RAII-owned across every post-registration early return, including failed
 CONNACK writes.
 
 Tenant inflight release must wake bounded pending work for other active sessions in
-the tenant; ACK handlers must not scan all sessions. Recovery limits must cover the
-worst-case serialized representation of every admitted legal state, not merely its
-logical payload bytes. A structural recovery overflow is an invariant failure, not
-a retryable shutdown I/O error.
+the tenant; ACK handlers must not scan all sessions. Recovery limits must cover
+compact NBMQ v2 records for every admitted legal state. Writes are streaming and
+bounded per record; NBMQ v1 remains read-only compatible. A structural recovery
+failure is not retryable, but EventBus required work must still drain or spool before
+the process remains alive and unready.
+
+Routing to matching persistent QoS1/QoS2 subscriptions is an atomic admission
+decision: preflight every target and retained mutation before the first commit. A
+producer acknowledgement is forbidden if any required persistent responsibility
+cannot be owned. QoS0 may still be shed under the documented best-effort policy.
 
 Will topic/payload/QoS/retain and retained state are validated, authorized, and
 bounded. A planned shutdown publishes each live connection's Will before atomically

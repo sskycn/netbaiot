@@ -374,12 +374,13 @@ async fn handle_management(
             )
             .map_err(|_| Error::Invalid)?;
             let (devices, disconnected) = services.ingress.invalidate_auth(&invalidation)?;
+            let mqtt_invalidated = services.mqtt.invalidate_sessions(&invalidation)?;
             let invalidated = devices.len();
             Ok(response(
                 StatusCode::OK,
                 serde_json::to_vec(&InvalidationResult {
                     invalidated,
-                    disconnected,
+                    disconnected: disconnected.saturating_add(mqtt_invalidated),
                 })
                 .map_err(|_| Error::Internal)?,
             ))

@@ -348,7 +348,11 @@ pub async fn connection(
                                 attachment.generation,
                                 id,
                             )? {
-                                InboundQos2Action::Deliver { message, operation_id } => {
+                                InboundQos2Action::Deliver {
+                                    message,
+                                    session_incarnation,
+                                    operation_id,
+                                } => {
                                     if let Err(error) = accept_iot_publish(
                                         &services,
                                         &auth,
@@ -358,6 +362,7 @@ pub async fn connection(
                                     ).await {
                                         let _ = services.mqtt.abandon_inbound_qos2_delivery(
                                             &attachment.key,
+                                            session_incarnation,
                                             id,
                                             operation_id,
                                         );
@@ -365,20 +370,28 @@ pub async fn connection(
                                     }
                                     services.mqtt.finish_inbound_qos2_delivery(
                                         &attachment.key,
+                                        session_incarnation,
                                         id,
                                         operation_id,
                                     )?;
                                     services.mqtt.route_inbound_qos2(
                                         &attachment.key,
+                                        session_incarnation,
                                         id,
+                                        operation_id,
                                         &auth.device_key,
                                     )?;
                                 }
-                                InboundQos2Action::EventAccepted => {
+                                InboundQos2Action::EventAccepted {
+                                    session_incarnation,
+                                    operation_id,
+                                } => {
                                     services.mqtt.route_inbound_qos2(
-                                    &attachment.key,
-                                    id,
-                                    &auth.device_key,
+                                        &attachment.key,
+                                        session_incarnation,
+                                        id,
+                                        operation_id,
+                                        &auth.device_key,
                                     )?;
                                 }
                                 InboundQos2Action::DeliveryInProgress => continue,

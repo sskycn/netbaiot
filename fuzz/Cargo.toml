@@ -11,6 +11,7 @@ cargo-fuzz = true
 libfuzzer-sys = "0.4"
 bytes = "1"
 serde_json = "1"
+sha2 = "0.10"
 netbaiot-core = { path = "../crates/netbaiot-core" }
 netbaiot-codecs = { path = "../crates/netbaiot-codecs" }
 netbaiot-runtime = { path = "../crates/netbaiot-runtime" }

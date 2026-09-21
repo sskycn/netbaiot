@@ -76,12 +76,14 @@ fuzz_target!(|data: &[u8]| {
                     packet_id,
                 );
                 if let Ok(netbaiot_transports::mqtt::broker::InboundQos2Action::Deliver {
+                    session_incarnation,
                     operation_id,
                     ..
                 }) = action
                 {
                     let _ = broker.abandon_inbound_qos2_delivery(
                         &attachment.key,
+                        session_incarnation,
                         packet_id,
                         operation_id,
                     );

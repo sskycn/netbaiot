@@ -1046,14 +1046,17 @@ pub async fn run_with_credentials(
     // fsynced image before claiming a successful planned shutdown. A storage failure blocks the
     // voluntary shutdown: the process stays alive and unready so an operator can repair storage.
     let retry_delay = Duration::from_millis(limits.retry_max_ms.min(1_000));
+    let mut mqtt_structural_failure = None;
     loop {
         match mqtt_broker.commit_to(&config.spool_directory).await {
             Ok(_) => break,
             Err(error @ (Error::Overloaded | Error::Configuration | Error::Invalid)) => {
                 // Limits validation proves that every admitted legal state fits the recovery
-                // image. Retrying a structural violation cannot succeed and would hang shutdown.
+                // image. Retrying cannot repair a structural violation, but unrelated required
+                // EventBus work must still be drained or spooled before exit is blocked.
                 tracing::error!(error=%error, "MQTT recovery invariant violated");
-                return Err(error);
+                mqtt_structural_failure = Some(error);
+                break;
             }
             Err(error) => {
                 tracing::error!(error=%error, "MQTT recovery commit failed; shutdown remains blocked");
@@ -1110,6 +1113,13 @@ pub async fn run_with_credentials(
             }
         }
     }
+    if !shutdown_can_finish(mqtt_structural_failure.is_none(), true)
+        && let Some(error) = mqtt_structural_failure
+    {
+        tracing::error!(error=%error, "critical MQTT recovery fault; required EventBus work is safe, process remains alive and unready");
+        std::future::pending::<()>().await;
+        return Err(error);
+    }
     lifecycle.mark_drained()?;
     management_listener.cancel();
     if management_running {
@@ -1119,9 +1129,21 @@ pub async fn run_with_credentials(
     failure.map_or(Ok(()), Err)
 }
 
+fn shutdown_can_finish(mqtt_recovery_safe: bool, eventbus_required_work_safe: bool) -> bool {
+    mqtt_recovery_safe && eventbus_required_work_safe
+}
+
 #[cfg(test)]
 mod reliability_tests {
     use super::*;
+
+    #[test]
+    fn mqtt_recovery_structural_eventbus_safety_001() {
+        assert!(!shutdown_can_finish(false, false));
+        assert!(!shutdown_can_finish(false, true));
+        assert!(!shutdown_can_finish(true, false));
+        assert!(shutdown_can_finish(true, true));
+    }
 
     fn delivery() -> DeliveryEnvelope {
         DeliveryEnvelope {

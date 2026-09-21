@@ -58,9 +58,19 @@
     "MQTT-CONNACK-WRITE-FAIL-CLEANUP-001": "mqtt_connack_failure_attachment_guard_cleans_clean_and_preserves_persistent_session",
     "MQTT-TENANT-INFLIGHT-WAKE-QOS1-001": "mqtt_tenant_qos1_capacity_release_wakes_other_session",
     "MQTT-TENANT-INFLIGHT-WAKE-QOS2-001": "mqtt_tenant_qos2_capacity_release_wakes_other_session",
-    "MQTT-RECOVERY-BINARY-WORSTCASE-001": "mqtt_recovery_bound_accepts_worst_case_binary_json_expansion",
+    "MQTT-RECOVERY-BINARY-WORSTCASE-001": "mqtt_recovery_v2_raw_binary_round_trip_bound",
     "WILL-RESOURCE-FAILURE-001": "mqtt_accepted_will_reservation_survives_later_retained_pressure",
-    "EVENTBUS-CONCURRENCY-NOSPIN-001": "event_bus_full_concurrency_waits_for_completion_without_ready_timer_spin"
+    "EVENTBUS-CONCURRENCY-NOSPIN-001": "event_bus_full_concurrency_waits_for_completion_without_ready_timer_spin",
+    "MQTT-PERSISTENT-OVERLOAD-QOS1-001": "mqtt_persistent_overload_qos1_001_is_atomic",
+    "MQTT-PERSISTENT-OVERLOAD-QOS2-001": "mqtt_persistent_overload_qos2_001_is_atomic",
+    "QOS2-CLEAN-SESSION-INCARNATION-001": "qos2_clean_session_incarnation_001",
+    "MQTT-AUTHZ-PERSISTENT-RESET-001": "mqtt_authz_persistent_reset_001",
+    "MQTT-RECOVERY-STRUCTURAL-EVENTBUS-SAFETY-001": "mqtt_recovery_structural_eventbus_safety_001",
+    "MQTT-RECOVERY-V2-ROUNDTRIP-001": "recovery_file_round_trip_preserves_session_retained_and_inflight",
+    "MQTT-RECOVERY-V1-COMPAT-001": "mqtt_recovery_v1_compat_001",
+    "MQTT-RECOVERY-SEMANTIC-INVALID-001": "mqtt_recovery_semantic_invalid_001",
+    "RETAIN-REPLACEMENT-RESERVATION-001": "retain_replacement_reservation_001",
+    "EVENTBUS-SINK-PANIC-RECOVERY-001": "eventbus_sink_panic_recovery_001"
   },
   "normative_requirements": {
     "MQTT-1.5.3-1": {
