@@ -95,18 +95,38 @@ and restored brokers simultaneously and is not the 67,072-byte codec record buff
 
 ## Validation
 
-- Rust 1.88.0: fmt PASS, clippy `-D warnings` PASS, workspace tests PASS (131
+- Rust 1.88.0: fmt PASS, clippy `-D warnings` PASS, workspace tests PASS (132
   executed, 3 ignored; both manual benchmarks were run separately and passed).
 - Rust stable 1.97.1: fmt PASS, clippy `-D warnings` PASS, workspace tests PASS
-  (131 executed, 3 ignored).
-- Raw MQTT: 30/30 PASS.
+  (132 executed, 3 ignored).
+- Raw MQTT: 31/31 PASS.
 - Mosquitto broker differential: 11/11 PASS.
 - Mosquitto MQTT 3.1.1 client matrix: PASS.
 - Verified TLS matrix: PASS.
-- Full release gate: 74/74 PASS; normative mapping 125/125 PASS.
+- Full release gate: 76/76 PASS; normative mapping 125/125 PASS.
 - Fuzz: `mqtt_packet`, `mqtt_state`, and `restart_spool` 1,000 runs each;
   `mqtt_recovery` 10,000 runs, including v1/v3 framing and v3 trailer corruption
   paths; no crash. macOS emitted non-fatal external-symbolizer warnings.
+
+## Mosquitto 2.0.18 persistent unsubscribe interoperability remediation
+
+The first remote external run exposed a harness compatibility defect, not a broker
+state defect. Mosquitto 2.0.18 rejects an invocation containing `-U` without any
+`-t`, while the newer local 2.1.2 client accepts it. The old harness ignored the
+2.0.18 nonzero exit and then re-subscribed the target topic during verification,
+mixing session resume with a new subscription.
+
+`PERSISTENT-UNSUB-RECONNECT-001` now proves at raw packet level that Session Present
+is one, exact UNSUBACK is received, no post-unsubscribe offline message is queued,
+and only a fresh post-resubscribe publication is delivered. The test-only broker
+unit regression additionally verifies that the filter is absent from both
+`StoredSession` and `SubscriptionTrie`. `MOSQUITTO-PERSISTENT-UNSUB-001` uses
+a different authorized topic to satisfy both 2.0.x and 2.1.x parsers, observes
+`UNSUBACK` in the debug trace as the correctness boundary, and checks the exact
+forbidden payload rather than requiring empty stdout. It passes with isolated
+official 2.0.18 clients and local 2.1.2 clients. No production broker code changed;
+the next remote Mosquitto 2.0.18 workflow is expected to pass for this protocol
+reason.
 
 ## Remaining risks
 
@@ -115,7 +135,8 @@ OS crash, power loss, or hardware loss can discard recent state. Business delive
 is at-least-once. Legacy v1 read compatibility has a hard but comparatively large
 1.25 GiB ceiling. Planned v3 commit and route commit use the single broker mutex;
 the measured bounded scans remain a future performance topic, not a correctness
-gap. The external workflow exists but has not run remotely because nothing was
-pushed. MQTT 5, clustering, shared subscriptions, bridges, crash-durable
+gap. The corrected external workflow has not yet been rerun remotely because this
+commit is intentionally unpushed. MQTT 5, clustering, shared subscriptions,
+bridges, crash-durable
 exactly-once delivery, a runtime database, and an external runtime broker remain
 outside the claimed profile.

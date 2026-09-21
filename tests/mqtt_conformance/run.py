@@ -149,7 +149,11 @@ def validate_catalog(catalog: dict[str, object]) -> tuple[set[str], dict[str, st
     raw = list(catalog.get("netbaiot_raw", []))
     differential = list(catalog.get("mosquitto_differential", []))
     rust = dict(catalog.get("rust_release_gate", {}))
-    external = ["MOSQUITTO-CLIENT-001", "TLS-001", "RESTART-001", "NORMATIVE-COVERAGE-001"]
+    external = list(catalog.get("external_client", [])) + [
+        "TLS-001",
+        "RESTART-001",
+        "NORMATIVE-COVERAGE-001",
+    ]
     ids = raw + differential + list(rust) + external
     duplicates = sorted({test_id for test_id in ids if ids.count(test_id) > 1})
     if duplicates:
@@ -361,6 +365,57 @@ def raw_netbaiot(port: int, results: Results) -> None:
         "unsubscribe",
         "MQTT-3.10.4-1; MQTT-3.10.4-4; MQTT-3.10.4-5; MQTT-3.10.4-6",
         unsubscribe_matrix,
+    )
+
+    def persistent_unsubscribe_reconnect() -> str:
+        client_id = "persistent-unsub"
+        subscriber, body = connected(port, client_id, clean=False)
+        assert body == b"\x00\x00"
+        subscriber.send(subscribe(1, [(TOPIC_A, 1)]))
+        assert subscriber.recv() == (0x90, b"\x00\x01\x01")
+        subscriber.close(True)
+
+        resumed, body = connected(port, client_id, clean=False)
+        assert body == b"\x01\x00"
+        resumed.send(unsubscribe(2, [TOPIC_A]))
+        assert resumed.recv() == (0xB0, b"\x00\x02")
+        resumed.close(True)
+
+        stale_payload = event(90)
+        publisher, _ = connected(port, "persistent-unsub-publisher")
+        publisher.send(publish(TOPIC_A, stale_payload, qos=1, packet_id=1))
+        assert publisher.recv() == (0x40, b"\x00\x01")
+        publisher.close(True)
+
+        verify, body = connected(port, client_id, clean=False)
+        assert body == b"\x01\x00"
+        no_packet(verify)
+        verify.send(subscribe(3, [(TOPIC_A, 1)]))
+        assert verify.recv() == (0x90, b"\x00\x03\x01")
+        verify.close(True)
+
+        fresh_payload = event(91)
+        publisher, _ = connected(port, "persistent-unsub-publisher-2")
+        publisher.send(publish(TOPIC_A, fresh_payload, qos=1, packet_id=1))
+        assert publisher.recv() == (0x40, b"\x00\x01")
+        publisher.close(True)
+
+        final, body = connected(port, client_id, clean=False)
+        assert body == b"\x01\x00"
+        first, packet_body = final.recv()
+        delivered = parse_publish(first, packet_body)
+        assert delivered["payload"] == fresh_payload
+        assert delivered["qos"] == 1
+        final.send(frame(0x40, int(delivered["packet_id"]).to_bytes(2, "big")))
+        no_packet(final)
+        final.close(True)
+        return "Session Present=1; UNSUBACK committed; no stale offline delivery; resubscribe delivered only fresh publication"
+
+    results.run(
+        "PERSISTENT-UNSUB-RECONNECT-001",
+        "unsubscribe/session",
+        "MQTT-3.10.4-4; MQTT-4.1.0-1; MQTT-4.5.0-1",
+        persistent_unsubscribe_reconnect,
     )
 
     def qos0() -> str:
@@ -987,20 +1042,67 @@ def main() -> int:
                 "MOSQUITTO-DIFFERENTIAL-REQUIRED",
                 f"required Mosquitto broker is unavailable at {MOSQUITTO}",
             )
-        for executable, test_id in [
-            (shutil.which("mosquitto_pub"), "MOSQUITTO-CLIENT-001"),
-            (shutil.which("mosquitto_sub"), "MOSQUITTO-CLIENT-001"),
-        ]:
-            if executable is None and not any(
-                item["test_id"] == test_id for item in results.items
-            ):
-                results.required_missing(test_id, f"required executable is unavailable: {executable}")
-        if not any(item["test_id"] == "MOSQUITTO-CLIENT-001" for item in results.items):
+        external_client_ids = list(catalog["external_client"])
+        missing_clients = [
+            executable
+            for executable in ("mosquitto_pub", "mosquitto_sub")
+            if shutil.which(executable) is None
+        ]
+        if missing_clients:
+            for test_id in external_client_ids:
+                if args.only is None or args.only == test_id:
+                    results.required_missing(
+                        test_id,
+                        f"required executables are unavailable: {', '.join(missing_clients)}",
+                    )
+        else:
+            client_outcome: dict[str, str] = {}
+
+            def client_matrix() -> str:
+                if "error" in client_outcome:
+                    raise AssertionError(client_outcome["error"])
+                if "details" not in client_outcome:
+                    command = ["python3", "tests/run_mosquitto_cli_interop.py"]
+                    try:
+                        completed = subprocess.run(
+                            command,
+                            cwd=ROOT,
+                            capture_output=True,
+                            text=True,
+                            timeout=180,
+                        )
+                    except Exception as error:
+                        client_outcome["error"] = str(error)
+                        raise
+                    if completed.returncode != 0:
+                        error = (
+                            f"command failed ({completed.returncode}): {' '.join(command)}\n"
+                            f"{completed.stdout[-2000:]}\n{completed.stderr[-2000:]}"
+                        )
+                        client_outcome["error"] = error
+                        raise AssertionError(error)
+                    lines = completed.stdout.strip().splitlines()
+                    client_outcome["details"] = next(
+                        (
+                            line
+                            for line in reversed(lines)
+                            if line.startswith("MOSQUITTO-PERSISTENT-UNSUB-001:")
+                        ),
+                        "Mosquitto CLI matrix completed",
+                    )
+                return client_outcome["details"]
+
             results.run(
                 "MOSQUITTO-CLIENT-001",
                 "external-client",
                 "MQTT 3.1.1 client interoperability",
-                lambda: command_check(["python3", "tests/run_mosquitto_cli_interop.py"]),
+                client_matrix,
+            )
+            results.run(
+                "MOSQUITTO-PERSISTENT-UNSUB-001",
+                "external-client",
+                "MQTT 3.10.4-4 persistent unsubscribe interoperability",
+                client_matrix,
             )
         if shutil.which("mosquitto_pub") is not None:
             results.run(
@@ -1057,8 +1159,8 @@ def main() -> int:
                 list(catalog["netbaiot_raw"])
                 + list(catalog["mosquitto_differential"])
                 + list(rust_evidence)
+                + list(catalog["external_client"])
                 + [
-                    "MOSQUITTO-CLIENT-001",
                     "TLS-001",
                     "RESTART-001",
                     "NORMATIVE-COVERAGE-001",

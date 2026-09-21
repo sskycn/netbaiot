@@ -18,6 +18,7 @@
     "SUB-001",
     "SUB-002",
     "UNSUB-001",
+    "PERSISTENT-UNSUB-RECONNECT-001",
     "QOS0-001",
     "QOS1-001",
     "QOS1-DUP-001",
@@ -46,6 +47,10 @@
     "DIFF-WILL-001",
     "DIFF-DUPLICATE-CLIENT-001",
     "DIFF-KEEPALIVE-001"
+  ],
+  "external_client": [
+    "MOSQUITTO-CLIENT-001",
+    "MOSQUITTO-PERSISTENT-UNSUB-001"
   ],
   "classification_exceptions": {
     "DIFF-UNKNOWN-PUBACK-001": "IMPLEMENTATION_DEFINED_ALLOWED"
