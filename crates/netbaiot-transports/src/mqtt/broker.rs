@@ -3,7 +3,7 @@ use netbaiot_core::{
     AuthInvalidation, AuthenticatedDevice, CodecId, DeviceId, DeviceKey, Permissions, ProductId,
     TenantId,
 };
-use netbaiot_runtime::{Error, Limits, Result, lock, now_ms};
+use netbaiot_runtime::{Error, Histogram, Limits, Metrics, Result, lock, now_ms};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
@@ -12,6 +12,7 @@ use std::{
     io::{BufReader, Cursor, Read, Write},
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
+    time::Instant,
 };
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
@@ -527,13 +528,23 @@ impl Drop for Attachment {
 
 pub struct MqttBroker {
     limits: Arc<Limits>,
+    metrics: Option<Arc<Metrics>>,
     state: Mutex<BrokerState>,
 }
 
 impl MqttBroker {
     pub fn new(limits: Arc<Limits>) -> Arc<Self> {
+        Self::new_inner(limits, None)
+    }
+
+    pub fn new_with_metrics(limits: Arc<Limits>, metrics: Arc<Metrics>) -> Arc<Self> {
+        Self::new_inner(limits, Some(metrics))
+    }
+
+    fn new_inner(limits: Arc<Limits>, metrics: Option<Arc<Metrics>>) -> Arc<Self> {
         Arc::new(Self {
             limits,
+            metrics,
             state: Mutex::new(BrokerState {
                 sessions: HashMap::new(),
                 active: HashMap::new(),
@@ -823,8 +834,23 @@ impl MqttBroker {
         if message.qos > 2 || !valid_topic(&message.topic, &self.limits, false) {
             return Err(Error::Invalid);
         }
+        let lock_started = self
+            .metrics
+            .as_ref()
+            .filter(|metrics| metrics.lock_timing_enabled())
+            .map(|_| Instant::now());
         let mut state = lock(&self.state)?;
-        route_locked(&mut state, owner, &message, &self.limits)
+        let lock_wait_us = lock_started.map(|started| started.elapsed().as_micros() as u64);
+        let hold_started = lock_started.map(|_| Instant::now());
+        let result = route_locked(&mut state, owner, &message, &self.limits);
+        let lock_hold_us = hold_started.map(|started| started.elapsed().as_micros() as u64);
+        drop(state);
+        if let (Some(metrics), Some(wait), Some(hold)) = (&self.metrics, lock_wait_us, lock_hold_us)
+        {
+            metrics.observe(Histogram::BrokerLockWait, wait);
+            metrics.observe(Histogram::BrokerLockHold, hold);
+        }
+        result
     }
 
     pub fn reserve_will(

@@ -5,6 +5,8 @@ import argparse
 import json
 import os
 import signal
+import socket
+import ssl
 import subprocess
 import tempfile
 import time
@@ -42,12 +44,44 @@ def last_json(output, event=None):
     return values[-1] if values else None
 
 
+def management_get(port, path, tls=False):
+    stream = socket.create_connection(("127.0.0.1", port), timeout=3)
+    if tls:
+        stream = ssl._create_unverified_context().wrap_socket(stream, server_hostname="localhost")
+    request = (
+        f"GET {path} HTTP/1.1\r\n"
+        f"Host: 127.0.0.1:{port}\r\n"
+        f"Authorization: Bearer {'ab' * 32}\r\n"
+        "Connection: close\r\n\r\n"
+    ).encode()
+    stream.sendall(request)
+    response = bytearray()
+    while True:
+        chunk = stream.recv(65536)
+        if not chunk:
+            break
+        response.extend(chunk)
+    stream.close()
+    head, separator, body = bytes(response).partition(b"\r\n\r\n")
+    if not separator or b" 200 " not in head.split(b"\r\n", 1)[0]:
+        raise RuntimeError(f"management response: {response[:256]!r}")
+    return body.decode()
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--rate", type=float, required=True)
     parser.add_argument("--duration", type=float, default=30)
     parser.add_argument("--connections", type=int, default=32)
     parser.add_argument("--sink-delay-ms", type=float, default=0)
+    parser.add_argument("--sink-mode", choices=("none", "webhook"), default="webhook")
+    parser.add_argument("--qos", type=int, choices=(0, 1, 2), default=1)
+    parser.add_argument("--payload-bytes", type=int, default=256)
+    parser.add_argument("--warmup", type=float, default=2)
+    parser.add_argument("--cooldown", type=float, default=2)
+    parser.add_argument("--sample-output")
+    parser.add_argument("--sample-seconds", type=int, default=10)
+    parser.add_argument("--tls", action="store_true")
     args = parser.parse_args()
     ports = [free_port() for _ in range(6)]
     device_http, management, mqtt, tcp, udp, sink_port = ports
@@ -58,8 +92,10 @@ def main():
         "max_connections_per_tenant": maximum,
         "max_devices": maximum,
         "max_devices_per_tenant": maximum,
+        "max_persistent_sessions": maximum,
+        "max_persistent_sessions_per_tenant": maximum,
         "auth_cache_max_entries": maximum,
-        "auth_cache_max_bytes": 16 * 1024 * 1024,
+        "auth_cache_max_bytes": 64 * 1024 * 1024,
         "rate_entries": maximum,
         "requests_per_second": 1000000,
         "requests_per_ip_second": 1000000,
@@ -74,6 +110,9 @@ def main():
         "global_event_max_count": 50000,
         "global_event_max_bytes": 64 * 1024 * 1024,
         "sink_delivery_concurrency": 8,
+        # Scaling admitted MQTT sessions also scales the validated maximum
+        # recovery image. This is a ceiling; the benchmark does not allocate it.
+        "mqtt_recovery_max_bytes": 512 * 1024 * 1024,
     }
     with tempfile.TemporaryDirectory(prefix="netbaiot-load-") as temporary:
         control = os.path.join(temporary, "sink.json")
@@ -93,8 +132,19 @@ def main():
                     "development": True,
                     "limits": limits,
                     "credentials": [credential(i) for i in range(args.connections)],
-                    "tls": None,
-                    "delivery_url": f"http://127.0.0.1:{sink_port}/events",
+                    "tls": (
+                        {
+                            "certificate": os.path.join(ROOT, "tests/fixtures/localhost-cert.pem"),
+                            "private_key": os.path.join(ROOT, "tests/fixtures/localhost-key.pem"),
+                        }
+                        if args.tls
+                        else None
+                    ),
+                    "delivery_url": (
+                        f"http://127.0.0.1:{sink_port}/events"
+                        if args.sink_mode == "webhook"
+                        else None
+                    ),
                     "auth_provider_url": None,
                     "spool_directory": os.path.join(temporary, "spool"),
                     "device_configs": [],
@@ -102,26 +152,29 @@ def main():
                 output,
             )
         with open(load_config, "w", encoding="utf-8") as output:
-            json.dump(
-                {
-                    "transport": "mqtt",
-                    "address": f"127.0.0.1:{mqtt}",
-                    "connections": args.connections,
-                    "tenant_width": args.connections + 1,
-                    "ramp_per_sec": args.connections,
-                    "warmup_secs": 2,
-                    "duration_secs": args.duration,
-                    "cooldown_secs": 2,
-                    "publish_rate": args.rate,
-                    "payload_bytes": 256,
-                    "qos": 1,
-                    "subscribe": False,
-                    "report_every_secs": 5,
-                },
-                output,
-            )
+            workload = {
+                "transport": "mqtt",
+                "address": f"127.0.0.1:{mqtt}",
+                "connections": args.connections,
+                "tenant_width": args.connections + 1,
+                # Stay below the host's small listen backlog when publisher
+                # counts are large; connection-ramp loss is not publish load.
+                "ramp_per_sec": min(200, args.connections),
+                "warmup_secs": args.warmup,
+                "duration_secs": args.duration,
+                "cooldown_secs": args.cooldown,
+                "publish_rate": args.rate,
+                "payload_bytes": args.payload_bytes,
+                "qos": args.qos,
+                "subscribe": False,
+                "report_every_secs": 5,
+            }
+            if args.tls:
+                workload["tls_ca"] = os.path.join(ROOT, "tests/fixtures/localhost-cert.pem")
+            json.dump(workload, output)
         environment = os.environ.copy()
         environment["NETBAIOT_ADMIN_SECRET"] = "ab" * 32
+        environment["NETBAIOT_PERF_LOCK_METRICS"] = "1"
         environment["NO_PROXY"] = "127.0.0.1,localhost"
         environment["no_proxy"] = "127.0.0.1,localhost"
         sink = subprocess.Popen(
@@ -145,7 +198,7 @@ def main():
             deadline = time.time() + 10
             while True:
                 try:
-                    status(management, False)
+                    status(management, args.tls)
                     break
                 except Exception:
                     if server.poll() is not None or time.time() > deadline:
@@ -158,8 +211,23 @@ def main():
                 text=True,
             )
             samples = []
+            profiler = None
+            profile_at = time.time() + args.warmup + 1
             while load.poll() is None:
-                state = status(management, False)
+                if args.sample_output and profiler is None and time.time() >= profile_at:
+                    profiler = subprocess.Popen(
+                        [
+                            "sample",
+                            str(server.pid),
+                            str(args.sample_seconds),
+                            "-file",
+                            args.sample_output,
+                        ],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.PIPE,
+                        text=True,
+                    )
+                state = status(management, args.tls)
                 samples.append(
                     {
                         "event_count": state["event_count"],
@@ -173,10 +241,24 @@ def main():
                                 ["ps", "-o", "%cpu=", "-p", str(server.pid)], text=True
                             ).strip()
                         ),
+                        "loadgen_cpu_percent": float(
+                            subprocess.check_output(
+                                ["ps", "-o", "%cpu=", "-p", str(load.pid)], text=True
+                            ).strip()
+                        ),
+                        "sink_cpu_percent": float(
+                            subprocess.check_output(
+                                ["ps", "-o", "%cpu=", "-p", str(sink.pid)], text=True
+                            ).strip()
+                        ),
                     }
                 )
                 time.sleep(1)
             load_out, load_err = load.communicate(timeout=5)
+            profile_stderr = ""
+            if profiler is not None:
+                _, profile_stderr = profiler.communicate(timeout=args.sample_seconds + 10)
+            metrics = management_get(management, "/api/v1/metrics", args.tls)
             server.send_signal(signal.SIGTERM)
             server.wait(timeout=30)
             sink.send_signal(signal.SIGTERM)
@@ -185,13 +267,21 @@ def main():
                 "rate_requested": args.rate,
                 "duration_seconds": args.duration,
                 "connections": args.connections,
+                "qos": args.qos,
+                "payload_bytes": args.payload_bytes,
+                "warmup_seconds": args.warmup,
+                "cooldown_seconds": args.cooldown,
+                "sink_mode": args.sink_mode,
+                "tls": args.tls,
                 "sink_delay_ms": args.sink_delay_ms,
                 "load": last_json(load_out, "final"),
                 "sink": last_json(sink_out),
+                "metrics": metrics,
                 "samples": samples,
                 "server_exit": server.returncode,
                 "load_stderr": load_err[-512:],
                 "sink_stderr": sink_err[-512:],
+                "profile_stderr": profile_stderr[-512:],
             }
             print(json.dumps(result, sort_keys=True))
         finally:

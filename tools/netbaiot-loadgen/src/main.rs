@@ -112,7 +112,7 @@ impl Config {
             || self.offset > 50000
             || self.tenant_width == 0
             || self.payload_bytes > 65000
-            || self.qos > 1
+            || self.qos > 2
             || self.window == 0
             || self.window > 32
             || self.command_padding > 256
@@ -456,6 +456,13 @@ struct Pending {
     command: bool,
     phase: usize,
 }
+fn connack_accepted(packet: &(u8, Vec<u8>), clean_session: bool) -> bool {
+    packet.0 == 0x20
+        && packet.1.len() == 2
+        && packet.1[1] == 0
+        && packet.1[0] <= 1
+        && (!clean_session || packet.1[0] == 0)
+}
 #[allow(clippy::too_many_arguments)]
 async fn mqtt_or_tcp(
     c: &Config,
@@ -494,9 +501,12 @@ async fn mqtt_or_tcp(
             next(&mut stream, &mut buffer, true),
         )
         .await??;
-        if ack != (0x20, vec![0, 0]) {
+        if !connack_accepted(&ack, c.mqtt_clean_session) {
             count(s, "connect_rejected", 1);
             return Err("CONNACK rejection".into());
+        }
+        if ack.1[0] == 1 {
+            count(s, "session_present", 1);
         }
     } else {
         write(
@@ -597,6 +607,18 @@ async fn mqtt_or_tcp(
                     );
                     count(s, "pubacks", 1);
                 }
+            } else if first == 0x50 && b.len() == 2 {
+                let id = u16::from_be_bytes([b[0], b[1]]);
+                if ids.contains_key(&id) {
+                    write(&mut stream, &packet(0x62, &b), s).await?;
+                    count(s, "pubrels", 1);
+                }
+            } else if first == 0x70 && b.len() == 2 {
+                let id = u16::from_be_bytes([b[0], b[1]]);
+                if let Some(p) = ids.remove(&id) {
+                    observe(s, "pubcomp", p.at.elapsed());
+                    count(s, "pubcomps", 1);
+                }
             } else if !mqtt || first >> 4 == 3 {
                 let payload = if mqtt {
                     if b.len() < 2 {
@@ -664,14 +686,16 @@ async fn mqtt_or_tcp(
                     let source = format!("ack:{command_id}");
                     let a=json!({"schema_version":1,"source_message_id":source,"kind":"command_ack","data":{"command_id":command_id,"execution":"succeeded"}}).to_string();
                     let at = Instant::now();
-                    pending.insert(
-                        source,
-                        Pending {
-                            at,
-                            command: true,
-                            phase: 0,
-                        },
-                    );
+                    if c.subscribe {
+                        pending.insert(
+                            source,
+                            Pending {
+                                at,
+                                command: true,
+                                phase: 0,
+                            },
+                        );
+                    }
                     if mqtt {
                         pid = pid.wrapping_add(1).max(1);
                         while ids.contains_key(&pid) {
@@ -741,7 +765,7 @@ async fn mqtt_or_tcp(
                     if mqtt {
                         let mut b = Vec::new();
                         text(&mut b, &(topics.clone() + "up"));
-                        if c.qos == 1 {
+                        if c.qos > 0 {
                             pid = pid.wrapping_add(1).max(1);
                             while ids.contains_key(&pid) {
                                 pid = pid.wrapping_add(1).max(1);
@@ -1096,13 +1120,33 @@ mod tests {
     fn bad_config_and_oversize_response() {
         assert!(
             Config {
+                qos: 2,
+                ..Config::default()
+            }
+            .validate()
+            .is_ok()
+        );
+        assert!(
+            Config {
                 connections: 50001,
                 ..Config::default()
             }
             .validate()
             .is_err()
         );
+        assert!(
+            Config {
+                qos: 3,
+                ..Config::default()
+            }
+            .validate()
+            .is_err()
+        );
         assert!(parse(&mut BytesMut::from(&[0x30, 0xff, 0xff, 0x7f][..]), true).is_err());
+        assert!(connack_accepted(&(0x20, vec![0, 0]), true));
+        assert!(!connack_accepted(&(0x20, vec![1, 0]), true));
+        assert!(connack_accepted(&(0x20, vec![1, 0]), false));
+        assert!(!connack_accepted(&(0x20, vec![2, 0]), false));
     }
     #[tokio::test]
     async fn http_response_enforces_streamed_boundary() {

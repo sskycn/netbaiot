@@ -35,7 +35,7 @@ pub struct Services {
 impl Services {
     pub fn new(ingress: Arc<Ingress>, shutdown: CancellationToken) -> Arc<Self> {
         let limits = ingress.limits.clone();
-        let mqtt = MqttBroker::new(limits.clone());
+        let mqtt = MqttBroker::new_with_metrics(limits.clone(), ingress.metrics.clone());
         Self::new_with_mqtt(ingress, shutdown, mqtt)
     }
 

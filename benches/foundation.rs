@@ -510,6 +510,100 @@ fn main() {
             black_box(broker.matching_retained_count("bench/retained/#").unwrap());
         });
     }
+    for payload_bytes in [64, 256, 1_024, 8_192, 32_768] {
+        let payload = vec![b'x'; payload_bytes];
+        let offline = MqttBroker::new(Arc::new(Limits::default()));
+        let mut offline_attachment = offline.attach(&auth, "offline-cost".into(), false).unwrap();
+        offline
+            .subscribe(
+                &offline_attachment.key,
+                offline_attachment.generation,
+                &down,
+                2,
+            )
+            .unwrap();
+        offline_attachment.detach().unwrap();
+        let offline_before = offline.usage().unwrap().1;
+        offline
+            .route(
+                &auth.device_key,
+                BrokerMessage {
+                    topic: down.clone(),
+                    payload: payload.clone(),
+                    qos: 1,
+                    retain: false,
+                },
+            )
+            .unwrap();
+        let offline_bytes = offline.usage().unwrap().1 - offline_before;
+
+        let outbound_qos1 = MqttBroker::new(Arc::new(Limits::default()));
+        let mut qos1_attachment = outbound_qos1
+            .attach(&auth, "outbound-qos1-cost".into(), false)
+            .unwrap();
+        outbound_qos1
+            .subscribe(&qos1_attachment.key, qos1_attachment.generation, &down, 1)
+            .unwrap();
+        let qos1_before = outbound_qos1.usage().unwrap().1;
+        outbound_qos1
+            .route(
+                &auth.device_key,
+                BrokerMessage {
+                    topic: down.clone(),
+                    payload: payload.clone(),
+                    qos: 1,
+                    retain: false,
+                },
+            )
+            .unwrap();
+        black_box(qos1_attachment.receiver.try_recv().unwrap());
+        let qos1_bytes = outbound_qos1.usage().unwrap().1 - qos1_before;
+
+        let outbound_qos2 = MqttBroker::new(Arc::new(Limits::default()));
+        let mut qos2_attachment = outbound_qos2
+            .attach(&auth, "outbound-qos2-cost".into(), false)
+            .unwrap();
+        outbound_qos2
+            .subscribe(&qos2_attachment.key, qos2_attachment.generation, &down, 2)
+            .unwrap();
+        let qos2_before = outbound_qos2.usage().unwrap().1;
+        outbound_qos2
+            .route(
+                &auth.device_key,
+                BrokerMessage {
+                    topic: down.clone(),
+                    payload: payload.clone(),
+                    qos: 2,
+                    retain: false,
+                },
+            )
+            .unwrap();
+        black_box(qos2_attachment.receiver.try_recv().unwrap());
+        let qos2_bytes = outbound_qos2.usage().unwrap().1 - qos2_before;
+
+        let inbound_qos2 = MqttBroker::new(Arc::new(Limits::default()));
+        let inbound_attachment = inbound_qos2
+            .attach(&auth, "inbound-qos2-cost".into(), false)
+            .unwrap();
+        let inbound_before = inbound_qos2.usage().unwrap().1;
+        inbound_qos2
+            .inbound_qos2(
+                &inbound_attachment.key,
+                inbound_attachment.generation,
+                1,
+                BrokerMessage {
+                    topic: up.clone(),
+                    payload,
+                    qos: 2,
+                    retain: false,
+                },
+            )
+            .unwrap();
+        let inbound_bytes = inbound_qos2.usage().unwrap().1 - inbound_before;
+        println!(
+            "mqtt_state_payload_{payload_bytes}: offline_messages=1 offline_bytes={offline_bytes} outbound_qos1_bytes={qos1_bytes} outbound_qos2_bytes={qos2_bytes} inbound_qos2_bytes={inbound_bytes}"
+        );
+    }
     println!(
         "layout_bytes: session_endpoint={} queued_command={} device_event={}",
         std::mem::size_of::<SessionEndpoint>(),

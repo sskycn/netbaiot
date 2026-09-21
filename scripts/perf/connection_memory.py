@@ -110,8 +110,14 @@ def main():
         "messages_per_device_second": maximum,
         "messages_per_tenant_second": maximum * 3,
         "global_connection_logical_bytes": maximum * 524288,
+        # Scaling the admitted session/connection counts also scales the validated
+        # worst-case NBMQ recovery image. Keep the benchmark configuration valid;
+        # this is a ceiling and is not allocated by the probe.
+        "mqtt_recovery_max_bytes": 512 * 1024 * 1024,
     }
-    if args.disconnected and maximum * 524288 > 2**32 - 1:
+    logical_bytes_per_connection = 524288
+    if maximum * logical_bytes_per_connection > 2**32 - 1:
+        logical_bytes_per_connection = 65536
         limits["connection_memory_reservation"] = 65536
         limits["global_connection_logical_bytes"] = maximum * 65536
     config = {
@@ -224,7 +230,7 @@ def main():
                 "tasks_delta_per_connection": round(
                     (loaded_status["runtime_tasks"] - base_status["runtime_tasks"]) / args.connections, 3
                 ),
-                "logical_bytes_per_connection": 524288,
+                "logical_bytes_per_connection": logical_bytes_per_connection,
             }
             print(json.dumps(result, sort_keys=True))
             if load.poll() is None:

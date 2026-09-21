@@ -415,11 +415,8 @@ pub async fn connection(
                                 services.mqtt.inbound_qos2(&attachment.key, attachment.generation, id, message)?;
                                 send(&mut stream, &services, &ack(0x50, id)).await?;
                             } else {
-                                let acceptance = process_publish(&services, &auth, &message, validated_at, validation_us).await?;
+                                let _acceptance = process_publish(&services, &auth, &message, validated_at, validation_us).await?;
                                 if let Some(id) = packet_id {
-                                    if let Some(acceptance) = acceptance {
-                                        services.ingress.metrics.observe(Histogram::CodecToEventAccepted, acceptance.accepted_at.elapsed().as_micros() as u64);
-                                    }
                                     let started = Instant::now();
                                     send(&mut stream, &services, &ack(0x40, id)).await?;
                                     services.ingress.metrics.observe(Histogram::PubackWrite, started.elapsed().as_micros() as u64);
