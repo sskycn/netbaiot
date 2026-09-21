@@ -7,14 +7,18 @@ jobs:
       fail-fast: false
       matrix:
         toolchain: ["1.88.0", stable]
+    env:
+      RUSTUP_TOOLCHAIN: ${{ matrix.toolchain }}
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ matrix.toolchain }}
           components: rustfmt, clippy
+      - run: rustc --version --verbose
+      - run: cargo --version --verbose
       - run: cargo fmt --all -- --check
-      - run: cargo clippy --workspace --all-targets --all-features -- -D warnings
-      - run: cargo test --workspace --all-features
+      - run: cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
+      - run: cargo test --locked --workspace --all-features
       - if: matrix.toolchain == 'stable'
         run: python3 tests/mqtt_conformance/run.py --netbaiot-only

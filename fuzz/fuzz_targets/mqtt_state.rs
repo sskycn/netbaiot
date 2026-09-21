@@ -70,11 +70,22 @@ fuzz_target!(|data: &[u8]| {
                 );
             }
             3 => {
-                let _ = broker.inbound_qos2_message(
+                let action = broker.begin_inbound_qos2_delivery(
                     &attachment.key,
                     attachment.generation,
                     packet_id,
                 );
+                if let Ok(netbaiot_transports::mqtt::broker::InboundQos2Action::Deliver {
+                    operation_id,
+                    ..
+                }) = action
+                {
+                    let _ = broker.abandon_inbound_qos2_delivery(
+                        &attachment.key,
+                        packet_id,
+                        operation_id,
+                    );
+                }
                 let _ = broker.complete_inbound_qos2(
                     &attachment.key,
                     attachment.generation,

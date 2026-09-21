@@ -285,19 +285,20 @@ fn main() {
             qos2_message.clone(),
         )
         .unwrap();
-        qos2.mark_inbound_qos2_event_accepted(
-            &qos2_attachment.key,
-            qos2_attachment.generation,
-            qos2_packet_id,
-        )
-        .unwrap();
-        qos2.route_inbound_qos2(
-            &qos2_attachment.key,
-            qos2_attachment.generation,
-            qos2_packet_id,
-            &auth.device_key,
-        )
-        .unwrap();
+        let netbaiot_transports::mqtt::broker::InboundQos2Action::Deliver { operation_id, .. } =
+            qos2.begin_inbound_qos2_delivery(
+                &qos2_attachment.key,
+                qos2_attachment.generation,
+                qos2_packet_id,
+            )
+            .unwrap()
+        else {
+            panic!("expected QoS2 delivery ownership")
+        };
+        qos2.finish_inbound_qos2_delivery(&qos2_attachment.key, qos2_packet_id, operation_id)
+            .unwrap();
+        qos2.route_inbound_qos2(&qos2_attachment.key, qos2_packet_id, &auth.device_key)
+            .unwrap();
     });
     let codec = JsonV1::default();
     let ctx = DecodeContext {

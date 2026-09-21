@@ -1,6 +1,10 @@
 use crate::*;
 use netbaiot_core::*;
-use std::{collections::HashMap, sync::Arc, time::Instant};
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+    time::Instant,
+};
 
 pub struct CodecRegistry {
     codecs: HashMap<(CodecId, u16), Arc<dyn DeviceCodec>>,
@@ -51,6 +55,7 @@ pub struct Ingress {
     pub sessions: Arc<Sessions>,
     pub admission: Arc<Admission>,
     pub lifecycle: Arc<Lifecycle>,
+    auth_registration: Mutex<()>,
 }
 
 impl Ingress {
@@ -75,6 +80,7 @@ impl Ingress {
             metrics,
             sessions,
             lifecycle,
+            auth_registration: Mutex::new(()),
         }
     }
 
@@ -95,6 +101,42 @@ impl Ingress {
             .inspect_err(|_| {
                 self.metrics.inc(Metric::AuthFailures);
             })
+    }
+
+    pub async fn authenticate_session(
+        &self,
+        request: AuthenticationRequest<'_>,
+    ) -> Result<AuthenticatedSessionCandidate> {
+        if !self.lifecycle.ready() {
+            return Err(Error::Draining);
+        }
+        self.auth_cache
+            .authenticate_candidate(request)
+            .await
+            .inspect_err(|_| self.metrics.inc(Metric::AuthFailures))
+    }
+
+    pub fn register_session(
+        &self,
+        candidate: AuthenticatedSessionCandidate,
+        transport: Transport,
+    ) -> Result<(SessionLease, tokio::sync::mpsc::Receiver<QueuedCommand>)> {
+        let _gate = lock(&self.auth_registration)?;
+        if !self.auth_cache.candidate_is_current(&candidate)? {
+            self.metrics.inc(Metric::AuthFailures);
+            return Err(Error::Authentication);
+        }
+        self.sessions.register(Arc::new(candidate.auth), transport)
+    }
+
+    pub fn invalidate_auth(
+        &self,
+        invalidation: &AuthInvalidation,
+    ) -> Result<(Vec<DeviceKey>, usize)> {
+        let _gate = lock(&self.auth_registration)?;
+        let devices = self.auth_cache.invalidate(invalidation)?;
+        let disconnected = self.sessions.disconnect_matching(invalidation)?;
+        Ok((devices, disconnected))
     }
 
     pub async fn ingest(
@@ -328,6 +370,89 @@ mod tests {
                 .is_err()
         );
         assert_eq!(events.usage().unwrap().events, 0);
+        events.stop_workers().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn auth_invalidation_epoch_fences_session_registration_for_every_scope() {
+        let limits = Arc::new(Limits::default());
+        let metrics = Arc::new(Metrics::default());
+        let identity = identity("revoked");
+        let provider = StaticAuthenticator::new(
+            vec![Credential {
+                credential_id: "revoked".into(),
+                secret_hex: "00".repeat(32),
+                identity: identity.clone(),
+            }],
+            &limits,
+        )
+        .unwrap();
+        let sink_id = SinkId::new("auth-race").unwrap();
+        let events = EventBus::new(
+            limits.clone(),
+            metrics.clone(),
+            vec![SinkDefinition::bounded(
+                sink_id.clone(),
+                SinkDeliveryMode::ConfirmedRequired,
+                Arc::new(TestSink),
+                &limits,
+            )],
+            vec![RouteDefinition {
+                tenant: None,
+                sinks: vec![sink_id],
+            }],
+            1,
+        )
+        .unwrap();
+        let lifecycle = Arc::new(Lifecycle::starting());
+        lifecycle.mark_running().unwrap();
+        let ingress = Ingress::new(
+            limits.clone(),
+            AuthCache::new(provider, limits.clone(), metrics.clone()),
+            CodecRegistry::new(vec![(
+                CodecId::new("test").unwrap(),
+                1,
+                Arc::new(TestCodec),
+            )])
+            .unwrap(),
+            events.clone(),
+            ConfigCache::empty(limits.clone()),
+            metrics,
+            Sessions::new(limits),
+            lifecycle,
+        );
+        let invalidations = [
+            AuthInvalidation::Device {
+                device: identity.device_key.clone(),
+            },
+            AuthInvalidation::Product {
+                tenant_id: identity.device_key.tenant_id.clone(),
+                product_id: identity.device_key.product_id.clone(),
+            },
+            AuthInvalidation::Tenant {
+                tenant_id: identity.device_key.tenant_id.clone(),
+            },
+            AuthInvalidation::CredentialVersion { version: 1 },
+            AuthInvalidation::AuthGeneration { generation: 1 },
+            AuthInvalidation::All,
+        ];
+        for invalidation in invalidations {
+            let candidate = ingress
+                .authenticate_session(AuthenticationRequest::Secret {
+                    credential_id: "revoked",
+                    secret: b"0000000000000000000000000000000000000000000000000000000000000000",
+                })
+                .await
+                .unwrap();
+            ingress.invalidate_auth(&invalidation).unwrap();
+            assert!(
+                matches!(
+                    ingress.register_session(candidate, Transport::Mqtt),
+                    Err(Error::Authentication)
+                ),
+                "a pre-invalidation candidate must never become a live session"
+            );
+        }
         events.stop_workers().await.unwrap();
     }
 }

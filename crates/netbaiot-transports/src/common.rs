@@ -162,8 +162,8 @@ pub async fn authenticate_stream(
     reader: &mut Reader,
     stream: &mut BoxStream,
     stop: &CancellationToken,
-) -> Result<netbaiot_core::AuthenticatedDevice> {
-    let auth = s.ingress.authenticate(request);
+) -> Result<AuthenticatedSessionCandidate> {
+    let auth = s.ingress.authenticate_session(request);
     tokio::pin!(auth);
     let until = Instant::now() + Duration::from_millis(s.ingress.limits.authentication_timeout_ms);
     loop {

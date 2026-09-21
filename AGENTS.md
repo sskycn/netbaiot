@@ -276,6 +276,25 @@ QoS2 uses explicit inbound/outbound state. MQTT Packet Identifier is protocol st
 not EventId, and is reusable only after its lifecycle completes. MQTT QoS2 is not a
 business exactly-once promise.
 
+Every outbound acknowledgement must match one exact state transition: PUBACK only
+completes `AwaitPuback`, PUBREC only advances `AwaitPubrec`, and PUBCOMP only
+completes `AwaitPubcomp`. A wrong acknowledgement must not mutate accounting or
+packet-ID order. Inbound QoS2 EventAccepted ownership uses an operation token that
+survives same-session connection takeover; connection generation alone is not a
+valid fence for finishing already accepted work.
+
+Authentication invalidation and live-session registration share one synchronization
+boundary. A result returned before any device/product/tenant/version/generation/all
+invalidation may not register afterward. MQTT attachment and Will responsibility
+are RAII-owned across every post-registration early return, including failed
+CONNACK writes.
+
+Tenant inflight release must wake bounded pending work for other active sessions in
+the tenant; ACK handlers must not scan all sessions. Recovery limits must cover the
+worst-case serialized representation of every admitted legal state, not merely its
+logical payload bytes. A structural recovery overflow is an invariant failure, not
+a retryable shutdown I/O error.
+
 Will topic/payload/QoS/retain and retained state are validated, authorized, and
 bounded. A planned shutdown publishes each live connection's Will before atomically
 snapshotting required MQTT protocol state; only MQTT DISCONNECT suppresses that

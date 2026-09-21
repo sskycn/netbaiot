@@ -236,12 +236,29 @@ impl Default for Limits {
             spool_max_bytes: 268_435_456,
             spool_segment_max_bytes: 67_108_864,
             spool_record_max_bytes: 1_048_576,
-            mqtt_recovery_max_bytes: 268_435_456,
+            // JSON may encode one logical UTF-8 byte as a six-byte `\u00xx` escape. This bound
+            // covers that expansion plus per-record envelope overhead (see recovery_upper_bound).
+            mqtt_recovery_max_bytes: 1_342_177_280,
         }
     }
 }
 
 impl Limits {
+    /// Conservative upper bound for the serialized MQTT recovery image. MQTT session accounting
+    /// charges every message and filter a fixed 64-byte envelope; multiplying all logical bytes by
+    /// six covers JSON string escaping (the worst representation) and byte arrays (at most four
+    /// characters per byte). The remaining terms cover the retained tenant wrapper, top-level
+    /// vectors, checksum, and length headers.
+    pub fn mqtt_recovery_upper_bound(&self) -> Result<usize> {
+        self.global_mqtt_session_bytes
+            .checked_add(self.max_retained_bytes)
+            .and_then(|bytes| bytes.checked_mul(6))
+            .and_then(|bytes| bytes.checked_add(self.max_retained_messages.checked_mul(512)?))
+            .and_then(|bytes| bytes.checked_add(self.max_persistent_sessions.checked_mul(256)?))
+            .and_then(|bytes| bytes.checked_add(52))
+            .ok_or(Error::Configuration)
+    }
+
     pub fn validate(&self) -> Result<()> {
         let value = serde_json::to_value(self).map_err(|_| Error::Configuration)?;
         if value
@@ -308,10 +325,7 @@ impl Limits {
             || self.sink_timeout_ms > self.sink_max_age_ms
             || self.spool_record_max_bytes > self.spool_segment_max_bytes
             || self.spool_segment_max_bytes > self.spool_max_bytes
-            || self.mqtt_recovery_max_bytes
-                < self
-                    .global_mqtt_session_bytes
-                    .saturating_add(self.max_retained_bytes)
+            || self.mqtt_recovery_max_bytes < self.mqtt_recovery_upper_bound()?
             || self.max_read_buffer_per_connection < max_frame
             || self.connection_memory_reservation < max_frame
             || self.global_connection_logical_bytes < self.connection_memory_reservation

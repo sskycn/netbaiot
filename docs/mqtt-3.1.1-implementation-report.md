@@ -56,6 +56,12 @@ It is one only when an actual resumable session for the authenticated key existe
 New, CleanSession=1, expired/removed and cross-identity ClientId cases return zero.
 Unit, Paho reconnect and real subprocess restart tests cover this.
 
+Connection ownership is an `Attachment` RAII guard. If the success CONNACK cannot
+be written, Drop clears active ownership exactly once. CleanSession=1 removes its
+temporary stored state; CleanSession=0 preserves resumable state but not a live
+owner. A real duplex write-failure regression verifies the next reconnect observes
+Session Present 0 and 1 respectively.
+
 ## 10. Subscription router
 
 A level trie supports insertion, replacement, removal/pruning, exact children, `+`
@@ -83,6 +89,13 @@ DISCONNECT deletes the Will without publication. Raw socket tests validate abnor
 takeover, normal-DISCONNECT, and planned-shutdown/restart behavior; Mosquitto CLI
 validates QoS0/1/2 retained Wills.
 
+An authenticated CONNECT reserves retained capacity before the success CONNACK and
+then arms a `WillGuard`. Abnormal completion, including CONNACK write failure,
+publishes through Drop; MQTT DISCONNECT explicitly suppresses it. Publication and
+reservation release occur under one broker lock, so later retained pressure cannot
+discard an accepted Will. The optional IoT binding happens afterward and cannot
+duplicate or suppress MQTT delivery.
+
 ## 14. Inbound QoS0
 
 The bound ACL is checked, canonical IoT payload crosses codec/EventBus admission,
@@ -101,6 +114,12 @@ PUBREC without another application delivery. PUBREL crosses EventAccepted once,
 fences/removes state, routes once and returns PUBCOMP; duplicate PUBREL returns
 PUBCOMP without a second DeviceEvent. Recovery preserves AwaitPubrel.
 
+PUBREL first claims a bounded operation token and changes the stored state to
+`Delivering`. EventAccepted completion is fenced by that token, not by connection
+generation, so a same-session takeover cannot strand accepted work. Restore maps an
+interrupted Delivering state back to AwaitPubrel; EventAccepted remains routable by
+the replacement session.
+
 ## 17. Outbound QoS0
 
 Active delivery has no packet ID or inflight record. A full active sender sheds QoS0
@@ -116,6 +135,10 @@ on PUBACK. Persistent reconnect resends the same ID with DUP=1.
 AwaitPubrec sends PUBLISH; PUBREC moves to AwaitPubcomp and sends PUBREL; PUBCOMP
 releases state. Duplicate PUBREC resends PUBREL. Reconnect before PUBREC resends
 PUBLISH with DUP; reconnect before PUBCOMP resends PUBREL.
+
+Completion is an exhaustive state×ACK match: PUBACK completes only AwaitPuback,
+PUBREC advances only AwaitPubrec, and PUBCOMP completes only AwaitPubcomp. Wrong
+PUBACK/PUBCOMP leave the map, order, byte accounting, and packet identifier intact.
 
 ## 20. Packet Identifier lifecycle
 
@@ -134,6 +157,11 @@ by state rather than setting an illegal fixed-header bit.
 Disconnected CleanSession=0 subscriptions queue eligible QoS1/2 only. Reconnect
 promotes messages into available per-session and per-tenant inflight slots. The
 business command API remains live-only and returns `DEVICE_OFFLINE`.
+
+When a tenant inflight ceiling queues work for another active session, a bounded
+deduplicated per-tenant ready queue records that session. PUBACK/PUBCOMP release
+wakes eligible work directly through the existing bounded connection channel; it
+does not scan all sessions and creates no task per message.
 
 ## 23. Session resource bounds
 
@@ -160,6 +188,14 @@ JSON and SHA-256. It is written 0600 under a 0700 directory using temp file, fsy
 atomic rename and directory fsync. Restore rejects unknown/corrupt/over-limit state
 and contains no credentials. EventBus spool remains an independent replay-safe
 responsibility in the same recovery directory.
+
+The JSON format remains backward compatible, but its configured file bound is now
+derived rather than equated with logical state bytes. Six times the global session
+plus retained logical ceilings covers worst-case JSON string escaping and byte-array
+expansion; bounded per-session/retained wrapper allowances and the 52-byte envelope
+are added with checked arithmetic. The default is 1.25 GiB. Startup rejects a lower
+bound, high-byte payloads are committed/recovered in tests, and structural overflow
+during shutdown returns an invariant error instead of retrying forever.
 
 ## 27. Graceful restart tests
 

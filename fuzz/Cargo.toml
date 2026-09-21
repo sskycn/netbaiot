@@ -48,6 +48,13 @@ doc = false
 bench = false
 
 [[bin]]
+name = "mqtt_recovery"
+path = "fuzz_targets/mqtt_recovery.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
 name = "tcp_frame"
 path = "fuzz_targets/tcp_frame.rs"
 test = false
