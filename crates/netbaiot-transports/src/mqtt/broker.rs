@@ -4615,6 +4615,80 @@ mod tests {
     }
 
     #[test]
+    fn persistent_unsubscribe_commits_session_trie_and_offline_removal() {
+        let broker = MqttBroker::new(Arc::new(Limits::default()));
+        let device = auth("persistent-unsub");
+        let topic = "v1/t/t/p/p/d/persistent-unsub/up";
+        let first = broker.attach(&device, "client".into(), false).unwrap();
+        broker
+            .subscribe(&first.key, first.generation, topic, 1)
+            .unwrap();
+        broker.detach(&first.key, first.generation, false).unwrap();
+
+        let resumed = broker.attach(&device, "client".into(), false).unwrap();
+        assert!(resumed.session_present);
+        broker
+            .unsubscribe(&resumed.key, resumed.generation, topic)
+            .unwrap();
+        {
+            let state = broker.state.lock().unwrap();
+            let session = state.sessions.get(&resumed.key).unwrap();
+            assert!(!session.subscriptions.contains_key(topic));
+            assert!(state.trie.matching(topic).is_empty());
+        }
+        broker
+            .detach(&resumed.key, resumed.generation, false)
+            .unwrap();
+
+        assert_eq!(
+            broker
+                .route(
+                    &device.device_key,
+                    BrokerMessage {
+                        topic: topic.into(),
+                        payload: b"stale".to_vec(),
+                        qos: 1,
+                        retain: false,
+                    },
+                )
+                .unwrap(),
+            0
+        );
+        {
+            let state = broker.state.lock().unwrap();
+            let session = state.sessions.get(&resumed.key).unwrap();
+            assert!(session.offline.is_empty());
+            assert_eq!(state.offline_count, 0);
+        }
+
+        let verify = broker.attach(&device, "client".into(), false).unwrap();
+        assert!(verify.session_present);
+        assert!(verify.receiver.is_empty());
+        broker
+            .subscribe(&verify.key, verify.generation, topic, 1)
+            .unwrap();
+        broker
+            .detach(&verify.key, verify.generation, false)
+            .unwrap();
+        assert_eq!(
+            broker
+                .route(
+                    &device.device_key,
+                    BrokerMessage {
+                        topic: topic.into(),
+                        payload: b"fresh".to_vec(),
+                        qos: 1,
+                        retain: false,
+                    },
+                )
+                .unwrap(),
+            1
+        );
+        let state = broker.state.lock().unwrap();
+        assert_eq!(state.sessions.get(&verify.key).unwrap().offline.len(), 1);
+    }
+
+    #[test]
     fn mqtt_accepted_will_reservation_survives_later_retained_pressure() {
         let limits = Arc::new(Limits {
             max_retained_messages: 1,

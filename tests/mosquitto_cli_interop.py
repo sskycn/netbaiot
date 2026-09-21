@@ -3,16 +3,60 @@
 
 import argparse
 import json
+import os
 import shutil
 import subprocess
+import sys
 import time
 
 
 PASSWORD = "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"
 ROOT = "v1/t/demo/p/sensor/d/device-1"
 TOPIC = f"{ROOT}/up"
-MOSQUITTO_PUB = shutil.which("mosquitto_pub") or "/usr/local/bin/mosquitto_pub"
-MOSQUITTO_SUB = shutil.which("mosquitto_sub") or "/usr/local/bin/mosquitto_sub"
+VERIFY_TOPIC = f"{ROOT}/down"
+MOSQUITTO_PUB = (
+    os.environ.get("NETBAIOT_MOSQUITTO_PUB")
+    or shutil.which("mosquitto_pub")
+    or "/usr/local/bin/mosquitto_pub"
+)
+MOSQUITTO_SUB = (
+    os.environ.get("NETBAIOT_MOSQUITTO_SUB")
+    or shutil.which("mosquitto_sub")
+    or "/usr/local/bin/mosquitto_sub"
+)
+
+
+def tool_version(executable):
+    completed = subprocess.run(
+        [executable, "--help"], capture_output=True, text=True, timeout=5
+    )
+    lines = (completed.stdout + completed.stderr).splitlines()
+    return next((line.strip() for line in lines if " version " in line), lines[0].strip())
+
+
+def redacted_command(command):
+    output = []
+    redact_next = False
+    for argument in command:
+        if redact_next:
+            output.append("<redacted>")
+            redact_next = False
+        else:
+            output.append(argument)
+            redact_next = argument == "-P"
+    return output
+
+
+def record_stage(diagnostics, stage, command, completed):
+    diagnostics.append(
+        {
+            "stage": stage,
+            "command": redacted_command(command),
+            "returncode": completed.returncode,
+            "stdout": completed.stdout,
+            "stderr": completed.stderr,
+        }
+    )
 
 
 def event(source, sequence):
@@ -32,6 +76,7 @@ class Matrix:
         self.base = ["-h", host, "-p", str(port), "-V", "mqttv311", "-u", "demo-device", "-P", PASSWORD]
         self.sequence = 0
         self.clients = 0
+        self.last_command = []
 
     def publish(self, topic=TOPIC, qos=1, payload=None, retain=False, check=True, extra=()):
         self.sequence += 1
@@ -39,6 +84,7 @@ class Matrix:
         command = [MOSQUITTO_PUB, *self.base, "-i", f"mosq-pub-{self.sequence}", "-t", topic, "-q", str(qos), "-m", payload, *extra]
         if retain:
             command.append("-r")
+        self.last_command = command
         return subprocess.run(command, check=check, capture_output=True, text=True, timeout=8)
 
     def subscriber(self, topic, qos=2, count=1, client_id=None, persistent=False, extra=()):
@@ -64,6 +110,10 @@ def main():
     args = parser.parse_args()
     matrix = Matrix(args.host, args.port)
     results = {}
+    versions = {
+        "mosquitto_pub": tool_version(MOSQUITTO_PUB),
+        "mosquitto_sub": tool_version(MOSQUITTO_SUB),
+    }
 
     matrix.publish(qos=1)
     bad = subprocess.run(
@@ -126,27 +176,161 @@ def main():
     results["clean_session_0_session_present_offline_qos1_qos2"] = "pass"
 
     unsub_id = "mosq-unsubscribe"
-    subprocess.run(
-        [MOSQUITTO_SUB, *matrix.base, "-c", "-i", unsub_id, "-t", TOPIC, "-q", "1", "-E"],
-        check=True,
-        capture_output=True,
-        timeout=8,
-    )
-    unsubscribed = subprocess.run(
-        [MOSQUITTO_SUB, *matrix.base, "-c", "-i", unsub_id, "-U", TOPIC, "-W", "1"],
-        capture_output=True,
-        timeout=8,
-    )
-    assert b"Protocol error" not in unsubscribed.stderr
-    matrix.publish(payload=event("mosq-after-unsubscribe", 50))
-    no_offline = subprocess.run(
-        [MOSQUITTO_SUB, *matrix.base, "-c", "-i", unsub_id, "-t", TOPIC, "-q", "1", "-W", "1", "-N"],
-        capture_output=True,
-        text=True,
-        timeout=4,
-    )
-    assert not no_offline.stdout
-    results["unsubscribe"] = "pass"
+    unsubscribe_diagnostics = []
+    try:
+        initial_command = [
+            MOSQUITTO_SUB,
+            *matrix.base,
+            "-c",
+            "-i",
+            unsub_id,
+            "-t",
+            TOPIC,
+            "-q",
+            "1",
+            "-E",
+            "-d",
+        ]
+        initial = subprocess.run(
+            initial_command, capture_output=True, text=True, timeout=8
+        )
+        record_stage(
+            unsubscribe_diagnostics, "initial persistent subscription", initial_command, initial
+        )
+        assert initial.returncode == 0, initial.stderr
+        assert "received SUBACK" in initial.stdout, initial.stdout
+
+        # Mosquitto 2.0.x requires at least one -t even when -U is present. Subscribe to a
+        # different allowed topic and wait for the debug trace to report UNSUBACK. The timeout
+        # bounds the otherwise long-lived subscriber; it is not the correctness boundary.
+        unsubscribe_command = [
+            MOSQUITTO_SUB,
+            *matrix.base,
+            "-c",
+            "-i",
+            unsub_id,
+            "-t",
+            VERIFY_TOPIC,
+            "-q",
+            "1",
+            "-U",
+            TOPIC,
+            "-W",
+            "1",
+            "-d",
+        ]
+        unsubscribed = subprocess.run(
+            unsubscribe_command, capture_output=True, text=True, timeout=8
+        )
+        record_stage(
+            unsubscribe_diagnostics, "persistent unsubscribe", unsubscribe_command, unsubscribed
+        )
+        assert "sending UNSUBSCRIBE" in unsubscribed.stdout, unsubscribed.stdout
+        assert "received UNSUBACK" in unsubscribed.stdout, unsubscribed.stdout
+
+        post_unsubscribe_payload = event("mosq-after-unsubscribe", 50)
+        published = matrix.publish(payload=post_unsubscribe_payload)
+        record_stage(
+            unsubscribe_diagnostics,
+            "post-unsubscribe publish",
+            matrix.last_command,
+            published,
+        )
+        assert published.returncode == 0, published.stderr
+
+        verify_command = [
+            MOSQUITTO_SUB,
+            *matrix.base,
+            "-c",
+            "-i",
+            unsub_id,
+            "-t",
+            VERIFY_TOPIC,
+            "-q",
+            "1",
+            "-E",
+            "-d",
+        ]
+        verified = subprocess.run(
+            verify_command, capture_output=True, text=True, timeout=8
+        )
+        record_stage(
+            unsubscribe_diagnostics, "resume without target resubscribe", verify_command, verified
+        )
+        assert verified.returncode == 0, verified.stderr
+        # Mosquitto's v3.1.1 debug line prints the CONNACK return code, not the
+        # Session Present bit. The raw control test asserts Session Present=1.
+        assert "received CONNACK (0)" in verified.stdout, verified.stdout
+        assert post_unsubscribe_payload not in verified.stdout, verified.stdout
+
+        resubscribe_command = [
+            MOSQUITTO_SUB,
+            *matrix.base,
+            "-c",
+            "-i",
+            unsub_id,
+            "-t",
+            TOPIC,
+            "-q",
+            "1",
+            "-E",
+            "-d",
+        ]
+        resubscribed = subprocess.run(
+            resubscribe_command, capture_output=True, text=True, timeout=8
+        )
+        record_stage(
+            unsubscribe_diagnostics, "explicit target resubscribe", resubscribe_command, resubscribed
+        )
+        assert resubscribed.returncode == 0, resubscribed.stderr
+        assert "received SUBACK" in resubscribed.stdout, resubscribed.stdout
+
+        fresh_payload = event("mosq-after-resubscribe", 51)
+        published = matrix.publish(payload=fresh_payload)
+        record_stage(
+            unsubscribe_diagnostics,
+            "post-resubscribe publish",
+            matrix.last_command,
+            published,
+        )
+        assert published.returncode == 0, published.stderr
+
+        final_command = [
+            MOSQUITTO_SUB,
+            *matrix.base,
+            "-c",
+            "-i",
+            unsub_id,
+            "-t",
+            VERIFY_TOPIC,
+            "-q",
+            "1",
+            "-C",
+            "1",
+            "-W",
+            "5",
+            "-N",
+        ]
+        final = subprocess.run(final_command, capture_output=True, text=True, timeout=8)
+        record_stage(
+            unsubscribe_diagnostics, "fresh delivery after resubscribe", final_command, final
+        )
+        assert final.returncode == 0, final.stderr
+        assert post_unsubscribe_payload not in final.stdout, final.stdout
+        assert fresh_payload in final.stdout, final.stdout
+    except Exception:
+        print(
+            json.dumps(
+                {
+                    "versions": versions,
+                    "persistent_unsubscribe_diagnostics": unsubscribe_diagnostics,
+                },
+                indent=2,
+            ),
+            file=sys.stderr,
+        )
+        raise
+    results["MOSQUITTO-PERSISTENT-UNSUB-001"] = "pass"
 
     will_topic = TOPIC
     # The production source limiter is intentionally active during interop; start a fresh window
@@ -190,7 +374,11 @@ def main():
     assert not no_will.stdout
     results["will_qos0_qos1_qos2_retained_and_normal_suppression"] = "pass"
 
-    print(json.dumps({"mosquitto_pub": "2.1.2", "mosquitto_sub": "2.1.2", "results": results}, indent=2))
+    print(json.dumps({"versions": versions, "results": results}, indent=2))
+    print(
+        "MOSQUITTO-PERSISTENT-UNSUB-001: PASS — "
+        f"{versions['mosquitto_sub']}; target unsubscribe persisted without stale delivery"
+    )
 
 
 if __name__ == "__main__":

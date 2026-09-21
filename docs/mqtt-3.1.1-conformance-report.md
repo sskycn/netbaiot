@@ -101,7 +101,7 @@ the packet encoder/decoder or state transition was inspected in addition to test
 
 ## Test matrices and outcomes
 
-- Raw/state-machine: 30/30 PASS. It covers CONNECT/CONNACK, first-packet rules,
+- Raw/state-machine: 31/31 PASS. It covers CONNECT/CONNACK, first-packet rules,
   flags, fragmentation, Remaining Length, UTF-8, sessions, subscribe/unsubscribe,
   QoS0/1/2 duplicates, retained, Will, keepalive, slowloris, illegal sequences,
   ACL, cross-identity ownership, and planned-shutdown Will recovery.
@@ -110,6 +110,8 @@ the packet encoder/decoder or state transition was inspected in addition to test
   NetbaIoT protocol-error policy, so this is `IMPLEMENTATION_DEFINED_ALLOWED`.
 - Mosquitto client: PASS with explicit MQTT 3.1.1 for authentication, QoS0/1/2,
   exact/`+`/`#`, unsubscribe, retained, persistent offline QoS1/2, and Wills.
+  `MOSQUITTO-PERSISTENT-UNSUB-001` passes with isolated official 2.0.18 clients
+  and local 2.1.2 clients (libmosquitto 2.1.0).
 - TLS client: PASS with certificate/hostname verification; untrusted CA rejected;
   no `--insecure` success path.
 - Paho: unavailable for this run. Historical Paho 2.1.0 evidence exists, but is
@@ -118,7 +120,7 @@ the packet encoder/decoder or state transition was inspected in addition to test
   QoS1, outbound/inbound QoS2 stages, >1 MiB legal state, and repeated generations.
 - Resource/failure: PASS for retained subscription transaction rollback, QoS2
   pending-route/recovery, count/byte quotas, slow packet deadline and malformed fuzz.
-- Correctness-freeze release gate: 74/74 PASS. This includes raw and differential
+- Correctness-freeze release gate: 76/76 PASS. This includes raw and differential
   cases, Mosquitto client/TLS, restart, the 29 stable audit IDs, and
   `NORMATIVE-COVERAGE-001` proving 125/125 current PASS evidence. Unknown `--only`
   fails before build; missing release dependencies are `SKIPPED_REQUIRED` and make
@@ -177,6 +179,15 @@ the packet encoder/decoder or state transition was inspected in addition to test
 18. Restore now applies canonical live ACL/ownership helpers to every recovered
     subscription and pending message, while legacy incomplete profiles remain
     unindexed until authenticated reset.
+19. The remote Mosquitto 2.0.18 client rejected the harness's `-U TOPIC` command
+    because 2.0.x also requires `-t`; the harness ignored its nonzero return and
+    re-subscribed the target topic during verification. Broker behavior was
+    independently correct: `PERSISTENT-UNSUB-RECONNECT-001` and the internal state
+    regression prove committed removal from the stored session and trie with no
+    offline enqueue. The portable CLI flow now supplies a different authorized
+    `-t`, observes `UNSUBACK`, resumes without target resubscription, and checks the
+    exact forbidden payload. This is a harness/version compatibility fix; no
+    production broker code changed. The next remote 2.0.18 run is expected to pass.
 
 ## Remaining limitations and release practice
 
