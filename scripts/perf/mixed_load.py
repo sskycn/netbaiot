@@ -50,6 +50,15 @@ def main():
     parser.add_argument("--sample-every", type=float, default=5)
     parser.add_argument("--profile-output")
     parser.add_argument("--profile-seconds", type=int, default=10)
+    parser.add_argument(
+        "--scenario", choices=("mixed", "route-fairness"), default="mixed"
+    )
+    parser.add_argument(
+        "--server-bin", default=os.path.join(ROOT, "target/release/netbaiot-server")
+    )
+    parser.add_argument(
+        "--loadgen-bin", default=os.path.join(ROOT, "target/release/netbaiot-loadgen")
+    )
     args = parser.parse_args()
     if args.duration <= 0 or args.duration > 14400:
         raise SystemExit("duration must be in (0, 14400]")
@@ -62,7 +71,7 @@ def main():
         raise SystemExit("warmup/cooldown must be nonnegative and sample-every positive")
 
     device_http, management, mqtt, tcp, udp, sink_port = [free_port() for _ in range(6)]
-    maximum = 1100
+    maximum = 1100 if args.scenario == "mixed" else 256
     limits = {
         "max_connections": maximum,
         "max_connections_per_ip": maximum,
@@ -91,17 +100,24 @@ def main():
         "sink_delivery_concurrency": 8,
         "mqtt_recovery_max_bytes": 512 * 1024 * 1024,
     }
-    # Device mix: 70% idle, 20% at 1 msg/s, 9% at 10 msg/s, 1% bursty.
-    # Message mix at average burst rate: QoS0=720/s, QoS1=360/s, QoS2=120/s.
-    profiles = [
-        ("idle", 0, 699, 0, 0.0, False, 0.0, None),
-        ("command-idle", 699, 1, 0, 0.0, False, 0.1, None),
-        ("slow-q0", 700, 200, 0, 200.0, False, 0.0, None),
-        ("medium-q0", 900, 52, 0, 520.0, False, 0.0, None),
-        ("medium-q1", 952, 36, 1, 360.0, True, 0.0, None),
-        ("medium-q2", 988, 2, 2, 20.0, False, 0.0, None),
-        ("bursty-q2", 990, 10, 2, 0.0, False, 0.0, burst_phases(args.duration)),
-    ]
+    if args.scenario == "route-fairness":
+        profiles = [
+            ("hot-q1", 0, 1, 1, 20_000.0, False, 0.0, None),
+            ("low-rate-q1", 1, 100, 1, 1_000.0, False, 0.0, None),
+        ]
+    else:
+        # Device mix: 70% idle, 20% at 1 msg/s, 9% at 10 msg/s, 1% bursty.
+        # Message mix at average burst rate: QoS0=720/s, QoS1=360/s, QoS2=120/s.
+        profiles = [
+            ("idle", 0, 699, 0, 0.0, False, 0.0, None),
+            ("command-idle", 699, 1, 0, 0.0, False, 0.1, None),
+            ("slow-q0", 700, 200, 0, 200.0, False, 0.0, None),
+            ("medium-q0", 900, 52, 0, 520.0, False, 0.0, None),
+            ("medium-q1", 952, 36, 1, 360.0, True, 0.0, None),
+            ("medium-q2", 988, 2, 2, 20.0, False, 0.0, None),
+            ("bursty-q2", 990, 10, 2, 0.0, False, 0.0, burst_phases(args.duration)),
+        ]
+    connection_count = sum(profile[2] for profile in profiles)
 
     with tempfile.TemporaryDirectory(prefix="netbaiot-mixed-") as temporary:
         control = os.path.join(temporary, "sink.json")
@@ -119,9 +135,13 @@ def main():
                     "business_tcp": None,
                     "development": True,
                     "limits": limits,
-                    "credentials": [credential(index) for index in range(1000)],
+                    "credentials": [credential(index) for index in range(connection_count)],
                     "tls": None,
-                    "delivery_url": f"http://127.0.0.1:{sink_port}/events",
+                    "delivery_url": (
+                        f"http://127.0.0.1:{sink_port}/events"
+                        if args.scenario == "mixed"
+                        else None
+                    ),
                     "auth_provider_url": None,
                     "spool_directory": os.path.join(temporary, "spool"),
                     "device_configs": [],
@@ -177,7 +197,7 @@ def main():
             if not sink.stdout.readline():
                 raise RuntimeError("sink did not start")
             server = subprocess.Popen(
-                [os.path.join(ROOT, "target/release/netbaiot-server"), server_config],
+                [args.server_bin, server_config],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.PIPE,
                 text=True,
@@ -202,7 +222,7 @@ def main():
                     (
                         name,
                         subprocess.Popen(
-                            [os.path.join(ROOT, "target/release/netbaiot-loadgen"), path],
+                            [args.loadgen_bin, path],
                             stdout=load_output,
                             stderr=subprocess.PIPE,
                             text=True,
@@ -268,8 +288,13 @@ def main():
                         "duration_seconds": args.duration,
                         "warmup_seconds": args.warmup,
                         "cooldown_seconds": args.cooldown,
-                        "connections": 1000,
-                        "nominal_message_mix": {"qos0": 0.6, "qos1": 0.3, "qos2": 0.1},
+                        "scenario": args.scenario,
+                        "connections": connection_count,
+                        "nominal_message_mix": (
+                            {"qos0": 0.6, "qos1": 0.3, "qos2": 0.1}
+                            if args.scenario == "mixed"
+                            else {"qos0": 0.0, "qos1": 1.0, "qos2": 0.0}
+                        ),
                         "profiles": load_results,
                         "profile_stderr": profile_stderr[-512:],
                         "sink": last_json(sink_out),

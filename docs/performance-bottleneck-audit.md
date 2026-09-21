@@ -477,3 +477,31 @@ No optimization claim should be made yet for:
 - TLS profile and handshake capacity.
 
 Those gaps are first-class audit findings. They are not zeroes.
+
+## Broker route experiment result (2026-09-22)
+
+**Decision: KEEP.** The experiment removed the broker mutex acquisition on valid,
+non-retained routes when the authoritative subscription count is zero. Broker
+acquisitions and wait sum at the representative no-subscriber QoS1 20k point fell
+100%, clearing the >=25% acceptance threshold. Throughput moved only +0.063% and
+the 25--30k/s knee was unchanged, so this is a contention-boundary removal, not a
+capacity claim.
+
+The implementation retains `std::sync::Mutex`, a single authoritative
+`BrokerState`, and the existing preflight/commit for every retained or subscribed
+route. Persistent QoS1/QoS2 atomicity, session incarnation/provenance, Will,
+retained, and recovery gates all passed. Publisher fairness and route-plan memory
+did not regress. See `docs/performance-broker-route-experiment.md` for the exact
+before/after table and source-level accounting.
+
+The updated observed ranking is:
+
+1. EventBus serialized state contention plus runtime wake pressure. The after
+   profile still has aggregate mutex wait at 36.2%, while dedicated broker metrics
+   record zero route acquisitions for this workload.
+2. Kernel I/O, timekeeping, and Tokio scheduling on the shared loopback host
+   (`sendto` 9.9%, `recvfrom` 6.9%, `mach_absolute_time` 6.0%).
+3. Per-event EventId entropy (`getentropy` 3.9%), followed by allocation/copy/JSON.
+
+No EventBus, UUID, I/O, runtime, parser, hashing, TLS, or sink optimization was
+started. A later task may test EventBus contention as one separate experiment.

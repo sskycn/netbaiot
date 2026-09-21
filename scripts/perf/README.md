@@ -36,6 +36,7 @@ python3 scripts/perf/connection_memory.py --transport tcp --connections 3000
 python3 scripts/perf/event_load.py --rate 10000 --duration 20 --warmup 5 --connections 64 --sink-mode none --qos 1
 python3 scripts/perf/event_load.py --rate 1000 --duration 15 --connections 32 --sink-mode webhook --sink-delay-ms 10
 python3 scripts/perf/event_load.py --rate 10000 --duration 15 --warmup 5 --connections 64 --sink-mode none --qos 1 --tls
+python3 scripts/perf/mixed_load.py --scenario route-fairness --duration 15 --warmup 5 --cooldown 2 --sample-every 1
 python3 scripts/perf/mixed_load.py --duration 1800 --warmup 30 --cooldown 10 --sample-every 5
 cargo bench --bench foundation
 cargo test -p netbaiot-server --test server subprocess_graceful_restart_sixty_second_soak -- --ignored --nocapture
@@ -52,6 +53,12 @@ persistent reconnects, low-frequency command/downlink traffic, and the confirmed
 HTTP webhook. It writes one JSON result to stdout; redirect it under
 `target/perf-audit/`. Run the server and load generator on separate hosts before
 treating throughput as a production hardware ceiling.
+
+The `route-fairness` scenario instead runs one saturated QoS1 publisher beside
+100 publishers at 10 msg/s each, without an external business sink. Compare the
+`low-rate-q1` PUBACK P99 and completion count between builds. Both event and mixed
+drivers accept `--server-bin` and `--loadgen-bin`, which permits an exact-SHA
+comparison binary from an isolated worktree without moving the current checkout.
 
 The event and mixed drivers set `NETBAIOT_PERF_LOCK_METRICS=1` for the child
 server. Broker/EventBus lock timing is disabled by default outside these drivers.
