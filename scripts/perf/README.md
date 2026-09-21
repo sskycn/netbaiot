@@ -33,8 +33,10 @@ python3 scripts/perf/connection_memory.py --transport mqtt --connections 1000 --
 python3 scripts/perf/connection_memory.py --transport mqtt --connections 10000 --persistent --disconnected
 python3 scripts/perf/connection_memory.py --transport tcp --connections 1000
 python3 scripts/perf/connection_memory.py --transport tcp --connections 3000
-python3 scripts/perf/event_load.py --rate 10000 --duration 20 --connections 64
-python3 scripts/perf/event_load.py --rate 1000 --duration 15 --connections 32 --sink-delay-ms 10
+python3 scripts/perf/event_load.py --rate 10000 --duration 20 --warmup 5 --connections 64 --sink-mode none --qos 1
+python3 scripts/perf/event_load.py --rate 1000 --duration 15 --connections 32 --sink-mode webhook --sink-delay-ms 10
+python3 scripts/perf/event_load.py --rate 10000 --duration 15 --warmup 5 --connections 64 --sink-mode none --qos 1 --tls
+python3 scripts/perf/mixed_load.py --duration 1800 --warmup 30 --cooldown 10 --sample-every 5
 cargo bench --bench foundation
 cargo test -p netbaiot-server --test server subprocess_graceful_restart_sixty_second_soak -- --ignored --nocapture
 ```
@@ -43,6 +45,16 @@ cargo test -p netbaiot-server --test server subprocess_graceful_restart_sixty_se
 MQTT and auth-cache state remains. Broker logical session bytes are printed by the
 foundation benchmark; RSS additionally includes hash tables, allocator capacity,
 credentials/auth cache, metrics, runtime, and process overhead.
+
+`mixed_load.py` uses 1,000 MQTT devices (70% idle, 20% at 1 msg/s, 9% at
+10 msg/s, and 1% bursty), an approximately 60/30/10 QoS0/QoS1/QoS2 event mix,
+persistent reconnects, low-frequency command/downlink traffic, and the confirmed
+HTTP webhook. It writes one JSON result to stdout; redirect it under
+`target/perf-audit/`. Run the server and load generator on separate hosts before
+treating throughput as a production hardware ceiling.
+
+The event and mixed drivers set `NETBAIOT_PERF_LOCK_METRICS=1` for the child
+server. Broker/EventBus lock timing is disabled by default outside these drivers.
 
 The ignored restart soak runs 12 healthy process generations with a five-second
 dwell per generation after the initial forced-spool/recovery pair. Each generation

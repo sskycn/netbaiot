@@ -855,7 +855,16 @@ pub async fn run_with_credentials(
         return Err(Error::Configuration);
     }
     let limits = Arc::new(config.limits.clone());
-    let metrics = Arc::new(Metrics::default());
+    let metrics = Arc::new(
+        if matches!(
+            std::env::var("NETBAIOT_PERF_LOCK_METRICS").as_deref(),
+            Ok("1")
+        ) {
+            Metrics::with_lock_timing()
+        } else {
+            Metrics::default()
+        },
+    );
     let lifecycle = Arc::new(Lifecycle::starting());
     let identities: HashMap<_, _> = config
         .credentials
@@ -939,7 +948,7 @@ pub async fn run_with_credentials(
         snapshot.revision,
     )?;
     let spool = RestartSpool::new(config.spool_directory.clone(), limits.clone());
-    let mqtt_broker = MqttBroker::new(limits.clone());
+    let mqtt_broker = MqttBroker::new_with_metrics(limits.clone(), metrics.clone());
     mqtt_broker.recover_from(&config.spool_directory).await?;
     let recovery = spool.recover().await?;
     let recovered_files = recovery.committed_files;

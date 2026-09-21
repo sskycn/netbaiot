@@ -1,4 +1,4 @@
-use crate::{Error, Limits, Metric, Metrics, Result, lock, now_ms};
+use crate::{Error, Histogram, Limits, Metric, Metrics, Result, lock, now_ms};
 use async_trait::async_trait;
 use futures_util::FutureExt;
 use netbaiot_core::{DeviceEvent, EventAccepted, EventId, RouteDefinition, SinkId};
@@ -244,7 +244,10 @@ impl EventBus {
             .map_err(|_| Error::Invalid)?
             .len();
         let event = Arc::new(event);
+        let lock_started = self.metrics.lock_timing_enabled().then(Instant::now);
         let mut state = lock(&self.state)?;
+        let lock_wait_us = lock_started.map(|started| started.elapsed().as_micros() as u64);
+        let hold_started = lock_started.map(|_| Instant::now());
         if !state.accepting {
             return Err(Error::Draining);
         }
@@ -326,7 +329,12 @@ impl EventBus {
                 routing_revision: revision,
             },
         );
+        let lock_hold_us = hold_started.map(|started| started.elapsed().as_micros() as u64);
         drop(state);
+        if let (Some(wait), Some(hold)) = (lock_wait_us, lock_hold_us) {
+            self.metrics.observe(Histogram::EventBusLockWait, wait);
+            self.metrics.observe(Histogram::EventBusLockHold, hold);
+        }
         for notify in accepted_notifies {
             notify.notify_one();
         }
@@ -622,6 +630,10 @@ impl EventBus {
         }
         if result.is_ok() {
             self.metrics.inc(Metric::SinkAcks);
+            self.metrics.observe(
+                Histogram::EventAcceptedToSinkAck,
+                u64::try_from(age).unwrap_or(u64::MAX).saturating_mul(1_000),
+            );
         } else {
             self.metrics.inc(Metric::SinkDrops);
         }

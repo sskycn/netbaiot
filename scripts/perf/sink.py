@@ -9,6 +9,15 @@ async def main():
     stats = dict(received=0, rejected=0, active=0, max_active=0)
     latency_ms = [0] * 60001
     latency_count = 0
+    settings_value = {"delay": 0, "status": 204}
+    settings_loaded_at = 0.0
+    def settings():
+        nonlocal settings_value, settings_loaded_at
+        now = time.monotonic()
+        if now - settings_loaded_at >= .1:
+            settings_value = json.loads(open(control).read())
+            settings_loaded_at = now
+        return settings_value
     def percentiles():
         if latency_count == 0: return dict(count=0, p50_ms=0, p95_ms=0, p99_ms=0)
         result = dict(count=latency_count)
@@ -45,9 +54,9 @@ async def main():
                     latency_count += 1
                 except (KeyError, TypeError, ValueError, json.JSONDecodeError):
                     stats['rejected'] += 1
-                settings = json.loads(open(control).read())
-                await asyncio.sleep(min(float(settings.get('delay', 0)), 10))
-                status = int(settings.get('status', 204))
+                current = settings()
+                await asyncio.sleep(min(float(current.get('delay', 0)), 10))
+                status = int(current.get('status', 204))
                 writer.write(f'HTTP/1.1 {status} Test\r\nContent-Length: 0\r\nConnection: keep-alive\r\n\r\n'.encode())
                 await asyncio.wait_for(writer.drain(), 5)
                 stats['received'] += 1
@@ -62,10 +71,8 @@ async def main():
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGTERM, signal.SIGINT): loop.add_signal_handler(sig, stop.set)
     print(json.dumps(dict(event='ready', pid=os.getpid())), flush=True)
-    while not stop.is_set():
-        try: await asyncio.wait_for(stop.wait(), 1)
-        except asyncio.TimeoutError: pass
-        print(json.dumps(dict(epoch=time.time(), latency=percentiles(), **stats)), flush=True)
+    await stop.wait()
+    print(json.dumps(dict(epoch=time.time(), latency=percentiles(), **stats)), flush=True)
     server.close(); await server.wait_closed()
     for task in list(tasks): task.cancel()
     await asyncio.gather(*list(tasks), return_exceptions=True)

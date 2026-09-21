@@ -103,18 +103,26 @@ pub enum Histogram {
     AdmissionWait,
     AdmissionLockWait,
     AdmissionLockHold,
+    EventBusLockWait,
+    EventBusLockHold,
+    BrokerLockWait,
+    BrokerLockHold,
     AuthenticationToCodec,
     CodecToEventAccepted,
     EventAcceptedToSinkAck,
     PubackWrite,
 }
 
-const HISTOGRAM_NAMES: [&str; 9] = [
+const HISTOGRAM_NAMES: [&str; 13] = [
     "mqtt_protocol_validation_us",
     "validation_to_admission_us",
     "admission_wait_us",
     "admission_lock_wait_us",
     "admission_lock_hold_us",
+    "event_bus_lock_wait_us",
+    "event_bus_lock_hold_us",
+    "broker_lock_wait_us",
+    "broker_lock_hold_us",
     "authentication_to_codec_us",
     "codec_to_event_accepted_us",
     "event_accepted_to_sink_ack_us",
@@ -144,6 +152,7 @@ impl Default for HistogramState {
 pub struct Metrics {
     values: [AtomicU64; NAMES.len()],
     histograms: [HistogramState; HISTOGRAM_NAMES.len()],
+    lock_timing_enabled: bool,
 }
 
 impl Default for Metrics {
@@ -151,11 +160,21 @@ impl Default for Metrics {
         Self {
             values: std::array::from_fn(|_| AtomicU64::new(0)),
             histograms: std::array::from_fn(|_| HistogramState::default()),
+            lock_timing_enabled: false,
         }
     }
 }
 
 impl Metrics {
+    pub fn with_lock_timing() -> Self {
+        Self {
+            lock_timing_enabled: true,
+            ..Self::default()
+        }
+    }
+    pub fn lock_timing_enabled(&self) -> bool {
+        self.lock_timing_enabled
+    }
     pub fn inc(&self, metric: Metric) {
         self.add(metric, 1);
     }
@@ -196,5 +215,25 @@ impl Metrics {
             ));
         }
         output
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn renders_lock_histograms_with_closed_names() {
+        assert!(!Metrics::default().lock_timing_enabled());
+        let metrics = Metrics::with_lock_timing();
+        assert!(metrics.lock_timing_enabled());
+        metrics.observe(Histogram::EventBusLockWait, 25);
+        metrics.observe(Histogram::BrokerLockHold, 26);
+        let rendered = metrics.render();
+        assert!(rendered.contains("netbaiot_event_bus_lock_wait_us_count 1\n"));
+        assert!(rendered.contains("netbaiot_event_bus_lock_wait_us_bucket{le=\"25\"} 1\n"));
+        assert!(rendered.contains("netbaiot_broker_lock_hold_us_count 1\n"));
+        assert!(rendered.contains("netbaiot_broker_lock_hold_us_bucket{le=\"25\"} 0\n"));
+        assert!(rendered.contains("netbaiot_broker_lock_hold_us_bucket{le=\"50\"} 1\n"));
     }
 }
