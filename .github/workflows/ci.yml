@@ -19,6 +19,10 @@ jobs:
       - run: cargo --version --verbose
       - run: cargo fmt --all -- --check
       - run: cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
-      - run: cargo test --locked --workspace --all-features
+      - name: Run workspace tests
+        run: >-
+          python3 scripts/ci_annotate.py
+          --title "Rust workspace tests failed"
+          -- cargo test --locked --workspace --all-features
       - if: matrix.toolchain == 'stable'
         run: python3 tests/mqtt_conformance/run.py --netbaiot-only
