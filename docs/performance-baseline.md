@@ -1,5 +1,24 @@
 # Performance baseline
 
+## Latest experiment: EventBus (2026-09-22)
+
+**REVERT — insufficient measurable gain.** The single failed-poll/deadline-scan
+fusion candidate reduced QoS1 20k state acquisitions from 4.526 to 3.766/event
+(16.8%), but full-state wait sum fell only 3.9% and wait P99 stayed <=100 us.
+Accepted throughput was 19,969.35 -> 19,965.00/s; PUBACK P99 improved from
+1.60 to 1.38 ms. The 25--30k/s shared-host knee did not improve. Sampled peak
+CPU rose 6.3%; there is no retained EventBus optimization or new capacity claim.
+
+Fresh comparisons used identical opt-in instrumentation on the starting
+`cbbad11d827d3d8e04160819ab72378f6d9ae9a9` behavior and the candidate, Rust
+stable 1.97.1 release builds, three 20-second primary repetitions, 64 publishers,
+256-byte payloads and concurrency eight. These are separate from the historical
+Rust 1.88 numbers below. [The experiment report](performance-eventbus-experiment.md)
+contains complete lock/wake definitions, auxiliary workloads, and gate results.
+
+Baseline names remain: correctness `ce07b5b...`, initial performance `70b855f...`,
+broker-route optimized `cbbad11d...`. No EventBus optimized baseline was created.
+
 ## Scope and result status
 
 This document records a release-build, single-host loopback baseline for commit

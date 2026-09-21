@@ -1,5 +1,26 @@
 # Performance bottleneck audit
 
+## Latest EventBus experiment (2026-09-22)
+
+**REVERT — insufficient measurable gain.** Fresh lifecycle instrumentation shows
+4.526 state acquisitions/event at QoS1 20k, rather than the historical publish-only
+one/event. A single candidate fused failed `take_ready` and deadline lookup,
+reducing acquisitions to 3.766/event. The measured wait-sum reduction was only
+3.9%, wait P99 was unchanged, and the saturation knee did not move. Favorable
+PUBACK tails alone did not meet the agreed compound acquisition/tail threshold.
+
+Notify calls must not be equated with executor wakes: the primary BEFORE run
+issued one worker notify and one drain notify per event, but only about 0.290
+Notify branches and one JoinSet completion returned per event. Most recorded
+empty iterations were completion-to-idle transitions. The experiment supports
+redundant state access as real work, but rejects this particular scan fusion as
+a sufficient fix for the network bottleneck. It does not establish a Notify storm.
+
+The candidate was removed; opt-in measurement helpers and correctness regressions
+remain. See [the report](performance-eventbus-experiment.md) for fresh profiles,
+limitations, and the retained bottleneck ranking. The original audit and prior
+broker experiment below remain historical evidence, not replacement baselines.
+
 ## Executive conclusion
 
 On the measured Apple M4 single-host loopback workload, NetbaIoT's no-subscriber

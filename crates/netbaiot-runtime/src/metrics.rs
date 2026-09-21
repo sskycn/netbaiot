@@ -95,6 +95,37 @@ const NAMES: [&str; 43] = [
     "timeouts",
 ];
 
+/// Opt-in experiment counters, inactive unless lock timing is enabled.
+/// Wake counters count worker select completions, not executor task polls.
+#[derive(Clone, Copy)]
+#[repr(usize)]
+pub enum EventBusProbe {
+    Publish,
+    TakeReady,
+    Complete,
+    NextDelay,
+    Other,
+    NotifyWorker,
+    NotifyDrain,
+    WakeNotify,
+    WakeTimer,
+    WakeJoin,
+    EmptyWake,
+}
+const EVENT_BUS_PROBES: [&str; 11] = [
+    "publish",
+    "take_ready",
+    "complete",
+    "next_delay",
+    "other",
+    "notify_worker",
+    "notify_drain",
+    "wake_notify",
+    "wake_timer",
+    "wake_join",
+    "empty_wake",
+];
+
 #[derive(Clone, Copy)]
 #[repr(usize)]
 pub enum Histogram {
@@ -105,6 +136,8 @@ pub enum Histogram {
     AdmissionLockHold,
     EventBusLockWait,
     EventBusLockHold,
+    EventBusStateWait,
+    EventBusStateHold,
     BrokerLockWait,
     BrokerLockHold,
     AuthenticationToCodec,
@@ -113,7 +146,7 @@ pub enum Histogram {
     PubackWrite,
 }
 
-const HISTOGRAM_NAMES: [&str; 13] = [
+const HISTOGRAM_NAMES: [&str; 15] = [
     "mqtt_protocol_validation_us",
     "validation_to_admission_us",
     "admission_wait_us",
@@ -121,6 +154,8 @@ const HISTOGRAM_NAMES: [&str; 13] = [
     "admission_lock_hold_us",
     "event_bus_lock_wait_us",
     "event_bus_lock_hold_us",
+    "event_bus_state_wait_us",
+    "event_bus_state_hold_us",
     "broker_lock_wait_us",
     "broker_lock_hold_us",
     "authentication_to_codec_us",
@@ -153,6 +188,7 @@ pub struct Metrics {
     values: [AtomicU64; NAMES.len()],
     histograms: [HistogramState; HISTOGRAM_NAMES.len()],
     lock_timing_enabled: bool,
+    event_bus_probes: [AtomicU64; EVENT_BUS_PROBES.len()],
 }
 
 impl Default for Metrics {
@@ -161,6 +197,7 @@ impl Default for Metrics {
             values: std::array::from_fn(|_| AtomicU64::new(0)),
             histograms: std::array::from_fn(|_| HistogramState::default()),
             lock_timing_enabled: false,
+            event_bus_probes: std::array::from_fn(|_| AtomicU64::new(0)),
         }
     }
 }
@@ -174,6 +211,11 @@ impl Metrics {
     }
     pub fn lock_timing_enabled(&self) -> bool {
         self.lock_timing_enabled
+    }
+    pub fn event_bus_probe(&self, probe: EventBusProbe) {
+        if self.lock_timing_enabled {
+            self.event_bus_probes[probe as usize].fetch_add(1, Ordering::Relaxed);
+        }
     }
     pub fn inc(&self, metric: Metric) {
         self.add(metric, 1);
@@ -199,6 +241,14 @@ impl Metrics {
                 format!("netbaiot_{name}_total {}\n", value.load(Ordering::Relaxed))
             })
             .collect();
+        if self.lock_timing_enabled {
+            for (name, value) in EVENT_BUS_PROBES.iter().zip(&self.event_bus_probes) {
+                output.push_str(&format!(
+                    "netbaiot_event_bus_probe_{name}_total {}\n",
+                    value.load(Ordering::Relaxed)
+                ));
+            }
+        }
         for (name, state) in HISTOGRAM_NAMES.iter().zip(&self.histograms) {
             let mut cumulative = 0;
             for (bound, value) in BOUNDS.iter().zip(&state.buckets) {
@@ -221,6 +271,20 @@ impl Metrics {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn eventbus_probes_require_explicit_opt_in() {
+        let disabled = Metrics::default();
+        disabled.event_bus_probe(EventBusProbe::WakeNotify);
+        assert!(!disabled.render().contains("event_bus_probe_"));
+        let enabled = Metrics::with_lock_timing();
+        enabled.event_bus_probe(EventBusProbe::WakeNotify);
+        assert!(
+            enabled
+                .render()
+                .contains("netbaiot_event_bus_probe_wake_notify_total 1\n")
+        );
+    }
 
     #[test]
     fn renders_lock_histograms_with_closed_names() {
