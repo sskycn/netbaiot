@@ -373,14 +373,19 @@ async fn handle_management(
                 &body(req, services.ingress.limits.max_http_body_size).await?,
             )
             .map_err(|_| Error::Invalid)?;
-            let (devices, disconnected) = services.ingress.invalidate_auth(&invalidation)?;
-            let mqtt_invalidated = services.mqtt.invalidate_sessions(&invalidation)?;
+            let mqtt = services.mqtt.clone();
+            let (devices, disconnected, mqtt_invalidated) = services
+                .ingress
+                .invalidate_auth_with(&invalidation, || mqtt.invalidate_sessions(&invalidation))?;
             let invalidated = devices.len();
             Ok(response(
                 StatusCode::OK,
                 serde_json::to_vec(&InvalidationResult {
                     invalidated,
-                    disconnected: disconnected.saturating_add(mqtt_invalidated),
+                    disconnected,
+                    invalidated_cache_entries: invalidated,
+                    disconnected_connections: disconnected,
+                    invalidated_mqtt_sessions: mqtt_invalidated,
                 })
                 .map_err(|_| Error::Internal)?,
             ))

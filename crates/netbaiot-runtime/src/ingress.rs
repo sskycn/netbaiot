@@ -121,22 +121,50 @@ impl Ingress {
         candidate: AuthenticatedSessionCandidate,
         transport: Transport,
     ) -> Result<(SessionLease, tokio::sync::mpsc::Receiver<QueuedCommand>)> {
+        let (lease, receiver, ()) =
+            self.register_session_with(candidate, transport, |_, _| Ok(()))?;
+        Ok((lease, receiver))
+    }
+
+    /// Atomically fences the final transport-specific session establishment step against auth
+    /// invalidation. Lock order is auth_registration -> AuthCache -> Sessions -> finalizer.
+    pub fn register_session_with<T>(
+        &self,
+        candidate: AuthenticatedSessionCandidate,
+        transport: Transport,
+        finalize: impl FnOnce(&AuthenticatedDevice, u64) -> Result<T>,
+    ) -> Result<(SessionLease, tokio::sync::mpsc::Receiver<QueuedCommand>, T)> {
         let _gate = lock(&self.auth_registration)?;
         if !self.auth_cache.candidate_is_current(&candidate)? {
             self.metrics.inc(Metric::AuthFailures);
             return Err(Error::Authentication);
         }
-        self.sessions.register(Arc::new(candidate.auth), transport)
+        let auth = Arc::new(candidate.auth);
+        let (lease, receiver) = self.sessions.register(auth.clone(), transport)?;
+        let finalized = finalize(auth.as_ref(), lease.generation)?;
+        Ok((lease, receiver, finalized))
     }
 
     pub fn invalidate_auth(
         &self,
         invalidation: &AuthInvalidation,
     ) -> Result<(Vec<DeviceKey>, usize)> {
+        let (devices, disconnected, ()) = self.invalidate_auth_with(invalidation, || Ok(()))?;
+        Ok((devices, disconnected))
+    }
+
+    /// Invalidates transport-specific persistent state under the same ordering gate as auth-cache
+    /// invalidation and active-session cancellation.
+    pub fn invalidate_auth_with<T>(
+        &self,
+        invalidation: &AuthInvalidation,
+        finalize: impl FnOnce() -> Result<T>,
+    ) -> Result<(Vec<DeviceKey>, usize, T)> {
         let _gate = lock(&self.auth_registration)?;
         let devices = self.auth_cache.invalidate(invalidation)?;
         let disconnected = self.sessions.disconnect_matching(invalidation)?;
-        Ok((devices, disconnected))
+        let finalized = finalize()?;
+        Ok((devices, disconnected, finalized))
     }
 
     pub async fn ingest(

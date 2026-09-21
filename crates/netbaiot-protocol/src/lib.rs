@@ -549,8 +549,16 @@ pub enum AuthInvalidation {
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct InvalidationResult {
+    /// Legacy cache-entry count retained for wire compatibility.
     pub invalidated: usize,
+    /// Legacy live-connection count; offline MQTT state is not included.
     pub disconnected: usize,
+    #[serde(default)]
+    pub invalidated_cache_entries: usize,
+    #[serde(default)]
+    pub disconnected_connections: usize,
+    #[serde(default)]
+    pub invalidated_mqtt_sessions: usize,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]

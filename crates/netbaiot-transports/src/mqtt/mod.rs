@@ -216,16 +216,21 @@ pub async fn connection(
         return Err(error);
     }
     let auth = Arc::new(candidate.auth.clone());
-    let (live_session, mut commands) = services
+    let requested_client_id = connect.client_id.clone();
+    let clean_session = connect.clean_session;
+    let mqtt = services.mqtt.clone();
+    let (live_session, mut commands, (mut attachment, client_id)) = services
         .ingress
-        .register_session(candidate, Transport::Mqtt)?;
-    if connect.client_id.is_empty() {
-        connect.client_id = format!("generated-{}", live_session.generation);
-    }
-    let mut attachment =
-        services
-            .mqtt
-            .attach(&auth, connect.client_id.clone(), connect.clean_session)?;
+        .register_session_with(candidate, Transport::Mqtt, move |bound_auth, generation| {
+            let client_id = if requested_client_id.is_empty() {
+                format!("generated-{generation}")
+            } else {
+                requested_client_id
+            };
+            let attachment = mqtt.attach(bound_auth, client_id.clone(), clean_session)?;
+            Ok((attachment, client_id))
+        })?;
+    connect.client_id = client_id;
     let mut will_guard = connect
         .will
         .take()

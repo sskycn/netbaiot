@@ -236,22 +236,24 @@ impl Default for Limits {
             spool_max_bytes: 268_435_456,
             spool_segment_max_bytes: 67_108_864,
             spool_record_max_bytes: 1_048_576,
-            // JSON may encode one logical UTF-8 byte as a six-byte `\u00xx` escape. This bound
-            // NBMQ v2 stores raw payload bytes and bounded record envelopes.
-            mqtt_recovery_max_bytes: 201_588_784,
+            // NBMQ v3 stores raw payload bytes, bounded record envelopes, profile metadata, and a
+            // fixed integrity trailer. The checked upper-bound formula below covers admitted state.
+            mqtt_recovery_max_bytes: 202_178_660,
         }
     }
 }
 
 impl Limits {
-    /// Conservative upper bound for compact NBMQ v2. Session and retained accounting already
-    /// charges a 64-byte envelope per record, which covers v2 framing/checksum; the final retained
-    /// term covers its tenant identifier outside `BrokerMessage` accounting.
+    /// Conservative upper bound for compact NBMQ v3. Logical state accounting covers payloads and
+    /// the common record envelope; these extra terms cover retained owners, session profile data,
+    /// pending-Will owners, and the fixed header/trailer outside that accounting.
     pub fn mqtt_recovery_upper_bound(&self) -> Result<usize> {
         self.global_mqtt_session_bytes
             .checked_add(self.max_retained_bytes)
             .and_then(|bytes| bytes.checked_add(self.max_retained_messages.checked_mul(64)?))
-            .and_then(|bytes| bytes.checked_add(48))
+            .and_then(|bytes| bytes.checked_add(self.max_persistent_sessions.checked_mul(128)?))
+            .and_then(|bytes| bytes.checked_add(self.max_connections.checked_mul(256)?))
+            .and_then(|bytes| bytes.checked_add(100))
             .ok_or(Error::Configuration)
     }
 

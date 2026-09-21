@@ -183,18 +183,22 @@ before mutation; restore recomputes and revalidates them.
 
 ## 26. Restart recovery architecture
 
-`mqtt-runtime.state` is NBMQ v2: a checksummed header followed by typed,
+`mqtt-runtime.state` is NBMQ v3: a checksummed header followed by typed,
 length-delimited, individually checksummed session/subscription/message/QoS/retained
-records. Payload bytes remain raw. Encoding holds the broker lock for one coherent
-view but allocates only one bounded record (67,072 bytes maximum), writes 0600 under
-a 0700 directory, fsyncs the file, atomically renames, then fsyncs the directory.
-The decoder streams the same records and accepts legacy NBMQ v1 JSON images.
+and pending-Will records, followed by an authoritative record-count, byte-count,
+whole-stream SHA-256 trailer. Payload bytes remain raw and deterministic ordering
+makes deletion, boundary truncation, reordering, and append detectable. Encoding
+holds the broker lock for one coherent view but allocates only one bounded record
+(67,072 bytes maximum), writes 0600 under a 0700 directory, fsyncs the file,
+atomically renames, then fsyncs the directory. The decoder streams the same records
+and accepts legacy NBMQ v1 JSON and NBMQ v2 record images as read-only formats.
 
-The configured 192.25 MiB bound is derived from admitted session and retained bytes
-plus retained owner envelopes. Restore rejects framing, checksum, duplicate,
-ordering, topic/filter, packet-ID and state/QoS inconsistencies. A structural MQTT
-failure blocks successful exit only after unrelated EventBus required work has
-drained or been safely spooled.
+The current configured ceiling is 202,178,660 bytes. Version is read before the
+ceiling check so v1 alone retains its prior 1,342,177,280-byte compatibility bound.
+Restore rejects framing, per-record and whole-image checksums, count/byte mismatch,
+duplicates, ordering, topic/filter, ownership/ACL, packet-ID and state/QoS
+inconsistencies. A structural MQTT failure blocks successful exit only after
+unrelated EventBus required work has drained or been safely spooled.
 
 ## 27. Graceful restart tests
 
@@ -292,3 +296,42 @@ endpoint per DeviceKey even though multiple persistent ClientIds may be stored.
 Exhausting explicit persistent subscriber/session limits rejects the entire QoS1/2
 publication before any target commit; QoS0 remains best effort.
 Performance results are single-host measurements, not production capacity claims.
+
+## 39. Accepted Will responsibility
+
+Successful CONNECT reserves one bounded Will responsibility. DISCONNECT suppresses
+it. Abnormal detach either atomically publishes it to every required target or
+moves it to the bounded broker-owned pending queue without partial fanout. Capacity
+release retries pending entries once; no task or busy loop is created. Pending state
+is included in NBMQ v3 and settles exactly once after planned restart.
+
+## 40. Authorization establishment and provenance
+
+Candidate freshness, node-local session registration, and MQTT attach share one
+gate with cache invalidation, live disconnect, and persistent-session invalidation.
+The lock order is `auth_registration -> AuthCache -> Sessions -> MqttBroker`.
+Persistent compatibility includes credential version, auth generation, permissions,
+codec ID, and codec version; mismatch resets state and returns Session Present=0.
+
+## 41. Compact atomic route planning
+
+One global bounded pass builds tenant/global usage and each matching subscriber
+contributes only compact projected counters, route mode, and packet-ID metadata.
+Stored subscriptions and pending payloads are not cloned. Planning therefore scales
+with one state pass plus matches rather than matches multiplied by all sessions,
+while the subsequent lock-held commit remains all-or-nothing.
+
+## 42. Management invalidation
+
+The response preserves legacy `invalidated` and connection-only `disconnected`
+fields and adds `invalidated_cache_entries`, `disconnected_connections`, and
+`invalidated_mqtt_sessions`. Removing an offline persistent session is no longer
+reported as disconnecting a network connection.
+
+## 43. Final release evidence
+
+Rust 1.88 and stable 1.97.1 fmt/clippy pass; both execute 131 workspace tests with
+3 intentionally ignored. Raw MQTT is 30/30, Mosquitto differential 11/11, client
+and verified TLS matrices PASS, and the complete release gate is 74/74 with
+normative coverage 125/125. Required fuzz completed 13,000 runs without a crash.
+The release-oriented external workflow installs Mosquitto only for testing.

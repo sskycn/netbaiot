@@ -21,7 +21,7 @@ Normative source: [OASIS MQTT Version 3.1.1 Plus Errata 01](https://docs.oasis-o
 | Paho | unavailable in the current Python environment; no package was installed |
 | Broker profile | authenticated DeviceKey, canonical IoT topics, bounded in-memory state, planned-restart snapshot |
 | Raw artifact | `target/mqtt-conformance/results.json` |
-| Stable catalog | `tests/mqtt_conformance/catalog.json` (125 exact normative mappings plus 20 named Rust fault invariants) |
+| Stable catalog | `tests/mqtt_conformance/catalog.json` (125 exact normative mappings plus 29 named Rust fault invariants) |
 
 ## Normative traceability summary
 
@@ -96,7 +96,7 @@ the packet encoder/decoder or state transition was inspected in addition to test
 | 24-hour disconnected-session idle policy | PROFILE | documented MQTT 3.1.1 administrative deletion policy, not MQTT 5 Session Expiry |
 | EventAccepted before QoS1 PUBACK | PASS | end-to-end admission ordering tests; not a business persistence claim |
 | Live-only business commands | PROFILE | deliberately separate from MQTT persistent subscription delivery |
-| Planned restart snapshot | PASS | valid >1 MiB image, corruption/limit checks, sessions/QoS/retained restoration |
+| Planned restart snapshot | PASS | NBMQ v3 manifest/digest, v1/v2 compatibility, corruption/ownership/limit checks, sessions/QoS/retained/pending-Will restoration |
 | Abrupt crash durability | PROFILE | bounded recent in-memory loss is documented; no crash-durable broker claim |
 
 ## Test matrices and outcomes
@@ -118,14 +118,15 @@ the packet encoder/decoder or state transition was inspected in addition to test
   QoS1, outbound/inbound QoS2 stages, >1 MiB legal state, and repeated generations.
 - Resource/failure: PASS for retained subscription transaction rollback, QoS2
   pending-route/recovery, count/byte quotas, slow packet deadline and malformed fuzz.
-- Correctness-freeze release gate: 65/65 PASS. This includes raw and differential
-  cases, Mosquitto client/TLS, restart, the twenty stable audit IDs, and
+- Correctness-freeze release gate: 74/74 PASS. This includes raw and differential
+  cases, Mosquitto client/TLS, restart, the 29 stable audit IDs, and
   `NORMATIVE-COVERAGE-001` proving 125/125 current PASS evidence. Unknown `--only`
   fails before build; missing release dependencies are `SKIPPED_REQUIRED` and make
   the process nonzero.
-- Fuzz: the final remediation smoke completed 1,000 runs each for `mqtt_state`,
-  `mqtt_recovery`, and `restart_spool` (3,000 total) without a crash. The new
-  recovery target emitted only non-fatal local symbolizer warnings.
+- Fuzz: `mqtt_packet`, `mqtt_state`, and `restart_spool` completed 1,000 runs each;
+  `mqtt_recovery` completed 10,000 runs over raw, legacy-v1, and v3 trailer
+  corruption paths. No target crashed; the host emitted only non-fatal local
+  symbolizer warnings.
 - Soak: PASS, the ignored 60-second test completed 12 planned child-process
   generations in 61.93 seconds without duplicate/lost recovered responsibility.
 
@@ -156,6 +157,26 @@ the packet encoder/decoder or state transition was inspected in addition to test
     per-tenant ready scheduler now wakes another active session for QoS1/QoS2.
 11. The recovery file limit ignored JSON expansion. Startup now validates a checked
     conservative encoded upper bound, and worst-case binary patterns are exercised.
+12. Accepted Wills could disappear when any durable subscriber was full. Bounded
+    pending-Will ownership now survives overload and planned restart and settles by
+    one atomic route.
+13. Auth revocation fenced session registration but not broker attach. Candidate
+    freshness, connection registration, and attach now share the same boundary as
+    cache/live-session/persistent-session invalidation.
+14. v1 images larger than the compact-format ceiling were rejected before version
+    detection. The reader now applies a 1,342,177,280-byte legacy ceiling only to
+    v1 and the configured 202,178,660-byte ceiling to v2/v3.
+15. NBMQ v2 could not detect complete valid-record deletion or reordering. New
+    writes are v3 with authoritative record/byte counts and an incremental whole-
+    stream SHA-256 trailer; v1/v2 remain read-only.
+16. Persistent state omitted codec binding. Codec ID and version now participate in
+    resume compatibility, with mismatch resetting the session.
+17. Atomic routing cloned complete matched sessions and repeatedly scanned global
+    state. Compact target projections and one accounting pass retain atomicity
+    without payload clones or matches-by-all-sessions rescans.
+18. Restore now applies canonical live ACL/ownership helpers to every recovered
+    subscription and pending message, while legacy incomplete profiles remain
+    unindexed until authenticated reset.
 
 ## Remaining limitations and release practice
 
@@ -167,4 +188,5 @@ bounded local substitute used in this audit. These limitations do not leave an
 applicable MQTT 3.1.1 MUST untested or failing.
 
 Mosquitto remains a test/reference implementation only. It is not a NetbaIoT
-runtime or production dependency.
+runtime or production dependency. A separate `mqtt-interop.yml` workflow installs
+it only for testing and runs the full release gate on release-relevant triggers.

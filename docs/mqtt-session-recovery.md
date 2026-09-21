@@ -6,9 +6,10 @@ The key is `(Authenticated DeviceKey, ClientId)`. Authentication completes befor
 lookup. A restored record contains identity, ClientId, subscriptions and QoS state,
 but never credentials; a reconnecting client must authenticate as the same
 DeviceKey. Stored authorization provenance contains only credential version, auth
-generation and permissions. A mismatch resets the session. Active attachment has a
-monotonically increasing generation; persistent state also has a separate monotonic
-session incarnation. Cleanup from an old connection cannot remove a newer
+generation, permissions, codec ID, and codec version. A mismatch resets the
+session. Active attachment has a monotonically increasing generation; persistent
+state also has a separate monotonic session incarnation. Cleanup from an old
+connection cannot remove a newer
 generation, and old async QoS2 work cannot mutate a new incarnation.
 
 CleanSession=1 removes only that key's old state. CleanSession=0 detaches the socket
@@ -19,7 +20,7 @@ tenant count/byte ceilings always providing a hard bound.
 
 ## Snapshot contents
 
-`mqtt-runtime.state` contains one compact NBMQ v2 record stream with:
+`mqtt-runtime.state` contains one compact NBMQ v3 record stream with:
 
 - format version and snapshot/broker generation;
 - persistent SessionKey and last-seen time;
@@ -28,30 +29,35 @@ tenant count/byte ceilings always providing a hard bound.
 - inbound QoS2 AwaitPubrel and EventAccepted/pending-route records;
 - outbound AwaitPuback/AwaitPubrec/AwaitPubcomp records;
 - next packet identifier;
-- retained topic/payload/QoS/owner state.
+- retained topic/payload/QoS/owner state;
+- bounded pending Will responsibilities accepted before subscriber pressure.
 
-Will belongs to the active Network Connection. Before a planned restart snapshots
-broker state, closing a live Network Connection publishes its Will unless that
-client already sent DISCONNECT. The published message (including retained state or
-offline subscriber delivery) is part of the snapshot; the dead connection's Will
-itself is not restored. A reconnect creates a new Will contract.
+Will begins as a bounded responsibility reserved at successful CONNECT. MQTT
+DISCONNECT suppresses it. Every other connection end transfers it to broker-owned
+publication. If atomic subscriber routing is overloaded, the Will remains in the
+bounded pending queue and is retried once when ACK/removal capacity changes; there
+is no retry task or busy loop. Pending state is included in planned restart recovery.
 
 ## Atomicity and validation
 
 New wire files are:
 
 ```text
-NBMQ | version=2 | generation | header SHA-256
+NBMQ | version=3 | generation | header SHA-256
 record type | checked length | binary payload | record SHA-256
+NEND | record count | total record bytes | whole-stream SHA-256
 ```
 
 Shutdown stops listeners, closes owners, waits for detach, then streams one coherent
 lock-held view to a private temporary file, fsyncs it, atomically renames it, and
-fsyncs the directory. The encoder allocates at most one bounded record and keeps
-binary payloads raw. The decoder reads v2 incrementally and retains read compatibility
-with the legacy NBMQ v1 JSON envelope. File and record limits are checked before
+fsyncs the directory. The encoder allocates at most one bounded record, hashes
+incrementally, and keeps binary payloads raw. The decoder reads v3 incrementally and
+retains read compatibility with NBMQ v2 records and the legacy NBMQ v1 JSON envelope.
+v1 uses the immediately previous release's 1,342,177,280-byte read ceiling; v2/v3
+use the compact configured ceiling. File and record limits are checked before
 allocation. Restore recomputes logical counters and rejects impossible QoS/topic/
-packet-ID/order/authorization state instead of trusting serialized counters.
+packet-ID/order/authorization/codec/ownership state instead of trusting serialized
+counters.
 
 The EventBus spool and MQTT snapshot are independent replay-safe responsibilities,
 not a general transaction/database. If either required commit fails, planned

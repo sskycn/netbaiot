@@ -112,3 +112,29 @@ are restored and revalidated. NBMQ v2 writes compact bounded records and v1 rema
 readable. A structural MQTT commit fault is separated from EventBus safety handling,
 and sink panics retain supervisor-owned delivery responsibility. Current evidence
 and benchmark numbers are in `docs/correctness-baseline-freeze.md`.
+
+## Final correctness-freeze closure
+
+The final pass from baseline `564583edb5e805ba8d626ed7b774f7cce55c87b7`
+supersedes the earlier current-format and gate counts in this historical report.
+Bounded, planned-restart-recoverable pending Will responsibility closes subscriber
+pressure loss without a retry task or busy loop. Candidate freshness, live session
+registration, and MQTT attach are atomic relative to cache invalidation, connection
+disconnect, and persistent-session invalidation under the documented
+`auth_registration -> AuthCache -> Sessions -> MqttBroker` order.
+
+NBMQ v3 adds an authoritative count/byte/digest trailer while retaining v1/v2 as
+read-only formats. Version is identified before applying the 1,342,177,280-byte v1
+legacy ceiling or 202,178,660-byte v2/v3 ceiling. Codec ID/version join credential,
+generation, and permission provenance. Recovery now applies canonical live ACL and
+ownership checks, and compact route projections remove full-session payload cloning
+and repeated per-match global scans. Management invalidation reports cache entries,
+network connections, and persistent MQTT sessions separately.
+
+The final local evidence is Rust 1.88 and stable 1.97.1 fmt/clippy PASS and 131
+workspace tests PASS (3 ignored), raw 30/30, Mosquitto differential 11/11, client
+and TLS PASS, release gate 74/74, normative mapping 125/125, and the required fuzz
+runs without a crash. `.github/workflows/mqtt-interop.yml` makes the external gate a
+separate release-oriented CI job; Mosquitto remains test-only. The authoritative
+issue ledger, benchmarks, and remaining limitations are in
+`docs/correctness-baseline-freeze.md`.

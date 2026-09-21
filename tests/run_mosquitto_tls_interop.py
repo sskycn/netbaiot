@@ -4,6 +4,7 @@
 import json
 import os
 import pathlib
+import shutil
 import socket
 import subprocess
 import tempfile
@@ -15,6 +16,7 @@ CERTIFICATE = ROOT / "tests/fixtures/localhost-cert.pem"
 PRIVATE_KEY = ROOT / "tests/fixtures/localhost-key.pem"
 PASSWORD = "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"
 TOPIC = "v1/t/demo/p/sensor/d/device-1/up"
+MOSQUITTO_PUB = shutil.which("mosquitto_pub") or "/usr/local/bin/mosquitto_pub"
 
 
 def free_address():
@@ -67,7 +69,7 @@ def main():
             wait_port(config["mqtt"], server)
             port = config["mqtt"].split(":")[1]
             base = [
-                "/usr/local/bin/mosquitto_pub",
+                MOSQUITTO_PUB,
                 "-h",
                 "127.0.0.1",
                 "-p",

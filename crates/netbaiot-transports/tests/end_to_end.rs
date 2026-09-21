@@ -207,6 +207,98 @@ async fn identical_cache_misses_are_single_flight() {
     assert_eq!(provider.calls.load(Ordering::Relaxed), 1);
 }
 
+#[tokio::test]
+async fn auth_mqtt_attach_revoke_race_001() {
+    let identity = auth();
+    let invalidations = [
+        AuthInvalidation::Device {
+            device: identity.device_key.clone(),
+        },
+        AuthInvalidation::CredentialVersion { version: 1 },
+        AuthInvalidation::AuthGeneration { generation: 1 },
+        AuthInvalidation::All,
+    ];
+    for (index, invalidation) in invalidations.into_iter().enumerate() {
+        let provider = Arc::new(CountingProvider {
+            calls: AtomicUsize::new(0),
+            auth: identity.clone(),
+            delay: false,
+        });
+        let (ingress, services, _) = runtime(Limits::default(), provider);
+        let candidate = ingress
+            .authenticate_session(AuthenticationRequest::Secret {
+                credential_id: "a",
+                secret: b"secret",
+            })
+            .await
+            .unwrap();
+        let stale_candidate = ingress
+            .authenticate_session(AuthenticationRequest::Secret {
+                credential_id: "a",
+                secret: b"secret",
+            })
+            .await
+            .unwrap();
+        let register_ingress = ingress.clone();
+        let register_broker = services.mqtt.clone();
+        let (entered_tx, entered_rx) = std::sync::mpsc::channel();
+        let (resume_tx, resume_rx) = std::sync::mpsc::channel();
+        let register = std::thread::spawn(move || {
+            register_ingress.register_session_with(candidate, Transport::Mqtt, move |bound, _| {
+                entered_tx.send(()).unwrap();
+                resume_rx.recv().unwrap();
+                register_broker.attach(bound, format!("race-{index}"), false)
+            })
+        });
+        entered_rx.recv().unwrap();
+
+        let invalidate_ingress = ingress.clone();
+        let invalidate_broker = services.mqtt.clone();
+        let invalidation_for_thread = invalidation.clone();
+        let (done_tx, done_rx) = std::sync::mpsc::channel();
+        let invalidate = std::thread::spawn(move || {
+            let result = invalidate_ingress.invalidate_auth_with(&invalidation_for_thread, || {
+                invalidate_broker.invalidate_sessions(&invalidation_for_thread)
+            });
+            done_tx.send(()).unwrap();
+            result
+        });
+        assert!(
+            done_rx
+                .recv_timeout(std::time::Duration::from_millis(25))
+                .is_err(),
+            "revocation must wait for the fenced MQTT attach"
+        );
+        resume_tx.send(()).unwrap();
+        let registered = register.join().unwrap().unwrap();
+        let (_, disconnected, invalidated_mqtt) = invalidate.join().unwrap().unwrap();
+        assert_eq!(disconnected, 1);
+        assert_eq!(invalidated_mqtt, 1);
+        drop(registered);
+        assert!(matches!(
+            ingress.register_session_with(stale_candidate, Transport::Mqtt, |bound, _| {
+                services.mqtt.attach(bound, format!("stale-{index}"), false)
+            }),
+            Err(Error::Authentication)
+        ));
+
+        let fresh = ingress
+            .authenticate_session(AuthenticationRequest::Secret {
+                credential_id: "a",
+                secret: b"secret",
+            })
+            .await
+            .unwrap();
+        let (_, _, probe) = ingress
+            .register_session_with(fresh, Transport::Mqtt, |bound, _| {
+                services.mqtt.attach(bound, format!("race-{index}"), false)
+            })
+            .unwrap();
+        assert!(!probe.session_present);
+        ingress.events.stop_workers().await.unwrap();
+    }
+}
+
 fn mqtt_string(value: &[u8], output: &mut Vec<u8>) {
     output.extend_from_slice(&(value.len() as u16).to_be_bytes());
     output.extend_from_slice(value);
