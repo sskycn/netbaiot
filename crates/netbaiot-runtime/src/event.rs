@@ -1,5 +1,6 @@
 use crate::{Error, Limits, Metric, Metrics, Result, lock, now_ms};
 use async_trait::async_trait;
+use futures_util::FutureExt;
 use netbaiot_core::{DeviceEvent, EventAccepted, EventId, RouteDefinition, SinkId};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -474,10 +475,15 @@ impl EventBus {
                         attempt: record.attempt.saturating_add(1),
                         accepted_at: record.accepted_at,
                     };
-                    let result = tokio::time::timeout(timeout, sink.deliver(envelope)).await;
+                    let result = std::panic::AssertUnwindSafe(tokio::time::timeout(
+                        timeout,
+                        sink.deliver(envelope),
+                    ))
+                    .catch_unwind()
+                    .await;
                     let result = match result {
-                        Ok(result) => result,
-                        Err(_) => Err(SinkError::Retryable),
+                        Ok(Ok(result)) => result,
+                        Ok(Err(_)) | Err(_) => Err(SinkError::Retryable),
                     };
                     (record, result)
                 });
@@ -702,6 +708,20 @@ mod tests {
         calls: AtomicUsize,
     }
 
+    struct PanicOnce {
+        calls: AtomicUsize,
+    }
+
+    #[async_trait]
+    impl EventSink for PanicOnce {
+        async fn deliver(&self, _: DeliveryEnvelope) -> std::result::Result<SinkAck, SinkError> {
+            if self.calls.fetch_add(1, Ordering::SeqCst) == 0 {
+                panic!("test sink panic");
+            }
+            Ok(SinkAck)
+        }
+    }
+
     struct RetryBesideBlocked {
         delivered: Mutex<Vec<String>>,
         release: Arc<tokio::sync::Notify>,
@@ -810,6 +830,44 @@ mod tests {
         let state = bus.state.lock().unwrap();
         assert!(state.sinks.get(&second).unwrap().queue.is_empty());
         assert!(state.active.is_empty());
+    }
+
+    #[tokio::test]
+    async fn eventbus_sink_panic_recovery_001() {
+        let limits = Arc::new(Limits {
+            retry_base_ms: 1,
+            retry_max_ms: 1,
+            ..Limits::default()
+        });
+        let sink = Arc::new(PanicOnce {
+            calls: AtomicUsize::new(0),
+        });
+        let id = SinkId::new("panic-recovery").unwrap();
+        let bus = EventBus::new(
+            limits.clone(),
+            Arc::new(Metrics::default()),
+            vec![SinkDefinition::bounded(
+                id.clone(),
+                SinkDeliveryMode::ConfirmedRequired,
+                sink.clone(),
+                &limits,
+            )],
+            vec![RouteDefinition {
+                tenant: None,
+                sinks: vec![id],
+            }],
+            1,
+        )
+        .unwrap();
+        bus.publish(named_event("panic-owned")).unwrap();
+        assert!(
+            bus.wait_required_drained(Duration::from_secs(1))
+                .await
+                .unwrap()
+        );
+        assert_eq!(sink.calls.load(Ordering::SeqCst), 2);
+        assert_eq!(bus.usage().unwrap(), EventBusUsage::default());
+        bus.stop_workers().await.unwrap();
     }
 
     #[tokio::test]

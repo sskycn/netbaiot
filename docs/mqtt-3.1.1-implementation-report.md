@@ -99,7 +99,7 @@ duplicate or suppress MQTT delivery.
 ## 14. Inbound QoS0
 
 The bound ACL is checked, canonical IoT payload crosses codec/EventBus admission,
-and broker routing follows without PUBACK. Overload closes/sheds according to the
+and broker routing follows without PUBACK. Overload rejects atomically according to the
 bounded subsystem that rejected work.
 
 ## 15. Inbound QoS1
@@ -183,19 +183,18 @@ before mutation; restore recomputes and revalidates them.
 
 ## 26. Restart recovery architecture
 
-`mqtt-runtime.state` is one `NBMQ` versioned/generation snapshot with checked length,
-JSON and SHA-256. It is written 0600 under a 0700 directory using temp file, fsync,
-atomic rename and directory fsync. Restore rejects unknown/corrupt/over-limit state
-and contains no credentials. EventBus spool remains an independent replay-safe
-responsibility in the same recovery directory.
+`mqtt-runtime.state` is NBMQ v2: a checksummed header followed by typed,
+length-delimited, individually checksummed session/subscription/message/QoS/retained
+records. Payload bytes remain raw. Encoding holds the broker lock for one coherent
+view but allocates only one bounded record (67,072 bytes maximum), writes 0600 under
+a 0700 directory, fsyncs the file, atomically renames, then fsyncs the directory.
+The decoder streams the same records and accepts legacy NBMQ v1 JSON images.
 
-The JSON format remains backward compatible, but its configured file bound is now
-derived rather than equated with logical state bytes. Six times the global session
-plus retained logical ceilings covers worst-case JSON string escaping and byte-array
-expansion; bounded per-session/retained wrapper allowances and the 52-byte envelope
-are added with checked arithmetic. The default is 1.25 GiB. Startup rejects a lower
-bound, high-byte payloads are committed/recovered in tests, and structural overflow
-during shutdown returns an invariant error instead of retrying forever.
+The configured 192.25 MiB bound is derived from admitted session and retained bytes
+plus retained owner envelopes. Restore rejects framing, checksum, duplicate,
+ordering, topic/filter, packet-ID and state/QoS inconsistencies. A structural MQTT
+failure blocks successful exit only after unrelated EventBus required work has
+drained or been safely spooled.
 
 ## 27. Graceful restart tests
 
@@ -290,5 +289,6 @@ No `$SYS` service, MQTT 5, shared subscriptions, WebSocket, bridging, clustering
 multi-node migration is implemented. Publishing is intentionally limited to
 canonical IoT topics, and the IoT live-session binding selects one current command
 endpoint per DeviceKey even though multiple persistent ClientIds may be stored.
-Exhausting explicit subscriber/session limits sheds delivery by documented policy.
+Exhausting explicit persistent subscriber/session limits rejects the entire QoS1/2
+publication before any target commit; QoS0 remains best effort.
 Performance results are single-host measurements, not production capacity claims.

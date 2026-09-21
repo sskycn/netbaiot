@@ -22,14 +22,20 @@ reaches zero, the process exits without a new spool. Otherwise the process enter
 pending responsibility is durably committed are workers stopped and graceful exit
 allowed.
 
-An MQTT snapshot or EventBus spool failure blocks voluntary shutdown. The process
-stays alive and unready, keeps accepted in-memory responsibility, leaves the
-management health/readiness surface available, and retries at a bounded cadence.
-Repairing storage or restoring the required sink lets shutdown finish. An external
-SIGKILL while blocked remains part of the explicitly lossy abnormal-crash contract.
+An MQTT snapshot or EventBus spool failure blocks voluntary shutdown. A structural
+MQTT recovery error is recorded as critical and is not retried, but it no longer
+short-circuits EventBus safety: required events first drain or enter the fsynced
+restart spool. The process then stays alive and unready with management available.
+Retryable storage failures continue at a bounded cadence. An external SIGKILL while
+blocked remains part of the explicitly lossy abnormal-crash contract.
 
 At startup the MQTT broker first validates/restores its snapshot, then EventBus spool
 segments are restored with their original IDs, sinks/listeners are initialized, and
 only then readiness is enabled. Recovered EventBus segment files are removed only
 after required work drains. MQTT reconnect still authenticates before session
 resume; restored state never contains credentials.
+
+MQTT recovery writes NBMQ v2 incrementally as bounded typed records. It reads both
+v1 and v2. Recovery validates topic/filter syntax, packet identifiers, legal QoS per
+state, non-QoS0 offline backlog, retained consistency, ordering, duplicates, and
+authorization provenance before the replacement broker state becomes visible.

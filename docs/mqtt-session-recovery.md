@@ -5,8 +5,11 @@
 The key is `(Authenticated DeviceKey, ClientId)`. Authentication completes before
 lookup. A restored record contains identity, ClientId, subscriptions and QoS state,
 but never credentials; a reconnecting client must authenticate as the same
-DeviceKey. Active attachment has a monotonically increasing generation. Cleanup
-from an old connection cannot remove or mutate a newer generation.
+DeviceKey. Stored authorization provenance contains only credential version, auth
+generation and permissions. A mismatch resets the session. Active attachment has a
+monotonically increasing generation; persistent state also has a separate monotonic
+session incarnation. Cleanup from an old connection cannot remove a newer
+generation, and old async QoS2 work cannot mutate a new incarnation.
 
 CleanSession=1 removes only that key's old state. CleanSession=0 detaches the socket
 while preserving the compact `StoredSession`. Disconnected state contains no
@@ -16,7 +19,7 @@ tenant count/byte ceilings always providing a hard bound.
 
 ## Snapshot contents
 
-`mqtt-runtime.state` contains one JSON snapshot with:
+`mqtt-runtime.state` contains one compact NBMQ v2 record stream with:
 
 - format version and snapshot/broker generation;
 - persistent SessionKey and last-seen time;
@@ -35,19 +38,20 @@ itself is not restored. A reconnect creates a new Will contract.
 
 ## Atomicity and validation
 
-The wire file is:
+New wire files are:
 
 ```text
-NBMQ | version u32 | generation u64 | JSON length u32 | JSON | SHA-256
+NBMQ | version=2 | generation | header SHA-256
+record type | checked length | binary payload | record SHA-256
 ```
 
-Shutdown stops listeners, closes owners, waits for detach, builds one locked broker
-snapshot, writes a private temporary file, fsyncs it, atomically renames it, and
-fsyncs the directory. Internal state such as an inflight packet and its packet ID is
-therefore not split across records. Snapshot/file/record/segment limits are checked
-before write and before allocation during read. Restore recomputes all logical byte
-counters instead of trusting serialized counters. Unknown version, checksum,
-generation, syntax, duplicate-key, or resource-bound failure aborts startup.
+Shutdown stops listeners, closes owners, waits for detach, then streams one coherent
+lock-held view to a private temporary file, fsyncs it, atomically renames it, and
+fsyncs the directory. The encoder allocates at most one bounded record and keeps
+binary payloads raw. The decoder reads v2 incrementally and retains read compatibility
+with the legacy NBMQ v1 JSON envelope. File and record limits are checked before
+allocation. Restore recomputes logical counters and rejects impossible QoS/topic/
+packet-ID/order/authorization state instead of trusting serialized counters.
 
 The EventBus spool and MQTT snapshot are independent replay-safe responsibilities,
 not a general transaction/database. If either required commit fails, planned

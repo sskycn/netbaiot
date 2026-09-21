@@ -32,7 +32,7 @@ spool relationship values.
 | Sink timeout/retry | 5 s / 5 attempts / max age 1 h |
 | Restart spool | 100,000 records / 256 MiB total |
 | Spool segment/record | 64 MiB / 1 MiB |
-| MQTT recovery image | 256 MiB; validated against session + retained ceilings |
+| MQTT recovery image | 192.25 MiB; compact NBMQ v2 bound from session, retained, and owner envelopes |
 
 Every sink queue is independently count and byte charged. Global event accounting
 charges the shared event once; each sink charges its delivery responsibility.
@@ -54,8 +54,8 @@ byte limits.
 | router → required sink | all-or-nothing reject before acceptance |
 | router → best-effort sink | drop and metric |
 | command → live session | reject overloaded/offline; never persist |
-| MQTT route → active subscriber | bounded channel; cancel/shedding on overflow |
-| MQTT route → persistent offline subscriber | bounded QoS1/2 queue; shed at limit |
+| MQTT route → active subscriber | QoS0 may shed; QoS1/2 is preflighted and retained as outbound state |
+| MQTT route → persistent offline subscriber | bounded QoS1/2 queue; whole publication rejects atomically at limit |
 | graceful drain → spool | remain alive/unready and retry bounded commits while accepted work remains |
 
 TLS, allocator-retained pages, Tokio, and kernel socket buffers are not exactly

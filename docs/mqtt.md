@@ -75,14 +75,27 @@ Persistent MQTT offline subscription delivery is separate from the command API.
 Explicit management commands still require a live device and return
 `DEVICE_OFFLINE`; they are never silently converted into stored MQTT commands.
 
-Slow active consumers have a bounded sender. QoS0 is shed when that bound is full;
-QoS1/2 moves to the bounded persistent offline queue where possible. Exhausting the
-offline/session/tenant/global bound sheds that subscriber delivery without
-unbounded waiting tasks. A single subscriber cannot make already-enqueued peers be
-replayed.
+Slow active consumers have a bounded sender. QoS0 may be shed when that bound is
+full. For QoS1/2, the broker preflights every matching session, tenant/global
+inflight limit, offline queue, session bytes, and an optional retained mutation as
+one route plan. If any persistent target cannot own its responsibility, no target or
+retained value is changed and the source is not acknowledged. Commit happens only
+after the complete plan succeeds, so multi-subscriber routing cannot partially
+deliver and silently shed a peer.
 
-Planned restart writes one internally consistent, versioned MQTT snapshot with
-SHA-256, restrictive permissions, file fsync, atomic rename, and directory fsync.
+Persistent sessions store authorization provenance (credential version, auth
+generation, and permissions, never secrets) and a monotonic session incarnation.
+CleanSession=0 takeover keeps the incarnation; CleanSession=1 creates a new one.
+Inbound QoS2 completion and routing require the same incarnation, packet identifier,
+and operation token. Reconnect under changed authorization resets the old session
+and returns Session Present=0. Management invalidation removes matching persistent
+state in the same bounded control operation.
+
+Planned restart writes compact NBMQ v2 records incrementally, with a checksummed
+header and a length/checksum on every bounded record. Payload bytes remain binary;
+there is no complete snapshot clone or whole-image serialization buffer. NBMQ v1
+JSON images remain readable, while all new writes use v2. The file uses restrictive
+permissions, file fsync, atomic rename, and directory fsync.
 It contains no password or socket/TLS/task state. Reconnect must authenticate before
 the `(DeviceKey, ClientId)` state can resume. Abrupt crash may lose mutations since
 the last successful planned snapshot; this is intentionally not a crash-durable
