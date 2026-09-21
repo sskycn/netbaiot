@@ -82,6 +82,12 @@ def main():
     parser.add_argument("--sample-output")
     parser.add_argument("--sample-seconds", type=int, default=10)
     parser.add_argument("--tls", action="store_true")
+    parser.add_argument(
+        "--server-bin", default=os.path.join(ROOT, "target/release/netbaiot-server")
+    )
+    parser.add_argument(
+        "--loadgen-bin", default=os.path.join(ROOT, "target/release/netbaiot-loadgen")
+    )
     args = parser.parse_args()
     ports = [free_port() for _ in range(6)]
     device_http, management, mqtt, tcp, udp, sink_port = ports
@@ -189,7 +195,7 @@ def main():
             if not ready:
                 raise RuntimeError("sink did not start")
             server = subprocess.Popen(
-                [os.path.join(ROOT, "target/release/netbaiot-server"), server_config],
+                [args.server_bin, server_config],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.PIPE,
                 text=True,
@@ -205,7 +211,7 @@ def main():
                         raise RuntimeError("server did not start")
                     time.sleep(.05)
             load = subprocess.Popen(
-                [os.path.join(ROOT, "target/release/netbaiot-loadgen"), load_config],
+                [args.loadgen_bin, load_config],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,

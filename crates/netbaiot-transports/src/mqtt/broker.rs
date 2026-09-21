@@ -11,7 +11,10 @@ use std::{
     fs,
     io::{BufReader, Cursor, Read, Write},
     path::{Path, PathBuf},
-    sync::{Arc, Mutex},
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicUsize, Ordering},
+    },
     time::Instant,
 };
 use tokio::sync::mpsc;
@@ -529,6 +532,9 @@ impl Drop for Attachment {
 pub struct MqttBroker {
     limits: Arc<Limits>,
     metrics: Option<Arc<Metrics>>,
+    /// Derived from `BrokerState::subscription_count`. Broker state remains authoritative; this
+    /// hint only lets a non-retained route with no possible target linearize without the mutex.
+    subscription_count: AtomicUsize,
     state: Mutex<BrokerState>,
 }
 
@@ -545,6 +551,7 @@ impl MqttBroker {
         Arc::new(Self {
             limits,
             metrics,
+            subscription_count: AtomicUsize::new(0),
             state: Mutex::new(BrokerState {
                 sessions: HashMap::new(),
                 active: HashMap::new(),
@@ -654,6 +661,7 @@ impl MqttBroker {
             mark_pending(&mut state, &key);
         }
         let session_incarnation = state.sessions.get(&key).ok_or(Error::Internal)?.incarnation;
+        self.publish_subscription_count(&state);
         drop(state);
         let attachment = Attachment {
             key: key.clone(),
@@ -690,6 +698,7 @@ impl MqttBroker {
             session.active_generation = None;
             session.last_seen_ms = now_ms();
         }
+        self.publish_subscription_count(&state);
         Ok(())
     }
 
@@ -807,6 +816,7 @@ impl MqttBroker {
                 return Err(error);
             }
         }
+        self.publish_subscription_count(&state);
         Ok(qos)
     }
 
@@ -826,6 +836,7 @@ impl MqttBroker {
             state.subscription_count = state.subscription_count.saturating_sub(1);
             state.trie.remove(filter, key);
             retry_pending_wills(&mut state, &self.limits);
+            self.publish_subscription_count(&state);
         }
         Ok(())
     }
@@ -833,6 +844,12 @@ impl MqttBroker {
     pub fn route(&self, owner: &DeviceKey, message: BrokerMessage) -> Result<usize> {
         if message.qos > 2 || !valid_topic(&message.topic, &self.limits, false) {
             return Err(Error::Invalid);
+        }
+        // Stores happen while holding the broker mutex after the matching trie mutation. A zero
+        // observed here therefore linearizes this route before a concurrent subscribe or after a
+        // concurrent final unsubscribe. Retained messages still need the mutex for their update.
+        if !message.retain && self.subscription_count.load(Ordering::Acquire) == 0 {
+            return Ok(0);
         }
         let lock_started = self
             .metrics
@@ -1739,7 +1756,9 @@ impl MqttBroker {
             return Err(Error::Overloaded);
         }
         retry_pending_wills(&mut replacement, &self.limits);
-        *lock(&self.state)? = replacement;
+        let mut state = lock(&self.state)?;
+        *state = replacement;
+        self.publish_subscription_count(&state);
         Ok(())
     }
 
@@ -1789,6 +1808,7 @@ impl MqttBroker {
             remove_session(&mut state, key);
         }
         retry_pending_wills(&mut state, &self.limits);
+        self.publish_subscription_count(&state);
         Ok(keys.len())
     }
 
@@ -1832,6 +1852,11 @@ impl MqttBroker {
             return Err(Error::Overloaded);
         }
         Ok(())
+    }
+
+    fn publish_subscription_count(&self, state: &BrokerState) {
+        self.subscription_count
+            .store(state.subscription_count, Ordering::Release);
     }
 
     fn prune_expired(&self, state: &mut BrokerState) {
@@ -4376,6 +4401,68 @@ mod tests {
         assert!(stored_payload_bytes > 8_000_000);
         assert!(plan.temporary_bytes() < 512 * 1024);
         assert!(plan.temporary_bytes() < stored_payload_bytes / 16);
+    }
+
+    #[test]
+    fn mqtt_empty_subscription_route_hint_tracks_authoritative_state_001() {
+        let broker = MqttBroker::new(Arc::new(Limits::default()));
+        let device = auth("route-hint");
+        let mut attachment = broker
+            .attach(&device, "route-hint-client".into(), false)
+            .unwrap();
+        let topic = "v1/t/t/p/p/d/route-hint/down";
+        let message = BrokerMessage {
+            topic: topic.into(),
+            payload: b"payload".to_vec(),
+            qos: 0,
+            retain: false,
+        };
+
+        assert_eq!(broker.subscription_count.load(Ordering::Acquire), 0);
+        assert_eq!(
+            broker.route(&device.device_key, message.clone()).unwrap(),
+            0
+        );
+        broker
+            .subscribe(&attachment.key, attachment.generation, topic, 0)
+            .unwrap();
+        assert_eq!(broker.subscription_count.load(Ordering::Acquire), 1);
+        assert_eq!(
+            broker.route(&device.device_key, message.clone()).unwrap(),
+            1
+        );
+        assert!(attachment.receiver.try_recv().is_ok());
+
+        broker
+            .unsubscribe(&attachment.key, attachment.generation, topic)
+            .unwrap();
+        assert_eq!(broker.subscription_count.load(Ordering::Acquire), 0);
+        assert_eq!(broker.route(&device.device_key, message).unwrap(), 0);
+    }
+
+    #[test]
+    fn mqtt_empty_subscription_route_hint_is_restored_and_cleaned_001() {
+        let source = MqttBroker::new(Arc::new(Limits::default()));
+        let device = auth("route-hint-restore");
+        let mut attachment = source.attach(&device, "persistent".into(), false).unwrap();
+        source
+            .subscribe(
+                &attachment.key,
+                attachment.generation,
+                "v1/t/t/p/p/d/route-hint-restore/down",
+                1,
+            )
+            .unwrap();
+        attachment.detach().unwrap();
+
+        let recovered = MqttBroker::new(Arc::new(Limits::default()));
+        recovered.restore(source.snapshot().unwrap()).unwrap();
+        assert_eq!(recovered.subscription_count.load(Ordering::Acquire), 1);
+        let clean = recovered
+            .attach(&device, "persistent".into(), true)
+            .unwrap();
+        assert_eq!(recovered.subscription_count.load(Ordering::Acquire), 0);
+        drop(clean);
     }
 
     #[test]

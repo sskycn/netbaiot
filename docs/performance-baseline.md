@@ -472,3 +472,27 @@ All required post-change gates passed:
 - ignored 60-second multi-generation graceful-restart soak (62.78 s).
 
 The restart test is lifecycle/recovery evidence, not a four-hour performance soak.
+
+## Broker route experiment (2026-09-22)
+
+The focused experiment at starting SHA
+`70b855f1a97ebe1222dc0212fe0847e91b07cf4b` was **KEPT**. A derived atomic
+subscription-count hint removes the broker mutex acquisition for valid,
+non-retained publishes only when the authoritative broker has no subscriptions.
+Subscribed and retained routing continue through the original locked atomic
+preflight/commit path; the lock type and ownership/state-machine semantics did not
+change.
+
+At 20k offered QoS1/s, three-run median throughput moved from 19,978.55 to
+19,991.05/s (+0.063%), PUBACK P99 from 1.50 to 1.36 ms, server peak CPU from
+140.9% to 134.3%, and peak RSS from 8,192 to 8,208 KiB. Broker-route acquisitions
+and wait sum fell 100% (one acquisition/publish to zero) in this no-subscriber
+workload. This satisfies the experiment's >=25% lock-wait threshold, but the
+25--30k/s saturation knee did not move materially.
+
+QoS0 25k and QoS2 20k throughput remained within 0.04% and 0.006%. Compact fanout
+plan bytes remained exactly 10,090/101,890/204,890 at 100/1k/2k targets. The
+hot-publisher fairness scenario completed every low-rate message with unchanged
+0.13 ms P99, bounded overload remained stable, all Rust/MQTT/restart gates passed,
+and no second bottleneck was optimized. Full methodology and source accounting are
+in `docs/performance-broker-route-experiment.md`.
