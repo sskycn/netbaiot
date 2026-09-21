@@ -25,7 +25,7 @@ use subtle::ConstantTimeEq;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::{TcpListener, TcpStream, UdpSocket},
-    sync::{mpsc, oneshot},
+    sync::{Notify, mpsc, oneshot},
     task::JoinSet,
 };
 use tokio_rustls::{TlsAcceptor, rustls};
@@ -247,6 +247,7 @@ struct StreamRequest {
 
 struct TcpStreamSink {
     active: Mutex<Option<ActiveStream>>,
+    availability: Notify,
     generation: AtomicU64,
 }
 
@@ -272,6 +273,7 @@ impl TcpStreamSink {
     fn new() -> Arc<Self> {
         Arc::new(Self {
             active: Mutex::new(None),
+            availability: Notify::new(),
             generation: AtomicU64::new(0),
         })
     }
@@ -291,6 +293,8 @@ impl TcpStreamSink {
             sender,
             filter,
         });
+        drop(active);
+        self.availability.notify_waiters();
         Ok(generation)
     }
 
@@ -301,6 +305,8 @@ impl TcpStreamSink {
             .is_some_and(|owner| owner.generation == generation)
         {
             *active = None;
+            drop(active);
+            self.availability.notify_waiters();
         }
         Ok(())
     }
@@ -309,17 +315,27 @@ impl TcpStreamSink {
 #[async_trait]
 impl EventSink for TcpStreamSink {
     async fn deliver(&self, delivery: DeliveryEnvelope) -> std::result::Result<SinkAck, SinkError> {
-        let active = self
-            .active
-            .lock()
-            .map_err(|_| SinkError::Permanent)?
-            .clone()
-            .ok_or(SinkError::Retryable)?;
-        // A filter mismatch is not an ACK of required work. The logical sink
-        // retains responsibility until a matching subscriber confirms it.
-        if !active.filter.matches(&delivery.event) {
-            return Err(SinkError::Retryable);
-        }
+        let active = loop {
+            // Construct the waiter before checking state so a concurrent claim or release cannot
+            // be lost between the state check and awaiting the notification. EventBus owns the
+            // outer bounded delivery timeout, so this wait consumes exactly one configured sink
+            // concurrency slot and cannot create unbounded hidden work.
+            let available = self.availability.notified();
+            let active = self
+                .active
+                .lock()
+                .map_err(|_| SinkError::Permanent)?
+                .clone();
+            if let Some(active) = active
+                && active.filter.matches(&delivery.event)
+            {
+                break active;
+            }
+            // No subscriber, or only a non-matching subscriber, is normal during reconnect and
+            // filter replacement. Do not consume a delivery attempt before an eligible owner can
+            // possibly acknowledge the already-accepted required work.
+            available.await;
+        };
         let (result, receive) = oneshot::channel();
         active
             .sender
@@ -1183,10 +1199,22 @@ mod reliability_tests {
             sink.claim(other, EventFilter::default()),
             Err(Error::Conflict)
         ));
-        assert!(matches!(
-            sink.deliver(delivery()).await,
-            Err(SinkError::Retryable)
-        ));
+        let pending = delivery();
+        let expected = pending.event.event_id;
+        let sink_task = {
+            let sink = sink.clone();
+            tokio::spawn(async move { sink.deliver(pending).await })
+        };
+        assert!(
+            tokio::time::timeout(Duration::from_millis(20), async {
+                while !sink_task.is_finished() {
+                    tokio::task::yield_now().await;
+                }
+            })
+            .await
+            .is_err(),
+            "a non-matching subscriber must not acknowledge required work"
+        );
         sink.release(generation.wrapping_add(1)).unwrap();
         assert!(sink.active.lock().unwrap().is_some());
         sink.release(generation).unwrap();
@@ -1204,12 +1232,6 @@ mod reliability_tests {
                 },
             )
             .unwrap();
-        let pending = delivery();
-        let expected = pending.event.event_id;
-        let sink_task = {
-            let sink = sink.clone();
-            tokio::spawn(async move { sink.deliver(pending).await })
-        };
         let request = requests.recv().await.unwrap();
         assert_eq!(request.delivery.event.event_id, expected);
         request.result.send(Ok(SinkAck)).unwrap();

@@ -375,6 +375,13 @@ async fn official_client_reconnects_and_replays_unacked_event_with_same_id() {
     ));
     replay.ack().await.unwrap();
 
+    // The server registers the MQTT session before the SDK receives SUBACK for its command
+    // subscription. Server-side presence therefore cannot prove that the SDK publish path is
+    // ready; wait on the SDK's stricter connection boundary before the first post-restart send.
+    device
+        .wait_until_connected(Duration::from_secs(5))
+        .await
+        .unwrap();
     tokio::time::timeout(Duration::from_secs(5), async {
         loop {
             if business
