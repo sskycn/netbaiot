@@ -25,6 +25,12 @@ use tokio::{
 };
 use tokio_rustls::{TlsConnector, rustls};
 use tokio_util::sync::CancellationToken;
+
+// These integration tests close ephemeral-port reservations before a subprocess or composition
+// root binds the configured addresses. Serializing only those tests prevents the Rust test
+// harness from handing a just-released port to a sibling test in that narrow handoff window.
+static EPHEMERAL_PORT_TEST_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
 fn config() -> Config {
     serde_json::from_str(include_str!("../../../configs/development.json")).unwrap()
 }
@@ -115,6 +121,7 @@ fn non_loopback_management_requires_tls_while_loopback_development_allows_http()
 }
 #[tokio::test]
 async fn composition_root_serves_http_and_stops_all_listeners() {
+    let _port_guard = EPHEMERAL_PORT_TEST_LOCK.lock().await;
     let mut c = config();
     let mut reservations = Vec::new();
     for _ in 0..5 {
@@ -156,14 +163,28 @@ async fn composition_root_serves_http_and_stops_all_listeners() {
     .await
     .unwrap();
     assert_eq!(response.status(), 202);
+    // Observe the sockets owned by this server instance. Reconnecting to the released ephemeral
+    // addresses after shutdown is racy because another concurrent test may legitimately receive
+    // one of those ports before this assertion runs.
+    let mut active_connections = Vec::new();
+    for address in addresses {
+        active_connections.push(TcpStream::connect(address).await.unwrap());
+    }
     stop.cancel();
     tokio::time::timeout(Duration::from_secs(3), server)
         .await
         .unwrap()
         .unwrap()
         .unwrap();
-    for address in addresses {
-        assert!(tokio::net::TcpStream::connect(address).await.is_err());
+    for mut connection in active_connections {
+        let mut byte = [0u8; 1];
+        let result = tokio::time::timeout(Duration::from_secs(1), connection.read(&mut byte))
+            .await
+            .expect("owned connection remained open after server shutdown");
+        assert!(
+            matches!(result, Ok(0) | Err(_)),
+            "owned connection received data after server shutdown"
+        );
     }
 }
 #[tokio::test]
@@ -541,6 +562,7 @@ async fn request_drain(client: &reqwest::Client, address: std::net::SocketAddr, 
 
 #[tokio::test]
 async fn external_auth_outage_preserves_bound_session_and_recovers_new_authentication() {
+    let _port_guard = EPHEMERAL_PORT_TEST_LOCK.lock().await;
     let provider_listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let provider_address = provider_listener.local_addr().unwrap();
     let provider_available = Arc::new(AtomicBool::new(true));
@@ -632,6 +654,7 @@ async fn external_auth_outage_preserves_bound_session_and_recovers_new_authentic
 
 #[tokio::test]
 async fn subprocess_mqtt_session_retained_and_qos1_inflight_survive_graceful_restart() {
+    let _port_guard = EPHEMERAL_PORT_TEST_LOCK.lock().await;
     let mut c = config();
     c.device_http = free_address().await;
     c.management_http = free_address().await;
@@ -712,6 +735,7 @@ async fn subprocess_mqtt_session_retained_and_qos1_inflight_survive_graceful_res
 
 #[tokio::test]
 async fn subprocess_mqtt_qos2_resumes_outbound_and_inbound_restart_stages() {
+    let _port_guard = EPHEMERAL_PORT_TEST_LOCK.lock().await;
     let mut c = config();
     c.device_http = free_address().await;
     c.management_http = free_address().await;
@@ -829,6 +853,7 @@ async fn subprocess_mqtt_qos2_resumes_outbound_and_inbound_restart_stages() {
 }
 
 async fn exercise_graceful_restart_spool_replay(healthy_cycles: u32, dwell_per_cycle: Duration) {
+    let _port_guard = EPHEMERAL_PORT_TEST_LOCK.lock().await;
     let sink_listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let sink_address = sink_listener.local_addr().unwrap();
     let healthy = Arc::new(AtomicBool::new(false));
@@ -1126,6 +1151,7 @@ async fn subprocess_graceful_restart_sixty_second_soak() {
 
 #[tokio::test]
 async fn subprocess_sigkill_exposes_the_documented_three_event_loss_window() {
+    let _port_guard = EPHEMERAL_PORT_TEST_LOCK.lock().await;
     let mut c = config();
     c.device_http = free_address().await;
     c.management_http = free_address().await;
@@ -1185,6 +1211,7 @@ async fn subprocess_sigkill_exposes_the_documented_three_event_loss_window() {
 
 #[tokio::test]
 async fn subprocess_spool_failure_stays_alive_until_repaired_then_replays_same_event_id() {
+    let _port_guard = EPHEMERAL_PORT_TEST_LOCK.lock().await;
     let mut c = config();
     c.device_http = free_address().await;
     c.management_http = free_address().await;
