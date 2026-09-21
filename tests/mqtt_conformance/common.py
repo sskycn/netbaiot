@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import pathlib
+import shutil
 import socket
 import subprocess
 import tempfile
@@ -14,7 +15,7 @@ from dataclasses import dataclass, field
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 SERVER = ROOT / "target/debug/netbaiot-server"
-MOSQUITTO = pathlib.Path("/usr/local/sbin/mosquitto")
+MOSQUITTO = pathlib.Path(shutil.which("mosquitto") or "/usr/local/sbin/mosquitto")
 USERNAME_A = "demo-device"
 USERNAME_B = "demo-device-b"
 PASSWORD = "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"

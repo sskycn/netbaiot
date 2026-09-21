@@ -309,8 +309,10 @@ async fn auth(
     let result = client.auth_cache().invalidate_device(key).await?;
     print_value(&result, output, || {
         format!(
-            "invalidated={} disconnected={}",
-            result.invalidated, result.disconnected
+            "invalidated_cache_entries={} disconnected_connections={} invalidated_mqtt_sessions={}",
+            result.invalidated_cache_entries,
+            result.disconnected_connections,
+            result.invalidated_mqtt_sessions
         )
     })
     .await

@@ -3,6 +3,7 @@
 
 import argparse
 import json
+import shutil
 import subprocess
 import time
 
@@ -10,6 +11,8 @@ import time
 PASSWORD = "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"
 ROOT = "v1/t/demo/p/sensor/d/device-1"
 TOPIC = f"{ROOT}/up"
+MOSQUITTO_PUB = shutil.which("mosquitto_pub") or "/usr/local/bin/mosquitto_pub"
+MOSQUITTO_SUB = shutil.which("mosquitto_sub") or "/usr/local/bin/mosquitto_sub"
 
 
 def event(source, sequence):
@@ -33,7 +36,7 @@ class Matrix:
     def publish(self, topic=TOPIC, qos=1, payload=None, retain=False, check=True, extra=()):
         self.sequence += 1
         payload = payload if payload is not None else event(f"mosq-{self.sequence}", self.sequence)
-        command = ["/usr/local/bin/mosquitto_pub", *self.base, "-i", f"mosq-pub-{self.sequence}", "-t", topic, "-q", str(qos), "-m", payload, *extra]
+        command = [MOSQUITTO_PUB, *self.base, "-i", f"mosq-pub-{self.sequence}", "-t", topic, "-q", str(qos), "-m", payload, *extra]
         if retain:
             command.append("-r")
         return subprocess.run(command, check=check, capture_output=True, text=True, timeout=8)
@@ -41,7 +44,7 @@ class Matrix:
     def subscriber(self, topic, qos=2, count=1, client_id=None, persistent=False, extra=()):
         self.clients += 1
         client_id = client_id or f"mosq-sub-{self.clients}"
-        command = ["/usr/local/bin/mosquitto_sub", *self.base, "-t", topic, "-q", str(qos), "-C", str(count), "-W", "5", "-N", *extra]
+        command = [MOSQUITTO_SUB, *self.base, "-t", topic, "-q", str(qos), "-C", str(count), "-W", "5", "-N", *extra]
         command.extend(["-i", client_id])
         if persistent:
             command.append("-c")
@@ -64,7 +67,7 @@ def main():
 
     matrix.publish(qos=1)
     bad = subprocess.run(
-        ["/usr/local/bin/mosquitto_pub", "-h", args.host, "-p", str(args.port), "-V", "mqttv311", "-u", "demo-device", "-P", "wrong", "-i", "mosq-bad-auth", "-t", TOPIC, "-q", "1", "-m", event("bad-auth", 0)],
+        [MOSQUITTO_PUB, "-h", args.host, "-p", str(args.port), "-V", "mqttv311", "-u", "demo-device", "-P", "wrong", "-i", "mosq-bad-auth", "-t", TOPIC, "-q", "1", "-m", event("bad-auth", 0)],
         capture_output=True,
         text=True,
         timeout=8,
@@ -96,7 +99,7 @@ def main():
     matrix.receive(replay, [retained_two])
     matrix.publish(payload="", retain=True)
     empty = subprocess.run(
-        ["/usr/local/bin/mosquitto_sub", *matrix.base, "-t", f"{ROOT}/#", "-q", "1", "-W", "1", "-N"],
+        [MOSQUITTO_SUB, *matrix.base, "-t", f"{ROOT}/#", "-q", "1", "-W", "1", "-N"],
         capture_output=True,
         text=True,
         timeout=4,
@@ -106,7 +109,7 @@ def main():
 
     persistent_id = "mosq-persistent"
     initial = subprocess.run(
-        ["/usr/local/bin/mosquitto_sub", *matrix.base, "-c", "-i", persistent_id, "-t", TOPIC, "-q", "2", "-E"],
+        [MOSQUITTO_SUB, *matrix.base, "-c", "-i", persistent_id, "-t", TOPIC, "-q", "2", "-E"],
         capture_output=True,
         text=True,
         timeout=8,
@@ -124,20 +127,20 @@ def main():
 
     unsub_id = "mosq-unsubscribe"
     subprocess.run(
-        ["/usr/local/bin/mosquitto_sub", *matrix.base, "-c", "-i", unsub_id, "-t", TOPIC, "-q", "1", "-E"],
+        [MOSQUITTO_SUB, *matrix.base, "-c", "-i", unsub_id, "-t", TOPIC, "-q", "1", "-E"],
         check=True,
         capture_output=True,
         timeout=8,
     )
     unsubscribed = subprocess.run(
-        ["/usr/local/bin/mosquitto_sub", *matrix.base, "-c", "-i", unsub_id, "-U", TOPIC, "-W", "1"],
+        [MOSQUITTO_SUB, *matrix.base, "-c", "-i", unsub_id, "-U", TOPIC, "-W", "1"],
         capture_output=True,
         timeout=8,
     )
     assert b"Protocol error" not in unsubscribed.stderr
     matrix.publish(payload=event("mosq-after-unsubscribe", 50))
     no_offline = subprocess.run(
-        ["/usr/local/bin/mosquitto_sub", *matrix.base, "-c", "-i", unsub_id, "-t", TOPIC, "-q", "1", "-W", "1", "-N"],
+        [MOSQUITTO_SUB, *matrix.base, "-c", "-i", unsub_id, "-t", TOPIC, "-q", "1", "-W", "1", "-N"],
         capture_output=True,
         text=True,
         timeout=4,
@@ -152,7 +155,7 @@ def main():
     for qos in (0, 1, 2):
         payload = event(f"mosq-will-{qos}", 60 + qos)
         writer = subprocess.Popen(
-            ["/usr/local/bin/mosquitto_pub", *matrix.base, "-d", "-i", f"mosq-will-writer-{qos}", "-t", TOPIC, "-l", "--will-topic", will_topic, "--will-payload", payload, "--will-qos", str(qos), "--will-retain"],
+            [MOSQUITTO_PUB, *matrix.base, "-d", "-i", f"mosq-will-writer-{qos}", "-t", TOPIC, "-l", "--will-topic", will_topic, "--will-payload", payload, "--will-qos", str(qos), "--will-retain"],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -172,14 +175,14 @@ def main():
 
     normal_payload = event("mosq-normal-disconnect-will", 70)
     normal = subprocess.run(
-        ["/usr/local/bin/mosquitto_pub", *matrix.base, "-t", TOPIC, "-m", event("mosq-normal", 71), "--will-topic", will_topic, "--will-payload", normal_payload, "--will-qos", "2", "--will-retain"],
+        [MOSQUITTO_PUB, *matrix.base, "-t", TOPIC, "-m", event("mosq-normal", 71), "--will-topic", will_topic, "--will-payload", normal_payload, "--will-qos", "2", "--will-retain"],
         capture_output=True,
         text=True,
         timeout=8,
     )
     assert normal.returncode == 0, normal.stderr
     no_will = subprocess.run(
-        ["/usr/local/bin/mosquitto_sub", *matrix.base, "-t", will_topic, "-q", "2", "-W", "1", "-N"],
+        [MOSQUITTO_SUB, *matrix.base, "-t", will_topic, "-q", "2", "-W", "1", "-N"],
         capture_output=True,
         text=True,
         timeout=4,

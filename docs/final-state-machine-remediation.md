@@ -92,3 +92,34 @@ failure cannot bypass EventBus drain/spool; retained replacement reserves only i
 positive delta; and EventSink panics become supervised retryable failures. NBMQ v2
 replaces new JSON writes while retaining v1 reads. Evidence is consolidated in
 `docs/correctness-baseline-freeze.md`.
+
+## Final correctness-freeze supersession
+
+The final pass from baseline `564583edb5e805ba8d626ed7b774f7cce55c87b7`
+supersedes the earlier v2/current-gate statements above. Accepted Wills now reserve
+bounded broker ownership and move to restart-recoverable pending state rather than
+being lost under subscriber pressure. The auth registration gate includes broker
+attach, and invalidation performs cache, live-session, and persistent-session work
+under the same ordering boundary:
+
+```text
+auth_registration -> AuthCache -> Sessions -> MqttBroker
+```
+
+Persistent compatibility now includes permissions, credential version, auth
+generation, codec ID, and codec version. Routing uses a compact projected plan and
+one accounting pass rather than cloning session payload state. Restore uses the
+canonical live ACL helpers and validates ownership of subscriptions, offline and
+outbound deliveries, inbound QoS2, retained messages, and pending Wills.
+
+New writes are NBMQ v3. Its incremental whole-image trailer authenticates the
+header and ordered record stream and declares authoritative record and byte counts.
+NBMQ v1 and v2 remain read-only; v1 uses its exact 1,342,177,280-byte legacy read
+ceiling while v2/v3 use the configured 202,178,660-byte bound. Management responses
+report cache entries, active connections, and persistent MQTT sessions separately.
+
+Final evidence is raw 30/30, Mosquitto differential 11/11, MQTT 3.1.1 client and
+TLS PASS, full release gate 74/74, normative mapping 125/125, both Rust toolchains
+131 tests PASS with 3 ignored, and required fuzz 13,000 total runs without a crash.
+The dedicated external workflow installs Mosquitto only as a test dependency. See
+`docs/correctness-baseline-freeze.md` for the authoritative ledger and benchmarks.

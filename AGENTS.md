@@ -283,23 +283,26 @@ packet-ID order. Inbound QoS2 EventAccepted ownership uses an operation token th
 survives same-session connection takeover; connection generation alone is not a
 valid fence for finishing already accepted work.
 
-Persistent MQTT state also carries a monotonic session incarnation and authorization
-provenance. CleanSession=1 creates a new incarnation; stale work must match the
+Persistent MQTT state also carries a monotonic session incarnation and complete
+authorization/profile provenance: credential version, auth generation, permissions,
+codec ID, and codec version. CleanSession=1 creates a new incarnation; stale work must match the
 session incarnation, packet identifier, and operation token. CleanSession=0 takeover
 keeps the incarnation. Any credential version, auth generation, or permission change
 resets the old persistent session, and management invalidation removes matching
 bounded persistent sessions as well as live sessions.
 
-Authentication invalidation and live-session registration share one synchronization
-boundary. A result returned before any device/product/tenant/version/generation/all
+Authentication invalidation, live-session registration, and the final MQTT broker
+attachment share one synchronization boundary. Lock order is auth-registration gate,
+AuthCache, Sessions, then MqttBroker; the reverse order is forbidden. A result returned before any device/product/tenant/version/generation/all
 invalidation may not register afterward. MQTT attachment and Will responsibility
 are RAII-owned across every post-registration early return, including failed
 CONNACK writes.
 
 Tenant inflight release must wake bounded pending work for other active sessions in
 the tenant; ACK handlers must not scan all sessions. Recovery limits must cover
-compact NBMQ v2 records for every admitted legal state. Writes are streaming and
-bounded per record; NBMQ v1 remains read-only compatible. A structural recovery
+compact NBMQ v3 records for every admitted legal state. Writes are streaming and
+bounded per record and finish with an authoritative record-count/byte-count/whole-stream
+digest trailer; NBMQ v1 and v2 remain read-only compatible under separate ceilings. A structural recovery
 failure is not retryable, but EventBus required work must still drain or spool before
 the process remains alive and unready.
 
@@ -309,9 +312,11 @@ producer acknowledgement is forbidden if any required persistent responsibility
 cannot be owned. QoS0 may still be shed under the documented best-effort policy.
 
 Will topic/payload/QoS/retain and retained state are validated, authorized, and
-bounded. A planned shutdown publishes each live connection's Will before atomically
-snapshotting required MQTT protocol state; only MQTT DISCONNECT suppresses that
-Will. Reconnect must authenticate before restoring state. Abrupt crash may lose
+bounded. CONNECT reserves one broker-owned Will responsibility. Subscriber pressure
+moves an abnormal-disconnect Will into a bounded pending queue; capacity release retries it
+without a task or busy loop, and planned recovery persists it. Only MQTT DISCONNECT suppresses
+that Will. Route preflight stores compact per-target decisions and tenant projections; it must
+never clone complete session payload state or rescan all sessions once per target. Reconnect must authenticate before restoring state. Abrupt crash may lose
 recent in-memory MQTT state. No runtime broker or database is required.
 
 MQTT 3.1.1 behavior changes require conformance regression against raw

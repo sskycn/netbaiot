@@ -26,14 +26,14 @@ The normative source is MQTT 3.1.1 with Errata 01.
 | UNSUBSCRIBE / UNSUBACK | PASS | `UNSUB-001`, `DIFF-SUB-001`, Mosquitto CLI matrix |
 | Persistent offline QoS1/QoS2 | PASS | `SESSION-OFFLINE-001`, `MQTT-TENANT-INFLIGHT-WAKE-QOS1-001`, `MQTT-TENANT-INFLIGHT-WAKE-QOS2-001`, CLI matrix, bounded queue and restart tests |
 | Retained create/replace/delete/replay | PASS | `RETAIN-001`, `DIFF-RETAIN-001`, CLI and recovery tests |
-| Will QoS0/1/2 and RETAIN | PASS | `WILL-001`, `DIFF-WILL-001`, `WILL-RESOURCE-FAILURE-001`, Mosquitto CLI matrix |
+| Will QoS0/1/2 and RETAIN | PASS | `WILL-001`, `DIFF-WILL-001`, `WILL-RESOURCE-FAILURE-001`, `WILL-SUBSCRIBER-PRESSURE-001`, pending-Will restart test, Mosquitto CLI matrix |
 | DISCONNECT suppresses Will | PASS | `WILL-001`, Mosquitto CLI matrix |
 | EOF/timeout/protocol/takeover/shutdown Will | PASS | `WILL-001`, `WILL-TAKEOVER-001`, `WILL-SHUTDOWN-001`, keepalive and malformed cases |
 | Keep Alive / PING | PASS | `KEEPALIVE-001`, `DIFF-PING-001`, `DIFF-KEEPALIVE-001` |
 | Whole-packet deadline | PASS | `SLOWLORIS-001`; independent of MQTT keepalive |
 | Malformed and illegal sequences | PASS | `CONNECT-003`, `HEADER-001`, `REMAINING-001`, `SUB-002`, `SEQUENCE-001/002`, packet unit/fuzz suites |
 | ACL and identity isolation | PROFILE (PASS) | `SECURITY-ACL-001`, `SECURITY-SESSION-001`; canonical authenticated device namespace |
-| Planned restart recovery | PASS | session/QoS1/QoS2/retained/Will subprocess, >1 MiB snapshot, and `MQTT-RECOVERY-BINARY-WORSTCASE-001` |
+| Planned restart recovery | PASS | session/QoS1/QoS2/retained/pending-Will subprocess and unit coverage, NBMQ v1/v2 compatibility, NBMQ v3 whole-image integrity, ownership validation, and `MQTT-RECOVERY-BINARY-WORSTCASE-001` |
 | TLS interoperability | PASS | `tests/run_mosquitto_tls_interop.py`; test CA/hostname verification succeeds and untrusted CA fails |
 | Abrupt crash durability | PROFILE | recent memory state may be lost; no crash durability claim |
 | MQTT 5, WebSocket, shared subscriptions, bridges | NOT_APPLICABLE | explicitly outside this embedded MQTT 3.1.1 profile |
@@ -43,9 +43,9 @@ IDs and the exact 125-requirement evidence map are in
 `tests/mqtt_conformance/catalog.json`. Each run writes diagnostic results to
 `target/mqtt-conformance/results.json`. Developer core mode has 30 NetbaIoT raw
 cases. `--release-gate` requires Mosquitto clients, TLS, the isolated 11-case broker
-differential, restart evidence, and twenty named Rust fault invariants; missing required
+differential, restart evidence, and 29 named Rust fault invariants; missing required
 dependencies are `SKIPPED_REQUIRED` and fail the gate. The current release run is
-65/65 PASS, including `NORMATIVE-COVERAGE-001` at 125/125.
+74/74 PASS, including `NORMATIVE-COVERAGE-001` at 125/125.
 
 The real-client suite is `tests/run_mosquitto_cli_interop.py`, which forces
 `-V mqttv311`. It covers authentication, QoS0/1/2, exact/`+`/`#`, unsubscribe,
@@ -58,8 +58,15 @@ Paho is optional and was unavailable in the current environment; historical Paho
 - Functional MQTT 3.1.1 conformance: PASS through the raw, Mosquitto client,
   differential, TLS, and normative matrices.
 - Resource-pressure conformance: PASS for atomic multi-subscriber QoS1/QoS2 route
-  admission, retained replacement reservation, bounded queues/state, and source ACK
-  suppression on failed ownership.
-- Restart-state conformance: PASS for NBMQ v2 round trip, NBMQ v1 compatibility,
-  semantic corruption rejection, session incarnation persistence, and interrupted
-  QoS2 delivery normalization.
+  admission without deep session clones or repeated scans, retained replacement and
+  accepted-Will responsibility, bounded queues/state, and source ACK suppression on
+  failed ownership.
+- Restart-state conformance: PASS for NBMQ v3 whole-image integrity, read-only NBMQ
+  v1/v2 compatibility under version-specific ceilings, semantic/ACL ownership
+  rejection, session incarnation persistence, and interrupted QoS2 delivery
+  normalization.
+- Security/authorization persistence: PASS for credential, generation, permission,
+  codec ID/version provenance and the atomic revoke/register/attach fence.
+- External interoperability: PASS for Mosquitto MQTT 3.1.1 clients, the 11-case
+  differential matrix, and verified TLS. A dedicated test-only Mosquitto workflow
+  now runs the full release gate on release-relevant triggers.

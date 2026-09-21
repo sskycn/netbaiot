@@ -50,7 +50,10 @@ connection replacement publish the Will once. DISCONNECT and planned server
 shutdown are deliberately different: MQTT DISCONNECT deletes the Will, while a
 planned server shutdown publishes the Will before the recovery snapshot. This
 follows MQTT-3.1.2-8; orderly process shutdown is not an MQTT DISCONNECT from the
-client.
+client. An accepted Will also reserves bounded broker responsibility at CONNECT.
+If an abnormal disconnect cannot atomically route it because a durable subscriber
+is full, the Will remains in a bounded pending queue, survives a planned restart,
+and is retried when broker capacity changes; it is never partially routed.
 
 For regular QoS0/QoS1 canonical uplinks, retained mutation and bounded broker routing
 run before the IoT binding crosses `EventAccepted`; no later broker-side failure can
@@ -81,21 +84,28 @@ inflight limit, offline queue, session bytes, and an optional retained mutation 
 one route plan. If any persistent target cannot own its responsibility, no target or
 retained value is changed and the source is not acknowledged. Commit happens only
 after the complete plan succeeds, so multi-subscriber routing cannot partially
-deliver and silently shed a peer.
+deliver and silently shed a peer. Planning keeps only compact per-target decisions:
+it performs one bounded global accounting pass and does not clone stored payloads
+or rescan all sessions once per match.
 
 Persistent sessions store authorization provenance (credential version, auth
-generation, and permissions, never secrets) and a monotonic session incarnation.
+generation, permissions, codec identifier, and codec version, never secrets) and a
+monotonic session incarnation.
 CleanSession=0 takeover keeps the incarnation; CleanSession=1 creates a new one.
 Inbound QoS2 completion and routing require the same incarnation, packet identifier,
 and operation token. Reconnect under changed authorization resets the old session
 and returns Session Present=0. Management invalidation removes matching persistent
 state in the same bounded control operation.
 
-Planned restart writes compact NBMQ v2 records incrementally, with a checksummed
-header and a length/checksum on every bounded record. Payload bytes remain binary;
-there is no complete snapshot clone or whole-image serialization buffer. NBMQ v1
-JSON images remain readable, while all new writes use v2. The file uses restrictive
-permissions, file fsync, atomic rename, and directory fsync.
+Planned restart writes compact NBMQ v3 records incrementally, with a checksummed
+header, a length/checksum on every bounded record, and an authenticated whole-image
+trailer containing the authoritative record count, byte count, and SHA-256 digest.
+Payload bytes remain binary; there is no complete snapshot clone or whole-image
+serialization buffer. NBMQ v1 and v2 images remain readable under version-specific
+ceilings, while all new writes use v3. Legacy sessions that lack complete
+authorization/codec provenance are never exposed through the subscription index and
+reset safely on attach. The file uses restrictive permissions, file fsync, atomic
+rename, and directory fsync.
 It contains no password or socket/TLS/task state. Reconnect must authenticate before
 the `(DeviceKey, ClientId)` state can resume. Abrupt crash may lose mutations since
 the last successful planned snapshot; this is intentionally not a crash-durable

@@ -36,3 +36,11 @@ result begun in an older epoch is rejected and cannot repopulate the cache after
 invalidation. Active sessions are matched against their bounded, immutable bound
 identity and canceled independently of positive-cache contents, so TTL expiry or
 eviction cannot defeat revocation.
+
+The final MQTT establishment boundary is fenced by the same short gate. Lock order
+is `auth_registration -> AuthCache -> Sessions -> MqttBroker`: candidate freshness,
+live registration, and `MqttBroker::attach` complete before release. Invalidation
+uses that order for cache removal, active cancellation, and persistent MQTT-session
+removal, so a stale candidate cannot recreate state after revocation completes.
+Management results separately report cache entries, network connections, and
+persistent MQTT sessions; offline state is not a disconnected connection.

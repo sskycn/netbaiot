@@ -1,0 +1,36 @@
+name: MQTT external interoperability
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    tags: ["v*"]
+    paths:
+      - ".github/workflows/mqtt-interop.yml"
+      - "apps/netbaiot-server/**"
+      - "crates/netbaiot-transports/src/mqtt/**"
+      - "crates/netbaiot-runtime/**"
+      - "tests/mqtt_conformance/**"
+      - "tests/mosquitto_cli_interop.py"
+      - "tests/run_mosquitto_cli_interop.py"
+      - "tests/run_mosquitto_tls_interop.py"
+      - "Cargo.toml"
+      - "Cargo.lock"
+  release:
+    types: [published]
+
+jobs:
+  release-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install test-only Mosquitto tools
+        run: sudo apt-get update && sudo apt-get install --yes mosquitto mosquitto-clients
+      - name: Show external tool versions
+        run: |
+          mosquitto -h 2>&1 | head -1
+          mosquitto_pub --help 2>&1 | head -1
+      - name: Run complete MQTT release gate
+        run: python3 tests/mqtt_conformance/run.py --release-gate

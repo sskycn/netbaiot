@@ -22,7 +22,7 @@ spool relationship values.
 | MQTT offline queue | 128 + 1 MiB/session; 4,096 + 32 MiB/tenant; 16,384 + 128 MiB global |
 | MQTT retained | 4,096 + 64 MiB global; 512 + 8 MiB/tenant; 64 KiB/message |
 | MQTT session state | 2 MiB/session / 32 MiB/tenant / 128 MiB global |
-| MQTT Will | 64 KiB payload, charged to bounded connection input/reservation |
+| MQTT Will | 64 KiB payload; at most 256 node / 64 tenant responsibilities, sharing MQTT session byte ceilings |
 | Auth cache | 4,096 / 4 MiB / 256 miss waiters |
 | Config cache | 4,096 / 16 MiB |
 | Presence registry | bounded by configured devices / 1 h offline TTL / oldest-offline eviction |
@@ -32,7 +32,7 @@ spool relationship values.
 | Sink timeout/retry | 5 s / 5 attempts / max age 1 h |
 | Restart spool | 100,000 records / 256 MiB total |
 | Spool segment/record | 64 MiB / 1 MiB |
-| MQTT recovery image | 192.25 MiB; compact NBMQ v2 bound from session, retained, and owner envelopes |
+| MQTT recovery image | 202,178,660 B; compact NBMQ v3 bound including profiles, pending-Will owners, and integrity trailer |
 
 Every sink queue is independently count and byte charged. Global event accounting
 charges the shared event once; each sink charges its delivery responsibility.
@@ -56,6 +56,7 @@ byte limits.
 | command → live session | reject overloaded/offline; never persist |
 | MQTT route → active subscriber | QoS0 may shed; QoS1/2 is preflighted and retained as outbound state |
 | MQTT route → persistent offline subscriber | bounded QoS1/2 queue; whole publication rejects atomically at limit |
+| accepted Will → overloaded persistent subscriber | bounded pending ownership; retry on capacity release and planned-restart persistence |
 | graceful drain → spool | remain alive/unready and retry bounded commits while accepted work remains |
 
 TLS, allocator-retained pages, Tokio, and kernel socket buffers are not exactly
