@@ -1,0 +1,36 @@
+# 内嵌 MQTT 3.1.1 broker
+
+NetbaIoT 直接实现 MQTT 3.1.1，不依赖外部 broker 或数据库。子系统分层包括增量 packet codec、连接状态机、认证后的会话挂接、有界会话存储、topic trie、retain 存储、QoS 引擎，最后才是 IoT 绑定/EventBus。
+
+支持的控制报文包括 CONNECT/CONNACK、PUBLISH、PUBACK/PUBREC/PUBREL/PUBCOMP、SUBSCRIBE/SUBACK、UNSUBSCRIBE/UNSUBACK、PINGREQ/PINGRESP 和 DISCONNECT。已实现 QoS0、QoS1 以及明确的入站/出站 QoS2 状态机。MQTT 5、MQTT-SN、WebSocket、共享订阅、bridge 模式和 `$SYS` 服务不在当前范围内。仍会遵守 MQTT 对 `$` 开头 topic 的通配符规则。
+
+CONNECT 阶段通过有界 AuthCache 认证一次。得到的 `Arc<AuthenticatedDevice>` 会绑定到连接；后续普通 MQTT 报文不会再调用远程认证。MQTT ClientId 不作为可信身份。持久会话以 `(Authenticated DeviceKey, ClientId)` 为键，因此其他设备或租户不能仅凭复制 ClientId 继承或删除会话。空 ClientId 仅在 CleanSession=1 时接受，并会生成仅对当前连接有效的值。
+
+CleanSession=1 会删除该认证身份的旧会话，并始终返回 Session Present=0。CleanSession=0 会在 socket 销毁后保留订阅、离线 QoS1/2 投递、入站 QoS2、出站 QoS1/2 和 packet ID 分配状态。默认断开会话保留策略为 24 小时；这是 broker 资源策略，不是 MQTT 5 的 Session Expiry。会话有效期在新连接挂接时检查；与此同时所有集合仍受硬性容量限制。
+
+订阅使用 topic trie 支持精确 topic filter、`+` 和末尾的整层 `#`。根级通配符不会匹配以 `$` 开头的 topic。重复订阅会更新已有条目。订阅请求 QoS 和 publish QoS 通过 `min(publish_qos, subscription_qos)` 合并。授权只允许绑定设备命名空间内的有效 filter。发布仅限以下规范 topic：
+
+```text
+v1/t/{tenant}/p/{product}/d/{device}/up
+v1/t/{tenant}/p/{product}/d/{device}/up_ack
+v1/t/{tenant}/p/{product}/d/{device}/down
+v1/t/{tenant}/p/{product}/d/{device}/down_ack
+```
+
+Retain 发布、替换、通配符重放和零载荷删除均已实现，并受数量/字节/消息数/租户上限约束。retain 存储有界，但通配符 retain 重放当前会扫描该有界存储；这是经过权衡的简化方案，已作为扩展性限制记录。
+
+CONNECT 阶段会校验 Will Topic、二进制载荷、QoS、retain 标志、大小、语法和授权。EOF、网络/协议错误、keepalive 超时和连接替换都会恰好发布一次 Will。DISCONNECT 与计划内服务端关机的语义不同：MQTT DISCONNECT 会删除 Will，而计划内服务端关机会在恢复快照写入前发布 Will。此行为符合 MQTT-3.1.2-8；服务端有序关机不等同于客户端发送 MQTT DISCONNECT。已接受的 Will 还会在 CONNECT 时预留有界的 broker 投递责任。如果异常断开时因持久订阅者容量已满，无法原子路由 Will，则 Will 会留在有界待处理队列中，在计划重启时保留，并在 broker 容量变化后重试；不会出现部分路由。
+
+普通 QoS0/QoS1 规范上行会先完成 retain 更新和有界 broker 路由，然后 IoT 绑定才跨过 `EventAccepted`；之后的 broker 故障不会把已接受的事件改成生产者可见的失败。IoT 接受前失败可能导致 MQTT 投递按通常的至少一次语义重放。入站 QoS2 会单独保存 `EventAccepted` 待路由阶段，包括计划重启期间的状态，因此可以完成 retain/订阅者责任而不重复发出业务事件。对于 retained QoS2 流程，会在 PUBREC 前预留 retain 容量，并在路由时原子释放。`EventAccepted` 表示每个必需 EventBus sink 都已预留数量/字节容量并完成入队；它不是数据库提交。MQTT QoS2 可避免同一已存 MQTT 流重复进入 IoT 绑定，但不承诺业务层恰好一次：EventBus 恢复采用至少一次投递，消费者仍须实现幂等。
+
+SUBSCRIBE 会先针对会话、租户、全局、离线队列和活动 channel 容量完整预检 retain 重放，之后才插入订阅映射和 trie 节点。因此 SUBACK 失败不会留下能接收后续实时发布的隐藏订阅。
+
+持久 MQTT 会话的离线订阅投递与命令 API 相互独立。显式管理命令仍要求设备在线；设备离线时返回 `DEVICE_OFFLINE`，不会静默地转换为已存储的 MQTT 命令。
+
+慢速活动消费者使用有界 sender。队列满时可以舍弃 QoS0。对 QoS1/2，broker 会将所有匹配会话、租户/全局 inflight 限额、离线队列、会话字节数以及可选 retain 更新合并为一个路由计划并预检。只要任一持久目标无法接管其责任，就不会更改任何目标或 retain 值，也不会确认源发布。只有整个计划成功后才提交，因而多订阅者路由不会部分投递后静默漏掉某个订阅者。计划仅保存紧凑的逐目标决策：只进行一次有界全局记账，不会复制已存载荷，也不会针对每个匹配项重新扫描所有会话。
+
+持久会话会保存授权来源信息（credential version、auth generation、permissions、codec 标识和版本，不含密钥），以及单调递增的 session incarnation。CleanSession=0 接管会保留 incarnation；CleanSession=1 会创建新的 incarnation。入站 QoS2 完成和路由必须匹配相同的 incarnation、packet identifier 和 operation token。授权变更后重连会重置旧会话并返回 Session Present=0。管理失效操作会在同一个有界控制操作中删除匹配的持久状态。
+
+计划重启时会增量写入紧凑的 NBMQ v3 记录：带校验和的头部、每条有界记录的长度/校验和，以及包含权威记录数量、字节数和 SHA-256 摘要的全镜像校验尾部。载荷字节保持二进制，不会复制完整快照或创建整个镜像的序列化缓冲区。仍可按各版本独立上限读取 NBMQ v1/v2 镜像；所有新写入均使用 v3。缺少完整授权/codec 来源信息的旧会话不会暴露在订阅索引中，并会在连接挂接时安全重置。文件使用受限权限，并执行文件 fsync、原子重命名和目录 fsync。镜像不包含密码或 socket/TLS/task 状态。恢复 `(DeviceKey, ClientId)` 会话前必须重新认证。突发崩溃可能丢失上一次计划快照之后的修改；broker 不承诺崩溃持久性。
+
+实现证据和恢复细节见英文版 [MQTT 3.1.1 一致性清单](mqtt-3.1.1-conformance.md)和 [MQTT 会话恢复说明](mqtt-session-recovery.md)。
