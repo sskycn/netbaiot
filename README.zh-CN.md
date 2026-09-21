@@ -1,0 +1,56 @@
+# NetbaIoT
+
+NetbaIoT 是一个无数据库、以内存为主的 IoT 协议网关和实时事件路由器。它通过 HTTP、内嵌 MQTT 3.1.1、通用分帧 TCP 和经过认证的 UDP 接收设备流量，将其规范化为 `DeviceEvent`，并发送到需确认或尽力而为的业务接收端。
+
+运行时不需要 PostgreSQL 或其他数据库。业务系统负责持久化业务数据和离线命令。NetbaIoT 唯一的持久化机制是有界本地重启 spool，仅用于计划内优雅关机无法完成所有已接受的必需投递时。
+
+## 本地运行
+
+```bash
+cargo run -p netbaiot-server -- configs/development.json
+```
+
+开发环境监听地址：
+
+- 设备 HTTP：`127.0.0.1:8080`
+- 管理 HTTP：`127.0.0.1:9090`
+- 内嵌 MQTT：`127.0.0.1:1883`
+- 通用 TCP：`127.0.0.1:9000`
+- UDP：`127.0.0.1:9001`
+
+上传设备事件：
+
+```bash
+curl --noproxy '*' -i http://127.0.0.1:8080/v1/device/data \
+  -H 'Authorization: Bearer demo-device:000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f' \
+  --data '{"schema_version":1,"source_message_id":"demo:1","kind":"heartbeat","data":{"sequence":1}}'
+```
+
+HTTP `202` 和 MQTT QoS1 PUBACK 表示事件已越过有界的 `EventAccepted` 边界，不代表业务数据库已存储事件。
+
+设置 64 字符的 `NETBAIOT_ADMIN_SECRET` 以启用管理调用。生产配置必须指定需确认的 webhook 或分帧 TCP/RPC 业务接收端。由于重试和重启重放可能造成重复投递，业务接收端必须使用稳定的 `event_id` 去重。
+
+参阅[架构](docs/architecture.zh-CN.md)、[投递语义](docs/delivery-semantics.zh-CN.md)、[设备协议](docs/device-protocol.zh-CN.md)、[HTTP API](docs/http-api.zh-CN.md)、[业务系统集成](docs/business-integration.zh-CN.md)和[MQTT 指南](docs/mqtt.zh-CN.md)。
+
+## 官方 Rust 客户端
+
+业务系统使用 `netbaiot-client`；事件 ACK 由应用显式发出，并且发生在应用处理之后：
+
+```rust
+let client = NetbaIoTClient::builder()
+    .endpoint(endpoint)
+    .token(token)
+    .event_address(event_address)
+    .connect()
+    .await?;
+let mut events = client.events().subscribe(EventFilter::default()).await?;
+while let Some(delivery) = events.next().await {
+    let delivery = delivery?;
+    handle(delivery.event()).await?;
+    delivery.ack().await?;
+}
+```
+
+命令通过 `client.commands().send(&command)` 发送，配置使用 `client.configs()`，运行操作使用 `client.runtime()`。离线设备会返回类型化的 `ClientError::DeviceOffline`；NetbaIoT 不会存储命令。
+
+可选的 `netbaiot-device-sdk` 支持标准 MQTT 遥测/命令和设备 HTTP 上传/配置，不造成厂商锁定。标准 MQTT 3.1.1 客户端仍是一等支持对象。`netbaiot` CLI 提供状态、事件订阅、命令、配置、缓存失效和显式 drain 操作。参阅 [SDK 概览](docs/sdk.zh-CN.md)、[业务客户端](docs/client.zh-CN.md)、[设备 SDK](docs/device-sdk.zh-CN.md)和 [CLI](docs/cli.zh-CN.md)。

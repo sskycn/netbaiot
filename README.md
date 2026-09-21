@@ -1,5 +1,7 @@
 # NetbaIoT
 
+[简体中文](README.zh-CN.md)
+
 NetbaIoT is a database-free, memory-first IoT protocol gateway and real-time event
 router. It accepts device traffic over HTTP, embedded MQTT 3.1.1, generic framed
 TCP, and authenticated UDP; normalizes it into `DeviceEvent`; and sends it to
