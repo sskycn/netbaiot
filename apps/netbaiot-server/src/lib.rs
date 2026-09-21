@@ -1191,6 +1191,86 @@ mod reliability_tests {
     }
 
     #[tokio::test]
+    async fn eventbus_tcp_absence_filter_change_and_reconnect_preserve_isolation() {
+        let limits = Arc::new(Limits::default());
+        let metrics = Arc::new(Metrics::with_lock_timing());
+        let tcp = TcpStreamSink::new();
+        let fast_id = SinkId::new("fast").unwrap();
+        let tcp_id = SinkId::new("tcp").unwrap();
+        let bus = EventBus::new(
+            limits.clone(),
+            metrics.clone(),
+            vec![
+                SinkDefinition::bounded(
+                    fast_id.clone(),
+                    SinkDeliveryMode::ConfirmedRequired,
+                    Arc::new(AuditSink),
+                    &limits,
+                ),
+                SinkDefinition::bounded(
+                    tcp_id.clone(),
+                    SinkDeliveryMode::ConfirmedRequired,
+                    tcp.clone(),
+                    &limits,
+                ),
+            ],
+            vec![RouteDefinition {
+                tenant: None,
+                sinks: vec![fast_id, tcp_id],
+            }],
+            1,
+        )
+        .unwrap();
+        let event = (*delivery().event).clone();
+        let expected = event.event_id;
+        bus.publish(event).unwrap();
+        tokio::time::timeout(Duration::from_secs(1), async {
+            while metrics.get(Metric::SinkAcks) != 1 {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        assert_eq!(bus.usage().unwrap().pending_required, 1);
+        let (sender, mut mismatched) = mpsc::channel(1);
+        let generation = tcp
+            .claim(
+                sender,
+                EventFilter {
+                    tenant: Some(TenantId::new("tenant-b").unwrap()),
+                    ..EventFilter::default()
+                },
+            )
+            .unwrap();
+        tokio::time::sleep(Duration::from_millis(20)).await;
+        assert!(mismatched.try_recv().is_err());
+        assert_eq!(metrics.get(Metric::SinkAcks), 1);
+        assert_eq!(metrics.get(Metric::SinkRetries), 0);
+        assert!(
+            metrics
+                .render()
+                .contains("netbaiot_event_bus_probe_wake_timer_total 0\n")
+        );
+        tcp.release(generation).unwrap();
+        let (sender, mut requests) = mpsc::channel(1);
+        let generation = tcp.claim(sender, EventFilter::default()).unwrap();
+        let request = tokio::time::timeout(Duration::from_secs(1), requests.recv())
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(request.delivery.event.event_id, expected);
+        request.result.send(Ok(SinkAck)).unwrap();
+        assert!(
+            bus.wait_required_drained(Duration::from_secs(1))
+                .await
+                .unwrap()
+        );
+        assert_eq!(bus.usage().unwrap(), EventBusUsage::default());
+        tcp.release(generation).unwrap();
+        bus.stop_workers().await.unwrap();
+    }
+
+    #[tokio::test]
     async fn active_subscriber_is_rejected_and_filter_mismatch_is_not_acknowledged() {
         let sink = TcpStreamSink::new();
         let (sender, _receiver) = mpsc::channel(1);

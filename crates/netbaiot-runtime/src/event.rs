@@ -1,4 +1,4 @@
-use crate::{Error, Histogram, Limits, Metric, Metrics, Result, lock, now_ms};
+use crate::{Error, EventBusProbe, Histogram, Limits, Metric, Metrics, Result, lock, now_ms};
 use async_trait::async_trait;
 use futures_util::FutureExt;
 use netbaiot_core::{DeviceEvent, EventAccepted, EventId, RouteDefinition, SinkId};
@@ -129,6 +129,40 @@ struct State {
     accepting: bool,
 }
 
+// Field drop order releases the state mutex before updating probe histograms.
+struct ProbedState<'a> {
+    guard: std::sync::MutexGuard<'a, State>,
+    _timing: StateTiming<'a>,
+}
+impl std::ops::Deref for ProbedState<'_> {
+    type Target = State;
+    fn deref(&self) -> &State {
+        &self.guard
+    }
+}
+impl std::ops::DerefMut for ProbedState<'_> {
+    fn deref_mut(&mut self) -> &mut State {
+        &mut self.guard
+    }
+}
+struct StateTiming<'a> {
+    metrics: &'a Metrics,
+    wait: Option<Duration>,
+    held: Option<Instant>,
+}
+impl Drop for StateTiming<'_> {
+    fn drop(&mut self) {
+        if let (Some(wait), Some(held)) = (self.wait, self.held) {
+            // Includes mutex release, excludes histogram recording.
+            let hold = held.elapsed();
+            self.metrics
+                .observe(Histogram::EventBusStateWait, wait.as_micros() as u64);
+            self.metrics
+                .observe(Histogram::EventBusStateHold, hold.as_micros() as u64);
+        }
+    }
+}
+
 pub struct EventBus {
     limits: Arc<Limits>,
     metrics: Arc<Metrics>,
@@ -139,6 +173,22 @@ pub struct EventBus {
 }
 
 impl EventBus {
+    fn lock_state(&self, operation: EventBusProbe) -> Result<ProbedState<'_>> {
+        let started = self.metrics.lock_timing_enabled().then(Instant::now);
+        let guard = lock(&self.state)?;
+        let wait = started.map(|t| t.elapsed());
+        let held = started.map(|_| Instant::now());
+        self.metrics.event_bus_probe(operation);
+        Ok(ProbedState {
+            guard,
+            _timing: StateTiming {
+                metrics: &self.metrics,
+                wait,
+                held,
+            },
+        })
+    }
+
     pub fn new(
         limits: Arc<Limits>,
         metrics: Arc<Metrics>,
@@ -193,7 +243,12 @@ impl EventBus {
     }
 
     fn start_workers(self: &Arc<Self>) -> Result<()> {
-        let ids = lock(&self.state)?.sinks.keys().cloned().collect::<Vec<_>>();
+        let ids = self
+            .lock_state(EventBusProbe::Other)?
+            .sinks
+            .keys()
+            .cloned()
+            .collect::<Vec<_>>();
         let mut workers = lock(&self.workers)?;
         for id in ids {
             let bus = self.clone();
@@ -203,7 +258,7 @@ impl EventBus {
     }
 
     pub fn replace_routes(&self, revision: u64, routes: Vec<RouteDefinition>) -> Result<()> {
-        let mut state = lock(&self.state)?;
+        let mut state = self.lock_state(EventBusProbe::Other)?;
         validate_routes(&routes, &state.sinks, &self.limits)?;
         if revision <= state.routing_revision {
             return Err(Error::Conflict);
@@ -214,7 +269,7 @@ impl EventBus {
     }
 
     pub fn validate_route_update(&self, revision: u64, routes: &[RouteDefinition]) -> Result<()> {
-        let state = lock(&self.state)?;
+        let state = self.lock_state(EventBusProbe::Other)?;
         if revision <= state.routing_revision {
             return Err(Error::Conflict);
         }
@@ -222,12 +277,12 @@ impl EventBus {
     }
 
     pub fn close_admission(&self) -> Result<()> {
-        lock(&self.state)?.accepting = false;
+        self.lock_state(EventBusProbe::Other)?.accepting = false;
         Ok(())
     }
 
     pub fn usage(&self) -> Result<EventBusUsage> {
-        let state = lock(&self.state)?;
+        let state = self.lock_state(EventBusProbe::Other)?;
         Ok(EventBusUsage {
             events: state.active.len(),
             bytes: state.active_bytes,
@@ -245,7 +300,7 @@ impl EventBus {
             .len();
         let event = Arc::new(event);
         let lock_started = self.metrics.lock_timing_enabled().then(Instant::now);
-        let mut state = lock(&self.state)?;
+        let mut state = self.lock_state(EventBusProbe::Publish)?;
         let lock_wait_us = lock_started.map(|started| started.elapsed().as_micros() as u64);
         let hold_started = lock_started.map(|_| Instant::now());
         if !state.accepting {
@@ -336,6 +391,7 @@ impl EventBus {
             self.metrics.observe(Histogram::EventBusLockHold, hold);
         }
         for notify in accepted_notifies {
+            self.metrics.event_bus_probe(EventBusProbe::NotifyWorker);
             notify.notify_one();
         }
         self.metrics.inc(Metric::EventsAccepted);
@@ -355,7 +411,7 @@ impl EventBus {
                 .map_err(|_| Error::Invalid)?
                 .len();
             let event = Arc::new(record.event);
-            let mut state = lock(&self.state)?;
+            let mut state = self.lock_state(EventBusProbe::Other)?;
             if state.active.contains_key(&event.event_id)
                 || state.active.len() >= self.limits.global_event_max_count
                 || state.active_bytes.saturating_add(bytes) > self.limits.global_event_max_bytes
@@ -403,6 +459,7 @@ impl EventBus {
             );
             drop(state);
             for notify in notifies {
+                self.metrics.event_bus_probe(EventBusProbe::NotifyWorker);
                 notify.notify_one();
             }
             restored += 1;
@@ -411,7 +468,7 @@ impl EventBus {
     }
 
     pub fn spool_records(&self) -> Result<Vec<SpoolRecord>> {
-        let state = lock(&self.state)?;
+        let state = self.lock_state(EventBusProbe::Other)?;
         let mut records = Vec::new();
         for active in state.active.values() {
             if !active.required.is_empty() {
@@ -459,20 +516,27 @@ impl EventBus {
     }
 
     async fn run_sink(self: Arc<Self>, id: SinkId) {
-        let (definition, notify) = match self.state.lock().ok().and_then(|state| {
-            state
-                .sinks
-                .get(&id)
-                .map(|sink| (sink.definition.clone(), sink.notify.clone()))
-        }) {
-            Some(value) => value,
-            None => return,
-        };
+        let (definition, notify) =
+            match self
+                .lock_state(EventBusProbe::Other)
+                .ok()
+                .and_then(|state| {
+                    state
+                        .sinks
+                        .get(&id)
+                        .map(|sink| (sink.definition.clone(), sink.notify.clone()))
+                }) {
+                Some(value) => value,
+                None => return,
+            };
         let mut inflight = JoinSet::new();
+        let mut woke = false;
         loop {
+            let mut took_work = false;
             while inflight.len() < definition.concurrency {
                 let next = self.take_ready(&id);
                 let Ok(Some(record)) = next else { break };
+                took_work = true;
                 let sink = definition.sink.clone();
                 let sink_id = id.clone();
                 let timeout = definition.timeout;
@@ -496,6 +560,10 @@ impl EventBus {
                     (record, result)
                 });
             }
+            if woke && !took_work {
+                self.metrics.event_bus_probe(EventBusProbe::EmptyWake);
+            }
+            woke = true;
             if self.stop.is_cancelled() {
                 inflight.abort_all();
                 while inflight.join_next().await.is_some() {}
@@ -508,6 +576,7 @@ impl EventBus {
                     biased;
                     _ = self.stop.cancelled() => continue,
                     completed = inflight.join_next() => {
+                        self.metrics.event_bus_probe(EventBusProbe::WakeJoin);
                         if let Some(Ok((record, result))) = completed {
                             let _ = self.complete(&id, record, result, &definition);
                         }
@@ -524,8 +593,8 @@ impl EventBus {
                 tokio::select! {
                     biased;
                     _ = self.stop.cancelled() => continue,
-                    _ = notify.notified() => {},
-                    _ = tokio::time::sleep(delay) => {},
+                    _ = notify.notified() => { self.metrics.event_bus_probe(EventBusProbe::WakeNotify); },
+                    _ = tokio::time::sleep(delay) => { self.metrics.event_bus_probe(EventBusProbe::WakeTimer); },
                 }
             } else {
                 let delay = self
@@ -537,19 +606,20 @@ impl EventBus {
                     biased;
                     _ = self.stop.cancelled() => continue,
                     completed = inflight.join_next() => {
+                        self.metrics.event_bus_probe(EventBusProbe::WakeJoin);
                         if let Some(Ok((record, result))) = completed {
                             let _ = self.complete(&id, record, result, &definition);
                         }
                     }
-                    _ = notify.notified() => {},
-                    _ = tokio::time::sleep(delay) => {},
+                    _ = notify.notified() => { self.metrics.event_bus_probe(EventBusProbe::WakeNotify); },
+                    _ = tokio::time::sleep(delay) => { self.metrics.event_bus_probe(EventBusProbe::WakeTimer); },
                 }
             }
         }
     }
 
     fn take_ready(&self, id: &SinkId) -> Result<Option<DeliveryRecord>> {
-        let mut state = lock(&self.state)?;
+        let mut state = self.lock_state(EventBusProbe::TakeReady)?;
         let sink = state.sinks.get_mut(id).ok_or(Error::Internal)?;
         let now = Instant::now();
         let Some(position) = sink
@@ -568,7 +638,7 @@ impl EventBus {
     }
 
     fn next_ready_delay(&self, id: &SinkId) -> Result<Option<Duration>> {
-        let state = lock(&self.state)?;
+        let state = self.lock_state(EventBusProbe::NextDelay)?;
         let sink = state.sinks.get(id).ok_or(Error::Internal)?;
         let now = Instant::now();
         Ok(sink
@@ -585,7 +655,7 @@ impl EventBus {
         result: std::result::Result<SinkAck, SinkError>,
         definition: &SinkDefinition,
     ) -> Result<()> {
-        let mut state = lock(&self.state)?;
+        let mut state = self.lock_state(EventBusProbe::Complete)?;
         {
             let sink = state.sinks.get_mut(id).ok_or(Error::Internal)?;
             sink.inflight = sink.inflight.saturating_sub(1);
@@ -609,6 +679,7 @@ impl EventBus {
             record.next_attempt = Instant::now() + Duration::from_millis(1 + seed % cap.max(1));
             let sink = state.sinks.get_mut(id).ok_or(Error::Internal)?;
             sink.queue.push_back(record);
+            self.metrics.event_bus_probe(EventBusProbe::NotifyWorker);
             sink.notify.notify_one();
             self.metrics.inc(Metric::SinkRetries);
             return Ok(());
@@ -619,6 +690,7 @@ impl EventBus {
                 Instant::now() + Duration::from_millis(self.limits.retry_max_ms.max(1));
             let sink = state.sinks.get_mut(id).ok_or(Error::Internal)?;
             sink.queue.push_back(record);
+            self.metrics.event_bus_probe(EventBusProbe::NotifyWorker);
             sink.notify.notify_one();
             self.metrics.inc(Metric::SinkFailures);
             return Ok(());
@@ -647,6 +719,7 @@ impl EventBus {
             state.active_bytes = state.active_bytes.saturating_sub(active.bytes);
         }
         drop(state);
+        self.metrics.event_bus_probe(EventBusProbe::NotifyDrain);
         self.changed.notify_waiters();
         Ok(())
     }
@@ -804,6 +877,77 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore = "release-only queue scan measurement"]
+    async fn eventbus_queue_depth_probe() {
+        for depth in [0, 1_000, 10_000, 16_383] {
+            let limits = Arc::new(Limits {
+                sink_queue_max_count: 16_384,
+                sink_queue_max_bytes: 64 * 1024 * 1024,
+                ..Limits::default()
+            });
+            let id = SinkId::new("depth").unwrap();
+            let definition = SinkDefinition::bounded(
+                id.clone(),
+                SinkDeliveryMode::ConfirmedRequired,
+                Arc::new(Ack),
+                &limits,
+            );
+            let bus = EventBus::new(
+                limits,
+                Arc::new(Metrics::with_lock_timing()),
+                vec![definition.clone()],
+                vec![RouteDefinition {
+                    tenant: None,
+                    sinks: vec![id.clone()],
+                }],
+                1,
+            )
+            .unwrap();
+            bus.stop_workers().await.unwrap();
+            for _ in 0..depth {
+                bus.publish(event(8)).unwrap();
+            }
+            {
+                let mut state = bus.state.lock().unwrap();
+                for record in &mut state.sinks.get_mut(&id).unwrap().queue {
+                    record.next_attempt = Instant::now() + Duration::from_secs(3_600);
+                }
+            }
+            let mut take_ns = Vec::new();
+            let mut delay_ns = Vec::new();
+            let mut complete_ns = Vec::new();
+            for _ in 0..1_000 {
+                let start = Instant::now();
+                assert!(bus.take_ready(&id).unwrap().is_none());
+                take_ns.push(start.elapsed().as_nanos());
+                let start = Instant::now();
+                let _ = bus.next_ready_delay(&id).unwrap();
+                delay_ns.push(start.elapsed().as_nanos());
+                bus.publish(event(8)).unwrap();
+                let record = bus.take_ready(&id).unwrap().unwrap();
+                let start = Instant::now();
+                bus.complete(&id, record, Ok(SinkAck), &definition).unwrap();
+                complete_ns.push(start.elapsed().as_nanos());
+            }
+            take_ns.sort_unstable();
+            delay_ns.sort_unstable();
+            complete_ns.sort_unstable();
+            println!(
+                "depth={depth} take_ns={}/{}/{} delay_ns={}/{}/{} complete_ns={}/{}/{}",
+                take_ns[500],
+                take_ns[950],
+                take_ns[990],
+                delay_ns[500],
+                delay_ns[950],
+                delay_ns[990],
+                complete_ns[500],
+                complete_ns[950],
+                complete_ns[990]
+            );
+        }
+    }
+
+    #[tokio::test]
     async fn required_admission_is_atomic_and_count_byte_bounded() {
         let limits = Arc::new(Limits {
             sink_queue_max_count: 1,
@@ -842,6 +986,59 @@ mod tests {
         let state = bus.state.lock().unwrap();
         assert!(state.sinks.get(&second).unwrap().queue.is_empty());
         assert!(state.active.is_empty());
+    }
+
+    #[tokio::test]
+    async fn eventbus_timeout_retries_owned_event_and_drains() {
+        struct TimeoutOnce;
+        #[async_trait]
+        impl EventSink for TimeoutOnce {
+            async fn deliver(
+                &self,
+                delivery: DeliveryEnvelope,
+            ) -> std::result::Result<SinkAck, SinkError> {
+                if delivery.attempt == 1 {
+                    std::future::pending::<()>().await;
+                }
+                Ok(SinkAck)
+            }
+        }
+        let limits = Arc::new(Limits {
+            sink_timeout_ms: 10,
+            retry_base_ms: 1,
+            retry_max_ms: 1,
+            ..Limits::default()
+        });
+        let metrics = Arc::new(Metrics::default());
+        let id = SinkId::new("timeout").unwrap();
+        let bus = EventBus::new(
+            limits.clone(),
+            metrics.clone(),
+            vec![SinkDefinition::bounded(
+                id.clone(),
+                SinkDeliveryMode::ConfirmedRequired,
+                Arc::new(TimeoutOnce),
+                &limits,
+            )],
+            vec![RouteDefinition {
+                tenant: None,
+                sinks: vec![id],
+            }],
+            1,
+        )
+        .unwrap();
+        let event = event(8);
+        let expected = event.event_id;
+        assert_eq!(bus.publish(event).unwrap().event_id, expected);
+        assert!(
+            bus.wait_required_drained(Duration::from_secs(1))
+                .await
+                .unwrap()
+        );
+        assert_eq!(metrics.get(Metric::SinkRetries), 1);
+        assert_eq!(metrics.get(Metric::SinkAcks), 1);
+        assert_eq!(bus.usage().unwrap(), EventBusUsage::default());
+        bus.stop_workers().await.unwrap();
     }
 
     #[tokio::test]
