@@ -109,5 +109,5 @@
   "spool_max_bytes": 268435456,
   "spool_segment_max_bytes": 67108864,
   "spool_record_max_bytes": 1048576,
-  "mqtt_recovery_max_bytes": 268435456
+  "mqtt_recovery_max_bytes": 1342177280
 }

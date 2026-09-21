@@ -27,6 +27,12 @@ pub enum AuthenticationRequest<'a> {
     },
 }
 
+#[derive(Clone)]
+pub struct AuthenticatedSessionCandidate {
+    pub auth: AuthenticatedDevice,
+    epoch: u64,
+}
+
 /// Identity plus HMAC verification material cached by the gateway. The key is
 /// intentionally opaque and this type does not implement `Debug` or serialization.
 #[derive(Clone)]
@@ -170,6 +176,13 @@ impl AuthCache {
         &self,
         request: AuthenticationRequest<'_>,
     ) -> Result<AuthenticatedDevice> {
+        Ok(self.authenticate_candidate(request).await?.auth)
+    }
+
+    pub async fn authenticate_candidate(
+        &self,
+        request: AuthenticationRequest<'_>,
+    ) -> Result<AuthenticatedSessionCandidate> {
         let key = cache_key(&request)?;
         loop {
             let follower = {
@@ -179,7 +192,10 @@ impl AuthCache {
                     match &entry.value {
                         CachedAuth::Positive(auth) => {
                             self.metrics.inc(Metric::AuthCacheHits);
-                            return Ok(auth.clone());
+                            return Ok(AuthenticatedSessionCandidate {
+                                auth: auth.clone(),
+                                epoch: state.epoch,
+                            });
                         }
                         CachedAuth::Negative => {
                             self.metrics.inc(Metric::AuthNegativeHits);
@@ -255,7 +271,10 @@ impl AuthCache {
                 Err(Error::Authentication | Error::Forbidden) => CachedAuth::Negative,
                 Err(_) => {
                     let _ = completed.completed.send(true);
-                    return result;
+                    return result.map(|auth| AuthenticatedSessionCandidate {
+                        auth,
+                        epoch: leader_epoch,
+                    });
                 }
             };
             let ttl = match value {
@@ -306,8 +325,15 @@ impl AuthCache {
                 );
             }
             let _ = completed.completed.send(true);
-            return result;
+            return result.map(|auth| AuthenticatedSessionCandidate {
+                auth,
+                epoch: state.epoch,
+            });
         }
+    }
+
+    pub fn candidate_is_current(&self, candidate: &AuthenticatedSessionCandidate) -> Result<bool> {
+        Ok(lock(&self.state)?.epoch == candidate.epoch)
     }
 
     pub async fn verify_signed(
@@ -580,11 +606,14 @@ pub fn decode_hex(s: &str) -> Result<Vec<u8>> {
     if s.len() > 256 || !s.len().is_multiple_of(2) {
         return Err(Error::Invalid);
     }
-    s.as_bytes()
-        .chunks_exact(2)
-        .map(|pair| {
-            let a = (pair[0] as char).to_digit(16).ok_or(Error::Invalid)?;
-            let b = (pair[1] as char).to_digit(16).ok_or(Error::Invalid)?;
+    let bytes = s.as_bytes();
+    (0..bytes.len())
+        .step_by(2)
+        .map(|index| {
+            let a = (bytes[index] as char).to_digit(16).ok_or(Error::Invalid)?;
+            let b = (bytes[index + 1] as char)
+                .to_digit(16)
+                .ok_or(Error::Invalid)?;
             Ok((a * 16 + b) as u8)
         })
         .collect()

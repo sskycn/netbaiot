@@ -1049,6 +1049,12 @@ pub async fn run_with_credentials(
     loop {
         match mqtt_broker.commit_to(&config.spool_directory).await {
             Ok(_) => break,
+            Err(error @ (Error::Overloaded | Error::Configuration | Error::Invalid)) => {
+                // Limits validation proves that every admitted legal state fits the recovery
+                // image. Retrying a structural violation cannot succeed and would hang shutdown.
+                tracing::error!(error=%error, "MQTT recovery invariant violated");
+                return Err(error);
+            }
             Err(error) => {
                 tracing::error!(error=%error, "MQTT recovery commit failed; shutdown remains blocked");
                 tokio::time::sleep(retry_delay).await;

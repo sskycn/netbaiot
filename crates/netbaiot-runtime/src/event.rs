@@ -487,6 +487,20 @@ impl EventBus {
                 while inflight.join_next().await.is_some() {}
                 break;
             }
+            if inflight.len() >= definition.concurrency {
+                // No queue slot can be consumed until an in-flight delivery completes. A ready
+                // queued record would otherwise produce a zero-duration timer and spin this task.
+                tokio::select! {
+                    biased;
+                    _ = self.stop.cancelled() => continue,
+                    completed = inflight.join_next() => {
+                        if let Some(Ok((record, result))) = completed {
+                            let _ = self.complete(&id, record, result, &definition);
+                        }
+                    }
+                }
+                continue;
+            }
             if inflight.is_empty() {
                 let delay = self
                     .next_ready_delay(&id)
@@ -854,6 +868,62 @@ mod tests {
                 .unwrap()
         );
         assert_eq!(bus.usage().unwrap(), EventBusUsage::default());
+        bus.stop_workers().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn event_bus_full_concurrency_waits_for_completion_without_ready_timer_spin() {
+        let limits = Arc::new(Limits {
+            sink_delivery_concurrency: 1,
+            ..Limits::default()
+        });
+        let release = Arc::new(tokio::sync::Notify::new());
+        let sink = Arc::new(Signal {
+            calls: AtomicUsize::new(0),
+            block: Some(release.clone()),
+        });
+        let id = SinkId::new("spin-guard").unwrap();
+        let bus = EventBus::new(
+            limits.clone(),
+            Arc::new(Metrics::default()),
+            vec![SinkDefinition::bounded(
+                id.clone(),
+                SinkDeliveryMode::ConfirmedRequired,
+                sink.clone(),
+                &limits,
+            )],
+            vec![RouteDefinition {
+                tenant: None,
+                sinks: vec![id],
+            }],
+            1,
+        )
+        .unwrap();
+        bus.publish(named_event("blocked-first")).unwrap();
+        bus.publish(named_event("ready-second")).unwrap();
+        tokio::time::timeout(Duration::from_secs(1), async {
+            while sink.calls.load(Ordering::SeqCst) != 1 {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        tokio::time::sleep(Duration::from_millis(10)).await;
+        assert_eq!(sink.calls.load(Ordering::SeqCst), 1);
+        release.notify_one();
+        tokio::time::timeout(Duration::from_secs(1), async {
+            while sink.calls.load(Ordering::SeqCst) != 2 {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        release.notify_one();
+        assert!(
+            bus.wait_required_drained(Duration::from_secs(1))
+                .await
+                .unwrap()
+        );
         bus.stop_workers().await.unwrap();
     }
 

@@ -113,6 +113,58 @@ class Results:
             }
         )
 
+    def required_missing(self, test_id: str, details: str) -> None:
+        self.items.append(
+            {
+                "test_id": test_id,
+                "category": "release-dependency",
+                "spec_requirement": "release gate",
+                "implementation": self.implementation,
+                "result": "SKIPPED_REQUIRED",
+                "duration_ms": 0,
+                "details": details,
+            }
+        )
+
+
+def command_check(command: list[str]) -> str:
+    completed = subprocess.run(
+        command,
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        timeout=180,
+    )
+    if completed.returncode != 0:
+        raise AssertionError(
+            f"command failed ({completed.returncode}): {' '.join(command)}\n"
+            f"{completed.stdout[-2000:]}\n{completed.stderr[-2000:]}"
+        )
+    output = (completed.stdout + completed.stderr).strip().splitlines()
+    return output[-1] if output else "completed"
+
+
+def validate_catalog(catalog: dict[str, object]) -> tuple[set[str], dict[str, str]]:
+    raw = list(catalog.get("netbaiot_raw", []))
+    differential = list(catalog.get("mosquitto_differential", []))
+    rust = dict(catalog.get("rust_release_gate", {}))
+    external = ["MOSQUITTO-CLIENT-001", "TLS-001", "RESTART-001", "NORMATIVE-COVERAGE-001"]
+    ids = raw + differential + list(rust) + external
+    duplicates = sorted({test_id for test_id in ids if ids.count(test_id) > 1})
+    if duplicates:
+        raise ValueError(f"duplicate test IDs in catalog: {', '.join(duplicates)}")
+    requirements = dict(catalog.get("normative_requirements", {}))
+    if len(requirements) != 125:
+        raise ValueError(f"expected 125 applicable normative requirements, found {len(requirements)}")
+    for requirement, entry in requirements.items():
+        if not isinstance(entry, dict) or entry.get("kind") not in {"runtime", "source-audit"}:
+            raise ValueError(f"invalid evidence classification for {requirement}")
+        evidence = entry.get("evidence", [])
+        unknown = [test_id for test_id in evidence if test_id not in ids]
+        if not evidence or unknown:
+            raise ValueError(f"invalid evidence for {requirement}: {unknown or 'empty'}")
+    return set(ids), rust
+
 
 def raw_netbaiot(port: int, results: Results) -> None:
     def connect_valid() -> str:
@@ -866,12 +918,23 @@ def differential_vectors(netbaiot_port: int, mosquitto_port: int, results: Resul
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--netbaiot-only", action="store_true")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--netbaiot-only", action="store_true")
+    mode.add_argument("--release-gate", action="store_true")
     parser.add_argument("--no-build", action="store_true")
     parser.add_argument("--only")
     args = parser.parse_args()
+    catalog = json.loads((ROOT / "tests/mqtt_conformance/catalog.json").read_text())
+    try:
+        known_ids, rust_evidence = validate_catalog(catalog)
+    except ValueError as error:
+        print(f"catalog validation failed: {error}", file=sys.stderr)
+        return 2
+    if args.only is not None and args.only not in known_ids:
+        print(f"no MQTT conformance test has exact ID {args.only!r}", file=sys.stderr)
+        return 2
     if not args.no_build:
-        subprocess.run(["cargo", "build", "-p", "netbaiot-server"], cwd=ROOT, check=True)
+        subprocess.run(["cargo", "build", "--locked", "-p", "netbaiot-server"], cwd=ROOT, check=True)
 
     output = ROOT / "target/mqtt-conformance/results.json"
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -896,7 +959,8 @@ def main() -> int:
         if broker.process.poll() is None:
             broker.stop()
 
-    if not args.netbaiot_only and MOSQUITTO.exists():
+    mosquitto_available = MOSQUITTO.exists()
+    if not args.netbaiot_only and mosquitto_available:
         with temporary_root("netbaiot-differential-") as net_root_name, temporary_root(
             "mosquitto-differential-"
         ) as mosq_root_name:
@@ -912,6 +976,125 @@ def main() -> int:
                 netbaiot.stop()
                 mosquitto.stop()
 
+    if args.release_gate:
+        if not mosquitto_available:
+            results.required_missing(
+                "MOSQUITTO-DIFFERENTIAL-REQUIRED",
+                f"required Mosquitto broker is unavailable at {MOSQUITTO}",
+            )
+        for executable, test_id in [
+            ("/usr/local/bin/mosquitto_pub", "MOSQUITTO-CLIENT-001"),
+            ("/usr/local/bin/mosquitto_sub", "MOSQUITTO-CLIENT-001"),
+        ]:
+            if not pathlib.Path(executable).exists() and not any(
+                item["test_id"] == test_id for item in results.items
+            ):
+                results.required_missing(test_id, f"required executable is unavailable: {executable}")
+        if not any(item["test_id"] == "MOSQUITTO-CLIENT-001" for item in results.items):
+            results.run(
+                "MOSQUITTO-CLIENT-001",
+                "external-client",
+                "MQTT 3.1.1 client interoperability",
+                lambda: command_check(["python3", "tests/run_mosquitto_cli_interop.py"]),
+            )
+        if pathlib.Path("/usr/local/bin/mosquitto_pub").exists():
+            results.run(
+                "TLS-001",
+                "tls",
+                "verified MQTT TLS transport",
+                lambda: command_check(["python3", "tests/run_mosquitto_tls_interop.py"]),
+            )
+        else:
+            results.required_missing("TLS-001", "mosquitto_pub is required for TLS release evidence")
+        for test_id, test_filter in rust_evidence.items():
+            if args.only is None or args.only == test_id:
+                results.run(
+                    test_id,
+                    "rust-release-invariant",
+                    "named deterministic Rust evidence",
+                    lambda test_filter=test_filter: command_check(
+                        ["cargo", "test", "--locked", test_filter]
+                    ),
+                )
+        results.run(
+            "RESTART-001",
+            "restart-recovery",
+            "planned MQTT restart recovery",
+            lambda: command_check(
+                [
+                    "cargo",
+                    "test",
+                    "--locked",
+                    "qos2_recovery_resumes_each_protocol_stage_without_reallocation",
+                ]
+            ),
+        )
+        if args.only is None:
+            by_id = {item["test_id"]: item["result"] for item in results.items}
+
+            def normative_coverage() -> str:
+                missing = []
+                for requirement, entry in catalog["normative_requirements"].items():
+                    evidence = entry["evidence"]
+                    if not all(by_id.get(test_id) == "PASS" for test_id in evidence):
+                        missing.append(requirement)
+                if missing:
+                    raise AssertionError(f"requirements without current PASS evidence: {missing}")
+                return f"{len(catalog['normative_requirements'])}/125 requirements have current PASS evidence"
+
+            results.run(
+                "NORMATIVE-COVERAGE-001",
+                "traceability",
+                "all applicable MQTT 3.1.1 requirements",
+                normative_coverage,
+            )
+            required_ids = (
+                list(catalog["netbaiot_raw"])
+                + list(catalog["mosquitto_differential"])
+                + list(rust_evidence)
+                + [
+                    "MOSQUITTO-CLIENT-001",
+                    "TLS-001",
+                    "RESTART-001",
+                    "NORMATIVE-COVERAGE-001",
+                ]
+            )
+            final_by_id = {item["test_id"]: item["result"] for item in results.items}
+            incomplete = [
+                test_id for test_id in required_ids if final_by_id.get(test_id) != "PASS"
+            ]
+            if incomplete:
+                results.items.append(
+                    {
+                        "test_id": "RELEASE-GATE-INCOMPLETE",
+                        "category": "harness",
+                        "spec_requirement": "all required release evidence",
+                        "implementation": "harness",
+                        "result": "FAIL",
+                        "duration_ms": 0,
+                        "details": f"missing or non-PASS required evidence: {incomplete}",
+                    }
+                )
+
+    result_ids = [item["test_id"] for item in results.items]
+    duplicate_results = sorted({test_id for test_id in result_ids if result_ids.count(test_id) > 1})
+    if duplicate_results:
+        results.items.append(
+            {
+                "test_id": "HARNESS-DUPLICATE-ID",
+                "category": "harness",
+                "spec_requirement": "unique evidence identity",
+                "implementation": "harness",
+                "result": "FAIL",
+                "duration_ms": 0,
+                "details": f"duplicate executed test IDs: {duplicate_results}",
+            }
+        )
+
+    if args.only is not None and not any(item["test_id"] == args.only for item in results.items):
+        print(f"selected test {args.only!r} is known but did not execute in this mode", file=sys.stderr)
+        return 2
+
     document = {
         "schema_version": 1,
         "suite": "NetbaIoT MQTT 3.1.1 raw conformance",
@@ -919,7 +1102,7 @@ def main() -> int:
         "summary": {
             "total": len(results.items),
             "pass": sum(item["result"] == "PASS" for item in results.items),
-            "fail": sum(item["result"] == "FAIL" for item in results.items),
+            "fail": sum(item["result"] != "PASS" for item in results.items),
         },
     }
     output.write_text(json.dumps(document, indent=2) + "\n")

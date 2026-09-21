@@ -213,12 +213,16 @@ fn mqtt_string(value: &[u8], output: &mut Vec<u8>) {
 }
 
 fn connect_packet() -> Vec<u8> {
+    connect_packet_for(b"a", true)
+}
+
+fn connect_packet_for(client_id: &[u8], clean_session: bool) -> Vec<u8> {
     let mut body = Vec::new();
     mqtt_string(b"MQTT", &mut body);
     body.push(4);
-    body.push(0xc2);
+    body.push(if clean_session { 0xc2 } else { 0xc0 });
     body.extend_from_slice(&30u16.to_be_bytes());
-    mqtt_string(b"a", &mut body);
+    mqtt_string(client_id, &mut body);
     mqtt_string(b"a", &mut body);
     mqtt_string(b"secret", &mut body);
     let mut packet = vec![0x10];
@@ -236,6 +240,70 @@ fn connect_packet() -> Vec<u8> {
     }
     packet.extend_from_slice(&body);
     packet
+}
+
+#[tokio::test]
+async fn mqtt_connack_write_fail_cleanup() {
+    async fn failed_handshake_session_present(clean_session: bool, client_id: &str) -> bool {
+        let provider = Arc::new(CountingProvider {
+            calls: AtomicUsize::new(0),
+            auth: auth(),
+            delay: false,
+        });
+        let (ingress, services, stop) = runtime(Limits::default(), provider);
+        // One-byte server-to-client capacity makes the four-byte CONNACK block after attachment.
+        let (mut client, server) = tokio::io::duplex(1);
+        let lease = services
+            .connections
+            .acquire("127.0.0.1".parse().unwrap(), Transport::Mqtt)
+            .unwrap();
+        let task = tokio::spawn(netbaiot_transports::mqtt::connection(
+            Box::new(server),
+            services.clone(),
+            lease,
+            stop.child_token(),
+        ));
+        client
+            .write_all(&connect_packet_for(client_id.as_bytes(), clean_session))
+            .await
+            .unwrap();
+        tokio::time::timeout(std::time::Duration::from_secs(1), async {
+            loop {
+                if services
+                    .ingress
+                    .sessions
+                    .lookup(&auth().device_key)
+                    .unwrap()
+                    .is_some()
+                {
+                    break;
+                }
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        drop(client);
+        assert!(
+            tokio::time::timeout(std::time::Duration::from_secs(1), task)
+                .await
+                .unwrap()
+                .unwrap()
+                .is_err(),
+            "closed peer must make CONNACK write fail"
+        );
+        let probe = services
+            .mqtt
+            .attach(&auth(), client_id.to_owned(), false)
+            .unwrap();
+        let present = probe.session_present;
+        drop(probe);
+        ingress.events.stop_workers().await.unwrap();
+        present
+    }
+
+    assert!(!failed_handshake_session_present(true, "connack-clean").await);
+    assert!(failed_handshake_session_present(false, "connack-persistent").await);
 }
 
 fn connect_packet_options(clean: bool, will: Option<(&str, &[u8], u8, bool)>) -> Vec<u8> {

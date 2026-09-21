@@ -49,5 +49,951 @@
   ],
   "classification_exceptions": {
     "DIFF-UNKNOWN-PUBACK-001": "IMPLEMENTATION_DEFINED_ALLOWED"
+  },
+  "rust_release_gate": {
+    "QOS2-OUT-WRONG-PUBACK-001": "mqtt_outbound_ack_state_matrix_preserves_transaction_on_wrong_ack",
+    "QOS2-OUT-WRONG-PUBCOMP-001": "mqtt_outbound_ack_state_matrix_preserves_transaction_on_wrong_ack",
+    "QOS2-IN-SESSION-TAKEOVER-001": "mqtt_inbound_qos2_takeover_can_finish_event_accepted_handoff",
+    "AUTH-REGISTER-REVOKE-RACE-001": "auth_invalidation_epoch_fences_session_registration_for_every_scope",
+    "MQTT-CONNACK-WRITE-FAIL-CLEANUP-001": "mqtt_connack_failure_attachment_guard_cleans_clean_and_preserves_persistent_session",
+    "MQTT-TENANT-INFLIGHT-WAKE-QOS1-001": "mqtt_tenant_qos1_capacity_release_wakes_other_session",
+    "MQTT-TENANT-INFLIGHT-WAKE-QOS2-001": "mqtt_tenant_qos2_capacity_release_wakes_other_session",
+    "MQTT-RECOVERY-BINARY-WORSTCASE-001": "mqtt_recovery_bound_accepts_worst_case_binary_json_expansion",
+    "WILL-RESOURCE-FAILURE-001": "mqtt_accepted_will_reservation_survives_later_retained_pressure",
+    "EVENTBUS-CONCURRENCY-NOSPIN-001": "event_bus_full_concurrency_waits_for_completion_without_ready_timer_spin"
+  },
+  "normative_requirements": {
+    "MQTT-1.5.3-1": {
+      "evidence": [
+        "UTF8-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-1.5.3-2": {
+      "evidence": [
+        "UTF8-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-1.5.3-3": {
+      "evidence": [
+        "UTF8-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-2.2.2-1": {
+      "evidence": [
+        "HEADER-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-2.2.2-2": {
+      "evidence": [
+        "HEADER-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-2.3.1-1": {
+      "evidence": [
+        "SUB-002",
+        "QOS1-001",
+        "QOS2-IN-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-2.3.1-4": {
+      "evidence": [
+        "SUB-002",
+        "QOS1-001",
+        "QOS2-IN-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-2.3.1-5": {
+      "evidence": [
+        "SUB-002",
+        "QOS1-001",
+        "QOS2-IN-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-2.3.1-6": {
+      "evidence": [
+        "SUB-002",
+        "QOS1-001",
+        "QOS2-IN-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-2.3.1-7": {
+      "evidence": [
+        "SUB-002",
+        "QOS1-001",
+        "QOS2-IN-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.1.0-1": {
+      "evidence": [
+        "SEQUENCE-001",
+        "CONNECT-005"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.1.0-2": {
+      "evidence": [
+        "SEQUENCE-001",
+        "CONNECT-005"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.1.2-1": {
+      "evidence": [
+        "CONNECT-003",
+        "SESSION-001",
+        "WILL-001",
+        "KEEPALIVE-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.1.2-2": {
+      "evidence": [
+        "CONNECT-003",
+        "SESSION-001",
+        "WILL-001",
+        "KEEPALIVE-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.1.2-3": {
+      "evidence": [
+        "CONNECT-003",
+        "SESSION-001",
+        "WILL-001",
+        "KEEPALIVE-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.1.2-4": {
+      "evidence": [
+        "CONNECT-003",
+        "SESSION-001",
+        "WILL-001",
+        "KEEPALIVE-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.1.2-5": {
+      "evidence": [
+        "CONNECT-003",
+        "SESSION-001",
+        "WILL-001",
+        "KEEPALIVE-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.1.2-6": {
+      "evidence": [
+        "CONNECT-003",
+        "SESSION-001",
+        "WILL-001",
+        "KEEPALIVE-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.1.2-7": {
+      "evidence": [
+        "CONNECT-003",
+        "SESSION-001",
+        "WILL-001",
+        "KEEPALIVE-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.1.2-8": {
+      "evidence": [
+        "CONNECT-003",
+        "SESSION-001",
+        "WILL-001",
+        "KEEPALIVE-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.1.2-9": {
+      "evidence": [
+        "CONNECT-003",
+        "SESSION-001",
+        "WILL-001",
+        "KEEPALIVE-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.1.2-10": {
+      "evidence": [
+        "CONNECT-003",
+        "SESSION-001",
+        "WILL-001",
+        "KEEPALIVE-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.1.2-11": {
+      "evidence": [
+        "CONNECT-003",
+        "SESSION-001",
+        "WILL-001",
+        "KEEPALIVE-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.1.2-12": {
+      "evidence": [
+        "CONNECT-003",
+        "SESSION-001",
+        "WILL-001",
+        "KEEPALIVE-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.1.2-13": {
+      "evidence": [
+        "CONNECT-003",
+        "SESSION-001",
+        "WILL-001",
+        "KEEPALIVE-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.1.2-14": {
+      "evidence": [
+        "CONNECT-003",
+        "SESSION-001",
+        "WILL-001",
+        "KEEPALIVE-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.1.2-15": {
+      "evidence": [
+        "CONNECT-003",
+        "SESSION-001",
+        "WILL-001",
+        "KEEPALIVE-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.1.2-16": {
+      "evidence": [
+        "CONNECT-003",
+        "SESSION-001",
+        "WILL-001",
+        "KEEPALIVE-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.1.2-17": {
+      "evidence": [
+        "CONNECT-003",
+        "SESSION-001",
+        "WILL-001",
+        "KEEPALIVE-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.1.2-18": {
+      "evidence": [
+        "CONNECT-003",
+        "SESSION-001",
+        "WILL-001",
+        "KEEPALIVE-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.1.2-19": {
+      "evidence": [
+        "CONNECT-003",
+        "SESSION-001",
+        "WILL-001",
+        "KEEPALIVE-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.1.2-20": {
+      "evidence": [
+        "CONNECT-003",
+        "SESSION-001",
+        "WILL-001",
+        "KEEPALIVE-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.1.2-21": {
+      "evidence": [
+        "CONNECT-003",
+        "SESSION-001",
+        "WILL-001",
+        "KEEPALIVE-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.1.2-22": {
+      "evidence": [
+        "CONNECT-003",
+        "SESSION-001",
+        "WILL-001",
+        "KEEPALIVE-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.1.2-24": {
+      "evidence": [
+        "CONNECT-003",
+        "SESSION-001",
+        "WILL-001",
+        "KEEPALIVE-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.1.3-1": {
+      "evidence": [
+        "CONNECT-004",
+        "UTF8-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.1.3-2": {
+      "evidence": [
+        "CONNECT-004",
+        "UTF8-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.1.3-3": {
+      "evidence": [
+        "CONNECT-004",
+        "UTF8-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.1.3-4": {
+      "evidence": [
+        "CONNECT-004",
+        "UTF8-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.1.3-5": {
+      "evidence": [
+        "CONNECT-004",
+        "UTF8-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.1.3-6": {
+      "evidence": [
+        "CONNECT-004",
+        "UTF8-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.1.3-8": {
+      "evidence": [
+        "CONNECT-004",
+        "UTF8-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.1.3-9": {
+      "evidence": [
+        "CONNECT-004",
+        "UTF8-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.1.3-10": {
+      "evidence": [
+        "CONNECT-004",
+        "UTF8-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.1.3-11": {
+      "evidence": [
+        "CONNECT-004",
+        "UTF8-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.1.4-1": {
+      "evidence": [
+        "CONNECT-001",
+        "CONNECT-005",
+        "WILL-TAKEOVER-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.1.4-2": {
+      "evidence": [
+        "CONNECT-001",
+        "CONNECT-005",
+        "WILL-TAKEOVER-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.1.4-3": {
+      "evidence": [
+        "CONNECT-001",
+        "CONNECT-005",
+        "WILL-TAKEOVER-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.1.4-4": {
+      "evidence": [
+        "CONNECT-001",
+        "CONNECT-005",
+        "WILL-TAKEOVER-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.1.4-5": {
+      "evidence": [
+        "CONNECT-001",
+        "CONNECT-005",
+        "WILL-TAKEOVER-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.2.0-1": {
+      "evidence": [
+        "CONNECT-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.2.2-1": {
+      "evidence": [
+        "CONNACK-001",
+        "SESSION-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.2.2-2": {
+      "evidence": [
+        "CONNACK-001",
+        "SESSION-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.2.2-3": {
+      "evidence": [
+        "CONNACK-001",
+        "SESSION-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.2.2-4": {
+      "evidence": [
+        "CONNACK-001",
+        "SESSION-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.2.2-5": {
+      "evidence": [
+        "CONNACK-001",
+        "SESSION-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.2.2-6": {
+      "evidence": [
+        "CONNACK-001",
+        "SESSION-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.3.1-1": {
+      "evidence": [
+        "QOS0-001",
+        "QOS1-001",
+        "QOS2-IN-001",
+        "RETAIN-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.3.1-2": {
+      "evidence": [
+        "QOS0-001",
+        "QOS1-001",
+        "QOS2-IN-001",
+        "RETAIN-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.3.1-3": {
+      "evidence": [
+        "QOS0-001",
+        "QOS1-001",
+        "QOS2-IN-001",
+        "RETAIN-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.3.1-4": {
+      "evidence": [
+        "QOS0-001",
+        "QOS1-001",
+        "QOS2-IN-001",
+        "RETAIN-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.3.1-5": {
+      "evidence": [
+        "QOS0-001",
+        "QOS1-001",
+        "QOS2-IN-001",
+        "RETAIN-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.3.1-6": {
+      "evidence": [
+        "QOS0-001",
+        "QOS1-001",
+        "QOS2-IN-001",
+        "RETAIN-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.3.1-7": {
+      "evidence": [
+        "QOS0-001",
+        "QOS1-001",
+        "QOS2-IN-001",
+        "RETAIN-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.3.1-8": {
+      "evidence": [
+        "QOS0-001",
+        "QOS1-001",
+        "QOS2-IN-001",
+        "RETAIN-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.3.1-9": {
+      "evidence": [
+        "QOS0-001",
+        "QOS1-001",
+        "QOS2-IN-001",
+        "RETAIN-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.3.1-10": {
+      "evidence": [
+        "QOS0-001",
+        "QOS1-001",
+        "QOS2-IN-001",
+        "RETAIN-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.3.1-11": {
+      "evidence": [
+        "QOS0-001",
+        "QOS1-001",
+        "QOS2-IN-001",
+        "RETAIN-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.3.1-12": {
+      "evidence": [
+        "QOS0-001",
+        "QOS1-001",
+        "QOS2-IN-001",
+        "RETAIN-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.3.2-1": {
+      "evidence": [
+        "SUB-001",
+        "SUB-002"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.3.2-2": {
+      "evidence": [
+        "SUB-001",
+        "SUB-002"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.3.2-3": {
+      "evidence": [
+        "SUB-001",
+        "SUB-002"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.3.4-1": {
+      "evidence": [
+        "QOS1-001",
+        "QOS2-IN-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.3.5-1": {
+      "evidence": [
+        "SUB-001",
+        "QOS1-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.3.5-2": {
+      "evidence": [
+        "SUB-001",
+        "QOS1-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.6.1-1": {
+      "evidence": [
+        "HEADER-001",
+        "QOS2-IN-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.8.1-1": {
+      "evidence": [
+        "HEADER-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.8.3-1": {
+      "evidence": [
+        "SUB-001",
+        "SUB-002"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.8.3-2": {
+      "evidence": [
+        "SUB-001",
+        "SUB-002"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.8.3-3": {
+      "evidence": [
+        "SUB-001",
+        "SUB-002"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3-8.3-4": {
+      "evidence": [
+        "SUB-002"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.8.4-1": {
+      "evidence": [
+        "SUB-001",
+        "SUB-RESUB-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.8.4-2": {
+      "evidence": [
+        "SUB-001",
+        "SUB-RESUB-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.8.4-3": {
+      "evidence": [
+        "SUB-001",
+        "SUB-RESUB-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.8.4-4": {
+      "evidence": [
+        "SUB-001",
+        "SUB-RESUB-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.8.4-5": {
+      "evidence": [
+        "SUB-001",
+        "SUB-RESUB-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.8.4-6": {
+      "evidence": [
+        "SUB-001",
+        "SUB-RESUB-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.9.3-1": {
+      "evidence": [
+        "SUB-001",
+        "SUB-RESUB-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.9.3-2": {
+      "evidence": [
+        "SUB-001",
+        "SUB-RESUB-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.10.1-1": {
+      "evidence": [
+        "HEADER-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.10.3-1": {
+      "evidence": [
+        "UNSUB-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.10.3-2": {
+      "evidence": [
+        "UNSUB-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.10.4-1": {
+      "evidence": [
+        "UNSUB-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.10.4-2": {
+      "evidence": [
+        "UNSUB-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.10.4-3": {
+      "evidence": [
+        "UNSUB-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.10.4-4": {
+      "evidence": [
+        "UNSUB-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.10.4-5": {
+      "evidence": [
+        "UNSUB-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.10.4-6": {
+      "evidence": [
+        "UNSUB-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.12.4-1": {
+      "evidence": [
+        "KEEPALIVE-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.14.1-1": {
+      "evidence": [
+        "HEADER-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-3.14.4-3": {
+      "evidence": [
+        "WILL-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-4.1.0-1": {
+      "evidence": [
+        "SESSION-001",
+        "SESSION-OFFLINE-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-4.1.0-2": {
+      "evidence": [
+        "SESSION-001",
+        "SESSION-OFFLINE-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-4.3.1-1": {
+      "evidence": [
+        "QOS0-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-4.3.2-1": {
+      "evidence": [
+        "QOS1-001",
+        "QOS1-DUP-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-4.3.2-2": {
+      "evidence": [
+        "QOS1-001",
+        "QOS1-DUP-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-4.3.3-1": {
+      "evidence": [
+        "QOS2-IN-001",
+        "QOS2-OUT-WRONG-PUBACK-001",
+        "QOS2-OUT-WRONG-PUBCOMP-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-4.3.3-2": {
+      "evidence": [
+        "QOS2-IN-001",
+        "QOS2-OUT-WRONG-PUBACK-001",
+        "QOS2-OUT-WRONG-PUBCOMP-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-4.4.0-1": {
+      "evidence": [
+        "SESSION-OFFLINE-001",
+        "MQTT-TENANT-INFLIGHT-WAKE-QOS1-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-4.5.0-1": {
+      "evidence": [
+        "SESSION-OFFLINE-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-4.6.0-1": {
+      "evidence": [
+        "SESSION-OFFLINE-001",
+        "QOS2-IN-SESSION-TAKEOVER-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-4.6.0-5": {
+      "evidence": [
+        "SESSION-OFFLINE-001",
+        "QOS2-IN-SESSION-TAKEOVER-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-4.6.0-6": {
+      "evidence": [
+        "SESSION-OFFLINE-001",
+        "QOS2-IN-SESSION-TAKEOVER-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-4.7.1-1": {
+      "evidence": [
+        "SUB-001",
+        "SUB-002"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-4.7.1-2": {
+      "evidence": [
+        "SUB-001",
+        "SUB-002"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-4.7.1-3": {
+      "evidence": [
+        "SUB-001",
+        "SUB-002"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-4.7.2-1": {
+      "evidence": [
+        "SUB-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-4.7.3-1": {
+      "evidence": [
+        "SUB-001",
+        "SUB-002"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-4.7.3-2": {
+      "evidence": [
+        "SUB-001",
+        "SUB-002"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-4.7.3-3": {
+      "evidence": [
+        "SUB-001",
+        "SUB-002"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-4.7.3-4": {
+      "evidence": [
+        "SUB-001",
+        "SUB-002"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-4.8.0-1": {
+      "evidence": [
+        "REMAINING-001",
+        "SEQUENCE-002"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-4.8.0-2": {
+      "evidence": [
+        "REMAINING-001",
+        "SEQUENCE-002"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-7.0.0-2": {
+      "evidence": [
+        "CONNECT-001"
+      ],
+      "kind": "runtime"
+    },
+    "MQTT-7.1.1-1": {
+      "evidence": [
+        "FRAMING-001"
+      ],
+      "kind": "runtime"
+    }
   }
 }

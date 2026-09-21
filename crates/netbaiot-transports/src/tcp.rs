@@ -83,7 +83,7 @@ pub async fn connection(
     {
         return Err(Error::Authentication);
     }
-    let auth = authenticate_stream(
+    let candidate = authenticate_stream(
         &s,
         AuthenticationRequest::Secret {
             credential_id: &hello.credential_id,
@@ -94,9 +94,9 @@ pub async fn connection(
         &stop,
     )
     .await?;
-    connection.authenticate(&auth.device_key)?;
-    let auth = Arc::new(auth);
-    let (session, mut outbound) = s.ingress.sessions.register(auth.clone(), Transport::Tcp)?;
+    connection.authenticate(&candidate.auth.device_key)?;
+    let auth = Arc::new(candidate.auth.clone());
+    let (session, mut outbound) = s.ingress.register_session(candidate, Transport::Tcp)?;
     write(
         &mut stream,
         &framer.encode(br#"{"authenticated":true}"#)?,

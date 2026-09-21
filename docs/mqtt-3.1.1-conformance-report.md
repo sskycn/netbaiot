@@ -15,13 +15,13 @@ Normative source: [OASIS MQTT Version 3.1.1 Plus Errata 01](https://docs.oasis-o
 | Item | Audited value |
 |---|---|
 | Host | macOS 26.6.2, arm64 |
-| Rust | rustc/cargo 1.97.1 |
+| Rust | rustc/cargo 1.88.0 MSRV and 1.97.1 current stable |
 | Mosquitto clients | mosquitto_pub/sub 2.1.2, libmosquitto 2.1.0 |
 | Reference broker | Mosquitto 2.1.2, isolated loopback temporary configuration |
 | Paho | unavailable in the current Python environment; no package was installed |
 | Broker profile | authenticated DeviceKey, canonical IoT topics, bounded in-memory state, planned-restart snapshot |
 | Raw artifact | `target/mqtt-conformance/results.json` |
-| Stable catalog | `tests/mqtt_conformance/catalog.json` |
+| Stable catalog | `tests/mqtt_conformance/catalog.json` (125 exact normative mappings plus 10 named Rust fault invariants) |
 
 ## Normative traceability summary
 
@@ -118,8 +118,14 @@ the packet encoder/decoder or state transition was inspected in addition to test
   QoS1, outbound/inbound QoS2 stages, >1 MiB legal state, and repeated generations.
 - Resource/failure: PASS for retained subscription transaction rollback, QoS2
   pending-route/recovery, count/byte quotas, slow packet deadline and malformed fuzz.
-- Fuzz: PASS, 1,000 runs each for `mqtt_fixed_header`, `mqtt_remaining_length`,
-  `mqtt_packet`, `mqtt_state`, and `restart_spool` (5,000 total current runs).
+- Final remediation release gate: 55/55 PASS. This includes raw and differential
+  cases, Mosquitto client/TLS, restart, the ten stable audit IDs, and
+  `NORMATIVE-COVERAGE-001` proving 125/125 current PASS evidence. Unknown `--only`
+  fails before build; missing release dependencies are `SKIPPED_REQUIRED` and make
+  the process nonzero.
+- Fuzz: the final remediation smoke completed 1,000 runs each for `mqtt_state`,
+  `mqtt_recovery`, and `restart_spool` (3,000 total) without a crash. The new
+  recovery target emitted only non-fatal local symbolizer warnings.
 - Soak: PASS, the ignored 60-second test completed 12 planned child-process
   generations in 61.93 seconds without duplicate/lost recovered responsibility.
 
@@ -140,6 +146,16 @@ the packet encoder/decoder or state transition was inspected in addition to test
    protocol implementation change.
 6. The requested invalid-filter examples included `a/#`; MQTT 3.1.1 defines it as
    valid. The harness keeps the specification-correct behavior.
+7. Outbound completion used a boolean QoS2 discriminator, allowing PUBACK to remove
+   AwaitPubrec. It now uses exact state×ACK transitions and mutation-free failures.
+8. Inbound EventAccepted completion was tied to a superseded connection generation.
+   A stored Delivering operation token now survives same-session takeover.
+9. CONNACK write failure could leak broker attachment ownership. Attachment and Will
+   responsibility are now generation-fenced RAII guards with real write-failure tests.
+10. Tenant capacity release polled only the acknowledging session. A bounded
+    per-tenant ready scheduler now wakes another active session for QoS1/QoS2.
+11. The recovery file limit ignored JSON expansion. Startup now validates a checked
+    conservative encoded upper bound, and worst-case binary patterns are exercised.
 
 ## Remaining limitations and release practice
 

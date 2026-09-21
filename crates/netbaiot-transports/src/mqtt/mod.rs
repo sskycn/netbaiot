@@ -3,7 +3,7 @@ pub mod packet;
 pub mod topics;
 
 use crate::common::*;
-use broker::{BrokerFrame, BrokerMessage, subscribe_acl};
+use broker::{BrokerFrame, BrokerMessage, InboundQos2Action, subscribe_acl};
 use netbaiot_core::*;
 use netbaiot_runtime::*;
 use packet::*;
@@ -137,18 +137,10 @@ async fn process_publish(
     Ok(acceptance)
 }
 
-async fn publish_will(services: &Services, auth: &AuthenticatedDevice, will: Will) -> Result<()> {
-    let message = BrokerMessage {
-        topic: will.topic,
-        payload: will.payload.to_vec(),
-        qos: will.qos,
-        retain: will.retain,
-    };
-    // Route once before attempting the optional IoT binding. A malformed canonical payload does
-    // not suppress the MQTT Will, and must not cause duplicate broker delivery.
-    services.mqtt.route(&auth.device_key, message.clone())?;
-    let _ = accept_iot_publish(services, auth, &message, Instant::now(), 0).await;
-    Ok(())
+async fn bind_will(services: &Services, auth: &AuthenticatedDevice, message: &BrokerMessage) {
+    // MQTT delivery is settled synchronously by WillGuard. The optional IoT binding cannot make
+    // an already accepted Will disappear or be published twice.
+    let _ = accept_iot_publish(services, auth, message, Instant::now(), 0).await;
 }
 
 pub async fn connection(
@@ -192,7 +184,7 @@ pub async fn connection(
         return Err(Error::Authentication);
     };
     machine.transition(ConnectionState::Authenticating)?;
-    let auth = match authenticate_stream(
+    let candidate = match authenticate_stream(
         &services,
         AuthenticationRequest::Secret {
             credential_id: username,
@@ -204,7 +196,7 @@ pub async fn connection(
     )
     .await
     {
-        Ok(auth) => auth,
+        Ok(candidate) => candidate,
         Err(error) => {
             services.ingress.metrics.inc(Metric::MqttConnectFailure);
             if matches!(error, Error::Authentication) {
@@ -214,20 +206,19 @@ pub async fn connection(
         }
     };
     if let Some(will) = &connect.will
-        && publish_acl(&auth, &will.topic).is_err()
+        && publish_acl(&candidate.auth, &will.topic).is_err()
     {
         send(&mut stream, &services, &connack(false, 5)).await?;
         return Err(Error::Forbidden);
     }
-    if let Err(error) = connection.authenticate(&auth.device_key) {
+    if let Err(error) = connection.authenticate(&candidate.auth.device_key) {
         send(&mut stream, &services, &connack(false, 3)).await?;
         return Err(error);
     }
-    let auth = Arc::new(auth);
+    let auth = Arc::new(candidate.auth.clone());
     let (live_session, mut commands) = services
         .ingress
-        .sessions
-        .register(auth.clone(), Transport::Mqtt)?;
+        .register_session(candidate, Transport::Mqtt)?;
     if connect.client_id.is_empty() {
         connect.client_id = format!("generated-{}", live_session.generation);
     }
@@ -235,6 +226,26 @@ pub async fn connection(
         services
             .mqtt
             .attach(&auth, connect.client_id.clone(), connect.clean_session)?;
+    let mut will_guard = connect
+        .will
+        .take()
+        .map(|will| {
+            services.mqtt.reserve_will(
+                auth.device_key.clone(),
+                BrokerMessage {
+                    topic: will.topic,
+                    payload: will.payload.to_vec(),
+                    qos: will.qos,
+                    retain: will.retain,
+                },
+            )
+        })
+        .transpose()?;
+    if let Some(will) = &mut will_guard {
+        // From this point the broker has accepted CONNECT responsibility. Drop publishes the Will
+        // on every early return, including a failed CONNACK write.
+        will.arm();
+    }
     send(
         &mut stream,
         &services,
@@ -332,17 +343,46 @@ pub async fn connection(
                             }
                         }
                         Packet::Pubrel(id) => {
-                            if let Some((message, event_accepted)) = services.mqtt.inbound_qos2_message(&attachment.key, attachment.generation, id)? {
-                                if !event_accepted {
-                                    accept_iot_publish(&services, &auth, &message, validated_at, validation_us).await?;
-                                    services.mqtt.mark_inbound_qos2_event_accepted(&attachment.key, attachment.generation, id)?;
+                            match services.mqtt.begin_inbound_qos2_delivery(
+                                &attachment.key,
+                                attachment.generation,
+                                id,
+                            )? {
+                                InboundQos2Action::Deliver { message, operation_id } => {
+                                    if let Err(error) = accept_iot_publish(
+                                        &services,
+                                        &auth,
+                                        &message,
+                                        validated_at,
+                                        validation_us,
+                                    ).await {
+                                        let _ = services.mqtt.abandon_inbound_qos2_delivery(
+                                            &attachment.key,
+                                            id,
+                                            operation_id,
+                                        );
+                                        return Err(error);
+                                    }
+                                    services.mqtt.finish_inbound_qos2_delivery(
+                                        &attachment.key,
+                                        id,
+                                        operation_id,
+                                    )?;
+                                    services.mqtt.route_inbound_qos2(
+                                        &attachment.key,
+                                        id,
+                                        &auth.device_key,
+                                    )?;
                                 }
-                                services.mqtt.route_inbound_qos2(
+                                InboundQos2Action::EventAccepted => {
+                                    services.mqtt.route_inbound_qos2(
                                     &attachment.key,
-                                    attachment.generation,
                                     id,
                                     &auth.device_key,
-                                )?;
+                                    )?;
+                                }
+                                InboundQos2Action::DeliveryInProgress => continue,
+                                InboundQos2Action::Unknown => {}
                             }
                             send(&mut stream, &services, &ack(0x70, id)).await?;
                         }
@@ -376,13 +416,14 @@ pub async fn connection(
         Ok(())
     }
     .await;
-    services.mqtt.detach(
-        &attachment.key,
-        attachment.generation,
-        connect.clean_session,
-    )?;
-    if !normal_disconnect && let Some(will) = connect.will.take() {
-        let _ = publish_will(&services, &auth, will).await;
+    attachment.detach()?;
+    if let Some(will) = &mut will_guard {
+        if normal_disconnect {
+            will.suppress()?;
+        } else {
+            let message = will.publish()?;
+            bind_will(&services, &auth, &message).await;
+        }
     }
     machine.transition(ConnectionState::Draining)?;
     machine.transition(ConnectionState::Closed)?;
