@@ -1,0 +1,3774 @@
+{
+  "before": [
+    [
+      {
+        "accepted": {
+          "p50_ns": 2250,
+          "p95_ns": 14083,
+          "p99_ns": 23333
+        },
+        "completion": [
+          {
+            "p50_ns": 35625,
+            "p95_ns": 145334,
+            "p99_ns": 202667
+          }
+        ],
+        "delay_ms": 0,
+        "events": 10000,
+        "events_per_sec": 171445.71600017147,
+        "publish_per_sec": 174869.1213919582,
+        "retry": false,
+        "sampled_max_bytes": 9996,
+        "sampled_max_depth": 42,
+        "sinks": 1,
+        "window": 128,
+        "probes": {
+          "publish": 1.0,
+          "take_ready": 1.2875,
+          "complete": 1.0,
+          "next_delay": 0.2875,
+          "other": 0.008,
+          "notify_worker": 1.0,
+          "notify_drain": 1.0,
+          "wake_notify": 0.0463,
+          "wake_timer": 0.0,
+          "wake_join": 1.0,
+          "empty_wake": 0.2161,
+          "locks": 3.575,
+          "worker_wakes": 1.0463
+        },
+        "locks": {
+          "event_bus_lock_wait_us": {
+            "count": 10000.0,
+            "mean": 1.5474,
+            "sum": 15474.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 25.0
+          },
+          "event_bus_lock_hold_us": {
+            "count": 10000.0,
+            "mean": 0.0447,
+            "sum": 447.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          },
+          "event_bus_state_wait_us": {
+            "count": 35830.0,
+            "mean": 1.1385989394362266,
+            "sum": 40796.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 25.0
+          },
+          "event_bus_state_hold_us": {
+            "count": 35830.0,
+            "mean": 0.41800167457437903,
+            "sum": 14977.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          }
+        }
+      },
+      {
+        "accepted": {
+          "p50_ns": 6791,
+          "p95_ns": 46125,
+          "p99_ns": 74833
+        },
+        "completion": [
+          {
+            "p50_ns": 4266000,
+            "p95_ns": 5829167,
+            "p99_ns": 6070125
+          },
+          {
+            "p50_ns": 2264792,
+            "p95_ns": 4035583,
+            "p99_ns": 5118208
+          },
+          {
+            "p50_ns": 2084333,
+            "p95_ns": 2857500,
+            "p99_ns": 3367584
+          },
+          {
+            "p50_ns": 1725875,
+            "p95_ns": 2989791,
+            "p99_ns": 3576417
+          }
+        ],
+        "delay_ms": 0,
+        "events": 10000,
+        "events_per_sec": 47949.21219444365,
+        "publish_per_sec": 48475.79966891029,
+        "retry": false,
+        "sampled_max_bytes": 66878,
+        "sampled_max_depth": 281,
+        "sinks": 4,
+        "window": 128,
+        "probes": {
+          "publish": 1.0,
+          "take_ready": 4.0079,
+          "complete": 4.0,
+          "next_delay": 0.0079,
+          "other": 0.008,
+          "notify_worker": 4.0,
+          "notify_drain": 4.0,
+          "wake_notify": 0.0018,
+          "wake_timer": 0.0,
+          "wake_join": 4.0,
+          "empty_wake": 0.0071,
+          "locks": 9.015799999999999,
+          "worker_wakes": 4.0018
+        },
+        "locks": {
+          "event_bus_lock_wait_us": {
+            "count": 10000.0,
+            "mean": 9.6277,
+            "sum": 96277.0,
+            "p50_upper": 10.0,
+            "p95_upper": 50.0,
+            "p99_upper": 100.0
+          },
+          "event_bus_lock_hold_us": {
+            "count": 10000.0,
+            "mean": 0.3353,
+            "sum": 3353.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          },
+          "event_bus_state_wait_us": {
+            "count": 90238.0,
+            "mean": 7.174693588067111,
+            "sum": 647430.0,
+            "p50_upper": 10.0,
+            "p95_upper": 50.0,
+            "p99_upper": 100.0
+          },
+          "event_bus_state_hold_us": {
+            "count": 90238.0,
+            "mean": 1.969126088787429,
+            "sum": 177690.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 25.0
+          }
+        }
+      },
+      {
+        "accepted": {
+          "p50_ns": 10250,
+          "p95_ns": 87625,
+          "p99_ns": 143042
+        },
+        "completion": [
+          {
+            "p50_ns": 2832167,
+            "p95_ns": 5677833,
+            "p99_ns": 6230875
+          },
+          {
+            "p50_ns": 5539958,
+            "p95_ns": 6538083,
+            "p99_ns": 6995625
+          },
+          {
+            "p50_ns": 6355167,
+            "p95_ns": 7757750,
+            "p99_ns": 8431125
+          },
+          {
+            "p50_ns": 6520500,
+            "p95_ns": 8292041,
+            "p99_ns": 8578334
+          },
+          {
+            "p50_ns": 3454625,
+            "p95_ns": 4697750,
+            "p99_ns": 5210042
+          },
+          {
+            "p50_ns": 5313583,
+            "p95_ns": 7567583,
+            "p99_ns": 7834917
+          },
+          {
+            "p50_ns": 7335708,
+            "p95_ns": 9771833,
+            "p99_ns": 10019792
+          },
+          {
+            "p50_ns": 4955917,
+            "p95_ns": 6311208,
+            "p99_ns": 6688125
+          }
+        ],
+        "delay_ms": 0,
+        "events": 10000,
+        "events_per_sec": 22573.10228634488,
+        "publish_per_sec": 22865.80573097122,
+        "retry": false,
+        "sampled_max_bytes": 54740,
+        "sampled_max_depth": 230,
+        "sinks": 8,
+        "window": 128,
+        "probes": {
+          "publish": 1.0,
+          "take_ready": 8.0074,
+          "complete": 8.0,
+          "next_delay": 0.0074,
+          "other": 0.008,
+          "notify_worker": 8.0,
+          "notify_drain": 8.0,
+          "wake_notify": 0.0016,
+          "wake_timer": 0.0,
+          "wake_join": 8.0,
+          "empty_wake": 0.0074,
+          "locks": 17.0148,
+          "worker_wakes": 8.0016
+        },
+        "locks": {
+          "event_bus_lock_wait_us": {
+            "count": 10000.0,
+            "mean": 18.8605,
+            "sum": 188605.0,
+            "p50_upper": 10.0,
+            "p95_upper": 100.0,
+            "p99_upper": 250.0
+          },
+          "event_bus_lock_hold_us": {
+            "count": 10000.0,
+            "mean": 1.4985,
+            "sum": 14985.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 25.0
+          },
+          "event_bus_state_wait_us": {
+            "count": 170228.0,
+            "mean": 16.996745541274056,
+            "sum": 2893322.0,
+            "p50_upper": 10.0,
+            "p95_upper": 100.0,
+            "p99_upper": 250.0
+          },
+          "event_bus_state_hold_us": {
+            "count": 170228.0,
+            "mean": 3.433542072984468,
+            "sum": 584485.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 25.0
+          }
+        }
+      },
+      {
+        "accepted": {
+          "p50_ns": 1125,
+          "p95_ns": 16042,
+          "p99_ns": 29750
+        },
+        "completion": [
+          {
+            "p50_ns": 35443291,
+            "p95_ns": 36601500,
+            "p99_ns": 36650125
+          }
+        ],
+        "delay_ms": 1,
+        "events": 2000,
+        "events_per_sec": 3567.6469739397644,
+        "publish_per_sec": 3830.69631614634,
+        "retry": false,
+        "sampled_max_bytes": 30464,
+        "sampled_max_depth": 128,
+        "sinks": 1,
+        "window": 128,
+        "probes": {
+          "publish": 1.0,
+          "take_ready": 1.005,
+          "complete": 1.0,
+          "next_delay": 0.005,
+          "other": 0.0085,
+          "notify_worker": 1.0,
+          "notify_drain": 1.0,
+          "wake_notify": 0.0015,
+          "wake_timer": 0.0,
+          "wake_join": 1.0,
+          "empty_wake": 0.0045,
+          "locks": 3.01,
+          "worker_wakes": 1.0015
+        },
+        "locks": {
+          "event_bus_lock_wait_us": {
+            "count": 2000.0,
+            "mean": 2.526,
+            "sum": 5052.0,
+            "p50_upper": 10.0,
+            "p95_upper": 25.0,
+            "p99_upper": 50.0
+          },
+          "event_bus_lock_hold_us": {
+            "count": 2000.0,
+            "mean": 0.025,
+            "sum": 50.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          },
+          "event_bus_state_wait_us": {
+            "count": 6037.0,
+            "mean": 1.042570813317873,
+            "sum": 6294.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 25.0
+          },
+          "event_bus_state_hold_us": {
+            "count": 6037.0,
+            "mean": 0.65363591187676,
+            "sum": 3946.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          }
+        }
+      },
+      {
+        "accepted": {
+          "p50_ns": 1125,
+          "p95_ns": 17292,
+          "p99_ns": 29416
+        },
+        "completion": [
+          {
+            "p50_ns": 190801833,
+            "p95_ns": 191956250,
+            "p99_ns": 192275042
+          }
+        ],
+        "delay_ms": 10,
+        "events": 2000,
+        "events_per_sec": 672.4919884138037,
+        "publish_per_sec": 716.5400857941462,
+        "retry": false,
+        "sampled_max_bytes": 30464,
+        "sampled_max_depth": 128,
+        "sinks": 1,
+        "window": 128,
+        "probes": {
+          "publish": 1.0,
+          "take_ready": 1.0045,
+          "complete": 1.0,
+          "next_delay": 0.0045,
+          "other": 0.0085,
+          "notify_worker": 1.0,
+          "notify_drain": 1.0,
+          "wake_notify": 0.001,
+          "wake_timer": 0.0,
+          "wake_join": 1.0,
+          "empty_wake": 0.0045,
+          "locks": 3.0090000000000003,
+          "worker_wakes": 1.001
+        },
+        "locks": {
+          "event_bus_lock_wait_us": {
+            "count": 2000.0,
+            "mean": 2.478,
+            "sum": 4956.0,
+            "p50_upper": 10.0,
+            "p95_upper": 25.0,
+            "p99_upper": 50.0
+          },
+          "event_bus_lock_hold_us": {
+            "count": 2000.0,
+            "mean": 0.0135,
+            "sum": 27.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          },
+          "event_bus_state_wait_us": {
+            "count": 6035.0,
+            "mean": 1.1138359569179785,
+            "sum": 6722.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 25.0
+          },
+          "event_bus_state_hold_us": {
+            "count": 6035.0,
+            "mean": 0.6722452361226181,
+            "sum": 4057.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          }
+        }
+      },
+      {
+        "accepted": {
+          "p50_ns": 1583,
+          "p95_ns": 14833,
+          "p99_ns": 30875
+        },
+        "completion": [
+          {
+            "p50_ns": 6198792,
+            "p95_ns": 10420375,
+            "p99_ns": 11433250
+          }
+        ],
+        "delay_ms": 0,
+        "events": 2000,
+        "events_per_sec": 19420.987532939816,
+        "publish_per_sec": 21864.942980328386,
+        "retry": true,
+        "sampled_max_bytes": 30464,
+        "sampled_max_depth": 128,
+        "sinks": 1,
+        "window": 128,
+        "probes": {
+          "publish": 1.0,
+          "take_ready": 2.6685,
+          "complete": 2.0,
+          "next_delay": 0.6685,
+          "other": 0.0085,
+          "notify_worker": 2.0,
+          "notify_drain": 1.0,
+          "wake_notify": 0.166,
+          "wake_timer": 0.035,
+          "wake_join": 2.0,
+          "empty_wake": 0.564,
+          "locks": 6.337,
+          "worker_wakes": 2.201
+        },
+        "locks": {
+          "event_bus_lock_wait_us": {
+            "count": 2000.0,
+            "mean": 1.874,
+            "sum": 3748.0,
+            "p50_upper": 10.0,
+            "p95_upper": 25.0,
+            "p99_upper": 50.0
+          },
+          "event_bus_lock_hold_us": {
+            "count": 2000.0,
+            "mean": 0.0525,
+            "sum": 105.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          },
+          "event_bus_state_wait_us": {
+            "count": 12691.0,
+            "mean": 0.5584272318966197,
+            "sum": 7087.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 25.0
+          },
+          "event_bus_state_hold_us": {
+            "count": 12691.0,
+            "mean": 0.21322196832400914,
+            "sum": 2706.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          }
+        }
+      },
+      {
+        "accepted": {
+          "p50_ns": 7000,
+          "p95_ns": 7000,
+          "p99_ns": 7000
+        },
+        "completion": [
+          {
+            "p50_ns": 13667,
+            "p95_ns": 13667,
+            "p99_ns": 13667
+          }
+        ],
+        "delay_ms": 0,
+        "events": 1,
+        "events_per_sec": 439.528175294385,
+        "publish_per_sec": 106666.66666666667,
+        "retry": false,
+        "sampled_max_bytes": 232,
+        "sampled_max_depth": 1,
+        "sinks": 1,
+        "window": 1,
+        "probes": {
+          "publish": 1.0,
+          "take_ready": 3.0,
+          "complete": 1.0,
+          "next_delay": 2.0,
+          "other": 2.0,
+          "notify_worker": 1.0,
+          "notify_drain": 1.0,
+          "wake_notify": 1.0,
+          "wake_timer": 0.0,
+          "wake_join": 1.0,
+          "empty_wake": 1.0,
+          "locks": 7.0,
+          "worker_wakes": 2.0
+        },
+        "locks": {
+          "event_bus_lock_wait_us": {
+            "count": 1.0,
+            "mean": 0.0,
+            "sum": 0.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          },
+          "event_bus_lock_hold_us": {
+            "count": 1.0,
+            "mean": 1.0,
+            "sum": 1.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          },
+          "event_bus_state_wait_us": {
+            "count": 9.0,
+            "mean": 0.0,
+            "sum": 0.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          },
+          "event_bus_state_hold_us": {
+            "count": 9.0,
+            "mean": 0.1111111111111111,
+            "sum": 1.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          }
+        }
+      },
+      {
+        "accepted": {
+          "p50_ns": 5375,
+          "p95_ns": 5375,
+          "p99_ns": 5375
+        },
+        "completion": [
+          {
+            "p50_ns": 2265125,
+            "p95_ns": 2265125,
+            "p99_ns": 2265125
+          }
+        ],
+        "delay_ms": 0,
+        "events": 1,
+        "events_per_sec": 439.8102130968444,
+        "publish_per_sec": 86333.41966675299,
+        "retry": true,
+        "sampled_max_bytes": 232,
+        "sampled_max_depth": 1,
+        "sinks": 1,
+        "window": 1,
+        "probes": {
+          "publish": 1.0,
+          "take_ready": 7.0,
+          "complete": 2.0,
+          "next_delay": 5.0,
+          "other": 2.0,
+          "notify_worker": 2.0,
+          "notify_drain": 1.0,
+          "wake_notify": 2.0,
+          "wake_timer": 1.0,
+          "wake_join": 2.0,
+          "empty_wake": 3.0,
+          "locks": 15.0,
+          "worker_wakes": 5.0
+        },
+        "locks": {
+          "event_bus_lock_wait_us": {
+            "count": 1.0,
+            "mean": 0.0,
+            "sum": 0.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          },
+          "event_bus_lock_hold_us": {
+            "count": 1.0,
+            "mean": 1.0,
+            "sum": 1.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          },
+          "event_bus_state_wait_us": {
+            "count": 17.0,
+            "mean": 0.0,
+            "sum": 0.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          },
+          "event_bus_state_hold_us": {
+            "count": 17.0,
+            "mean": 0.058823529411764705,
+            "sum": 1.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          }
+        }
+      }
+    ],
+    [
+      {
+        "accepted": {
+          "p50_ns": 2000,
+          "p95_ns": 9291,
+          "p99_ns": 14500
+        },
+        "completion": [
+          {
+            "p50_ns": 21333,
+            "p95_ns": 53500,
+            "p99_ns": 83333
+          }
+        ],
+        "delay_ms": 0,
+        "events": 10000,
+        "events_per_sec": 222654.54312679343,
+        "publish_per_sec": 234613.96899079016,
+        "retry": false,
+        "sampled_max_bytes": 5950,
+        "sampled_max_depth": 25,
+        "sinks": 1,
+        "window": 128,
+        "probes": {
+          "publish": 1.0,
+          "take_ready": 1.289,
+          "complete": 1.0,
+          "next_delay": 0.289,
+          "other": 0.008,
+          "notify_worker": 1.0,
+          "notify_drain": 1.0,
+          "wake_notify": 0.0306,
+          "wake_timer": 0.0,
+          "wake_join": 1.0,
+          "empty_wake": 0.2179,
+          "locks": 3.578,
+          "worker_wakes": 1.0306
+        },
+        "locks": {
+          "event_bus_lock_wait_us": {
+            "count": 10000.0,
+            "mean": 1.0129,
+            "sum": 10129.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 25.0
+          },
+          "event_bus_lock_hold_us": {
+            "count": 10000.0,
+            "mean": 0.0087,
+            "sum": 87.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          },
+          "event_bus_state_wait_us": {
+            "count": 35860.0,
+            "mean": 0.7805911879531512,
+            "sum": 27992.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          },
+          "event_bus_state_hold_us": {
+            "count": 35860.0,
+            "mean": 0.2754601226993865,
+            "sum": 9878.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          }
+        }
+      },
+      {
+        "accepted": {
+          "p50_ns": 6500,
+          "p95_ns": 45000,
+          "p99_ns": 72750
+        },
+        "completion": [
+          {
+            "p50_ns": 3326625,
+            "p95_ns": 4182417,
+            "p99_ns": 4341791
+          },
+          {
+            "p50_ns": 2258875,
+            "p95_ns": 3382959,
+            "p99_ns": 3560583
+          },
+          {
+            "p50_ns": 1947083,
+            "p95_ns": 2598625,
+            "p99_ns": 2865375
+          },
+          {
+            "p50_ns": 1815375,
+            "p95_ns": 2734292,
+            "p99_ns": 2850583
+          }
+        ],
+        "delay_ms": 0,
+        "events": 10000,
+        "events_per_sec": 51479.31182105898,
+        "publish_per_sec": 52086.27240976712,
+        "retry": false,
+        "sampled_max_bytes": 50218,
+        "sampled_max_depth": 211,
+        "sinks": 4,
+        "window": 128,
+        "probes": {
+          "publish": 1.0,
+          "take_ready": 4.0113,
+          "complete": 4.0,
+          "next_delay": 0.0113,
+          "other": 0.008,
+          "notify_worker": 4.0,
+          "notify_drain": 4.0,
+          "wake_notify": 0.0026,
+          "wake_timer": 0.0,
+          "wake_join": 4.0,
+          "empty_wake": 0.0106,
+          "locks": 9.0226,
+          "worker_wakes": 4.0026
+        },
+        "locks": {
+          "event_bus_lock_wait_us": {
+            "count": 10000.0,
+            "mean": 9.5861,
+            "sum": 95861.0,
+            "p50_upper": 10.0,
+            "p95_upper": 50.0,
+            "p99_upper": 100.0
+          },
+          "event_bus_lock_hold_us": {
+            "count": 10000.0,
+            "mean": 0.2782,
+            "sum": 2782.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 25.0
+          },
+          "event_bus_state_wait_us": {
+            "count": 90306.0,
+            "mean": 6.799714304697362,
+            "sum": 614055.0,
+            "p50_upper": 10.0,
+            "p95_upper": 50.0,
+            "p99_upper": 100.0
+          },
+          "event_bus_state_hold_us": {
+            "count": 90306.0,
+            "mean": 1.8611609416871526,
+            "sum": 168074.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 25.0
+          }
+        }
+      },
+      {
+        "accepted": {
+          "p50_ns": 8541,
+          "p95_ns": 88833,
+          "p99_ns": 142250
+        },
+        "completion": [
+          {
+            "p50_ns": 3633083,
+            "p95_ns": 5972459,
+            "p99_ns": 6469666
+          },
+          {
+            "p50_ns": 6221292,
+            "p95_ns": 7413875,
+            "p99_ns": 7815000
+          },
+          {
+            "p50_ns": 6221291,
+            "p95_ns": 9486708,
+            "p99_ns": 9966541
+          },
+          {
+            "p50_ns": 7499167,
+            "p95_ns": 9103750,
+            "p99_ns": 9622167
+          },
+          {
+            "p50_ns": 4863750,
+            "p95_ns": 6454750,
+            "p99_ns": 6667750
+          },
+          {
+            "p50_ns": 4190208,
+            "p95_ns": 5542417,
+            "p99_ns": 6075083
+          },
+          {
+            "p50_ns": 6324667,
+            "p95_ns": 8204916,
+            "p99_ns": 9023250
+          },
+          {
+            "p50_ns": 4177959,
+            "p95_ns": 6540375,
+            "p99_ns": 7643500
+          }
+        ],
+        "delay_ms": 0,
+        "events": 10000,
+        "events_per_sec": 22434.739429430552,
+        "publish_per_sec": 22655.793287527064,
+        "retry": false,
+        "sampled_max_bytes": 55216,
+        "sampled_max_depth": 232,
+        "sinks": 8,
+        "window": 128,
+        "probes": {
+          "publish": 1.0,
+          "take_ready": 8.0085,
+          "complete": 8.0,
+          "next_delay": 0.0085,
+          "other": 0.008,
+          "notify_worker": 8.0,
+          "notify_drain": 8.0,
+          "wake_notify": 0.0023,
+          "wake_timer": 0.0,
+          "wake_join": 8.0,
+          "empty_wake": 0.0079,
+          "locks": 17.017,
+          "worker_wakes": 8.0023
+        },
+        "locks": {
+          "event_bus_lock_wait_us": {
+            "count": 10000.0,
+            "mean": 18.9546,
+            "sum": 189546.0,
+            "p50_upper": 10.0,
+            "p95_upper": 100.0,
+            "p99_upper": 250.0
+          },
+          "event_bus_lock_hold_us": {
+            "count": 10000.0,
+            "mean": 1.3549,
+            "sum": 13549.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 25.0
+          },
+          "event_bus_state_wait_us": {
+            "count": 170250.0,
+            "mean": 17.13668135095448,
+            "sum": 2917520.0,
+            "p50_upper": 10.0,
+            "p95_upper": 100.0,
+            "p99_upper": 250.0
+          },
+          "event_bus_state_hold_us": {
+            "count": 170250.0,
+            "mean": 3.4525286343612334,
+            "sum": 587793.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 25.0
+          }
+        }
+      },
+      {
+        "accepted": {
+          "p50_ns": 1083,
+          "p95_ns": 17583,
+          "p99_ns": 28083
+        },
+        "completion": [
+          {
+            "p50_ns": 36406417,
+            "p95_ns": 36723875,
+            "p99_ns": 36933958
+          }
+        ],
+        "delay_ms": 1,
+        "events": 2000,
+        "events_per_sec": 3533.7634925914726,
+        "publish_per_sec": 3796.711117218923,
+        "retry": false,
+        "sampled_max_bytes": 30464,
+        "sampled_max_depth": 128,
+        "sinks": 1,
+        "window": 128,
+        "probes": {
+          "publish": 1.0,
+          "take_ready": 1.005,
+          "complete": 1.0,
+          "next_delay": 0.005,
+          "other": 0.0085,
+          "notify_worker": 1.0,
+          "notify_drain": 1.0,
+          "wake_notify": 0.0015,
+          "wake_timer": 0.0,
+          "wake_join": 1.0,
+          "empty_wake": 0.0045,
+          "locks": 3.01,
+          "worker_wakes": 1.0015
+        },
+        "locks": {
+          "event_bus_lock_wait_us": {
+            "count": 2000.0,
+            "mean": 2.537,
+            "sum": 5074.0,
+            "p50_upper": 10.0,
+            "p95_upper": 25.0,
+            "p99_upper": 25.0
+          },
+          "event_bus_lock_hold_us": {
+            "count": 2000.0,
+            "mean": 0.0495,
+            "sum": 99.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          },
+          "event_bus_state_wait_us": {
+            "count": 6037.0,
+            "mean": 1.0715587212191486,
+            "sum": 6469.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 25.0
+          },
+          "event_bus_state_hold_us": {
+            "count": 6037.0,
+            "mean": 0.7044889845949975,
+            "sum": 4253.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          }
+        }
+      },
+      {
+        "accepted": {
+          "p50_ns": 1083,
+          "p95_ns": 18208,
+          "p99_ns": 28500
+        },
+        "completion": [
+          {
+            "p50_ns": 190369041,
+            "p95_ns": 192373209,
+            "p99_ns": 192441875
+          }
+        ],
+        "delay_ms": 10,
+        "events": 2000,
+        "events_per_sec": 673.6169339213784,
+        "publish_per_sec": 717.4940015259303,
+        "retry": false,
+        "sampled_max_bytes": 30464,
+        "sampled_max_depth": 128,
+        "sinks": 1,
+        "window": 128,
+        "probes": {
+          "publish": 1.0,
+          "take_ready": 1.006,
+          "complete": 1.0,
+          "next_delay": 0.006,
+          "other": 0.0085,
+          "notify_worker": 1.0,
+          "notify_drain": 1.0,
+          "wake_notify": 0.0025,
+          "wake_timer": 0.0,
+          "wake_join": 1.0,
+          "empty_wake": 0.005,
+          "locks": 3.012,
+          "worker_wakes": 1.0025
+        },
+        "locks": {
+          "event_bus_lock_wait_us": {
+            "count": 2000.0,
+            "mean": 2.494,
+            "sum": 4988.0,
+            "p50_upper": 10.0,
+            "p95_upper": 25.0,
+            "p99_upper": 50.0
+          },
+          "event_bus_lock_hold_us": {
+            "count": 2000.0,
+            "mean": 0.0125,
+            "sum": 25.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          },
+          "event_bus_state_wait_us": {
+            "count": 6041.0,
+            "mean": 1.0958450587651052,
+            "sum": 6620.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 25.0
+          },
+          "event_bus_state_hold_us": {
+            "count": 6041.0,
+            "mean": 0.7103128621089224,
+            "sum": 4291.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          }
+        }
+      },
+      {
+        "accepted": {
+          "p50_ns": 2333,
+          "p95_ns": 17084,
+          "p99_ns": 29792
+        },
+        "completion": [
+          {
+            "p50_ns": 6115833,
+            "p95_ns": 10697666,
+            "p99_ns": 11537750
+          }
+        ],
+        "delay_ms": 0,
+        "events": 2000,
+        "events_per_sec": 18822.503341747244,
+        "publish_per_sec": 21439.913372458817,
+        "retry": true,
+        "sampled_max_bytes": 30464,
+        "sampled_max_depth": 128,
+        "sinks": 1,
+        "window": 128,
+        "probes": {
+          "publish": 1.0,
+          "take_ready": 2.5585,
+          "complete": 2.0,
+          "next_delay": 0.5585,
+          "other": 0.0085,
+          "notify_worker": 2.0,
+          "notify_drain": 1.0,
+          "wake_notify": 0.125,
+          "wake_timer": 0.036,
+          "wake_join": 2.0,
+          "empty_wake": 0.484,
+          "locks": 6.117000000000001,
+          "worker_wakes": 2.161
+        },
+        "locks": {
+          "event_bus_lock_wait_us": {
+            "count": 2000.0,
+            "mean": 2.489,
+            "sum": 4978.0,
+            "p50_upper": 10.0,
+            "p95_upper": 25.0,
+            "p99_upper": 25.0
+          },
+          "event_bus_lock_hold_us": {
+            "count": 2000.0,
+            "mean": 0.0665,
+            "sum": 133.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          },
+          "event_bus_state_wait_us": {
+            "count": 12251.0,
+            "mean": 0.7513672353277283,
+            "sum": 9205.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 25.0
+          },
+          "event_bus_state_hold_us": {
+            "count": 12251.0,
+            "mean": 0.4190678311974533,
+            "sum": 5134.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          }
+        }
+      },
+      {
+        "accepted": {
+          "p50_ns": 7666,
+          "p95_ns": 7666,
+          "p99_ns": 7666
+        },
+        "completion": [
+          {
+            "p50_ns": 16583,
+            "p95_ns": 16583,
+            "p99_ns": 16583
+          }
+        ],
+        "delay_ms": 0,
+        "events": 1,
+        "events_per_sec": 435.1373402230079,
+        "publish_per_sec": 60606.0606060606,
+        "retry": false,
+        "sampled_max_bytes": 232,
+        "sampled_max_depth": 1,
+        "sinks": 1,
+        "window": 1,
+        "probes": {
+          "publish": 1.0,
+          "take_ready": 3.0,
+          "complete": 1.0,
+          "next_delay": 2.0,
+          "other": 2.0,
+          "notify_worker": 1.0,
+          "notify_drain": 1.0,
+          "wake_notify": 1.0,
+          "wake_timer": 0.0,
+          "wake_join": 1.0,
+          "empty_wake": 1.0,
+          "locks": 7.0,
+          "worker_wakes": 2.0
+        },
+        "locks": {
+          "event_bus_lock_wait_us": {
+            "count": 1.0,
+            "mean": 0.0,
+            "sum": 0.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          },
+          "event_bus_lock_hold_us": {
+            "count": 1.0,
+            "mean": 1.0,
+            "sum": 1.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          },
+          "event_bus_state_wait_us": {
+            "count": 9.0,
+            "mean": 0.0,
+            "sum": 0.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          },
+          "event_bus_state_hold_us": {
+            "count": 9.0,
+            "mean": 0.1111111111111111,
+            "sum": 1.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          }
+        }
+      },
+      {
+        "accepted": {
+          "p50_ns": 5583,
+          "p95_ns": 5583,
+          "p99_ns": 5583
+        },
+        "completion": [
+          {
+            "p50_ns": 9046500,
+            "p95_ns": 9046500,
+            "p99_ns": 9046500
+          }
+        ],
+        "delay_ms": 0,
+        "events": 1,
+        "events_per_sec": 110.35902660689915,
+        "publish_per_sec": 64168.37782340863,
+        "retry": true,
+        "sampled_max_bytes": 232,
+        "sampled_max_depth": 1,
+        "sinks": 1,
+        "window": 1,
+        "probes": {
+          "publish": 1.0,
+          "take_ready": 7.0,
+          "complete": 2.0,
+          "next_delay": 5.0,
+          "other": 2.0,
+          "notify_worker": 2.0,
+          "notify_drain": 1.0,
+          "wake_notify": 2.0,
+          "wake_timer": 1.0,
+          "wake_join": 2.0,
+          "empty_wake": 3.0,
+          "locks": 15.0,
+          "worker_wakes": 5.0
+        },
+        "locks": {
+          "event_bus_lock_wait_us": {
+            "count": 1.0,
+            "mean": 0.0,
+            "sum": 0.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          },
+          "event_bus_lock_hold_us": {
+            "count": 1.0,
+            "mean": 0.0,
+            "sum": 0.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          },
+          "event_bus_state_wait_us": {
+            "count": 17.0,
+            "mean": 0.8235294117647058,
+            "sum": 14.0,
+            "p50_upper": 10.0,
+            "p95_upper": 25.0,
+            "p99_upper": 25.0
+          },
+          "event_bus_state_hold_us": {
+            "count": 17.0,
+            "mean": 0.5882352941176471,
+            "sum": 10.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          }
+        }
+      }
+    ],
+    [
+      {
+        "accepted": {
+          "p50_ns": 1792,
+          "p95_ns": 8500,
+          "p99_ns": 12667
+        },
+        "completion": [
+          {
+            "p50_ns": 17708,
+            "p95_ns": 51375,
+            "p99_ns": 78916
+          }
+        ],
+        "delay_ms": 0,
+        "events": 10000,
+        "events_per_sec": 254760.57715601136,
+        "publish_per_sec": 270516.41827713884,
+        "retry": false,
+        "sampled_max_bytes": 6188,
+        "sampled_max_depth": 26,
+        "sinks": 1,
+        "window": 128,
+        "probes": {
+          "publish": 1.0,
+          "take_ready": 1.3737,
+          "complete": 1.0,
+          "next_delay": 0.3737,
+          "other": 0.008,
+          "notify_worker": 1.0,
+          "notify_drain": 1.0,
+          "wake_notify": 0.051,
+          "wake_timer": 0.0,
+          "wake_join": 1.0,
+          "empty_wake": 0.2715,
+          "locks": 3.7474,
+          "worker_wakes": 1.051
+        },
+        "locks": {
+          "event_bus_lock_wait_us": {
+            "count": 10000.0,
+            "mean": 0.9418,
+            "sum": 9418.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          },
+          "event_bus_lock_hold_us": {
+            "count": 10000.0,
+            "mean": 0.0033,
+            "sum": 33.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          },
+          "event_bus_state_wait_us": {
+            "count": 37554.0,
+            "mean": 0.6410235926931884,
+            "sum": 24073.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          },
+          "event_bus_state_hold_us": {
+            "count": 37554.0,
+            "mean": 0.22154763806784897,
+            "sum": 8320.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          }
+        }
+      },
+      {
+        "accepted": {
+          "p50_ns": 6667,
+          "p95_ns": 43334,
+          "p99_ns": 70084
+        },
+        "completion": [
+          {
+            "p50_ns": 2115042,
+            "p95_ns": 2628042,
+            "p99_ns": 2849041
+          },
+          {
+            "p50_ns": 1886834,
+            "p95_ns": 2692583,
+            "p99_ns": 3164625
+          },
+          {
+            "p50_ns": 2549917,
+            "p95_ns": 3706417,
+            "p99_ns": 3886625
+          },
+          {
+            "p50_ns": 3334792,
+            "p95_ns": 4243625,
+            "p99_ns": 4542708
+          }
+        ],
+        "delay_ms": 0,
+        "events": 10000,
+        "events_per_sec": 50674.17762029977,
+        "publish_per_sec": 51268.795800626256,
+        "retry": false,
+        "sampled_max_bytes": 52360,
+        "sampled_max_depth": 220,
+        "sinks": 4,
+        "window": 128,
+        "probes": {
+          "publish": 1.0,
+          "take_ready": 4.0165,
+          "complete": 4.0,
+          "next_delay": 0.0165,
+          "other": 0.008,
+          "notify_worker": 4.0,
+          "notify_drain": 4.0,
+          "wake_notify": 0.004,
+          "wake_timer": 0.0,
+          "wake_join": 4.0,
+          "empty_wake": 0.0146,
+          "locks": 9.033000000000001,
+          "worker_wakes": 4.004
+        },
+        "locks": {
+          "event_bus_lock_wait_us": {
+            "count": 10000.0,
+            "mean": 9.3954,
+            "sum": 93954.0,
+            "p50_upper": 10.0,
+            "p95_upper": 50.0,
+            "p99_upper": 100.0
+          },
+          "event_bus_lock_hold_us": {
+            "count": 10000.0,
+            "mean": 0.3105,
+            "sum": 3105.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 25.0
+          },
+          "event_bus_state_wait_us": {
+            "count": 90410.0,
+            "mean": 6.853412233160049,
+            "sum": 619617.0,
+            "p50_upper": 10.0,
+            "p95_upper": 50.0,
+            "p99_upper": 100.0
+          },
+          "event_bus_state_hold_us": {
+            "count": 90410.0,
+            "mean": 1.8942152416768057,
+            "sum": 171256.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 25.0
+          }
+        }
+      },
+      {
+        "accepted": {
+          "p50_ns": 9209,
+          "p95_ns": 89250,
+          "p99_ns": 141000
+        },
+        "completion": [
+          {
+            "p50_ns": 5888083,
+            "p95_ns": 7791208,
+            "p99_ns": 8140667
+          },
+          {
+            "p50_ns": 5971166,
+            "p95_ns": 7633042,
+            "p99_ns": 7940958
+          },
+          {
+            "p50_ns": 4023000,
+            "p95_ns": 6200125,
+            "p99_ns": 6668042
+          },
+          {
+            "p50_ns": 3984084,
+            "p95_ns": 5894750,
+            "p99_ns": 7190083
+          },
+          {
+            "p50_ns": 4284791,
+            "p95_ns": 6550583,
+            "p99_ns": 7861708
+          },
+          {
+            "p50_ns": 5550833,
+            "p95_ns": 7803333,
+            "p99_ns": 8249250
+          },
+          {
+            "p50_ns": 9238875,
+            "p95_ns": 10602417,
+            "p99_ns": 10863708
+          },
+          {
+            "p50_ns": 5060833,
+            "p95_ns": 6447542,
+            "p99_ns": 6795500
+          }
+        ],
+        "delay_ms": 0,
+        "events": 10000,
+        "events_per_sec": 22202.636635036954,
+        "publish_per_sec": 22498.288723913935,
+        "retry": false,
+        "sampled_max_bytes": 58072,
+        "sampled_max_depth": 244,
+        "sinks": 8,
+        "window": 128,
+        "probes": {
+          "publish": 1.0,
+          "take_ready": 8.012,
+          "complete": 8.0,
+          "next_delay": 0.012,
+          "other": 0.008,
+          "notify_worker": 8.0,
+          "notify_drain": 8.0,
+          "wake_notify": 0.002,
+          "wake_timer": 0.0,
+          "wake_join": 8.0,
+          "empty_wake": 0.0107,
+          "locks": 17.024,
+          "worker_wakes": 8.002
+        },
+        "locks": {
+          "event_bus_lock_wait_us": {
+            "count": 10000.0,
+            "mean": 19.2535,
+            "sum": 192535.0,
+            "p50_upper": 10.0,
+            "p95_upper": 100.0,
+            "p99_upper": 250.0
+          },
+          "event_bus_lock_hold_us": {
+            "count": 10000.0,
+            "mean": 1.4223,
+            "sum": 14223.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 25.0
+          },
+          "event_bus_state_wait_us": {
+            "count": 170320.0,
+            "mean": 17.363327853452326,
+            "sum": 2957322.0,
+            "p50_upper": 10.0,
+            "p95_upper": 100.0,
+            "p99_upper": 250.0
+          },
+          "event_bus_state_hold_us": {
+            "count": 170320.0,
+            "mean": 3.429503287928605,
+            "sum": 584113.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 25.0
+          }
+        }
+      },
+      {
+        "accepted": {
+          "p50_ns": 1166,
+          "p95_ns": 16209,
+          "p99_ns": 29917
+        },
+        "completion": [
+          {
+            "p50_ns": 36415833,
+            "p95_ns": 36642167,
+            "p99_ns": 36678125
+          }
+        ],
+        "delay_ms": 1,
+        "events": 2000,
+        "events_per_sec": 3532.0192217996005,
+        "publish_per_sec": 3786.562813870558,
+        "retry": false,
+        "sampled_max_bytes": 30464,
+        "sampled_max_depth": 128,
+        "sinks": 1,
+        "window": 128,
+        "probes": {
+          "publish": 1.0,
+          "take_ready": 1.0055,
+          "complete": 1.0,
+          "next_delay": 0.0055,
+          "other": 0.0085,
+          "notify_worker": 1.0,
+          "notify_drain": 1.0,
+          "wake_notify": 0.002,
+          "wake_timer": 0.0,
+          "wake_join": 1.0,
+          "empty_wake": 0.005,
+          "locks": 3.011,
+          "worker_wakes": 1.002
+        },
+        "locks": {
+          "event_bus_lock_wait_us": {
+            "count": 2000.0,
+            "mean": 2.604,
+            "sum": 5208.0,
+            "p50_upper": 10.0,
+            "p95_upper": 25.0,
+            "p99_upper": 50.0
+          },
+          "event_bus_lock_hold_us": {
+            "count": 2000.0,
+            "mean": 0.03,
+            "sum": 60.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          },
+          "event_bus_state_wait_us": {
+            "count": 6039.0,
+            "mean": 1.0932273555224374,
+            "sum": 6602.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 25.0
+          },
+          "event_bus_state_hold_us": {
+            "count": 6039.0,
+            "mean": 0.6986256002649446,
+            "sum": 4219.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          }
+        }
+      },
+      {
+        "accepted": {
+          "p50_ns": 1292,
+          "p95_ns": 18417,
+          "p99_ns": 28084
+        },
+        "completion": [
+          {
+            "p50_ns": 190370875,
+            "p95_ns": 216572000,
+            "p99_ns": 230785250
+          }
+        ],
+        "delay_ms": 10,
+        "events": 2000,
+        "events_per_sec": 665.3105052729042,
+        "publish_per_sec": 708.0243662946415,
+        "retry": false,
+        "sampled_max_bytes": 30464,
+        "sampled_max_depth": 128,
+        "sinks": 1,
+        "window": 128,
+        "probes": {
+          "publish": 1.0,
+          "take_ready": 1.006,
+          "complete": 1.0,
+          "next_delay": 0.006,
+          "other": 0.0085,
+          "notify_worker": 1.0,
+          "notify_drain": 1.0,
+          "wake_notify": 0.0025,
+          "wake_timer": 0.0,
+          "wake_join": 1.0,
+          "empty_wake": 0.005,
+          "locks": 3.012,
+          "worker_wakes": 1.0025
+        },
+        "locks": {
+          "event_bus_lock_wait_us": {
+            "count": 2000.0,
+            "mean": 4.976,
+            "sum": 9952.0,
+            "p50_upper": 10.0,
+            "p95_upper": 25.0,
+            "p99_upper": 25.0
+          },
+          "event_bus_lock_hold_us": {
+            "count": 2000.0,
+            "mean": 0.079,
+            "sum": 158.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          },
+          "event_bus_state_wait_us": {
+            "count": 6041.0,
+            "mean": 1.928323125310379,
+            "sum": 11649.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 25.0
+          },
+          "event_bus_state_hold_us": {
+            "count": 6041.0,
+            "mean": 0.7927495447773547,
+            "sum": 4789.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          }
+        }
+      },
+      {
+        "accepted": {
+          "p50_ns": 2458,
+          "p95_ns": 17000,
+          "p99_ns": 31458
+        },
+        "completion": [
+          {
+            "p50_ns": 6362834,
+            "p95_ns": 10681167,
+            "p99_ns": 11781542
+          }
+        ],
+        "delay_ms": 0,
+        "events": 2000,
+        "events_per_sec": 18748.27884941325,
+        "publish_per_sec": 21345.334078598557,
+        "retry": true,
+        "sampled_max_bytes": 30464,
+        "sampled_max_depth": 128,
+        "sinks": 1,
+        "window": 128,
+        "probes": {
+          "publish": 1.0,
+          "take_ready": 2.604,
+          "complete": 2.0,
+          "next_delay": 0.604,
+          "other": 0.0085,
+          "notify_worker": 2.0,
+          "notify_drain": 1.0,
+          "wake_notify": 0.139,
+          "wake_timer": 0.034,
+          "wake_join": 2.0,
+          "empty_wake": 0.504,
+          "locks": 6.208,
+          "worker_wakes": 2.173
+        },
+        "locks": {
+          "event_bus_lock_wait_us": {
+            "count": 2000.0,
+            "mean": 2.5725,
+            "sum": 5145.0,
+            "p50_upper": 10.0,
+            "p95_upper": 25.0,
+            "p99_upper": 50.0
+          },
+          "event_bus_lock_hold_us": {
+            "count": 2000.0,
+            "mean": 0.048,
+            "sum": 96.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          },
+          "event_bus_state_wait_us": {
+            "count": 12433.0,
+            "mean": 0.7562937344164723,
+            "sum": 9403.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 25.0
+          },
+          "event_bus_state_hold_us": {
+            "count": 12433.0,
+            "mean": 0.4229872114533902,
+            "sum": 5259.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          }
+        }
+      },
+      {
+        "accepted": {
+          "p50_ns": 6250,
+          "p95_ns": 6250,
+          "p99_ns": 6250
+        },
+        "completion": [
+          {
+            "p50_ns": 13125,
+            "p95_ns": 13125,
+            "p99_ns": 13125
+          }
+        ],
+        "delay_ms": 0,
+        "events": 1,
+        "events_per_sec": 434.106346504554,
+        "publish_per_sec": 53333.333333333336,
+        "retry": false,
+        "sampled_max_bytes": 232,
+        "sampled_max_depth": 1,
+        "sinks": 1,
+        "window": 1,
+        "probes": {
+          "publish": 1.0,
+          "take_ready": 3.0,
+          "complete": 1.0,
+          "next_delay": 2.0,
+          "other": 2.0,
+          "notify_worker": 1.0,
+          "notify_drain": 1.0,
+          "wake_notify": 1.0,
+          "wake_timer": 0.0,
+          "wake_join": 1.0,
+          "empty_wake": 1.0,
+          "locks": 7.0,
+          "worker_wakes": 2.0
+        },
+        "locks": {
+          "event_bus_lock_wait_us": {
+            "count": 1.0,
+            "mean": 0.0,
+            "sum": 0.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          },
+          "event_bus_lock_hold_us": {
+            "count": 1.0,
+            "mean": 1.0,
+            "sum": 1.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          },
+          "event_bus_state_wait_us": {
+            "count": 9.0,
+            "mean": 0.0,
+            "sum": 0.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          },
+          "event_bus_state_hold_us": {
+            "count": 9.0,
+            "mean": 0.1111111111111111,
+            "sum": 1.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          }
+        }
+      },
+      {
+        "accepted": {
+          "p50_ns": 4416,
+          "p95_ns": 4416,
+          "p99_ns": 4416
+        },
+        "completion": [
+          {
+            "p50_ns": 11393458,
+            "p95_ns": 11393458,
+            "p99_ns": 11393458
+          }
+        ],
+        "delay_ms": 0,
+        "events": 1,
+        "events_per_sec": 87.63761844771868,
+        "publish_per_sec": 55944.055944055945,
+        "retry": true,
+        "sampled_max_bytes": 232,
+        "sampled_max_depth": 1,
+        "sinks": 1,
+        "window": 1,
+        "probes": {
+          "publish": 1.0,
+          "take_ready": 7.0,
+          "complete": 2.0,
+          "next_delay": 5.0,
+          "other": 2.0,
+          "notify_worker": 2.0,
+          "notify_drain": 1.0,
+          "wake_notify": 2.0,
+          "wake_timer": 1.0,
+          "wake_join": 2.0,
+          "empty_wake": 3.0,
+          "locks": 15.0,
+          "worker_wakes": 5.0
+        },
+        "locks": {
+          "event_bus_lock_wait_us": {
+            "count": 1.0,
+            "mean": 0.0,
+            "sum": 0.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          },
+          "event_bus_lock_hold_us": {
+            "count": 1.0,
+            "mean": 1.0,
+            "sum": 1.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          },
+          "event_bus_state_wait_us": {
+            "count": 17.0,
+            "mean": 0.23529411764705882,
+            "sum": 4.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          },
+          "event_bus_state_hold_us": {
+            "count": 17.0,
+            "mean": 0.29411764705882354,
+            "sum": 5.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          }
+        }
+      }
+    ]
+  ],
+  "after": [
+    [
+      {
+        "accepted": {
+          "p50_ns": 1000,
+          "p95_ns": 8542,
+          "p99_ns": 19792
+        },
+        "completion": [
+          {
+            "p50_ns": 60375,
+            "p95_ns": 168584,
+            "p99_ns": 396792
+          }
+        ],
+        "delay_ms": 0,
+        "events": 10000,
+        "events_per_sec": 272838.5809468961,
+        "publish_per_sec": 290863.25509082683,
+        "retry": false,
+        "sampled_max_bytes": 19992,
+        "sampled_max_depth": 84,
+        "sinks": 1,
+        "window": 128,
+        "probes": {
+          "publish": 1.0,
+          "take_ready": 1.0928,
+          "complete": 1.0,
+          "next_delay": 0.0928,
+          "other": 0.008,
+          "notify_worker": 1.0,
+          "notify_drain": 1.0,
+          "wake_notify": 0.0182,
+          "wake_timer": 0.0,
+          "wake_join": 1.0,
+          "empty_wake": 0.0692,
+          "locks": 3.1856,
+          "worker_wakes": 1.0182
+        },
+        "locks": {
+          "event_bus_lock_wait_us": {
+            "count": 10000.0,
+            "mean": 0.994,
+            "sum": 9940.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 25.0
+          },
+          "event_bus_lock_hold_us": {
+            "count": 10000.0,
+            "mean": 0.0576,
+            "sum": 576.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          },
+          "event_bus_state_wait_us": {
+            "count": 31936.0,
+            "mean": 0.766376503006012,
+            "sum": 24475.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 25.0
+          },
+          "event_bus_state_hold_us": {
+            "count": 31936.0,
+            "mean": 0.26039579158316634,
+            "sum": 8316.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          }
+        }
+      },
+      {
+        "accepted": {
+          "p50_ns": 4458,
+          "p95_ns": 43875,
+          "p99_ns": 69916
+        },
+        "completion": [
+          {
+            "p50_ns": 7011542,
+            "p95_ns": 8300042,
+            "p99_ns": 8436917
+          },
+          {
+            "p50_ns": 306292,
+            "p95_ns": 1362208,
+            "p99_ns": 1673166
+          },
+          {
+            "p50_ns": 387792,
+            "p95_ns": 2637000,
+            "p99_ns": 2814583
+          },
+          {
+            "p50_ns": 1659208,
+            "p95_ns": 2721250,
+            "p99_ns": 2944083
+          }
+        ],
+        "delay_ms": 0,
+        "events": 10000,
+        "events_per_sec": 51792.49527364995,
+        "publish_per_sec": 52406.30080954633,
+        "retry": false,
+        "sampled_max_bytes": 108528,
+        "sampled_max_depth": 456,
+        "sinks": 4,
+        "window": 128,
+        "probes": {
+          "publish": 1.0,
+          "take_ready": 4.139,
+          "complete": 4.0,
+          "next_delay": 0.139,
+          "other": 0.008,
+          "notify_worker": 4.0,
+          "notify_drain": 4.0,
+          "wake_notify": 0.0106,
+          "wake_timer": 0.0,
+          "wake_join": 4.0,
+          "empty_wake": 0.1065,
+          "locks": 9.277999999999999,
+          "worker_wakes": 4.0106
+        },
+        "locks": {
+          "event_bus_lock_wait_us": {
+            "count": 10000.0,
+            "mean": 8.5162,
+            "sum": 85162.0,
+            "p50_upper": 10.0,
+            "p95_upper": 50.0,
+            "p99_upper": 100.0
+          },
+          "event_bus_lock_hold_us": {
+            "count": 10000.0,
+            "mean": 0.3013,
+            "sum": 3013.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          },
+          "event_bus_state_wait_us": {
+            "count": 92860.0,
+            "mean": 6.399332328236055,
+            "sum": 594242.0,
+            "p50_upper": 10.0,
+            "p95_upper": 50.0,
+            "p99_upper": 100.0
+          },
+          "event_bus_state_hold_us": {
+            "count": 92860.0,
+            "mean": 1.7682748223131597,
+            "sum": 164202.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 25.0
+          }
+        }
+      },
+      {
+        "accepted": {
+          "p50_ns": 9041,
+          "p95_ns": 97791,
+          "p99_ns": 179125
+        },
+        "completion": [
+          {
+            "p50_ns": 1557667,
+            "p95_ns": 3647292,
+            "p99_ns": 4206709
+          },
+          {
+            "p50_ns": 2858209,
+            "p95_ns": 5896833,
+            "p99_ns": 6726125
+          },
+          {
+            "p50_ns": 5715042,
+            "p95_ns": 9521541,
+            "p99_ns": 9992959
+          },
+          {
+            "p50_ns": 12935917,
+            "p95_ns": 15377875,
+            "p99_ns": 15646791
+          },
+          {
+            "p50_ns": 4647875,
+            "p95_ns": 9036375,
+            "p99_ns": 10502834
+          },
+          {
+            "p50_ns": 2845834,
+            "p95_ns": 5817083,
+            "p99_ns": 6700000
+          },
+          {
+            "p50_ns": 3938625,
+            "p95_ns": 6179459,
+            "p99_ns": 6411667
+          },
+          {
+            "p50_ns": 5821125,
+            "p95_ns": 9531458,
+            "p99_ns": 10317417
+          }
+        ],
+        "delay_ms": 0,
+        "events": 10000,
+        "events_per_sec": 22964.973248676786,
+        "publish_per_sec": 23098.651374152167,
+        "retry": false,
+        "sampled_max_bytes": 91630,
+        "sampled_max_depth": 385,
+        "sinks": 8,
+        "window": 128,
+        "probes": {
+          "publish": 1.0,
+          "take_ready": 8.5715,
+          "complete": 8.0,
+          "next_delay": 0.5715,
+          "other": 0.008,
+          "notify_worker": 8.0,
+          "notify_drain": 8.0,
+          "wake_notify": 0.1274,
+          "wake_timer": 0.0,
+          "wake_join": 8.0,
+          "empty_wake": 0.4411,
+          "locks": 18.143,
+          "worker_wakes": 8.1274
+        },
+        "locks": {
+          "event_bus_lock_wait_us": {
+            "count": 10000.0,
+            "mean": 18.8026,
+            "sum": 188026.0,
+            "p50_upper": 10.0,
+            "p95_upper": 100.0,
+            "p99_upper": 250.0
+          },
+          "event_bus_lock_hold_us": {
+            "count": 10000.0,
+            "mean": 1.6923,
+            "sum": 16923.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 25.0
+          },
+          "event_bus_state_wait_us": {
+            "count": 181510.0,
+            "mean": 15.41056140157567,
+            "sum": 2797171.0,
+            "p50_upper": 10.0,
+            "p95_upper": 100.0,
+            "p99_upper": 250.0
+          },
+          "event_bus_state_hold_us": {
+            "count": 181510.0,
+            "mean": 3.0598699796154483,
+            "sum": 555397.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 25.0
+          }
+        }
+      },
+      {
+        "accepted": {
+          "p50_ns": 1041,
+          "p95_ns": 20000,
+          "p99_ns": 35042
+        },
+        "completion": [
+          {
+            "p50_ns": 36491375,
+            "p95_ns": 36825625,
+            "p99_ns": 36977541
+          }
+        ],
+        "delay_ms": 1,
+        "events": 2000,
+        "events_per_sec": 3505.4896353293116,
+        "publish_per_sec": 3760.0021956908818,
+        "retry": false,
+        "sampled_max_bytes": 30464,
+        "sampled_max_depth": 128,
+        "sinks": 1,
+        "window": 128,
+        "probes": {
+          "publish": 1.0,
+          "take_ready": 1.0045,
+          "complete": 1.0,
+          "next_delay": 0.0045,
+          "other": 0.0085,
+          "notify_worker": 1.0,
+          "notify_drain": 1.0,
+          "wake_notify": 0.001,
+          "wake_timer": 0.0,
+          "wake_join": 1.0,
+          "empty_wake": 0.0045,
+          "locks": 3.0090000000000003,
+          "worker_wakes": 1.001
+        },
+        "locks": {
+          "event_bus_lock_wait_us": {
+            "count": 2000.0,
+            "mean": 2.596,
+            "sum": 5192.0,
+            "p50_upper": 10.0,
+            "p95_upper": 25.0,
+            "p99_upper": 50.0
+          },
+          "event_bus_lock_hold_us": {
+            "count": 2000.0,
+            "mean": 0.0745,
+            "sum": 149.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          },
+          "event_bus_state_wait_us": {
+            "count": 6035.0,
+            "mean": 1.108036454018227,
+            "sum": 6687.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 25.0
+          },
+          "event_bus_state_hold_us": {
+            "count": 6035.0,
+            "mean": 0.6669428334714167,
+            "sum": 4025.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          }
+        }
+      },
+      {
+        "accepted": {
+          "p50_ns": 1208,
+          "p95_ns": 16709,
+          "p99_ns": 34583
+        },
+        "completion": [
+          {
+            "p50_ns": 190709625,
+            "p95_ns": 197297709,
+            "p99_ns": 197692875
+          }
+        ],
+        "delay_ms": 10,
+        "events": 2000,
+        "events_per_sec": 671.5378624169176,
+        "publish_per_sec": 715.6056765580588,
+        "retry": false,
+        "sampled_max_bytes": 30464,
+        "sampled_max_depth": 128,
+        "sinks": 1,
+        "window": 128,
+        "probes": {
+          "publish": 1.0,
+          "take_ready": 1.0055,
+          "complete": 1.0,
+          "next_delay": 0.0055,
+          "other": 0.0085,
+          "notify_worker": 1.0,
+          "notify_drain": 1.0,
+          "wake_notify": 0.002,
+          "wake_timer": 0.0,
+          "wake_join": 1.0,
+          "empty_wake": 0.005,
+          "locks": 3.011,
+          "worker_wakes": 1.002
+        },
+        "locks": {
+          "event_bus_lock_wait_us": {
+            "count": 2000.0,
+            "mean": 2.4235,
+            "sum": 4847.0,
+            "p50_upper": 10.0,
+            "p95_upper": 25.0,
+            "p99_upper": 50.0
+          },
+          "event_bus_lock_hold_us": {
+            "count": 2000.0,
+            "mean": 0.033,
+            "sum": 66.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          },
+          "event_bus_state_wait_us": {
+            "count": 6039.0,
+            "mean": 1.1806590495115086,
+            "sum": 7130.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 25.0
+          },
+          "event_bus_state_hold_us": {
+            "count": 6039.0,
+            "mean": 0.7146878622288458,
+            "sum": 4316.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          }
+        }
+      },
+      {
+        "accepted": {
+          "p50_ns": 1833,
+          "p95_ns": 10708,
+          "p99_ns": 20125
+        },
+        "completion": [
+          {
+            "p50_ns": 6415792,
+            "p95_ns": 10471958,
+            "p99_ns": 11468584
+          }
+        ],
+        "delay_ms": 0,
+        "events": 2000,
+        "events_per_sec": 18944.17788249614,
+        "publish_per_sec": 21090.242585559135,
+        "retry": true,
+        "sampled_max_bytes": 30464,
+        "sampled_max_depth": 128,
+        "sinks": 1,
+        "window": 128,
+        "probes": {
+          "publish": 1.0,
+          "take_ready": 2.509,
+          "complete": 2.0,
+          "next_delay": 0.509,
+          "other": 0.0085,
+          "notify_worker": 2.0,
+          "notify_drain": 1.0,
+          "wake_notify": 0.1085,
+          "wake_timer": 0.0365,
+          "wake_join": 2.0,
+          "empty_wake": 0.447,
+          "locks": 6.018000000000001,
+          "worker_wakes": 2.145
+        },
+        "locks": {
+          "event_bus_lock_wait_us": {
+            "count": 2000.0,
+            "mean": 1.261,
+            "sum": 2522.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 25.0
+          },
+          "event_bus_lock_hold_us": {
+            "count": 2000.0,
+            "mean": 0.026,
+            "sum": 52.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          },
+          "event_bus_state_wait_us": {
+            "count": 12053.0,
+            "mean": 0.4961420393263088,
+            "sum": 5980.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          },
+          "event_bus_state_hold_us": {
+            "count": 12053.0,
+            "mean": 0.2802621753920186,
+            "sum": 3378.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          }
+        }
+      },
+      {
+        "accepted": {
+          "p50_ns": 5542,
+          "p95_ns": 5542,
+          "p99_ns": 5542
+        },
+        "completion": [
+          {
+            "p50_ns": 10625,
+            "p95_ns": 10625,
+            "p99_ns": 10625
+          }
+        ],
+        "delay_ms": 0,
+        "events": 1,
+        "events_per_sec": 439.45574285159313,
+        "publish_per_sec": 63661.828367710725,
+        "retry": false,
+        "sampled_max_bytes": 232,
+        "sampled_max_depth": 1,
+        "sinks": 1,
+        "window": 1,
+        "probes": {
+          "publish": 1.0,
+          "take_ready": 3.0,
+          "complete": 1.0,
+          "next_delay": 2.0,
+          "other": 2.0,
+          "notify_worker": 1.0,
+          "notify_drain": 1.0,
+          "wake_notify": 1.0,
+          "wake_timer": 0.0,
+          "wake_join": 1.0,
+          "empty_wake": 1.0,
+          "locks": 7.0,
+          "worker_wakes": 2.0
+        },
+        "locks": {
+          "event_bus_lock_wait_us": {
+            "count": 1.0,
+            "mean": 0.0,
+            "sum": 0.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          },
+          "event_bus_lock_hold_us": {
+            "count": 1.0,
+            "mean": 1.0,
+            "sum": 1.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          },
+          "event_bus_state_wait_us": {
+            "count": 9.0,
+            "mean": 0.0,
+            "sum": 0.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          },
+          "event_bus_state_hold_us": {
+            "count": 9.0,
+            "mean": 0.1111111111111111,
+            "sum": 1.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          }
+        }
+      },
+      {
+        "accepted": {
+          "p50_ns": 6209,
+          "p95_ns": 6209,
+          "p99_ns": 6209
+        },
+        "completion": [
+          {
+            "p50_ns": 6819459,
+            "p95_ns": 6819459,
+            "p99_ns": 6819459
+          }
+        ],
+        "delay_ms": 0,
+        "events": 1,
+        "events_per_sec": 146.1258315838418,
+        "publish_per_sec": 48290.515742708136,
+        "retry": true,
+        "sampled_max_bytes": 232,
+        "sampled_max_depth": 1,
+        "sinks": 1,
+        "window": 1,
+        "probes": {
+          "publish": 1.0,
+          "take_ready": 7.0,
+          "complete": 2.0,
+          "next_delay": 5.0,
+          "other": 2.0,
+          "notify_worker": 2.0,
+          "notify_drain": 1.0,
+          "wake_notify": 2.0,
+          "wake_timer": 1.0,
+          "wake_join": 2.0,
+          "empty_wake": 3.0,
+          "locks": 15.0,
+          "worker_wakes": 5.0
+        },
+        "locks": {
+          "event_bus_lock_wait_us": {
+            "count": 1.0,
+            "mean": 0.0,
+            "sum": 0.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          },
+          "event_bus_lock_hold_us": {
+            "count": 1.0,
+            "mean": 1.0,
+            "sum": 1.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          },
+          "event_bus_state_wait_us": {
+            "count": 17.0,
+            "mean": 0.0,
+            "sum": 0.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          },
+          "event_bus_state_hold_us": {
+            "count": 17.0,
+            "mean": 0.11764705882352941,
+            "sum": 2.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          }
+        }
+      }
+    ],
+    [
+      {
+        "accepted": {
+          "p50_ns": 1791,
+          "p95_ns": 8583,
+          "p99_ns": 14250
+        },
+        "completion": [
+          {
+            "p50_ns": 33166,
+            "p95_ns": 157500,
+            "p99_ns": 229333
+          }
+        ],
+        "delay_ms": 0,
+        "events": 10000,
+        "events_per_sec": 243975.0900457163,
+        "publish_per_sec": 258348.14572426843,
+        "retry": false,
+        "sampled_max_bytes": 13566,
+        "sampled_max_depth": 57,
+        "sinks": 1,
+        "window": 128,
+        "probes": {
+          "publish": 1.0,
+          "take_ready": 1.0921,
+          "complete": 1.0,
+          "next_delay": 0.0921,
+          "other": 0.008,
+          "notify_worker": 1.0,
+          "notify_drain": 1.0,
+          "wake_notify": 0.0093,
+          "wake_timer": 0.0,
+          "wake_join": 1.0,
+          "empty_wake": 0.0686,
+          "locks": 3.1842,
+          "worker_wakes": 1.0093
+        },
+        "locks": {
+          "event_bus_lock_wait_us": {
+            "count": 10000.0,
+            "mean": 0.8706,
+            "sum": 8706.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 25.0
+          },
+          "event_bus_lock_hold_us": {
+            "count": 10000.0,
+            "mean": 0.0107,
+            "sum": 107.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          },
+          "event_bus_state_wait_us": {
+            "count": 31922.0,
+            "mean": 0.7877952509241276,
+            "sum": 25148.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          },
+          "event_bus_state_hold_us": {
+            "count": 31922.0,
+            "mean": 0.2760165403170227,
+            "sum": 8811.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          }
+        }
+      },
+      {
+        "accepted": {
+          "p50_ns": 6708,
+          "p95_ns": 45291,
+          "p99_ns": 71459
+        },
+        "completion": [
+          {
+            "p50_ns": 1878542,
+            "p95_ns": 2925458,
+            "p99_ns": 3128917
+          },
+          {
+            "p50_ns": 1684834,
+            "p95_ns": 3418167,
+            "p99_ns": 3814000
+          },
+          {
+            "p50_ns": 2493208,
+            "p95_ns": 3814500,
+            "p99_ns": 4105084
+          },
+          {
+            "p50_ns": 4405208,
+            "p95_ns": 5067500,
+            "p99_ns": 5243375
+          }
+        ],
+        "delay_ms": 0,
+        "events": 10000,
+        "events_per_sec": 50673.30045031386,
+        "publish_per_sec": 51271.588722777145,
+        "retry": false,
+        "sampled_max_bytes": 62832,
+        "sampled_max_depth": 264,
+        "sinks": 4,
+        "window": 128,
+        "probes": {
+          "publish": 1.0,
+          "take_ready": 4.0169,
+          "complete": 4.0,
+          "next_delay": 0.0169,
+          "other": 0.008,
+          "notify_worker": 4.0,
+          "notify_drain": 4.0,
+          "wake_notify": 0.0029,
+          "wake_timer": 0.0,
+          "wake_join": 4.0,
+          "empty_wake": 0.0156,
+          "locks": 9.0338,
+          "worker_wakes": 4.0029
+        },
+        "locks": {
+          "event_bus_lock_wait_us": {
+            "count": 10000.0,
+            "mean": 9.6814,
+            "sum": 96814.0,
+            "p50_upper": 10.0,
+            "p95_upper": 50.0,
+            "p99_upper": 100.0
+          },
+          "event_bus_lock_hold_us": {
+            "count": 10000.0,
+            "mean": 0.3103,
+            "sum": 3103.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 25.0
+          },
+          "event_bus_state_wait_us": {
+            "count": 90418.0,
+            "mean": 6.860724634475436,
+            "sum": 620333.0,
+            "p50_upper": 10.0,
+            "p95_upper": 50.0,
+            "p99_upper": 100.0
+          },
+          "event_bus_state_hold_us": {
+            "count": 90418.0,
+            "mean": 1.8837620827711297,
+            "sum": 170326.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 25.0
+          }
+        }
+      },
+      {
+        "accepted": {
+          "p50_ns": 8625,
+          "p95_ns": 89666,
+          "p99_ns": 145042
+        },
+        "completion": [
+          {
+            "p50_ns": 3814084,
+            "p95_ns": 5747084,
+            "p99_ns": 6060584
+          },
+          {
+            "p50_ns": 4653708,
+            "p95_ns": 6546208,
+            "p99_ns": 6771750
+          },
+          {
+            "p50_ns": 4423834,
+            "p95_ns": 6100208,
+            "p99_ns": 6477541
+          },
+          {
+            "p50_ns": 5667959,
+            "p95_ns": 8547666,
+            "p99_ns": 8889084
+          },
+          {
+            "p50_ns": 4037459,
+            "p95_ns": 5796959,
+            "p99_ns": 6242417
+          },
+          {
+            "p50_ns": 10949500,
+            "p95_ns": 12224500,
+            "p99_ns": 12928292
+          },
+          {
+            "p50_ns": 6165458,
+            "p95_ns": 8118083,
+            "p99_ns": 8965917
+          },
+          {
+            "p50_ns": 4739584,
+            "p95_ns": 6054958,
+            "p99_ns": 6395000
+          }
+        ],
+        "delay_ms": 0,
+        "events": 10000,
+        "events_per_sec": 22605.46012283807,
+        "publish_per_sec": 22825.270119496407,
+        "retry": false,
+        "sampled_max_bytes": 68544,
+        "sampled_max_depth": 288,
+        "sinks": 8,
+        "window": 128,
+        "probes": {
+          "publish": 1.0,
+          "take_ready": 8.0318,
+          "complete": 8.0,
+          "next_delay": 0.0318,
+          "other": 0.008,
+          "notify_worker": 8.0,
+          "notify_drain": 8.0,
+          "wake_notify": 0.0021,
+          "wake_timer": 0.0,
+          "wake_join": 8.0,
+          "empty_wake": 0.0254,
+          "locks": 17.0636,
+          "worker_wakes": 8.0021
+        },
+        "locks": {
+          "event_bus_lock_wait_us": {
+            "count": 10000.0,
+            "mean": 18.7741,
+            "sum": 187741.0,
+            "p50_upper": 10.0,
+            "p95_upper": 100.0,
+            "p99_upper": 250.0
+          },
+          "event_bus_lock_hold_us": {
+            "count": 10000.0,
+            "mean": 1.3472,
+            "sum": 13472.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 25.0
+          },
+          "event_bus_state_wait_us": {
+            "count": 170716.0,
+            "mean": 16.94800721666393,
+            "sum": 2893296.0,
+            "p50_upper": 10.0,
+            "p95_upper": 100.0,
+            "p99_upper": 250.0
+          },
+          "event_bus_state_hold_us": {
+            "count": 170716.0,
+            "mean": 3.393296468989433,
+            "sum": 579290.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 25.0
+          }
+        }
+      },
+      {
+        "accepted": {
+          "p50_ns": 1125,
+          "p95_ns": 17334,
+          "p99_ns": 29667
+        },
+        "completion": [
+          {
+            "p50_ns": 36504333,
+            "p95_ns": 36651083,
+            "p99_ns": 36693458
+          }
+        ],
+        "delay_ms": 1,
+        "events": 2000,
+        "events_per_sec": 3501.8818237450355,
+        "publish_per_sec": 3750.5828077507244,
+        "retry": false,
+        "sampled_max_bytes": 30226,
+        "sampled_max_depth": 128,
+        "sinks": 1,
+        "window": 128,
+        "probes": {
+          "publish": 1.0,
+          "take_ready": 1.005,
+          "complete": 1.0,
+          "next_delay": 0.005,
+          "other": 0.0085,
+          "notify_worker": 1.0,
+          "notify_drain": 1.0,
+          "wake_notify": 0.0015,
+          "wake_timer": 0.0,
+          "wake_join": 1.0,
+          "empty_wake": 0.0045,
+          "locks": 3.01,
+          "worker_wakes": 1.0015
+        },
+        "locks": {
+          "event_bus_lock_wait_us": {
+            "count": 2000.0,
+            "mean": 2.399,
+            "sum": 4798.0,
+            "p50_upper": 10.0,
+            "p95_upper": 25.0,
+            "p99_upper": 50.0
+          },
+          "event_bus_lock_hold_us": {
+            "count": 2000.0,
+            "mean": 0.045,
+            "sum": 90.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          },
+          "event_bus_state_wait_us": {
+            "count": 6037.0,
+            "mean": 1.0203743581248965,
+            "sum": 6160.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 25.0
+          },
+          "event_bus_state_hold_us": {
+            "count": 6037.0,
+            "mean": 0.657114460824913,
+            "sum": 3967.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          }
+        }
+      },
+      {
+        "accepted": {
+          "p50_ns": 1125,
+          "p95_ns": 15667,
+          "p99_ns": 25000
+        },
+        "completion": [
+          {
+            "p50_ns": 190264333,
+            "p95_ns": 192206250,
+            "p99_ns": 192253959
+          }
+        ],
+        "delay_ms": 10,
+        "events": 2000,
+        "events_per_sec": 674.0155519173836,
+        "publish_per_sec": 717.6730348934873,
+        "retry": false,
+        "sampled_max_bytes": 30464,
+        "sampled_max_depth": 128,
+        "sinks": 1,
+        "window": 128,
+        "probes": {
+          "publish": 1.0,
+          "take_ready": 1.0045,
+          "complete": 1.0,
+          "next_delay": 0.0045,
+          "other": 0.0085,
+          "notify_worker": 1.0,
+          "notify_drain": 1.0,
+          "wake_notify": 0.001,
+          "wake_timer": 0.0,
+          "wake_join": 1.0,
+          "empty_wake": 0.0045,
+          "locks": 3.0090000000000003,
+          "worker_wakes": 1.001
+        },
+        "locks": {
+          "event_bus_lock_wait_us": {
+            "count": 2000.0,
+            "mean": 2.288,
+            "sum": 4576.0,
+            "p50_upper": 10.0,
+            "p95_upper": 25.0,
+            "p99_upper": 25.0
+          },
+          "event_bus_lock_hold_us": {
+            "count": 2000.0,
+            "mean": 0.0155,
+            "sum": 31.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          },
+          "event_bus_state_wait_us": {
+            "count": 6035.0,
+            "mean": 1.016238608119304,
+            "sum": 6133.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 25.0
+          },
+          "event_bus_state_hold_us": {
+            "count": 6035.0,
+            "mean": 0.6745650372825186,
+            "sum": 4071.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          }
+        }
+      },
+      {
+        "accepted": {
+          "p50_ns": 2250,
+          "p95_ns": 16125,
+          "p99_ns": 25500
+        },
+        "completion": [
+          {
+            "p50_ns": 6360791,
+            "p95_ns": 10475334,
+            "p99_ns": 11394917
+          }
+        ],
+        "delay_ms": 0,
+        "events": 2000,
+        "events_per_sec": 18726.306832878246,
+        "publish_per_sec": 21049.243537021845,
+        "retry": true,
+        "sampled_max_bytes": 30464,
+        "sampled_max_depth": 128,
+        "sinks": 1,
+        "window": 128,
+        "probes": {
+          "publish": 1.0,
+          "take_ready": 2.5355,
+          "complete": 2.0,
+          "next_delay": 0.5355,
+          "other": 0.0085,
+          "notify_worker": 2.0,
+          "notify_drain": 1.0,
+          "wake_notify": 0.111,
+          "wake_timer": 0.0365,
+          "wake_join": 2.0,
+          "empty_wake": 0.469,
+          "locks": 6.071,
+          "worker_wakes": 2.1475
+        },
+        "locks": {
+          "event_bus_lock_wait_us": {
+            "count": 2000.0,
+            "mean": 2.172,
+            "sum": 4344.0,
+            "p50_upper": 10.0,
+            "p95_upper": 25.0,
+            "p99_upper": 25.0
+          },
+          "event_bus_lock_hold_us": {
+            "count": 2000.0,
+            "mean": 0.032,
+            "sum": 64.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          },
+          "event_bus_state_wait_us": {
+            "count": 12159.0,
+            "mean": 0.719302574224854,
+            "sum": 8746.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 25.0
+          },
+          "event_bus_state_hold_us": {
+            "count": 12159.0,
+            "mean": 0.40085533349782054,
+            "sum": 4874.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          }
+        }
+      },
+      {
+        "accepted": {
+          "p50_ns": 5917,
+          "p95_ns": 5917,
+          "p99_ns": 5917
+        },
+        "completion": [
+          {
+            "p50_ns": 12292,
+            "p95_ns": 12292,
+            "p99_ns": 12292
+          }
+        ],
+        "delay_ms": 0,
+        "events": 1,
+        "events_per_sec": 434.8850903125867,
+        "publish_per_sec": 61068.70229007633,
+        "retry": false,
+        "sampled_max_bytes": 232,
+        "sampled_max_depth": 1,
+        "sinks": 1,
+        "window": 1,
+        "probes": {
+          "publish": 1.0,
+          "take_ready": 3.0,
+          "complete": 1.0,
+          "next_delay": 2.0,
+          "other": 2.0,
+          "notify_worker": 1.0,
+          "notify_drain": 1.0,
+          "wake_notify": 1.0,
+          "wake_timer": 0.0,
+          "wake_join": 1.0,
+          "empty_wake": 1.0,
+          "locks": 7.0,
+          "worker_wakes": 2.0
+        },
+        "locks": {
+          "event_bus_lock_wait_us": {
+            "count": 1.0,
+            "mean": 0.0,
+            "sum": 0.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          },
+          "event_bus_lock_hold_us": {
+            "count": 1.0,
+            "mean": 1.0,
+            "sum": 1.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          },
+          "event_bus_state_wait_us": {
+            "count": 9.0,
+            "mean": 0.0,
+            "sum": 0.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          },
+          "event_bus_state_hold_us": {
+            "count": 9.0,
+            "mean": 0.1111111111111111,
+            "sum": 1.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          }
+        }
+      },
+      {
+        "accepted": {
+          "p50_ns": 6208,
+          "p95_ns": 6208,
+          "p99_ns": 6208
+        },
+        "completion": [
+          {
+            "p50_ns": 2292333,
+            "p95_ns": 2292333,
+            "p99_ns": 2292333
+          }
+        ],
+        "delay_ms": 0,
+        "events": 1,
+        "events_per_sec": 218.06683748568935,
+        "publish_per_sec": 81076.69855683476,
+        "retry": true,
+        "sampled_max_bytes": 232,
+        "sampled_max_depth": 1,
+        "sinks": 1,
+        "window": 1,
+        "probes": {
+          "publish": 1.0,
+          "take_ready": 7.0,
+          "complete": 2.0,
+          "next_delay": 5.0,
+          "other": 2.0,
+          "notify_worker": 2.0,
+          "notify_drain": 1.0,
+          "wake_notify": 2.0,
+          "wake_timer": 1.0,
+          "wake_join": 2.0,
+          "empty_wake": 3.0,
+          "locks": 15.0,
+          "worker_wakes": 5.0
+        },
+        "locks": {
+          "event_bus_lock_wait_us": {
+            "count": 1.0,
+            "mean": 0.0,
+            "sum": 0.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          },
+          "event_bus_lock_hold_us": {
+            "count": 1.0,
+            "mean": 1.0,
+            "sum": 1.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          },
+          "event_bus_state_wait_us": {
+            "count": 17.0,
+            "mean": 0.0,
+            "sum": 0.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          },
+          "event_bus_state_hold_us": {
+            "count": 17.0,
+            "mean": 0.17647058823529413,
+            "sum": 3.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          }
+        }
+      }
+    ],
+    [
+      {
+        "accepted": {
+          "p50_ns": 1583,
+          "p95_ns": 8583,
+          "p99_ns": 15417
+        },
+        "completion": [
+          {
+            "p50_ns": 49417,
+            "p95_ns": 200625,
+            "p99_ns": 275625
+          }
+        ],
+        "delay_ms": 0,
+        "events": 10000,
+        "events_per_sec": 263667.59889861825,
+        "publish_per_sec": 280590.1799161069,
+        "retry": false,
+        "sampled_max_bytes": 16184,
+        "sampled_max_depth": 68,
+        "sinks": 1,
+        "window": 128,
+        "probes": {
+          "publish": 1.0,
+          "take_ready": 1.0617,
+          "complete": 1.0,
+          "next_delay": 0.0617,
+          "other": 0.008,
+          "notify_worker": 1.0,
+          "notify_drain": 1.0,
+          "wake_notify": 0.0064,
+          "wake_timer": 0.0,
+          "wake_join": 1.0,
+          "empty_wake": 0.0468,
+          "locks": 3.1234,
+          "worker_wakes": 1.0064
+        },
+        "locks": {
+          "event_bus_lock_wait_us": {
+            "count": 10000.0,
+            "mean": 0.8613,
+            "sum": 8613.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 25.0
+          },
+          "event_bus_lock_hold_us": {
+            "count": 10000.0,
+            "mean": 0.0253,
+            "sum": 253.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          },
+          "event_bus_state_wait_us": {
+            "count": 31314.0,
+            "mean": 0.7480360222264801,
+            "sum": 23424.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          },
+          "event_bus_state_hold_us": {
+            "count": 31314.0,
+            "mean": 0.26706904260075365,
+            "sum": 8363.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          }
+        }
+      },
+      {
+        "accepted": {
+          "p50_ns": 6459,
+          "p95_ns": 45542,
+          "p99_ns": 71875
+        },
+        "completion": [
+          {
+            "p50_ns": 2048542,
+            "p95_ns": 2580583,
+            "p99_ns": 3027125
+          },
+          {
+            "p50_ns": 1706125,
+            "p95_ns": 2550667,
+            "p99_ns": 2762584
+          },
+          {
+            "p50_ns": 4570458,
+            "p95_ns": 5322041,
+            "p99_ns": 5562458
+          },
+          {
+            "p50_ns": 1687084,
+            "p95_ns": 2450042,
+            "p99_ns": 2756875
+          }
+        ],
+        "delay_ms": 0,
+        "events": 10000,
+        "events_per_sec": 50172.66722735626,
+        "publish_per_sec": 50597.6319053447,
+        "retry": false,
+        "sampled_max_bytes": 65212,
+        "sampled_max_depth": 274,
+        "sinks": 4,
+        "window": 128,
+        "probes": {
+          "publish": 1.0,
+          "take_ready": 4.0088,
+          "complete": 4.0,
+          "next_delay": 0.0088,
+          "other": 0.008,
+          "notify_worker": 4.0,
+          "notify_drain": 4.0,
+          "wake_notify": 0.0015,
+          "wake_timer": 0.0,
+          "wake_join": 4.0,
+          "empty_wake": 0.0074,
+          "locks": 9.017600000000002,
+          "worker_wakes": 4.0015
+        },
+        "locks": {
+          "event_bus_lock_wait_us": {
+            "count": 10000.0,
+            "mean": 9.5236,
+            "sum": 95236.0,
+            "p50_upper": 10.0,
+            "p95_upper": 50.0,
+            "p99_upper": 100.0
+          },
+          "event_bus_lock_hold_us": {
+            "count": 10000.0,
+            "mean": 0.3383,
+            "sum": 3383.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 25.0
+          },
+          "event_bus_state_wait_us": {
+            "count": 90256.0,
+            "mean": 6.9798462152100695,
+            "sum": 629973.0,
+            "p50_upper": 10.0,
+            "p95_upper": 50.0,
+            "p99_upper": 100.0
+          },
+          "event_bus_state_hold_us": {
+            "count": 90256.0,
+            "mean": 1.8966827690125865,
+            "sum": 171187.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 25.0
+          }
+        }
+      },
+      {
+        "accepted": {
+          "p50_ns": 8958,
+          "p95_ns": 89792,
+          "p99_ns": 144708
+        },
+        "completion": [
+          {
+            "p50_ns": 5404875,
+            "p95_ns": 6490792,
+            "p99_ns": 6795583
+          },
+          {
+            "p50_ns": 10028875,
+            "p95_ns": 14435083,
+            "p99_ns": 15156667
+          },
+          {
+            "p50_ns": 5511375,
+            "p95_ns": 8603125,
+            "p99_ns": 9705666
+          },
+          {
+            "p50_ns": 4692084,
+            "p95_ns": 6422708,
+            "p99_ns": 6811959
+          },
+          {
+            "p50_ns": 4540709,
+            "p95_ns": 7019917,
+            "p99_ns": 7521459
+          },
+          {
+            "p50_ns": 3355875,
+            "p95_ns": 6363708,
+            "p99_ns": 6650917
+          },
+          {
+            "p50_ns": 7188292,
+            "p95_ns": 10452542,
+            "p99_ns": 10717875
+          },
+          {
+            "p50_ns": 1815208,
+            "p95_ns": 3875584,
+            "p99_ns": 5240750
+          }
+        ],
+        "delay_ms": 0,
+        "events": 10000,
+        "events_per_sec": 22313.052908804773,
+        "publish_per_sec": 22519.849152682116,
+        "retry": false,
+        "sampled_max_bytes": 78064,
+        "sampled_max_depth": 328,
+        "sinks": 8,
+        "window": 128,
+        "probes": {
+          "publish": 1.0,
+          "take_ready": 8.0218,
+          "complete": 8.0,
+          "next_delay": 0.0218,
+          "other": 0.008,
+          "notify_worker": 8.0,
+          "notify_drain": 8.0,
+          "wake_notify": 0.0023,
+          "wake_timer": 0.0,
+          "wake_join": 8.0,
+          "empty_wake": 0.0183,
+          "locks": 17.043599999999998,
+          "worker_wakes": 8.0023
+        },
+        "locks": {
+          "event_bus_lock_wait_us": {
+            "count": 10000.0,
+            "mean": 19.0596,
+            "sum": 190596.0,
+            "p50_upper": 10.0,
+            "p95_upper": 100.0,
+            "p99_upper": 250.0
+          },
+          "event_bus_lock_hold_us": {
+            "count": 10000.0,
+            "mean": 1.6215,
+            "sum": 16215.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 25.0
+          },
+          "event_bus_state_wait_us": {
+            "count": 170516.0,
+            "mean": 17.333470172887,
+            "sum": 2955634.0,
+            "p50_upper": 10.0,
+            "p95_upper": 100.0,
+            "p99_upper": 250.0
+          },
+          "event_bus_state_hold_us": {
+            "count": 170516.0,
+            "mean": 3.314486617091651,
+            "sum": 565173.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 25.0
+          }
+        }
+      },
+      {
+        "accepted": {
+          "p50_ns": 1041,
+          "p95_ns": 17417,
+          "p99_ns": 27875
+        },
+        "completion": [
+          {
+            "p50_ns": 36295041,
+            "p95_ns": 36644875,
+            "p99_ns": 36723167
+          }
+        ],
+        "delay_ms": 1,
+        "events": 2000,
+        "events_per_sec": 3533.4666775320766,
+        "publish_per_sec": 3789.5911591430336,
+        "retry": false,
+        "sampled_max_bytes": 30464,
+        "sampled_max_depth": 128,
+        "sinks": 1,
+        "window": 128,
+        "probes": {
+          "publish": 1.0,
+          "take_ready": 1.0045,
+          "complete": 1.0,
+          "next_delay": 0.0045,
+          "other": 0.0085,
+          "notify_worker": 1.0,
+          "notify_drain": 1.0,
+          "wake_notify": 0.001,
+          "wake_timer": 0.0,
+          "wake_join": 1.0,
+          "empty_wake": 0.0045,
+          "locks": 3.0090000000000003,
+          "worker_wakes": 1.001
+        },
+        "locks": {
+          "event_bus_lock_wait_us": {
+            "count": 2000.0,
+            "mean": 2.389,
+            "sum": 4778.0,
+            "p50_upper": 10.0,
+            "p95_upper": 25.0,
+            "p99_upper": 25.0
+          },
+          "event_bus_lock_hold_us": {
+            "count": 2000.0,
+            "mean": 0.0365,
+            "sum": 73.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          },
+          "event_bus_state_wait_us": {
+            "count": 6035.0,
+            "mean": 1.0293289146644573,
+            "sum": 6212.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 25.0
+          },
+          "event_bus_state_hold_us": {
+            "count": 6035.0,
+            "mean": 0.6949461474730737,
+            "sum": 4194.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          }
+        }
+      },
+      {
+        "accepted": {
+          "p50_ns": 1166,
+          "p95_ns": 16625,
+          "p99_ns": 26750
+        },
+        "completion": [
+          {
+            "p50_ns": 190857916,
+            "p95_ns": 192125750,
+            "p99_ns": 192574541
+          }
+        ],
+        "delay_ms": 10,
+        "events": 2000,
+        "events_per_sec": 672.6224112235594,
+        "publish_per_sec": 716.6200616512109,
+        "retry": false,
+        "sampled_max_bytes": 30464,
+        "sampled_max_depth": 128,
+        "sinks": 1,
+        "window": 128,
+        "probes": {
+          "publish": 1.0,
+          "take_ready": 1.0045,
+          "complete": 1.0,
+          "next_delay": 0.0045,
+          "other": 0.0085,
+          "notify_worker": 1.0,
+          "notify_drain": 1.0,
+          "wake_notify": 0.001,
+          "wake_timer": 0.0,
+          "wake_join": 1.0,
+          "empty_wake": 0.0045,
+          "locks": 3.0090000000000003,
+          "worker_wakes": 1.001
+        },
+        "locks": {
+          "event_bus_lock_wait_us": {
+            "count": 2000.0,
+            "mean": 2.426,
+            "sum": 4852.0,
+            "p50_upper": 10.0,
+            "p95_upper": 25.0,
+            "p99_upper": 25.0
+          },
+          "event_bus_lock_hold_us": {
+            "count": 2000.0,
+            "mean": 0.025,
+            "sum": 50.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          },
+          "event_bus_state_wait_us": {
+            "count": 6035.0,
+            "mean": 1.087323943661972,
+            "sum": 6562.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 25.0
+          },
+          "event_bus_state_hold_us": {
+            "count": 6035.0,
+            "mean": 0.7070422535211267,
+            "sum": 4267.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          }
+        }
+      },
+      {
+        "accepted": {
+          "p50_ns": 2208,
+          "p95_ns": 15125,
+          "p99_ns": 27417
+        },
+        "completion": [
+          {
+            "p50_ns": 6220958,
+            "p95_ns": 10548542,
+            "p99_ns": 11168875
+          }
+        ],
+        "delay_ms": 0,
+        "events": 2000,
+        "events_per_sec": 18831.704587050142,
+        "publish_per_sec": 21205.94677941416,
+        "retry": true,
+        "sampled_max_bytes": 30464,
+        "sampled_max_depth": 128,
+        "sinks": 1,
+        "window": 128,
+        "probes": {
+          "publish": 1.0,
+          "take_ready": 2.51,
+          "complete": 2.0,
+          "next_delay": 0.51,
+          "other": 0.0085,
+          "notify_worker": 2.0,
+          "notify_drain": 1.0,
+          "wake_notify": 0.1105,
+          "wake_timer": 0.036,
+          "wake_join": 2.0,
+          "empty_wake": 0.4505,
+          "locks": 6.02,
+          "worker_wakes": 2.1465
+        },
+        "locks": {
+          "event_bus_lock_wait_us": {
+            "count": 2000.0,
+            "mean": 2.153,
+            "sum": 4306.0,
+            "p50_upper": 10.0,
+            "p95_upper": 25.0,
+            "p99_upper": 25.0
+          },
+          "event_bus_lock_hold_us": {
+            "count": 2000.0,
+            "mean": 0.0505,
+            "sum": 101.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          },
+          "event_bus_state_wait_us": {
+            "count": 12057.0,
+            "mean": 0.7224019241934146,
+            "sum": 8710.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 25.0
+          },
+          "event_bus_state_hold_us": {
+            "count": 12057.0,
+            "mean": 0.40739819192170523,
+            "sum": 4912.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          }
+        }
+      },
+      {
+        "accepted": {
+          "p50_ns": 2625,
+          "p95_ns": 2625,
+          "p99_ns": 2625
+        },
+        "completion": [
+          {
+            "p50_ns": 7333,
+            "p95_ns": 7333,
+            "p99_ns": 7333
+          }
+        ],
+        "delay_ms": 0,
+        "events": 1,
+        "events_per_sec": 434.77466933212526,
+        "publish_per_sec": 68965.5172413793,
+        "retry": false,
+        "sampled_max_bytes": 232,
+        "sampled_max_depth": 1,
+        "sinks": 1,
+        "window": 1,
+        "probes": {
+          "publish": 1.0,
+          "take_ready": 3.0,
+          "complete": 1.0,
+          "next_delay": 2.0,
+          "other": 2.0,
+          "notify_worker": 1.0,
+          "notify_drain": 1.0,
+          "wake_notify": 1.0,
+          "wake_timer": 0.0,
+          "wake_join": 1.0,
+          "empty_wake": 1.0,
+          "locks": 7.0,
+          "worker_wakes": 2.0
+        },
+        "locks": {
+          "event_bus_lock_wait_us": {
+            "count": 1.0,
+            "mean": 0.0,
+            "sum": 0.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          },
+          "event_bus_lock_hold_us": {
+            "count": 1.0,
+            "mean": 0.0,
+            "sum": 0.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          },
+          "event_bus_state_wait_us": {
+            "count": 9.0,
+            "mean": 0.0,
+            "sum": 0.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          },
+          "event_bus_state_hold_us": {
+            "count": 9.0,
+            "mean": 0.0,
+            "sum": 0.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          }
+        }
+      },
+      {
+        "accepted": {
+          "p50_ns": 2375,
+          "p95_ns": 2375,
+          "p99_ns": 2375
+        },
+        "completion": [
+          {
+            "p50_ns": 6841917,
+            "p95_ns": 6841917,
+            "p99_ns": 6841917
+          }
+        ],
+        "delay_ms": 0,
+        "events": 1,
+        "events_per_sec": 145.7876410568321,
+        "publish_per_sec": 67037.60809814306,
+        "retry": true,
+        "sampled_max_bytes": 232,
+        "sampled_max_depth": 1,
+        "sinks": 1,
+        "window": 1,
+        "probes": {
+          "publish": 1.0,
+          "take_ready": 7.0,
+          "complete": 2.0,
+          "next_delay": 5.0,
+          "other": 2.0,
+          "notify_worker": 2.0,
+          "notify_drain": 1.0,
+          "wake_notify": 2.0,
+          "wake_timer": 1.0,
+          "wake_join": 2.0,
+          "empty_wake": 3.0,
+          "locks": 15.0,
+          "worker_wakes": 5.0
+        },
+        "locks": {
+          "event_bus_lock_wait_us": {
+            "count": 1.0,
+            "mean": 0.0,
+            "sum": 0.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          },
+          "event_bus_lock_hold_us": {
+            "count": 1.0,
+            "mean": 0.0,
+            "sum": 0.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          },
+          "event_bus_state_wait_us": {
+            "count": 17.0,
+            "mean": 0.0,
+            "sum": 0.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          },
+          "event_bus_state_hold_us": {
+            "count": 17.0,
+            "mean": 0.0,
+            "sum": 0.0,
+            "p50_upper": 10.0,
+            "p95_upper": 10.0,
+            "p99_upper": 10.0
+          }
+        }
+      }
+    ]
+  ]
+}

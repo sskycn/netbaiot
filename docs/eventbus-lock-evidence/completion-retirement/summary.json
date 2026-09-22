@@ -1,0 +1,1424 @@
+{
+  "after-publishers-1": {
+    "accepted_s": 9112.0,
+    "bytes_max": 400,
+    "cpu_peak": 20.5,
+    "cpu_seconds": 1.69,
+    "cpu_us_per_event": 18.546971027216856,
+    "latency": {
+      "count": 91120,
+      "max_ms": 0.67,
+      "mean_ms": 0.059314826602282704,
+      "p50_ms": 0.06,
+      "p95_ms": 0.08,
+      "p99_ms": 0.11
+    },
+    "locks": {
+      "event_bus_lock_hold_us": {
+        "count": 91120.0,
+        "mean": 0.001646180860403863,
+        "p50_upper": 10.0,
+        "p95_upper": 10.0,
+        "p99_upper": 10.0,
+        "sum": 150.0
+      },
+      "event_bus_lock_wait_us": {
+        "count": 91120.0,
+        "mean": 0.0004280070237050044,
+        "p50_upper": 10.0,
+        "p95_upper": 10.0,
+        "p99_upper": 10.0,
+        "sum": 39.0
+      },
+      "event_bus_route_wait_us": null,
+      "event_bus_state_hold_us": {
+        "count": 637863.0,
+        "mean": 0.0007070483787270935,
+        "p50_upper": 10.0,
+        "p95_upper": 10.0,
+        "p99_upper": 10.0,
+        "sum": 451.0
+      },
+      "event_bus_state_wait_us": {
+        "count": 637863.0,
+        "mean": 0.0001316897202063766,
+        "p50_upper": 10.0,
+        "p95_upper": 10.0,
+        "p99_upper": 10.0,
+        "sum": 84.0
+      }
+    },
+    "pending_max": 1,
+    "probes": {
+      "complete": 1.0,
+      "empty_wake": 1.0000109745390693,
+      "locks": 7.000021949078139,
+      "next_delay": 2.0000109745390695,
+      "notify_drain": 1.0,
+      "notify_worker": 1.0,
+      "other": 0.00023046532045654082,
+      "publish": 1.0,
+      "take_ready": 3.0000109745390695,
+      "wake_join": 1.0,
+      "wake_notify": 1.0,
+      "wake_timer": 0.0,
+      "worker_wakes": 2.0
+    },
+    "pubacks_s": 9112.0,
+    "rejects": {
+      "netbaiot_connections_rejected_total": 0.0,
+      "netbaiot_events_rejected_total": 0.0,
+      "netbaiot_ingress_admission_rejects_total": 0.0,
+      "netbaiot_ingress_rejected_total": 0.0,
+      "netbaiot_protocol_admission_rejects_total": 0.0,
+      "netbaiot_queue_rejects_total": 0.0
+    },
+    "retries": 0.0,
+    "rss_peak_kib": 5280,
+    "sink_acks_s": 9112.0,
+    "sink_failures": 0.0
+  },
+  "after-publishers-100": {
+    "accepted_s": 19985.1,
+    "bytes_max": 9223,
+    "cpu_peak": 104.0,
+    "cpu_seconds": 9.0,
+    "cpu_us_per_event": 45.03354999474609,
+    "latency": {
+      "count": 199851,
+      "max_ms": 27.266,
+      "mean_ms": 0.3549147114600377,
+      "p50_ms": 0.24,
+      "p95_ms": 0.98,
+      "p99_ms": 2.01
+    },
+    "locks": {
+      "event_bus_lock_hold_us": {
+        "count": 199851.0,
+        "mean": 0.3038863953645466,
+        "p50_upper": 10.0,
+        "p95_upper": 10.0,
+        "p99_upper": 10.0,
+        "sum": 60732.0
+      },
+      "event_bus_lock_wait_us": {
+        "count": 199851.0,
+        "mean": 4.671855532371617,
+        "p50_upper": 10.0,
+        "p95_upper": 50.0,
+        "p99_upper": 100.0,
+        "sum": 933675.0
+      },
+      "event_bus_route_wait_us": null,
+      "event_bus_state_hold_us": {
+        "count": 923663.0,
+        "mean": 0.34632652818181525,
+        "p50_upper": 10.0,
+        "p95_upper": 10.0,
+        "p99_upper": 10.0,
+        "sum": 319889.0
+      },
+      "event_bus_state_wait_us": {
+        "count": 923663.0,
+        "mean": 2.1854680765603907,
+        "p50_upper": 10.0,
+        "p95_upper": 10.0,
+        "p99_upper": 100.0,
+        "sum": 2018636.0
+      }
+    },
+    "pending_max": 23,
+    "probes": {
+      "complete": 1.0,
+      "empty_wake": 0.6075125968846791,
+      "locks": 4.621658135310806,
+      "next_delay": 0.8108290676554033,
+      "notify_drain": 1.0,
+      "notify_worker": 1.0,
+      "other": 0.00010007455554388019,
+      "publish": 1.0,
+      "take_ready": 1.8108290676554033,
+      "wake_join": 1.0,
+      "wake_notify": 0.29606556884879237,
+      "wake_timer": 0.0,
+      "worker_wakes": 1.2960655688487923
+    },
+    "pubacks_s": 19985.1,
+    "rejects": {
+      "netbaiot_connections_rejected_total": 0.0,
+      "netbaiot_events_rejected_total": 0.0,
+      "netbaiot_ingress_admission_rejects_total": 0.0,
+      "netbaiot_ingress_rejected_total": 0.0,
+      "netbaiot_protocol_admission_rejects_total": 0.0,
+      "netbaiot_queue_rejects_total": 0.0
+    },
+    "retries": 0.0,
+    "rss_peak_kib": 8832,
+    "sink_acks_s": 19985.1,
+    "sink_failures": 0.0
+  },
+  "after-publishers-1000": {
+    "accepted_s": 19995.9,
+    "bytes_max": 20000,
+    "cpu_peak": 77.8,
+    "cpu_seconds": 7.81,
+    "cpu_us_per_event": 39.05800689141274,
+    "latency": {
+      "count": 199959,
+      "max_ms": 27.293,
+      "mean_ms": 1.4173745217769642,
+      "p50_ms": 0.31,
+      "p95_ms": 7.74,
+      "p99_ms": 12.62
+    },
+    "locks": {
+      "event_bus_lock_hold_us": {
+        "count": 199959.0,
+        "mean": 0.08722288069054156,
+        "p50_upper": 10.0,
+        "p95_upper": 10.0,
+        "p99_upper": 10.0,
+        "sum": 17441.0
+      },
+      "event_bus_lock_wait_us": {
+        "count": 199959.0,
+        "mean": 2.6758835561290066,
+        "p50_upper": 10.0,
+        "p95_upper": 10.0,
+        "p99_upper": 50.0,
+        "sum": 535067.0
+      },
+      "event_bus_route_wait_us": null,
+      "event_bus_state_hold_us": {
+        "count": 1004552.0,
+        "mean": 0.1472268234994306,
+        "p50_upper": 10.0,
+        "p95_upper": 10.0,
+        "p99_upper": 10.0,
+        "sum": 147897.0
+      },
+      "event_bus_state_wait_us": {
+        "count": 1004552.0,
+        "mean": 1.3510410610899186,
+        "p50_upper": 10.0,
+        "p95_upper": 10.0,
+        "p99_upper": 50.0,
+        "sum": 1357191.0
+      }
+    },
+    "pending_max": 50,
+    "probes": {
+      "complete": 1.0,
+      "empty_wake": 0.6662165743977515,
+      "locks": 5.023674853344936,
+      "next_delay": 1.011837426672468,
+      "notify_drain": 1.0,
+      "notify_worker": 1.0,
+      "other": 0.00011502357983386594,
+      "publish": 1.0,
+      "take_ready": 2.011837426672468,
+      "wake_join": 1.0,
+      "wake_notify": 0.42546722078025995,
+      "wake_timer": 0.0,
+      "worker_wakes": 1.42546722078026
+    },
+    "pubacks_s": 19995.9,
+    "rejects": {
+      "netbaiot_connections_rejected_total": 0.0,
+      "netbaiot_events_rejected_total": 0.0,
+      "netbaiot_ingress_admission_rejects_total": 0.0,
+      "netbaiot_ingress_rejected_total": 0.0,
+      "netbaiot_protocol_admission_rejects_total": 0.0,
+      "netbaiot_queue_rejects_total": 0.0
+    },
+    "retries": 0.0,
+    "rss_peak_kib": 32528,
+    "sink_acks_s": 19995.9,
+    "sink_failures": 0.0
+  },
+  "after-q1-20k-1": {
+    "accepted_s": 19995.95,
+    "bytes_max": 6813,
+    "cpu_peak": 120.9,
+    "cpu_seconds": 19.24,
+    "cpu_us_per_event": 48.109742222800115,
+    "latency": {
+      "count": 399919,
+      "max_ms": 10.522,
+      "mean_ms": 0.31005373588151597,
+      "p50_ms": 0.25,
+      "p95_ms": 0.71,
+      "p99_ms": 1.29
+    },
+    "locks": {
+      "event_bus_lock_hold_us": {
+        "count": 399919.0,
+        "mean": 0.2937044751562191,
+        "p50_upper": 10.0,
+        "p95_upper": 10.0,
+        "p99_upper": 10.0,
+        "sum": 117458.0
+      },
+      "event_bus_lock_wait_us": {
+        "count": 399919.0,
+        "mean": 4.573598653727379,
+        "p50_upper": 10.0,
+        "p95_upper": 50.0,
+        "p99_upper": 250.0,
+        "sum": 1829069.0
+      },
+      "event_bus_route_wait_us": null,
+      "event_bus_state_hold_us": {
+        "count": 1880234.0,
+        "mean": 0.33048333345743136,
+        "p50_upper": 10.0,
+        "p95_upper": 10.0,
+        "p99_upper": 10.0,
+        "sum": 621386.0
+      },
+      "event_bus_state_wait_us": {
+        "count": 1880234.0,
+        "mean": 2.214013255796885,
+        "p50_upper": 10.0,
+        "p95_upper": 10.0,
+        "p99_upper": 100.0,
+        "sum": 4162863.0
+      }
+    },
+    "pending_max": 17,
+    "probes": {
+      "complete": 1.0,
+      "empty_wake": 0.6377816507842838,
+      "locks": 4.70146454657068,
+      "next_delay": 0.8507322732853403,
+      "notify_drain": 1.0,
+      "notify_worker": 1.0,
+      "other": 7.251468422355527e-05,
+      "publish": 1.0,
+      "take_ready": 1.8507322732853402,
+      "wake_join": 1.0,
+      "wake_notify": 0.3144336728187458,
+      "wake_timer": 0.0,
+      "worker_wakes": 1.3144336728187458
+    },
+    "pubacks_s": 19995.95,
+    "rejects": {
+      "netbaiot_connections_rejected_total": 0.0,
+      "netbaiot_events_rejected_total": 0.0,
+      "netbaiot_ingress_admission_rejects_total": 0.0,
+      "netbaiot_ingress_rejected_total": 0.0,
+      "netbaiot_protocol_admission_rejects_total": 0.0,
+      "netbaiot_queue_rejects_total": 0.0
+    },
+    "retries": 0.0,
+    "rss_peak_kib": 7904,
+    "sink_acks_s": 19995.95,
+    "sink_failures": 0.0
+  },
+  "after-q1-20k-2": {
+    "accepted_s": 19993.15,
+    "bytes_max": 17628,
+    "cpu_peak": 106.1,
+    "cpu_seconds": 18.35,
+    "cpu_us_per_event": 45.89071757076799,
+    "latency": {
+      "count": 399863,
+      "max_ms": 4.777,
+      "mean_ms": 0.35873537186486376,
+      "p50_ms": 0.29,
+      "p95_ms": 0.85,
+      "p99_ms": 1.49
+    },
+    "locks": {
+      "event_bus_lock_hold_us": {
+        "count": 399863.0,
+        "mean": 0.24444372197477637,
+        "p50_upper": 10.0,
+        "p95_upper": 10.0,
+        "p99_upper": 10.0,
+        "sum": 97744.0
+      },
+      "event_bus_lock_wait_us": {
+        "count": 399863.0,
+        "mean": 5.104575817217397,
+        "p50_upper": 10.0,
+        "p95_upper": 50.0,
+        "p99_upper": 250.0,
+        "sum": 2041131.0
+      },
+      "event_bus_route_wait_us": null,
+      "event_bus_state_hold_us": {
+        "count": 1769946.0,
+        "mean": 0.33863180006621674,
+        "p50_upper": 10.0,
+        "p95_upper": 10.0,
+        "p99_upper": 10.0,
+        "sum": 599360.0
+      },
+      "event_bus_state_wait_us": {
+        "count": 1769946.0,
+        "mean": 2.4803558978635505,
+        "p50_upper": 10.0,
+        "p95_upper": 10.0,
+        "p99_upper": 100.0,
+        "sum": 4390096.0
+      }
+    },
+    "pending_max": 44,
+    "probes": {
+      "complete": 1.0,
+      "empty_wake": 0.5336977914935865,
+      "locks": 4.426308510664903,
+      "next_delay": 0.7131542553324514,
+      "notify_drain": 1.0,
+      "notify_worker": 1.0,
+      "other": 7.252483975761699e-05,
+      "publish": 1.0,
+      "take_ready": 1.7131542553324515,
+      "wake_join": 1.0,
+      "wake_notify": 0.2678867512122902,
+      "wake_timer": 0.0,
+      "worker_wakes": 1.2678867512122902
+    },
+    "pubacks_s": 19993.15,
+    "rejects": {
+      "netbaiot_connections_rejected_total": 0.0,
+      "netbaiot_events_rejected_total": 0.0,
+      "netbaiot_ingress_admission_rejects_total": 0.0,
+      "netbaiot_ingress_rejected_total": 0.0,
+      "netbaiot_protocol_admission_rejects_total": 0.0,
+      "netbaiot_queue_rejects_total": 0.0
+    },
+    "retries": 0.0,
+    "rss_peak_kib": 8016,
+    "sink_acks_s": 19993.15,
+    "sink_failures": 0.0
+  },
+  "after-q1-20k-3": {
+    "accepted_s": 19967.1,
+    "bytes_max": 17586,
+    "cpu_peak": 115.7,
+    "cpu_seconds": 19.04,
+    "cpu_us_per_event": 47.6784310190263,
+    "latency": {
+      "count": 399342,
+      "max_ms": 12.766,
+      "mean_ms": 0.40655411652167817,
+      "p50_ms": 0.31,
+      "p95_ms": 1.06,
+      "p99_ms": 1.83
+    },
+    "locks": {
+      "event_bus_lock_hold_us": {
+        "count": 399342.0,
+        "mean": 0.3081869675616389,
+        "p50_upper": 10.0,
+        "p95_upper": 10.0,
+        "p99_upper": 10.0,
+        "sum": 123072.0
+      },
+      "event_bus_lock_wait_us": {
+        "count": 399342.0,
+        "mean": 5.683584496496737,
+        "p50_upper": 10.0,
+        "p95_upper": 50.0,
+        "p99_upper": 250.0,
+        "sum": 2269694.0
+      },
+      "event_bus_route_wait_us": null,
+      "event_bus_state_hold_us": {
+        "count": 1767997.0,
+        "mean": 0.3756799361084889,
+        "p50_upper": 10.0,
+        "p95_upper": 10.0,
+        "p99_upper": 10.0,
+        "sum": 664201.0
+      },
+      "event_bus_state_wait_us": {
+        "count": 1767997.0,
+        "mean": 2.7377405052157893,
+        "p50_upper": 10.0,
+        "p95_upper": 10.0,
+        "p99_upper": 100.0,
+        "sum": 4840317.0
+      }
+    },
+    "pending_max": 44,
+    "probes": {
+      "complete": 1.0,
+      "empty_wake": 0.527592890304551,
+      "locks": 4.427202748521317,
+      "next_delay": 0.7136013742606588,
+      "notify_drain": 1.0,
+      "notify_worker": 1.0,
+      "other": 7.261945901007157e-05,
+      "publish": 1.0,
+      "take_ready": 1.7136013742606588,
+      "wake_join": 1.0,
+      "wake_notify": 0.27418102779071574,
+      "wake_timer": 0.0,
+      "worker_wakes": 1.2741810277907157
+    },
+    "pubacks_s": 19967.1,
+    "rejects": {
+      "netbaiot_connections_rejected_total": 0.0,
+      "netbaiot_events_rejected_total": 0.0,
+      "netbaiot_ingress_admission_rejects_total": 0.0,
+      "netbaiot_ingress_rejected_total": 0.0,
+      "netbaiot_protocol_admission_rejects_total": 0.0,
+      "netbaiot_queue_rejects_total": 0.0
+    },
+    "retries": 0.0,
+    "rss_peak_kib": 7952,
+    "sink_acks_s": 19967.1,
+    "sink_failures": 0.0
+  },
+  "after-q1-25k": {
+    "accepted_s": 24137.55,
+    "bytes_max": 15192,
+    "cpu_peak": 129.8,
+    "cpu_seconds": 21.34,
+    "cpu_us_per_event": 44.20498352152559,
+    "latency": {
+      "count": 482751,
+      "max_ms": 7.671,
+      "mean_ms": 0.4008428009470721,
+      "p50_ms": 0.31,
+      "p95_ms": 1.04,
+      "p99_ms": 2.0
+    },
+    "locks": {
+      "event_bus_lock_hold_us": {
+        "count": 482751.0,
+        "mean": 0.25315535338093553,
+        "p50_upper": 10.0,
+        "p95_upper": 10.0,
+        "p99_upper": 10.0,
+        "sum": 122211.0
+      },
+      "event_bus_lock_wait_us": {
+        "count": 482751.0,
+        "mean": 6.014021721342887,
+        "p50_upper": 10.0,
+        "p95_upper": 50.0,
+        "p99_upper": 250.0,
+        "sum": 2903275.0
+      },
+      "event_bus_route_wait_us": null,
+      "event_bus_state_hold_us": {
+        "count": 2040744.0,
+        "mean": 0.377549560356419,
+        "p50_upper": 10.0,
+        "p95_upper": 10.0,
+        "p99_upper": 10.0,
+        "sum": 770482.0
+      },
+      "event_bus_state_wait_us": {
+        "count": 2040744.0,
+        "mean": 2.8346872513161867,
+        "p50_upper": 10.0,
+        "p95_upper": 10.0,
+        "p99_upper": 100.0,
+        "sum": 5784871.0
+      }
+    },
+    "pending_max": 38,
+    "probes": {
+      "complete": 1.0,
+      "empty_wake": 0.4549923252359912,
+      "locks": 4.227262087494381,
+      "next_delay": 0.6136310437471906,
+      "notify_drain": 1.0,
+      "notify_worker": 1.0,
+      "other": 6.0072376856806093e-05,
+      "publish": 1.0,
+      "take_ready": 1.6136310437471906,
+      "wake_join": 1.0,
+      "wake_notify": 0.23312017996855522,
+      "wake_timer": 0.0,
+      "worker_wakes": 1.2331201799685552
+    },
+    "pubacks_s": 24137.55,
+    "rejects": {
+      "netbaiot_connections_rejected_total": 0.0,
+      "netbaiot_events_rejected_total": 0.0,
+      "netbaiot_ingress_admission_rejects_total": 0.0,
+      "netbaiot_ingress_rejected_total": 0.0,
+      "netbaiot_protocol_admission_rejects_total": 0.0,
+      "netbaiot_queue_rejects_total": 0.0
+    },
+    "retries": 0.0,
+    "rss_peak_kib": 8000,
+    "sink_acks_s": 24137.55,
+    "sink_failures": 0.0
+  },
+  "after-q1-30k": {
+    "accepted_s": 26493.95,
+    "bytes_max": 33580,
+    "cpu_peak": 134.4,
+    "cpu_seconds": 22.8,
+    "cpu_us_per_event": 43.02869145597391,
+    "latency": {
+      "count": 529879,
+      "max_ms": 10.057,
+      "mean_ms": 0.4123183424895117,
+      "p50_ms": 0.33,
+      "p95_ms": 1.0,
+      "p99_ms": 1.87
+    },
+    "locks": {
+      "event_bus_lock_hold_us": {
+        "count": 529879.0,
+        "mean": 0.19335735139531857,
+        "p50_upper": 10.0,
+        "p95_upper": 10.0,
+        "p99_upper": 10.0,
+        "sum": 102456.0
+      },
+      "event_bus_lock_wait_us": {
+        "count": 529879.0,
+        "mean": 6.127600829623367,
+        "p50_upper": 10.0,
+        "p95_upper": 50.0,
+        "p99_upper": 250.0,
+        "sum": 3246887.0
+      },
+      "event_bus_route_wait_us": null,
+      "event_bus_state_hold_us": {
+        "count": 2160302.0,
+        "mean": 0.36832998349304863,
+        "p50_upper": 10.0,
+        "p95_upper": 10.0,
+        "p99_upper": 10.0,
+        "sum": 795704.0
+      },
+      "event_bus_state_wait_us": {
+        "count": 2160302.0,
+        "mean": 2.94457256439146,
+        "p50_upper": 10.0,
+        "p95_upper": 10.0,
+        "p99_upper": 100.0,
+        "sum": 6361166.0
+      }
+    },
+    "pending_max": 84,
+    "probes": {
+      "complete": 1.0,
+      "empty_wake": 0.3997308819560692,
+      "locks": 4.076917560424173,
+      "next_delay": 0.5384587802120862,
+      "notify_drain": 1.0,
+      "notify_worker": 1.0,
+      "other": 5.472947597470366e-05,
+      "publish": 1.0,
+      "take_ready": 1.5384587802120862,
+      "wake_join": 1.0,
+      "wake_notify": 0.20536952776011128,
+      "wake_timer": 0.0,
+      "worker_wakes": 1.2053695277601113
+    },
+    "pubacks_s": 26493.95,
+    "rejects": {
+      "netbaiot_connections_rejected_total": 0.0,
+      "netbaiot_events_rejected_total": 0.0,
+      "netbaiot_ingress_admission_rejects_total": 0.0,
+      "netbaiot_ingress_rejected_total": 0.0,
+      "netbaiot_protocol_admission_rejects_total": 0.0,
+      "netbaiot_queue_rejects_total": 0.0
+    },
+    "retries": 0.0,
+    "rss_peak_kib": 8112,
+    "sink_acks_s": 26493.95,
+    "sink_failures": 0.0
+  },
+  "after_primary_median": {
+    "accepted_s": 19993.15,
+    "bytes_max": 17586,
+    "cpu_peak": 115.7,
+    "cpu_seconds": 19.04,
+    "cpu_us_per_event": 47.6784310190263,
+    "latency": {
+      "count": 399863,
+      "max_ms": 10.522,
+      "mean_ms": 0.35873537186486376,
+      "p50_ms": 0.29,
+      "p95_ms": 0.85,
+      "p99_ms": 1.49
+    },
+    "locks": {
+      "event_bus_lock_hold_us": {
+        "count": 399863.0,
+        "mean": 0.2937044751562191,
+        "p50_upper": 10.0,
+        "p95_upper": 10.0,
+        "p99_upper": 10.0,
+        "sum": 117458.0
+      },
+      "event_bus_lock_wait_us": {
+        "count": 399863.0,
+        "mean": 5.104575817217397,
+        "p50_upper": 10.0,
+        "p95_upper": 50.0,
+        "p99_upper": 250.0,
+        "sum": 2041131.0
+      },
+      "event_bus_route_wait_us": null,
+      "event_bus_state_hold_us": {
+        "count": 1769946.0,
+        "mean": 0.33863180006621674,
+        "p50_upper": 10.0,
+        "p95_upper": 10.0,
+        "p99_upper": 10.0,
+        "sum": 621386.0
+      },
+      "event_bus_state_wait_us": {
+        "count": 1769946.0,
+        "mean": 2.4803558978635505,
+        "p50_upper": 10.0,
+        "p95_upper": 10.0,
+        "p99_upper": 100.0,
+        "sum": 4390096.0
+      }
+    },
+    "pending_max": 44,
+    "probes": {
+      "complete": 1.0,
+      "empty_wake": 0.5336977914935865,
+      "locks": 4.427202748521317,
+      "next_delay": 0.7136013742606588,
+      "notify_drain": 1.0,
+      "notify_worker": 1.0,
+      "other": 7.252483975761699e-05,
+      "publish": 1.0,
+      "take_ready": 1.7136013742606588,
+      "wake_join": 1.0,
+      "wake_notify": 0.27418102779071574,
+      "wake_timer": 0.0,
+      "worker_wakes": 1.2741810277907157
+    },
+    "pubacks_s": 19993.15,
+    "rejects": {
+      "netbaiot_connections_rejected_total": 0.0,
+      "netbaiot_events_rejected_total": 0.0,
+      "netbaiot_ingress_admission_rejects_total": 0.0,
+      "netbaiot_ingress_rejected_total": 0.0,
+      "netbaiot_protocol_admission_rejects_total": 0.0,
+      "netbaiot_queue_rejects_total": 0.0
+    },
+    "retries": 0.0,
+    "rss_peak_kib": 7952,
+    "sink_acks_s": 19993.15,
+    "sink_failures": 0.0
+  },
+  "before-publishers-1": {
+    "accepted_s": 8314.1,
+    "bytes_max": 399,
+    "cpu_peak": 20.5,
+    "cpu_seconds": 1.71,
+    "cpu_us_per_event": 20.567469720114023,
+    "latency": {
+      "count": 83141,
+      "max_ms": 0.491,
+      "mean_ms": 0.05995636328646516,
+      "p50_ms": 0.06,
+      "p95_ms": 0.08,
+      "p99_ms": 0.11
+    },
+    "locks": {
+      "event_bus_lock_hold_us": {
+        "count": 83141.0,
+        "mean": 0.004185660504444257,
+        "p50_upper": 10.0,
+        "p95_upper": 10.0,
+        "p99_upper": 10.0,
+        "sum": 348.0
+      },
+      "event_bus_lock_wait_us": {
+        "count": 83141.0,
+        "mean": 0.0003608328021072636,
+        "p50_upper": 10.0,
+        "p95_upper": 10.0,
+        "p99_upper": 10.0,
+        "sum": 30.0
+      },
+      "event_bus_route_wait_us": null,
+      "event_bus_state_hold_us": {
+        "count": 582010.0,
+        "mean": 0.0018762564217109671,
+        "p50_upper": 10.0,
+        "p95_upper": 10.0,
+        "p99_upper": 10.0,
+        "sum": 1092.0
+      },
+      "event_bus_state_wait_us": {
+        "count": 582010.0,
+        "mean": 0.00018040927131836223,
+        "p50_upper": 10.0,
+        "p95_upper": 10.0,
+        "p99_upper": 10.0,
+        "sum": 105.0
+      }
+    },
+    "pending_max": 1,
+    "probes": {
+      "complete": 1.0,
+      "empty_wake": 1.0000120277600701,
+      "locks": 7.000024055520139,
+      "next_delay": 2.00001202776007,
+      "notify_drain": 1.0,
+      "notify_worker": 1.0,
+      "other": 0.0002525829614750845,
+      "publish": 1.0,
+      "take_ready": 3.00001202776007,
+      "wake_join": 1.0,
+      "wake_notify": 1.0,
+      "wake_timer": 0.0,
+      "worker_wakes": 2.0
+    },
+    "pubacks_s": 8314.1,
+    "rejects": {
+      "netbaiot_connections_rejected_total": 0.0,
+      "netbaiot_events_rejected_total": 0.0,
+      "netbaiot_ingress_admission_rejects_total": 0.0,
+      "netbaiot_ingress_rejected_total": 0.0,
+      "netbaiot_protocol_admission_rejects_total": 0.0,
+      "netbaiot_queue_rejects_total": 0.0
+    },
+    "retries": 0.0,
+    "rss_peak_kib": 5280,
+    "sink_acks_s": 8314.1,
+    "sink_failures": 0.0
+  },
+  "before-publishers-100": {
+    "accepted_s": 19963.0,
+    "bytes_max": 0,
+    "cpu_peak": 95.6,
+    "cpu_seconds": 8.9,
+    "cpu_us_per_event": 44.58247758352953,
+    "latency": {
+      "count": 199630,
+      "max_ms": 20.137,
+      "mean_ms": 0.5332678254771327,
+      "p50_ms": 0.42,
+      "p95_ms": 1.14,
+      "p99_ms": 1.92
+    },
+    "locks": {
+      "event_bus_lock_hold_us": {
+        "count": 199630.0,
+        "mean": 0.24979712468065923,
+        "p50_upper": 10.0,
+        "p95_upper": 10.0,
+        "p99_upper": 10.0,
+        "sum": 49867.0
+      },
+      "event_bus_lock_wait_us": {
+        "count": 199630.0,
+        "mean": 8.188463657766869,
+        "p50_upper": 10.0,
+        "p95_upper": 50.0,
+        "p99_upper": 250.0,
+        "sum": 1634663.0
+      },
+      "event_bus_route_wait_us": null,
+      "event_bus_state_hold_us": {
+        "count": 779050.0,
+        "mean": 0.4724523458057891,
+        "p50_upper": 10.0,
+        "p95_upper": 10.0,
+        "p99_upper": 10.0,
+        "sum": 368064.0
+      },
+      "event_bus_state_wait_us": {
+        "count": 779050.0,
+        "mean": 3.6258365958539245,
+        "p50_upper": 10.0,
+        "p95_upper": 25.0,
+        "p99_upper": 100.0,
+        "sum": 2824708.0
+      }
+    },
+    "pending_max": 0,
+    "probes": {
+      "complete": 1.0,
+      "empty_wake": 0.3347142213094224,
+      "locks": 3.902369383359215,
+      "next_delay": 0.4511846916796073,
+      "notify_drain": 1.0,
+      "notify_worker": 1.0,
+      "other": 0.00010018534288433603,
+      "publish": 1.0,
+      "take_ready": 1.4511846916796072,
+      "wake_join": 1.0,
+      "wake_notify": 0.17192806692380905,
+      "wake_timer": 0.0,
+      "worker_wakes": 1.171928066923809
+    },
+    "pubacks_s": 19963.0,
+    "rejects": {
+      "netbaiot_connections_rejected_total": 0.0,
+      "netbaiot_events_rejected_total": 0.0,
+      "netbaiot_ingress_admission_rejects_total": 0.0,
+      "netbaiot_ingress_rejected_total": 0.0,
+      "netbaiot_protocol_admission_rejects_total": 0.0,
+      "netbaiot_queue_rejects_total": 0.0
+    },
+    "retries": 0.0,
+    "rss_peak_kib": 8864,
+    "sink_acks_s": 19963.0,
+    "sink_failures": 0.0
+  },
+  "before-publishers-1000": {
+    "accepted_s": 19998.1,
+    "bytes_max": 16000,
+    "cpu_peak": 114.7,
+    "cpu_seconds": 10.68,
+    "cpu_us_per_event": 53.405073481980786,
+    "latency": {
+      "count": 199981,
+      "max_ms": 2.923,
+      "mean_ms": 0.29021563048489607,
+      "p50_ms": 0.25,
+      "p95_ms": 0.62,
+      "p99_ms": 1.09
+    },
+    "locks": {
+      "event_bus_lock_hold_us": {
+        "count": 199981.0,
+        "mean": 0.2065596231642006,
+        "p50_upper": 10.0,
+        "p95_upper": 10.0,
+        "p99_upper": 10.0,
+        "sum": 41308.0
+      },
+      "event_bus_lock_wait_us": {
+        "count": 199981.0,
+        "mean": 3.224361314324861,
+        "p50_upper": 10.0,
+        "p95_upper": 25.0,
+        "p99_upper": 100.0,
+        "sum": 644811.0
+      },
+      "event_bus_route_wait_us": null,
+      "event_bus_state_hold_us": {
+        "count": 948405.0,
+        "mean": 0.3256678317807266,
+        "p50_upper": 10.0,
+        "p95_upper": 10.0,
+        "p99_upper": 10.0,
+        "sum": 308865.0
+      },
+      "event_bus_state_wait_us": {
+        "count": 948405.0,
+        "mean": 1.7894000980593734,
+        "p50_upper": 10.0,
+        "p95_upper": 10.0,
+        "p99_upper": 50.0,
+        "sum": 1697076.0
+      }
+    },
+    "pending_max": 40,
+    "probes": {
+      "complete": 1.0,
+      "empty_wake": 0.6550672313869818,
+      "locks": 4.7423555237747586,
+      "next_delay": 0.8711777618873793,
+      "notify_drain": 1.0,
+      "notify_worker": 1.0,
+      "other": 0.0001200114010831029,
+      "publish": 1.0,
+      "take_ready": 1.8711777618873793,
+      "wake_join": 1.0,
+      "wake_notify": 0.3138548162075397,
+      "wake_timer": 0.0,
+      "worker_wakes": 1.3138548162075396
+    },
+    "pubacks_s": 19998.1,
+    "rejects": {
+      "netbaiot_connections_rejected_total": 0.0,
+      "netbaiot_events_rejected_total": 0.0,
+      "netbaiot_ingress_admission_rejects_total": 0.0,
+      "netbaiot_ingress_rejected_total": 0.0,
+      "netbaiot_protocol_admission_rejects_total": 0.0,
+      "netbaiot_queue_rejects_total": 0.0
+    },
+    "retries": 0.0,
+    "rss_peak_kib": 31824,
+    "sink_acks_s": 19998.1,
+    "sink_failures": 0.0
+  },
+  "before-q1-20k-1": {
+    "accepted_s": 19999.3,
+    "bytes_max": 6416,
+    "cpu_peak": 111.9,
+    "cpu_seconds": 18.44,
+    "cpu_us_per_event": 46.101613556474476,
+    "latency": {
+      "count": 399986,
+      "max_ms": 3.076,
+      "mean_ms": 0.2555248208687304,
+      "p50_ms": 0.23,
+      "p95_ms": 0.53,
+      "p99_ms": 0.84
+    },
+    "locks": {
+      "event_bus_lock_hold_us": {
+        "count": 399986.0,
+        "mean": 0.2609391328696504,
+        "p50_upper": 10.0,
+        "p95_upper": 10.0,
+        "p99_upper": 10.0,
+        "sum": 104372.0
+      },
+      "event_bus_lock_wait_us": {
+        "count": 399986.0,
+        "mean": 5.2527488462096175,
+        "p50_upper": 10.0,
+        "p95_upper": 50.0,
+        "p99_upper": 100.0,
+        "sum": 2101026.0
+      },
+      "event_bus_route_wait_us": null,
+      "event_bus_state_hold_us": {
+        "count": 1824480.0,
+        "mean": 0.4169933350872577,
+        "p50_upper": 10.0,
+        "p95_upper": 10.0,
+        "p99_upper": 10.0,
+        "sum": 760796.0
+      },
+      "event_bus_state_wait_us": {
+        "count": 1824480.0,
+        "mean": 2.1937352012628257,
+        "p50_upper": 10.0,
+        "p95_upper": 10.0,
+        "p99_upper": 100.0,
+        "sum": 4002426.0
+      }
+    },
+    "pending_max": 16,
+    "probes": {
+      "complete": 1.0,
+      "empty_wake": 0.59108568799908,
+      "locks": 4.561284644962574,
+      "next_delay": 0.7806423224812868,
+      "notify_drain": 1.0,
+      "notify_worker": 1.0,
+      "other": 7.500262509187821e-05,
+      "publish": 1.0,
+      "take_ready": 1.7806423224812868,
+      "wake_join": 1.0,
+      "wake_notify": 0.27917227102948605,
+      "wake_timer": 0.0,
+      "worker_wakes": 1.279172271029486
+    },
+    "pubacks_s": 19999.3,
+    "rejects": {
+      "netbaiot_connections_rejected_total": 0.0,
+      "netbaiot_events_rejected_total": 0.0,
+      "netbaiot_ingress_admission_rejects_total": 0.0,
+      "netbaiot_ingress_rejected_total": 0.0,
+      "netbaiot_protocol_admission_rejects_total": 0.0,
+      "netbaiot_queue_rejects_total": 0.0
+    },
+    "retries": 0.0,
+    "rss_peak_kib": 7936,
+    "sink_acks_s": 19999.3,
+    "sink_failures": 0.0
+  },
+  "before-q1-20k-2": {
+    "accepted_s": 19994.5,
+    "bytes_max": 18029,
+    "cpu_peak": 114.6,
+    "cpu_seconds": 18.84,
+    "cpu_us_per_event": 47.112956062917306,
+    "latency": {
+      "count": 399890,
+      "max_ms": 3.625,
+      "mean_ms": 0.3850791642701743,
+      "p50_ms": 0.32,
+      "p95_ms": 0.89,
+      "p99_ms": 1.34
+    },
+    "locks": {
+      "event_bus_lock_hold_us": {
+        "count": 399890.0,
+        "mean": 0.30106029158018455,
+        "p50_upper": 10.0,
+        "p95_upper": 10.0,
+        "p99_upper": 10.0,
+        "sum": 120391.0
+      },
+      "event_bus_lock_wait_us": {
+        "count": 399890.0,
+        "mean": 6.3744779814448975,
+        "p50_upper": 10.0,
+        "p95_upper": 50.0,
+        "p99_upper": 250.0,
+        "sum": 2549090.0
+      },
+      "event_bus_route_wait_us": null,
+      "event_bus_state_hold_us": {
+        "count": 1728471.0,
+        "mean": 0.4190958367250593,
+        "p50_upper": 10.0,
+        "p95_upper": 10.0,
+        "p99_upper": 10.0,
+        "sum": 724395.0
+      },
+      "event_bus_state_wait_us": {
+        "count": 1728471.0,
+        "mean": 2.900095517946208,
+        "p50_upper": 10.0,
+        "p95_upper": 10.0,
+        "p99_upper": 100.0,
+        "sum": 5012731.0
+      }
+    },
+    "pending_max": 45,
+    "probes": {
+      "complete": 1.0,
+      "empty_wake": 0.4871764735302208,
+      "locks": 4.322293630748456,
+      "next_delay": 0.6611468153742279,
+      "notify_drain": 1.0,
+      "notify_worker": 1.0,
+      "other": 7.251994298432069e-05,
+      "publish": 1.0,
+      "take_ready": 1.661146815374228,
+      "wake_join": 1.0,
+      "wake_notify": 0.25609042486683836,
+      "wake_timer": 0.0,
+      "worker_wakes": 1.2560904248668383
+    },
+    "pubacks_s": 19994.5,
+    "rejects": {
+      "netbaiot_connections_rejected_total": 0.0,
+      "netbaiot_events_rejected_total": 0.0,
+      "netbaiot_ingress_admission_rejects_total": 0.0,
+      "netbaiot_ingress_rejected_total": 0.0,
+      "netbaiot_protocol_admission_rejects_total": 0.0,
+      "netbaiot_queue_rejects_total": 0.0
+    },
+    "retries": 0.0,
+    "rss_peak_kib": 8000,
+    "sink_acks_s": 19994.5,
+    "sink_failures": 0.0
+  },
+  "before-q1-20k-3": {
+    "accepted_s": 19979.55,
+    "bytes_max": 7615,
+    "cpu_peak": 116.0,
+    "cpu_seconds": 17.63,
+    "cpu_us_per_event": 44.1201128153537,
+    "latency": {
+      "count": 399591,
+      "max_ms": 19.644,
+      "mean_ms": 0.30441039462850766,
+      "p50_ms": 0.24,
+      "p95_ms": 0.71,
+      "p99_ms": 1.42
+    },
+    "locks": {
+      "event_bus_lock_hold_us": {
+        "count": 399591.0,
+        "mean": 0.23479257540835505,
+        "p50_upper": 10.0,
+        "p95_upper": 10.0,
+        "p99_upper": 10.0,
+        "sum": 93821.0
+      },
+      "event_bus_lock_wait_us": {
+        "count": 399591.0,
+        "mean": 5.395416813692,
+        "p50_upper": 10.0,
+        "p95_upper": 50.0,
+        "p99_upper": 100.0,
+        "sum": 2155960.0
+      },
+      "event_bus_route_wait_us": null,
+      "event_bus_state_hold_us": {
+        "count": 1796155.0,
+        "mean": 0.3857579106480231,
+        "p50_upper": 10.0,
+        "p95_upper": 10.0,
+        "p99_upper": 10.0,
+        "sum": 692881.0
+      },
+      "event_bus_state_wait_us": {
+        "count": 1796155.0,
+        "mean": 2.284788896281223,
+        "p50_upper": 10.0,
+        "p95_upper": 10.0,
+        "p99_upper": 100.0,
+        "sum": 4103835.0
+      }
+    },
+    "pending_max": 19,
+    "probes": {
+      "complete": 1.0,
+      "empty_wake": 0.5594420294751383,
+      "locks": 4.4949085439862255,
+      "next_delay": 0.747454271993113,
+      "notify_drain": 1.0,
+      "notify_worker": 1.0,
+      "other": 7.507676599322807e-05,
+      "publish": 1.0,
+      "take_ready": 1.747454271993113,
+      "wake_join": 1.0,
+      "wake_notify": 0.27669291850917566,
+      "wake_timer": 0.0,
+      "worker_wakes": 1.2766929185091755
+    },
+    "pubacks_s": 19979.55,
+    "rejects": {
+      "netbaiot_connections_rejected_total": 0.0,
+      "netbaiot_events_rejected_total": 0.0,
+      "netbaiot_ingress_admission_rejects_total": 0.0,
+      "netbaiot_ingress_rejected_total": 0.0,
+      "netbaiot_protocol_admission_rejects_total": 0.0,
+      "netbaiot_queue_rejects_total": 0.0
+    },
+    "retries": 0.0,
+    "rss_peak_kib": 8080,
+    "sink_acks_s": 19979.55,
+    "sink_failures": 0.0
+  },
+  "before-q1-25k": {
+    "accepted_s": 24205.0,
+    "bytes_max": 24843,
+    "cpu_peak": 134.7,
+    "cpu_seconds": 21.56,
+    "cpu_us_per_event": 44.53625284032225,
+    "latency": {
+      "count": 484100,
+      "max_ms": 6.876,
+      "mean_ms": 0.4108220677545962,
+      "p50_ms": 0.33,
+      "p95_ms": 0.96,
+      "p99_ms": 1.78
+    },
+    "locks": {
+      "event_bus_lock_hold_us": {
+        "count": 484100.0,
+        "mean": 0.279101425325346,
+        "p50_upper": 10.0,
+        "p95_upper": 10.0,
+        "p99_upper": 10.0,
+        "sum": 135113.0
+      },
+      "event_bus_lock_wait_us": {
+        "count": 484100.0,
+        "mean": 6.979372030572196,
+        "p50_upper": 10.0,
+        "p95_upper": 50.0,
+        "p99_upper": 250.0,
+        "sum": 3378714.0
+      },
+      "event_bus_route_wait_us": null,
+      "event_bus_state_hold_us": {
+        "count": 2017735.0,
+        "mean": 0.40529801980934066,
+        "p50_upper": 10.0,
+        "p95_upper": 10.0,
+        "p99_upper": 10.0,
+        "sum": 817784.0
+      },
+      "event_bus_state_wait_us": {
+        "count": 2017735.0,
+        "mean": 3.194892788200631,
+        "p50_upper": 10.0,
+        "p95_upper": 10.0,
+        "p99_upper": 100.0,
+        "sum": 6446447.0
+      }
+    },
+    "pending_max": 62,
+    "probes": {
+      "complete": 1.0,
+      "empty_wake": 0.43556496591613303,
+      "locks": 4.167952902292915,
+      "next_delay": 0.5839764511464574,
+      "notify_drain": 1.0,
+      "notify_worker": 1.0,
+      "other": 5.990497831026647e-05,
+      "publish": 1.0,
+      "take_ready": 1.5839764511464574,
+      "wake_join": 1.0,
+      "wake_notify": 0.22334021896302417,
+      "wake_timer": 0.0,
+      "worker_wakes": 1.2233402189630243
+    },
+    "pubacks_s": 24205.0,
+    "rejects": {
+      "netbaiot_connections_rejected_total": 0.0,
+      "netbaiot_events_rejected_total": 0.0,
+      "netbaiot_ingress_admission_rejects_total": 0.0,
+      "netbaiot_ingress_rejected_total": 0.0,
+      "netbaiot_protocol_admission_rejects_total": 0.0,
+      "netbaiot_queue_rejects_total": 0.0
+    },
+    "retries": 0.0,
+    "rss_peak_kib": 7888,
+    "sink_acks_s": 24205.0,
+    "sink_failures": 0.0
+  },
+  "before-q1-30k": {
+    "accepted_s": 26708.75,
+    "bytes_max": 29251,
+    "cpu_peak": 134.7,
+    "cpu_seconds": 24.11,
+    "cpu_us_per_event": 45.13502129451959,
+    "latency": {
+      "count": 534175,
+      "max_ms": 9.435,
+      "mean_ms": 0.44920184396499274,
+      "p50_ms": 0.36,
+      "p95_ms": 1.09,
+      "p99_ms": 1.94
+    },
+    "locks": {
+      "event_bus_lock_hold_us": {
+        "count": 534175.0,
+        "mean": 0.252662516965414,
+        "p50_upper": 10.0,
+        "p95_upper": 10.0,
+        "p99_upper": 10.0,
+        "sum": 134966.0
+      },
+      "event_bus_lock_wait_us": {
+        "count": 534175.0,
+        "mean": 7.848225768708756,
+        "p50_upper": 10.0,
+        "p95_upper": 50.0,
+        "p99_upper": 250.0,
+        "sum": 4192326.0
+      },
+      "event_bus_route_wait_us": null,
+      "event_bus_state_hold_us": {
+        "count": 2164636.0,
+        "mean": 0.4530401416219632,
+        "p50_upper": 10.0,
+        "p95_upper": 10.0,
+        "p99_upper": 10.0,
+        "sum": 980667.0
+      },
+      "event_bus_state_wait_us": {
+        "count": 2164636.0,
+        "mean": 3.568172200776482,
+        "p50_upper": 10.0,
+        "p95_upper": 10.0,
+        "p99_upper": 100.0,
+        "sum": 7723794.0
+      }
+    },
+    "pending_max": 73,
+    "probes": {
+      "complete": 1.0,
+      "empty_wake": 0.39064351570178313,
+      "locks": 4.052243178733561,
+      "next_delay": 0.5261215893667806,
+      "notify_drain": 1.0,
+      "notify_worker": 1.0,
+      "other": 5.4289324659521694e-05,
+      "publish": 1.0,
+      "take_ready": 1.5261215893667806,
+      "wake_join": 1.0,
+      "wake_notify": 0.2020218093321477,
+      "wake_timer": 0.0,
+      "worker_wakes": 1.2020218093321478
+    },
+    "pubacks_s": 26708.75,
+    "rejects": {
+      "netbaiot_connections_rejected_total": 0.0,
+      "netbaiot_events_rejected_total": 0.0,
+      "netbaiot_ingress_admission_rejects_total": 0.0,
+      "netbaiot_ingress_rejected_total": 0.0,
+      "netbaiot_protocol_admission_rejects_total": 0.0,
+      "netbaiot_queue_rejects_total": 0.0
+    },
+    "retries": 0.0,
+    "rss_peak_kib": 8320,
+    "sink_acks_s": 26708.75,
+    "sink_failures": 0.0
+  },
+  "before_primary_median": {
+    "accepted_s": 19994.5,
+    "bytes_max": 7615,
+    "cpu_peak": 114.6,
+    "cpu_seconds": 18.44,
+    "cpu_us_per_event": 46.101613556474476,
+    "latency": {
+      "count": 399890,
+      "max_ms": 3.625,
+      "mean_ms": 0.30441039462850766,
+      "p50_ms": 0.24,
+      "p95_ms": 0.71,
+      "p99_ms": 1.34
+    },
+    "locks": {
+      "event_bus_lock_hold_us": {
+        "count": 399890.0,
+        "mean": 0.2609391328696504,
+        "p50_upper": 10.0,
+        "p95_upper": 10.0,
+        "p99_upper": 10.0,
+        "sum": 104372.0
+      },
+      "event_bus_lock_wait_us": {
+        "count": 399890.0,
+        "mean": 5.395416813692,
+        "p50_upper": 10.0,
+        "p95_upper": 50.0,
+        "p99_upper": 100.0,
+        "sum": 2155960.0
+      },
+      "event_bus_route_wait_us": null,
+      "event_bus_state_hold_us": {
+        "count": 1796155.0,
+        "mean": 0.4169933350872577,
+        "p50_upper": 10.0,
+        "p95_upper": 10.0,
+        "p99_upper": 10.0,
+        "sum": 724395.0
+      },
+      "event_bus_state_wait_us": {
+        "count": 1796155.0,
+        "mean": 2.284788896281223,
+        "p50_upper": 10.0,
+        "p95_upper": 10.0,
+        "p99_upper": 100.0,
+        "sum": 4103835.0
+      }
+    },
+    "pending_max": 19,
+    "probes": {
+      "complete": 1.0,
+      "empty_wake": 0.5594420294751383,
+      "locks": 4.4949085439862255,
+      "next_delay": 0.747454271993113,
+      "notify_drain": 1.0,
+      "notify_worker": 1.0,
+      "other": 7.500262509187821e-05,
+      "publish": 1.0,
+      "take_ready": 1.747454271993113,
+      "wake_join": 1.0,
+      "wake_notify": 0.27669291850917566,
+      "wake_timer": 0.0,
+      "worker_wakes": 1.2766929185091755
+    },
+    "pubacks_s": 19994.5,
+    "rejects": {
+      "netbaiot_connections_rejected_total": 0.0,
+      "netbaiot_events_rejected_total": 0.0,
+      "netbaiot_ingress_admission_rejects_total": 0.0,
+      "netbaiot_ingress_rejected_total": 0.0,
+      "netbaiot_protocol_admission_rejects_total": 0.0,
+      "netbaiot_queue_rejects_total": 0.0
+    },
+    "retries": 0.0,
+    "rss_peak_kib": 8000,
+    "sink_acks_s": 19994.5,
+    "sink_failures": 0.0
+  }
+}
