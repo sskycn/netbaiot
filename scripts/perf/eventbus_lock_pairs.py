@@ -17,15 +17,17 @@ def main():
     parser.add_argument("--loadgen", required=True)
     parser.add_argument("--output", required=True)
     parser.add_argument("--secondary", action="store_true")
+    parser.add_argument("--knee-only", action="store_true", help="Only the 25k/30k points")
     args = parser.parse_args()
     output = pathlib.Path(args.output)
     output.mkdir(parents=True, exist_ok=True)
     binaries = {name: str(pathlib.Path(getattr(args, name)).resolve())
                 for name in ("before", "after", "loadgen")}
     cases = [(f"q1-20k-{i}", 20000, 64, 20) for i in range(1, 4)]
-    if args.secondary:
+    if args.secondary or args.knee_only:
         cases = [("q1-25k", 25000, 64, 20), ("q1-30k", 30000, 64, 20)]
-        cases += [(f"publishers-{n}", 20000, n, 10) for n in (1, 100, 1000)]
+        if not args.knee_only:
+            cases += [(f"publishers-{n}", 20000, n, 10) for n in (1, 100, 1000)]
     manifest = {"binaries": binaries,
                 "sha256": {k: hashlib.sha256(pathlib.Path(v).read_bytes()).hexdigest()
                            for k, v in binaries.items()}, "runs": []}
@@ -41,7 +43,7 @@ def main():
             with (output / filename).open("w") as stream:
                 subprocess.run(command, cwd=ROOT, stdout=stream, check=True, timeout=120)
             manifest["runs"].append({"file": filename, "command": command})
-            suffix = "secondary" if args.secondary else "primary"
+            suffix = "secondary" if args.secondary or args.knee_only else "primary"
             (output / f"manifest-{suffix}.json").write_text(json.dumps(manifest, indent=2) + "\n")
 
 
