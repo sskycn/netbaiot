@@ -8,48 +8,49 @@ import socket
 import subprocess
 import tempfile
 import time
+import urllib.error
+import urllib.request
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 ADMIN = "d" * 64
 
 
-def tcp_address():
-    with socket.socket() as listener:
-        listener.bind(("127.0.0.1", 0))
-        return f"127.0.0.1:{listener.getsockname()[1]}"
-
-
-def udp_address():
-    with socket.socket(type=socket.SOCK_DGRAM) as listener:
-        listener.bind(("127.0.0.1", 0))
-        return f"127.0.0.1:{listener.getsockname()[1]}"
-
-
-def wait_port(address):
-    host, port = address.split(":")
+def wait_ready(address):
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    request = urllib.request.Request(
+        f"http://{address}/api/v1/ready",
+        headers={"Authorization": f"Bearer {ADMIN}"},
+    )
     deadline = time.monotonic() + 8
     while time.monotonic() < deadline:
         try:
-            with socket.create_connection((host, int(port)), timeout=0.2):
-                return
-        except OSError:
+            with opener.open(request, timeout=0.2) as response:
+                if response.status == 200:
+                    return
+        except (OSError, urllib.error.URLError):
             time.sleep(0.03)
-    raise AssertionError(f"server did not listen on {address}")
+    raise AssertionError(f"server did not become ready on {address}")
 
 
 def main():
     subprocess.run(["cargo", "build", "-p", "netbaiot-server"], cwd=ROOT, check=True)
     with tempfile.TemporaryDirectory(prefix="netbaiot-mosquitto-") as temporary:
         config = json.loads((ROOT / "configs/development.json").read_text())
-        config["device_http"] = tcp_address()
-        config["management_http"] = tcp_address()
-        config["mqtt"] = tcp_address()
-        config["tcp"] = tcp_address()
-        config["udp"] = udp_address()
+        tcp_reservations = [socket.socket() for _ in range(4)]
+        udp_reservation = socket.socket(type=socket.SOCK_DGRAM)
+        for listener in [*tcp_reservations, udp_reservation]:
+            listener.bind(("127.0.0.1", 0))
+        for field, listener in zip(
+            ("device_http", "management_http", "mqtt", "tcp"), tcp_reservations
+        ):
+            config[field] = f"127.0.0.1:{listener.getsockname()[1]}"
+        config["udp"] = f"127.0.0.1:{udp_reservation.getsockname()[1]}"
         config["spool_directory"] = str(pathlib.Path(temporary) / "spool")
         config_path = pathlib.Path(temporary) / "config.json"
         config_path.write_text(json.dumps(config))
+        for listener in [*tcp_reservations, udp_reservation]:
+            listener.close()
         environment = os.environ.copy()
         environment["NETBAIOT_ADMIN_SECRET"] = ADMIN
         server = subprocess.Popen(
@@ -61,7 +62,9 @@ def main():
             text=True,
         )
         try:
-            wait_port(config["mqtt"])
+            # A raw TCP readiness probe on the MQTT listener is an invalid pre-CONNECT
+            # connection. Use the authenticated management readiness contract instead.
+            wait_ready(config["management_http"])
             port = config["mqtt"].split(":")[1]
             subprocess.run(
                 [

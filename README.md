@@ -12,10 +12,25 @@ durable business data and offline commands. NetbaIoT's only persistent mechanism
 a bounded local restart spool used when a planned graceful shutdown cannot finish
 all already accepted required deliveries.
 
-## Run locally
+## Quick start
+
+Requirements: Rust 1.88 or newer, Python 3, `curl`, and optional Mosquitto client
+tools. Mosquitto is only a client here; NetbaIoT includes its own MQTT 3.1.1
+broker.
+
+Build the locked workspace, start the tutorial business consumer, then start the
+gateway:
 
 ```bash
-cargo run -p netbaiot-server -- configs/development.json
+cargo +1.88.0 build --locked
+python3 examples/business_http_sink.py
+```
+
+In another terminal:
+
+```bash
+export NETBAIOT_ADMIN_SECRET=abababababababababababababababababababababababababababababababab
+cargo run -p netbaiot-server -- configs/tutorial.json
 ```
 
 Development listeners are:
@@ -26,7 +41,7 @@ Development listeners are:
 - generic TCP: `127.0.0.1:9000`
 - UDP: `127.0.0.1:9001`
 
-Upload a device event:
+Publish the first device event (HTTP requires no additional client package):
 
 ```bash
 curl --noproxy '*' -i http://127.0.0.1:8080/v1/device/data \
@@ -36,13 +51,16 @@ curl --noproxy '*' -i http://127.0.0.1:8080/v1/device/data \
 
 HTTP `202` and MQTT QoS1 PUBACK mean the event crossed the bounded
 `EventAccepted` boundary. They do not mean that a business database stored it.
+The Python terminal prints the normalized event and acknowledges it with HTTP
+204. Continue with the Chinese [10-minute end-to-end tutorial](docs/getting-started.md)
+for MQTT publish and subscribe, a live command, CLI usage, and graceful shutdown.
 
 Set a 64-character `NETBAIOT_ADMIN_SECRET` to enable management calls. Production
 configurations must specify a confirmed webhook or framed TCP/RPC business sink.
 The business sink must deduplicate by stable `event_id` because retry and restart
 replay can duplicate delivery.
 
-See [architecture](docs/architecture.md), [delivery semantics](docs/delivery-semantics.md),
+See the [complete user guide](docs/user-guide.md), [architecture](docs/architecture.md), [delivery semantics](docs/delivery-semantics.md),
 [HTTP API](docs/http-api.md), [MQTT profile](docs/mqtt.md), and the
 [refactor report](docs/pure-event-bus-refactor.md).
 

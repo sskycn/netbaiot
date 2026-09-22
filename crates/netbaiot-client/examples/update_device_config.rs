@@ -13,7 +13,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .configs()
         .set_device_config(&DeviceConfig {
             device: DeviceKey {
-                tenant_id: TenantId::new("tenant-a")?,
+                tenant_id: TenantId::new("demo")?,
                 product_id: ProductId::new("sensor")?,
                 device_id: DeviceId::new("device-1")?,
             },
