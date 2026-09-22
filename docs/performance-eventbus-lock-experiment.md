@@ -406,3 +406,306 @@ calls. Queue and batch buckets are fixed numeric bounds, not high-cardinality
 labels. Baseline batches are exactly one record when nonempty. Selection timing
 excludes VecDeque removal and captures just readiness/minimum selection. C must
 use identical selection probes and keep the queue structure unchanged.
+
+C BASELINE_SHA: `49e885e740ef5dd971f516821e88bc946517a46f`.
+
+The shared checkout was concurrently changed by another task after baseline build.
+All subsequent work runs in `/tmp/netbaiot-eventbus-c/worktree` on
+`codex/eventbus-batch-dispatch`, based on the frozen instrumentation commit.
+No unrelated staged work was modified. The independent baseline binary is unchanged.
+
+### Measured prerequisite: 1/4/8 required sinks (before implementing C)
+
+| Required sinks | All State locks/event | publish | take_ready | complete | next_ready_delay | control |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | 3.7834 | 1.0000 | 1.3877 | 1.0000 | 0.3877 | 0.0080 |
+| 4 | 9.0262 | 1.0000 | 4.0091 | 4.0000 | 0.0091 | 0.0080 |
+| 8 | 17.0706 | 1.0000 | 8.0313 | 8.0000 | 0.0313 | 0.0080 |
+
+These are runtime probe deltas for 10,000 accepted, acknowledged, no-retry events,
+not static source estimates. The fixture bounds outstanding deliveries to 128 ×
+sink count. Its observer adds 0.008 control acquisitions/event.
+Raw discovery measurements are retained separately from the paired acceptance runs.
+
+### Decision to test C, based on verified discovery
+
+| Site | Locks/event | Wait sum s | Wait share | Hold sum s |
+| --- | --- | --- | --- | --- |
+| publish | 1.000000 | 2.455093 | 49.34% | 0.689613 |
+| take_ready | 1.699460 | 1.520655 | 30.56% | 0.224219 |
+| next_ready_delay | 0.699460 | 0.187804 | 3.77% | 0.030724 |
+| complete | 1.000000 | 0.812221 | 16.32% | 0.338293 |
+| control_restore_spool | 0.000073 | 0.000142 | 0.00% | 0.000046 |
+
+The verified 20k discovery uses the frozen isolated measurement scripts. The earlier
+network discovery is retained but excluded from comparisons because the shared
+checkout changed during its launch. Dequeue is a material wait contributor, so C
+is implemented only after this evidence and the fanout table above.
+
+C uses one worker-owned reusable Vec of DeliveryRecord handles, grown only for
+actual ready work and bounded by sink concurrency (no payload cloning). One State
+acquisition selects at most available slots, also clamped to remaining sink inflight
+capacity. Each selection recomputes now, scans the unchanged VecDeque, and chooses
+the same earliest ready deadline with existing queue-order tie breaking. It does
+not optimize scans or introduce a different retry order. Record removal and inflight
+increments are atomic under State. Count/bytes and ActiveEvent ownership remain
+unchanged until baseline complete(). The worker releases State before spawning
+bounded deliveries; there is no await between removal and dispatch. Required
+spool ownership survives cancellation. No completion batching is implemented.
+
+Selection instrumentation accumulates scan ns per acquisition; both sides take
+the same number of selection timestamps per scan. Baseline buffers return one
+record; C reuses the bounded Vec across batches. `complete()` is byte-identical
+to BASELINE_SHA (checked directly).
+
+### C decision: REVERT
+
+Three alternating pairs give total State wait (ns-precision) medians
+6.286437 -> 6.347108 seconds (**+0.97%**), while acquisitions/event fall
+4.404347 -> 4.058205 (**-7.86%**) and take_ready acquisitions/event fall
+1.702137 -> 1.291566 (**-24.12%**). Nonempty batches average 1.344969 records,
+P95 = 3, P99 = 7. The >=20% wait reduction gate fails even though actual batching
+and fewer acquisitions are directly observed. Accepted throughput, primary P99,
+CPU and RSS do not rescue a failed contention gate.
+
+The hypothesis that dequeue acquisition frequency is the main removable source of
+the representative workload's contention is not supported. This is narrower than
+claiming repeated acquisitions never matter. Batch dequeue reduces its own wait,
+but does not remove the dominant overall serialized contention; the measurements
+do not establish an exclusive CPU bottleneck or a causal scheduler explanation.
+
+C is completely reverted to the instrumentation-only baseline, including its
+C-only helper/test. That test passed before reversion and is preserved in
+`eventbus-batch-evidence/candidate.patch.gz`; no existing test was deleted or
+weakened. Frozen candidate binaries finish secondary measurement independently of
+the reverted working tree. Retain only default-off instrumentation, tooling,
+raw evidence and this report. No A/B implementation was revisited.
+
+**Experiment D is only a proposal:** measure and independently test bounded
+completion batching as a possible way to reduce remaining repeated State access.
+It would require explicit retry/ownership/ACK/drain proofs, unchanged required
+fanout admission, and the same paired acceptance gates. No D code is implemented.
+### C primary raw results and medians
+
+All After values below are the rejected candidate, not the final production implementation.
+Three paired 20k runs; each summary field is its own median, not a pooled distribution.
+Independent site medians need not add to the median total. Nanosecond histograms retain
+sub-microsecond samples; P95/P99 are bucket upper bounds, not exact quantiles.
+
+| Run | Accepted/PUBACK per s | P50/P95/P99 ms | CPU us/event | RSS KiB | Pending peak | Locks/event | Wait sum s | Hold sum s | Mean nonempty batch |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| before 1 | 19,973.800000 | 0.32/1.06/1.67 | 55.347505 | 7920 | 39 | 4.419322 | 6.038254 | 1.538150 | 1.000000 |
+| after 1 | 19,977.700000 | 0.32/1.03/1.69 | 53.084189 | 8160 | 28 | 4.075434 | 5.674935 | 1.465492 | 1.365268 |
+| before 2 | 19,986.650000 | 0.39/1.04/1.36 | 58.363958 | 8016 | 37 | 4.363125 | 6.394763 | 1.546721 | 1.000000 |
+| after 2 | 19,991.550000 | 0.37/1.02/1.36 | 59.049949 | 7936 | 45 | 4.058205 | 6.347108 | 1.593168 | 1.344969 |
+| before 3 | 19,978.000000 | 0.31/1.08/1.69 | 57.237962 | 7968 | 48 | 4.404347 | 6.286437 | 1.588430 | 1.000000 |
+| after 3 | 19,991.050000 | 0.35/1.14/1.69 | 57.150575 | 8016 | 28 | 3.971075 | 6.530664 | 1.603577 | 1.313321 |
+
+| Site | Side | Locks/event | Count/run | Wait sum s | Wait mean us | Wait P95/P99 <=us | Hold sum s | Hold mean us | Hold P95/P99 <=us |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| publish | before | 1.000000 | 399560 | 2.936253 | 7.348717 | 50/250 | 0.821816 | 2.057235 | 10/25 |
+| publish | after | 1.000000 | 399821 | 3.177689 | 7.947580 | 50/250 | 0.807203 | 2.018861 | 10/25 |
+| take_ready | before | 1.702137 | 680106 | 2.021364 | 2.972131 | 0.5/100 | 0.281047 | 0.413240 | 1/5 |
+| take_ready | after | 1.291566 | 516408 | 1.468805 | 2.844272 | 0.25/100 | 0.280777 | 0.550480 | 2.5/10 |
+| next_ready_delay | before | 0.702137 | 280546 | 0.260216 | 0.927533 | 0.1/5 | 0.036497 | 0.130093 | 0.25/1 |
+| next_ready_delay | after | 0.766564 | 306496 | 0.488845 | 1.725974 | 0.1/50 | 0.044468 | 0.152253 | 0.25/1 |
+| complete | before | 1.000000 | 399560 | 1.068512 | 2.674222 | 0.25/100 | 0.420004 | 1.051166 | 2.5/10 |
+| complete | after | 1.000000 | 399821 | 1.168308 | 2.922005 | 0.25/100 | 0.430195 | 1.075969 | 2.5/10 |
+| control_restore_spool | before | 0.000073 | 29 | 0.000091 | 3.139345 | 25/100 | 0.000016 | 0.550241 | 2.5/10 |
+| control_restore_spool | after | 0.000073 | 29 | 0.000002 | 0.081793 | 0.25/0.5 | 0.000016 | 0.558966 | 2.5/10 |
+
+| Median metric | Before | After | Delta |
+| --- | --- | --- | --- |
+| State acquisitions/event | 4.404347 | 4.058205 | -7.86% |
+| take_ready acquisitions/event | 1.702137 | 1.291566 | -24.12% |
+| Total State wait s (ns precision) | 6.286437 | 6.347108 | +0.97% |
+| Legacy total State wait us | 6,143,197.000000 | 6,205,342.000000 | +1.01% |
+| Total State hold s (ns precision) | 1.546721 | 1.593168 | +3.00% |
+| take_ready wait s | 2.021364 | 1.468805 | -27.34% |
+| Accepted/PUBACK per s | 19,978.000000 | 19,991.050000 | +0.07% |
+| PUBACK P99 ms | 1.670000 | 1.690000 | +1.20% |
+| CPU us/event | 57.237962 | 57.150575 | -0.15% |
+| RSS KiB | 7,968.000000 | 8,016.000000 | +0.60% |
+| Pending peak | 39.000000 | 28.000000 | -28.21% |
+
+| Run | Dequeue calls | Empty calls | Nonempty batches | Records | Records/batch | P95 batch | P99 batch | Size 2 batches | Size 4 batches | Size 8 batches |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| before 1 | 682954 | 283478 | 399476 | 399476 | 1.000000 | 1 | 1 | 0 | 0 | 0 |
+| after 1 | 516955 | 224299 | 292656 | 399554 | 1.365268 | 3 | 7 | 23703 | 4560 | 1839 |
+| before 2 | 672161 | 272428 | 399733 | 399733 | 1.000000 | 1 | 1 | 0 | 0 | 0 |
+| after 2 | 516408 | 219129 | 297279 | 399831 | 1.344969 | 3 | 7 | 24010 | 4266 | 1744 |
+| before 3 | 680106 | 280546 | 399560 | 399560 | 1.000000 | 1 | 1 | 0 | 0 | 0 |
+| after 3 | 506346 | 201911 | 304435 | 399821 | 1.313321 | 3 | 7 | 21632 | 3934 | 1632 |
+
+### C saturation knee
+
+| Offered | Side | Accepted/s | P99 ms | Wait sum s | CPU us/event | RSS KiB | Mean nonempty batch |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| q1-25k | before | 24,089.850000 | 1.15 | 5.197725 | 42.694330 | 8048 | 1.000000 |
+| q1-25k | after | 24,193.300000 | 1.39 | 6.496976 | 44.826460 | 8000 | 1.273288 |
+| q1-30k | before | 26,634.400000 | 1.63 | 8.070167 | 47.570060 | 7968 | 1.000000 |
+| q1-30k | after | 26,670.100000 | 1.74 | 8.222157 | 46.419024 | 8336 | 1.226578 |
+
+Single paired secondary points: the approximate 25–30k/s knee is unchanged. At 25k
+candidate P99 is worse (1.15 -> 1.39ms), as is the 30k point (1.63 -> 1.74ms).
+There is no basis to call the tiny accepted-rate differences a capacity increase.
+
+### Queue selection cost
+
+| Side | Initial queue mean | Queue P95 <= | Queue P99 <= | Selection ns/call | Selection P95 <=ns | Selection P99 <=ns | Selection sum s | % take hold | % total State hold |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| before | 5.143898 | 32.0 | 64.0 | 139.092515 | 500.0 | 1000.0 | 0.094598 | 33.658983 | 6.116013 |
+| after | 5.279575 | 32.0 | 64.0 | 206.660371 | 1000.0 | 2500.0 | 0.106721 | 38.009191 | 6.698672 |
+
+Selection sum measures only min-by-deadline scans (all scans in a batch), excluding
+VecDeque removal. Before averages 139ns/selection call with small queues, about 6%
+of total State hold time. Scanning is visible inside take_ready, but is not established
+as the dominant primary-load critical-section cost. C still repeats the O(Q) scan
+for each record; it changes neither the queue data structure nor next_ready_delay.
+The separate ignored depth probe tests future queues up to 16,383 entries; its
+whole-call latencies include locking and instrumentation (and C test helper Vec costs),
+so they must not be interpreted as pure selection timings. Large backlog scan cost
+is a possible later independent study; no queue optimization is included here.
+
+Nanosecond units do not imply nanosecond hardware accuracy: timer quantization and
+the scan timer's own overhead remain. The extra probes run only when explicitly
+enabled and affect absolute timings; both compared binaries have the same probes.
+No timing-disabled A/A calibration or CPU sampling profile was run in C.
+
+### C fanout and delayed/retry microbenchmarks
+
+Three separate paired process repetitions; 10,000 no-retry events per fast 1/4/8
+sink case. Low-rate/delayed/retry cases use the existing bounded fixture. Microburst
+throughput is not server capacity. Values are per-field medians across three runs.
+
+| Scenario | Side | Events/s | All locks/event | publish | take_ready | complete | next delay | Mean batch | Take wait sum s |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 sinks/0ms/retry=False | before | 224,632.024665 | 3.765400 | 1.000000 | 1.378700 | 1.000000 | 0.378700 | 1.000000 | 0.009855 |
+| 1 sinks/0ms/retry=False | after | 218,485.513045 | 3.483900 | 1.000000 | 1.049200 | 1.000000 | 0.426700 | 1.182173 | 0.007167 |
+| 4 sinks/0ms/retry=False | before | 50,650.233003 | 9.051600 | 1.000000 | 4.021800 | 4.000000 | 0.021800 | 1.000000 | 0.237310 |
+| 4 sinks/0ms/retry=False | after | 46,677.840750 | 9.015800 | 1.000000 | 4.001200 | 4.000000 | 0.006000 | 1.000826 | 0.265185 |
+| 8 sinks/0ms/retry=False | before | 23,310.285918 | 17.026000 | 1.000000 | 8.009000 | 8.000000 | 0.009000 | 1.000000 | 1.277751 |
+| 8 sinks/0ms/retry=False | after | 21,848.248997 | 17.018800 | 1.000000 | 8.002500 | 8.000000 | 0.008400 | 1.000663 | 1.382970 |
+| 1 sinks/1ms/retry=False | before | 3,532.450971 | 3.017500 | 1.000000 | 1.004500 | 1.000000 | 0.004500 | 1.000000 | 0.000287 |
+| 1 sinks/1ms/retry=False | after | 3,523.938001 | 3.016000 | 1.000000 | 1.002000 | 1.000000 | 0.005500 | 1.002506 | 0.000362 |
+| 1 sinks/10ms/retry=False | before | 673.691567 | 3.019500 | 1.000000 | 1.005500 | 1.000000 | 0.005500 | 1.000000 | 0.000407 |
+| 1 sinks/10ms/retry=False | after | 673.738554 | 3.016000 | 1.000000 | 1.002000 | 1.000000 | 0.005500 | 1.002506 | 0.000391 |
+| 1 sinks/0ms/retry=True | before | 18,562.353516 | 6.125500 | 1.000000 | 2.558500 | 2.000000 | 0.558500 | 1.000000 | 0.001567 |
+| 1 sinks/0ms/retry=True | after | 19,043.009370 | 5.724500 | 1.000000 | 2.155500 | 2.000000 | 0.560500 | 1.173709 | 0.000869 |
+
+
+### Slow required sink and scan-depth observations
+
+| Side | Accepted | Explicit rejects | Slow backlog | Event bytes | Fast ACK/s | Worker select returns in blocked 100ms |
+| --- | --- | --- | --- | --- | --- | --- |
+| before | 1024 | 1024 | 1024 | 241492 | 132631.7 | 0 |
+| after | 1024 | 1024 | 1024 | 241492 | 119347.3 | 0 |
+
+Both fixtures assert all 1,024 fast deliveries finish while the slow required sink
+is blocked, accounting remains bounded, and all counts/bytes return to zero after
+release. This short blocked interval is not a long outage or memory-soak claim.
+
+| Future queue depth | Side | take P50/P95/P99 ns | next delay P50/P95/P99 ns |
+| --- | --- | --- | --- |
+| 0 | before | 333/416/541 | 250/292/458 |
+| 1000 | before | 1209/1459/1542 | 5292/6334/6458 |
+| 10000 | before | 4375/5166/5209 | 25042/29291/30250 |
+| 16383 | before | 6292/6417/7583 | 36625/37417/44959 |
+| 0 | after | 333/417/542 | 250/375/500 |
+| 1000 | after | 1250/1500/1541 | 5292/6334/6458 |
+| 10000 | after | 4375/5167/5250 | 25000/29292/31208 |
+| 16383 | after | 6333/6459/8166 | 36625/39292/45125 |
+
+At 16,383 future records baseline take P50 is about 6.3us and next-ready-delay
+P50 about 36.6us, versus hundreds of ns at depth zero. Thus linear scans can be
+material with a large backlog; the representative primary queue (mean ~5, P99
+<=64) does not demonstrate that large-backlog condition. Next-delay scanning
+and completion are unchanged by C. These are isolated timings, not saturation evidence.
+
+### C correctness, reproducibility and final answers
+
+Candidate runtime tests: **41 passed, 0 failed, 1 ignored**, including the new
+batch deadline/tie-order/concurrency/spool test. Both frozen revisions passed the
+ignored release queue-depth test. Paired micro fixtures cover 1/4/8 required
+fanout, delayed ACK, retry and blocked required sink isolation. Final source is
+the instrumentation-only baseline; its gates passed:
+
+```sh
+cargo fmt --all -- --check
+CARGO_INCREMENTAL=0 cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
+CARGO_INCREMENTAL=0 cargo test --locked --workspace --all-features
+python3 tests/mqtt_conformance/run.py --release-gate --no-build
+CARGO_INCREMENTAL=0 cargo test --locked -p netbaiot-server --test server \
+  subprocess_graceful_restart_sixty_second_soak -- --ignored --nocapture
+```
+
+Final workspace: **142 passed, 0 failed, 4 intentionally ignored**. Existing
+atomic admission/last-required-target rollback, best-effort full, 1/4/8 shared
+fanout, slow sink, retry, panic, cancellation, restore and inflight spool tests
+all pass. Subprocess recovery, failed-spool repair and SIGKILL bounded-loss tests
+also pass. MQTT: **76/76**, including external Mosquitto interoperability and
+**125/125** normative coverage. Restart soak: **61.88s**, passed. No timeout,
+resource limit or assertion was relaxed. No parser/spool format changed; no new
+fuzz campaign, long-duration outage/memory soak, physical-network test or allocator
+trace was run. The 60-second restart soak is not abrupt-crash durability evidence.
+
+Every network run has published = accepted = PUBACK = sink ACK = dequeued, zero
+reject/retry/failure counters, zero client errors, final sampled pending = 0 and
+normal server exit. Per-site acquisitions exactly sum to the aggregate count;
+ns/us totals differ only by expected integer truncation. Checks are retained in
+`eventbus-batch-evidence/measurement-checks.txt`. Pending and RSS peaks are sampled,
+not exact maxima. `ps time` CPU/event includes setup, connected-idle warmup and
+metrics rendering before shutdown. No benchmark ran alongside this task's Rust
+builds or tests; unrelated shared-host work was not controlled. Single paired
+knee points and microbursts cannot establish production capacity.
+
+The C build uses the same M4/16GiB/macOS 26.6.2/Rust 1.97.1 host and release profile
+described above. `provenance.json` records the exact BASELINE_SHA, binary hashes,
+toolchain, isolated branch and unchanged complete() hash. Exact network commands
+and execution order are in `paired/manifest-primary.json` and
+`paired/manifest-secondary.json`. Reproduction from repository root:
+
+```sh
+mkdir -p /tmp/netbaiot-eventbus-c/baseline-src
+git archive 49e885e740ef5dd971f516821e88bc946517a46f | tar -x -C /tmp/netbaiot-eventbus-c/baseline-src
+CARGO_INCREMENTAL=0 cargo build --locked --release \
+  --manifest-path /tmp/netbaiot-eventbus-c/baseline-src/Cargo.toml \
+  --target-dir /tmp/netbaiot-eventbus-c/baseline-target \
+  -p netbaiot-server -p netbaiot-loadgen -p netbaiot-runtime --example eventbus_probe --bins
+# In a separate checkout of BASELINE_SHA, apply only candidate.patch.gz, then build:
+# gzip -dc /path/to/eventbus-batch-evidence/candidate.patch.gz | git apply
+# cargo build --locked --release -p netbaiot-server -p netbaiot-runtime --example eventbus_probe --bins
+python3 scripts/perf/eventbus_lock_pairs.py --before BASELINE_SERVER \
+  --after CANDIDATE_SERVER --loadgen BASELINE_LOADGEN --output RESULTS
+# Repeat with --knee-only for 25k/30k.
+python3 docs/eventbus-batch-evidence/reproduce_micro.py --before BASELINE_PROBE \
+  --after CANDIDATE_PROBE --output RESULTS
+python3 scripts/perf/eventbus_site_summary.py RESULTS > RESULTS/summary.json
+```
+
+1. **How many State acquisitions per accepted event?** Primary medians 4.404347
+   before, 4.058205 for C. No-retry paired 1/4/8-sink micro medians before are
+   3.7654 / 9.0516 / 17.0260 and after 3.4839 / 9.0158 / 17.0188. Observer/control
+   calls are included and separately reported.
+2. **Largest wait site?** Publish: median 2.936253s before and 3.177689s after per
+   20-second run. Waiting caller attribution is not proof that this caller alone
+   causes the contention; all sites share the same mutex.
+3. **Actual batch size?** Primary mean nonempty batch 1.344969, P95 3, P99 7, with
+   measured size-2/4/8 batches. Saturated 4/8-sink micros average only 1.000826 /
+   1.000663: unchanged worker scheduling observes one completion then refills that
+   slot, leaving little opportunity to batch in these cases. Their throughput
+   does not improve. No hidden completion batching was added to manufacture gains.
+4. **Did acquisitions become lower total wait?** No. Take acquisitions fall 24.12%
+   and its own wait falls, but next-delay/publish and other waits offset this.
+   Total ns-precision wait increases 0.97%; legacy us sum increases 1.01%.
+5. **Did the knee move?** No measurable shift: both sides remain ~24.1k accepted/s
+   at 25k offered and ~26.6k at 30k offered.
+6. **Is a new dominant bottleneck proven?** No. Serialized State contention remains
+   unresolved. Dequeue frequency is not supported as its main independently
+   removable cause; small-queue min scans consume only ~6% of total State hold.
+   Large-backlog scans and proposed completion batching require separate evidence.
+
+Final decision **REVERT**. Final `event.rs` and `metrics.rs` are exactly those of
+the instrumentation-only `49e885e` baseline. The final evidence commit is on
+`codex/eventbus-batch-dispatch`, isolated from the concurrently changed shared
+checkout. No push was performed.

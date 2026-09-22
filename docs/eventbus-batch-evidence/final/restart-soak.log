@@ -1,0 +1,8 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.06s
+     Running tests/server.rs (target/debug/deps/server-5751a92c0075cd83)
+
+running 1 test
+test subprocess_graceful_restart_sixty_second_soak has been running for over 60 seconds
+test subprocess_graceful_restart_sixty_second_soak ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 12 filtered out; finished in 61.88s

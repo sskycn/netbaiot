@@ -1,0 +1,25 @@
+{
+  "START_SHA": "fd734c02822a5b4b701e7907c219d72d230749b1",
+  "BASELINE_SHA": "49e885e740ef5dd971f516821e88bc946517a46f",
+  "binaries": {
+    "baseline_server": "/tmp/netbaiot-eventbus-c/baseline-target/release/netbaiot-server",
+    "baseline_probe": "/tmp/netbaiot-eventbus-c/baseline-target/release/examples/eventbus_probe",
+    "candidate_server": "/tmp/netbaiot-eventbus-c/candidate-server",
+    "candidate_probe": "/tmp/netbaiot-eventbus-c/candidate-probe",
+    "loadgen": "/tmp/netbaiot-eventbus-c/baseline-target/release/netbaiot-loadgen"
+  },
+  "sha256": {
+    "baseline_server": "3ebec8d0bfca614e20780f6b290ef2362517fd44bdbce4ebdc7a4b93f7523328",
+    "baseline_probe": "91d7c51dab09fa2b8862da11f421b24c508e64a1708a821b5813ca0801e0c116",
+    "candidate_server": "89df5bd77dae171dc69ca091b289d2b89d7e98dc9fc269372d7357aa4046943e",
+    "candidate_probe": "17d53232f28c42da3a2655351e60337123d83e2ccd4fa5855128b987d6d05b1f",
+    "loadgen": "54d73c34052d8b934fb05af7cecc575bae8bbcf7fd05ba02a6dc1c4304e9239f"
+  },
+  "complete_function_sha256": "0d9715e95e095cfb9303494f2b16ed037778534f300c7fb93d85846e6775bf2f",
+  "complete_identical": true,
+  "rustc": "rustc 1.97.1 (8bab26f4f 2026-07-14)\nbinary: rustc\ncommit-hash: 8bab26f4f68e0e26f0bb7960be334d5b520ea452\ncommit-date: 2026-07-14\nhost: aarch64-apple-darwin\nrelease: 1.97.1\nLLVM version: 22.1.6\n",
+  "os": "ProductName:\t\tmacOS\nProductVersion:\t\t26.6.2\nBuildVersion:\t\t25G83\n",
+  "worktree": "/tmp/netbaiot-eventbus-c/worktree",
+  "branch": "codex/eventbus-batch-dispatch",
+  "final_runtime_equals_baseline": true
+}
