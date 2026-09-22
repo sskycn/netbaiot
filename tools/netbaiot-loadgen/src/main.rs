@@ -13,6 +13,7 @@ use std::{
 use tokio::{
     io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
     net::{TcpStream, UdpSocket},
+    sync::watch,
     task::JoinSet,
     time::{Instant, sleep_until, timeout},
 };
@@ -25,6 +26,8 @@ const MAX_PACKET: usize = 65536;
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(default, deny_unknown_fields)]
 struct Config {
+    audit_open_loop: bool,
+    tls_server_name: String,
     transport: String,
     address: String,
     http_url: String,
@@ -68,6 +71,8 @@ struct Phase {
 impl Default for Config {
     fn default() -> Self {
         Self {
+            audit_open_loop: false,
+            tls_server_name: "localhost".into(),
             transport: "mqtt".into(),
             address: "127.0.0.1:1883".into(),
             http_url: "http://127.0.0.1:8080".into(),
@@ -123,12 +128,27 @@ impl Config {
         {
             return Err("invalid bounded load configuration".into());
         }
+        if self.audit_open_loop
+            && (self.transport != "mqtt"
+                || !self.phases.is_empty()
+                || self.reconnect_every_secs != 0.0
+                || self.retry_connections
+                || self.bad_auth
+                || self.slow_fraction != 0.0
+                || self.command_rate != 0.0
+                || self.connections > 10000
+                || !(0.01..=1_000_000.0).contains(&self.publish_rate))
+        {
+            return Err("audit mode requires bounded, fixed-rate MQTT connections".into());
+        }
+        if self.tls_server_name.is_empty() || self.tls_server_name.len() > 253 {
+            return Err("invalid TLS server name".into());
+        }
         for v in [
             self.ramp_per_sec,
             self.warmup_secs,
             self.duration_secs,
             self.cooldown_secs,
-            self.publish_rate,
             self.reconnect_every_secs,
             self.command_rate,
             self.timeout_secs,
@@ -136,6 +156,9 @@ impl Config {
             if !v.is_finite() || !(0.0..=86400.0).contains(&v) {
                 return Err("invalid rate/duration".into());
             }
+        }
+        if !self.publish_rate.is_finite() || !(0.0..=1_000_000.0).contains(&self.publish_rate) {
+            return Err("invalid publish rate".into());
         }
         if self.ramp_per_sec == 0.0
             || self.timeout_secs == 0.0
@@ -250,6 +273,8 @@ struct Stats {
     counters: HashMap<&'static str, u64>,
     hist: HashMap<&'static str, Histogram>,
     errors: Vec<String>,
+    inflight: usize,
+    inflight_peak: usize,
 }
 type Shared = Arc<Mutex<Stats>>;
 fn count(s: &Shared, k: &'static str, n: u64) {
@@ -284,7 +309,7 @@ fn phase_ack(s: &Shared, phase: usize, elapsed: Duration) {
 fn snapshot(s: &Shared) -> Value {
     match s.lock() {
         Ok(s) => {
-            json!({"counters":s.counters,"error_samples":s.errors,"latencies":s.hist.iter().map(|(k,h)|(*k,h.value())).collect::<HashMap<_,_>>()})
+            json!({"counters":s.counters,"error_samples":s.errors,"inflight":s.inflight,"inflight_peak":s.inflight_peak,"latencies":s.hist.iter().map(|(k,h)|(*k,h.value())).collect::<HashMap<_,_>>()})
         }
         Err(_) => json!({"error":"statistics lock poisoned"}),
     }
@@ -334,7 +359,7 @@ async fn connect(c: &Config, connector: &Option<TlsConnector>) -> Result<Stream>
     if let Some(tls) = connector {
         Ok(Box::new(
             tls.connect(
-                rustls::pki_types::ServerName::try_from("localhost")?,
+                rustls::pki_types::ServerName::try_from(c.tls_server_name.clone())?,
                 socket,
             )
             .await?,
@@ -474,6 +499,7 @@ async fn mqtt_or_tcp(
     end: Instant,
     run: &str,
     generation: usize,
+    mut audit_start: Option<watch::Receiver<Option<AuditTiming>>>,
 ) -> Result<()> {
     let mqtt = c.transport == "mqtt";
     let started = Instant::now();
@@ -556,6 +582,22 @@ async fn mqtt_or_tcp(
             return Err("SUBACK rejected".into());
         }
     }
+    let (traffic_start, measure, end) = if let Some(rx) = &mut audit_start {
+        count(s, "ready", 1);
+        let timing = loop {
+            if let Some(timing) = *rx.borrow_and_update() {
+                break timing;
+            }
+            rx.changed().await.map_err(|_| "audit start cancelled")?;
+        };
+        (timing.warmup, timing.measure, timing.end)
+    } else {
+        (measure, measure, end)
+    };
+    let mut occupancy = InflightGauge {
+        stats: s.clone(),
+        current: 0,
+    };
     let slow = (relative as f64) < (c.connections as f64 * c.slow_fraction);
     if slow {
         sleep_until(end).await;
@@ -571,7 +613,7 @@ async fn mqtt_or_tcp(
     } else {
         end
     };
-    let mut due = measure + Duration::from_secs_f64(relative as f64 / c.rate(0.0).max(1.0));
+    let mut due = traffic_start + Duration::from_secs_f64(relative as f64 / c.rate(0.0).max(1.0));
     // Reconnection must not replay missed schedule slots as an artificial burst.
     let rate_now = c.rate(
         Instant::now()
@@ -593,30 +635,48 @@ async fn mqtt_or_tcp(
     let traffic_end = end - Duration::from_secs_f64(c.cooldown_secs);
     loop {
         while let Some((first, b)) = parse(&mut buffer, mqtt)? {
+            if c.audit_open_loop {
+                let header = 2 + usize::from(b.len() >= 128) + usize::from(b.len() >= 16384);
+                count(s, "wire_bytes_received", (header + b.len()) as u64);
+            }
             if first == 0x40 && b.len() == 2 {
                 let id = u16::from_be_bytes([b[0], b[1]]);
                 if let Some(p) = ids.remove(&id) {
-                    observe(
-                        s,
-                        if p.command {
-                            "command_puback"
-                        } else {
-                            "puback"
-                        },
-                        p.at.elapsed(),
-                    );
+                    if c.audit_open_loop && p.at >= measure {
+                        count(s, "measurement_pubacks", 1);
+                    }
+                    if !c.audit_open_loop || p.at >= measure {
+                        observe(
+                            s,
+                            if p.command {
+                                "command_puback"
+                            } else {
+                                "puback"
+                            },
+                            p.at.elapsed(),
+                        );
+                    }
                     count(s, "pubacks", 1);
                 }
             } else if first == 0x50 && b.len() == 2 {
                 let id = u16::from_be_bytes([b[0], b[1]]);
-                if ids.contains_key(&id) {
+                if let Some(p) = ids.get(&id) {
+                    if !c.audit_open_loop || p.at >= measure {
+                        observe(s, "pubrec", p.at.elapsed());
+                    }
+                    count(s, "pubrecs", 1);
                     write(&mut stream, &packet(0x62, &b), s).await?;
                     count(s, "pubrels", 1);
                 }
             } else if first == 0x70 && b.len() == 2 {
                 let id = u16::from_be_bytes([b[0], b[1]]);
                 if let Some(p) = ids.remove(&id) {
-                    observe(s, "pubcomp", p.at.elapsed());
+                    if c.audit_open_loop && p.at >= measure {
+                        count(s, "measurement_pubcomps", 1);
+                    }
+                    if !c.audit_open_loop || p.at >= measure {
+                        observe(s, "pubcomp", p.at.elapsed());
+                    }
                     count(s, "pubcomps", 1);
                 }
             } else if !mqtt || first >> 4 == 3 {
@@ -733,7 +793,13 @@ async fn mqtt_or_tcp(
             return Err("ack deadline".into());
         }
         let elapsed = now.saturating_duration_since(measure).as_secs_f64();
-        let rate = if now < measure { 0.0 } else { c.rate(elapsed) };
+        let rate = if c.audit_open_loop && now >= traffic_start && now < measure {
+            c.publish_rate
+        } else if now < measure {
+            0.0
+        } else {
+            c.rate(elapsed)
+        };
         if now >= traffic_end {
             due = end;
         }
@@ -745,7 +811,20 @@ async fn mqtt_or_tcp(
                     "generator_schedule_lag",
                     now.saturating_duration_since(due),
                 );
-                due = (due + step).max(now + step.min(Duration::from_millis(1)));
+                if c.audit_open_loop {
+                    let (next, slots) = advance_open_loop(due, now, step);
+                    due = next;
+                    count(s, "scheduled_slots", slots);
+                    count(s, "schedule_missed", slots - 1);
+                    count(s, "publish_attempted", 1);
+                    if now >= measure {
+                        count(s, "measurement_scheduled_slots", slots);
+                        count(s, "measurement_schedule_missed", slots - 1);
+                        count(s, "measurement_attempted", 1);
+                    }
+                } else {
+                    due = (due + step).max(now + step.min(Duration::from_millis(1)));
+                }
                 if pending.len() < c.window && ids.len() < c.window {
                     seq += 1;
                     let unique = format!("{run}.{generation}");
@@ -787,12 +866,22 @@ async fn mqtt_or_tcp(
                     }
                     count(s, "published", 1);
                     count(s, "payload_bytes", payload.len() as u64);
+                    if c.audit_open_loop && now >= measure {
+                        count(s, "measurement_published", 1);
+                        count(s, "measurement_payload_bytes", payload.len() as u64);
+                    }
                 } else {
                     count(s, "client_window_full", 1);
+                    if c.audit_open_loop && now >= measure {
+                        count(s, "measurement_window_full", 1);
+                    }
                 }
             } else {
                 due = now + Duration::from_millis(if c.phases.is_empty() { 10000 } else { 100 });
             }
+        }
+        if c.audit_open_loop {
+            occupancy.set(pending.len() + ids.len());
         }
         if mqtt && now >= ping {
             write(&mut stream, &[0xc0, 0], s).await?;
@@ -980,6 +1069,140 @@ async fn commands(
     }
     Ok(())
 }
+// Each connection owns one bounded pending map and one active write. No send queue.
+struct InflightGauge {
+    stats: Shared,
+    current: usize,
+}
+impl InflightGauge {
+    fn set(&mut self, value: usize) {
+        if let Ok(mut stats) = self.stats.lock() {
+            stats.inflight = stats.inflight.saturating_sub(self.current) + value;
+            stats.inflight_peak = stats.inflight_peak.max(stats.inflight);
+        }
+        self.current = value;
+    }
+}
+impl Drop for InflightGauge {
+    fn drop(&mut self) {
+        self.set(0);
+    }
+}
+
+#[derive(Clone, Copy)]
+struct AuditTiming {
+    warmup: Instant,
+    measure: Instant,
+    end: Instant,
+}
+
+// Absolute schedule: missed slots are explicitly discarded, never shifted into
+// an unbounded catch-up burst or silently turned into an ACK-paced workload.
+fn advance_open_loop(due: Instant, now: Instant, step: Duration) -> (Instant, u64) {
+    let step_ns = step.as_nanos().max(1);
+    let lag = now.saturating_duration_since(due).as_nanos();
+    let slots = (lag / step_ns + 1).min(u128::from(u64::MAX)) as u64;
+    let remaining = (step_ns - lag % step_ns).min(u128::from(u64::MAX)) as u64;
+    (now + Duration::from_nanos(remaining), slots)
+}
+
+async fn run_audit(c: Config) -> Result<()> {
+    let connector = tls(&c)?;
+    let c = Arc::new(c);
+    let stats: Shared = Arc::new(Mutex::new(Stats::default()));
+    let (start_tx, start_rx) = watch::channel(None);
+    let began = Instant::now();
+    let readiness_deadline = began
+        + Duration::from_secs_f64(c.connections as f64 / c.ramp_per_sec + c.timeout_secs + 10.0);
+    let run = Uuid::new_v4().simple().to_string();
+    let mut tasks = JoinSet::new();
+    println!(
+        "{}",
+        json!({"event":"start","pid":std::process::id(),"config":&*c,"epoch_ms":now_ms(),"pacing":"absolute_schedule_drop_missed"})
+    );
+    for relative in 0..c.connections {
+        let (c, stats, connector, rx, run) = (
+            c.clone(),
+            stats.clone(),
+            connector.clone(),
+            start_rx.clone(),
+            run.clone(),
+        );
+        tasks.spawn(async move {
+            sleep_until(began + Duration::from_secs_f64(relative as f64 / c.ramp_per_sec)).await;
+            count(&stats, "connect_attempts", 1);
+            if let Err(error) = mqtt_or_tcp(
+                &c,
+                c.offset + relative,
+                relative,
+                &stats,
+                &connector,
+                readiness_deadline,
+                readiness_deadline,
+                &run,
+                0,
+                Some(rx),
+            )
+            .await
+            {
+                error_sample(&stats, &error);
+                count(&stats, "client_errors", 1);
+            }
+        });
+    }
+    // A failed connection cannot leave an unbounded barrier wait.
+    loop {
+        let state = snapshot(&stats);
+        if state["counters"]["ready"].as_u64().unwrap_or(0) == c.connections as u64 {
+            break;
+        }
+        if state["counters"]["client_errors"].as_u64().unwrap_or(0) > 0
+            || Instant::now() >= readiness_deadline
+        {
+            tasks.abort_all();
+            while tasks.join_next().await.is_some() {}
+            println!(
+                "{}",
+                json!({"event":"setup_failed","stats":snapshot(&stats)})
+            );
+            return Err("not all publishers became ready".into());
+        }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    let warmup = Instant::now() + Duration::from_millis(100);
+    let measure = warmup + Duration::from_secs_f64(c.warmup_secs);
+    let traffic_end = measure + Duration::from_secs_f64(c.duration_secs);
+    let end = traffic_end + Duration::from_secs_f64(c.cooldown_secs);
+    start_tx
+        .send(Some(AuditTiming {
+            warmup,
+            measure,
+            end,
+        }))
+        .map_err(|_| "no audit workers")?;
+    let mut tick = tokio::time::interval(Duration::from_secs_f64(c.report_every_secs));
+    let mut stage = 0;
+    let mut boundary = warmup;
+    while !tasks.is_empty() {
+        tokio::select! {
+            result = tasks.join_next() => { if result.is_some_and(|r|r.is_err()) { return Err("audit worker panicked".into()); } },
+            _ = sleep_until(boundary), if stage < 3 => {
+                let event = ["warmup_start", "measurement_start", "measurement_end"][stage];
+                if stage == 1 { if let Ok(mut s) = stats.lock() { s.hist.retain(|k,_| *k == "connect"); s.inflight_peak=s.inflight; } }
+                println!("{}",json!({"event":event,"epoch_ms":now_ms(),"elapsed_s":began.elapsed().as_secs_f64(),"stats":snapshot(&stats)}));
+                stage += 1; boundary = if stage == 1 { measure } else { traffic_end };
+            },
+            _ = tick.tick() => println!("{}",json!({"event":"sample","epoch_ms":now_ms(),"elapsed_s":began.elapsed().as_secs_f64(),"measurement_s":Instant::now().saturating_duration_since(measure).as_secs_f64(),"phase":if Instant::now()<measure {"warmup"} else if Instant::now()<traffic_end {"measurement"} else {"cooldown"},"tasks":tokio::runtime::Handle::current().metrics().num_alive_tasks(),"stats":snapshot(&stats)})),
+            _ = sleep_until(end + Duration::from_secs(6)) => { tasks.abort_all(); while tasks.join_next().await.is_some() {} count(&stats,"forced_tasks",1); break; }
+        }
+    }
+    println!(
+        "{}",
+        json!({"event":"final","epoch_ms":now_ms(),"elapsed_s":began.elapsed().as_secs_f64(),"stats":snapshot(&stats)})
+    );
+    Ok(())
+}
+
 #[tokio::main(flavor = "multi_thread", worker_threads = 4)]
 async fn main() -> Result<()> {
     let path = std::env::args()
@@ -991,6 +1214,9 @@ async fn main() -> Result<()> {
     }
     let c: Config = serde_json::from_slice(&bytes)?;
     c.validate()?;
+    if c.audit_open_loop {
+        return run_audit(c).await;
+    }
     let c = Arc::new(c);
     let connector = tls(&c)?;
     let s: Shared = Arc::new(Mutex::new(Stats::default()));
@@ -1036,6 +1262,7 @@ async fn main() -> Result<()> {
                     end,
                     &run,
                     generation,
+                    None,
                 )
                 .await
                 {
@@ -1088,6 +1315,31 @@ async fn main() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn open_loop_schedule_counts_skips_without_drift() {
+        let due = Instant::now();
+        let step = Duration::from_millis(10);
+        let (next, slots) = advance_open_loop(due, due + Duration::from_millis(35), step);
+        assert_eq!(slots, 4);
+        assert_eq!(next, due + Duration::from_millis(40));
+        let (next, slots) = advance_open_loop(next, next, step);
+        assert_eq!(slots, 1);
+        assert_eq!(next, due + Duration::from_millis(50));
+    }
+    #[test]
+    fn audit_rejects_unbounded_or_incompatible_workloads() {
+        let mut c = Config {
+            audit_open_loop: true,
+            publish_rate: 100_000.0,
+            ..Config::default()
+        };
+        assert!(c.validate().is_ok());
+        c.connections = 10001;
+        assert!(c.validate().is_err());
+        c.connections = 100;
+        c.retry_connections = true;
+        assert!(c.validate().is_err());
+    }
     #[test]
     fn frames_handle_all_splits() {
         for mqtt in [true, false] {
