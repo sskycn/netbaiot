@@ -4,10 +4,21 @@ NetbaIoT 是一个无数据库、以内存为主的 IoT 协议网关和实时事
 
 运行时不需要 PostgreSQL 或其他数据库。业务系统负责持久化业务数据和离线命令。NetbaIoT 唯一的持久化机制是有界本地重启 spool，仅用于计划内优雅关机无法完成所有已接受的必需投递时。
 
-## 本地运行
+## 5 分钟 Quick Start
+
+要求 Rust 1.88+、Python 3 和 `curl`；MQTT 命令可选安装 Mosquitto clients。
+Mosquitto 在此仅作为客户端，NetbaIoT 自带 MQTT 3.1.1 broker。
 
 ```bash
-cargo run -p netbaiot-server -- configs/development.json
+cargo +1.88.0 build --locked
+python3 examples/business_http_sink.py
+```
+
+另开终端：
+
+```bash
+export NETBAIOT_ADMIN_SECRET=abababababababababababababababababababababababababababababababab
+cargo run -p netbaiot-server -- configs/tutorial.json
 ```
 
 开发环境监听地址：
@@ -27,10 +38,11 @@ curl --noproxy '*' -i http://127.0.0.1:8080/v1/device/data \
 ```
 
 HTTP `202` 和 MQTT QoS1 PUBACK 表示事件已越过有界的 `EventAccepted` 边界，不代表业务数据库已存储事件。
+Python 终端会打印规范化事件并返回 HTTP 204。继续阅读[10 分钟端到端教程](docs/getting-started.md)，完成 MQTT 收发、在线命令、CLI 和优雅关机。
 
 设置 64 字符的 `NETBAIOT_ADMIN_SECRET` 以启用管理调用。生产配置必须指定需确认的 webhook 或分帧 TCP/RPC 业务接收端。由于重试和重启重放可能造成重复投递，业务接收端必须使用稳定的 `event_id` 去重。
 
-参阅[架构](docs/architecture.zh-CN.md)、[投递语义](docs/delivery-semantics.zh-CN.md)、[设备协议](docs/device-protocol.zh-CN.md)、[HTTP API](docs/http-api.zh-CN.md)、[业务系统集成](docs/business-integration.zh-CN.md)和[MQTT 指南](docs/mqtt.zh-CN.md)。
+参阅[完整用户指南](docs/user-guide.md)、[架构](docs/architecture.zh-CN.md)、[投递语义](docs/delivery-semantics.zh-CN.md)、[设备协议](docs/device-protocol.zh-CN.md)、[HTTP API](docs/http-api.zh-CN.md)、[业务系统集成](docs/business-integration.zh-CN.md)和[MQTT 指南](docs/mqtt.zh-CN.md)。
 
 ## 官方 Rust 客户端
 
