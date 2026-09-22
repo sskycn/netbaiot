@@ -877,6 +877,100 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn fanout_restore_inflight_spool_preserves_shared_event_and_accounting() {
+        for count in [1, 4, 8] {
+            let limits = Arc::new(Limits::default());
+            let ids = (0..count)
+                .map(|i| SinkId::new(format!("sink{i}")).unwrap())
+                .collect::<Vec<_>>();
+            let definitions = || {
+                ids.iter()
+                    .map(|id| {
+                        SinkDefinition::bounded(
+                            id.clone(),
+                            SinkDeliveryMode::ConfirmedRequired,
+                            Arc::new(Ack),
+                            &limits,
+                        )
+                    })
+                    .collect()
+            };
+            let routes = || {
+                vec![RouteDefinition {
+                    tenant: None,
+                    sinks: ids.clone(),
+                }]
+            };
+            let bus = EventBus::new(
+                limits.clone(),
+                Arc::new(Metrics::default()),
+                definitions(),
+                routes(),
+                7,
+            )
+            .unwrap();
+            bus.stop_workers().await.unwrap();
+            let original = event(256);
+            let bytes = serde_json::to_vec(&original).unwrap().len();
+            let acceptance = bus.publish(original.clone()).unwrap();
+            assert_eq!(acceptance.required_deliveries, count);
+            assert_eq!(
+                bus.usage().unwrap(),
+                EventBusUsage {
+                    events: 1,
+                    bytes,
+                    pending_required: count
+                }
+            );
+            let mut records = bus.spool_records().unwrap();
+            records[0].attempts = ids.iter().map(|id| (id.clone(), 3)).collect();
+            let restored = EventBus::new(
+                limits.clone(),
+                Arc::new(Metrics::default()),
+                definitions(),
+                routes(),
+                99,
+            )
+            .unwrap();
+            restored.stop_workers().await.unwrap();
+            assert_eq!(restored.restore(records).unwrap(), 1);
+            let deliveries = ids
+                .iter()
+                .map(|id| restored.take_ready(id).unwrap().unwrap())
+                .collect::<Vec<_>>();
+            for delivery in &deliveries {
+                assert!(Arc::ptr_eq(&delivery.event, &deliveries[0].event));
+                assert_eq!(delivery.attempt, 3);
+                assert_eq!(delivery.accepted_at, acceptance.accepted_at);
+            }
+            // All entries are inflight, but every required responsibility is still spooled.
+            let snapshot = restored.spool_records().unwrap();
+            assert_eq!(snapshot[0].pending_sinks, ids);
+            assert_eq!(snapshot[0].routing_revision, 7);
+            assert_eq!(snapshot[0].accepted_at, acceptance.accepted_at);
+            assert_eq!(snapshot[0].event.event_id, original.event_id);
+            assert!(snapshot[0].attempts.values().all(|attempt| *attempt == 3));
+            for (index, (id, record)) in ids.iter().zip(deliveries).enumerate() {
+                let definition = lock(&restored.state).unwrap().sinks[id].definition.clone();
+                restored
+                    .complete(id, record, Ok(SinkAck), &definition)
+                    .unwrap();
+                if index + 1 < count {
+                    let pending = restored.spool_records().unwrap();
+                    assert_eq!(pending[0].attempts[id], 4);
+                    assert_eq!(pending[0].pending_sinks, ids[index + 1..]);
+                }
+            }
+            assert_eq!(restored.usage().unwrap(), EventBusUsage::default());
+            let state = lock(&restored.state).unwrap();
+            assert!(state.sinks.values().all(|sink| sink.used_count == 0
+                && sink.used_bytes == 0
+                && sink.inflight == 0
+                && sink.queue.is_empty()));
+        }
+    }
+
+    #[tokio::test]
     #[ignore = "release-only queue scan measurement"]
     async fn eventbus_queue_depth_probe() {
         for depth in [0, 1_000, 10_000, 16_383] {
@@ -986,6 +1080,125 @@ mod tests {
         let state = bus.state.lock().unwrap();
         assert!(state.sinks.get(&second).unwrap().queue.is_empty());
         assert!(state.active.is_empty());
+    }
+
+    #[tokio::test]
+    async fn required_last_target_full_preserves_every_queue_and_counter() {
+        for count in [1, 4, 8] {
+            for byte_limit in [false, true] {
+                let limits = Arc::new(Limits::default());
+                let ids = (0..count)
+                    .map(|i| SinkId::new(format!("sink{i}")).unwrap())
+                    .collect::<Vec<_>>();
+                let last = ids.last().unwrap().clone();
+                let bytes = serde_json::to_vec(&event(8)).unwrap().len();
+                let definitions = ids
+                    .iter()
+                    .map(|id| {
+                        let mut definition = SinkDefinition::bounded(
+                            id.clone(),
+                            SinkDeliveryMode::ConfirmedRequired,
+                            Arc::new(Ack),
+                            &limits,
+                        );
+                        definition.concurrency = 1;
+                        if id == &last {
+                            if byte_limit {
+                                definition.max_bytes = bytes;
+                            } else {
+                                definition.max_count = 1;
+                            }
+                        }
+                        definition
+                    })
+                    .collect();
+                let bus = EventBus::new(
+                    limits,
+                    Arc::new(Metrics::default()),
+                    definitions,
+                    vec![RouteDefinition {
+                        tenant: None,
+                        sinks: vec![last],
+                    }],
+                    1,
+                )
+                .unwrap();
+                bus.stop_workers().await.unwrap();
+                bus.publish(event(8)).unwrap();
+                bus.replace_routes(
+                    2,
+                    vec![RouteDefinition {
+                        tenant: None,
+                        sinks: ids,
+                    }],
+                )
+                .unwrap();
+                let before = bus.usage().unwrap();
+                let accounting = || {
+                    let state = lock(&bus.state).unwrap();
+                    state
+                        .sinks
+                        .values()
+                        .map(|sink| {
+                            (
+                                sink.used_count,
+                                sink.used_bytes,
+                                sink.inflight,
+                                sink.queue.len(),
+                            )
+                        })
+                        .collect::<Vec<_>>()
+                };
+                let counters = accounting();
+                assert!(matches!(bus.publish(event(8)), Err(Error::Overloaded)));
+                assert_eq!(bus.usage().unwrap(), before);
+                assert_eq!(accounting(), counters);
+                assert_eq!(bus.spool_records().unwrap().len(), 1);
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn cancelled_inflight_required_delivery_remains_owned_for_spool() {
+        let limits = Arc::new(Limits::default());
+        let id = SinkId::new("blocked").unwrap();
+        let sink = Arc::new(Signal {
+            calls: AtomicUsize::new(0),
+            block: Some(Arc::new(tokio::sync::Notify::new())),
+        });
+        let bus = EventBus::new(
+            limits.clone(),
+            Arc::new(Metrics::default()),
+            vec![SinkDefinition::bounded(
+                id.clone(),
+                SinkDeliveryMode::ConfirmedRequired,
+                sink.clone(),
+                &limits,
+            )],
+            vec![RouteDefinition {
+                tenant: None,
+                sinks: vec![id.clone()],
+            }],
+            9,
+        )
+        .unwrap();
+        let acceptance = bus.publish(event(8)).unwrap();
+        tokio::time::timeout(Duration::from_secs(1), async {
+            while sink.calls.load(Ordering::SeqCst) == 0 {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        bus.close_admission().unwrap();
+        let before = bus.usage().unwrap();
+        bus.stop_workers().await.unwrap();
+        assert_eq!(bus.usage().unwrap(), before);
+        let records = bus.spool_records().unwrap();
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0].event.event_id, acceptance.event_id);
+        assert_eq!(records[0].routing_revision, 9);
+        assert_eq!(records[0].pending_sinks, vec![id]);
     }
 
     #[tokio::test]

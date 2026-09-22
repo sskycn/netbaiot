@@ -40,6 +40,10 @@ def network(path):
     n = m["netbaiot_events_accepted_total"]
     latency = "puback" if d["qos"] == 1 else "pubcomp"
     return {"accepted_s": n / d["duration_seconds"], "sink_acks_s": m["netbaiot_sink_acks_total"] / d["duration_seconds"],
+            "pubacks_s": d["load"]["stats"]["counters"].get("pubacks", 0) / d["duration_seconds"] if d["qos"] == 1 else None,
+            "cpu_seconds": d.get("server_cpu_seconds"),
+            "cpu_us_per_event": d["server_cpu_seconds"] * 1_000_000 / n if d.get("server_cpu_seconds") is not None else None,
+            "sink_failures": m["netbaiot_sink_failures_total"],
             "latency": d["load"]["stats"]["latencies"].get(latency),
             "cpu_peak": max(s["cpu_percent"] for s in d["samples"]),
             "rss_peak_kib": max(s["rss_kib"] for s in d["samples"]),
@@ -49,7 +53,7 @@ def network(path):
             "rejects": {k:v for k,v in m.items() if "reject" in k},
             "probes": probes(m, n),
             "locks": {name: histogram(m, name) for name in (
-                "event_bus_lock_wait_us", "event_bus_lock_hold_us", "event_bus_state_wait_us", "event_bus_state_hold_us")}}
+                "event_bus_lock_wait_us", "event_bus_lock_hold_us", "event_bus_state_wait_us", "event_bus_state_hold_us", "event_bus_route_wait_us")}}
 
 
 def main():
@@ -78,6 +82,11 @@ def main():
         if values[0] is None: return None
         return statistics.median(values)
     if primaries: result["primary_median"] = median_tree(primaries)
+    for side in ("before", "after"):
+        paired = [result[f"{side}-q1-20k-{i}"] for i in (1, 2, 3)
+                  if f"{side}-q1-20k-{i}" in result]
+        if len(paired) == 3:
+            result[f"{side}_primary_median"] = median_tree(paired)
     print(json.dumps(result,indent=2,sort_keys=True))
 
 if __name__ == "__main__": main()
