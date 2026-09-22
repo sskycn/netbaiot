@@ -1,0 +1,32 @@
+   Compiling smallvec v1.15.2
+   Compiling syn v3.0.4
+   Compiling syn v2.0.119
+   Compiling tracing-core v0.1.36
+   Compiling parking_lot_core v0.9.12
+   Compiling parking_lot v0.12.5
+   Compiling thiserror-impl v2.0.20
+   Compiling serde_derive v1.0.229
+   Compiling futures-macro v0.3.34
+   Compiling tokio-macros v2.7.2
+   Compiling async-trait v0.1.92
+   Compiling tokio v1.53.1
+   Compiling futures-util v0.3.34
+   Compiling tracing-attributes v0.1.31
+   Compiling thiserror v2.0.20
+   Compiling tracing v0.1.44
+   Compiling serde v1.0.229
+   Compiling netbaiot-protocol v0.1.0 (/tmp/netbaiot-eventbus-c/candidate-test-src/crates/netbaiot-protocol)
+   Compiling netbaiot-core v0.1.0 (/tmp/netbaiot-eventbus-c/candidate-test-src/crates/netbaiot-core)
+   Compiling tokio-util v0.7.19
+   Compiling netbaiot-runtime v0.1.0 (/tmp/netbaiot-eventbus-c/candidate-test-src/crates/netbaiot-runtime)
+    Finished `release` profile [optimized] target(s) in 9.00s
+     Running unittests src/lib.rs (/tmp/netbaiot-eventbus-c/worktree/target/release/deps/netbaiot_runtime-441ad488d904c163)
+
+running 1 test
+depth=0 take_ns=333/417/542 delay_ns=250/375/500 complete_ns=792/917/1000
+depth=1000 take_ns=1250/1500/1541 delay_ns=5292/6334/6458 complete_ns=792/1000/1166
+depth=10000 take_ns=4375/5167/5250 delay_ns=25000/29292/31208 complete_ns=375/458/500
+depth=16383 take_ns=6333/6459/8166 delay_ns=36625/39292/45125 complete_ns=333/375/458
+test event::tests::eventbus_queue_depth_probe ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 41 filtered out; finished in 0.16s

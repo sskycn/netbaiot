@@ -1,0 +1,1910 @@
+{
+  "before-micro": [
+    {
+      "accepted": {
+        "p50_ns": 2583,
+        "p95_ns": 13959,
+        "p99_ns": 22833
+      },
+      "batch": {
+        "batches": 10000.0,
+        "calls": 13877.0,
+        "empty_calls": 3877.0,
+        "histogram_including_empty": {
+          "0.0": 3877.0,
+          "1.0": 13877.0,
+          "2.0": 13877.0,
+          "3.0": 13877.0,
+          "4.0": 13877.0,
+          "5.0": 13877.0,
+          "6.0": 13877.0,
+          "7.0": 13877.0,
+          "8.0": 13877.0,
+          "16.0": 13877.0,
+          "32.0": 13877.0,
+          "64.0": 13877.0,
+          "128.0": 13877.0,
+          "256.0": 13877.0,
+          "1024.0": 13877.0,
+          "16384.0": 13877.0,
+          "Infinity": 13877.0
+        },
+        "mean_records_per_batch": 1.0,
+        "mean_records_per_call": 0.7206168480219067,
+        "nonempty_p50_upper": 1.0,
+        "nonempty_p95_upper": 1.0,
+        "nonempty_p99_upper": 1.0,
+        "records": 10000.0
+      },
+      "completion": [
+        {
+          "p50_ns": 28250,
+          "p95_ns": 134416,
+          "p99_ns": 429833
+        }
+      ],
+      "delay_ms": 0,
+      "events": 10000,
+      "events_per_sec": 159320.33943198316,
+      "publish_per_sec": 165300.75348050654,
+      "queue_len": {
+        "count": 13877.0,
+        "mean": 4.3853138286373134,
+        "p50_upper": 2.0,
+        "p95_upper": 32.0,
+        "p99_upper": 64.0,
+        "sum": 60855.0
+      },
+      "retry": false,
+      "sampled_max_bytes": 17612,
+      "sampled_max_depth": 74,
+      "selection_ns": {
+        "count": 13877.0,
+        "mean": 63.54867766808388,
+        "p50_upper": 100.0,
+        "p95_upper": 250.0,
+        "p99_upper": 1000.0,
+        "sum": 881865.0
+      },
+      "sinks": 1,
+      "sites": {
+        "complete": {
+          "acquisitions_per_event": 1.0,
+          "count": 10000.0,
+          "hold_ns": {
+            "count": 10000.0,
+            "mean": 802.7555,
+            "p50_upper": 500.0,
+            "p95_upper": 5000.0,
+            "p99_upper": 5000.0,
+            "sum": 8027555.0
+          },
+          "wait_ns": {
+            "count": 10000.0,
+            "mean": 1253.3891,
+            "p50_upper": 100.0,
+            "p95_upper": 10000.0,
+            "p99_upper": 25000.0,
+            "sum": 12533891.0
+          }
+        },
+        "control_restore_spool": {
+          "acquisitions_per_event": 0.008,
+          "count": 80.0,
+          "hold_ns": {
+            "count": 80.0,
+            "mean": 347.3875,
+            "p50_upper": 250.0,
+            "p95_upper": 2500.0,
+            "p99_upper": 5000.0,
+            "sum": 27791.0
+          },
+          "wait_ns": {
+            "count": 80.0,
+            "mean": 606.2625,
+            "p50_upper": 100.0,
+            "p95_upper": 5000.0,
+            "p99_upper": 25000.0,
+            "sum": 48501.0
+          }
+        },
+        "next_ready_delay": {
+          "acquisitions_per_event": 0.3877,
+          "count": 3877.0,
+          "hold_ns": {
+            "count": 3877.0,
+            "mean": 184.74181067835957,
+            "p50_upper": 100.0,
+            "p95_upper": 2500.0,
+            "p99_upper": 5000.0,
+            "sum": 716244.0
+          },
+          "wait_ns": {
+            "count": 3877.0,
+            "mean": 477.08408563322155,
+            "p50_upper": 100.0,
+            "p95_upper": 5000.0,
+            "p99_upper": 10000.0,
+            "sum": 1849655.0
+          }
+        },
+        "publish": {
+          "acquisitions_per_event": 1.0,
+          "count": 10000.0,
+          "hold_ns": {
+            "count": 10000.0,
+            "mean": 1387.0748,
+            "p50_upper": 2500.0,
+            "p95_upper": 5000.0,
+            "p99_upper": 5000.0,
+            "sum": 13870748.0
+          },
+          "wait_ns": {
+            "count": 10000.0,
+            "mean": 1843.5855,
+            "p50_upper": 100.0,
+            "p95_upper": 25000.0,
+            "p99_upper": 25000.0,
+            "sum": 18435855.0
+          }
+        },
+        "take_ready": {
+          "acquisitions_per_event": 1.3877,
+          "count": 13877.0,
+          "hold_ns": {
+            "count": 13877.0,
+            "mean": 376.55437054118323,
+            "p50_upper": 250.0,
+            "p95_upper": 2500.0,
+            "p99_upper": 5000.0,
+            "sum": 5225445.0
+          },
+          "wait_ns": {
+            "count": 13877.0,
+            "mean": 972.6622468833322,
+            "p50_upper": 100.0,
+            "p95_upper": 10000.0,
+            "p99_upper": 25000.0,
+            "sum": 13497634.0
+          }
+        }
+      },
+      "state_acquisitions_per_event": 3.7834,
+      "state_hold_sum_ns": 27867783.0,
+      "state_wait_sum_ns": 46365536.0,
+      "window": 128
+    },
+    {
+      "accepted": {
+        "p50_ns": 4958,
+        "p95_ns": 41458,
+        "p99_ns": 64167
+      },
+      "batch": {
+        "batches": 40000.0,
+        "calls": 40091.0,
+        "empty_calls": 91.0,
+        "histogram_including_empty": {
+          "0.0": 91.0,
+          "1.0": 40091.0,
+          "2.0": 40091.0,
+          "3.0": 40091.0,
+          "4.0": 40091.0,
+          "5.0": 40091.0,
+          "6.0": 40091.0,
+          "7.0": 40091.0,
+          "8.0": 40091.0,
+          "16.0": 40091.0,
+          "32.0": 40091.0,
+          "64.0": 40091.0,
+          "128.0": 40091.0,
+          "256.0": 40091.0,
+          "1024.0": 40091.0,
+          "16384.0": 40091.0,
+          "Infinity": 40091.0
+        },
+        "mean_records_per_batch": 1.0,
+        "mean_records_per_call": 0.9977301638771794,
+        "nonempty_p50_upper": 1.0,
+        "nonempty_p95_upper": 1.0,
+        "nonempty_p99_upper": 1.0,
+        "records": 40000.0
+      },
+      "completion": [
+        {
+          "p50_ns": 3875584,
+          "p95_ns": 4547209,
+          "p99_ns": 4655625
+        },
+        {
+          "p50_ns": 2577375,
+          "p95_ns": 3440750,
+          "p99_ns": 3703334
+        },
+        {
+          "p50_ns": 1671291,
+          "p95_ns": 2367417,
+          "p99_ns": 2955792
+        },
+        {
+          "p50_ns": 1108167,
+          "p95_ns": 2436458,
+          "p99_ns": 2754792
+        }
+      ],
+      "delay_ms": 0,
+      "events": 10000,
+      "events_per_sec": 50903.09522786129,
+      "publish_per_sec": 51501.57131551591,
+      "queue_len": {
+        "count": 40091.0,
+        "mean": 117.5052006684792,
+        "p50_upper": 128.0,
+        "p95_upper": 256.0,
+        "p99_upper": 256.0,
+        "sum": 4710901.0
+      },
+      "retry": false,
+      "sampled_max_bytes": 59738,
+      "sampled_max_depth": 251,
+      "selection_ns": {
+        "count": 40091.0,
+        "mean": 1190.7129530318525,
+        "p50_upper": 1000.0,
+        "p95_upper": 2500.0,
+        "p99_upper": 10000.0,
+        "sum": 47736873.0
+      },
+      "sinks": 4,
+      "sites": {
+        "complete": {
+          "acquisitions_per_event": 4.0,
+          "count": 40000.0,
+          "hold_ns": {
+            "count": 40000.0,
+            "mean": 1807.7626,
+            "p50_upper": 2500.0,
+            "p95_upper": 10000.0,
+            "p99_upper": 25000.0,
+            "sum": 72310504.0
+          },
+          "wait_ns": {
+            "count": 40000.0,
+            "mean": 7386.31325,
+            "p50_upper": 100.0,
+            "p95_upper": 50000.0,
+            "p99_upper": 100000.0,
+            "sum": 295452530.0
+          }
+        },
+        "control_restore_spool": {
+          "acquisitions_per_event": 0.008,
+          "count": 80.0,
+          "hold_ns": {
+            "count": 80.0,
+            "mean": 2428.6875,
+            "p50_upper": 2500.0,
+            "p95_upper": 5000.0,
+            "p99_upper": 25000.0,
+            "sum": 194295.0
+          },
+          "wait_ns": {
+            "count": 80.0,
+            "mean": 6862.475,
+            "p50_upper": 100.0,
+            "p95_upper": 50000.0,
+            "p99_upper": 100000.0,
+            "sum": 548998.0
+          }
+        },
+        "next_ready_delay": {
+          "acquisitions_per_event": 0.0091,
+          "count": 91.0,
+          "hold_ns": {
+            "count": 91.0,
+            "mean": 456.45054945054943,
+            "p50_upper": 100.0,
+            "p95_upper": 2500.0,
+            "p99_upper": 5000.0,
+            "sum": 41537.0
+          },
+          "wait_ns": {
+            "count": 91.0,
+            "mean": 4638.2967032967035,
+            "p50_upper": 100.0,
+            "p95_upper": 50000.0,
+            "p99_upper": 100000.0,
+            "sum": 422085.0
+          }
+        },
+        "publish": {
+          "acquisitions_per_event": 1.0,
+          "count": 10000.0,
+          "hold_ns": {
+            "count": 10000.0,
+            "mean": 2512.5531,
+            "p50_upper": 2500.0,
+            "p95_upper": 10000.0,
+            "p99_upper": 25000.0,
+            "sum": 25125531.0
+          },
+          "wait_ns": {
+            "count": 10000.0,
+            "mean": 8575.0183,
+            "p50_upper": 100.0,
+            "p95_upper": 50000.0,
+            "p99_upper": 100000.0,
+            "sum": 85750183.0
+          }
+        },
+        "take_ready": {
+          "acquisitions_per_event": 4.0091,
+          "count": 40091.0,
+          "hold_ns": {
+            "count": 40091.0,
+            "mean": 2861.6084906836945,
+            "p50_upper": 2500.0,
+            "p95_upper": 10000.0,
+            "p99_upper": 25000.0,
+            "sum": 114724746.0
+          },
+          "wait_ns": {
+            "count": 40091.0,
+            "mean": 5714.12663690105,
+            "p50_upper": 100.0,
+            "p95_upper": 50000.0,
+            "p99_upper": 100000.0,
+            "sum": 229085051.0
+          }
+        }
+      },
+      "state_acquisitions_per_event": 9.0262,
+      "state_hold_sum_ns": 212396613.0,
+      "state_wait_sum_ns": 611258847.0,
+      "window": 128
+    },
+    {
+      "accepted": {
+        "p50_ns": 8375,
+        "p95_ns": 76666,
+        "p99_ns": 123458
+      },
+      "batch": {
+        "batches": 80000.0,
+        "calls": 80313.0,
+        "empty_calls": 313.0,
+        "histogram_including_empty": {
+          "0.0": 313.0,
+          "1.0": 80313.0,
+          "2.0": 80313.0,
+          "3.0": 80313.0,
+          "4.0": 80313.0,
+          "5.0": 80313.0,
+          "6.0": 80313.0,
+          "7.0": 80313.0,
+          "8.0": 80313.0,
+          "16.0": 80313.0,
+          "32.0": 80313.0,
+          "64.0": 80313.0,
+          "128.0": 80313.0,
+          "256.0": 80313.0,
+          "1024.0": 80313.0,
+          "16384.0": 80313.0,
+          "Infinity": 80313.0
+        },
+        "mean_records_per_batch": 1.0,
+        "mean_records_per_call": 0.996102747998456,
+        "nonempty_p50_upper": 1.0,
+        "nonempty_p95_upper": 1.0,
+        "nonempty_p99_upper": 1.0,
+        "records": 80000.0
+      },
+      "completion": [
+        {
+          "p50_ns": 5640625,
+          "p95_ns": 6879750,
+          "p99_ns": 7589833
+        },
+        {
+          "p50_ns": 5641917,
+          "p95_ns": 7389583,
+          "p99_ns": 8098166
+        },
+        {
+          "p50_ns": 1481000,
+          "p95_ns": 3925250,
+          "p99_ns": 4313584
+        },
+        {
+          "p50_ns": 5218083,
+          "p95_ns": 7163584,
+          "p99_ns": 7534792
+        },
+        {
+          "p50_ns": 7058458,
+          "p95_ns": 8557792,
+          "p99_ns": 8856958
+        },
+        {
+          "p50_ns": 4212625,
+          "p95_ns": 5501834,
+          "p99_ns": 6122792
+        },
+        {
+          "p50_ns": 4676083,
+          "p95_ns": 6106417,
+          "p99_ns": 7029416
+        },
+        {
+          "p50_ns": 7530583,
+          "p95_ns": 10911208,
+          "p99_ns": 11565459
+        }
+      ],
+      "delay_ms": 0,
+      "events": 10000,
+      "events_per_sec": 23747.31195864381,
+      "publish_per_sec": 24023.598380689353,
+      "queue_len": {
+        "count": 80313.0,
+        "mean": 117.8984348735572,
+        "p50_upper": 128.0,
+        "p95_upper": 256.0,
+        "p99_upper": 256.0,
+        "sum": 9468777.0
+      },
+      "retry": false,
+      "sampled_max_bytes": 65688,
+      "sampled_max_depth": 276,
+      "selection_ns": {
+        "count": 80313.0,
+        "mean": 1177.7090383873096,
+        "p50_upper": 2500.0,
+        "p95_upper": 2500.0,
+        "p99_upper": 5000.0,
+        "sum": 94585346.0
+      },
+      "sinks": 8,
+      "sites": {
+        "complete": {
+          "acquisitions_per_event": 8.0,
+          "count": 80000.0,
+          "hold_ns": {
+            "count": 80000.0,
+            "mean": 3417.87185,
+            "p50_upper": 5000.0,
+            "p95_upper": 10000.0,
+            "p99_upper": 25000.0,
+            "sum": 273429748.0
+          },
+          "wait_ns": {
+            "count": 80000.0,
+            "mean": 16199.5815875,
+            "p50_upper": 250.0,
+            "p95_upper": 100000.0,
+            "p99_upper": 250000.0,
+            "sum": 1295966527.0
+          }
+        },
+        "control_restore_spool": {
+          "acquisitions_per_event": 0.008,
+          "count": 80.0,
+          "hold_ns": {
+            "count": 80.0,
+            "mean": 3505.7625,
+            "p50_upper": 5000.0,
+            "p95_upper": 10000.0,
+            "p99_upper": 25000.0,
+            "sum": 280461.0
+          },
+          "wait_ns": {
+            "count": 80.0,
+            "mean": 10152.075,
+            "p50_upper": 100.0,
+            "p95_upper": 50000.0,
+            "p99_upper": 100000.0,
+            "sum": 812166.0
+          }
+        },
+        "next_ready_delay": {
+          "acquisitions_per_event": 0.0313,
+          "count": 313.0,
+          "hold_ns": {
+            "count": 313.0,
+            "mean": 1753.3482428115017,
+            "p50_upper": 2500.0,
+            "p95_upper": 10000.0,
+            "p99_upper": 10000.0,
+            "sum": 548798.0
+          },
+          "wait_ns": {
+            "count": 313.0,
+            "mean": 10699.712460063898,
+            "p50_upper": 100.0,
+            "p95_upper": 100000.0,
+            "p99_upper": 100000.0,
+            "sum": 3349010.0
+          }
+        },
+        "publish": {
+          "acquisitions_per_event": 1.0,
+          "count": 10000.0,
+          "hold_ns": {
+            "count": 10000.0,
+            "mean": 4924.0199,
+            "p50_upper": 5000.0,
+            "p95_upper": 25000.0,
+            "p99_upper": 25000.0,
+            "sum": 49240199.0
+          },
+          "wait_ns": {
+            "count": 10000.0,
+            "mean": 15752.1557,
+            "p50_upper": 250.0,
+            "p95_upper": 100000.0,
+            "p99_upper": 250000.0,
+            "sum": 157521557.0
+          }
+        },
+        "take_ready": {
+          "acquisitions_per_event": 8.0313,
+          "count": 80313.0,
+          "hold_ns": {
+            "count": 80313.0,
+            "mean": 4114.613200851668,
+            "p50_upper": 5000.0,
+            "p95_upper": 10000.0,
+            "p99_upper": 25000.0,
+            "sum": 330456930.0
+          },
+          "wait_ns": {
+            "count": 80313.0,
+            "mean": 15449.452604186123,
+            "p50_upper": 100.0,
+            "p95_upper": 100000.0,
+            "p99_upper": 250000.0,
+            "sum": 1240791887.0
+          }
+        }
+      },
+      "state_acquisitions_per_event": 17.0706,
+      "state_hold_sum_ns": 653956136.0,
+      "state_wait_sum_ns": 2698441147.0,
+      "window": 128
+    },
+    {
+      "accepted": {
+        "p50_ns": 1209,
+        "p95_ns": 14125,
+        "p99_ns": 23042
+      },
+      "batch": {
+        "batches": 2000.0,
+        "calls": 2009.0,
+        "empty_calls": 9.0,
+        "histogram_including_empty": {
+          "0.0": 9.0,
+          "1.0": 2009.0,
+          "2.0": 2009.0,
+          "3.0": 2009.0,
+          "4.0": 2009.0,
+          "5.0": 2009.0,
+          "6.0": 2009.0,
+          "7.0": 2009.0,
+          "8.0": 2009.0,
+          "16.0": 2009.0,
+          "32.0": 2009.0,
+          "64.0": 2009.0,
+          "128.0": 2009.0,
+          "256.0": 2009.0,
+          "1024.0": 2009.0,
+          "16384.0": 2009.0,
+          "Infinity": 2009.0
+        },
+        "mean_records_per_batch": 1.0,
+        "mean_records_per_call": 0.9955201592832255,
+        "nonempty_p50_upper": 1.0,
+        "nonempty_p95_upper": 1.0,
+        "nonempty_p99_upper": 1.0,
+        "records": 2000.0
+      },
+      "completion": [
+        {
+          "p50_ns": 36361750,
+          "p95_ns": 36728417,
+          "p99_ns": 36973292
+        }
+      ],
+      "delay_ms": 1,
+      "events": 2000,
+      "events_per_sec": 3532.6256748143,
+      "publish_per_sec": 3795.8812316211142,
+      "queue_len": {
+        "count": 2009.0,
+        "mean": 114.5191637630662,
+        "p50_upper": 128.0,
+        "p95_upper": 128.0,
+        "p99_upper": 128.0,
+        "sum": 230069.0
+      },
+      "retry": false,
+      "sampled_max_bytes": 30464,
+      "sampled_max_depth": 128,
+      "selection_ns": {
+        "count": 2009.0,
+        "mean": 1156.4743653558985,
+        "p50_upper": 2500.0,
+        "p95_upper": 2500.0,
+        "p99_upper": 5000.0,
+        "sum": 2323357.0
+      },
+      "sinks": 1,
+      "sites": {
+        "complete": {
+          "acquisitions_per_event": 1.0,
+          "count": 2000.0,
+          "hold_ns": {
+            "count": 2000.0,
+            "mean": 506.2055,
+            "p50_upper": 500.0,
+            "p95_upper": 2500.0,
+            "p99_upper": 2500.0,
+            "sum": 1012411.0
+          },
+          "wait_ns": {
+            "count": 2000.0,
+            "mean": 713.0115,
+            "p50_upper": 100.0,
+            "p95_upper": 5000.0,
+            "p99_upper": 10000.0,
+            "sum": 1426023.0
+          }
+        },
+        "control_restore_spool": {
+          "acquisitions_per_event": 0.0085,
+          "count": 17.0,
+          "hold_ns": {
+            "count": 17.0,
+            "mean": 1218.0,
+            "p50_upper": 2500.0,
+            "p95_upper": 2500.0,
+            "p99_upper": 2500.0,
+            "sum": 20706.0
+          },
+          "wait_ns": {
+            "count": 17.0,
+            "mean": 36.76470588235294,
+            "p50_upper": 100.0,
+            "p95_upper": 250.0,
+            "p99_upper": 250.0,
+            "sum": 625.0
+          }
+        },
+        "next_ready_delay": {
+          "acquisitions_per_event": 0.0045,
+          "count": 9.0,
+          "hold_ns": {
+            "count": 9.0,
+            "mean": 120.44444444444444,
+            "p50_upper": 250.0,
+            "p95_upper": 250.0,
+            "p99_upper": 250.0,
+            "sum": 1084.0
+          },
+          "wait_ns": {
+            "count": 9.0,
+            "mean": 41.888888888888886,
+            "p50_upper": 100.0,
+            "p95_upper": 100.0,
+            "p99_upper": 100.0,
+            "sum": 377.0
+          }
+        },
+        "publish": {
+          "acquisitions_per_event": 1.0,
+          "count": 2000.0,
+          "hold_ns": {
+            "count": 2000.0,
+            "mean": 629.3785,
+            "p50_upper": 500.0,
+            "p95_upper": 2500.0,
+            "p99_upper": 5000.0,
+            "sum": 1258757.0
+          },
+          "wait_ns": {
+            "count": 2000.0,
+            "mean": 1993.2185,
+            "p50_upper": 100.0,
+            "p95_upper": 25000.0,
+            "p99_upper": 25000.0,
+            "sum": 3986437.0
+          }
+        },
+        "take_ready": {
+          "acquisitions_per_event": 1.0045,
+          "count": 2009.0,
+          "hold_ns": {
+            "count": 2009.0,
+            "mean": 1774.5440517670484,
+            "p50_upper": 2500.0,
+            "p95_upper": 5000.0,
+            "p99_upper": 5000.0,
+            "sum": 3565059.0
+          },
+          "wait_ns": {
+            "count": 2009.0,
+            "mean": 141.75759084121452,
+            "p50_upper": 100.0,
+            "p95_upper": 100.0,
+            "p99_upper": 5000.0,
+            "sum": 284791.0
+          }
+        }
+      },
+      "state_acquisitions_per_event": 3.0175,
+      "state_hold_sum_ns": 5858017.0,
+      "state_wait_sum_ns": 5698253.0,
+      "window": 128
+    },
+    {
+      "accepted": {
+        "p50_ns": 1291,
+        "p95_ns": 12875,
+        "p99_ns": 22083
+      },
+      "batch": {
+        "batches": 2000.0,
+        "calls": 2011.0,
+        "empty_calls": 11.0,
+        "histogram_including_empty": {
+          "0.0": 11.0,
+          "1.0": 2011.0,
+          "2.0": 2011.0,
+          "3.0": 2011.0,
+          "4.0": 2011.0,
+          "5.0": 2011.0,
+          "6.0": 2011.0,
+          "7.0": 2011.0,
+          "8.0": 2011.0,
+          "16.0": 2011.0,
+          "32.0": 2011.0,
+          "64.0": 2011.0,
+          "128.0": 2011.0,
+          "256.0": 2011.0,
+          "1024.0": 2011.0,
+          "16384.0": 2011.0,
+          "Infinity": 2011.0
+        },
+        "mean_records_per_batch": 1.0,
+        "mean_records_per_call": 0.9945300845350572,
+        "nonempty_p50_upper": 1.0,
+        "nonempty_p95_upper": 1.0,
+        "nonempty_p99_upper": 1.0,
+        "records": 2000.0
+      },
+      "completion": [
+        {
+          "p50_ns": 190251417,
+          "p95_ns": 191865500,
+          "p99_ns": 192367833
+        }
+      ],
+      "delay_ms": 10,
+      "events": 2000,
+      "events_per_sec": 674.0424414645089,
+      "publish_per_sec": 718.2647406218081,
+      "queue_len": {
+        "count": 2011.0,
+        "mean": 114.02237692690204,
+        "p50_upper": 128.0,
+        "p95_upper": 128.0,
+        "p99_upper": 128.0,
+        "sum": 229299.0
+      },
+      "retry": false,
+      "sampled_max_bytes": 30464,
+      "sampled_max_depth": 128,
+      "selection_ns": {
+        "count": 2011.0,
+        "mean": 1169.462953754351,
+        "p50_upper": 2500.0,
+        "p95_upper": 2500.0,
+        "p99_upper": 5000.0,
+        "sum": 2351790.0
+      },
+      "sinks": 1,
+      "sites": {
+        "complete": {
+          "acquisitions_per_event": 1.0,
+          "count": 2000.0,
+          "hold_ns": {
+            "count": 2000.0,
+            "mean": 565.521,
+            "p50_upper": 500.0,
+            "p95_upper": 2500.0,
+            "p99_upper": 5000.0,
+            "sum": 1131042.0
+          },
+          "wait_ns": {
+            "count": 2000.0,
+            "mean": 839.815,
+            "p50_upper": 100.0,
+            "p95_upper": 5000.0,
+            "p99_upper": 10000.0,
+            "sum": 1679630.0
+          }
+        },
+        "control_restore_spool": {
+          "acquisitions_per_event": 0.0085,
+          "count": 17.0,
+          "hold_ns": {
+            "count": 17.0,
+            "mean": 1078.4705882352941,
+            "p50_upper": 1000.0,
+            "p95_upper": 10000.0,
+            "p99_upper": 10000.0,
+            "sum": 18334.0
+          },
+          "wait_ns": {
+            "count": 17.0,
+            "mean": 100.41176470588235,
+            "p50_upper": 100.0,
+            "p95_upper": 1000.0,
+            "p99_upper": 1000.0,
+            "sum": 1707.0
+          }
+        },
+        "next_ready_delay": {
+          "acquisitions_per_event": 0.0055,
+          "count": 11.0,
+          "hold_ns": {
+            "count": 11.0,
+            "mean": 117.45454545454545,
+            "p50_upper": 250.0,
+            "p95_upper": 250.0,
+            "p99_upper": 250.0,
+            "sum": 1292.0
+          },
+          "wait_ns": {
+            "count": 11.0,
+            "mean": 49.18181818181818,
+            "p50_upper": 100.0,
+            "p95_upper": 100.0,
+            "p99_upper": 100.0,
+            "sum": 541.0
+          }
+        },
+        "publish": {
+          "acquisitions_per_event": 1.0,
+          "count": 2000.0,
+          "hold_ns": {
+            "count": 2000.0,
+            "mean": 707.024,
+            "p50_upper": 500.0,
+            "p95_upper": 2500.0,
+            "p99_upper": 5000.0,
+            "sum": 1414048.0
+          },
+          "wait_ns": {
+            "count": 2000.0,
+            "mean": 1959.0175,
+            "p50_upper": 100.0,
+            "p95_upper": 25000.0,
+            "p99_upper": 25000.0,
+            "sum": 3918035.0
+          }
+        },
+        "take_ready": {
+          "acquisitions_per_event": 1.0055,
+          "count": 2011.0,
+          "hold_ns": {
+            "count": 2011.0,
+            "mean": 1759.3699651914471,
+            "p50_upper": 2500.0,
+            "p95_upper": 5000.0,
+            "p99_upper": 5000.0,
+            "sum": 3538093.0
+          },
+          "wait_ns": {
+            "count": 2011.0,
+            "mean": 268.97762307309796,
+            "p50_upper": 100.0,
+            "p95_upper": 2500.0,
+            "p99_upper": 10000.0,
+            "sum": 540914.0
+          }
+        }
+      },
+      "state_acquisitions_per_event": 3.0195,
+      "state_hold_sum_ns": 6102809.0,
+      "state_wait_sum_ns": 6140827.0,
+      "window": 128
+    },
+    {
+      "accepted": {
+        "p50_ns": 3042,
+        "p95_ns": 17500,
+        "p99_ns": 34791
+      },
+      "batch": {
+        "batches": 4000.0,
+        "calls": 5034.0,
+        "empty_calls": 1034.0,
+        "histogram_including_empty": {
+          "0.0": 1034.0,
+          "1.0": 5034.0,
+          "2.0": 5034.0,
+          "3.0": 5034.0,
+          "4.0": 5034.0,
+          "5.0": 5034.0,
+          "6.0": 5034.0,
+          "7.0": 5034.0,
+          "8.0": 5034.0,
+          "16.0": 5034.0,
+          "32.0": 5034.0,
+          "64.0": 5034.0,
+          "128.0": 5034.0,
+          "256.0": 5034.0,
+          "1024.0": 5034.0,
+          "16384.0": 5034.0,
+          "Infinity": 5034.0
+        },
+        "mean_records_per_batch": 1.0,
+        "mean_records_per_call": 0.7945967421533572,
+        "nonempty_p50_upper": 1.0,
+        "nonempty_p95_upper": 1.0,
+        "nonempty_p99_upper": 1.0,
+        "records": 4000.0
+      },
+      "completion": [
+        {
+          "p50_ns": 6287708,
+          "p95_ns": 10517833,
+          "p99_ns": 11235458
+        }
+      ],
+      "delay_ms": 0,
+      "events": 2000,
+      "events_per_sec": 19013.598287825473,
+      "publish_per_sec": 21174.851260168864,
+      "queue_len": {
+        "count": 5034.0,
+        "mean": 114.06436233611443,
+        "p50_upper": 128.0,
+        "p95_upper": 128.0,
+        "p99_upper": 128.0,
+        "sum": 574200.0
+      },
+      "retry": true,
+      "sampled_max_bytes": 30464,
+      "sampled_max_depth": 128,
+      "selection_ns": {
+        "count": 5034.0,
+        "mean": 466.45252284465636,
+        "p50_upper": 500.0,
+        "p95_upper": 2500.0,
+        "p99_upper": 2500.0,
+        "sum": 2348122.0
+      },
+      "sinks": 1,
+      "sites": {
+        "complete": {
+          "acquisitions_per_event": 2.0,
+          "count": 4000.0,
+          "hold_ns": {
+            "count": 4000.0,
+            "mean": 555.9235,
+            "p50_upper": 500.0,
+            "p95_upper": 2500.0,
+            "p99_upper": 5000.0,
+            "sum": 2223694.0
+          },
+          "wait_ns": {
+            "count": 4000.0,
+            "mean": 903.2205,
+            "p50_upper": 100.0,
+            "p95_upper": 10000.0,
+            "p99_upper": 10000.0,
+            "sum": 3612882.0
+          }
+        },
+        "control_restore_spool": {
+          "acquisitions_per_event": 0.0085,
+          "count": 17.0,
+          "hold_ns": {
+            "count": 17.0,
+            "mean": 1127.4117647058824,
+            "p50_upper": 1000.0,
+            "p95_upper": 5000.0,
+            "p99_upper": 5000.0,
+            "sum": 19166.0
+          },
+          "wait_ns": {
+            "count": 17.0,
+            "mean": 477.88235294117646,
+            "p50_upper": 100.0,
+            "p95_upper": 10000.0,
+            "p99_upper": 10000.0,
+            "sum": 8124.0
+          }
+        },
+        "next_ready_delay": {
+          "acquisitions_per_event": 0.517,
+          "count": 1034.0,
+          "hold_ns": {
+            "count": 1034.0,
+            "mean": 617.9255319148937,
+            "p50_upper": 500.0,
+            "p95_upper": 2500.0,
+            "p99_upper": 5000.0,
+            "sum": 638935.0
+          },
+          "wait_ns": {
+            "count": 1034.0,
+            "mean": 175.8433268858801,
+            "p50_upper": 100.0,
+            "p95_upper": 100.0,
+            "p99_upper": 5000.0,
+            "sum": 181822.0
+          }
+        },
+        "publish": {
+          "acquisitions_per_event": 1.0,
+          "count": 2000.0,
+          "hold_ns": {
+            "count": 2000.0,
+            "mean": 1313.079,
+            "p50_upper": 2500.0,
+            "p95_upper": 5000.0,
+            "p99_upper": 5000.0,
+            "sum": 2626158.0
+          },
+          "wait_ns": {
+            "count": 2000.0,
+            "mean": 3144.733,
+            "p50_upper": 100.0,
+            "p95_upper": 25000.0,
+            "p99_upper": 50000.0,
+            "sum": 6289466.0
+          }
+        },
+        "take_ready": {
+          "acquisitions_per_event": 2.517,
+          "count": 5034.0,
+          "hold_ns": {
+            "count": 5034.0,
+            "mean": 815.0452920143027,
+            "p50_upper": 1000.0,
+            "p95_upper": 2500.0,
+            "p99_upper": 5000.0,
+            "sum": 4102938.0
+          },
+          "wait_ns": {
+            "count": 5034.0,
+            "mean": 331.6408422725467,
+            "p50_upper": 100.0,
+            "p95_upper": 2500.0,
+            "p99_upper": 10000.0,
+            "sum": 1669480.0
+          }
+        }
+      },
+      "state_acquisitions_per_event": 6.0425,
+      "state_hold_sum_ns": 9610891.0,
+      "state_wait_sum_ns": 11761774.0,
+      "window": 128
+    },
+    {
+      "accepted": {
+        "p50_ns": 3667,
+        "p95_ns": 3667,
+        "p99_ns": 3667
+      },
+      "batch": {
+        "batches": 1.0,
+        "calls": 3.0,
+        "empty_calls": 2.0,
+        "histogram_including_empty": {
+          "0.0": 2.0,
+          "1.0": 3.0,
+          "2.0": 3.0,
+          "3.0": 3.0,
+          "4.0": 3.0,
+          "5.0": 3.0,
+          "6.0": 3.0,
+          "7.0": 3.0,
+          "8.0": 3.0,
+          "16.0": 3.0,
+          "32.0": 3.0,
+          "64.0": 3.0,
+          "128.0": 3.0,
+          "256.0": 3.0,
+          "1024.0": 3.0,
+          "16384.0": 3.0,
+          "Infinity": 3.0
+        },
+        "mean_records_per_batch": 1.0,
+        "mean_records_per_call": 0.3333333333333333,
+        "nonempty_p50_upper": 1.0,
+        "nonempty_p95_upper": 1.0,
+        "nonempty_p99_upper": 1.0,
+        "records": 1.0
+      },
+      "completion": [
+        {
+          "p50_ns": 9417,
+          "p95_ns": 9417,
+          "p99_ns": 9417
+        }
+      ],
+      "delay_ms": 0,
+      "events": 1,
+      "events_per_sec": 436.2843753912926,
+      "publish_per_sec": 61538.461538461546,
+      "queue_len": {
+        "count": 3.0,
+        "mean": 0.3333333333333333,
+        "p50_upper": 0.0,
+        "p95_upper": 1.0,
+        "p99_upper": 1.0,
+        "sum": 1.0
+      },
+      "retry": false,
+      "sampled_max_bytes": 232,
+      "sampled_max_depth": 1,
+      "selection_ns": {
+        "count": 3.0,
+        "mean": 14.0,
+        "p50_upper": 100.0,
+        "p95_upper": 100.0,
+        "p99_upper": 100.0,
+        "sum": 42.0
+      },
+      "sinks": 1,
+      "sites": {
+        "complete": {
+          "acquisitions_per_event": 1.0,
+          "count": 1.0,
+          "hold_ns": {
+            "count": 1.0,
+            "mean": 333.0,
+            "p50_upper": 500.0,
+            "p95_upper": 500.0,
+            "p99_upper": 500.0,
+            "sum": 333.0
+          },
+          "wait_ns": {
+            "count": 1.0,
+            "mean": 42.0,
+            "p50_upper": 100.0,
+            "p95_upper": 100.0,
+            "p99_upper": 100.0,
+            "sum": 42.0
+          }
+        },
+        "control_restore_spool": {
+          "acquisitions_per_event": 2.0,
+          "count": 2.0,
+          "hold_ns": {
+            "count": 2.0,
+            "mean": 83.5,
+            "p50_upper": 100.0,
+            "p95_upper": 250.0,
+            "p99_upper": 250.0,
+            "sum": 167.0
+          },
+          "wait_ns": {
+            "count": 2.0,
+            "mean": 41.5,
+            "p50_upper": 100.0,
+            "p95_upper": 100.0,
+            "p99_upper": 100.0,
+            "sum": 83.0
+          }
+        },
+        "next_ready_delay": {
+          "acquisitions_per_event": 2.0,
+          "count": 2.0,
+          "hold_ns": {
+            "count": 2.0,
+            "mean": 41.5,
+            "p50_upper": 100.0,
+            "p95_upper": 100.0,
+            "p99_upper": 100.0,
+            "sum": 83.0
+          },
+          "wait_ns": {
+            "count": 2.0,
+            "mean": 41.5,
+            "p50_upper": 100.0,
+            "p95_upper": 100.0,
+            "p99_upper": 100.0,
+            "sum": 83.0
+          }
+        },
+        "publish": {
+          "acquisitions_per_event": 1.0,
+          "count": 1.0,
+          "hold_ns": {
+            "count": 1.0,
+            "mean": 1083.0,
+            "p50_upper": 2500.0,
+            "p95_upper": 2500.0,
+            "p99_upper": 2500.0,
+            "sum": 1083.0
+          },
+          "wait_ns": {
+            "count": 1.0,
+            "mean": 42.0,
+            "p50_upper": 100.0,
+            "p95_upper": 100.0,
+            "p99_upper": 100.0,
+            "sum": 42.0
+          }
+        },
+        "take_ready": {
+          "acquisitions_per_event": 3.0,
+          "count": 3.0,
+          "hold_ns": {
+            "count": 3.0,
+            "mean": 97.0,
+            "p50_upper": 100.0,
+            "p95_upper": 250.0,
+            "p99_upper": 250.0,
+            "sum": 291.0
+          },
+          "wait_ns": {
+            "count": 3.0,
+            "mean": 14.0,
+            "p50_upper": 100.0,
+            "p95_upper": 100.0,
+            "p99_upper": 100.0,
+            "sum": 42.0
+          }
+        }
+      },
+      "state_acquisitions_per_event": 9.0,
+      "state_hold_sum_ns": 1957.0,
+      "state_wait_sum_ns": 292.0,
+      "window": 1
+    },
+    {
+      "accepted": {
+        "p50_ns": 3292,
+        "p95_ns": 3292,
+        "p99_ns": 3292
+      },
+      "batch": {
+        "batches": 2.0,
+        "calls": 7.0,
+        "empty_calls": 5.0,
+        "histogram_including_empty": {
+          "0.0": 5.0,
+          "1.0": 7.0,
+          "2.0": 7.0,
+          "3.0": 7.0,
+          "4.0": 7.0,
+          "5.0": 7.0,
+          "6.0": 7.0,
+          "7.0": 7.0,
+          "8.0": 7.0,
+          "16.0": 7.0,
+          "32.0": 7.0,
+          "64.0": 7.0,
+          "128.0": 7.0,
+          "256.0": 7.0,
+          "1024.0": 7.0,
+          "16384.0": 7.0,
+          "Infinity": 7.0
+        },
+        "mean_records_per_batch": 1.0,
+        "mean_records_per_call": 0.2857142857142857,
+        "nonempty_p50_upper": 1.0,
+        "nonempty_p95_upper": 1.0,
+        "nonempty_p99_upper": 1.0,
+        "records": 2.0
+      },
+      "completion": [
+        {
+          "p50_ns": 7815375,
+          "p95_ns": 7815375,
+          "p99_ns": 7815375
+        }
+      ],
+      "delay_ms": 0,
+      "events": 1,
+      "events_per_sec": 99.02256803543582,
+      "publish_per_sec": 157903.0475288173,
+      "queue_len": {
+        "count": 7.0,
+        "mean": 0.5714285714285714,
+        "p50_upper": 1.0,
+        "p95_upper": 1.0,
+        "p99_upper": 1.0,
+        "sum": 4.0
+      },
+      "retry": true,
+      "sampled_max_bytes": 232,
+      "sampled_max_depth": 1,
+      "selection_ns": {
+        "count": 7.0,
+        "mean": 17.714285714285715,
+        "p50_upper": 100.0,
+        "p95_upper": 100.0,
+        "p99_upper": 100.0,
+        "sum": 124.0
+      },
+      "sinks": 1,
+      "sites": {
+        "complete": {
+          "acquisitions_per_event": 2.0,
+          "count": 2.0,
+          "hold_ns": {
+            "count": 2.0,
+            "mean": 500.0,
+            "p50_upper": 250.0,
+            "p95_upper": 1000.0,
+            "p99_upper": 1000.0,
+            "sum": 1000.0
+          },
+          "wait_ns": {
+            "count": 2.0,
+            "mean": 21.0,
+            "p50_upper": 100.0,
+            "p95_upper": 100.0,
+            "p99_upper": 100.0,
+            "sum": 42.0
+          }
+        },
+        "control_restore_spool": {
+          "acquisitions_per_event": 2.0,
+          "count": 2.0,
+          "hold_ns": {
+            "count": 2.0,
+            "mean": 125.5,
+            "p50_upper": 100.0,
+            "p95_upper": 250.0,
+            "p99_upper": 250.0,
+            "sum": 251.0
+          },
+          "wait_ns": {
+            "count": 2.0,
+            "mean": 124.5,
+            "p50_upper": 100.0,
+            "p95_upper": 250.0,
+            "p99_upper": 250.0,
+            "sum": 249.0
+          }
+        },
+        "next_ready_delay": {
+          "acquisitions_per_event": 5.0,
+          "count": 5.0,
+          "hold_ns": {
+            "count": 5.0,
+            "mean": 50.2,
+            "p50_upper": 100.0,
+            "p95_upper": 100.0,
+            "p99_upper": 100.0,
+            "sum": 251.0
+          },
+          "wait_ns": {
+            "count": 5.0,
+            "mean": 25.0,
+            "p50_upper": 100.0,
+            "p95_upper": 100.0,
+            "p99_upper": 100.0,
+            "sum": 125.0
+          }
+        },
+        "publish": {
+          "acquisitions_per_event": 1.0,
+          "count": 1.0,
+          "hold_ns": {
+            "count": 1.0,
+            "mean": 750.0,
+            "p50_upper": 1000.0,
+            "p95_upper": 1000.0,
+            "p99_upper": 1000.0,
+            "sum": 750.0
+          },
+          "wait_ns": {
+            "count": 1.0,
+            "mean": 42.0,
+            "p50_upper": 100.0,
+            "p95_upper": 100.0,
+            "p99_upper": 100.0,
+            "sum": 42.0
+          }
+        },
+        "take_ready": {
+          "acquisitions_per_event": 7.0,
+          "count": 7.0,
+          "hold_ns": {
+            "count": 7.0,
+            "mean": 113.0,
+            "p50_upper": 100.0,
+            "p95_upper": 250.0,
+            "p99_upper": 250.0,
+            "sum": 791.0
+          },
+          "wait_ns": {
+            "count": 7.0,
+            "mean": 17.714285714285715,
+            "p50_upper": 100.0,
+            "p95_upper": 100.0,
+            "p99_upper": 100.0,
+            "sum": 124.0
+          }
+        }
+      },
+      "state_acquisitions_per_event": 17.0,
+      "state_hold_sum_ns": 3043.0,
+      "state_wait_sum_ns": 582.0,
+      "window": 1
+    }
+  ],
+  "before-q1-20k": {
+    "batch": {
+      "batches": 399886.0,
+      "calls": 687279.0,
+      "empty_calls": 287393.0,
+      "histogram_including_empty": {
+        "0.0": 287393.0,
+        "1.0": 687279.0,
+        "2.0": 687279.0,
+        "3.0": 687279.0,
+        "4.0": 687279.0,
+        "5.0": 687279.0,
+        "6.0": 687279.0,
+        "7.0": 687279.0,
+        "8.0": 687279.0,
+        "16.0": 687279.0,
+        "32.0": 687279.0,
+        "64.0": 687279.0,
+        "128.0": 687279.0,
+        "256.0": 687279.0,
+        "1024.0": 687279.0,
+        "16384.0": 687279.0,
+        "Infinity": 687279.0
+      },
+      "mean_records_per_batch": 1.0,
+      "mean_records_per_call": 0.581839398555754,
+      "nonempty_p50_upper": 1.0,
+      "nonempty_p95_upper": 1.0,
+      "nonempty_p99_upper": 1.0,
+      "records": 399886.0
+    },
+    "network": {
+      "accepted_s": 19994.3,
+      "bytes_max": 40366,
+      "cpu_peak": 102.2,
+      "cpu_seconds": 18.54,
+      "cpu_us_per_event": 46.36321351585202,
+      "latency": {
+        "count": 399886,
+        "max_ms": 4.234,
+        "mean_ms": 0.33209495956347557,
+        "p50_ms": 0.25,
+        "p95_ms": 0.91,
+        "p99_ms": 1.69
+      },
+      "locks": {
+        "event_bus_lock_hold_us": {
+          "count": 399886.0,
+          "mean": 0.33587822529420885,
+          "p50_upper": 10.0,
+          "p95_upper": 10.0,
+          "p99_upper": 10.0,
+          "sum": 134313.0
+        },
+        "event_bus_lock_wait_us": {
+          "count": 399886.0,
+          "mean": 5.858552187373402,
+          "p50_upper": 10.0,
+          "p95_upper": 50.0,
+          "p99_upper": 250.0,
+          "sum": 2342753.0
+        },
+        "event_bus_route_wait_us": null,
+        "event_bus_state_hold_us": {
+          "count": 1774474.0,
+          "mean": 0.4071939064759472,
+          "p50_upper": 10.0,
+          "p95_upper": 10.0,
+          "p99_upper": 10.0,
+          "sum": 722555.0
+        },
+        "event_bus_state_wait_us": {
+          "count": 1774474.0,
+          "mean": 2.6603218756656903,
+          "p50_upper": 10.0,
+          "p95_upper": 10.0,
+          "p99_upper": 100.0,
+          "sum": 4720672.0
+        }
+      },
+      "pending_max": 101,
+      "probes": {
+        "complete": 1.0,
+        "empty_wake": 0.5442701169833403,
+        "locks": 4.437374651775756,
+        "next_delay": 0.7186873258878781,
+        "notify_drain": 1.0,
+        "notify_worker": 1.0,
+        "other": 7.502138109361168e-05,
+        "publish": 1.0,
+        "take_ready": 1.718687325887878,
+        "wake_join": 1.0,
+        "wake_notify": 0.26276738870578115,
+        "wake_timer": 0.0,
+        "worker_wakes": 1.262767388705781
+      },
+      "pubacks_s": 19994.3,
+      "rejects": {
+        "netbaiot_connections_rejected_total": 0.0,
+        "netbaiot_events_rejected_total": 0.0,
+        "netbaiot_ingress_admission_rejects_total": 0.0,
+        "netbaiot_ingress_rejected_total": 0.0,
+        "netbaiot_protocol_admission_rejects_total": 0.0,
+        "netbaiot_queue_rejects_total": 0.0
+      },
+      "retries": 0.0,
+      "rss_peak_kib": 7920,
+      "sink_acks_s": 19994.3,
+      "sink_failures": 0.0
+    },
+    "queue_len": {
+      "count": 687279.0,
+      "mean": 4.956608597090846,
+      "p50_upper": 1.0,
+      "p95_upper": 32.0,
+      "p99_upper": 64.0,
+      "sum": 3406573.0
+    },
+    "selection_ns": {
+      "count": 687279.0,
+      "mean": 104.7650910328993,
+      "p50_upper": 100.0,
+      "p95_upper": 500.0,
+      "p99_upper": 1000.0,
+      "sum": 72002847.0
+    },
+    "sites": {
+      "complete": {
+        "acquisitions_per_event": 1.0,
+        "count": 399886.0,
+        "hold_ns": {
+          "count": 399886.0,
+          "mean": 833.5378257803474,
+          "p50_upper": 1000.0,
+          "p95_upper": 2500.0,
+          "p99_upper": 10000.0,
+          "sum": 333320107.0
+        },
+        "wait_ns": {
+          "count": 399886.0,
+          "mean": 1890.6648669870913,
+          "p50_upper": 100.0,
+          "p95_upper": 250.0,
+          "p99_upper": 100000.0,
+          "sum": 756050411.0
+        }
+      },
+      "control_restore_spool": {
+        "acquisitions_per_event": 7.502138109361168e-05,
+        "count": 30.0,
+        "hold_ns": {
+          "count": 30.0,
+          "mean": 1093.0333333333333,
+          "p50_upper": 500.0,
+          "p95_upper": 5000.0,
+          "p99_upper": 25000.0,
+          "sum": 32791.0
+        },
+        "wait_ns": {
+          "count": 30.0,
+          "mean": 4790.366666666667,
+          "p50_upper": 100.0,
+          "p95_upper": 1000.0,
+          "p99_upper": 250000.0,
+          "sum": 143711.0
+        }
+      },
+      "next_ready_delay": {
+        "acquisitions_per_event": 0.7186873258878781,
+        "count": 287393.0,
+        "hold_ns": {
+          "count": 287393.0,
+          "mean": 105.67382643279412,
+          "p50_upper": 100.0,
+          "p95_upper": 250.0,
+          "p99_upper": 500.0,
+          "sum": 30369918.0
+        },
+        "wait_ns": {
+          "count": 287393.0,
+          "mean": 655.3866691255528,
+          "p50_upper": 100.0,
+          "p95_upper": 100.0,
+          "p99_upper": 2500.0,
+          "sum": 188353541.0
+        }
+      },
+      "publish": {
+        "acquisitions_per_event": 1.0,
+        "count": 399886.0,
+        "hold_ns": {
+          "count": 399886.0,
+          "mean": 1832.3997089170414,
+          "p50_upper": 1000.0,
+          "p95_upper": 10000.0,
+          "p99_upper": 25000.0,
+          "sum": 732750990.0
+        },
+        "wait_ns": {
+          "count": 399886.0,
+          "mean": 5927.780377407561,
+          "p50_upper": 100.0,
+          "p95_upper": 50000.0,
+          "p99_upper": 250000.0,
+          "sum": 2370436384.0
+        }
+      },
+      "take_ready": {
+        "acquisitions_per_event": 1.718687325887878,
+        "count": 687279.0,
+        "hold_ns": {
+          "count": 687279.0,
+          "mean": 317.817641743746,
+          "p50_upper": 250.0,
+          "p95_upper": 1000.0,
+          "p99_upper": 5000.0,
+          "sum": 218429391.0
+        },
+        "wait_ns": {
+          "count": 687279.0,
+          "mean": 2225.038853216816,
+          "p50_upper": 100.0,
+          "p95_upper": 500.0,
+          "p99_upper": 100000.0,
+          "sum": 1529222478.0
+        }
+      }
+    },
+    "state_acquisitions_per_event": 4.437449673156849,
+    "state_hold_sum_ns": 1314903197.0,
+    "state_wait_sum_ns": 4844206525.0
+  },
+  "before-q1-20k-verified": {
+    "batch": {
+      "batches": 398137.0,
+      "calls": 676618.0,
+      "empty_calls": 278481.0,
+      "histogram_including_empty": {
+        "0.0": 278481.0,
+        "1.0": 676618.0,
+        "2.0": 676618.0,
+        "3.0": 676618.0,
+        "4.0": 676618.0,
+        "5.0": 676618.0,
+        "6.0": 676618.0,
+        "7.0": 676618.0,
+        "8.0": 676618.0,
+        "16.0": 676618.0,
+        "32.0": 676618.0,
+        "64.0": 676618.0,
+        "128.0": 676618.0,
+        "256.0": 676618.0,
+        "1024.0": 676618.0,
+        "16384.0": 676618.0,
+        "Infinity": 676618.0
+      },
+      "mean_records_per_batch": 1.0,
+      "mean_records_per_call": 0.5884221229704205,
+      "nonempty_p50_upper": 1.0,
+      "nonempty_p95_upper": 1.0,
+      "nonempty_p99_upper": 1.0,
+      "records": 398137.0
+    },
+    "network": {
+      "accepted_s": 19906.85,
+      "bytes_max": 6796,
+      "cpu_peak": 116.5,
+      "cpu_seconds": 18.0,
+      "cpu_us_per_event": 45.2105682214916,
+      "latency": {
+        "count": 398137,
+        "max_ms": 15.137,
+        "mean_ms": 0.4013137764136466,
+        "p50_ms": 0.28,
+        "p95_ms": 1.09,
+        "p99_ms": 2.33
+      },
+      "locks": {
+        "event_bus_lock_hold_us": {
+          "count": 398137.0,
+          "mean": 0.29366273418446415,
+          "p50_upper": 10.0,
+          "p95_upper": 10.0,
+          "p99_upper": 10.0,
+          "sum": 116918.0
+        },
+        "event_bus_lock_wait_us": {
+          "count": 398137.0,
+          "mean": 6.103924026151802,
+          "p50_upper": 10.0,
+          "p95_upper": 50.0,
+          "p99_upper": 250.0,
+          "sum": 2430198.0
+        },
+        "event_bus_route_wait_us": null,
+        "event_bus_state_hold_us": {
+          "count": 1751402.0,
+          "mean": 0.3953044475226133,
+          "p50_upper": 10.0,
+          "p95_upper": 10.0,
+          "p99_upper": 10.0,
+          "sum": 692337.0
+        },
+        "event_bus_state_wait_us": {
+          "count": 1751402.0,
+          "mean": 2.7734534961133996,
+          "p50_upper": 10.0,
+          "p95_upper": 10.0,
+          "p99_upper": 100.0,
+          "sum": 4857432.0
+        }
+      },
+      "pending_max": 17,
+      "probes": {
+        "complete": 1.0,
+        "empty_wake": 0.5231490667785209,
+        "locks": 4.3989204720987996,
+        "next_delay": 0.6994602360494001,
+        "notify_drain": 1.0,
+        "notify_worker": 1.0,
+        "other": 7.283924880129201e-05,
+        "publish": 1.0,
+        "take_ready": 1.6994602360494,
+        "wake_join": 1.0,
+        "wake_notify": 0.26116387072791525,
+        "wake_timer": 0.0,
+        "worker_wakes": 1.2611638707279154
+      },
+      "pubacks_s": 19906.85,
+      "rejects": {
+        "netbaiot_connections_rejected_total": 0.0,
+        "netbaiot_events_rejected_total": 0.0,
+        "netbaiot_ingress_admission_rejects_total": 0.0,
+        "netbaiot_ingress_rejected_total": 0.0,
+        "netbaiot_protocol_admission_rejects_total": 0.0,
+        "netbaiot_queue_rejects_total": 0.0
+      },
+      "retries": 0.0,
+      "rss_peak_kib": 8128,
+      "sink_acks_s": 19906.85,
+      "sink_failures": 0.0
+    },
+    "queue_len": {
+      "count": 676618.0,
+      "mean": 5.579619519433417,
+      "p50_upper": 1.0,
+      "p95_upper": 32.0,
+      "p99_upper": 64.0,
+      "sum": 3775271.0
+    },
+    "selection_ns": {
+      "count": 676618.0,
+      "mean": 113.36744810217878,
+      "p50_upper": 100.0,
+      "p95_upper": 500.0,
+      "p99_upper": 1000.0,
+      "sum": 76706456.0
+    },
+    "sites": {
+      "complete": {
+        "acquisitions_per_event": 1.0,
+        "count": 398137.0,
+        "hold_ns": {
+          "count": 398137.0,
+          "mean": 849.6910133948867,
+          "p50_upper": 1000.0,
+          "p95_upper": 2500.0,
+          "p99_upper": 10000.0,
+          "sum": 338293431.0
+        },
+        "wait_ns": {
+          "count": 398137.0,
+          "mean": 2040.0531023240744,
+          "p50_upper": 100.0,
+          "p95_upper": 250.0,
+          "p99_upper": 100000.0,
+          "sum": 812220622.0
+        }
+      },
+      "control_restore_spool": {
+        "acquisitions_per_event": 7.283924880129201e-05,
+        "count": 29.0,
+        "hold_ns": {
+          "count": 29.0,
+          "mean": 1574.6896551724137,
+          "p50_upper": 250.0,
+          "p95_upper": 10000.0,
+          "p99_upper": 50000.0,
+          "sum": 45666.0
+        },
+        "wait_ns": {
+          "count": 29.0,
+          "mean": 4903.689655172414,
+          "p50_upper": 100.0,
+          "p95_upper": 50000.0,
+          "p99_upper": 100000.0,
+          "sum": 142207.0
+        }
+      },
+      "next_ready_delay": {
+        "acquisitions_per_event": 0.6994602360494001,
+        "count": 278481.0,
+        "hold_ns": {
+          "count": 278481.0,
+          "mean": 110.32552669661484,
+          "p50_upper": 100.0,
+          "p95_upper": 250.0,
+          "p99_upper": 500.0,
+          "sum": 30723563.0
+        },
+        "wait_ns": {
+          "count": 278481.0,
+          "mean": 674.386414153928,
+          "p50_upper": 100.0,
+          "p95_upper": 100.0,
+          "p99_upper": 2500.0,
+          "sum": 187803803.0
+        }
+      },
+      "publish": {
+        "acquisitions_per_event": 1.0,
+        "count": 398137.0,
+        "hold_ns": {
+          "count": 398137.0,
+          "mean": 1732.1001087565335,
+          "p50_upper": 1000.0,
+          "p95_upper": 10000.0,
+          "p99_upper": 25000.0,
+          "sum": 689613141.0
+        },
+        "wait_ns": {
+          "count": 398137.0,
+          "mean": 6166.451970050511,
+          "p50_upper": 100.0,
+          "p95_upper": 50000.0,
+          "p99_upper": 250000.0,
+          "sum": 2455092688.0
+        }
+      },
+      "take_ready": {
+        "acquisitions_per_event": 1.6994602360494,
+        "count": 676618.0,
+        "hold_ns": {
+          "count": 676618.0,
+          "mean": 331.3816599617509,
+          "p50_upper": 250.0,
+          "p95_upper": 1000.0,
+          "p99_upper": 5000.0,
+          "sum": 224218796.0
+        },
+        "wait_ns": {
+          "count": 676618.0,
+          "mean": 2247.4353712138904,
+          "p50_upper": 100.0,
+          "p95_upper": 500.0,
+          "p99_upper": 100000.0,
+          "sum": 1520655226.0
+        }
+      }
+    },
+    "state_acquisitions_per_event": 4.398993311347602,
+    "state_hold_sum_ns": 1282894597.0,
+    "state_wait_sum_ns": 4975914546.0
+  }
+}
