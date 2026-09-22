@@ -1,0 +1,171 @@
+{
+  "kind": "configuration-preflight-not-capacity",
+  "source_sha": "286da293b30a06c77ed017d5466f1d093186c25e",
+  "server_sha256": "31f877c61e6e48165bcc187be273ae36de1e108d202933088ae36c8eb1baeaa9",
+  "hostname": "X",
+  "platform": "macOS-26.6.2-arm64-arm-64bit",
+  "rustc": "rustc 1.97.1 (8bab26f4f 2026-07-14)\nbinary: rustc\ncommit-hash: 8bab26f4f68e0e26f0bb7960be334d5b520ea452\ncommit-date: 2026-07-14\nhost: aarch64-apple-darwin\nrelease: 1.97.1\nLLVM version: 22.1.6",
+  "cargo": "cargo 1.97.1 (c980f4866 2026-06-30)\nrelease: 1.97.1\ncommit-hash: c980f4866141969fab6254a680546a277789d6f0\ncommit-date: 2026-06-30\nhost: aarch64-apple-darwin\nlibgit2: 1.9.2 (sys:0.20.4 vendored)\nlibcurl: 8.7.1 (sys:0.4.88+curl-8.20.0 system ssl:(SecureTransport) LibreSSL/3.3.6)\nssl: OpenSSL 3.6.2 7 Apr 2026\nos: Mac OS 26.6.2 [64-bit]",
+  "rustflags": "",
+  "all_passed": true,
+  "build_command": "cargo build --release --locked",
+  "profile": "release",
+  "features": "workspace defaults",
+  "cases": [
+    {
+      "name": "loopback-development-control",
+      "expected": "ready",
+      "passed": true,
+      "ready": true,
+      "exit_code": 0,
+      "development": true,
+      "mqtt": "127.0.0.1:24002",
+      "tls": null,
+      "delivery_url": null
+    },
+    {
+      "name": "remote-development-plaintext",
+      "expected": "configuration rejection",
+      "passed": true,
+      "ready": false,
+      "exit_code": 1,
+      "development": true,
+      "mqtt": "0.0.0.0:24002",
+      "tls": null,
+      "delivery_url": null
+    },
+    {
+      "name": "remote-production-plaintext-ipv4",
+      "expected": "configuration rejection",
+      "passed": true,
+      "ready": false,
+      "exit_code": 1,
+      "development": false,
+      "mqtt": "0.0.0.0:24002",
+      "tls": null,
+      "delivery_url": "http://127.0.0.1:24006/events"
+    },
+    {
+      "name": "remote-production-plaintext-ipv6",
+      "expected": "configuration rejection",
+      "passed": true,
+      "ready": false,
+      "exit_code": 1,
+      "development": false,
+      "mqtt": "[::]:24002",
+      "tls": null,
+      "delivery_url": "http://127.0.0.1:24006/events"
+    },
+    {
+      "name": "production-without-required-sink",
+      "expected": "configuration rejection",
+      "passed": true,
+      "ready": false,
+      "exit_code": 1,
+      "development": false,
+      "mqtt": "127.0.0.1:24002",
+      "tls": null,
+      "delivery_url": null
+    }
+  ],
+  "dual_host_measurement_executed": false,
+  "status": "BENCHMARK BLOCKED BY PRODUCTION ISSUE",
+  "validation": [
+    {
+      "name": "1.88.0-fmt",
+      "command": [
+        "cargo",
+        "+1.88.0",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "exit_code": 0,
+      "seconds": 0.370525375
+    },
+    {
+      "name": "1.88.0-clippy",
+      "command": [
+        "cargo",
+        "+1.88.0",
+        "clippy",
+        "--locked",
+        "--workspace",
+        "--all-targets",
+        "--all-features",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "seconds": 21.001451540999998
+    },
+    {
+      "name": "1.88.0-test",
+      "command": [
+        "cargo",
+        "+1.88.0",
+        "test",
+        "--locked",
+        "--workspace",
+        "--all-features"
+      ],
+      "exit_code": 0,
+      "seconds": 39.533308082999994
+    },
+    {
+      "name": "stable-fmt",
+      "command": [
+        "cargo",
+        "+stable",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "exit_code": 0,
+      "seconds": 0.23929545899999738
+    },
+    {
+      "name": "stable-clippy",
+      "command": [
+        "cargo",
+        "+stable",
+        "clippy",
+        "--locked",
+        "--workspace",
+        "--all-targets",
+        "--all-features",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "seconds": 21.968787290999998
+    },
+    {
+      "name": "stable-test",
+      "command": [
+        "cargo",
+        "+stable",
+        "test",
+        "--locked",
+        "--workspace",
+        "--all-features"
+      ],
+      "exit_code": 0,
+      "seconds": 40.077890584
+    },
+    {
+      "name": "mqtt-core",
+      "command": [
+        "python3",
+        "tests/mqtt_conformance/run.py",
+        "--netbaiot-only"
+      ],
+      "exit_code": 0,
+      "seconds": 11.92911308299999
+    }
+  ]
+}
