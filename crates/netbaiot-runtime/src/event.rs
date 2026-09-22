@@ -989,6 +989,74 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn retries_and_required_fanout_preserve_exact_accepted_event_id() {
+        struct RetryTwice(Mutex<Vec<EventId>>);
+        #[async_trait]
+        impl EventSink for RetryTwice {
+            async fn deliver(
+                &self,
+                delivery: DeliveryEnvelope,
+            ) -> std::result::Result<SinkAck, SinkError> {
+                let mut seen = self.0.lock().unwrap();
+                assert!(seen.len() < 3, "unexpected extra delivery");
+                seen.push(delivery.event.event_id);
+                if delivery.attempt < 3 {
+                    Err(SinkError::Retryable)
+                } else {
+                    Ok(SinkAck)
+                }
+            }
+        }
+        let limits = Arc::new(Limits {
+            retry_base_ms: 1,
+            retry_max_ms: 1,
+            ..Limits::default()
+        });
+        let sinks = [
+            Arc::new(RetryTwice(Mutex::new(Vec::with_capacity(3)))),
+            Arc::new(RetryTwice(Mutex::new(Vec::with_capacity(3)))),
+        ];
+        let ids = [
+            SinkId::new("first").unwrap(),
+            SinkId::new("second").unwrap(),
+        ];
+        let bus = EventBus::new(
+            limits.clone(),
+            Arc::new(Metrics::default()),
+            ids.iter()
+                .zip(&sinks)
+                .map(|(id, sink)| {
+                    SinkDefinition::bounded(
+                        id.clone(),
+                        SinkDeliveryMode::ConfirmedRequired,
+                        sink.clone(),
+                        &limits,
+                    )
+                })
+                .collect(),
+            vec![RouteDefinition {
+                tenant: None,
+                sinks: ids.to_vec(),
+            }],
+            1,
+        )
+        .unwrap();
+        let event = event(8);
+        let event_id = event.event_id;
+        assert_eq!(bus.publish(event).unwrap().event_id, event_id);
+        assert!(
+            bus.wait_required_drained(Duration::from_secs(1))
+                .await
+                .unwrap()
+        );
+        for sink in sinks {
+            assert_eq!(*sink.0.lock().unwrap(), vec![event_id; 3]);
+        }
+        assert_eq!(bus.usage().unwrap(), EventBusUsage::default());
+        bus.stop_workers().await.unwrap();
+    }
+
+    #[tokio::test]
     async fn eventbus_timeout_retries_owned_event_and_drains() {
         struct TimeoutOnce;
         #[async_trait]

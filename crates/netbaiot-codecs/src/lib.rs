@@ -252,7 +252,12 @@ mod tests {
             r#""kind":"command_ack","data":{"command_id":"00000000-0000-0000-0000-000000000001","execution":"succeeded"}"#,
         ] {
             let wire = format!(r#"{{"schema_version":1,"source_message_id":"boot:1",{data}}}"#);
-            assert_eq!(codec.decode(&ctx, wire.as_bytes()).unwrap().len(), 1);
+            let first = codec.decode(&ctx, wire.as_bytes()).unwrap();
+            let second = codec.decode(&ctx, wire.as_bytes()).unwrap();
+            assert_eq!(first.len(), 1);
+            assert_eq!(second.len(), 1);
+            assert_ne!(first[0].event_id, second[0].event_id);
+            assert_eq!(first[0].source_message_id, second[0].source_message_id);
         }
         for bad in [
             b"{".as_slice(),
