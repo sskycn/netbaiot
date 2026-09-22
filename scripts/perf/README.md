@@ -67,3 +67,30 @@ The ignored restart soak runs 12 healthy process generations with a five-second
 dwell per generation after the initial forced-spool/recovery pair. Each generation
 waits for the accepted `event_id` at the confirmed webhook, drains, exits, and
 verifies that no committed EventBus spool segment remains.
+
+## EventBus lifecycle experiment
+
+The opt-in lock metrics additionally expose closed-vocabulary
+`event_bus_probe_*` counters and `event_bus_state_{wait,hold}_us` histograms.
+The older `event_bus_lock_*` names still cover successful publish only. Probe
+wakes count select branches returning, not executor polls. `empty_wake` includes
+completion-to-idle iterations and is not synonymous with a useless OS wake.
+
+```bash
+cargo build --release --locked
+cargo run --release --locked -p netbaiot-runtime --example eventbus_probe
+cargo run --release --locked -p netbaiot-runtime --example eventbus_probe -- --overload
+cargo test --release --locked -p netbaiot-runtime eventbus_queue_depth_probe -- --ignored --nocapture
+python3 scripts/perf/eventbus_campaign.py --server-bin /absolute/path/to/server --loadgen-bin /absolute/path/to/loadgen --output target/eventbus-experiment/before
+python3 scripts/perf/eventbus_summary.py target/eventbus-experiment/before
+```
+
+Run comparison binaries sequentially on an otherwise idle host with identical
+limits. The campaign performs three primary QoS1 20k repetitions, 25k/30k sweep,
+QoS0/QoS2, publisher scaling, bounded offered overload, macOS `sample`, and fairness.
+It requires local socket/process-sampling permissions and uses the existing
+loopback-only drivers. The microbench uses fixed sample storage and a bounded
+producer window; `--overload` blocks one sink, verifies independent fast completion,
+forces explicit rejection, opens the sink, and verifies zero residual accounting.
+Its process RSS is distinct from the real server's RSS. Results are diagnostics,
+not production capacity certification.
