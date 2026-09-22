@@ -1,5 +1,30 @@
 # Performance bottleneck audit
 
+## Latest EventId experiment (2026-09-22)
+
+**EXPERIMENT REVERTED — insufficient end-to-end gain.** The isolated EventId
+generator improved 97.80% in ns/ID using thread-local, OS-seeded ChaCha12 with
+unchanged UUIDv4 layout. Fresh entropy share was 3.02% of non-park network samples;
+the candidate removed the sampled entropy stack without a new generator mutex.
+It passed collision, process-overlap and focused identity checks.
+
+The primary matrix showed favorable CPU/P99 medians, but alternating confirmation
+changed QoS1 P99 from 0.47 to 1.04 ms while throughput fell 0.223%. CPU medians
+improved 3.99%, with the last pair regressing. This fails the mandatory combined
+retention conditions; the candidate and its direct dependency edge were removed.
+See [the experiment report](performance-eventid-experiment.md) for both favorable
+and unfavorable observations. A fast microbenchmark alone did not justify keeping
+the additional RNG lifecycle complexity.
+
+Fresh final-runtime ranking remains (1) serialized EventBus/shared-state
+contention, (2) kernel I/O/timekeeping/Tokio scheduling, (3) allocation/copy/JSON.
+BEFORE non-park samples show 25.52% mutex wait, 13.42% send/receive, 11.96%
+timekeeping, 8.70% Tokio, and at least 10.35% allocation/copy plus JSON. EventId
+entropy remains a smaller 3.02% tax. Mutex sample attribution is process-wide;
+EventBus's dedicated state histogram supplies the specific lock evidence.
+No next-hotspot optimization was started. Historical sections below retain their
+original measurements and are not substituted for these fresh observations.
+
 ## Latest EventBus experiment (2026-09-22)
 
 **REVERT — insufficient measurable gain.** Fresh lifecycle instrumentation shows
