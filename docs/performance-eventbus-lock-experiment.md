@@ -1,5 +1,8 @@
 # EventBus route preparation lock experiment
 
+The original A/B round below is historical. The follow-up **Experiment C: batch
+worker dequeue** is appended at the end, with its own exact measurement baseline.
+
 BASELINE_SHA: `8a94e62d90c2f19d3a19de480a9711e1bde4775b`.
 Initial checkout: `codex/dual-host-qos1-validation`, clean. No reset is used.
 Baseline source is an exact `git archive` of that commit, built into an independent
@@ -377,3 +380,29 @@ memory-loss window, not abrupt-crash durability.
 No push was performed. Final commit purpose: retain the rejected experiments'
 reproducible evidence and independent EventBus regressions; do not ship either
 unqualified performance implementation.
+
+## Experiment C: measurement baseline (2026-09-23)
+
+START_SHA: `fd734c02822a5b4b701e7907c219d72d230749b1`, clean checkout.
+Before changing dispatch, add only opt-in measurement and its tooling in a
+separate commit. That commit is the actual `BASELINE_SHA` for C and is built from
+an exact Git archive into an independent target directory. This avoids calling
+an uncommitted instrumentation patch an exact baseline build. A/B production
+implementations remain reverted; `complete()` remains untouched throughout C.
+
+The five fixed sites are publish, take_ready, next_ready_delay, complete, and
+control_restore_spool (including usage/startup). Each records nanosecond wait and
+hold histograms/count/sum using the same start/stop instants as legacy aggregate
+timing. Hold includes mutex release; all histogram atomics execute after release.
+No device, tenant, sink or event labels. Disabled metrics allocate no new timing
+storage and perform no extra clock reads or histogram atomics; only fixed field
+bookkeeping/enable checks remain. Enabled timing allocates a single fixed-size
+metrics block, not per-event samples or queues.
+
+Dequeue instrumentation records initial queue length, total selection-scan ns,
+and records returned per acquisition, including empty calls. Nonempty batches
+and mean records/nonempty batch are derived separately; P95 batch excludes empty
+calls. Queue and batch buckets are fixed numeric bounds, not high-cardinality
+labels. Baseline batches are exactly one record when nonempty. Selection timing
+excludes VecDeque removal and captures just readiness/minimum selection. C must
+use identical selection probes and keep the queue structure unchanged.

@@ -147,8 +147,10 @@ impl std::ops::DerefMut for ProbedState<'_> {
 }
 struct StateTiming<'a> {
     metrics: &'a Metrics,
+    site: EventBusProbe,
     wait: Option<Duration>,
     held: Option<Instant>,
+    dequeue: Option<(usize, usize, u64)>,
 }
 impl Drop for StateTiming<'_> {
     fn drop(&mut self) {
@@ -159,6 +161,15 @@ impl Drop for StateTiming<'_> {
                 .observe(Histogram::EventBusStateWait, wait.as_micros() as u64);
             self.metrics
                 .observe(Histogram::EventBusStateHold, hold.as_micros() as u64);
+            self.metrics.event_bus_state_timing(
+                self.site,
+                wait.as_nanos() as u64,
+                hold.as_nanos() as u64,
+            );
+            if let Some((queue_len, records, selection_ns)) = self.dequeue {
+                self.metrics
+                    .event_bus_dequeue(queue_len, records, selection_ns);
+            }
         }
     }
 }
@@ -183,8 +194,10 @@ impl EventBus {
             guard,
             _timing: StateTiming {
                 metrics: &self.metrics,
+                site: operation,
                 wait,
                 held,
+                dequeue: None,
             },
         })
     }
@@ -621,20 +634,28 @@ impl EventBus {
     fn take_ready(&self, id: &SinkId) -> Result<Option<DeliveryRecord>> {
         let mut state = self.lock_state(EventBusProbe::TakeReady)?;
         let sink = state.sinks.get_mut(id).ok_or(Error::Internal)?;
+        let queue_len = sink.queue.len();
         let now = Instant::now();
-        let Some(position) = sink
+        let selection_started = self.metrics.lock_timing_enabled().then(Instant::now);
+        let position = sink
             .queue
             .iter()
             .enumerate()
             .filter(|(_, record)| record.next_attempt <= now)
             .min_by_key(|(_, record)| record.next_attempt)
-            .map(|(position, _)| position)
-        else {
-            return Ok(None);
+            .map(|(position, _)| position);
+        let selection_ns = selection_started.map(|started| started.elapsed().as_nanos() as u64);
+        let record = if let Some(position) = position {
+            let record = sink.queue.remove(position).ok_or(Error::Internal)?;
+            sink.inflight += 1;
+            Some(record)
+        } else {
+            None
         };
-        let record = sink.queue.remove(position).ok_or(Error::Internal)?;
-        sink.inflight += 1;
-        Ok(Some(record))
+        if let Some(selection_ns) = selection_ns {
+            state._timing.dequeue = Some((queue_len, usize::from(record.is_some()), selection_ns));
+        }
+        Ok(record)
     }
 
     fn next_ready_delay(&self, id: &SinkId) -> Result<Option<Duration>> {
