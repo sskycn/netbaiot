@@ -705,15 +705,17 @@ async fn mqtt_or_tcp(
                         if !p.command && !c.phases.is_empty() {
                             phase_ack(s, p.phase, p.at.elapsed());
                         }
-                        observe(
-                            s,
-                            if p.command {
-                                "command_ack_completion"
-                            } else {
-                                "application_ack"
-                            },
-                            p.at.elapsed(),
-                        );
+                        if !c.audit_open_loop || p.at >= measure {
+                            observe(
+                                s,
+                                if p.command {
+                                    "command_ack_completion"
+                                } else {
+                                    "application_ack"
+                                },
+                                p.at.elapsed(),
+                            );
+                        }
                         count(
                             s,
                             if p.command {
@@ -806,11 +808,13 @@ async fn mqtt_or_tcp(
         if now >= due && now < traffic_end {
             if rate > 0.0 {
                 let step = Duration::from_secs_f64(c.connections as f64 / rate);
-                observe(
-                    s,
-                    "generator_schedule_lag",
-                    now.saturating_duration_since(due),
-                );
+                if !c.audit_open_loop || now >= measure {
+                    observe(
+                        s,
+                        "generator_schedule_lag",
+                        now.saturating_duration_since(due),
+                    );
+                }
                 if c.audit_open_loop {
                     let (next, slots) = advance_open_loop(due, now, step);
                     due = next;
@@ -1188,7 +1192,7 @@ async fn run_audit(c: Config) -> Result<()> {
             result = tasks.join_next() => { if result.is_some_and(|r|r.is_err()) { return Err("audit worker panicked".into()); } },
             _ = sleep_until(boundary), if stage < 3 => {
                 let event = ["warmup_start", "measurement_start", "measurement_end"][stage];
-                if stage == 1 { if let Ok(mut s) = stats.lock() { s.hist.retain(|k,_| *k == "connect"); s.inflight_peak=s.inflight; } }
+                if stage == 1 && let Ok(mut s) = stats.lock() { s.inflight_peak=s.inflight; }
                 println!("{}",json!({"event":event,"epoch_ms":now_ms(),"elapsed_s":began.elapsed().as_secs_f64(),"stats":snapshot(&stats)}));
                 stage += 1; boundary = if stage == 1 { measure } else { traffic_end };
             },
