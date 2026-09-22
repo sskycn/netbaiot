@@ -647,6 +647,31 @@ mod tests {
     use super::*;
 
     #[test]
+    fn generated_event_ids_keep_uuid_v4_and_canonical_serde_contract() {
+        let first = EventId::generate();
+        let second = EventId::generate();
+        assert_ne!(first, second);
+        for id in [first, second] {
+            assert_eq!(id.0.get_variant(), uuid::Variant::RFC4122);
+            assert_eq!(id.0.get_version(), Some(uuid::Version::Random));
+            let text = id.to_string();
+            assert_eq!(text.len(), 36);
+            assert_eq!(text, id.0.hyphenated().to_string());
+            assert_eq!(text, text.to_lowercase());
+            assert_eq!(Uuid::parse_str(&text).unwrap(), id.0);
+            let wire = serde_json::to_string(&id).unwrap();
+            assert_eq!(wire, format!("\"{text}\""));
+            assert_eq!(serde_json::from_str::<EventId>(&wire).unwrap(), id);
+        }
+        // Existing public parsing also supports UUIDs other than generated v4.
+        let nil = EventId(Uuid::nil());
+        assert_eq!(
+            serde_json::from_str::<EventId>(&serde_json::to_string(&nil).unwrap()).unwrap(),
+            nil
+        );
+    }
+
+    #[test]
     fn stable_error_and_ack_json() {
         let error = ApiError {
             code: ErrorCode::DeviceOffline,
