@@ -21,6 +21,26 @@ Final runtime still uses `Uuid::new_v4` per EventId. Baseline terminology remain
 correctness `ce07b5b...`, initial performance `70b855f...`, broker-route runtime
 `cbbad11d...`, EventBus evidence `43d76c3...`, plus this EventId evidence commit.
 
+## Separate-host audit preparation and same-host controls (2026-09-22)
+
+**SEPARATE-HOST MEASUREMENT NOT EXECUTED.** The final authorized scope was
+preparation plus local controls. The [new audit report](performance-separate-host-audit.md)
+records an explicit bounded open-loop generator, separate server/loadgen CPU,
+schedule misses, local repeated points and reproducible two-host commands.
+These controls are a **single-host baseline**, not a separate-host baseline.
+No new isolated saturation knee, cross-host capacity delta or true server
+bottleneck ranking is established. Historical numbers below remain unchanged.
+
+The retained decisions remain broker zero-subscription fast path **KEEP**,
+EventBus local scheduling **REVERT**, and EventId userspace RNG **REVERT**.
+EventId evidence from `0a50ee04c45c5f7fe0f9790db08b0c0a67d327e1` is now included in
+the merged history; the separate-host audit's measured starting HEAD was
+`286da293b30a06c77ed017d5466f1d093186c25e`, before that sibling evidence commit
+was merged. Do not interpret the historical ranking below as a newly demonstrated
+isolated server bottleneck, or implement another optimization before resolving
+placement and actual offered-rate validity.
+
+
 ## Latest experiment: EventBus (2026-09-22)
 
 **REVERT — insufficient measurable gain.** The single failed-poll/deadline-scan
