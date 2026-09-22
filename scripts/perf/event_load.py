@@ -68,6 +68,19 @@ def management_get(port, path, tls=False):
     return body.decode()
 
 
+def process_cpu_seconds(pid):
+    """Cumulative process user+system CPU from ps, independent of sample shares."""
+    value = subprocess.check_output(["ps", "-o", "time=", "-p", str(pid)], text=True).strip()
+    days = 0
+    if "-" in value:
+        prefix, value = value.split("-", 1)
+        days = int(prefix)
+    seconds = 0.0
+    for component in value.split(":"):
+        seconds = seconds * 60 + float(component)
+    return days * 86400 + seconds
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--rate", type=float, required=True)
@@ -210,6 +223,7 @@ def main():
                     if server.poll() is not None or time.time() > deadline:
                         raise RuntimeError("server did not start")
                     time.sleep(.05)
+            server_cpu_before = process_cpu_seconds(server.pid)
             load = subprocess.Popen(
                 [args.loadgen_bin, load_config],
                 stdout=subprocess.PIPE,
@@ -264,6 +278,7 @@ def main():
             profile_stderr = ""
             if profiler is not None:
                 _, profile_stderr = profiler.communicate(timeout=args.sample_seconds + 10)
+            server_cpu_seconds = process_cpu_seconds(server.pid) - server_cpu_before
             metrics = management_get(management, "/api/v1/metrics", args.tls)
             server.send_signal(signal.SIGTERM)
             server.wait(timeout=30)
@@ -285,6 +300,7 @@ def main():
                 "metrics": metrics,
                 "samples": samples,
                 "server_exit": server.returncode,
+                "server_cpu_seconds": server_cpu_seconds,
                 "load_stderr": load_err[-512:],
                 "sink_stderr": sink_err[-512:],
                 "profile_stderr": profile_stderr[-512:],

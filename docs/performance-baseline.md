@@ -1,5 +1,26 @@
 # Performance baseline
 
+## Latest experiment: EventId (2026-09-22)
+
+**EXPERIMENT REVERTED — insufficient end-to-end gain.** Starting HEAD was
+`43d76c3ccb7271b6b82b1c058c3f879c383ebd22`. A thread-local, OS-seeded ChaCha12
+candidate preserved UUIDv4 and reduced direct single-thread generation from
+643.87 to 14.19 ns/ID (97.80%). Fifty million IDs across five thread topologies,
+100 process starts and a separate two-million-ID overlap test found no duplicates.
+
+Fresh primary QoS1 20k medians were 19,998.80 -> 19,998.65 accepted/s,
+14.67 -> 13.78 CPU seconds, and 0.43 -> 0.32 ms P99. However, three alternating
+confirmation pairs gave 19,998.20 -> 19,953.60/s, 14.27 -> 13.70 CPU seconds, and
+0.47 -> 1.04 ms P99. The nominal CPU threshold passes, but the no-tail-regression
+condition does not. The 25--30k knee did not materially improve. The candidate
+was removed; no EventId optimized baseline or production capacity claim exists.
+
+[The full report](performance-eventid-experiment.md) includes the contract/security
+review, all repetitions, CPU/profile definitions, collision bounds and gates.
+Final runtime still uses `Uuid::new_v4` per EventId. Baseline terminology remains
+correctness `ce07b5b...`, initial performance `70b855f...`, broker-route runtime
+`cbbad11d...`, EventBus evidence `43d76c3...`, plus this EventId evidence commit.
+
 ## Latest experiment: EventBus (2026-09-22)
 
 **REVERT — insufficient measurable gain.** The single failed-poll/deadline-scan
