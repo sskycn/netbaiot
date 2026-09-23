@@ -169,7 +169,6 @@ async fn handle_management(
         (hyper::Method::GET, "/api/v1/status") => {
             let usage = services.ingress.events.usage()?;
             let (auth_entries, auth_bytes) = services.ingress.auth_cache.usage()?;
-            let (config_entries, config_bytes) = services.ingress.config.usage()?;
             let active = services.connections.active()?;
             let active_connections = ConnectionCounts {
                 mqtt: active[0],
@@ -185,8 +184,6 @@ async fn handle_management(
                     "pending_required": usage.pending_required,
                     "auth_cache_entries": auth_entries,
                     "auth_cache_bytes": auth_bytes,
-                    "config_cache_entries": config_entries,
-                    "config_cache_bytes": config_bytes,
                     "runtime_tasks": tokio::runtime::Handle::current().metrics().num_alive_tasks(),
                     "active_connections": active_connections,
                 }))
@@ -256,34 +253,6 @@ async fn handle_management(
                     .map_err(|_| Error::Internal)?,
             ))
         }
-        (hyper::Method::POST, "/api/v1/devices/config") => {
-            let device: DeviceKey = serde_json::from_slice(
-                &body(req, services.ingress.limits.max_http_body_size).await?,
-            )
-            .map_err(|_| Error::Invalid)?;
-            let Some(config) = services.ingress.config.device(&device)? else {
-                let request_id = Uuid::new_v4().to_string();
-                return Ok(api_error(
-                    StatusCode::NOT_FOUND,
-                    ErrorCode::NotFound,
-                    "device configuration was not found",
-                    &request_id,
-                ));
-            };
-            Ok(response(
-                StatusCode::OK,
-                serde_json::to_vec(config.as_ref()).map_err(|_| Error::Internal)?,
-            ))
-        }
-        (hyper::Method::PUT, "/api/v1/devices/config") => {
-            let config: DeviceConfig = serde_json::from_slice(
-                &body(req, services.ingress.limits.max_http_body_size).await?,
-            )
-            .map_err(|_| Error::Invalid)?;
-            let _mutation = services.control_lock.lock().await;
-            services.ingress.config.upsert_device(config)?;
-            Ok(response(StatusCode::NO_CONTENT, Vec::new()))
-        }
         (hyper::Method::POST, "/api/v1/auth/invalidate") => {
             let invalidation: AuthInvalidation = serde_json::from_slice(
                 &body(req, services.ingress.limits.max_http_body_size).await?,
@@ -306,18 +275,6 @@ async fn handle_management(
                 .map_err(|_| Error::Internal)?,
             ))
         }
-        (hyper::Method::POST, "/api/v1/config/invalidate") => {
-            let device: DeviceKey = serde_json::from_slice(
-                &body(req, services.ingress.limits.max_http_body_size).await?,
-            )
-            .map_err(|_| Error::Invalid)?;
-            let _mutation = services.control_lock.lock().await;
-            let invalidated = services.ingress.config.invalidate_device(&device)?;
-            Ok(response(
-                StatusCode::OK,
-                format!("{{\"invalidated\":{invalidated}}}").into_bytes(),
-            ))
-        }
         (hyper::Method::PUT, "/api/v1/control/snapshot") => {
             let snapshot: ControlSnapshot = serde_json::from_slice(
                 &body(req, services.ingress.limits.max_http_body_size).await?,
@@ -330,7 +287,7 @@ async fn handle_management(
                 .ingress
                 .events
                 .validate_route_update(revision, &routes)?;
-            services.ingress.config.apply(snapshot)?;
+            services.ingress.control.apply(snapshot)?;
             services.ingress.events.replace_routes(revision, routes)?;
             Ok(response(StatusCode::NO_CONTENT, Vec::new()))
         }
@@ -346,7 +303,7 @@ async fn handle_management(
                 .validate_route_update(update.revision, &update.routes)?;
             services
                 .ingress
-                .config
+                .control
                 .replace_routes(update.revision, update.routes.clone())?;
             services
                 .ingress

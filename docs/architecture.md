@@ -70,7 +70,7 @@ stops shared TCP/UDP and waits for connection owners, then commits MQTT recovery
 and drains/spools required work; management stops only after durable completion.
 
 Normal MQTT/TCP telemetry uses only socket parser state, its bound trusted auth
-context, shared codec/config snapshots, and bounded memory routing. It performs no
+context, shared codecs and routing snapshots, and bounded memory routing. It performs no
 database, filesystem, remote auth, or control-plane operation. UDP verifies each signed datagram and keeps a
 bounded local replay window.
 
@@ -85,8 +85,8 @@ then directly to a live local MQTT/TCP session's count-and-byte-bounded queue. A
 offline device returns unavailable; no offline command is retained.
 
 Management HTTP has an independent listener and admin authorization. Runtime
-configuration is a revisioned immutable control snapshot. Auth and configuration
-caches are separately bounded and reconstructed after restart.
+configuration is a revisioned immutable control snapshot. The auth cache and gateway control state
+are separately bounded and reconstructed after restart. Neither owns device desired state.
 
 Planned shutdown is `RUNNING -> QUIESCING -> DRAINING -> SPOOLING -> DRAINED`.
 The admission gate closes before listeners. Accepted required deliveries either ACK
@@ -131,3 +131,21 @@ per-packet task, UDP session, command endpoint, or ACK spool is created. Quiesce
 waits for active datagram admission guards; only required business work drains or
 spools. Auth invalidation fences receipt signing without a second provider lookup.
 See [wire format, retry and security boundaries](device-protocol.md#udp-acknowledgement-nba1).
+
+```text
+Device -- MQTT/TCP/UDP --> NetbaIoT -- DeviceEvent --> Business System
+Business System -- DeviceCommand --> NetbaIoT -- MQTT/TCP --> Device
+Device -- CommandAck --> NetbaIoT -- DeviceEvent --> Business System
+```
+
+NetbaIoT does not own or persist device desired configuration. Applications own
+persistent desired/reported state, revisions/history, retries, rollout, rollback,
+and offline reconciliation. Configuration changes can travel to online MQTT/TCP
+devices as ordinary `DeviceCommand` values. Devices return `CommandAck`; the
+application decides whether its desired state has converged. Commands remain
+online-only; UDP remains sessionless with no downlink. See the
+[ownership migration](remove-device-config.md).
+
+Connected/Disconnected types remain, but current MQTT/TCP sessions do not emit
+automatic presence events. Applications use their own presence/heartbeat logic
+or management connection queries to initiate reconciliation.

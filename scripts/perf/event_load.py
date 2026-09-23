@@ -175,7 +175,7 @@ def main():
                     ),
                     "auth_provider_url": None,
                     "spool_directory": os.path.join(temporary, "spool"),
-                    "device_configs": [],
+
                 },
                 output,
             )

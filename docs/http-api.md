@@ -16,10 +16,7 @@ authorize these operations. The device ingress does not dispatch HTTP.
 | `GET /api/v1/connections?offset=&limit=` | Paginated local live sessions; max 256 |
 | `POST /api/v1/devices/connection` | Query non-sensitive connection/presence by `DeviceKey` |
 | `POST /api/v1/devices/commands` | Send immediately to a live local session |
-| `POST /api/v1/devices/config` | Read one typed device configuration |
-| `PUT /api/v1/devices/config` | Set a newer typed device configuration revision |
 | `POST /api/v1/auth/invalidate` | Invalidate scope and disconnect affected sessions |
-| `POST /api/v1/config/invalidate` | Remove one cached device config |
 | `PUT /api/v1/control/snapshot` | Validate and atomically replace revisioned snapshot |
 | `PUT /api/v1/routes` | Validate and replace routes by revision |
 | `POST /api/v1/drain` | Request graceful shutdown |

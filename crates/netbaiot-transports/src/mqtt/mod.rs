@@ -109,7 +109,7 @@ async fn accept_iot_publish(
                 transport: Transport::Mqtt,
                 payload: &message.payload,
                 require_command_ack: kind == TopicKind::DownAck,
-                require_config_ack: false,
+
                 validated_at: validated_at.into(),
                 validation_us,
             },

@@ -1,6 +1,6 @@
 pub mod auth;
 pub mod commands;
-pub mod config;
+pub mod control;
 pub mod event;
 pub mod ingress;
 pub mod lifecycle;
@@ -11,7 +11,7 @@ pub mod sessions;
 pub mod spool;
 pub use auth::*;
 pub use commands::*;
-pub use config::*;
+pub use control::*;
 pub use event::*;
 pub use ingress::*;
 pub use lifecycle::*;

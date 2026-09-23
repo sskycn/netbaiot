@@ -427,10 +427,6 @@ impl NetbaIoTClient {
         Devices(self.clone())
     }
 
-    pub fn configs(&self) -> Configs {
-        Configs(self.clone())
-    }
-
     pub fn runtime(&self) -> Runtime {
         Runtime(self.clone())
     }
@@ -603,23 +599,6 @@ impl Devices {
     ) -> Result<DeviceConnectionInfo, ClientError> {
         self.0
             .request(Method::POST, paths::DEVICE_CONNECTION, Some(device))
-            .await
-    }
-}
-
-#[derive(Clone)]
-pub struct Configs(NetbaIoTClient);
-
-impl Configs {
-    pub async fn get_device_config(&self, device: &DeviceKey) -> Result<DeviceConfig, ClientError> {
-        self.0
-            .request(Method::POST, paths::DEVICE_CONFIG_MANAGEMENT, Some(device))
-            .await
-    }
-
-    pub async fn set_device_config(&self, config: &DeviceConfig) -> Result<(), ClientError> {
-        self.0
-            .request_empty(Method::PUT, paths::DEVICE_CONFIG_MANAGEMENT, Some(config))
             .await
     }
 }

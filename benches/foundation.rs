@@ -144,36 +144,6 @@ fn main() {
                 .unwrap(),
         );
     });
-    let config_cache = ConfigCache::empty(auth_limits);
-    config_cache
-        .apply(ControlSnapshot {
-            revision: 1,
-            products: vec![ProductRuntimeConfig {
-                tenant_id: auth.device_key.tenant_id.clone(),
-                product_id: auth.device_key.product_id.clone(),
-                codec_id: auth.codec_id.clone(),
-                codec_version: auth.codec_version,
-                revision: 1,
-            }],
-            devices: vec![DeviceConfigSnapshot {
-                device: auth.device_key.clone(),
-                revision: ConfigRevision::new(1).unwrap(),
-                payload: Arc::new(serde_json::json!({"sample_interval_seconds": 30})),
-            }],
-            routes: Vec::new(),
-        })
-        .unwrap();
-    measure("config_cache_hit", 20_000, || {
-        black_box(config_cache.device(&auth.device_key).unwrap());
-    });
-    let missing_device = DeviceKey {
-        tenant_id: auth.device_key.tenant_id.clone(),
-        product_id: auth.device_key.product_id.clone(),
-        device_id: DeviceId::new("missing").unwrap(),
-    };
-    measure("config_cache_miss", 20_000, || {
-        black_box(config_cache.device(&missing_device).unwrap());
-    });
     let event_limits = Arc::new(Limits {
         sink_queue_max_count: 16_000,
         sink_queue_max_bytes: 32 * 1024 * 1024,

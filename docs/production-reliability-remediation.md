@@ -1,5 +1,8 @@
 # Production reliability remediation
 
+> Historical audit: device-configuration ownership described here was removed later.
+> Current behavior and migration: [Remove device configuration](remove-device-config.md).
+
 Date: 2026-09-20
 
 Reviewed baseline: `e0687a63a9d99abb6e0ff0d43bc2621e69843d97`

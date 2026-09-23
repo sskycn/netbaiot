@@ -94,15 +94,22 @@ while let Some(delivery) = events.next().await {
 }
 ```
 
-Commands use `client.commands().send(&command)`, configuration uses
-`client.configs()`, and operations use `client.runtime()`. An offline device returns
+Commands use `client.commands().send(&command)` and operations use `client.runtime()`. An offline device returns
 typed `ClientError::DeviceOffline`; commands are never stored by NetbaIoT.
 
 The optional `netbaiot-device-sdk` supports standard MQTT telemetry/commands
 without lock-in. Standard MQTT 3.1.1 clients remain
-first-class. The `netbaiot` CLI exposes status, event subscribe, command, config,
-cache invalidation, and explicit drain operations. See [SDK overview](docs/sdk.md),
+first-class. The `netbaiot` CLI exposes status, event subscribe, command,
+auth cache invalidation, and explicit drain operations. See [SDK overview](docs/sdk.md),
 [business client](docs/client.md), [device SDK](docs/device-sdk.md), and
 [CLI](docs/cli.md).
 
 UDP v1.1 returns a signed 64-byte NBA1 receipt after EventAccepted. Lost ACKs can be retried with the exact original NBI1 datagram without duplicate ingestion within the live replay window. See [UDP protocol and retry limits](docs/device-protocol.md#udp-acknowledgement-nba1).
+
+NetbaIoT does not own or persist device desired configuration. Applications own
+persistent desired/reported state, revisions/history, retries, rollout, rollback,
+and offline reconciliation. Configuration changes can travel to online MQTT/TCP
+devices as ordinary `DeviceCommand` values. Devices return `CommandAck`; the
+application decides whether its desired state has converged. Commands remain
+online-only; UDP remains sessionless with no downlink. See the
+[ownership migration](docs/remove-device-config.md).

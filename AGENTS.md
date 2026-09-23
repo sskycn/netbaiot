@@ -72,21 +72,25 @@ One slow sink must not create an unbounded backlog or block unrelated sinks.
 At-least-once delivery and possible replay duplicates are expected. Business
 consumers must process `event_id` idempotently. Exactly-once is not claimed.
 
-## Authentication and configuration
+## Authentication and gateway control
 
 MQTT/TCP authenticate once and bind an immutable `Arc<AuthenticatedDevice>` to the
 connection. Normal packets/frames must not call an auth or control-plane service.
 
-The auth cache and configuration cache are separate and bounded by count and bytes.
+The auth cache and gateway product/routing control state are separate and bounded
+by count and bytes. Device business configuration belongs to external applications.
 Auth caching includes positive/negative TTLs, eviction, safe credential fingerprints,
 explicit invalidation, and bounded single-flight misses. Raw credentials must never
 be logged or used as metric labels. Cache misses fail closed when the provider is
 unavailable; valid sessions and unexpired positive entries may continue.
 
 Control-plane snapshots are revisioned, validated completely, and atomically
-replaced. Runtime configuration is shared through `Arc`; do not clone large product
-or device configuration per connection. Auth/config caches are rebuilt after restart
-and never written to the restart spool.
+replaced. Gateway control snapshots are shared through `Arc`; do not clone large
+product/routing state per connection. Auth caches and gateway control state are
+rebuilt after restart and never written to the restart spool. The gateway must not
+store device desired/reported configuration, compare business revisions, or perform
+configuration reconciliation. Applications may send configuration as ordinary
+DeviceCommand payloads; no special command name, permission or transport is added.
 
 ## Embedded MQTT
 
@@ -153,7 +157,7 @@ STARTING -> RUNNING -> QUIESCING -> DRAINING -> SPOOLING -> DRAINED -> EXIT
 ```
 
 Quiesce first makes readiness false, closes the ingress admission gate, waits for
-active admission guards, stops new connections/uploads/commands/config mutation,
+active admission guards, stops new connections/uploads/commands/control mutation,
 then drains accepted required deliveries.
 
 Before a successful planned exit, every pending required delivery must either:
@@ -186,9 +190,9 @@ and closes HTTP input without a response or fallback. Device credentials never
 authorize management operations.
 
 HTTP bodies, headers, concurrency, response bodies, and deadlines are bounded.
-Management configuration uses explicit revisions; no device config pull API exists.
-Delivering configuration
-is not the same as the device applying it; application ACK is a `ConfigAck` event.
+Gateway control snapshots use explicit routing revisions. Device configuration
+persistence and offline reconciliation are entirely external. CommandAck reports
+device command execution; business applications decide convergence and retries.
 
 Webhook success is a configured 2xx ACK. Confirmed TCP/RPC streams require an
 application `ACK event_id`; a socket write alone is not confirmation.
@@ -211,7 +215,7 @@ Protocol parsers cover valid, truncated, malformed, oversized, boundary, split, 
 multi-frame inputs. Arbitrary bytes must not panic or allocate without a checked
 bound. Preserve fuzz targets and add them for new spool/business framing decoders.
 
-Tests must cover auth/config caches, required admission rollback, count/byte cleanup,
+Tests must cover auth caches and gateway control snapshots, required admission rollback, count/byte cleanup,
 slow-sink isolation, live-session command routing, lifecycle gate races, restart
 recovery, corruption, spool failure, duplicate replay, and the invariant:
 
@@ -258,9 +262,10 @@ backoff, preserve subscription semantics, honor cancellation, and do not create
 unlimited queued work. Dropping/shutting down a client must stop its owned tasks.
 
 Command clients preserve caller-supplied `command_id`, do not blindly retry, and
-report offline devices explicitly. Config revisions are first-class; configuration
-download is distinct from application ACK. Client libraries create no hidden
-runtime, database, or unbounded offline queue.
+report offline devices explicitly. Business configuration ownership stays external;
+CommandAck is distinct from transport SENT and does not itself prove desired/reported
+convergence. Client libraries create no hidden runtime, database, or unbounded
+offline queue.
 
 ## MQTT 3.1.1 invariants
 

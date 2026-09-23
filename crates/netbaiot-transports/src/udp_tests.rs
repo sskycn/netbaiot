@@ -93,7 +93,7 @@ fn fixture(limits: Limits) -> (Arc<Ingress>, Arc<Provider>) {
             )])
             .unwrap(),
             events,
-            ConfigCache::empty(limits.clone()),
+            GatewayControl::empty(limits.clone()),
             metrics,
             Sessions::new(limits),
             lifecycle,

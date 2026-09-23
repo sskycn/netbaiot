@@ -122,7 +122,6 @@ pub async fn connection(
                 s.ingress.metrics.inc(Metric::TcpFrames);
                 let acceptance = s.ingress.ingest(&auth, IngressEnvelope {
                     transport: Transport::Tcp, payload: &frame, require_command_ack: false,
-                    require_config_ack: false,
                     validated_at: std::time::Instant::now(), validation_us: 0,
                 }).await?;
                 let bytes = serde_json::to_vec(&acceptance.receipt).map_err(|_| Error::Internal)?;

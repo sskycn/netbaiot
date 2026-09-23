@@ -25,7 +25,7 @@ spool relationship values.
 | MQTT session state | 2 MiB/session / 32 MiB/tenant / 128 MiB global |
 | MQTT Will | 64 KiB payload; at most 256 node / 64 tenant responsibilities, sharing MQTT session byte ceilings |
 | Auth cache | 4,096 / 4 MiB / 256 miss waiters |
-| Config cache | 4,096 / 16 MiB |
+| Gateway control profiles/routes | 4,096 product profiles / 16 MiB serialized snapshot; routes also limited to 256 filters |
 | Presence registry | bounded by configured devices / 1 h offline TTL / oldest-offline eviction |
 | Sinks/routes/fanout | 32 sinks / 256 filters / 8 per event |
 | Global active events | 16,384 / 64 MiB |
@@ -87,3 +87,9 @@ both explicitly. Multiple protocols, unclassified clients, or tighter shared IP
 limits can still exhaust available capacity. A separately reduced pending pool was
 rejected after paired measurements worsened legitimate new-connection admission.
 See the mixed-ingress audit for measured scope and remaining limitations.
+
+`control_max_products` and `control_max_bytes` bound only gateway product/codec
+profiles and routes. No per-device desired state is stored. The 16 MiB ceiling is
+retained for control safety, not preallocated memory; deleting device state does
+not imply a 16 MiB idle RSS reduction. All transport, EventBus, connection, auth
+and spool defaults remain unchanged.

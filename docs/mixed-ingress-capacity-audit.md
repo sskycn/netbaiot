@@ -1,5 +1,8 @@
 # Mixed protocol capacity and fairness audit
 
+> Historical audit: device-configuration ownership described here was removed later.
+> Current behavior and migration: [Remove device configuration](remove-device-config.md).
+
 > Historical report: describes the revision measured when it was written, not the
 > current device protocol surface. Device HTTP has since been removed. Current
 > behavior, migration, tests and measurements: [removal report](remove-device-http.md).

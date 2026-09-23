@@ -1,20 +1,29 @@
-# Control plane and configuration cache
+# Gateway control plane
 
-The control plane owns device definitions, credentials, product/codec bindings,
-device configuration, routes, and sink definitions. NetbaIoT retains only bounded
-runtime snapshots.
+Gateway control owns credentials, trusted identities, permissions, auth generations,
+product/codec profiles, routes and installed sink definitions. `GatewayControl`
+shares immutable `Arc` snapshots, separately bounded from the authentication cache.
+`ControlSnapshot` contains only `revision`, `products` and `routes`. No per-device
+business desired/reported state is stored.
 
-Startup validates a static bootstrap snapshot, constructs sinks/routes, recovers
-committed restart-spool records, and only then enters `RUNNING`/ready. An external
-HTTP authentication provider may be configured; requests are timeout and
-concurrency bounded and are never retried indefinitely.
+Startup validates bootstrap control data, constructs sinks/routes and recovers
+committed restart work before becoming ready. Optional external authentication
+requests have finite deadlines and concurrency; established MQTT/TCP sessions use
+their bound identity without per-message provider calls.
 
-`ControlSnapshot` has a monotonically increasing revision plus products, device
-configurations, and routes. A replacement is fully validated for count, bytes,
-unique keys, product references, and revision before the immutable indexed snapshot
-is swapped. Route updates are serialized and validated against installed sinks
-before config/event-router state changes.
+Control replacement checks revision, unique product keys, nonzero profile/codec
+versions, product count and serialized bytes. Management updates serialize route
+validation against installed sinks and fanout bounds before replacing either
+control or router state. Route replacement preserves product profiles; a stale or
+oversized update leaves existing state intact. Limits are `control_max_products`
+(4,096), `control_max_bytes` (16 MiB), and `max_routing_filters` (256). Auth state
+and control snapshots are rebuilt after restart and never enter the delivery spool.
 
-Device configuration values are shared as `Arc<DeviceConfigSnapshot>`. Device GET
-uses revision/ETag; device application result is a separate `ConfigAck` event.
-Auth/config caches are cold after restart and are never placed in the delivery spool.
+Profile metadata does not override a live session's immutable authenticated codec
+binding. Auth invalidation remains the mechanism for revoking trusted sessions.
+
+Device configuration persistence, desired/reported revisions, history, retries,
+rollout/rollback and offline reconciliation belong to business applications.
+Online changes use ordinary `DeviceCommand` over MQTT/TCP and return `CommandAck`.
+The gateway neither interprets command names nor compares application revisions.
+See [migration](remove-device-config.md).

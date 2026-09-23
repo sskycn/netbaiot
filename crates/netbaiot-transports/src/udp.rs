@@ -241,7 +241,6 @@ async fn accept_and_ack(
                         transport: Transport::Udp,
                         payload: envelope.payload,
                         require_command_ack: false,
-                        require_config_ack: false,
                         validated_at: std::time::Instant::now(),
                         validation_us: 0,
                     },

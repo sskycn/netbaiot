@@ -1,5 +1,8 @@
 # Remove Device HTTP/HTTPS Transport
 
+> Historical audit: device-configuration ownership described here was removed later.
+> Current behavior and migration: [Remove device configuration](remove-device-config.md).
+
 Baseline: `945fe5e386d623c32e2c7d2d0568fe0c058107ec`.
 This was the clean, latest completed local HEAD, newer than the suggested
 `bf9c611bc16d1fb9c95b21c939f9ef00e4530ddc`, and already included signed UDP ACK.

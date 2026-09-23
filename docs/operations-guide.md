@@ -23,7 +23,6 @@ netbaiot-server --print-default-limits
 | `auth_provider_url` | 外部认证 provider | null + static credentials | HTTPS provider；loopback 可 HTTP |
 | `spool_directory` | planned-restart recovery | `./var/...` | 独立、本地、受监控、权限受限目录 |
 | `credentials` | static demo/bootstrap credential | 固定演示值 | 建议 provider/安全生成的配置，不进 Git |
-| `device_configs` | bootstrap config snapshots | 示例一台设备 | 控制面 snapshot 管理 |
 
 Environment variables：
 
@@ -55,7 +54,6 @@ Environment variables：
   "delivery_url": "https://business.internal.example/netbaiot/events",
   "auth_provider_url": "https://identity.internal.example/device-auth",
   "spool_directory": "/var/lib/netbaiot/recovery",
-  "device_configs": [],
   "credentials": []
 }
 ```
@@ -110,9 +108,7 @@ curl --noproxy '*' http://127.0.0.1:9090/api/v1/status \
 | `GET /api/v1/connections?offset=0&limit=100` | 本节点 bounded pagination，limit 最大 256 |
 | `POST /api/v1/devices/connection` | 完整 DeviceKey 的 live status |
 | `POST /api/v1/devices/commands` | 只发 live MQTT/TCP session |
-| `POST/PUT /api/v1/devices/config` | 获取/更新 revisioned config |
 | `POST /api/v1/auth/invalidate` | cache/live/persistent MQTT auth invalidation |
-| `POST /api/v1/config/invalidate` | 移除一台设备的 config cache |
 | `PUT /api/v1/control/snapshot` | 完整验证并原子替换 snapshot |
 | `PUT /api/v1/routes` | revisioned route replacement |
 | `POST /api/v1/drain` | 开始 graceful shutdown |
@@ -146,7 +142,7 @@ curl -H "Authorization: Bearer $ADMIN" http://127.0.0.1:9090/api/v1/metrics
 
 稳定、低基数 counters 包括 connections accepted/rejected、MQTT connect/packets/publishes/subscriptions/PUBACK/protocol violations、management HTTP requests（`management_http_requests`）及 TCP/UDP traffic、auth cache/failures、codec/ingress/admission/queue rejects、command lifecycle、events accepted/rejected/bytes、sink ACK/retry/failure/drop、spool/recovery 和 timeouts。Histogram 提供关键阶段延迟。
 
-`/status` 提供当前 transport connection counts、EventBus `event_count/event_bytes/pending_required`、auth/config cache 和 runtime task 数。当前公共 metrics **没有直接导出** persistent session 数、offline message 数、QoS inflight 数、retained 数或逐 sink backlog gauge；不要在 dashboard 中假装这些指标存在。可用 rejection/sink counters、status、日志和外部 black-box probe 监控，若运维必须精确观测这些状态，应单独提出受控指标扩展。
+`/status` 提供当前 transport connection counts、EventBus `event_count/event_bytes/pending_required`、auth cache 和 runtime task 数。当前公共 metrics **没有直接导出** persistent session 数、offline message 数、QoS inflight 数、retained 数或逐 sink backlog gauge；不要在 dashboard 中假装这些指标存在。可用 rejection/sink counters、status、日志和外部 black-box probe 监控，若运维必须精确观测这些状态，应单独提出受控指标扩展。
 
 日志不得包含 password、token、Authorization、HMAC key、raw credential 或完整敏感 spool。device/event/command/client ID、revision、sink URL 可进入受控日志/trace，但不能成为 metric label。高流量 debug 会增加开销，不应长期启用。
 
