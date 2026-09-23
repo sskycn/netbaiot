@@ -1,0 +1,275 @@
+{
+  "kind": "configuration-preflight-not-capacity",
+  "source_sha": "945fe5e386d623c32e2c7d2d0568fe0c058107ec",
+  "source_status": "M AGENTS.md\n M Cargo.lock\n M Cargo.toml\n M README.md\n M README.zh-CN.md\n M apps/netbaiot-cli/tests/smoke.rs\n M apps/netbaiot-server/src/lib.rs\n M apps/netbaiot-server/tests/official_client.rs\n M apps/netbaiot-server/tests/server.rs\n M crates/netbaiot-device-sdk/Cargo.toml\n D crates/netbaiot-device-sdk/examples/device_config_pull.rs\n D crates/netbaiot-device-sdk/examples/device_http_upload.rs\n M crates/netbaiot-device-sdk/src/lib.rs\n M crates/netbaiot-protocol/src/lib.rs\n M crates/netbaiot-runtime/src/ingress.rs\n M crates/netbaiot-runtime/src/metrics.rs\n M crates/netbaiot-runtime/src/quota.rs\n M crates/netbaiot-transports/src/classifier.rs\n M crates/netbaiot-transports/src/common.rs\n D crates/netbaiot-transports/src/http.rs\n M crates/netbaiot-transports/src/lib.rs\n M docs/architecture.md\n M docs/architecture.zh-CN.md\n M docs/business-integration-guide.md\n M docs/delivery-semantics.md\n M docs/delivery-semantics.zh-CN.md\n M docs/dependencies.md\n M docs/device-integration-guide.md\n M docs/device-protocol.md\n M docs/device-protocol.zh-CN.md\n M docs/device-sdk.md\n M docs/device-sdk.zh-CN.md\n M docs/getting-started.md\n M docs/http-api.md\n M docs/http-api.zh-CN.md\n M docs/mixed-ingress-capacity-audit.md\n M docs/mqtt.md\n M docs/mqtt.zh-CN.md\n M docs/operations-guide.md\n M docs/performance-dual-host-qos1-capacity.md\n M docs/performance-eventid-experiment.md\n M docs/performance/mixed-ingress/README.md\n M docs/public-protocol.md\n M docs/public-protocol.zh-CN.md\n M docs/pure-event-bus-refactor.md\n M docs/reliability-followup-audit.md\n M docs/resource-budgets.md\n M docs/sdk-client-implementation-report.md\n M docs/sdk.md\n M docs/sdk.zh-CN.md\n M docs/single-device-ingress.md\n M docs/troubleshooting.md\n M docs/udp-reliable-ack.md\n M docs/user-guide.md\n M scripts/perf/README.md\n M scripts/perf/connection_memory.py\n M scripts/perf/dual_host_preflight.py\n D scripts/perf/ingress_compare.py\n D scripts/perf/mixed_ingress_audit.py\n D scripts/perf/mixed_ingress_plan.py\n D scripts/perf/mixed_ingress_progress.py\n D scripts/perf/mixed_ingress_report.py\n D scripts/perf/mixed_ingress_semantics.py\n D scripts/perf/mixed_ingress_tables.py\n D scripts/perf/mixed_ingress_verify.py\n M scripts/tutorial_smoke.sh\n M tools/netbaiot-loadgen/src/main.rs\n M tools/netbaiot-loadgen/src/mixed.rs\n?? crates/netbaiot-transports/src/management_http.rs\n?? docs/performance/remove-device-http/\n?? scripts/perf/device_protocol_benchmark.py\n?? scripts/perf/device_protocol_progress.py",
+  "server_binary": "/Users/sam/Dev/work/sskycn/netbaiot/target/remove-device-http/after-server",
+  "server_sha256": "e4d084ba997b834530527a7bc4ae17245f8076fcfe34de8e6397e79e7f4a9060",
+  "hostname": "X",
+  "platform": "macOS-26.6.2-arm64-arm-64bit",
+  "rustc": "rustc 1.97.1 (8bab26f4f 2026-07-14)\nbinary: rustc\ncommit-hash: 8bab26f4f68e0e26f0bb7960be334d5b520ea452\ncommit-date: 2026-07-14\nhost: aarch64-apple-darwin\nrelease: 1.97.1\nLLVM version: 22.1.6",
+  "cargo": "cargo 1.97.1 (c980f4866 2026-06-30)\nrelease: 1.97.1\ncommit-hash: c980f4866141969fab6254a680546a277789d6f0\ncommit-date: 2026-06-30\nhost: aarch64-apple-darwin\nlibgit2: 1.9.2 (sys:0.20.4 vendored)\nlibcurl: 8.7.1 (sys:0.4.88+curl-8.20.0 system ssl:(SecureTransport) LibreSSL/3.3.6)\nssl: OpenSSL 3.6.2 7 Apr 2026\nos: Mac OS 26.6.2 [64-bit]",
+  "rustflags": "",
+  "cases": [
+    {
+      "name": "loopback-development-control",
+      "expected": "ready",
+      "passed": true,
+      "ready": true,
+      "exit_code": 0,
+      "config": {
+        "device_ingress": "127.0.0.1:24000",
+        "management_http": "127.0.0.1:24001",
+        "business_tcp": null,
+        "development": true,
+        "limits": {},
+        "tls": null,
+        "delivery_url": null,
+        "auth_provider_url": null,
+        "spool_directory": "/var/folders/sz/lwplsmrn1118kbdhlmrnf7fc0000gn/T/netbaiot-dual-preflight-db19vf6t/spool",
+        "device_configs": [
+          {
+            "device": {
+              "tenant_id": "demo",
+              "product_id": "sensor",
+              "device_id": "device-1"
+            },
+            "revision": 1,
+            "payload": {
+              "sample_interval_seconds": 30
+            }
+          }
+        ],
+        "credentials": [
+          {
+            "credential_id": "demo-device",
+            "secret_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+            "identity": {
+              "device_key": {
+                "tenant_id": "demo",
+                "product_id": "sensor",
+                "device_id": "device-1"
+              },
+              "credential_version": 1,
+              "codec_id": "netbaiot-json",
+              "codec_version": 1,
+              "permissions": {
+                "publish": true,
+                "commands": true
+              }
+            }
+          }
+        ]
+      },
+      "log": "2026-09-23T07:52:53.254380Z  INFO netbaiot_server: runtime ready device_ingress=127.0.0.1:24000 management_http=127.0.0.1:24001 business_tcp=None\n2026-09-23T07:52:53.282429Z  INFO netbaiot_server: shutdown complete\n"
+    },
+    {
+      "name": "remote-development-plaintext",
+      "expected": "configuration rejection",
+      "passed": true,
+      "ready": false,
+      "exit_code": 1,
+      "config": {
+        "device_ingress": "0.0.0.0:24002",
+        "management_http": "127.0.0.1:24001",
+        "business_tcp": null,
+        "development": true,
+        "limits": {},
+        "tls": null,
+        "delivery_url": null,
+        "auth_provider_url": null,
+        "spool_directory": "/var/folders/sz/lwplsmrn1118kbdhlmrnf7fc0000gn/T/netbaiot-dual-preflight-db19vf6t/spool",
+        "device_configs": [
+          {
+            "device": {
+              "tenant_id": "demo",
+              "product_id": "sensor",
+              "device_id": "device-1"
+            },
+            "revision": 1,
+            "payload": {
+              "sample_interval_seconds": 30
+            }
+          }
+        ],
+        "credentials": [
+          {
+            "credential_id": "demo-device",
+            "secret_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+            "identity": {
+              "device_key": {
+                "tenant_id": "demo",
+                "product_id": "sensor",
+                "device_id": "device-1"
+              },
+              "credential_version": 1,
+              "codec_id": "netbaiot-json",
+              "codec_version": 1,
+              "permissions": {
+                "publish": true,
+                "commands": true
+              }
+            }
+          }
+        ]
+      },
+      "log": "Error: Configuration\n"
+    },
+    {
+      "name": "remote-production-plaintext-ipv4",
+      "expected": "configuration rejection",
+      "passed": true,
+      "ready": false,
+      "exit_code": 1,
+      "config": {
+        "device_ingress": "0.0.0.0:24002",
+        "management_http": "127.0.0.1:24001",
+        "business_tcp": null,
+        "development": false,
+        "limits": {},
+        "tls": null,
+        "delivery_url": "http://127.0.0.1:24006/events",
+        "auth_provider_url": null,
+        "spool_directory": "/var/folders/sz/lwplsmrn1118kbdhlmrnf7fc0000gn/T/netbaiot-dual-preflight-db19vf6t/spool",
+        "device_configs": [
+          {
+            "device": {
+              "tenant_id": "demo",
+              "product_id": "sensor",
+              "device_id": "device-1"
+            },
+            "revision": 1,
+            "payload": {
+              "sample_interval_seconds": 30
+            }
+          }
+        ],
+        "credentials": [
+          {
+            "credential_id": "demo-device",
+            "secret_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+            "identity": {
+              "device_key": {
+                "tenant_id": "demo",
+                "product_id": "sensor",
+                "device_id": "device-1"
+              },
+              "credential_version": 1,
+              "codec_id": "netbaiot-json",
+              "codec_version": 1,
+              "permissions": {
+                "publish": true,
+                "commands": true
+              }
+            }
+          }
+        ]
+      },
+      "log": "Error: Configuration\n"
+    },
+    {
+      "name": "remote-production-plaintext-ipv6",
+      "expected": "configuration rejection",
+      "passed": true,
+      "ready": false,
+      "exit_code": 1,
+      "config": {
+        "device_ingress": "[::]:24002",
+        "management_http": "127.0.0.1:24001",
+        "business_tcp": null,
+        "development": false,
+        "limits": {},
+        "tls": null,
+        "delivery_url": "http://127.0.0.1:24006/events",
+        "auth_provider_url": null,
+        "spool_directory": "/var/folders/sz/lwplsmrn1118kbdhlmrnf7fc0000gn/T/netbaiot-dual-preflight-db19vf6t/spool",
+        "device_configs": [
+          {
+            "device": {
+              "tenant_id": "demo",
+              "product_id": "sensor",
+              "device_id": "device-1"
+            },
+            "revision": 1,
+            "payload": {
+              "sample_interval_seconds": 30
+            }
+          }
+        ],
+        "credentials": [
+          {
+            "credential_id": "demo-device",
+            "secret_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+            "identity": {
+              "device_key": {
+                "tenant_id": "demo",
+                "product_id": "sensor",
+                "device_id": "device-1"
+              },
+              "credential_version": 1,
+              "codec_id": "netbaiot-json",
+              "codec_version": 1,
+              "permissions": {
+                "publish": true,
+                "commands": true
+              }
+            }
+          }
+        ]
+      },
+      "log": "Error: Configuration\n"
+    },
+    {
+      "name": "production-without-required-sink",
+      "expected": "configuration rejection",
+      "passed": true,
+      "ready": false,
+      "exit_code": 1,
+      "config": {
+        "device_ingress": "127.0.0.1:24000",
+        "management_http": "127.0.0.1:24001",
+        "business_tcp": null,
+        "development": false,
+        "limits": {},
+        "tls": null,
+        "delivery_url": null,
+        "auth_provider_url": null,
+        "spool_directory": "/var/folders/sz/lwplsmrn1118kbdhlmrnf7fc0000gn/T/netbaiot-dual-preflight-db19vf6t/spool",
+        "device_configs": [
+          {
+            "device": {
+              "tenant_id": "demo",
+              "product_id": "sensor",
+              "device_id": "device-1"
+            },
+            "revision": 1,
+            "payload": {
+              "sample_interval_seconds": 30
+            }
+          }
+        ],
+        "credentials": [
+          {
+            "credential_id": "demo-device",
+            "secret_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+            "identity": {
+              "device_key": {
+                "tenant_id": "demo",
+                "product_id": "sensor",
+                "device_id": "device-1"
+              },
+              "credential_version": 1,
+              "codec_id": "netbaiot-json",
+              "codec_version": 1,
+              "permissions": {
+                "publish": true,
+                "commands": true
+              }
+            }
+          }
+        ]
+      },
+      "log": "Error: Configuration\n"
+    }
+  ],
+  "all_passed": true
+}

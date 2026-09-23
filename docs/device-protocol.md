@@ -4,23 +4,22 @@
 
 `device_ingress` binds one TCP listener and one UDP socket at the same address and
 numeric port (development: `127.0.0.1:8080`; production example: `0.0.0.0:443`).
-TCP serves HTTPS, standard MQTT 3.1.1 over TLS, and generic framed TCP over TLS using
+TCP serves standard MQTT 3.1.1 over TLS, and generic framed TCP over TLS using
 one certificate. TLS finishes before application classification; no ALPN, custom
 preface, or client wire change is required. UDP on the same port remains NBI1/HMAC,
 authenticated but unencrypted; this does not add DTLS or QUIC.
 
 Management HTTP (`management_http`, normally `127.0.0.1:9090`) and optional
-`business_tcp` retain separate listeners and authorization. Device HTTP cannot
-serve management APIs. Non-loopback TCP ingress requires TLS. Development mode
+`business_tcp` retain separate listeners and authorization. Management HTTP is a
+control-plane protocol and never participates in device classification. Non-loopback TCP ingress requires TLS. Development mode
 requires loopback and permits plaintext for local testing.
 
-Configuration replaces `device_http`, `mqtt`, `tcp`, and `udp` with
-`device_ingress`; legacy fields are rejected as configuration errors. Choose the
-new address explicitly and update every device destination/firewall rule. There is
-no silent conversion of differing old ports.
+`device_ingress` is the only device address. Legacy separate-listener fields are
+rejected. Port 443 is only a deployment choice, not an HTTPS endpoint. HTTP bytes
+on device ingress close without an HTTP response; see [migration](remove-device-http.md).
 
 Authentication selects codec ID `netbaiot-json`, version `1`. The same synchronous
-codec decodes HTTP/MQTT/TCP/UDP payloads. Devices cannot supply their own trusted
+codec decodes MQTT/TCP/UDP payloads. Devices cannot supply their own trusted
 identity in the payload; unknown envelope fields are rejected.
 
 ```json
@@ -50,18 +49,6 @@ Codec defaults: 64 KiB input/encoded bytes, one output message, 64 telemetry fie
 allocation before serde; duplicate telemetry names are rejected. Invalid UTF-8,
 unknown fields, malformed JSON and oversized structures fail. A future multi-message
 codec needs a matching atomic batch receipt design; ingress currently requires one.
-
-## HTTP
-
-`POST /v1/device/data` with `Authorization: Bearer <credential-id>:<key>`.
-Successful configured acceptance returns 202; errors map to 400/401/403/409/413/429/
-503/504. Request and header bounds are enforced by Hyper and the adapter. Any
-Content-Encoding header is rejected with 415; request decompression is unsupported.
-Authenticated request-stage permits cover slow bodies at device, tenant and node levels. HTTP/1
-uses one request per connection in this milestone; header/body/response deadlines
-bound slow clients. HTTP devices do not have an offline command queue. POST typed
-configuration and command results to `/v1/device/config/ack` and
-`/v1/device/commands/ack`.
 
 ## Generic TCP
 
@@ -124,7 +111,7 @@ NBA1 (gateway → device) is a fixed **64-byte signed acceptance receipt**:
 | 32 | 32 | HMAC-SHA256 over bytes `[0..32)` |
 
 The HMAC uses the same decoded 32-byte key as NBI1. NBA1 means **EventAccepted**,
-at the same acceptance level as HTTP 202, MQTT QoS1 PUBACK, and the generic TCP
+at the same acceptance level as MQTT QoS1 PUBACK, and the generic TCP
 acceptance receipt. It does **not** mean final required-sink ACK, database commit,
 business processing, or device command execution. A codec `CommandAck` is a
 separate application event; NBA1 may acknowledge acceptance of that event.

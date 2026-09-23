@@ -1,5 +1,8 @@
 # Goal
 
+> Historical measurements from the revision stated below. Device HTTP has since
+> been removed; see the [current migration and verification report](remove-device-http.md).
+
 Determine the highest repeatable stable QoS1 ingress rate with exactly 256 MQTT
 application payload bytes, plaintext, normal EventAccepted semantics, a minimal
 downstream path, and independent server/load-generator hosts.

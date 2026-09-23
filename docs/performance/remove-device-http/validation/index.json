@@ -1,0 +1,122 @@
+{
+  "checks": [
+    {
+      "command": "cargo +1.88.0 fmt --all -- --check",
+      "result": "PASS",
+      "log": "docs/performance/remove-device-http/validation/fmt.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "cargo +1.88.0 check --workspace --all-targets",
+      "result": "PASS",
+      "log": "docs/performance/remove-device-http/validation/check.log",
+      "sha256": "6afe8cc1add70d3fe0e8b0a70ac490063b207f97b3b7fb2329efebeab2e17e22"
+    },
+    {
+      "command": "cargo +1.88.0 clippy --workspace --all-targets --all-features -- -D warnings",
+      "result": "PASS",
+      "log": "docs/performance/remove-device-http/validation/clippy.log",
+      "sha256": "ec09dfe33656e9892bb9c3a54d8b47335b450959c481fd3312ad054f8144beb6"
+    },
+    {
+      "command": "cargo +1.88.0 test --workspace --all-targets --all-features",
+      "result": "PASS",
+      "log": "docs/performance/remove-device-http/validation/test-all-targets.log",
+      "sha256": "6d17971f27d4e88931021c66adc72088f203ec593acef0af0518bbe2ee569c63",
+      "passed": 171,
+      "failed": 0,
+      "ignored": 4
+    },
+    {
+      "command": "cargo +1.88.0 test --workspace --all-features",
+      "result": "PASS",
+      "log": "docs/performance/remove-device-http/validation/test-all-features.log",
+      "sha256": "fb2e78708b8a3f856e3aa2cff6d2bcc1d53f14a926e4e352c7b9cce494c9be82",
+      "passed": 171,
+      "failed": 0,
+      "ignored": 4
+    },
+    {
+      "command": "RUSTUP_TOOLCHAIN=1.88.0 python3 tests/mqtt_conformance/run.py --release-gate",
+      "result": "PASS",
+      "log": "docs/performance/remove-device-http/validation/mqtt-release-gate.log",
+      "sha256": "9e669abbc135e031e03fe01387341e5c8dc1a855cdbaf97ab8502484d58355ff",
+      "total": 76,
+      "pass": 76,
+      "fail": 0
+    },
+    {
+      "command": "RUSTUP_TOOLCHAIN=1.88.0 bash scripts/tutorial_smoke.sh",
+      "result": "PASS",
+      "log": "docs/performance/remove-device-http/validation/tutorial-smoke.log",
+      "sha256": "d307afd0be0495c906379b8692684158bf1cbdb937e4bcbeae74e4ca9ec82612"
+    },
+    {
+      "command": "cargo +1.88.0 test -p netbaiot-server --test server subprocess_graceful_restart_sixty_second_soak -- --ignored --nocapture",
+      "result": "PASS",
+      "log": "docs/performance/remove-device-http/validation/restart-soak.log",
+      "sha256": "7ea614ddb873b116e38104ff01e12b84dc6bfc366a000daae241267c7c8d1096"
+    },
+    {
+      "command": "CARGO_NET_OFFLINE=true cargo +nightly fuzz run device_classifier -- -max_total_time=60 -max_len=65537",
+      "result": "PASS",
+      "log": "docs/performance/remove-device-http/validation/fuzz-classifier.log",
+      "sha256": "bc426b27f4b506d260c91817d6893726f3d56ed5db5459b02bedd7aad1a55eb2",
+      "iterations": 1120415,
+      "seconds": 61,
+      "sanitizer": "address"
+    },
+    {
+      "command": "CARGO_NET_OFFLINE=true cargo +nightly fuzz run udp_envelope -- -max_total_time=60 -max_len=1201",
+      "result": "PASS",
+      "log": "docs/performance/remove-device-http/validation/fuzz-udp.log",
+      "sha256": "7e860cfcf52b94a15946f99846ec8f6ec12bfff7da3d96ce35af5a59f3fee6b4",
+      "iterations": 673155,
+      "seconds": 61,
+      "sanitizer": "address"
+    },
+    {
+      "command": "python3 -m unittest discover -s scripts/perf -p 'test_*.py'",
+      "result": "PASS",
+      "log": "docs/performance/remove-device-http/validation/perf-tool-tests.log",
+      "sha256": "4c979c0d06f0e9e2109df48cae7f69ac5d403754045b4cfe404fe744e7390b47"
+    },
+    {
+      "command": "cargo +1.88.0 fmt --all -- --check",
+      "result": "PASS",
+      "log": "docs/performance/remove-device-http/validation/final-fmt.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "cargo +1.88.0 check --workspace --all-targets",
+      "result": "PASS",
+      "log": "docs/performance/remove-device-http/validation/final-check.log",
+      "sha256": "629beb97ce8970c91fa96204a43687c8cc5f56573c3d5340485d25711d5d40eb"
+    },
+    {
+      "command": "cargo +1.88.0 clippy --workspace --all-targets --all-features -- -D warnings",
+      "result": "PASS",
+      "log": "docs/performance/remove-device-http/validation/final-clippy.log",
+      "sha256": "056dd255e50223daf071ea386449d05254063bd5ec9d3bfb0597a710bae40521"
+    },
+    {
+      "command": "cargo +1.88.0 test -p netbaiot-server --test official_client",
+      "result": "PASS",
+      "log": "docs/performance/remove-device-http/validation/final-official-client.log",
+      "sha256": "de3c90c830948ea2607983197423db3af7719848eedc5f3bd6f20ba24cb8e2af"
+    },
+    {
+      "command": "python3 -m unittest discover -s scripts/perf -p 'test_*.py'",
+      "result": "PASS",
+      "log": "docs/performance/remove-device-http/validation/final-perf-tool-tests.log",
+      "sha256": "533131dad8973c589ae697ab1dd346cc55caa134cd1e536cedf26f1b057c0f1f"
+    }
+  ],
+  "not_run": [
+    "separate-host capacity",
+    "multi-hour soak",
+    "power-loss tests",
+    "new syscall/context-switch profiling"
+  ],
+  "ignored_tests": "Four remain ignored in the normal workspace suites. Relevant restart soak run explicitly; not all ignored diagnostics were run."
+}

@@ -1,0 +1,378 @@
+{
+  "pattern": "device_http|HttpRole|http_endpoint|/v1/device/|Transport::Http|HttpRequests|HTTP/MQTT/TCP/UDP|device HTTP|Device HTTP|HTTPS device|HTTP device|\u8bbe\u5907 HTTP|\u8bbe\u5907HTTP",
+  "unclassified": [],
+  "files": [
+    {
+      "file": "README.md",
+      "reason": "Explicit removal/migration explanation and historical-tool retrieval guidance.",
+      "hits": [
+        {
+          "line": 73,
+          "matches": [
+            "Device HTTP"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "README.zh-CN.md",
+      "reason": "Explicit removal/migration explanation and historical-tool retrieval guidance.",
+      "hits": [
+        {
+          "line": 52,
+          "matches": [
+            "\u8bbe\u5907 HTTP"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "apps/netbaiot-server/tests/server.rs",
+      "reason": "Negative regression inputs for rejected device HTTP and rejected legacy config.",
+      "hits": [
+        {
+          "line": 1416,
+          "matches": [
+            "/v1/device/"
+          ]
+        },
+        {
+          "line": 1634,
+          "matches": [
+            "device_http"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "crates/netbaiot-runtime/src/metrics.rs",
+      "reason": "ManagementHttpRequests: retained management-only metric.",
+      "hits": [
+        {
+          "line": 18,
+          "matches": [
+            "HttpRequests"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "crates/netbaiot-transports/src/management_http.rs",
+      "reason": "ManagementHttpRequests: retained management-only metric.",
+      "hits": [
+        {
+          "line": 120,
+          "matches": [
+            "HttpRequests"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "docs/mixed-ingress-capacity-audit.md",
+      "reason": "Historical report marked with current removal/migration notice; raw numbers retained.",
+      "hits": [
+        {
+          "line": 4,
+          "matches": [
+            "Device HTTP"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "docs/performance-dual-host-qos1-capacity.md",
+      "reason": "Historical report marked with current removal/migration notice; raw numbers retained.",
+      "hits": [
+        {
+          "line": 3,
+          "matches": [
+            "Device HTTP"
+          ]
+        },
+        {
+          "line": 99,
+          "matches": [
+            "device HTTP"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "docs/performance-eventid-experiment.md",
+      "reason": "Historical report marked with current removal/migration notice; raw numbers retained.",
+      "hits": [
+        {
+          "line": 3,
+          "matches": [
+            "Device HTTP"
+          ]
+        },
+        {
+          "line": 394,
+          "matches": [
+            "device_http"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "docs/performance/mixed-ingress/README.md",
+      "reason": "Historical/raw evidence preserved as measured; no active endpoint implementation.",
+      "hits": [
+        {
+          "line": 1,
+          "matches": [
+            "Device HTTP"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "docs/performance/remove-device-http/README.md",
+      "reason": "Current experiment evidence, validation test names or dependency provenance; before records intentionally preserve removed surfaces.",
+      "hits": [
+        {
+          "line": 19,
+          "matches": [
+            "Device HTTP"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "docs/performance/remove-device-http/config-preflight.json",
+      "reason": "Current experiment evidence, validation test names or dependency provenance; before records intentionally preserve removed surfaces.",
+      "hits": [
+        {
+          "line": 4,
+          "matches": [
+            "device_http"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "docs/pure-event-bus-refactor.md",
+      "reason": "Historical report marked with current removal/migration notice; raw numbers retained.",
+      "hits": [
+        {
+          "line": 4,
+          "matches": [
+            "Device HTTP"
+          ]
+        },
+        {
+          "line": 157,
+          "matches": [
+            "HTTP device"
+          ]
+        },
+        {
+          "line": 163,
+          "matches": [
+            "/v1/device/"
+          ]
+        },
+        {
+          "line": 164,
+          "matches": [
+            "/v1/device/"
+          ]
+        },
+        {
+          "line": 165,
+          "matches": [
+            "/v1/device/"
+          ]
+        },
+        {
+          "line": 166,
+          "matches": [
+            "/v1/device/"
+          ]
+        },
+        {
+          "line": 167,
+          "matches": [
+            "/v1/device/"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "docs/reliability-followup-audit.md",
+      "reason": "Historical report marked with current removal/migration notice; raw numbers retained.",
+      "hits": [
+        {
+          "line": 4,
+          "matches": [
+            "Device HTTP"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "docs/remove-device-http.md",
+      "reason": "Explicit removal/migration explanation and historical-tool retrieval guidance.",
+      "hits": [
+        {
+          "line": 1,
+          "matches": [
+            "Device HTTP"
+          ]
+        },
+        {
+          "line": 25,
+          "matches": [
+            "/v1/device/"
+          ]
+        },
+        {
+          "line": 26,
+          "matches": [
+            "HttpRole",
+            "device HTTP"
+          ]
+        },
+        {
+          "line": 28,
+          "matches": [
+            "Transport::Http"
+          ]
+        },
+        {
+          "line": 32,
+          "matches": [
+            "Device HTTP"
+          ]
+        },
+        {
+          "line": 81,
+          "matches": [
+            "Device HTTP"
+          ]
+        },
+        {
+          "line": 90,
+          "matches": [
+            "/v1/device/"
+          ]
+        },
+        {
+          "line": 91,
+          "matches": [
+            "http_endpoint"
+          ]
+        },
+        {
+          "line": 92,
+          "matches": [
+            "Transport::Http"
+          ]
+        },
+        {
+          "line": 236,
+          "matches": [
+            "/v1/device/",
+            "HttpRole",
+            "device_http",
+            "http_endpoint"
+          ]
+        },
+        {
+          "line": 237,
+          "matches": [
+            "HttpRequests",
+            "Transport::Http"
+          ]
+        },
+        {
+          "line": 242,
+          "matches": [
+            "HttpRequests"
+          ]
+        },
+        {
+          "line": 252,
+          "matches": [
+            "Device HTTP"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "docs/sdk-client-implementation-report.md",
+      "reason": "Historical report marked with current removal/migration notice; raw numbers retained.",
+      "hits": [
+        {
+          "line": 4,
+          "matches": [
+            "Device HTTP"
+          ]
+        },
+        {
+          "line": 37,
+          "matches": [
+            "/v1/device/"
+          ]
+        },
+        {
+          "line": 188,
+          "matches": [
+            "device HTTP"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "docs/single-device-ingress.md",
+      "reason": "Historical report marked with current removal/migration notice; raw numbers retained.",
+      "hits": [
+        {
+          "line": 4,
+          "matches": [
+            "Device HTTP"
+          ]
+        },
+        {
+          "line": 42,
+          "matches": [
+            "device_http"
+          ]
+        },
+        {
+          "line": 70,
+          "matches": [
+            "Device HTTP",
+            "HttpRole"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "docs/udp-reliable-ack.md",
+      "reason": "Historical report marked with current removal/migration notice; raw numbers retained.",
+      "hits": [
+        {
+          "line": 4,
+          "matches": [
+            "Device HTTP"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "scripts/perf/README.md",
+      "reason": "Explicit removal/migration explanation and historical-tool retrieval guidance.",
+      "hits": [
+        {
+          "line": 111,
+          "matches": [
+            "Device HTTP"
+          ]
+        }
+      ]
+    }
+  ]
+}

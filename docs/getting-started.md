@@ -44,7 +44,7 @@ credential   demo-device
 secret       000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
 ```
 
-监听地址：设备 HTTP/MQTT/generic TCP 与 UDP 共用 `8080`，management HTTP 独立 `9090`。教程 webhook 使用 `18080`。management token 使用下面的固定 64-hex 演示值。
+监听地址：设备 MQTT/generic TCP 与 UDP 共用 `8080`，management HTTP 独立 `9090`。教程 webhook 使用 `18080`。management token 使用下面的固定 64-hex 演示值。
 
 ## 4. Terminal 1：启动业务 webhook
 
@@ -67,7 +67,7 @@ export NETBAIOT_ADMIN_SECRET=abababababababababababababababababababababababababa
 RUST_LOG=info cargo run -p netbaiot-server -- configs/tutorial.json
 ```
 
-成功时日志包含 `runtime ready` 以及五个设备/管理监听地址。健康检查也需要 management bearer：
+成功时日志包含 `runtime ready` 以及设备 TCP/UDP 同号地址和独立管理监听地址。健康检查也需要 management bearer：
 
 ```bash
 curl --noproxy '*' -i http://127.0.0.1:9090/api/v1/ready \
@@ -90,6 +90,7 @@ mosquitto_sub -h 127.0.0.1 -p 8080 -V mqttv311 \
 ## 7. Terminal 4：发布首个事件
 
 ```bash
+export DEVICE_SECRET=000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
 mosquitto_pub -h 127.0.0.1 -p 8080 -V mqttv311 \
   -u demo-device -P "$DEVICE_SECRET" -i tutorial-publisher \
   -t 'v1/t/demo/p/sensor/d/device-1/up' -q 1 \
@@ -107,6 +108,7 @@ mosquitto_pub -h 127.0.0.1 -p 8080 -V mqttv311 \
 ## 8. Terminal 4：下发命令
 
 ```bash
+export NETBAIOT_ADMIN_SECRET=abababababababababababababababababababababababababababababababab
 curl --noproxy '*' -i http://127.0.0.1:9090/api/v1/devices/commands \
   -H "Authorization: Bearer $NETBAIOT_ADMIN_SECRET" \
   -H 'Content-Type: application/json' \
@@ -117,16 +119,15 @@ curl --noproxy '*' -i http://127.0.0.1:9090/api/v1/devices/commands \
 
 如果 Terminal 3 已退出，命令返回 `device_offline`。NetbaIoT 不保存离线命令；业务系统决定是否以及何时用同一个 `command_id` 重试，禁止盲目重试不确定的设备动作。
 
-## 9. HTTP ingress 快速确认
+## 9. 验证 TCP 和 UDP 入口
 
 ```bash
-curl --noproxy '*' -i http://127.0.0.1:8080/v1/device/data \
-  -H "Authorization: Bearer demo-device:$DEVICE_SECRET" \
-  -H 'Content-Type: application/json' \
-  --data '{"schema_version":1,"source_message_id":"http:1","kind":"heartbeat","data":{"sequence":1}}'
+python3 examples/device_tcp.py --address 127.0.0.1:8080
+python3 examples/device_udp.py --address 127.0.0.1:8080 --sequence 1
 ```
 
-你应该看到 HTTP 202 的 `EventAccepted` JSON，Terminal 1 再收到一条事件。一次性上传、简单设备或上级网关转发适合 HTTP；需要长连接命令、订阅和 MQTT QoS 时用 MQTT。
+TCP 返回分帧 `EventAccepted`；UDP 示例验证签名 NBA1。Terminal 1 会收到对应事件。
+需要双向命令时使用 MQTT/TCP；UDP 保持无会话。
 
 ## 10. CLI 快速确认
 

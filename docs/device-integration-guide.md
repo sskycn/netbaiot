@@ -16,7 +16,7 @@ export DOWN_TOPIC=v1/t/demo/p/sensor/d/device-1/down
 - `permissions.publish`、`permissions.commands`：上报与命令能力。
 - `codec_id=netbaiot-json`、`codec_version=1`：wire payload 解释方式。
 
-设备不能通过 topic 或 payload 伪造身份。MQTT/TCP 在连接时认证一次；正常 PUBLISH/frame 不调用远程 auth provider。HTTP 请求逐请求认证但使用独立、有界的正/负缓存。未知或过期的 cache miss 遇到 provider 故障会 fail closed；已绑定会话和未过期正缓存可继续。
+设备不能通过 topic 或 payload 伪造身份。MQTT/TCP 在连接时认证一次；正常 PUBLISH/frame 不调用远程 auth provider。认证缓存独立并限制正/负条目的数量、字节和 TTL。未知或过期的 cache miss 遇到 provider 故障会 fail closed；已绑定会话和未过期正缓存可继续。
 
 演示 secret 是 32 字节密钥的 64 个十六进制字符，只能用于 loopback 教程。生产应使用独立随机凭据、TLS、受保护的 provider 和显式 rotation/invalidation；不要把 secret 放入日志、metric label 或命令行历史。
 
@@ -180,26 +180,6 @@ wait "$WATCH_PID" 2>/dev/null || true
 
 异常断线、keepalive 超时和连接替换发布 Will；客户端发送 MQTT DISCONNECT 会 suppress Will。注意：计划内服务端关机关闭 network connection，不等于客户端 DISCONNECT，因此当前实现会发布仍 armed 的 Will，然后保存 MQTT snapshot。Will 在 CONNECT 时预留有界责任；订阅者压力下可进入有界 pending-Will 队列并在容量释放/计划重启后继续。
 
-## HTTP device ingress
-
-```bash
-curl --noproxy '*' -i http://127.0.0.1:8080/v1/device/data \
-  -H "Authorization: Bearer demo-device:$DEVICE_SECRET" \
-  -H 'Content-Type: application/json' \
-  --data '{"schema_version":1,"source_message_id":"http:2","kind":"telemetry","data":{"voltage":3.3}}'
-```
-
-成功为 HTTP 202 和 `EventAccepted`。设备 listener 还提供：
-
-| 方法/路径 | 用途 |
-|---|---|
-| `GET /v1/device/config` | 获取带 revision 的配置；支持 `If-None-Match`/304 |
-| `POST /v1/device/heartbeat` | heartbeat codec payload |
-| `POST /v1/device/config/ack` | 仅接受 `config_ack` kind |
-| `POST /v1/device/commands/ack` | 仅接受 `command_ack` kind |
-
-HTTP/1 当前一连接一请求；body/header/concurrency/deadline 均有界，不接受 `Content-Encoding`。HTTP 设备没有长连接命令通道。
-
 ## Generic TCP device ingress
 
 协议是 `u32` 大端 payload 长度 + JSON payload，长度必须为 `1..=max_tcp_frame_size`。首帧：
@@ -236,15 +216,14 @@ SDK 不创建 runtime、数据库或无界离线队列；调用方必须已有 T
 ```bash
 export NETBAIOT_DEVICE_CREDENTIAL_ID=demo-device
 export NETBAIOT_DEVICE_SECRET=$DEVICE_SECRET
-export NETBAIOT_DEVICE_HTTP_ENDPOINT=http://127.0.0.1:8080
 export NETBAIOT_MQTT_ENDPOINT=mqtt://127.0.0.1:8080
-cargo run -p netbaiot-device-sdk --example device_http_upload
-cargo run -p netbaiot-device-sdk --example device_config_pull
 cargo run -p netbaiot-device-sdk --example device_mqtt
 ```
 
 仓库示例使用 tutorial 身份 `demo/sensor/device-1`，可直接连接上述配置。示例均会被 workspace `--all-targets` 编译验证。
 
-SDK 支持 MQTT QoS0/1 publish、接收命令、`ack_command`，以及 HTTP upload/heartbeat/config check/config ACK。MQTT 断开时默认 `OfflinePublishPolicy::Reject`；重连使用可取消、有界的 full-jitter exponential backoff（100 ms–5 s），重连后重新订阅命令 topic。`connect()` 会等待成功 CONNACK 和 command SUBACK；`shutdown()` 或丢弃最后一个 client 会停止所属任务。
+SDK 支持 MQTT QoS0/1 publish、接收命令、`ack_command`，以及通过 `publish(DeviceUplink, PublishQos)` 上报 heartbeat/config ACK。MQTT 断开时默认 `OfflinePublishPolicy::Reject`；重连使用可取消、有界的 full-jitter exponential backoff（100 ms–5 s），重连后重新订阅命令 topic。`connect()` 会等待成功 CONNACK 和 command SUBACK；`shutdown()` 或丢弃最后一个 client 会停止所属任务。
 
 普通 MQTT 3.1.1 客户端始终是一等支持对象，不要求使用 SDK。
+
+设备主动配置拉取已移除。管理端仍可读写 revisioned configuration；没有等价的 MQTT/TCP 自动配置下载。已有命令通道可按应用约定携带配置，应用后通过 codec `ConfigAck` 上报。详见[迁移说明](remove-device-http.md)。

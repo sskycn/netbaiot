@@ -491,10 +491,11 @@ async fn official_client_throughput_latency_and_idle_memory_measurement() {
     let started = Instant::now();
     for sequence in 0..EVENTS {
         let source = publish_heartbeat(&device, sequence).await;
-        let accepted_at = Instant::now();
+        // MQTT publish returns after local enqueue, before server EventAccepted.
+        let enqueued_at = Instant::now();
         let delivery = next_event(&mut events).await;
         assert_eq!(delivery.event().source_message_id, source);
-        delivery_us.push(accepted_at.elapsed().as_micros());
+        delivery_us.push(enqueued_at.elapsed().as_micros());
         let ack_started = Instant::now();
         delivery.ack().await.unwrap();
         ack_us.push(ack_started.elapsed().as_micros());

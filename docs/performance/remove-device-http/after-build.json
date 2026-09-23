@@ -1,0 +1,47 @@
+{
+  "baseline": "945fe5e386d623c32e2c7d2d0568fe0c058107ec",
+  "command": "cargo +1.88.0 build --release --locked -p netbaiot-server -p netbaiot-loadgen -p netbaiot-device-sdk",
+  "artifacts": {
+    "target/remove-device-http/after-server": {
+      "bytes": 9251664,
+      "sha256": "e4d084ba997b834530527a7bc4ae17245f8076fcfe34de8e6397e79e7f4a9060"
+    },
+    "target/release/netbaiot-loadgen": {
+      "bytes": 5853840,
+      "sha256": "d2b77fb92387236237c4c41f643e785628a439509ae025ba4dc1b5c44634452a"
+    },
+    "target/release/libnetbaiot_device_sdk.rlib": {
+      "bytes": 306864,
+      "sha256": "5c60fbff78487a3312746b9bca677611fc04fea302734ccc2b77ad70c88b9c46"
+    }
+  },
+  "sdk_normal_dependency_packages": 95,
+  "removed_sdk_packages": [
+    "atomic-waker v1.1.2",
+    "base64 v0.22.1",
+    "futures-channel v0.3.34",
+    "http v1.5.0",
+    "http-body v1.1.0",
+    "http-body-util v0.1.5",
+    "httparse v1.10.1",
+    "hyper v1.11.0",
+    "hyper-rustls v0.27.9",
+    "hyper-util v0.1.20",
+    "ipnet v2.12.1",
+    "reqwest v0.12.28",
+    "ryu v1.0.23",
+    "serde_urlencoded v0.7.1",
+    "sync_wrapper v1.0.2",
+    "tower v0.5.3",
+    "tower-http v0.6.11",
+    "tower-layer v0.3.3",
+    "tower-service v0.3.3",
+    "try-lock v0.2.5",
+    "want v0.3.1",
+    "webpki-roots v1.0.9"
+  ],
+  "added_sdk_packages": [],
+  "platform": "macOS-26.6.2-arm64-arm-64bit",
+  "implementation_revision": "dda8027df0499dfb173f47e43cda08aa02359158",
+  "dependency_count_scope": "unique package/version pairs in native cargo tree normal edges, excluding SDK root"
+}

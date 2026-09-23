@@ -1,0 +1,20 @@
+{
+  "revision": "945fe5e386d623c32e2c7d2d0568fe0c058107ec",
+  "command": "cargo +1.88.0 build --release --locked -p netbaiot-server -p netbaiot-loadgen -p netbaiot-device-sdk",
+  "artifacts": {
+    "target/remove-device-http/before-server": {
+      "bytes": 9305488,
+      "sha256": "6968fb1fae9059eb243a897affb5a5560f94876352d82bbfc4e54ce85edf63c1"
+    },
+    "target/remove-device-http/loadgen": {
+      "bytes": 5891040,
+      "sha256": "910f063013a21c06e00b70caf147e33d4c034ab523bee0cfcc90939eeb925c4d"
+    },
+    "target/release/deps/libnetbaiot_device_sdk-55478f5b79b54fb0.rlib": {
+      "bytes": 429448,
+      "sha256": "dc8a637906224e08b580561f0a39f8f6bd4f4be5d8e075b5d894aaa805e91e7f"
+    }
+  },
+  "sdk_normal_dependency_packages": 117,
+  "platform": "macOS-26.6.2-arm64-arm-64bit"
+}
