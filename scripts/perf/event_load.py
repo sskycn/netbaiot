@@ -44,6 +44,19 @@ def last_json(output, event=None):
     return values[-1] if values else None
 
 
+def cpu_seconds(pid):
+    """Cumulative process CPU time; includes setup and warmup, excludes shutdown."""
+    value = subprocess.check_output(
+        ["ps", "-o", "time=", "-p", str(pid)], text=True
+    ).strip()
+    days, _, clock = value.rpartition("-")
+    parts = [float(part) for part in clock.split(":")]
+    seconds = 0.0
+    for part in parts:
+        seconds = seconds * 60 + part
+    return seconds + (int(days) * 86400 if days else 0)
+
+
 def management_get(port, path, tls=False):
     stream = socket.create_connection(("127.0.0.1", port), timeout=3)
     if tls:
@@ -280,6 +293,7 @@ def main():
                 _, profile_stderr = profiler.communicate(timeout=args.sample_seconds + 10)
             server_cpu_seconds = process_cpu_seconds(server.pid) - server_cpu_before
             metrics = management_get(management, "/api/v1/metrics", args.tls)
+            server_cpu_seconds = cpu_seconds(server.pid)
             server.send_signal(signal.SIGTERM)
             server.wait(timeout=30)
             sink.send_signal(signal.SIGTERM)

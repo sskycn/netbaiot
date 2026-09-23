@@ -40,6 +40,20 @@ was merged. Do not interpret the historical ranking below as a newly demonstrate
 isolated server bottleneck, or implement another optimization before resolving
 placement and actual offered-rate validity.
 
+## Dual-host QoS1 validation status (2026-09-22)
+
+**BENCHMARK BLOCKED BY PRODUCTION ISSUE — no new dual-host baseline.** The
+current release server rejects non-loopback plaintext MQTT; the minimal
+development sink also requires loopback listeners. A positive loopback startup
+control and four rejection cases reproduced these boundaries without changing
+production behavior. See the [dual-host report](performance-dual-host-qos1-capacity.md).
+
+All numbers below remain historical same-host evidence. The separate open-loop
+evidence commit `d718c0c50bcaa7f9640f16ad36a85f1b318e73bc` (not an ancestor of
+this audit's starting HEAD) records a healthy local QoS1 20k point and generator
+pacing limitations at higher rates. Consequently, the historical 25–30k/s knee
+must not be interpreted as a proven isolated-server capacity limit. No matched
+dual-host ratio, distortion percentage or new bottleneck ranking is available.
 
 ## Latest experiment: EventBus (2026-09-22)
 

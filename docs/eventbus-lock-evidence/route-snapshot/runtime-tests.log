@@ -1,0 +1,72 @@
+   Compiling smallvec v1.15.2
+   Compiling syn v3.0.4
+   Compiling syn v2.0.119
+   Compiling tracing-core v0.1.36
+   Compiling parking_lot_core v0.9.12
+   Compiling parking_lot v0.12.5
+   Compiling serde_derive v1.0.229
+   Compiling thiserror-impl v2.0.20
+   Compiling tokio-macros v2.7.2
+   Compiling futures-macro v0.3.34
+   Compiling async-trait v0.1.92
+   Compiling futures-util v0.3.34
+   Compiling tokio v1.53.1
+   Compiling tracing-attributes v0.1.31
+   Compiling thiserror v2.0.20
+   Compiling tracing v0.1.44
+   Compiling serde v1.0.229
+   Compiling tokio-util v0.7.19
+   Compiling netbaiot-protocol v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-protocol)
+   Compiling netbaiot-core v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-core)
+   Compiling netbaiot-runtime v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-runtime)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 7.14s
+     Running unittests src/lib.rs (target/debug/deps/netbaiot_runtime-d66e65b554c9009c)
+
+running 39 tests
+test config::tests::snapshot_replacement_is_validated_and_atomic ... ok
+test auth::cache_tests::invalidation_fences_delayed_success_and_retry_uses_new_generation ... ok
+test event::tests::eventbus_queue_depth_probe ... ignored, release-only queue scan measurement
+test event::tests::best_effort_overload_drops_without_blocking_required_acceptance ... ok
+test event::tests::delayed_retry_does_not_block_later_ready_delivery ... ok
+test config::tests::invalidation_releases_exact_byte_charge_across_reinsert_cycles ... ok
+test auth::cache_tests::cancelled_leader_releases_followers_and_all_inflight_resources ... ok
+test event::tests::required_admission_is_atomic_and_count_byte_bounded ... ok
+test event::tests::fanout_restore_inflight_spool_preserves_shared_event_and_accounting ... ok
+test event::tests::slow_required_sink_does_not_block_fast_sink_and_accounting_returns_to_zero ... ok
+test ingress::tests::auth_invalidation_epoch_fences_session_registration_for_every_scope ... ok
+test ingress::tests::presence_capacity_failure_occurs_before_event_accepted ... ok
+test event::tests::eventbus_sink_panic_recovery_001 ... ok
+test lifecycle::tests::quiesce_waits_for_active_and_closes_gate ... ok
+test limits::tests::defaults_validate_and_inconsistent_hierarchies_fail ... ok
+test metrics::tests::eventbus_probes_require_explicit_opt_in ... ok
+test quota::tests::connection_limits_and_raii_cleanup ... ok
+test metrics::tests::renders_lock_histograms_with_closed_names ... ok
+test quota::tests::expired_tenant_identity_replacement_is_shared ... ok
+test quota::tests::ingress_limits_isolate_devices_tenants_and_bytes ... ok
+test quota::tests::source_rate_table_has_capacity_and_global_limit ... ok
+test sessions::tests::active_revocation_uses_bound_identity_not_auth_cache_membership ... ok
+test sessions::tests::command_count_and_bytes_release_on_drop ... ok
+test sessions::tests::offline_presence_is_lru_bounded_and_active_presence_is_never_evicted ... ok
+test sessions::tests::stale_disconnect_cannot_remove_new_generation ... ok
+test auth::cache_tests::timed_out_leader_does_not_poison_retry ... ok
+test spool::tests::capacity_and_unusable_directory_fail_without_a_commit ... ok
+test spool::tests::corrupt_truncated_oversized_and_unknown_versions_fail ... ok
+test event::tests::route_snapshot_replacement_preserves_admission_revision ... ok
+test auth::cache_tests::positive_negative_ttl_capacity_invalidation_and_fail_closed ... ok
+test event::tests::event_bus_full_concurrency_waits_for_completion_without_ready_timer_spin ... ok
+test event::tests::eventbus_timeout_retries_owned_event_and_drains ... ok
+test quota::tests::ingress_wait_is_count_byte_and_deadline_bounded ... ok
+test event::tests::required_delivery_recovers_after_normal_retry_exhaustion ... ok
+test spool::tests::committed_record_round_trips_with_same_event_id ... ok
+test event::tests::delayed_retry_wakes_with_another_delivery_inflight ... ok
+test spool::tests::stale_cleanup_handle_cannot_delete_newer_committed_generation ... ok
+test spool::tests::repeated_failed_restarts_replace_one_generation_without_duplicates ... ok
+test auth::cache_tests::ten_thousand_signed_packets_use_one_verifier_lookup ... ok
+
+test result: ok. 38 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.29s
+
+   Doc-tests netbaiot_runtime
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s

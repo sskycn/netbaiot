@@ -44,6 +44,20 @@ was merged. Do not interpret the historical ranking below as a newly demonstrate
 isolated server bottleneck, or implement another optimization before resolving
 placement and actual offered-rate validity.
 
+## Dual-host QoS1 validation status (2026-09-22)
+
+**No true dual-host knee was measured.** Release startup checks confirmed that
+non-loopback plaintext MQTT and the remotely bound minimal development-sink
+configuration are prohibited by existing production validation. The requested
+experiment stopped at this boundary. This is not measured server, generator,
+network or sink saturation. See the [blocked audit](performance-dual-host-qos1-capacity.md).
+
+The historical ranking below is scoped to its same-host workload. Later
+open-loop evidence at `d718c0c50bcaa7f9640f16ad36a85f1b318e73bc` demonstrates
+why 25–30k/s cannot presently be called a server-only limit. No replacement
+ranking or true-knee profile is available. Recommended next task: **D, benchmark
+infrastructure still insufficient**. Broker fast path remains KEEP; EventBus
+and EventId experiments remain REVERT. No next optimization was implemented.
 
 ## Latest EventBus experiment (2026-09-22)
 
