@@ -4,6 +4,8 @@ import argparse
 import json
 from pathlib import Path
 import statistics
+import re
+from datetime import datetime, timezone
 
 ERRORS = ('connect_refused', 'connect_timeout', 'tls_failure', 'auth_failure',
           'http_overloaded', 'http_status_error', 'write_timeout', 'read_timeout',
@@ -67,8 +69,29 @@ def main():
         row = json.loads(path.read_text())
         if 'result' in row:
             summary = summarize(row); summary['raw_file'] = path.name; rows.append(summary)
+    aggregate = {}
+    for row in rows:
+        scenario = re.sub(r'-(?:pair|repeat)\d+$', '', row['scenario'])
+        key = row['label'] + '/' + scenario
+        aggregate.setdefault(key, []).append(row)
+    def distribution(values):
+        values = [v for v in values if v is not None]
+        return dict(n=len(values), median=statistics.median(values), minimum=min(values), maximum=max(values)) if values else None
+    tables = {}
+    for key, trials in aggregate.items():
+        protocols = {}
+        for name in trials[0]['groups']:
+            entries = [r['groups'][name] for r in trials]
+            protocols[name] = {field: distribution([g[field] for g in entries]) for field in
+                               ['accepted_per_second','sent_per_second','success_pct','offered_coverage_pct','connect_success_pct','app_connect_success_pct']}
+            protocols[name]['latency'] = {field: distribution([g['latency'].get(field) for g in entries]) for field in ['p50_ms','p95_ms','p99_ms','mean_ms']}
+            protocols[name]['errors'] = {field: distribution([g['errors'][field] for g in entries]) for field in ERRORS}
+        tables[key] = dict(runs=[r['name'] for r in trials], seconds=[r['seconds'] for r in trials],
+                          groups=protocols, total_accepted_per_second=distribution([sum(g['accepted_per_second'] for g in r['groups'].values()) for r in trials]),
+                          cpu_pct={kind:distribution([r['cpu_pct'].get(kind) for r in trials]) for kind in ['server','loadgen']},
+                          peak_rss_kib=distribution([r['rss_kib'].get('peak') for r in trials]))
     if args.output:
-        args.output.write_text(json.dumps(dict(schema_version=1, notes=[
+        args.output.write_text(json.dumps(dict(schema_version=1, generated_at=datetime.now(timezone.utc).isoformat(), aggregate=tables, notes=[
             'CPU 100% = one core. Histograms cover acknowledged operations only.',
             'Initial connection totals include warmup. Measurement connect counts exclude warmup.',
             'Server counter deltas span first-to-last successful sample, not exactly the client measurement interval.',

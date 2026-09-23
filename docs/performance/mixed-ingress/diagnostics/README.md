@@ -1,0 +1,1 @@
+These six completed first attempts retain independent device/CPU measurements, but their management observer failed to reset Python HTTP Request-sent state after a TLS rejection. They are excluded from the main matrix and repeated with observer version 2; no production code changed. The original raw records are preserved here rather than silently overwritten.
