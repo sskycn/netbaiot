@@ -1,0 +1,165 @@
+{
+  "integration_revision": "0c804f0fcfc3d9fdea6a343a6f61617767e20d47",
+  "timestamp": "2026-09-23T07:17:16.856429+00:00",
+  "environment": {
+    "RUSTUP_TOOLCHAIN": "1.88.0"
+  },
+  "checks": [
+    {
+      "command": "cargo +1.88.0 fmt --all -- --check",
+      "exit_code": 0,
+      "result": "PASS",
+      "seconds": 0.375663625,
+      "tail": []
+    },
+    {
+      "command": "cargo +1.88.0 check --workspace --all-targets",
+      "exit_code": 0,
+      "result": "PASS",
+      "seconds": 2.964283709,
+      "tail": [
+        "    Checking netbaiot-runtime v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-runtime)",
+        "    Checking netbaiot-transports v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-transports)",
+        "    Checking netbaiot-loadgen v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/tools/netbaiot-loadgen)",
+        "    Checking netbaiot-server v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/apps/netbaiot-server)",
+        "    Checking netbaiot-cli v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/apps/netbaiot-cli)",
+        "    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.89s"
+      ]
+    },
+    {
+      "command": "cargo +1.88.0 clippy --workspace --all-targets --all-features -- -D warnings",
+      "exit_code": 0,
+      "result": "PASS",
+      "seconds": 2.621922792,
+      "tail": [
+        "    Checking netbaiot-runtime v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-runtime)",
+        "    Checking netbaiot-transports v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-transports)",
+        "    Checking netbaiot-loadgen v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/tools/netbaiot-loadgen)",
+        "    Checking netbaiot-server v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/apps/netbaiot-server)",
+        "    Checking netbaiot-cli v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/apps/netbaiot-cli)",
+        "    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.54s"
+      ]
+    },
+    {
+      "command": "cargo +1.88.0 test --workspace --all-targets --all-features",
+      "exit_code": 0,
+      "result": "PASS",
+      "seconds": 73.932395625,
+      "tail": [
+        "retained_store_1000: logical_bytes=145890 bytes/message=145.9",
+        "retained_exact_1000: 10000 iterations, 3362946 ops/s, p50=250 ns p95=292 ns p99=333 ns",
+        "retained_wildcard_1000: 1000 iterations, 2363 ops/s, p50=423167 ns p95=439250 ns p99=468500 ns",
+        "retained_store_4000: logical_bytes=586890 bytes/message=146.7",
+        "retained_exact_4000: 10000 iterations, 2984184 ops/s, p50=292 ns p95=334 ns p99=375 ns",
+        "retained_wildcard_4000: 1000 iterations, 590 ops/s, p50=1698916 ns p95=1745792 ns p99=1777333 ns",
+        "mqtt_state_payload_64: offline_messages=1 offline_bytes=147 outbound_qos1_bytes=147 outbound_qos2_bytes=147 inbound_qos2_bytes=145",
+        "mqtt_state_payload_256: offline_messages=1 offline_bytes=339 outbound_qos1_bytes=339 outbound_qos2_bytes=339 inbound_qos2_bytes=337",
+        "mqtt_state_payload_1024: offline_messages=1 offline_bytes=1107 outbound_qos1_bytes=1107 outbound_qos2_bytes=1107 inbound_qos2_bytes=1105",
+        "mqtt_state_payload_8192: offline_messages=1 offline_bytes=8275 outbound_qos1_bytes=8275 outbound_qos2_bytes=8275 inbound_qos2_bytes=8273",
+        "mqtt_state_payload_32768: offline_messages=1 offline_bytes=32851 outbound_qos1_bytes=32851 outbound_qos2_bytes=32851 inbound_qos2_bytes=32849",
+        "layout_bytes: session_endpoint=96 queued_command=104 device_event=152"
+      ],
+      "test_totals": {
+        "passed": 170,
+        "failed": 0,
+        "ignored": 4
+      }
+    },
+    {
+      "command": "cargo +1.88.0 test --workspace --all-features",
+      "exit_code": 0,
+      "result": "PASS",
+      "seconds": 15.278949417000007,
+      "tail": [
+        "   Doc-tests netbaiot_server",
+        "",
+        "running 0 tests",
+        "",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "",
+        "   Doc-tests netbaiot_transports",
+        "",
+        "running 0 tests",
+        "",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        ""
+      ],
+      "test_totals": {
+        "passed": 170,
+        "failed": 0,
+        "ignored": 4
+      }
+    },
+    {
+      "command": "python3 tests/mqtt_conformance/run.py --release-gate --no-build",
+      "exit_code": 0,
+      "result": "PASS",
+      "seconds": 27.49440349999999,
+      "tail": [
+        "RETAIN-REPLACEMENT-RESERVATION-001: PASS \u2014      Running tests/end_to_end.rs (target/debug/deps/end_to_end-4f0c6ac88ef340f4)",
+        "EVENTBUS-SINK-PANIC-RECOVERY-001: PASS \u2014      Running tests/end_to_end.rs (target/debug/deps/end_to_end-4f0c6ac88ef340f4)",
+        "WILL-SUBSCRIBER-PRESSURE-001: PASS \u2014      Running tests/end_to_end.rs (target/debug/deps/end_to_end-4f0c6ac88ef340f4)",
+        "AUTH-MQTT-ATTACH-REVOKE-RACE-001: PASS \u2014      Running tests/end_to_end.rs (target/debug/deps/end_to_end-4f0c6ac88ef340f4)",
+        "MQTT-RECOVERY-V1-LARGE-COMPAT-001: PASS \u2014      Running tests/end_to_end.rs (target/debug/deps/end_to_end-4f0c6ac88ef340f4)",
+        "MQTT-RECOVERY-WHOLE-IMAGE-INTEGRITY-001: PASS \u2014      Running tests/end_to_end.rs (target/debug/deps/end_to_end-4f0c6ac88ef340f4)",
+        "MQTT-PERSISTENT-CODEC-PROVENANCE-001: PASS \u2014      Running tests/end_to_end.rs (target/debug/deps/end_to_end-4f0c6ac88ef340f4)",
+        "MQTT-ROUTE-PREFLIGHT-BOUNDED-MEMORY-001: PASS \u2014      Running tests/end_to_end.rs (target/debug/deps/end_to_end-4f0c6ac88ef340f4)",
+        "MQTT-RECOVERY-ACL-OWNERSHIP-001: PASS \u2014      Running tests/end_to_end.rs (target/debug/deps/end_to_end-4f0c6ac88ef340f4)",
+        "AUTH-INVALIDATION-COUNTING-001: PASS \u2014      Running tests/end_to_end.rs (target/debug/deps/end_to_end-4f0c6ac88ef340f4)",
+        "RESTART-001: PASS \u2014      Running tests/end_to_end.rs (target/debug/deps/end_to_end-4f0c6ac88ef340f4)",
+        "NORMATIVE-COVERAGE-001: PASS \u2014 125/125 requirements have current PASS evidence"
+      ]
+    },
+    {
+      "command": "bash scripts/tutorial_smoke.sh",
+      "exit_code": 0,
+      "result": "PASS",
+      "seconds": 14.282152707999984,
+      "tail": [
+        "acceptance: {'event_id': '9960ccae-9926-4e34-a4c7-e4f57d1f6324', 'accepted_at': 1790147970671, 'required_deliveries': 1, 'best_effort_deliveries': 0}",
+        "EventAccepted: signed NBA1 sequence=11; business completion is separate",
+        "{\"command_id\":\"00000000-0000-0000-0000-000000000123\",\"state\":\"queued\"}",
+        "{\"command_id\":\"00000000-0000-0000-0000-000000000123\",\"device\":{\"tenant_id\":\"demo\",\"product_id\":\"sensor\",\"device_id\":\"device-1\"},\"expires_at\":1790148270924,\"payload\":{\"name\":\"smoke\",\"arguments\":{}}}",
+        "{\"invalidated\":1,\"disconnected\":0,\"invalidated_cache_entries\":1,\"disconnected_connections\":0,\"invalidated_mqtt_sessions\":2}",
+        "{\"draining\":true}",
+        "2026-09-23T07:19:30.966127Z  INFO netbaiot_server: shutdown complete",
+        "accepted event 679574aa-c245-4fa3-b067-386bd88cd701",
+        "apply revision 1: {\"sample_interval_seconds\":30}",
+        "{\"draining\":true}",
+        "2026-09-23T07:19:33.759665Z  INFO netbaiot_server: shutdown complete",
+        "tutorial smoke: PASS"
+      ]
+    },
+    {
+      "command": "cargo +1.88.0 test -p netbaiot-server --test server subprocess_graceful_restart_sixty_second_soak -- --ignored --nocapture",
+      "exit_code": 0,
+      "result": "PASS",
+      "seconds": 61.919101541,
+      "tail": [
+        "    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.06s",
+        "     Running tests/server.rs (target/debug/deps/server-5225dda76e17a9eb)",
+        "",
+        "running 1 test",
+        "test subprocess_graceful_restart_sixty_second_soak has been running for over 60 seconds",
+        "test subprocess_graceful_restart_sixty_second_soak ... ok",
+        "",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 19 filtered out; finished in 61.78s",
+        ""
+      ],
+      "test_totals": {
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "command": "python3 scripts/perf/mixed_ingress_semantics.py --server target/debug/netbaiot-server --output docs/performance/mixed-ingress/integration-semantics.json",
+      "exit_code": 0,
+      "result": "PASS",
+      "seconds": 2.400417874999988,
+      "tail": [
+        "{\"test\": \"mixed-tls-required-boundary-restart\", \"binary_sha256\": \"66b23f921ff4852568602ffa338655bd6b81955c90eb3203bb9908e452651ada\", \"full_bus\": {\"status\": {\"active_connections\": {\"http\": 1, \"mqtt\": 0, \"tcp\": 0, \"udp\": 0}, \"auth_cache_bytes\": 592, \"auth_cache_entries\": 4, \"config_cache_bytes\": 130, \"config_cache_entries\": 1, \"event_bytes\": 982, \"event_count\": 4, \"lifecycle\": \"running\", \"pending_required\": 4, \"runtime_tasks\": 5}, \"counters\": {\"connections_accepted\": 9, \"connections_rejected\": 0, \"mqtt_connect_success\": 1, \"mqtt_connect_failure\": 0, \"mqtt_packets_received\": 4, \"mqtt_packets_sent\": 4, \"mqtt_protocol_violations\": 0, \"mqtt_publishes\": 2, \"mqtt_subscriptions\": 1, \"mqtt_pubacks\": 1, \"mqtt_keepalive_disconnects\": 0, \"http_requests\": 7, \"tcp_frames\": 2, \"udp_datagrams\": 3, \"auth_failures\": 0, \"auth_cache_hits\": 3, \"auth_cache_misses\": 4, \"auth_negative_hits\": 0, \"auth_evictions\": 0, \"auth_invalidations\": 0, \"codec_failures\": 0, \"ingress_accepted\": 4, \"ingress_rejected\": 5, \"ingress_bytes\": 940, \"protocol_admission_rejects\": 0, \"ingress_admission_rejects\": 0, \"queue_rejects\": 0, \"command_queued\": 0, \"command_sent\": 0, \"command_received\": 0, \"command_acked\": 0, \"command_failed\": 0, \"events_accepted\": 4, \"events_rejected\": 5, \"event_bytes\": 982, \"sink_acks\": 0, \"sink_retries\": 0, \"sink_failures\": 4, \"sink_drops\": 0, \"spool_records\": 0, \"spool_bytes\": 0, \"recovery_records\": 0, \"timeouts\": 0, \"protocol_detection_failures\": 0, \"protocol_detection_timeouts\": 0, \"udp_acks_sent\": 1, \"udp_ack_send_failures\": 0, \"udp_accepted_duplicates\": 0, \"udp_accepted\": 1, \"mqtt_protocol_validation_us_count\": 9, \"mqtt_protocol_validation_us_sum\": 12, \"validation_to_admission_us_count\": 9, \"validation_to_admission_us_sum\": 59, \"admission_wait_us_count\": 9, \"admission_wait_us_sum\": 57, \"admission_lock_wait_us_count\": 10, \"admission_lock_wait_us_sum\": 0, \"admission_lock_hold_us_count\": 10, \"admission_lock_hold_us_sum\": 4, \"event_bus_lock_wait_us_count\": 0, \"event_bus_lock_wait_us_sum\": 0, \"event_bus_lock_hold_us_count\": 0, \"event_bus_lock_hold_us_sum\": 0, \"event_bus_state_wait_us_count\": 0, \"event_bus_state_wait_us_sum\": 0, \"event_bus_state_hold_us_count\": 0, \"event_bus_state_hold_us_sum\": 0, \"broker_lock_wait_us_count\": 0, \"broker_lock_wait_us_sum\": 0, \"broker_lock_hold_us_count\": 0, \"broker_lock_hold_us_sum\": 0, \"authentication_to_codec_us_count\": 9, \"authentication_to_codec_us_sum\": 135, \"codec_to_event_accepted_us_count\": 4, \"codec_to_event_accepted_us_sum\": 60, \"event_accepted_to_sink_ack_us_count\": 0, \"event_accepted_to_sink_ack_us_sum\": 0, \"puback_write_us_count\": 1, \"puback_write_us_sum\": 10}}, \"shutdown\": {\"management_observed_unready\": true, \"device_ingress_closed\": true, \"spool_bytes\": 1590, \"exit_code\": 0}, \"recovered_ids\": {\"accepted-http\": [\"d25a32ce-db81-489e-828a-6055c4083489\"], \"accepted-mqtt\": [\"fb970775-e41e-4053-bf84-738624a9ca0c\"], \"accepted-tcp\": [\"b346bf88-c4d7-49d4-abb7-e256732ec3ed\"], \"accepted-udp\": [\"cbe05dad-414d-4eb9-80d0-6e71371aef48\"]}, \"recovery\": {\"status\": {\"active_connections\": {\"http\": 1, \"mqtt\": 1, \"tcp\": 0, \"udp\": 0}, \"auth_cache_bytes\": 140, \"auth_cache_entries\": 1, \"config_cache_bytes\": 130, \"config_cache_entries\": 1, \"event_bytes\": 0, \"event_count\": 0, \"lifecycle\": \"running\", \"pending_required\": 0, \"runtime_tasks\": 6}, \"counters\": {\"connections_accepted\": 4, \"connections_rejected\": 0, \"mqtt_connect_success\": 1, \"mqtt_connect_failure\": 0, \"mqtt_packets_received\": 2, \"mqtt_packets_sent\": 3, \"mqtt_protocol_violations\": 0, \"mqtt_publishes\": 0, \"mqtt_subscriptions\": 0, \"mqtt_pubacks\": 1, \"mqtt_keepalive_disconnects\": 0, \"http_requests\": 3, \"tcp_frames\": 0, \"udp_datagrams\": 0, \"auth_failures\": 0, \"auth_cache_hits\": 0, \"auth_cache_misses\": 1, \"auth_negative_hits\": 0, \"auth_evictions\": 0, \"auth_invalidations\": 0, \"codec_failures\": 0, \"ingress_accepted\": 0, \"ingress_rejected\": 0, \"ingress_bytes\": 0, \"protocol_admission_rejects\": 0, \"ingress_admission_rejects\": 0, \"queue_rejects\": 0, \"command_queued\": 0, \"command_sent\": 0, \"command_received\": 1, \"command_acked\": 0, \"command_failed\": 0, \"events_accepted\": 0, \"events_rejected\": 0, \"event_bytes\": 0, \"sink_acks\": 4, \"sink_retries\": 0, \"sink_failures\": 0, \"sink_drops\": 0, \"spool_records\": 0, \"spool_bytes\": 0, \"recovery_records\": 4, \"timeouts\": 0, \"protocol_detection_failures\": 0, \"protocol_detection_timeouts\": 0, \"udp_acks_sent\": 0, \"udp_ack_send_failures\": 0, \"udp_accepted_duplicates\": 0, \"udp_accepted\": 0, \"mqtt_protocol_validation_us_count\": 0, \"mqtt_protocol_validation_us_sum\": 0, \"validation_to_admission_us_count\": 0, \"validation_to_admission_us_sum\": 0, \"admission_wait_us_count\": 0, \"admission_wait_us_sum\": 0, \"admission_lock_wait_us_count\": 1, \"admission_lock_wait_us_sum\": 1, \"admission_lock_hold_us_count\": 1, \"admission_lock_hold_us_sum\": 9, \"event_bus_lock_wait_us_count\": 0, \"event_bus_lock_wait_us_sum\": 0, \"event_bus_lock_hold_us_count\": 0, \"event_bus_lock_hold_us_sum\": 0, \"event_bus_state_wait_us_count\": 0, \"event_bus_state_wait_us_sum\": 0, \"event_bus_state_hold_us_count\": 0, \"event_bus_state_hold_us_sum\": 0, \"broker_lock_wait_us_count\": 0, \"broker_lock_wait_us_sum\": 0, \"broker_lock_hold_us_count\": 0, \"broker_lock_hold_us_sum\": 0, \"authentication_to_codec_us_count\": 0, \"authentication_to_codec_us_sum\": 0, \"codec_to_event_accepted_us_count\": 0, \"codec_to_event_accepted_us_sum\": 0, \"event_accepted_to_sink_ack_us_count\": 4, \"event_accepted_to_sink_ack_us_sum\": 6336000, \"puback_write_us_count\": 0, \"puback_write_us_sum\": 0}}, \"retry_previously_rejected_udp\": true, \"pass\": true, \"cleanup\": {\"exit_code\": 0, \"forced\": false}}"
+      ]
+    }
+  ]
+}

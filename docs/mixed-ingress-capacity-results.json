@@ -39,7 +39,10 @@
       "Reproducible 9600 HTTP/s host-wide stall with EADDRNOTAVAIL; complete cause unresolved",
       "UDP-heavy offered load limited by bounded client windows/shared-host competition; no syscall attribution"
     ],
-    "push": false
+    "push": false,
+    "integration_revision": "0c804f0fcfc3d9fdea6a343a6f61617767e20d47",
+    "integration_validation_file": "performance/mixed-ingress/integration-validation.json",
+    "integration_semantics_file": "performance/mixed-ingress/integration-semantics.json"
   },
   "plan_file": "performance/mixed-ingress/plan.json",
   "validation_file": "performance/mixed-ingress/validation.json",
@@ -48,7 +51,7 @@
     "performance/mixed-ingress/matrix-verification.json",
     "performance/mixed-ingress/supplement-verification.json"
   ],
-  "generated_at": "2026-09-23T07:16:08.787122+00:00",
+  "generated_at": "2026-09-23T07:21:43.674096+00:00",
   "aggregate": {
     "baseline/admission-tenant-16": {
       "runs": [

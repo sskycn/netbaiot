@@ -661,3 +661,23 @@ allocation failure is directly measured, but the complete cause of simultaneous
 existing-session/UDP stalls remains unisolated. A separate-host reproduction and
 OS scheduling/socket traces would be needed to attribute that behavior to gateway
 code. No protocol quota or kernel tuning was used to hide this result.
+
+## Local integration validation
+
+The audit branch was merged locally into main as `0c804f0fcfc3d9fdea6a343a6f61617767e20d47`. This retains main's
+existing EventBus work. All nine checks in
+[integration-validation.json](performance/mixed-ingress/integration-validation.json)
+passed: formatting, workspace/all-target compilation, all-feature Clippy with
+warnings denied, both required workspace test commands, MQTT release gate, tutorial
+smoke, explicit 60-second subprocess restart soak, and mixed TLS/UDP acceptance
+and restart semantics. Each workspace test command reports 170 passed, zero failed
+and four default ignored cases; the restart soak is then explicitly executed.
+MQTT gates pass 76/76 with 125/125 normative requirements covered. The mixed
+semantic run verifies the integrated server binary separately and preserves its
+hash in `integration-semantics.json`.
+
+The classifier/UDP fuzz runs recorded above remain the final-candidate runs; they
+were not repeated after merging unrelated EventBus changes. No complete performance
+matrix was rerun on integrated main. Subsequent changes only record validation and
+report evidence. The branch and its temporary worktree are removed after local
+integration; no push is performed for this task.
