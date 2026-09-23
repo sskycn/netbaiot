@@ -1742,3 +1742,120 @@ async fn unclassified_connections_enforce_global_peer_and_rate_limits() {
         ingress.events.stop_workers().await.unwrap();
     }
 }
+
+#[tokio::test]
+async fn device_protocol_ceiling_preserves_other_tls_protocols_and_management() {
+    use netbaiot_runtime::{AdminAccess, Metric};
+    use netbaiot_transports::tcp::{LengthPrefixFramer, TcpFramer};
+    let stop = CancellationToken::new();
+    let (ingress, mut services) = tls_test_services(
+        Limits {
+            max_connections: 8,
+            max_connections_per_ip: 8,
+            max_device_connections_per_protocol: 2,
+            requests_per_ip_second: 1000,
+            ..Limits::default()
+        },
+        stop.clone(),
+    );
+    let admin = "d".repeat(64);
+    Arc::get_mut(&mut services).unwrap().admin = Some(Arc::new(
+        AdminAccess::new(&admin, Default::default(), &ingress.limits).unwrap(),
+    ));
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let task = tokio::spawn(serve_device_ingress(
+        listener,
+        services.clone(),
+        Some(tls_acceptor(&test_tls_files()).await.unwrap()),
+        stop.child_token(),
+    ));
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let management = listener.local_addr().unwrap();
+    let management_task = tokio::spawn(serve_stream(
+        listener,
+        Transport::Http,
+        services.with_http_role(HttpRole::Management),
+        Some(tls_acceptor(&test_tls_files()).await.unwrap()),
+        stop.child_token(),
+    ));
+    let mut slow = Vec::new();
+    for count in 1..=2 {
+        let mut socket = device_socket(address, true).await;
+        socket
+            .write_all(b"POST /v1/device/data HTTP/1.1\r\nHost: localhost\r\n")
+            .await
+            .unwrap();
+        tokio::time::timeout(Duration::from_secs(2), async {
+            while services.connections.active().unwrap()[0] < count {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        slow.push(socket);
+    }
+    let mut rejected = device_socket(address, true).await;
+    rejected
+        .write_all(b"POST /v1/device/data HTTP/1.1\r\n")
+        .await
+        .unwrap();
+    assert!(matches!(
+        tokio::time::timeout(Duration::from_secs(2), rejected.read(&mut [0; 1]))
+            .await
+            .unwrap(),
+        Ok(0) | Err(_)
+    ));
+    assert_eq!(ingress.metrics.get(Metric::ConnectionsRejected), 1);
+    let mut mqtt = device_socket(address, true).await;
+    mqtt.write_all(&mqtt_connect("cap-test", true))
+        .await
+        .unwrap();
+    assert_eq!(mqtt_read(&mut *mqtt).await, (0x20, vec![0, 0]));
+    let payload = br#"{"schema_version":1,"source_message_id":"cap-test","kind":"heartbeat","data":{"sequence":1}}"#;
+    mqtt.write_all(&mqtt_publish(
+        1,
+        "v1/t/demo/p/sensor/d/device-1/up",
+        payload,
+        1,
+        false,
+    ))
+    .await
+    .unwrap();
+    assert_eq!(mqtt_read(&mut *mqtt).await, (0x40, vec![0, 1]));
+    let mut tcp = device_socket(address, true).await;
+    let framer = LengthPrefixFramer { maximum: 65_536 };
+    tcp.write_all(&framer.encode(br#"{"credential_id":"demo-device","secret":"000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"}"#).unwrap()).await.unwrap();
+    assert_eq!(read_frame(&mut tcp).await, br#"{"authenticated":true}"#);
+    tcp.write_all(&framer.encode(payload).unwrap())
+        .await
+        .unwrap();
+    let accepted: EventAcceptance = serde_json::from_slice(&read_frame(&mut tcp).await).unwrap();
+    assert!(!accepted.event_id.0.is_nil());
+    // Even with the device HTTP ceiling reached, known management HTTP is unaffected.
+    let mut admin_socket = device_socket(management, true).await;
+    admin_socket.write_all(format!("GET /api/v1/ready HTTP/1.1\r\nHost: localhost\r\nAuthorization: Bearer {admin}\r\n\r\n").as_bytes()).await.unwrap();
+    let mut response = Vec::new();
+    tokio::time::timeout(
+        Duration::from_secs(2),
+        admin_socket.read_to_end(&mut response),
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    assert!(response.starts_with(b"HTTP/1.1 200"));
+    stop.cancel();
+    task.await.unwrap().unwrap();
+    management_task.await.unwrap().unwrap();
+    assert_eq!(services.connections.active().unwrap(), [0; 4]);
+    // Repeated pending acquire/drop catches leaked global/IP/byte ownership at shutdown.
+    for _ in 0..8 {
+        drop(
+            services
+                .connections
+                .acquire_device_pending(address.ip())
+                .unwrap(),
+        );
+    }
+    ingress.events.stop_workers().await.unwrap();
+}

@@ -6,6 +6,9 @@ use serde::{Deserialize, Serialize};
 #[serde(default, deny_unknown_fields)]
 pub struct Limits {
     pub max_connections: usize,
+    /// Device ingress only. Effective ceiling is also bounded by the global maximum.
+    /// Management/standalone transport listeners retain their existing global accounting.
+    pub max_device_connections_per_protocol: usize,
     pub max_connections_per_ip: usize,
     pub max_connections_per_device: usize,
     pub max_connections_per_tenant: usize,
@@ -124,6 +127,7 @@ impl Default for Limits {
     fn default() -> Self {
         Self {
             max_connections: 256,
+            max_device_connections_per_protocol: 192,
             max_connections_per_ip: 32,
             max_connections_per_device: 2,
             max_connections_per_tenant: 64,

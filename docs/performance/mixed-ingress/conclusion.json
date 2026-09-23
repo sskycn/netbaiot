@@ -1,0 +1,22 @@
+{
+  "decision": "KEEP_FIX",
+  "baseline": "bf9c611bc16d1fb9c95b21c939f9ef00e4530ddc",
+  "measured_final": "ff9e959397ddc2981758a8ae821f6be29d9038e9",
+  "rejected_experiment": "3d2d2c47ec8ea43d28ded60699bf6694ae3c86dd",
+  "kept_change": "192 classified device connections per protocol, under existing global/IP/byte ownership",
+  "formal_runs": 112,
+  "supplemental_runs": 15,
+  "formal_measurement_seconds": 9270,
+  "supplemental_measurement_seconds": 450,
+  "scope": "Same-host TLS fairness audit; not production network capacity or SLA. Integrated main contains earlier EventBus work and is a separately validated revision.",
+  "remaining_risks": [
+    "Pending/unclassified global-slot starvation",
+    "Shared per-IP connection cliff",
+    "Own-protocol ceiling rejects legitimate new same-protocol traffic",
+    "Post-TLS rejection/retry CPU; HTTP <95% coverage at 307 attempted idle clients",
+    "Shared ingress/required-queue pressure",
+    "Reproducible 9600 HTTP/s host-wide stall with EADDRNOTAVAIL; complete cause unresolved",
+    "UDP-heavy offered load limited by bounded client windows/shared-host competition; no syscall attribution"
+  ],
+  "push": false
+}

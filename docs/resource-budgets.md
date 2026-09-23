@@ -8,6 +8,7 @@ spool relationship values.
 | Resource | Default bound |
 |---|---:|
 | Connections | 256 node / 64 tenant / 32 IP / 2 device |
+| Device connections per classified protocol | 192 each; shares the 256 global maximum |
 | Logical connection memory | 512 KiB reservation / 128 MiB global |
 | MQTT/HTTP/TCP maximum | 64 KiB |
 | Initial stream read buffer | at most 4 KiB; grows incrementally |
@@ -69,3 +70,20 @@ entries this is 8192 extra live-entry bytes; HashMap spare buckets/allocator cos
 are additional (about 16 KiB extra bucket payload including spare slots at the
 default ceiling with the measured toolchain; not an RSS bound). No payload or
 event_id is retained for duplicate ACKs. See [measurements](udp-reliable-ack.md).
+
+Device ingress admission has a connection-level anti-monopoly ceiling. HTTP, MQTT
+and TCP each default to at most 192 classified device connections. Pending TLS and
+classification retain the existing shared global/IP/byte bounds. Classification
+charges the protocol counter while retaining the same permits. A failed transition
+releases all ownership. These are overlapping maxima, not three fixed partitions
+or guaranteed reservations. Management and standalone transport listeners retain
+existing admission and still share the process global ceiling. No new packet-level
+lock is introduced.
+
+The ceiling is a positive absolute configuration value. The global maximum also
+applies, so a protocol ceiling above it has no additional effect. Raising
+`max_connections` does not automatically raise the device protocol ceiling: size
+both explicitly. Multiple protocols, unclassified clients, or tighter shared IP
+limits can still exhaust available capacity. A separately reduced pending pool was
+rejected after paired measurements worsened legitimate new-connection admission.
+See the mixed-ingress audit for measured scope and remaining limitations.

@@ -1,0 +1,686 @@
+[
+  {
+    "name": "admission-tenant-4-pair0",
+    "groups": [
+      {
+        "label": "http",
+        "protocol": "http",
+        "rate": 5000.0,
+        "workers": 32,
+        "offset": 0,
+        "window": 128
+      },
+      {
+        "label": "mqtt",
+        "protocol": "mqtt",
+        "rate": 35000.0,
+        "workers": 32,
+        "offset": 128,
+        "window": 128
+      },
+      {
+        "label": "tcp",
+        "protocol": "tcp",
+        "rate": 5000.0,
+        "workers": 32,
+        "offset": 256,
+        "window": 128
+      },
+      {
+        "label": "udp",
+        "protocol": "udp",
+        "rate": 5000.0,
+        "workers": 8,
+        "offset": 384,
+        "window": 128
+      }
+    ],
+    "seconds": 30,
+    "repeats": 1,
+    "variant": "baseline",
+    "binary": "baseline",
+    "production_revision": "bf9c611bc16d1fb9c95b21c939f9ef00e4530ddc",
+    "limits": {
+      "max_ingress_per_tenant": 4
+    }
+  },
+  {
+    "name": "admission-tenant-16-pair0",
+    "groups": [
+      {
+        "label": "http",
+        "protocol": "http",
+        "rate": 5000.0,
+        "workers": 32,
+        "offset": 0,
+        "window": 128
+      },
+      {
+        "label": "mqtt",
+        "protocol": "mqtt",
+        "rate": 35000.0,
+        "workers": 32,
+        "offset": 128,
+        "window": 128
+      },
+      {
+        "label": "tcp",
+        "protocol": "tcp",
+        "rate": 5000.0,
+        "workers": 32,
+        "offset": 256,
+        "window": 128
+      },
+      {
+        "label": "udp",
+        "protocol": "udp",
+        "rate": 5000.0,
+        "workers": 8,
+        "offset": 384,
+        "window": 128
+      }
+    ],
+    "seconds": 30,
+    "repeats": 1,
+    "variant": "baseline",
+    "binary": "baseline",
+    "production_revision": "bf9c611bc16d1fb9c95b21c939f9ef00e4530ddc",
+    "limits": {
+      "max_ingress_per_tenant": 16
+    }
+  },
+  {
+    "name": "udp-generator-2-pair0",
+    "groups": [
+      {
+        "label": "http",
+        "protocol": "http",
+        "rate": 7000.0,
+        "workers": 32,
+        "offset": 0,
+        "window": 128
+      },
+      {
+        "label": "mqtt",
+        "protocol": "mqtt",
+        "rate": 7000.0,
+        "workers": 32,
+        "offset": 128,
+        "window": 128
+      },
+      {
+        "label": "tcp",
+        "protocol": "tcp",
+        "rate": 7000.0,
+        "workers": 32,
+        "offset": 256,
+        "window": 128
+      },
+      {
+        "label": "udp",
+        "protocol": "udp",
+        "rate": 49000.0,
+        "workers": 8,
+        "offset": 384,
+        "window": 128
+      }
+    ],
+    "seconds": 30,
+    "repeats": 1,
+    "variant": "baseline",
+    "binary": "baseline",
+    "production_revision": "bf9c611bc16d1fb9c95b21c939f9ef00e4530ddc",
+    "loadgen_workers": 2
+  },
+  {
+    "name": "udp-generator-4-pair0",
+    "groups": [
+      {
+        "label": "http",
+        "protocol": "http",
+        "rate": 7000.0,
+        "workers": 32,
+        "offset": 0,
+        "window": 128
+      },
+      {
+        "label": "mqtt",
+        "protocol": "mqtt",
+        "rate": 7000.0,
+        "workers": 32,
+        "offset": 128,
+        "window": 128
+      },
+      {
+        "label": "tcp",
+        "protocol": "tcp",
+        "rate": 7000.0,
+        "workers": 32,
+        "offset": 256,
+        "window": 128
+      },
+      {
+        "label": "udp",
+        "protocol": "udp",
+        "rate": 49000.0,
+        "workers": 8,
+        "offset": 384,
+        "window": 128
+      }
+    ],
+    "seconds": 30,
+    "repeats": 1,
+    "variant": "baseline",
+    "binary": "baseline",
+    "production_revision": "bf9c611bc16d1fb9c95b21c939f9ef00e4530ddc",
+    "loadgen_workers": 4
+  },
+  {
+    "name": "admission-tenant-16-pair1",
+    "groups": [
+      {
+        "label": "http",
+        "protocol": "http",
+        "rate": 5000.0,
+        "workers": 32,
+        "offset": 0,
+        "window": 128
+      },
+      {
+        "label": "mqtt",
+        "protocol": "mqtt",
+        "rate": 35000.0,
+        "workers": 32,
+        "offset": 128,
+        "window": 128
+      },
+      {
+        "label": "tcp",
+        "protocol": "tcp",
+        "rate": 5000.0,
+        "workers": 32,
+        "offset": 256,
+        "window": 128
+      },
+      {
+        "label": "udp",
+        "protocol": "udp",
+        "rate": 5000.0,
+        "workers": 8,
+        "offset": 384,
+        "window": 128
+      }
+    ],
+    "seconds": 30,
+    "repeats": 1,
+    "variant": "baseline",
+    "binary": "baseline",
+    "production_revision": "bf9c611bc16d1fb9c95b21c939f9ef00e4530ddc",
+    "limits": {
+      "max_ingress_per_tenant": 16
+    }
+  },
+  {
+    "name": "admission-tenant-4-pair1",
+    "groups": [
+      {
+        "label": "http",
+        "protocol": "http",
+        "rate": 5000.0,
+        "workers": 32,
+        "offset": 0,
+        "window": 128
+      },
+      {
+        "label": "mqtt",
+        "protocol": "mqtt",
+        "rate": 35000.0,
+        "workers": 32,
+        "offset": 128,
+        "window": 128
+      },
+      {
+        "label": "tcp",
+        "protocol": "tcp",
+        "rate": 5000.0,
+        "workers": 32,
+        "offset": 256,
+        "window": 128
+      },
+      {
+        "label": "udp",
+        "protocol": "udp",
+        "rate": 5000.0,
+        "workers": 8,
+        "offset": 384,
+        "window": 128
+      }
+    ],
+    "seconds": 30,
+    "repeats": 1,
+    "variant": "baseline",
+    "binary": "baseline",
+    "production_revision": "bf9c611bc16d1fb9c95b21c939f9ef00e4530ddc",
+    "limits": {
+      "max_ingress_per_tenant": 4
+    }
+  },
+  {
+    "name": "udp-generator-4-pair1",
+    "groups": [
+      {
+        "label": "http",
+        "protocol": "http",
+        "rate": 7000.0,
+        "workers": 32,
+        "offset": 0,
+        "window": 128
+      },
+      {
+        "label": "mqtt",
+        "protocol": "mqtt",
+        "rate": 7000.0,
+        "workers": 32,
+        "offset": 128,
+        "window": 128
+      },
+      {
+        "label": "tcp",
+        "protocol": "tcp",
+        "rate": 7000.0,
+        "workers": 32,
+        "offset": 256,
+        "window": 128
+      },
+      {
+        "label": "udp",
+        "protocol": "udp",
+        "rate": 49000.0,
+        "workers": 8,
+        "offset": 384,
+        "window": 128
+      }
+    ],
+    "seconds": 30,
+    "repeats": 1,
+    "variant": "baseline",
+    "binary": "baseline",
+    "production_revision": "bf9c611bc16d1fb9c95b21c939f9ef00e4530ddc",
+    "loadgen_workers": 4
+  },
+  {
+    "name": "udp-generator-2-pair1",
+    "groups": [
+      {
+        "label": "http",
+        "protocol": "http",
+        "rate": 7000.0,
+        "workers": 32,
+        "offset": 0,
+        "window": 128
+      },
+      {
+        "label": "mqtt",
+        "protocol": "mqtt",
+        "rate": 7000.0,
+        "workers": 32,
+        "offset": 128,
+        "window": 128
+      },
+      {
+        "label": "tcp",
+        "protocol": "tcp",
+        "rate": 7000.0,
+        "workers": 32,
+        "offset": 256,
+        "window": 128
+      },
+      {
+        "label": "udp",
+        "protocol": "udp",
+        "rate": 49000.0,
+        "workers": 8,
+        "offset": 384,
+        "window": 128
+      }
+    ],
+    "seconds": 30,
+    "repeats": 1,
+    "variant": "baseline",
+    "binary": "baseline",
+    "production_revision": "bf9c611bc16d1fb9c95b21c939f9ef00e4530ddc",
+    "loadgen_workers": 2
+  },
+  {
+    "name": "admission-tenant-4-pair2",
+    "groups": [
+      {
+        "label": "http",
+        "protocol": "http",
+        "rate": 5000.0,
+        "workers": 32,
+        "offset": 0,
+        "window": 128
+      },
+      {
+        "label": "mqtt",
+        "protocol": "mqtt",
+        "rate": 35000.0,
+        "workers": 32,
+        "offset": 128,
+        "window": 128
+      },
+      {
+        "label": "tcp",
+        "protocol": "tcp",
+        "rate": 5000.0,
+        "workers": 32,
+        "offset": 256,
+        "window": 128
+      },
+      {
+        "label": "udp",
+        "protocol": "udp",
+        "rate": 5000.0,
+        "workers": 8,
+        "offset": 384,
+        "window": 128
+      }
+    ],
+    "seconds": 30,
+    "repeats": 1,
+    "variant": "baseline",
+    "binary": "baseline",
+    "production_revision": "bf9c611bc16d1fb9c95b21c939f9ef00e4530ddc",
+    "limits": {
+      "max_ingress_per_tenant": 4
+    }
+  },
+  {
+    "name": "admission-tenant-16-pair2",
+    "groups": [
+      {
+        "label": "http",
+        "protocol": "http",
+        "rate": 5000.0,
+        "workers": 32,
+        "offset": 0,
+        "window": 128
+      },
+      {
+        "label": "mqtt",
+        "protocol": "mqtt",
+        "rate": 35000.0,
+        "workers": 32,
+        "offset": 128,
+        "window": 128
+      },
+      {
+        "label": "tcp",
+        "protocol": "tcp",
+        "rate": 5000.0,
+        "workers": 32,
+        "offset": 256,
+        "window": 128
+      },
+      {
+        "label": "udp",
+        "protocol": "udp",
+        "rate": 5000.0,
+        "workers": 8,
+        "offset": 384,
+        "window": 128
+      }
+    ],
+    "seconds": 30,
+    "repeats": 1,
+    "variant": "baseline",
+    "binary": "baseline",
+    "production_revision": "bf9c611bc16d1fb9c95b21c939f9ef00e4530ddc",
+    "limits": {
+      "max_ingress_per_tenant": 16
+    }
+  },
+  {
+    "name": "udp-generator-2-pair2",
+    "groups": [
+      {
+        "label": "http",
+        "protocol": "http",
+        "rate": 7000.0,
+        "workers": 32,
+        "offset": 0,
+        "window": 128
+      },
+      {
+        "label": "mqtt",
+        "protocol": "mqtt",
+        "rate": 7000.0,
+        "workers": 32,
+        "offset": 128,
+        "window": 128
+      },
+      {
+        "label": "tcp",
+        "protocol": "tcp",
+        "rate": 7000.0,
+        "workers": 32,
+        "offset": 256,
+        "window": 128
+      },
+      {
+        "label": "udp",
+        "protocol": "udp",
+        "rate": 49000.0,
+        "workers": 8,
+        "offset": 384,
+        "window": 128
+      }
+    ],
+    "seconds": 30,
+    "repeats": 1,
+    "variant": "baseline",
+    "binary": "baseline",
+    "production_revision": "bf9c611bc16d1fb9c95b21c939f9ef00e4530ddc",
+    "loadgen_workers": 2
+  },
+  {
+    "name": "udp-generator-4-pair2",
+    "groups": [
+      {
+        "label": "http",
+        "protocol": "http",
+        "rate": 7000.0,
+        "workers": 32,
+        "offset": 0,
+        "window": 128
+      },
+      {
+        "label": "mqtt",
+        "protocol": "mqtt",
+        "rate": 7000.0,
+        "workers": 32,
+        "offset": 128,
+        "window": 128
+      },
+      {
+        "label": "tcp",
+        "protocol": "tcp",
+        "rate": 7000.0,
+        "workers": 32,
+        "offset": 256,
+        "window": 128
+      },
+      {
+        "label": "udp",
+        "protocol": "udp",
+        "rate": 49000.0,
+        "workers": 8,
+        "offset": 384,
+        "window": 128
+      }
+    ],
+    "seconds": 30,
+    "repeats": 1,
+    "variant": "baseline",
+    "binary": "baseline",
+    "production_revision": "bf9c611bc16d1fb9c95b21c939f9ef00e4530ddc",
+    "loadgen_workers": 4
+  },
+  {
+    "name": "http-high-rate-repeat0",
+    "groups": [
+      {
+        "label": "http",
+        "protocol": "http",
+        "rate": 9600.0,
+        "workers": 32,
+        "offset": 0,
+        "window": 128
+      },
+      {
+        "label": "mqtt",
+        "protocol": "mqtt",
+        "rate": 1000,
+        "workers": 8,
+        "offset": 128,
+        "window": 128
+      },
+      {
+        "label": "tcp",
+        "protocol": "tcp",
+        "rate": 1000,
+        "workers": 8,
+        "offset": 256,
+        "window": 128
+      },
+      {
+        "label": "udp",
+        "protocol": "udp",
+        "rate": 1000,
+        "workers": 4,
+        "offset": 384,
+        "window": 128
+      },
+      {
+        "label": "mqtt_new",
+        "protocol": "mqtt",
+        "workers": 4,
+        "offset": 200,
+        "rate": 100,
+        "reuse": false,
+        "window": 1
+      }
+    ],
+    "seconds": 30,
+    "repeats": 1,
+    "variant": "baseline",
+    "binary": "baseline",
+    "production_revision": "bf9c611bc16d1fb9c95b21c939f9ef00e4530ddc",
+    "settle_before": 35
+  },
+  {
+    "name": "http-high-rate-repeat1",
+    "groups": [
+      {
+        "label": "http",
+        "protocol": "http",
+        "rate": 9600.0,
+        "workers": 32,
+        "offset": 0,
+        "window": 128
+      },
+      {
+        "label": "mqtt",
+        "protocol": "mqtt",
+        "rate": 1000,
+        "workers": 8,
+        "offset": 128,
+        "window": 128
+      },
+      {
+        "label": "tcp",
+        "protocol": "tcp",
+        "rate": 1000,
+        "workers": 8,
+        "offset": 256,
+        "window": 128
+      },
+      {
+        "label": "udp",
+        "protocol": "udp",
+        "rate": 1000,
+        "workers": 4,
+        "offset": 384,
+        "window": 128
+      },
+      {
+        "label": "mqtt_new",
+        "protocol": "mqtt",
+        "workers": 4,
+        "offset": 200,
+        "rate": 100,
+        "reuse": false,
+        "window": 1
+      }
+    ],
+    "seconds": 30,
+    "repeats": 1,
+    "variant": "baseline",
+    "binary": "baseline",
+    "production_revision": "bf9c611bc16d1fb9c95b21c939f9ef00e4530ddc",
+    "settle_before": 35
+  },
+  {
+    "name": "http-high-rate-repeat2",
+    "groups": [
+      {
+        "label": "http",
+        "protocol": "http",
+        "rate": 9600.0,
+        "workers": 32,
+        "offset": 0,
+        "window": 128
+      },
+      {
+        "label": "mqtt",
+        "protocol": "mqtt",
+        "rate": 1000,
+        "workers": 8,
+        "offset": 128,
+        "window": 128
+      },
+      {
+        "label": "tcp",
+        "protocol": "tcp",
+        "rate": 1000,
+        "workers": 8,
+        "offset": 256,
+        "window": 128
+      },
+      {
+        "label": "udp",
+        "protocol": "udp",
+        "rate": 1000,
+        "workers": 4,
+        "offset": 384,
+        "window": 128
+      },
+      {
+        "label": "mqtt_new",
+        "protocol": "mqtt",
+        "workers": 4,
+        "offset": 200,
+        "rate": 100,
+        "reuse": false,
+        "window": 1
+      }
+    ],
+    "seconds": 30,
+    "repeats": 1,
+    "variant": "baseline",
+    "binary": "baseline",
+    "production_revision": "bf9c611bc16d1fb9c95b21c939f9ef00e4530ddc",
+    "settle_before": 35
+  }
+]

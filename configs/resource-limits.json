@@ -1,5 +1,6 @@
 {
   "max_connections": 256,
+  "max_device_connections_per_protocol": 192,
   "max_connections_per_ip": 32,
   "max_connections_per_device": 2,
   "max_connections_per_tenant": 64,
