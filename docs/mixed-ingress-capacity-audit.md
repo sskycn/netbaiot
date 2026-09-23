@@ -90,3 +90,29 @@ MQTTS and TLS TCP probes cannot enter. UDP still receives valid acceptance ACKs.
 This is a global connection-slot cliff at low CPU, not a throughput capacity ceiling.
 Raw runs in `docs/performance/mixed-ingress` retain all counts and samples. Follow-up
 runs and any production experiment must remain separate from this baseline evidence.
+
+## Experiments in progress
+
+The first isolated production experiment is `3d2d2c47ec8ea43d28ded60699bf6694ae3c86dd`.
+It adds a 192-connection device-protocol ceiling and a 64-connection device-pending
+ceiling, reusing global permits and the connection accounting mutex. Management
+and standalone listeners do not acquire these device-specific caps. Quota race,
+rollback and TLS cross-protocol admission tests passed before measurement.
+
+Three 30-second idle-MQTT trials recovered HTTP acceptance from 0 to 98.2–98.6%,
+while TCP and UDP probes reached 100%. The MQTT gauge stayed at or below 192 and
+returned to zero on cooldown. Excess MQTT clients kept retrying, so server CPU rose
+to roughly two cores and victim tail latency increased. This is an explicit cost
+of rejecting after protocol detection/TLS, not evidence of cost-free isolation.
+
+The separate pending-pool experiment is performing poorly: a smaller pool is still
+shared by unknown legitimate clients and attackers. Do not interpret lower pending
+memory as a fix for new-connection fairness. Paired repeated trials are retained
+before deciding which portion of the experiment survives.
+
+Both baseline and the first candidate passed the bounded semantic regression:
+four protocols fill a failed required sink; fifth work receives no success ACK;
+rejected UDP retries remain unconfirmed; management observes unready after device
+closure; four stable event IDs and an unacknowledged persistent MQTT QoS1 delivery
+survive planned restart; the previously rejected UDP sequence can later succeed.
+This is correctness evidence, separate from capacity measurements.
