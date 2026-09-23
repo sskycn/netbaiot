@@ -1,0 +1,62 @@
+{
+  "binaries": {
+    "before": "/private/tmp/netbaiot-eventbus-c/baseline-target/release/examples/eventbus_probe",
+    "after": "/private/tmp/netbaiot-eventbus-c/candidate-probe"
+  },
+  "sha256": {
+    "before": "91d7c51dab09fa2b8862da11f421b24c508e64a1708a821b5813ca0801e0c116",
+    "after": "17d53232f28c42da3a2655351e60337123d83e2ccd4fa5855128b987d6d05b1f"
+  },
+  "commands": [
+    {
+      "command": [
+        "/private/tmp/netbaiot-eventbus-c/baseline-target/release/examples/eventbus_probe"
+      ],
+      "output": "before-micro-1.jsonl"
+    },
+    {
+      "command": [
+        "/private/tmp/netbaiot-eventbus-c/candidate-probe"
+      ],
+      "output": "after-micro-1.jsonl"
+    },
+    {
+      "command": [
+        "/private/tmp/netbaiot-eventbus-c/candidate-probe"
+      ],
+      "output": "after-micro-2.jsonl"
+    },
+    {
+      "command": [
+        "/private/tmp/netbaiot-eventbus-c/baseline-target/release/examples/eventbus_probe"
+      ],
+      "output": "before-micro-2.jsonl"
+    },
+    {
+      "command": [
+        "/private/tmp/netbaiot-eventbus-c/baseline-target/release/examples/eventbus_probe"
+      ],
+      "output": "before-micro-3.jsonl"
+    },
+    {
+      "command": [
+        "/private/tmp/netbaiot-eventbus-c/candidate-probe"
+      ],
+      "output": "after-micro-3.jsonl"
+    },
+    {
+      "command": [
+        "/private/tmp/netbaiot-eventbus-c/baseline-target/release/examples/eventbus_probe",
+        "--overload"
+      ],
+      "output": "before-isolation.json"
+    },
+    {
+      "command": [
+        "/private/tmp/netbaiot-eventbus-c/candidate-probe",
+        "--overload"
+      ],
+      "output": "after-isolation.json"
+    }
+  ]
+}
