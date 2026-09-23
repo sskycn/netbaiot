@@ -1,9 +1,6 @@
 {
-  "device_http": "127.0.0.1:8080",
+  "device_ingress": "127.0.0.1:8080",
   "management_http": "127.0.0.1:9090",
-  "mqtt": "127.0.0.1:1883",
-  "tcp": "127.0.0.1:9000",
-  "udp": "127.0.0.1:9001",
   "business_tcp": null,
   "development": true,
   "limits": {},

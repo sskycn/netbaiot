@@ -34,11 +34,14 @@ for kind in [socket.SOCK_STREAM]*4+[socket.SOCK_DGRAM,socket.SOCK_STREAM,socket.
     sock=socket.socket(socket.AF_INET,kind); sock.bind(("127.0.0.1",0)); sockets.append(sock)
 print(*(sock.getsockname()[1] for sock in sockets))
 ')"
+MQTT_PORT=$HTTP_PORT
+TCP_PORT=$HTTP_PORT
+UDP_PORT=$HTTP_PORT
 python3 -c '
 import json,sys
 c=json.load(open(sys.argv[1]))
 ports=list(map(int,sys.argv[4:]))
-for field,port in zip(("device_http","management_http","mqtt","tcp","udp"),ports[:5]):
+for field,port in zip(("device_ingress","management_http"),ports[:2]):
     c[field]=f"127.0.0.1:{port}"
 c["delivery_url"]=f"http://127.0.0.1:{ports[5]}/events"
 c["spool_directory"]=sys.argv[3]

@@ -1,5 +1,21 @@
 # 内嵌 MQTT 3.1.1 broker
 
+## Single Device Ingress（单设备入口）
+
+`device_ingress` 在同一个地址、相同端口号绑定一个 TCP listener 和一个 UDP socket。
+开发示例为 `127.0.0.1:8080`，生产可配置 `0.0.0.0:443`。TCP 通过同一证书承载
+HTTPS、标准 MQTT 3.1.1 TLS 和通用分帧 TLS TCP。TLS 握手后才识别应用协议，
+不要求 ALPN、自定义前导或修改客户端 wire protocol。UDP 同端口继续使用 NBI1/HMAC，
+只认证不加密，不涉及 DTLS/QUIC。
+
+Management HTTP（`management_http`，通常为 `127.0.0.1:9090`）和可选的
+`business_tcp` 继续独立监听与授权。设备 HTTP 不提供管理 API。
+非 loopback TCP 入口必须配置 TLS；开发模式强制 loopback，允许本地明文测试。
+
+配置中的 `device_http`、`mqtt`、`tcp`、`udp` 四个旧字段替换为 `device_ingress`。
+旧字段将触发配置错误；迁移时须明确选择新地址并修改所有设备目的端口和防火墙规则，
+不会静默选择旧配置中的某一个端口。
+
 NetbaIoT 直接实现 MQTT 3.1.1，不依赖外部 broker 或数据库。子系统分层包括增量 packet codec、连接状态机、认证后的会话挂接、有界会话存储、topic trie、retain 存储、QoS 引擎，最后才是 IoT 绑定/EventBus。
 
 支持的控制报文包括 CONNECT/CONNACK、PUBLISH、PUBACK/PUBREC/PUBREL/PUBCOMP、SUBSCRIBE/SUBACK、UNSUBSCRIBE/UNSUBACK、PINGREQ/PINGRESP 和 DISCONNECT。已实现 QoS0、QoS1 以及明确的入站/出站 QoS2 状态机。MQTT 5、MQTT-SN、WebSocket、共享订阅、bridge 模式和 `$SYS` 服务不在当前范围内。仍会遵守 MQTT 对 `$` 开头 topic 的通配符规则。

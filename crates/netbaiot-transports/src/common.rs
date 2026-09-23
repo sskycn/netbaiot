@@ -5,7 +5,7 @@ use netbaiot_runtime::*;
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{
     io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
-    net::TcpListener,
+    net::{TcpListener, TcpStream},
     task::JoinSet,
     time::Instant,
 };
@@ -185,6 +185,33 @@ pub async fn serve_stream(
     tls: Option<TlsAcceptor>,
     stop: CancellationToken,
 ) -> Result<()> {
+    serve_listener(listener, Some(transport), services, tls, stop).await
+}
+
+/// One device listener; HTTP is always dispatched with Device authorization/routing.
+pub async fn serve_device_ingress(
+    listener: TcpListener,
+    services: Arc<Services>,
+    tls: Option<TlsAcceptor>,
+    stop: CancellationToken,
+) -> Result<()> {
+    serve_listener(
+        listener,
+        None,
+        services.with_http_role(HttpRole::Device),
+        tls,
+        stop,
+    )
+    .await
+}
+
+async fn serve_listener(
+    listener: TcpListener,
+    transport: Option<Transport>,
+    services: Arc<Services>,
+    tls: Option<TlsAcceptor>,
+    stop: CancellationToken,
+) -> Result<()> {
     let mut tasks = JoinSet::new();
     let l = &services.ingress.limits;
     loop {
@@ -194,16 +221,8 @@ pub async fn serve_stream(
             accepted=listener.accept()=>{
                 let (socket,peer)=accepted.map_err(|_|Error::Unavailable)?;
                 if tasks.len()>=l.max_connections||services.rates.take(peer.ip()).is_err(){services.ingress.metrics.inc(Metric::ConnectionsRejected);continue;}
-                let lease=match services.connections.acquire(peer.ip(),transport){Ok(l)=>l,Err(_)=>{services.ingress.metrics.inc(Metric::ConnectionsRejected);continue;}};
-                let svc=services.clone();let cancel=stop.child_token();let tls=tls.clone();
-                tasks.spawn(async move{
-                    let _=socket.set_nodelay(true);
-                    let result=async{
-                        let stream:BoxStream=if let Some(tls)=tls{let handshake=tokio::time::timeout(Duration::from_millis(svc.ingress.limits.connect_timeout_ms),tls.accept(socket));tokio::select!{_ = cancel.cancelled()=>return Err(Error::Draining),result=handshake=>Box::new(result.map_err(|_|Error::Timeout)?.map_err(|_|Error::Invalid)?),}}else{Box::new(socket)};
-                        match transport{Transport::Http=>crate::http::connection(stream,peer,svc.clone(),lease,cancel).await,Transport::Mqtt=>crate::mqtt::connection(stream,svc.clone(),lease,cancel).await,Transport::Tcp=>crate::tcp::connection(stream,svc.clone(),lease,cancel).await,Transport::Udp=>Err(Error::Invalid)}
-                    }.await;
-                    if let Err(e)=result{if matches!(e,Error::Timeout){svc.ingress.metrics.inc(Metric::Timeouts);}tracing::debug!(transport=?transport,error=%e,"connection closed");}
-                });
+                let lease=match services.connections.acquire_pending(peer.ip()){Ok(l)=>l,Err(_)=>{services.ingress.metrics.inc(Metric::ConnectionsRejected);continue;}};
+                tasks.spawn(serve_accepted(socket, peer, transport, services.clone(), lease, tls.clone(), stop.child_token()));
             }
         }
     }
@@ -219,6 +238,68 @@ pub async fn serve_stream(
     }
     Ok(())
 }
+async fn serve_accepted(
+    socket: TcpStream,
+    peer: SocketAddr,
+    mut transport: Option<Transport>,
+    services: Arc<Services>,
+    lease: PendingConnectionLease,
+    tls: Option<TlsAcceptor>,
+    stop: CancellationToken,
+) {
+    let _ = socket.set_nodelay(true);
+    let result = async {
+        let deadline = lease.connect_deadline();
+        let stream: BoxStream = if let Some(tls) = tls {
+            tokio::select! {
+                biased;
+                _ = stop.cancelled() => return Err(Error::Draining),
+                result = tokio::time::timeout_at(deadline, tls.accept(socket)) => {
+                    Box::new(result.map_err(|_| Error::Timeout)?.map_err(|error| {
+                        tracing::debug!(%error, "TLS handshake rejected");
+                        Error::Invalid
+                    })?)
+                }
+            }
+        } else {
+            Box::new(socket)
+        };
+        let (classified, stream) = if let Some(transport) = transport {
+            (transport, stream)
+        } else {
+            let limits = &services.ingress.limits;
+            let result = tokio::select! {
+                biased;
+                _ = stop.cancelled() => return Err(Error::Draining),
+                result = crate::classifier::classify_device_stream(stream, limits.max_tcp_frame_size, limits.max_mqtt_packet_size, deadline) => result,
+            };
+            result.map_err(|reason| {
+                services.ingress.metrics.inc(if matches!(reason, crate::classifier::DetectionError::Timeout) {
+                    Metric::ProtocolDetectionTimeouts
+                } else {
+                    Metric::ProtocolDetectionFailures
+                });
+                tracing::debug!(?reason, "device protocol detection rejected");
+                reason.error()
+            })?
+        };
+        transport = Some(classified);
+        let lease = lease.classify(classified)?;
+        match classified {
+            Transport::Http => crate::http::connection(stream, peer, services.clone(), lease, stop).await,
+            Transport::Mqtt => crate::mqtt::connection(stream, services.clone(), lease, stop).await,
+            Transport::Tcp => crate::tcp::connection(stream, services.clone(), lease, stop).await,
+            Transport::Udp => Err(Error::Invalid),
+        }
+    }.await;
+    if let Err(error) = result {
+        if matches!(error, Error::Timeout) {
+            services.ingress.metrics.inc(Metric::Timeouts);
+        }
+        tracing::debug!(?transport, %error, "connection closed");
+    }
+}
+
 pub fn local_addr(listener: &TcpListener) -> Result<SocketAddr> {
     listener.local_addr().map_err(|_| Error::Unavailable)
 }

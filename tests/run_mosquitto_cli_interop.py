@@ -37,15 +37,15 @@ def main():
     subprocess.run(["cargo", "build", "-p", "netbaiot-server"], cwd=ROOT, check=True)
     with tempfile.TemporaryDirectory(prefix="netbaiot-mosquitto-") as temporary:
         config = json.loads((ROOT / "configs/development.json").read_text())
-        tcp_reservations = [socket.socket() for _ in range(4)]
+        tcp_reservations = [socket.socket() for _ in range(2)]
         udp_reservation = socket.socket(type=socket.SOCK_DGRAM)
-        for listener in [*tcp_reservations, udp_reservation]:
+        for listener in tcp_reservations:
             listener.bind(("127.0.0.1", 0))
+        udp_reservation.bind(tcp_reservations[0].getsockname())
         for field, listener in zip(
-            ("device_http", "management_http", "mqtt", "tcp"), tcp_reservations
+            ("device_ingress", "management_http"), tcp_reservations
         ):
             config[field] = f"127.0.0.1:{listener.getsockname()[1]}"
-        config["udp"] = f"127.0.0.1:{udp_reservation.getsockname()[1]}"
         config["spool_directory"] = str(pathlib.Path(temporary) / "spool")
         config_path = pathlib.Path(temporary) / "config.json"
         config_path.write_text(json.dumps(config))
@@ -65,7 +65,7 @@ def main():
             # A raw TCP readiness probe on the MQTT listener is an invalid pre-CONNECT
             # connection. Use the authenticated management readiness contract instead.
             wait_ready(config["management_http"])
-            port = config["mqtt"].split(":")[1]
+            port = config["device_ingress"].split(":")[1]
             subprocess.run(
                 [
                     "python3",

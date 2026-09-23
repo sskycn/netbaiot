@@ -213,9 +213,8 @@ def prepare(args):
     if external and (not args.tls or args.sink_mode == 'audit'):
         raise ValueError('non-loopback server requires TLS and an explicit required sink; runtime protections are preserved')
     ca = str(pathlib.Path(args.certificate).resolve()) if args.tls else None
-    config = dict(device_http='127.0.0.1:%d' % base, management_http='127.0.0.1:%d' % (base+1),
-                  mqtt='%s:%d' % (args.bind_host, base+2), tcp='127.0.0.1:%d' % (base+3),
-                  udp='127.0.0.1:%d' % (base+4), business_tcp=('127.0.0.1:%d' % (base+5)) if args.sink_mode=='tcp' else None,
+    config = dict(device_ingress='%s:%d' % (args.bind_host, base+2), management_http='127.0.0.1:%d' % (base+1),
+                  business_tcp=('127.0.0.1:%d' % (base+5)) if args.sink_mode=='tcp' else None,
                   development=not external, limits=limits, credentials=[credential(i) for i in range(args.connections)],
                   tls=dict(certificate=ca, private_key=str(pathlib.Path(args.private_key).resolve())) if ca else None,
                   delivery_url=('http://127.0.0.1:%d/events' % (base+6)) if args.sink_mode=='webhook' else None,

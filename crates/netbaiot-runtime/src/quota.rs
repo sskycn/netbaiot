@@ -81,7 +81,8 @@ pub struct ConnectionLease {
     owner: Arc<Connections>,
     ip: IpAddr,
     device: Option<DeviceKey>,
-    transport: Transport,
+    transport: Option<Transport>,
+    connect_deadline: tokio::time::Instant,
     _slot: OwnedSemaphorePermit,
     _bytes: BytesPermit,
 }
@@ -96,6 +97,10 @@ impl Connections {
         })
     }
     pub fn acquire(self: &Arc<Self>, ip: IpAddr, transport: Transport) -> Result<ConnectionLease> {
+        self.acquire_pending(ip)?.classify(transport)
+    }
+    /// Reserve count, bytes and peer capacity before TLS or protocol detection.
+    pub fn acquire_pending(self: &Arc<Self>, ip: IpAddr) -> Result<PendingConnectionLease> {
         let slot = self
             .slots
             .clone()
@@ -110,22 +115,41 @@ impl Connections {
             return Err(Error::Overloaded);
         }
         *count += 1;
-        counts.transports[transport as usize] += 1;
         self.metrics.inc(Metric::ConnectionsAccepted);
-        Ok(ConnectionLease {
+        Ok(PendingConnectionLease(ConnectionLease {
             owner: self.clone(),
             ip,
             device: None,
-            transport,
+            transport: None,
+            connect_deadline: tokio::time::Instant::now()
+                + Duration::from_millis(self.limits.connect_timeout_ms),
             _slot: slot,
             _bytes: bytes,
-        })
+        }))
     }
     pub fn active(&self) -> Result<[usize; 4]> {
         Ok(lock(&self.counts)?.transports)
     }
 }
+/// Pending and classified connections own exactly the same permits.
+pub struct PendingConnectionLease(ConnectionLease);
+impl PendingConnectionLease {
+    pub fn connect_deadline(&self) -> tokio::time::Instant {
+        self.0.connect_deadline
+    }
+    pub fn classify(mut self, transport: Transport) -> Result<ConnectionLease> {
+        {
+            let mut counts = lock(&self.0.owner.counts)?;
+            counts.transports[transport as usize] += 1;
+        }
+        self.0.transport = Some(transport);
+        Ok(self.0)
+    }
+}
 impl ConnectionLease {
+    pub fn connect_deadline(&self) -> tokio::time::Instant {
+        self.connect_deadline
+    }
     pub fn authenticate(&mut self, device: &DeviceKey) -> Result<()> {
         if self.device.as_ref() == Some(device) {
             return Ok(());
@@ -163,8 +187,10 @@ impl Drop for ConnectionLease {
                 decrement(&mut counts.tenants, &device.tenant_id);
                 decrement(&mut counts.devices, device);
             }
-            counts.transports[self.transport as usize] =
-                counts.transports[self.transport as usize].saturating_sub(1);
+            if let Some(transport) = self.transport {
+                counts.transports[transport as usize] =
+                    counts.transports[transport as usize].saturating_sub(1);
+            }
         }
     }
 }
@@ -507,6 +533,43 @@ impl Admission {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[tokio::test]
+    async fn pending_connection_owns_count_bytes_ip_and_classifies_once() {
+        let limits = Arc::new(Limits {
+            max_connections: 2,
+            max_connections_per_ip: 1,
+            global_connection_logical_bytes: 2 * Limits::default().connection_memory_reservation,
+            ..Limits::default()
+        });
+        let connections = Connections::new(limits.clone(), Arc::new(Metrics::default()));
+        let ip = "127.0.0.1".parse().unwrap();
+        let other = "127.0.0.2".parse().unwrap();
+        let a = connections.acquire_pending(ip).unwrap();
+        assert_eq!(connections.active().unwrap(), [0; 4]);
+        assert!(connections.acquire_pending(ip).is_err());
+        let b = connections.acquire_pending(other).unwrap();
+        assert_eq!(connections.slots.available_permits(), 0);
+        assert_eq!(connections.memory.available(), 0);
+        assert!(
+            connections
+                .acquire_pending("127.0.0.3".parse().unwrap())
+                .is_err()
+        );
+        let a = a.classify(Transport::Mqtt).unwrap();
+        assert_eq!(connections.active().unwrap()[Transport::Mqtt as usize], 1);
+        assert_eq!(connections.slots.available_permits(), 0);
+        drop(b);
+        assert_eq!(connections.slots.available_permits(), 1);
+        drop(a);
+        assert_eq!(connections.active().unwrap(), [0; 4]);
+        assert_eq!(connections.slots.available_permits(), 2);
+        assert_eq!(
+            connections.memory.available(),
+            limits.global_connection_logical_bytes
+        );
+        assert!(lock(&connections.counts).unwrap().ips.is_empty());
+        assert!(connections.acquire(ip, Transport::Http).is_ok());
+    }
     #[test]
     fn expired_tenant_identity_replacement_is_shared() {
         let old = ByteBudget::new(16);

@@ -35,11 +35,14 @@ cargo run -p netbaiot-server -- configs/tutorial.json
 
 Development listeners are:
 
-- device HTTP: `127.0.0.1:8080`
-- management HTTP: `127.0.0.1:9090`
-- embedded MQTT: `127.0.0.1:1883`
-- generic TCP: `127.0.0.1:9000`
-- UDP: `127.0.0.1:9001`
+- single device ingress: `127.0.0.1:8080` (TCP: HTTP/MQTT/framed TCP; UDP: NBI1)
+- separate management HTTP: `127.0.0.1:9090`
+- optional `business_tcp` remains separate.
+
+Production can use `device_ingress=0.0.0.0:443`: HTTPS, MQTTS and TLS TCP share
+one certificate; UDP uses the same numeric port and remains HMAC authenticated,
+not encrypted. No ALPN or custom preface is required. The four old device address
+fields are replaced by `device_ingress`; see [migration details](docs/architecture.md).
 
 Publish the first device event (HTTP requires no additional client package):
 

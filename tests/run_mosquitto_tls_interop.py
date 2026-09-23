@@ -43,11 +43,8 @@ def main():
     subprocess.run(["cargo", "build", "-p", "netbaiot-server"], cwd=ROOT, check=True)
     with tempfile.TemporaryDirectory(prefix="netbaiot-mosquitto-tls-") as temporary:
         config = json.loads((ROOT / "configs/development.json").read_text())
-        config["device_http"] = free_address()
         config["management_http"] = free_address()
-        config["mqtt"] = free_address()
-        config["tcp"] = free_address()
-        config["udp"] = free_address()
+        config["device_ingress"] = free_address()
         config["spool_directory"] = str(pathlib.Path(temporary) / "spool")
         config["tls"] = {
             "certificate": str(CERTIFICATE),
@@ -66,8 +63,8 @@ def main():
             text=True,
         )
         try:
-            wait_port(config["mqtt"], server)
-            port = config["mqtt"].split(":")[1]
+            wait_port(config["device_ingress"], server)
+            port = config["device_ingress"].split(":")[1]
             base = [
                 MOSQUITTO_PUB,
                 "-h",

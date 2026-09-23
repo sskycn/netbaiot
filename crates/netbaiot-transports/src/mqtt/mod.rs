@@ -157,7 +157,7 @@ pub async fn connection(
     let mut reader = Reader::new(limits.max_mqtt_packet_size, limits.packet_read_timeout_ms);
     let (first, _, _) = tokio::select! {
         _ = stop.cancelled() => return Ok(()),
-        packet = next(&mut reader, &mut stream, limits, Instant::now() + Duration::from_millis(limits.connect_timeout_ms)) => packet?,
+        packet = next(&mut reader, &mut stream, limits, connection.connect_deadline()) => packet?,
     };
     services.ingress.metrics.inc(Metric::MqttPacketsReceived);
     let mut connect = match first {

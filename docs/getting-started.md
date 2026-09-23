@@ -44,7 +44,7 @@ credential   demo-device
 secret       000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
 ```
 
-监听地址：device HTTP `8080`、management HTTP `9090`、MQTT `1883`、generic TCP `9000`、UDP `9001`。教程 webhook 使用 `18080`。management token 使用下面的固定 64-hex 演示值。
+监听地址：设备 HTTP/MQTT/generic TCP 与 UDP 共用 `8080`，management HTTP 独立 `9090`。教程 webhook 使用 `18080`。management token 使用下面的固定 64-hex 演示值。
 
 ## 4. Terminal 1：启动业务 webhook
 
@@ -80,7 +80,7 @@ curl --noproxy '*' -i http://127.0.0.1:9090/api/v1/ready \
 
 ```bash
 export DEVICE_SECRET=000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
-mosquitto_sub -h 127.0.0.1 -p 1883 -V mqttv311 \
+mosquitto_sub -h 127.0.0.1 -p 8080 -V mqttv311 \
   -u demo-device -P "$DEVICE_SECRET" -i tutorial-device \
   -t 'v1/t/demo/p/sensor/d/device-1/down' -q 1 -v
 ```
@@ -90,7 +90,7 @@ mosquitto_sub -h 127.0.0.1 -p 1883 -V mqttv311 \
 ## 7. Terminal 4：发布首个事件
 
 ```bash
-mosquitto_pub -h 127.0.0.1 -p 1883 -V mqttv311 \
+mosquitto_pub -h 127.0.0.1 -p 8080 -V mqttv311 \
   -u demo-device -P "$DEVICE_SECRET" -i tutorial-publisher \
   -t 'v1/t/demo/p/sensor/d/device-1/up' -q 1 \
   -m '{"schema_version":1,"source_message_id":"quickstart:1","kind":"telemetry","data":{"temperature":21.5,"online":true}}'

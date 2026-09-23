@@ -74,7 +74,7 @@ pub async fn connection(
         maximum: l.max_tcp_frame_size,
     };
     let mut reader = Reader::new(l.max_tcp_frame_size + 4, l.packet_read_timeout_ms);
-    let hello = tokio::select! {_=stop.cancelled()=>return Ok(()),hello=next(&mut reader,&mut stream,&framer,Instant::now()+Duration::from_millis(l.connect_timeout_ms))=>hello?};
+    let hello = tokio::select! {_=stop.cancelled()=>return Ok(()),hello=next(&mut reader,&mut stream,&framer,connection.connect_deadline())=>hello?};
     if hello.len() > l.max_username_bytes + l.max_password_bytes + 128 {
         return Err(Error::Invalid);
     }

@@ -26,6 +26,7 @@ subtle.workspace = true
 workspace = true
 
 [dev-dependencies]
+hmac.workspace = true
 uuid.workspace = true
 netbaiot-client.workspace = true
 netbaiot-device-sdk.workspace = true
