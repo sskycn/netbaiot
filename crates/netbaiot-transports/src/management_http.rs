@@ -31,7 +31,7 @@ fn error_code(error: &Error) -> ErrorCode {
         Error::Timeout => ErrorCode::Timeout,
         Error::Draining => ErrorCode::ServiceDraining,
         Error::Unavailable => ErrorCode::ServerUnavailable,
-        Error::Storage => ErrorCode::ServerUnavailable,
+        Error::Storage | Error::IncompatibleSpool => ErrorCode::ServerUnavailable,
         Error::Internal => ErrorCode::Internal,
         Error::Configuration | Error::Invalid | Error::Codec => ErrorCode::InvalidRequest,
     }
@@ -66,7 +66,9 @@ fn error(error: Error, request_id: &str) -> Response<Full<Bytes>> {
         Error::Conflict => StatusCode::CONFLICT,
         Error::Overloaded => StatusCode::TOO_MANY_REQUESTS,
         Error::Timeout => StatusCode::GATEWAY_TIMEOUT,
-        Error::Draining | Error::Storage | Error::Unavailable => StatusCode::SERVICE_UNAVAILABLE,
+        Error::Draining | Error::Storage | Error::IncompatibleSpool | Error::Unavailable => {
+            StatusCode::SERVICE_UNAVAILABLE
+        }
         _ => StatusCode::BAD_REQUEST,
     };
     api_error(status, error_code(&error), &error.to_string(), request_id)

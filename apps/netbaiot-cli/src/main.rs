@@ -365,8 +365,6 @@ fn parse_event_type(value: &str) -> Result<EventType, CliError> {
         "telemetry" => Ok(EventType::Telemetry),
         "device_event" => Ok(EventType::DeviceEvent),
         "heartbeat" => Ok(EventType::Heartbeat),
-        "connected" => Ok(EventType::Connected),
-        "disconnected" => Ok(EventType::Disconnected),
         "command_ack" => Ok(EventType::CommandAck),
         _ => Err(CliError::Usage(format!("unknown event type: {value}"))),
     }
@@ -453,6 +451,16 @@ mod tests {
         ];
         let values = options(&arguments, "--type").collect::<Vec<_>>();
         assert_eq!(values, ["telemetry", "heartbeat"]);
+    }
+
+    #[test]
+    fn rejects_removed_connection_event_filters() {
+        for kind in ["connected", "disconnected"] {
+            assert!(matches!(parse_event_type(kind), Err(CliError::Usage(_))));
+        }
+        for kind in ["telemetry", "device_event", "heartbeat", "command_ack"] {
+            assert!(parse_event_type(kind).is_ok());
+        }
     }
 
     #[test]

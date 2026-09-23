@@ -296,10 +296,76 @@ fn decode_segment(input: &[u8], limits: &Limits, output: &mut Vec<SpoolRecord>) 
         if output.len() >= limits.spool_max_records {
             return Err(Error::Overloaded);
         }
-        output.push(serde_json::from_slice(payload).map_err(|_| Error::Invalid)?);
+        output.push(serde_json::from_slice(payload).map_err(|_| {
+            if contains_legacy_config_ack(payload) {
+                Error::IncompatibleSpool
+            } else {
+                Error::Invalid
+            }
+        })?);
         at = checksum_end;
     }
     Ok(())
+}
+
+/// Failure-path diagnostic only, after record length and checksum validation.
+/// Project just the exact event discriminator; unknown fields are skipped without
+/// building a Value tree or a legacy domain object. Cap nesting explicitly because
+/// serde's ignored-field traversal need not enforce its normal recursion limit.
+fn contains_legacy_config_ack(payload: &[u8]) -> bool {
+    let mut depth = 0usize;
+    let mut string = false;
+    let mut escaped = false;
+    for &byte in payload {
+        if string {
+            if escaped {
+                escaped = false;
+            } else if byte == b'\\' {
+                escaped = true;
+            } else if byte == b'"' {
+                string = false;
+            }
+        } else {
+            match byte {
+                b'"' => string = true,
+                b'{' | b'[' => {
+                    depth += 1;
+                    if depth > 64 {
+                        return false;
+                    }
+                }
+                b'}' | b']' => {
+                    let Some(next) = depth.checked_sub(1) else {
+                        return false;
+                    };
+                    depth = next;
+                }
+                _ => {}
+            }
+        }
+    }
+    if depth != 0 || string {
+        return false;
+    }
+    #[derive(serde::Deserialize)]
+    struct RecordTag {
+        event: EventTag,
+    }
+    #[derive(serde::Deserialize)]
+    struct EventTag {
+        kind: KindTag,
+    }
+    #[derive(serde::Deserialize)]
+    struct KindTag {
+        kind: RemovedKind,
+    }
+    #[derive(serde::Deserialize)]
+    enum RemovedKind {
+        #[serde(rename = "config_ack")]
+        ConfigAck,
+    }
+    serde_json::from_slice::<RecordTag>(payload)
+        .is_ok_and(|record| matches!(record.event.kind.kind, RemovedKind::ConfigAck))
 }
 
 fn segment_generation(input: &[u8]) -> Result<u64> {
@@ -405,35 +471,162 @@ mod tests {
         let _ = fs::remove_dir(directory);
     }
 
+    const LEGACY_ACK_V1: &[u8] =
+        include_bytes!("../../../tests/fixtures/restart-spool/config-ack-v1.spool");
+    const LEGACY_ACK_V2: &[u8] =
+        include_bytes!("../../../tests/fixtures/restart-spool/config-ack-v2.spool");
+    const SUPPORTED_V1: &[u8] =
+        include_bytes!("../../../tests/fixtures/restart-spool/supported-v1.spool");
+    const SUPPORTED_V2: &[u8] =
+        include_bytes!("../../../tests/fixtures/restart-spool/supported-v2.spool");
+
+    fn segment(payload: &[u8]) -> Vec<u8> {
+        let mut bytes = b"NBSP\0\0\0\x01".to_vec();
+        bytes.extend_from_slice(&u32::try_from(payload.len()).unwrap().to_be_bytes());
+        bytes.extend_from_slice(payload);
+        bytes.extend_from_slice(&Sha256::digest(payload));
+        bytes
+    }
+
     #[tokio::test]
-    async fn removed_event_kind_fails_recovery_without_deleting_committed_work() {
+    async fn legacy_config_ack_blocks_recovery_and_replacement_without_mutation() {
+        for (name, bytes) in [
+            ("legacy.spool", LEGACY_ACK_V1),
+            (SNAPSHOT_NAME, LEGACY_ACK_V2),
+        ] {
+            let directory =
+                std::env::temp_dir().join(format!("netbaiot-spool-legacy-{}", Uuid::new_v4()));
+            fs::create_dir_all(&directory).unwrap();
+            let committed = directory.join(name);
+            fs::write(&committed, bytes).unwrap();
+            let spool = RestartSpool::new(directory.clone(), Arc::new(Limits::default()));
+            let error = spool.recover().await.unwrap_err();
+            assert!(matches!(error, Error::IncompatibleSpool));
+            assert_eq!(
+                error.to_string(),
+                "restart spool contains legacy ConfigAck records created by an older NetbaIoT version; drain or complete the old spool with the previous release before upgrading; committed files are preserved"
+            );
+            // Neither startup nor a subsequent commit may overwrite old responsibility.
+            assert!(matches!(
+                spool.commit(vec![record()]).await,
+                Err(Error::IncompatibleSpool)
+            ));
+            assert_eq!(fs::read(&committed).unwrap(), bytes);
+            assert_eq!(fs::read_dir(&directory).unwrap().count(), 1);
+            fs::remove_dir_all(directory).unwrap();
+        }
+    }
+
+    #[tokio::test]
+    async fn historical_supported_records_recover_with_identity_and_attempts() {
+        for (name, bytes, generation) in [
+            ("legacy.spool", SUPPORTED_V1, 0),
+            (SNAPSHOT_NAME, SUPPORTED_V2, 7),
+        ] {
+            let directory =
+                std::env::temp_dir().join(format!("netbaiot-spool-supported-{}", Uuid::new_v4()));
+            fs::create_dir_all(&directory).unwrap();
+            fs::write(directory.join(name), bytes).unwrap();
+            let spool = RestartSpool::new(directory.clone(), Arc::new(Limits::default()));
+            let recovered = spool.recover().await.unwrap();
+            assert_eq!(recovered.generation, generation);
+            assert_eq!(recovered.records.len(), 3);
+            for (index, record) in recovered.records.iter().enumerate() {
+                assert_eq!(record.event.event_id.0.as_u128(), index as u128 + 2);
+                assert_eq!(record.routing_revision, 1);
+                assert_eq!(record.attempts[&record.pending_sinks[0]], 2);
+            }
+            assert!(matches!(
+                recovered.records[0].event.kind,
+                DeviceEventKind::Heartbeat(_)
+            ));
+            assert!(matches!(
+                recovered.records[1].event.kind,
+                DeviceEventKind::Telemetry(_)
+            ));
+            assert!(matches!(
+                recovered.records[2].event.kind,
+                DeviceEventKind::CommandAck(_)
+            ));
+            assert_eq!(fs::read(directory.join(name)).unwrap(), bytes);
+            spool
+                .remove_committed(recovered.committed_files)
+                .await
+                .unwrap();
+            fs::remove_dir_all(directory).unwrap();
+        }
+    }
+
+    #[test]
+    fn legacy_diagnostic_requires_exact_path_valid_json_and_intact_framing() {
+        let limits = Limits::default();
+        let length = u32::from_be_bytes(LEGACY_ACK_V1[8..12].try_into().unwrap()) as usize;
+        let payload = &LEGACY_ACK_V1[12..12 + length];
+        assert!(contains_legacy_config_ack(payload));
+        for kind in ["future_event", "connected", "disconnected"] {
+            let changed = String::from_utf8(payload.to_vec())
+                .unwrap()
+                .replace("config_ack", kind);
+            assert!(matches!(
+                decode_spool_records(&segment(changed.as_bytes()), &limits),
+                Err(Error::Invalid)
+            ));
+        }
+        for payload in [
+            br#"{"event":{"kind":{"kind":"future","data":{"kind":"config_ack"}}}}"#.as_slice(),
+            br#"{"kind":"config_ack"}"#,
+            br#"{"event":{"kind":{"kind":"config_ack","kind":"future"}}}"#,
+            br#"{"event":{"kind":{"kind":"config_ack"}}} trailing"#,
+            br#"{"event":{"kind":{"kind":"config_ack"}},"extra":[}"#,
+        ] {
+            assert!(matches!(
+                decode_spool_records(&segment(payload), &limits),
+                Err(Error::Invalid)
+            ));
+        }
+        let deep = format!(
+            r#"{{"event":{{"kind":{{"kind":"config_ack"}}}},"extra":{}0{}}}"#,
+            "[".repeat(128),
+            "]".repeat(128)
+        );
+        assert!(!contains_legacy_config_ack(deep.as_bytes()));
+        let mut corrupt = LEGACY_ACK_V1.to_vec();
+        *corrupt.last_mut().unwrap() ^= 1;
+        let mut unknown_version = LEGACY_ACK_V1.to_vec();
+        unknown_version[7] = 99;
+        let mut bad_length = LEGACY_ACK_V1.to_vec();
+        bad_length[8..12].copy_from_slice(&u32::MAX.to_be_bytes());
+        for bytes in [
+            corrupt,
+            unknown_version,
+            bad_length,
+            LEGACY_ACK_V1[..LEGACY_ACK_V1.len() - 1].to_vec(),
+        ] {
+            assert!(matches!(
+                decode_spool_records(&bytes, &limits),
+                Err(Error::Invalid)
+            ));
+        }
+        let limits = Limits {
+            spool_record_max_bytes: length - 1,
+            ..limits
+        };
+        assert!(matches!(
+            decode_spool_records(LEGACY_ACK_V1, &limits),
+            Err(Error::Invalid)
+        ));
+    }
+
+    #[tokio::test]
+    async fn empty_or_absent_spool_recovers_no_work() {
         let directory =
-            std::env::temp_dir().join(format!("netbaiot-spool-old-kind-{}", Uuid::new_v4()));
+            std::env::temp_dir().join(format!("netbaiot-spool-empty-{}", Uuid::new_v4()));
         let spool = RestartSpool::new(directory.clone(), Arc::new(Limits::default()));
-        spool.commit(vec![record()]).await.unwrap();
-        let committed = fs::read_dir(&directory)
-            .unwrap()
-            .map(|entry| entry.unwrap().path())
-            .find(|path| {
-                path.extension()
-                    .is_some_and(|extension| extension == "spool")
-            })
-            .unwrap();
-        let current = fs::read(&committed).unwrap();
-        let mut legacy = serde_json::to_value(record()).unwrap();
-        legacy["event"]["kind"] = serde_json::json!({
-            "kind":"config_ack", "data":{"revision":42,"status":"applied","error":null}
-        });
-        let payload = serde_json::to_vec(&legacy).unwrap();
-        // Preserve the actual header and a valid length/checksum: only the removed
-        // event variant is incompatible, not the spool container format.
-        let mut bytes = current[..16].to_vec();
-        bytes.extend_from_slice(&(payload.len() as u32).to_be_bytes());
-        bytes.extend_from_slice(&payload);
-        bytes.extend_from_slice(&Sha256::digest(&payload));
-        fs::write(&committed, &bytes).unwrap();
-        assert!(matches!(spool.recover().await, Err(Error::Invalid)));
-        assert_eq!(fs::read(&committed).unwrap(), bytes);
+        assert!(spool.recover().await.unwrap().records.is_empty());
+        fs::create_dir_all(&directory).unwrap();
+        assert!(spool.recover().await.unwrap().records.is_empty());
+        fs::write(directory.join("empty.spool"), b"NBSP\0\0\0\x01").unwrap();
+        assert!(spool.recover().await.unwrap().records.is_empty());
         fs::remove_dir_all(directory).unwrap();
     }
 

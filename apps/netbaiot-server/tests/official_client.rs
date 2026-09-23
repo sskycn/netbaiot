@@ -384,6 +384,13 @@ async fn official_clients_cover_mqtt_tcp_command_ack_status_and_offline_contract
         ));
     }
 
+    // No application uplink remains outstanding. Connecting/disconnecting MQTT
+    // and TCP must not synthesize a business event for an unfiltered subscriber.
+    assert!(
+        tokio::time::timeout(Duration::from_millis(150), events.next())
+            .await
+            .is_err()
+    );
     events.close();
     business.runtime().drain().await.unwrap();
     assert!(
