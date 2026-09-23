@@ -1,0 +1,5 @@
+{
+  "context": "read-only kernel socket limits after HTTP 9600/s address-allocation failures",
+  "timestamp": 1790145203.4148421,
+  "sysctl": "net.inet.ip.portrange.first: 49152\nnet.inet.ip.portrange.last: 65535\nnet.inet.ip.portrange.hifirst: 49152\nnet.inet.ip.portrange.hilast: 65535\nnet.inet.tcp.msl: 15000\nkern.maxfiles: 122880\nkern.maxfilesperproc: 61440\nkern.ipc.somaxconn: 128\n"
+}

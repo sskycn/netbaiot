@@ -1,0 +1,42 @@
+{
+  "checked": 112,
+  "measurement_seconds": 9270,
+  "missing": [],
+  "failures": [],
+  "clock_offsets": [
+    {
+      "name": "baseline-default-ip-occupancy-32-2",
+      "wall_minus_monotonic_ms": 5.703916000002209
+    },
+    {
+      "name": "baseline-mqtt-heavy-repeat0-0",
+      "wall_minus_monotonic_ms": 39.070000000006985
+    },
+    {
+      "name": "baseline-mqtt-heavy-repeat1-0",
+      "wall_minus_monotonic_ms": 20.25199999997858
+    },
+    {
+      "name": "final-tls-pending-final-2",
+      "wall_minus_monotonic_ms": -221.89329100000032
+    },
+    {
+      "name": "baseline-slow-required-sink-0",
+      "wall_minus_monotonic_ms": 73.96508300000278
+    },
+    {
+      "name": "final-stable-mixed-soak-0",
+      "wall_minus_monotonic_ms": -12.876291000051424
+    }
+  ],
+  "server_hashes": {
+    "baseline": [
+      "52507235fda2a7dad65156fb693023ab8c6c191bed38aa4dad4b263d334aafe8"
+    ],
+    "final": [
+      "4740b3495277e2c6ed4b95afdff52b9bc109323c19036082ff19784ad77ff02c"
+    ]
+  },
+  "cleanup_policy": "Device connections and required work return to zero. Immediate sink tasks return to idle baseline; HTTP sink may retain <= sink concurrency idle connections plus one owned pool timer. Child exits must be normal.",
+  "passed": true
+}

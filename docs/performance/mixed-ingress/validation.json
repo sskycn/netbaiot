@@ -1,0 +1,153 @@
+{
+  "production_revision": "ff9e959397ddc2981758a8ae821f6be29d9038e9",
+  "checks": [
+    {
+      "command": "cargo +1.88.0 fmt --all -- --check",
+      "result": "PASS",
+      "tail": []
+    },
+    {
+      "command": "cargo +1.88.0 check --workspace --all-targets",
+      "result": "PASS",
+      "tail": [
+        "    Checking hyper-rustls v0.27.9",
+        "    Checking rumqttc v0.25.1",
+        "    Checking netbaiot-transports v0.1.0 (/Users/sam/.codex/worktrees/mixed-ingress-capacity-audit/netbaiot/crates/netbaiot-transports)",
+        "    Checking reqwest v0.12.28",
+        "    Checking netbaiot-client v0.1.0 (/Users/sam/.codex/worktrees/mixed-ingress-capacity-audit/netbaiot/crates/netbaiot-client)",
+        "    Checking netbaiot-loadgen v0.1.0 (/Users/sam/.codex/worktrees/mixed-ingress-capacity-audit/netbaiot/tools/netbaiot-loadgen)",
+        "    Checking netbaiot-device-sdk v0.1.0 (/Users/sam/.codex/worktrees/mixed-ingress-capacity-audit/netbaiot/crates/netbaiot-device-sdk)",
+        "    Checking netbaiot-cli v0.1.0 (/Users/sam/.codex/worktrees/mixed-ingress-capacity-audit/netbaiot/apps/netbaiot-cli)",
+        "    Checking netbaiot-server v0.1.0 (/Users/sam/.codex/worktrees/mixed-ingress-capacity-audit/netbaiot/apps/netbaiot-server)",
+        "    Finished `dev` profile [unoptimized + debuginfo] target(s) in 15.28s"
+      ]
+    },
+    {
+      "command": "cargo +1.88.0 clippy --workspace --all-targets --all-features -- -D warnings",
+      "result": "PASS",
+      "tail": [
+        "    Checking netbaiot-core v0.1.0 (/Users/sam/.codex/worktrees/mixed-ingress-capacity-audit/netbaiot/crates/netbaiot-core)",
+        "    Checking netbaiot-client v0.1.0 (/Users/sam/.codex/worktrees/mixed-ingress-capacity-audit/netbaiot/crates/netbaiot-client)",
+        "    Checking netbaiot-device-sdk v0.1.0 (/Users/sam/.codex/worktrees/mixed-ingress-capacity-audit/netbaiot/crates/netbaiot-device-sdk)",
+        "    Checking netbaiot-runtime v0.1.0 (/Users/sam/.codex/worktrees/mixed-ingress-capacity-audit/netbaiot/crates/netbaiot-runtime)",
+        "    Checking netbaiot-codecs v0.1.0 (/Users/sam/.codex/worktrees/mixed-ingress-capacity-audit/netbaiot/crates/netbaiot-codecs)",
+        "    Checking netbaiot-cli v0.1.0 (/Users/sam/.codex/worktrees/mixed-ingress-capacity-audit/netbaiot/apps/netbaiot-cli)",
+        "    Checking netbaiot-transports v0.1.0 (/Users/sam/.codex/worktrees/mixed-ingress-capacity-audit/netbaiot/crates/netbaiot-transports)",
+        "    Checking netbaiot-loadgen v0.1.0 (/Users/sam/.codex/worktrees/mixed-ingress-capacity-audit/netbaiot/tools/netbaiot-loadgen)",
+        "    Checking netbaiot-server v0.1.0 (/Users/sam/.codex/worktrees/mixed-ingress-capacity-audit/netbaiot/apps/netbaiot-server)",
+        "    Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.43s"
+      ]
+    },
+    {
+      "command": "cargo +1.88.0 test --workspace --all-targets --all-features",
+      "result": "PASS",
+      "tail": [
+        "retained_wildcard_1000: 1000 iterations, 2342 ops/s, p50=424917 ns p95=442708 ns p99=457000 ns",
+        "retained_store_4000: logical_bytes=586890 bytes/message=146.7",
+        "retained_exact_4000: 10000 iterations, 3314230 ops/s, p50=250 ns p95=292 ns p99=333 ns",
+        "retained_wildcard_4000: 1000 iterations, 578 ops/s, p50=1711542 ns p95=1858375 ns p99=1986625 ns",
+        "mqtt_state_payload_64: offline_messages=1 offline_bytes=147 outbound_qos1_bytes=147 outbound_qos2_bytes=147 inbound_qos2_bytes=145",
+        "mqtt_state_payload_256: offline_messages=1 offline_bytes=339 outbound_qos1_bytes=339 outbound_qos2_bytes=339 inbound_qos2_bytes=337",
+        "mqtt_state_payload_1024: offline_messages=1 offline_bytes=1107 outbound_qos1_bytes=1107 outbound_qos2_bytes=1107 inbound_qos2_bytes=1105",
+        "mqtt_state_payload_8192: offline_messages=1 offline_bytes=8275 outbound_qos1_bytes=8275 outbound_qos2_bytes=8275 inbound_qos2_bytes=8273",
+        "mqtt_state_payload_32768: offline_messages=1 offline_bytes=32851 outbound_qos1_bytes=32851 outbound_qos2_bytes=32851 inbound_qos2_bytes=32849",
+        "layout_bytes: session_endpoint=96 queued_command=104 device_event=152"
+      ]
+    },
+    {
+      "command": "cargo +1.88.0 test --workspace --all-features",
+      "result": "PASS",
+      "tail": [
+        "running 0 tests",
+        "",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "",
+        "   Doc-tests netbaiot_transports",
+        "",
+        "running 0 tests",
+        "",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        ""
+      ]
+    },
+    {
+      "command": "python3 tests/mqtt_conformance/run.py --release-gate --no-build",
+      "result": "PASS",
+      "tail": [
+        "WILL-SUBSCRIBER-PRESSURE-001: PASS \u2014      Running tests/end_to_end.rs (target/debug/deps/end_to_end-910d8e5a8e426061)",
+        "AUTH-MQTT-ATTACH-REVOKE-RACE-001: PASS \u2014      Running tests/end_to_end.rs (target/debug/deps/end_to_end-910d8e5a8e426061)",
+        "MQTT-RECOVERY-V1-LARGE-COMPAT-001: PASS \u2014      Running tests/end_to_end.rs (target/debug/deps/end_to_end-910d8e5a8e426061)",
+        "MQTT-RECOVERY-WHOLE-IMAGE-INTEGRITY-001: PASS \u2014      Running tests/end_to_end.rs (target/debug/deps/end_to_end-910d8e5a8e426061)",
+        "MQTT-PERSISTENT-CODEC-PROVENANCE-001: PASS \u2014      Running tests/end_to_end.rs (target/debug/deps/end_to_end-910d8e5a8e426061)",
+        "MQTT-ROUTE-PREFLIGHT-BOUNDED-MEMORY-001: PASS \u2014      Running tests/end_to_end.rs (target/debug/deps/end_to_end-910d8e5a8e426061)",
+        "MQTT-RECOVERY-ACL-OWNERSHIP-001: PASS \u2014      Running tests/end_to_end.rs (target/debug/deps/end_to_end-910d8e5a8e426061)",
+        "AUTH-INVALIDATION-COUNTING-001: PASS \u2014      Running tests/end_to_end.rs (target/debug/deps/end_to_end-910d8e5a8e426061)",
+        "RESTART-001: PASS \u2014      Running tests/end_to_end.rs (target/debug/deps/end_to_end-910d8e5a8e426061)",
+        "NORMATIVE-COVERAGE-001: PASS \u2014 125/125 requirements have current PASS evidence"
+      ]
+    },
+    {
+      "command": "RUSTUP_TOOLCHAIN=1.88.0 bash scripts/tutorial_smoke.sh",
+      "result": "PASS",
+      "tail": [
+        "{\"command_id\":\"00000000-0000-0000-0000-000000000123\",\"state\":\"queued\"}",
+        "{\"command_id\":\"00000000-0000-0000-0000-000000000123\",\"device\":{\"tenant_id\":\"demo\",\"product_id\":\"sensor\",\"device_id\":\"device-1\"},\"expires_at\":1790136185545,\"payload\":{\"name\":\"smoke\",\"arguments\":{}}}",
+        "{\"invalidated\":1,\"disconnected\":0,\"invalidated_cache_entries\":1,\"disconnected_connections\":0,\"invalidated_mqtt_sessions\":2}",
+        "{\"draining\":true}",
+        "2026-09-23T03:58:05.609829Z  INFO netbaiot_server: shutdown complete",
+        "accepted event 1a2520d1-60c0-4109-b205-412736a755ac",
+        "apply revision 1: {\"sample_interval_seconds\":30}",
+        "{\"draining\":true}",
+        "2026-09-23T03:58:16.692288Z  INFO netbaiot_server: shutdown complete",
+        "tutorial smoke: PASS"
+      ]
+    },
+    {
+      "command": "cargo +1.88.0 test -p netbaiot-server --test server subprocess_graceful_restart_sixty_second_soak -- --ignored --nocapture",
+      "result": "PASS",
+      "tail": [
+        "    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.08s",
+        "     Running tests/server.rs (target/debug/deps/server-5225dda76e17a9eb)",
+        "",
+        "running 1 test",
+        "test subprocess_graceful_restart_sixty_second_soak has been running for over 60 seconds",
+        "test subprocess_graceful_restart_sixty_second_soak ... ok",
+        "",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 19 filtered out; finished in 61.81s",
+        ""
+      ]
+    },
+    {
+      "command": "cargo +nightly fuzz run device_classifier -- -max_total_time=60 -max_len=4096",
+      "result": "PASS",
+      "tail": [
+        "#768342\tREDUCE cov: 121 ft: 359 corp: 141/790b lim: 4096 exec/s: 16347 rss: 120Mb L: 3/12 MS: 1 EraseBytes-",
+        "#977962\tDONE   cov: 121 ft: 359 corp: 141/790b lim: 4096 exec/s: 16032 rss: 139Mb",
+        "###### Recommended dictionary. ######",
+        "\"\\001\\000\" # Uses: 19145",
+        "\"\\000\\000\\000\\000\" # Uses: 17615",
+        "\"\\000\\000\\000\\274\" # Uses: 17684",
+        "\"\\001R\" # Uses: 18889",
+        "\"\\015\\000\\000\\000\\000\\000\\000\\000\" # Uses: 13903",
+        "###### End of recommended dictionary. ######",
+        "Done 977962 runs in 61 second(s)"
+      ]
+    },
+    {
+      "command": "cargo +nightly fuzz run udp_envelope -- -max_total_time=60 -max_len=1201",
+      "result": "PASS",
+      "tail": [
+        "\"\\001\\000\\000g\" # Uses: 2311",
+        "\"&&&\\000\" # Uses: 1979",
+        "\"\\031\\002\\000\\000\\000\\000\\000\\000\" # Uses: 1844",
+        "\"\\001\\000\\000\\000\\000\\000\\000?\" # Uses: 1745",
+        "\":\\377\\377\\377\" # Uses: 1773",
+        "\"\\376\\377\\377\\274\" # Uses: 1735",
+        "\"\\377\\377\\377\\377\\377\\377\\377\\000\" # Uses: 1712",
+        "\"GGGG\" # Uses: 1274",
+        "###### End of recommended dictionary. ######",
+        "Done 669805 runs in 61 second(s)"
+      ]
+    }
+  ]
+}
