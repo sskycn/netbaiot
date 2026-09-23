@@ -75,12 +75,17 @@ class Control:
             self.http = http.client.HTTPConnection('localhost', port, timeout=2)
 
     def get(self, path):
-        self.http.request('GET', '/api/v1/' + path, headers={'Authorization': 'Bearer ' + 'ab' * 32})
-        response = self.http.getresponse()
-        data = response.read(1_048_577)
-        if len(data) > 1_048_576 or response.status != 200:
-            raise ValueError(f'management {path} status={response.status} bytes={len(data)}')
-        return data.decode()
+        try:
+            self.http.request('GET', '/api/v1/' + path, headers={'Authorization': 'Bearer ' + 'ab' * 32})
+            response = self.http.getresponse()
+            data = response.read(1_048_577)
+            if len(data) > 1_048_576 or response.status != 200:
+                raise ValueError(f'management {path} status={response.status} bytes={len(data)}')
+            return data.decode()
+        finally:
+            # The server deliberately closes every response. Reset Request-sent
+            # state after TLS/overload errors too, so the next sample can recover.
+            self.http.close()
 
     def sample(self):
         status = json.loads(self.get('status'))
@@ -155,7 +160,7 @@ def run(plan, repeat, args):
     samples = []
     row = dict(name=name, plan=plan, repeat=repeat, label=args.label, timestamp=time.time(),
                baseline=BASELINE, production_revision=plan.get('production_revision', BASELINE), server_sha256=args.server_hash, loadgen_sha256=args.loadgen_hash,
-               server_config=config, network_before=command(['netstat', '-s', '-p', 'udp']),
+               harness_version=2, harness_sha256=digest(Path(__file__)), server_config=config, network_before=command(['netstat', '-s', '-p', 'udp']),
                tcp_before=command(['netstat', '-s', '-p', 'tcp']))
     try:
         for s in reservations:

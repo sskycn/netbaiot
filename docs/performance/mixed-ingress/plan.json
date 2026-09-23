@@ -49,6 +49,60 @@
     ],
     "seconds": 30,
     "repeats": 3,
+    "variant": "baseline",
+    "binary": "baseline",
+    "production_revision": "bf9c611bc16d1fb9c95b21c939f9ef00e4530ddc"
+  },
+  {
+    "name": "idle-final-256",
+    "groups": [
+      {
+        "label": "occupier",
+        "protocol": "mqtt",
+        "workers": 256,
+        "offset": 512,
+        "rate": 0,
+        "mode": "idle"
+      },
+      {
+        "label": "http",
+        "protocol": "http",
+        "rate": 100,
+        "workers": 4,
+        "offset": 0,
+        "window": 128,
+        "delay_secs": 3
+      },
+      {
+        "label": "mqtt",
+        "protocol": "mqtt",
+        "rate": 100,
+        "workers": 4,
+        "offset": 128,
+        "window": 128,
+        "delay_secs": 3
+      },
+      {
+        "label": "tcp",
+        "protocol": "tcp",
+        "rate": 100,
+        "workers": 4,
+        "offset": 256,
+        "window": 128,
+        "delay_secs": 3
+      },
+      {
+        "label": "udp",
+        "protocol": "udp",
+        "rate": 100,
+        "workers": 4,
+        "offset": 384,
+        "window": 128,
+        "delay_secs": 3
+      }
+    ],
+    "seconds": 30,
+    "repeats": 3,
     "variant": "final",
     "binary": "candidate",
     "production_revision": "ff9e959397ddc2981758a8ae821f6be29d9038e9"

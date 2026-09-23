@@ -20,6 +20,7 @@ def main():
         return [group(p, total * (.25 if dominant is None else .7 if p == dominant else .1)) for p in ['http','mqtt','tcp','udp']]
     def occupancy(workers):
         return [dict(label='occupier', protocol='mqtt', workers=workers, offset=512, rate=0, mode='idle')] + [group(p,100,4,delay_secs=3) for p in ['http','mqtt','tcp','udp']]
+    add('idle-final-256', occupancy(256), repeats=3)
     add('idle-final-256', occupancy(256), repeats=3, variant='final')
     for variant in ['baseline', 'final']:
         add('default-ip-occupancy-32', occupancy(32), repeats=3, variant=variant, limits={'max_connections_per_ip':32})
