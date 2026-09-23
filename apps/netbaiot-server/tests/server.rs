@@ -5,8 +5,8 @@ use netbaiot_core::{
 };
 use netbaiot_protocol::RouteDefinition;
 use netbaiot_runtime::{
-    AuthCache, CodecRegistry, ConfigCache, DeliveryEnvelope, Error, EventAcceptance, EventBus,
-    EventSink, Ingress, Lifecycle, Limits, Metrics, RestartSpool, Sessions, SinkAck,
+    AuthCache, CodecRegistry, DeliveryEnvelope, Error, EventAcceptance, EventBus, EventSink,
+    GatewayControl, Ingress, Lifecycle, Limits, Metrics, RestartSpool, Sessions, SinkAck,
     SinkDefinition, SinkDeliveryMode, SinkError, StaticAuthenticator,
 };
 use netbaiot_server::{Config, TlsFiles, read_config, run, tls_acceptor};
@@ -81,7 +81,7 @@ fn tls_test_services(limits: Limits, stop: CancellationToken) -> (Arc<Ingress>, 
         )])
         .unwrap(),
         events,
-        ConfigCache::empty(limits.clone()),
+        GatewayControl::empty(limits.clone()),
         metrics,
         Sessions::new(limits),
         lifecycle,
@@ -579,7 +579,6 @@ async fn external_auth_outage_preserves_bound_session_and_recovers_new_authentic
     c.device_ingress = free_address().await;
     c.management_http = free_address().await;
     c.credentials.clear();
-    c.device_configs.clear();
     c.auth_provider_url = Some(format!("http://{provider_address}/auth"));
     c.limits.authentication_timeout_ms = 500;
     c.spool_directory =
@@ -1344,7 +1343,7 @@ async fn exercise_shared_listener(tls: bool) {
     let stop = CancellationToken::new();
     let (ingress, mut services) = tls_test_services(Limits::default(), stop.clone());
     ingress
-        .config
+        .control
         .apply(ControlSnapshot {
             revision: 1,
             products: vec![ProductRuntimeConfig {
@@ -1354,7 +1353,6 @@ async fn exercise_shared_listener(tls: bool) {
                 codec_version: 1,
                 revision: 1,
             }],
-            devices: vec![],
             routes: vec![RouteDefinition {
                 tenant: None,
                 sinks: vec![SinkId::new("tls-test").unwrap()],
@@ -1441,16 +1439,42 @@ async fn exercise_shared_listener(tls: bool) {
         assert_eq!(response.status(), 200);
         if path == "status" {
             let value: serde_json::Value = response.json().await.unwrap();
+            assert!(value.get("config_cache_entries").is_none());
+            assert!(value.get("config_cache_bytes").is_none());
             assert_eq!(
                 value["active_connections"],
                 serde_json::json!({"mqtt":0,"tcp":0,"udp":0})
             );
         }
     }
-    let mutation = client.put(format!("{scheme}://localhost:{}/api/v1/devices/config", management_address.port()))
+    for (method, path) in [
+        (reqwest::Method::GET, "/api/v1/devices/config"),
+        (reqwest::Method::POST, "/api/v1/devices/config"),
+        (reqwest::Method::PUT, "/api/v1/devices/config"),
+        (reqwest::Method::POST, "/api/v1/config/invalidate"),
+    ] {
+        let removed = client
+            .request(
+                method,
+                format!("{scheme}://localhost:{}{path}", management_address.port()),
+            )
+            .bearer_auth(&admin)
+            .json(&serde_json::json!({}))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(removed.status(), 404, "removed endpoint {path}");
+    }
+    let mutation = client
+        .put(format!(
+            "{scheme}://localhost:{}/api/v1/routes",
+            management_address.port()
+        ))
         .bearer_auth(&admin)
-        .json(&serde_json::json!({"device":{"tenant_id":"demo","product_id":"sensor","device_id":"device-1"},"revision":2,"payload":{"sample_interval_seconds":10}}))
-        .send().await.unwrap();
+        .json(&serde_json::json!({"revision":2,"routes":[{"tenant":null,"sinks":["tls-test"]}]}))
+        .send()
+        .await
+        .unwrap();
     assert_eq!(mutation.status(), 204);
     assert_eq!(
         client
@@ -1826,4 +1850,19 @@ async fn device_protocol_ceiling_preserves_other_tls_protocols_and_management() 
         );
     }
     ingress.events.stop_workers().await.unwrap();
+}
+
+#[tokio::test]
+async fn removed_startup_device_config_is_rejected_even_when_empty() {
+    let root = std::env::temp_dir().join(format!("netbaiot-old-config-{}", uuid::Uuid::new_v4()));
+    std::fs::create_dir_all(&root).unwrap();
+    let mut legacy = serde_json::to_value(config()).unwrap();
+    legacy["device_configs"] = serde_json::json!([]);
+    let path = root.join("config.json");
+    std::fs::write(&path, serde_json::to_vec(&legacy).unwrap()).unwrap();
+    assert!(matches!(
+        read_config(path.to_str().unwrap()).await,
+        Err(Error::Configuration)
+    ));
+    std::fs::remove_dir_all(root).unwrap();
 }

@@ -54,7 +54,7 @@ def run(binary, probe, seconds, mode):
         device, management = [sock.getsockname()[1] for sock in reservations]
         config = json.loads((ROOT / 'configs/development.json').read_text())
         config.update(device_ingress=f'127.0.0.1:{device}', management_http=f'127.0.0.1:{management}',
-                      spool_directory=folder + '/spool', device_configs=[])
+                      spool_directory=folder + '/spool')
         config['limits'].update(requests_per_second=2_000_000, requests_per_ip_second=2_000_000,
                                 messages_per_device_second=2_000_000, messages_per_tenant_second=2_000_000)
         path = Path(folder) / 'config.json'

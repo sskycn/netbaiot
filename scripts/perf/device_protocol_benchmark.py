@@ -119,7 +119,7 @@ def server_config(folder, plan, device, management, sink):
                 development=True, business_tcp=None, limits=limits,
                 tls=dict(certificate=str(CERT), private_key=str(CERT.with_name('localhost-key.pem'))) if plan.get('tls', True) else None,
                 delivery_url=f'http://127.0.0.1:{sink}/events' if plan.get('sink') else None,
-                auth_provider_url=None, spool_directory=str(folder / 'spool'), device_configs=[],
+                auth_provider_url=None, spool_directory=str(folder / 'spool'),
                 credentials=[dict(credential_id=f'a{i}', secret_hex=SECRET,
                                   identity=dict(device_key=dict(tenant_id=f't{i//4096}', product_id='p', device_id=f'd{i}'),
                                                 credential_version=1, auth_generation=1, codec_id='netbaiot-json', codec_version=1,
@@ -158,10 +158,25 @@ def run(plan, repeat, args):
         print(json.dumps(dict(name=name, settling_seconds=settling)), flush=True)
         time.sleep(settling)
     # Reserve dynamic ports; close immediately before spawning owned listener.
-    reservations = [socket.socket() for _ in range(3)]
-    for sock in reservations:
+    # Device ingress requires both TCP and UDP on the same numeric port.
+    # A TCP-only reservation can pick a port already held by an unrelated UDP user.
+    for _ in range(100):
+        device_reservation = socket.socket()
+        udp_reservation = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        device_reservation.bind(('127.0.0.1', 0))
+        try:
+            udp_reservation.bind(device_reservation.getsockname())
+            break
+        except OSError:
+            device_reservation.close()
+            udp_reservation.close()
+    else:
+        raise RuntimeError('could not reserve paired device TCP/UDP port')
+    reservations = [device_reservation, socket.socket(), socket.socket()]
+    for sock in reservations[1:]:
         sock.bind(('127.0.0.1', 0))
     device, management, sinkport = [s.getsockname()[1] for s in reservations]
+    reservations.append(udp_reservation)
     config = server_config(folder, plan, device, management, sinkport)
     (folder / 'server.json').write_text(json.dumps(config))
     (folder / 'sink-control.json').write_text(json.dumps(dict(delay=plan.get('sink_delay', 2), status=204)))
@@ -170,7 +185,7 @@ def run(plan, repeat, args):
     files = []
     samples = []
     row = dict(name=name, plan=plan, repeat=repeat, label=args.label, timestamp=time.time(),
-               baseline=BASELINE, production_revision=plan.get('production_revision', BASELINE), server_sha256=args.server_hash, loadgen_sha256=args.loadgen_hash,
+               baseline=args.baseline, production_revision=plan.get('production_revision', args.baseline), server_sha256=args.server_hash, loadgen_sha256=args.loadgen_hash,
                harness_version=3, loadgen_tokio_workers=workers, loadgen_worker_source='main tokio macro (environment ignored)', server_tokio_workers=10, harness_sha256=digest(Path(__file__)), server_config=config, network_before=command(['netstat', '-s', '-p', 'udp']),
                tcp_before=command(['netstat', '-s', '-p', 'tcp']))
     try:
@@ -292,6 +307,7 @@ def main():
     parser.add_argument('--candidate', type=Path, help='Optional candidate server for interleaved paired plans')
     parser.add_argument('--loadgen', type=Path, default=ROOT / 'target/release/netbaiot-loadgen')
     parser.add_argument('--label', default='baseline')
+    parser.add_argument('--baseline', default=BASELINE, help='Source revision of the frozen baseline server')
     parser.add_argument('--resume', action='store_true', help='Skip only matching, completed successful raw records')
     parser.add_argument('--output', type=Path, default=ROOT / 'docs/performance/remove-device-http')
     args = parser.parse_args()

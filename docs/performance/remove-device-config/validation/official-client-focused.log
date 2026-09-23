@@ -1,0 +1,11 @@
+   Compiling netbaiot-server v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/apps/netbaiot-server)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.60s
+     Running tests/official_client.rs (target/debug/deps/official_client-24561382717af871)
+
+running 3 tests
+test official_clients_cover_mqtt_tcp_command_ack_status_and_offline_contracts ... ok
+test official_client_throughput_latency_and_idle_memory_measurement ... ok
+test official_client_reconnects_and_replays_unacked_event_with_same_id ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.86s
+

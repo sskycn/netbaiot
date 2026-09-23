@@ -1,0 +1,210 @@
+   Compiling netbaiot-protocol v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-protocol)
+   Compiling netbaiot-runtime v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-runtime)
+   Compiling netbaiot-client v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-client)
+   Compiling netbaiot-device-sdk v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-device-sdk)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.84s
+     Running unittests src/main.rs (target/debug/deps/netbaiot-2b53092449e246cc)
+
+running 3 tests
+test tests::parses_multiple_event_types ... ok
+test tests::global_parser_removes_secrets_and_preserves_command ... ok
+test tests::command_payload_shape_is_public_protocol ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/smoke.rs (target/debug/deps/smoke-b7797c0c98c97aad)
+
+running 1 test
+test cli_smoke_covers_status_device_command_events_auth_and_drain ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.21s
+
+     Running unittests src/lib.rs (target/debug/deps/netbaiot_client-b2ba8d5dddd012aa)
+
+running 4 tests
+test tests::reconnect_backoff_is_bounded ... ok
+test tests::builder_rejects_invalid_limits_and_redacts_token ... ok
+test tests::management_bearer_requires_https_off_loopback ... ok
+test tests::slow_consumer_is_not_acked_and_stream_drop_cancels_socket_task ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+
+     Running unittests src/lib.rs (target/debug/deps/netbaiot_codecs-577254fb2fe33de3)
+
+running 2 tests
+test tests::all_payloads_and_bounds ... ok
+test hostile::unknown_identity_duplicate_fields_and_huge_maps_are_rejected ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/netbaiot_core-d8fbe3a8fa999eef)
+
+running 1 test
+test tests::identities_are_namespace_safe ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/netbaiot_device_sdk-ffad5c5d242789fa)
+
+running 6 tests
+test tests::terminal_connack_codes_do_not_retry ... ok
+test tests::canonical_topics_are_identity_scoped ... ok
+test tests::reconnect_backoff_is_jittered_and_bounded ... ok
+test tests::credentials_are_redacted_and_transport_is_required ... ok
+test tests::full_command_buffer_disconnects_without_acknowledging_overflow ... ok
+test tests::command_connection_waits_for_successful_suback ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.21s
+
+     Running unittests src/bin/admission_auth.rs (target/debug/deps/admission_auth-addcfec2f37685b0)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (target/debug/deps/netbaiot_loadgen-66d838e7689d9faf)
+
+running 6 tests
+test tests::histogram_counts_and_quantiles ... ok
+test tests::open_loop_schedule_counts_skips_without_drift ... ok
+test tests::audit_rejects_unbounded_or_incompatible_workloads ... ok
+test tests::bad_config_and_oversize_response ... ok
+test mixed::tests::bounds_and_group_names_are_validated ... ok
+test tests::frames_handle_all_splits ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/udp_ack.rs (target/debug/deps/udp_ack-f3e5ef06910791b1)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/netbaiot_protocol-cbffdf2beef17798)
+
+running 6 tests
+test tests::generated_event_ids_keep_uuid_v4_and_canonical_serde_contract ... ok
+test tests::filter_is_bounded_and_matches_identity ... ok
+test tests::device_transports_and_connection_counts_have_only_three_wire_fields ... ok
+test tests::stable_error_and_ack_json ... ok
+test tests::response_types_accept_additive_fields ... ok
+test tests::removed_business_configuration_is_not_a_public_wire_variant ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/netbaiot_runtime-dc41b03c263c9445)
+
+running 46 tests
+test control::tests::snapshot_replacement_is_validated_atomic_and_shared ... ok
+test control::tests::product_route_and_byte_limits_roll_back_without_state_change ... ok
+test auth::cache_tests::invalidation_fences_delayed_success_and_retry_uses_new_generation ... ok
+test event::tests::cancelled_inflight_required_delivery_remains_owned_for_spool ... ok
+test auth::cache_tests::cancelled_leader_releases_followers_and_all_inflight_resources ... ok
+test event::tests::best_effort_overload_drops_without_blocking_required_acceptance ... ok
+test event::tests::delayed_retry_does_not_block_later_ready_delivery ... ok
+test event::tests::eventbus_queue_depth_probe ... ignored, release-only queue scan measurement
+test event::tests::required_admission_is_atomic_and_count_byte_bounded ... ok
+test event::tests::fanout_restore_inflight_spool_preserves_shared_event_and_accounting ... ok
+test event::tests::required_last_target_full_preserves_every_queue_and_counter ... ok
+test event::tests::slow_required_sink_does_not_block_fast_sink_and_accounting_returns_to_zero ... ok
+test ingress::tests::auth_invalidation_epoch_fences_session_registration_for_every_scope ... ok
+test ingress::tests::presence_capacity_failure_occurs_before_event_accepted ... ok
+test lifecycle::tests::quiesce_waits_for_active_and_closes_gate ... ok
+test limits::tests::defaults_validate_and_inconsistent_hierarchies_fail ... ok
+test metrics::tests::eventbus_probes_require_explicit_opt_in ... ok
+test metrics::tests::eventbus_site_and_batch_histograms_preserve_counts_and_units ... ok
+test metrics::tests::renders_lock_histograms_with_closed_names ... ok
+test quota::tests::concurrent_classification_cannot_exceed_protocol_cap ... ok
+test quota::tests::connection_limits_and_raii_cleanup ... ok
+test quota::tests::device_protocol_ceiling_shares_global_ownership_and_releases_on_failure ... ok
+test quota::tests::expired_tenant_identity_replacement_is_shared ... ok
+test quota::tests::ingress_limits_isolate_devices_tenants_and_bytes ... ok
+test event::tests::eventbus_sink_panic_recovery_001 ... ok
+test quota::tests::pending_connection_owns_count_bytes_ip_and_classifies_once ... ok
+test quota::tests::source_rate_table_has_capacity_and_global_limit ... ok
+test sessions::tests::active_revocation_uses_bound_identity_not_auth_cache_membership ... ok
+test sessions::tests::command_count_and_bytes_release_on_drop ... ok
+test sessions::tests::offline_presence_is_lru_bounded_and_active_presence_is_never_evicted ... ok
+test sessions::tests::stale_disconnect_cannot_remove_new_generation ... ok
+test event::tests::retries_and_required_fanout_preserve_exact_accepted_event_id ... ok
+test spool::tests::capacity_and_unusable_directory_fail_without_a_commit ... ok
+test spool::tests::corrupt_truncated_oversized_and_unknown_versions_fail ... ok
+test auth::cache_tests::timed_out_leader_does_not_poison_retry ... ok
+test auth::cache_tests::positive_negative_ttl_capacity_invalidation_and_fail_closed ... ok
+test event::tests::event_bus_full_concurrency_waits_for_completion_without_ready_timer_spin ... ok
+test event::tests::eventbus_timeout_retries_owned_event_and_drains ... ok
+test event::tests::delayed_retry_wakes_with_another_delivery_inflight ... ok
+test quota::tests::ingress_wait_is_count_byte_and_deadline_bounded ... ok
+test spool::tests::committed_record_round_trips_with_same_event_id ... ok
+test spool::tests::removed_event_kind_fails_recovery_without_deleting_committed_work ... ok
+test event::tests::required_delivery_recovers_after_normal_retry_exhaustion ... ok
+test spool::tests::stale_cleanup_handle_cannot_delete_newer_committed_generation ... ok
+test spool::tests::repeated_failed_restarts_replace_one_generation_without_duplicates ... ok
+test auth::cache_tests::ten_thousand_signed_packets_use_one_verifier_lookup ... ok
+
+test result: ok. 45 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.26s
+
+     Running unittests src/lib.rs (target/debug/deps/netbaiot_server-da55ea44f98c93fc)
+
+running 3 tests
+test reliability_tests::mqtt_recovery_structural_eventbus_safety_001 ... ok
+test reliability_tests::active_subscriber_is_rejected_and_filter_mismatch_is_not_acknowledged ... ok
+test reliability_tests::eventbus_tcp_absence_filter_change_and_reconnect_preserve_isolation ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running unittests src/main.rs (target/debug/deps/netbaiot_server-bd64964eab226b48)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/official_client.rs (target/debug/deps/official_client-24561382717af871)
+
+running 3 tests
+test official_clients_cover_mqtt_tcp_command_ack_status_and_offline_contracts ... ok
+test official_client_throughput_latency_and_idle_memory_measurement ... ok
+test official_client_reconnects_and_replays_unacked_event_with_same_id ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.91s
+
+     Running tests/server.rs (target/debug/deps/server-ecd9e105545b6525)
+
+running 21 tests
+test config_input_is_bounded_and_malformed_config_fails ... ok
+test public_streams_require_tls_and_volatile_store_requires_loopback ... ok
+test non_loopback_management_requires_tls_while_loopback_development_allows_http ... ok
+test legacy_device_addresses_are_rejected_without_ambiguous_conversion ... ok
+test subprocess_graceful_restart_sixty_second_soak ... ignored, 60-second multi-generation restart soak
+test removed_startup_device_config_is_rejected_even_when_empty ... ok
+test classification_does_not_refresh_first_packet_deadline ... ok
+test shared_plaintext_mqtt_tcp_udp_rejects_http_and_preserves_management ... ok
+test device_protocol_ceiling_preserves_other_tls_protocols_and_management ... ok
+test composition_root_serves_tcp_and_stops_all_listeners ... ok
+test tls_composition_completes_verified_handshake ... ok
+test unclassified_connections_enforce_global_peer_and_rate_limits ... ok
+test shared_tls_mqtts_tcp_udp_rejects_https_without_alpn ... ok
+test external_auth_outage_preserves_bound_session_and_recovers_new_authentication ... ok
+test audit_tls_handshake_timeout_shutdown_and_invalid_key ... ok
+test shared_ingress_releases_unknown_slow_eof_and_tls_failure_leases ... ok
+test subprocess_graceful_restart_spools_and_replays_every_accepted_event_id ... ok
+test subprocess_mqtt_qos2_resumes_outbound_and_inbound_restart_stages ... FAILED
+test subprocess_mqtt_session_retained_and_qos1_inflight_survive_graceful_restart ... ok
+test subprocess_sigkill_exposes_the_documented_three_event_loss_window ... ok
+test subprocess_spool_failure_stays_alive_until_repaired_then_replays_same_event_id ... ok
+
+failures:
+
+---- subprocess_mqtt_qos2_resumes_outbound_and_inbound_restart_stages stdout ----
+
+thread 'subprocess_mqtt_qos2_resumes_outbound_and_inbound_restart_stages' panicked at apps/netbaiot-server/tests/server.rs:319:6:
+called `Result::unwrap()` on an `Err` value: Elapsed(())
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    subprocess_mqtt_qos2_resumes_outbound_and_inbound_restart_stages
+
+test result: FAILED. 19 passed; 1 failed; 1 ignored; 0 measured; 0 filtered out; finished in 6.95s
+
+error: test failed, to rerun pass `-p netbaiot-server --test server`

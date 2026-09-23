@@ -28,7 +28,6 @@ Management HTTP（`management_http`，通常为 `127.0.0.1:9090`）和可选的
 ```json
 {"kind":"event","data":{"name":"boot","value":true}}
 {"kind":"heartbeat","data":{"sequence":42}}
-{"kind":"config_ack","data":{"revision":7,"status":"applied","error":null}}
 {"kind":"command_ack","data":{"command_id":"00000000-0000-0000-0000-000000000001","execution":"succeeded"}}
 ```
 
@@ -98,3 +97,7 @@ Replay 只存在内存中。这一保证限于同一 runtime 实例、同一有�
 NBA1 固定 64 字节，最小结构有效 NBI1 为 76 字节，载荷字节放大比最多 **64/76 ≈ 0.842**。未认证流量绝不回复。捕获的有效签名包仍可在有效时间窗内被伪造来源地址重放，造成有限 authenticated reflection；固定小回包及原有来源 IP/进程限速阻止字节放大。重复 ACK 同样经过限速。载荷仍未加密。
 
 `udp_datagrams`、`udp_accepted`、`udp_accepted_duplicates`、`udp_acks_sent`、`udp_ack_send_failures` 分别统计入包、新接纳数据报、已接受重复包、发送成功、发送失败或被抑制回执。socket 发送成功不等于设备收到。指标不新增设备 ID 等高基数标签。
+
+当前 0.x 版本的破坏性清理已移除 `config_ack`，旧载荷会被拒绝，不保留兼容别名。
+信封结构未变，继续使用 `schema_version=1`。应用配置操作通过普通 MQTT/TCP 命令与
+`command_ack` 表达。详见[迁移说明](remove-device-config.md)。

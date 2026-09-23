@@ -35,7 +35,6 @@ pub struct IngressEnvelope<'a> {
     pub transport: Transport,
     pub payload: &'a [u8],
     pub require_command_ack: bool,
-    pub require_config_ack: bool,
     pub validated_at: Instant,
     pub validation_us: u64,
 }
@@ -50,7 +49,7 @@ pub struct Ingress {
     pub auth_cache: Arc<AuthCache>,
     pub codecs: CodecRegistry,
     pub events: Arc<EventBus>,
-    pub config: Arc<ConfigCache>,
+    pub control: Arc<GatewayControl>,
     pub metrics: Arc<Metrics>,
     pub sessions: Arc<Sessions>,
     pub admission: Arc<Admission>,
@@ -65,7 +64,7 @@ impl Ingress {
         auth_cache: Arc<AuthCache>,
         codecs: CodecRegistry,
         events: Arc<EventBus>,
-        config: Arc<ConfigCache>,
+        control: Arc<GatewayControl>,
         metrics: Arc<Metrics>,
         sessions: Arc<Sessions>,
         lifecycle: Arc<Lifecycle>,
@@ -76,7 +75,7 @@ impl Ingress {
             auth_cache,
             codecs,
             events,
-            config,
+            control,
             metrics,
             sessions,
             lifecycle,
@@ -231,9 +230,6 @@ impl Ingress {
         if envelope.require_command_ack && !matches!(event.kind, DeviceEventKind::CommandAck(_)) {
             return Err(Error::Invalid);
         }
-        if envelope.require_config_ack && !matches!(event.kind, DeviceEventKind::ConfigAck(_)) {
-            return Err(Error::Invalid);
-        }
         if matches!(event.kind, DeviceEventKind::CommandAck(_)) && !auth.permissions.commands {
             return Err(Error::Forbidden);
         }
@@ -376,7 +372,7 @@ mod tests {
             )])
             .unwrap(),
             events.clone(),
-            ConfigCache::empty(limits),
+            GatewayControl::empty(limits),
             metrics,
             sessions,
             lifecycle,
@@ -389,7 +385,6 @@ mod tests {
                         transport: Transport::Tcp,
                         payload: b"x",
                         require_command_ack: false,
-                        require_config_ack: false,
                         validated_at: Instant::now(),
                         validation_us: 0,
                     },
@@ -444,7 +439,7 @@ mod tests {
             )])
             .unwrap(),
             events.clone(),
-            ConfigCache::empty(limits.clone()),
+            GatewayControl::empty(limits.clone()),
             metrics,
             Sessions::new(limits),
             lifecycle,

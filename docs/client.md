@@ -14,7 +14,7 @@ let client = NetbaIoTClient::builder()
     .await?;
 ```
 
-The scoped APIs are `events()`, `commands()`, `devices()`, `configs()`, `runtime()`,
+The scoped APIs are `events()`, `commands()`, `devices()`, `runtime()`,
 `auth_cache()`, and `routes()`. Secrets have redacted `Debug`. Connect, request,
 stream handshake, and ACK-write timeouts are finite and builder-validated.
 
@@ -41,6 +41,7 @@ a new `delivery_id`; applications requiring durable idempotency must persist eve
 IDs themselves. Dropping the stream aborts its owned task and closes the socket.
 
 Commands are never retried automatically. `DeviceOffline` is distinct from generic
-server failure, and caller-supplied `command_id` remains unchanged. Configuration
-revisions are typed. Download/set success is separate from a device's application
-ACK. `runtime().drain()` is explicitly administrative.
+server failure, and caller-supplied `command_id` remains unchanged. Applications
+persist desired/reported configuration and history externally. Ordinary commands
+can carry application-defined configuration operations; `CommandAck` reports device
+execution, while application code decides convergence, retries and rollback. `runtime().drain()` is explicitly administrative.

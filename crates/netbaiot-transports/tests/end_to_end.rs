@@ -104,7 +104,7 @@ fn runtime_with_sink(
         1,
     )
     .unwrap();
-    let config = ConfigCache::empty(limits.clone());
+    let config = GatewayControl::empty(limits.clone());
     let ingress = Arc::new(Ingress::new(
         limits.clone(),
         AuthCache::new(provider, limits.clone(), metrics.clone()),
@@ -169,7 +169,6 @@ async fn one_authentication_then_ten_thousand_messages_calls_provider_once() {
                     transport: Transport::Mqtt,
                     payload: &bytes,
                     require_command_ack: false,
-                    require_config_ack: false,
                     validated_at: std::time::Instant::now(),
                     validation_us: 0,
                 },

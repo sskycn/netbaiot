@@ -39,7 +39,6 @@ export DOWN_TOPIC=v1/t/demo/p/sensor/d/device-1/down
 ```json
 {"schema_version":1,"source_message_id":"m:1","kind":"event","data":{"name":"boot","value":true}}
 {"schema_version":1,"source_message_id":"m:2","kind":"heartbeat","data":{"sequence":42}}
-{"schema_version":1,"source_message_id":"m:3","kind":"config_ack","data":{"revision":7,"status":"applied","error":null}}
 {"schema_version":1,"source_message_id":"m:4","kind":"command_ack","data":{"command_id":"00000000-0000-0000-0000-000000000123","execution":"succeeded"}}
 ```
 
@@ -222,8 +221,11 @@ cargo run -p netbaiot-device-sdk --example device_mqtt
 
 仓库示例使用 tutorial 身份 `demo/sensor/device-1`，可直接连接上述配置。示例均会被 workspace `--all-targets` 编译验证。
 
-SDK 支持 MQTT QoS0/1 publish、接收命令、`ack_command`，以及通过 `publish(DeviceUplink, PublishQos)` 上报 heartbeat/config ACK。MQTT 断开时默认 `OfflinePublishPolicy::Reject`；重连使用可取消、有界的 full-jitter exponential backoff（100 ms–5 s），重连后重新订阅命令 topic。`connect()` 会等待成功 CONNACK 和 command SUBACK；`shutdown()` 或丢弃最后一个 client 会停止所属任务。
+SDK 支持 MQTT QoS0/1 publish、接收命令、`ack_command`，以及通过 `publish(DeviceUplink, PublishQos)` 上报 heartbeat。MQTT 断开时默认 `OfflinePublishPolicy::Reject`；重连使用可取消、有界的 full-jitter exponential backoff（100 ms–5 s），重连后重新订阅命令 topic。`connect()` 会等待成功 CONNACK 和 command SUBACK；`shutdown()` 或丢弃最后一个 client 会停止所属任务。
 
 普通 MQTT 3.1.1 客户端始终是一等支持对象，不要求使用 SDK。
 
-设备主动配置拉取已移除。管理端仍可读写 revisioned configuration；没有等价的 MQTT/TCP 自动配置下载。已有命令通道可按应用约定携带配置，应用后通过 codec `ConfigAck` 上报。详见[迁移说明](remove-device-http.md)。
+NetbaIoT 不持有或持久化设备期望配置。业务系统负责 desired/reported 状态、版本历史、
+重试、发布/回滚及离线协调。配置变更可作为普通 `DeviceCommand` 发往在线 MQTT/TCP 设备，
+设备通过 `CommandAck` 返回执行结果；是否收敛由业务系统判断。命令仅支持在线投递，
+UDP 无会话且没有下行。参阅[职责迁移](remove-device-config.md)。

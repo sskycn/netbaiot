@@ -1,7 +1,7 @@
 use futures_util::StreamExt;
 use netbaiot_client::{ClientError, NetbaIoTClient};
 use netbaiot_protocol::*;
-use std::{env, net::SocketAddr, path::Path, sync::Arc};
+use std::{env, net::SocketAddr, path::Path};
 use tokio::io::{AsyncWriteExt, stdout};
 
 const EXIT_USAGE: u8 = 2;
@@ -82,7 +82,6 @@ async fn run(mut arguments: Vec<String>) -> Result<(), CliError> {
         "server" => server(&client, &arguments[1..], global.output).await,
         "device" => device(&client, &arguments[1..], global.output).await,
         "command" => command(&client, &arguments[1..], global.output).await,
-        "config" => config(&client, &arguments[1..], global.output).await,
         "auth" => auth(&client, &arguments[1..], global.output).await,
         "events" => events(&client, &arguments[1..], global.output).await,
         _ => Err(CliError::Usage(format!("unknown command group: {group}"))),
@@ -247,53 +246,6 @@ async fn command(
     .await
 }
 
-async fn config(
-    client: &NetbaIoTClient,
-    arguments: &[String],
-    output: Output,
-) -> Result<(), CliError> {
-    let action = arguments.first().map(String::as_str);
-    let key = device_key(arguments.get(1).map(String::as_str), arguments)?;
-    match action {
-        Some("get") => {
-            let config = client.configs().get_device_config(&key).await?;
-            print_value(&config, output, || {
-                format!("revision={} payload={}", config.revision, config.payload)
-            })
-            .await
-        }
-        Some("set") => {
-            let file = option(arguments, "--file")
-                .ok_or_else(|| CliError::Usage("config set requires --file".into()))?;
-            let revision = option(arguments, "--revision")
-                .ok_or_else(|| CliError::Usage("config set requires --revision".into()))?
-                .parse::<u64>()
-                .ok()
-                .and_then(ConfigRevision::new)
-                .ok_or_else(|| CliError::Usage("--revision must be positive".into()))?;
-            let payload = serde_json::from_slice(&read_bounded(Path::new(file)).await?)
-                .map_err(|error| CliError::Usage(format!("invalid config JSON: {error}")))?;
-            client
-                .configs()
-                .set_device_config(&DeviceConfig {
-                    device: key,
-                    revision,
-                    payload: Arc::new(payload),
-                })
-                .await?;
-            print_json_line(
-                &serde_json::json!({"updated": true, "revision": revision}),
-                output,
-                "configuration updated",
-            )
-            .await
-        }
-        _ => Err(CliError::Usage(
-            "expected: config get DEVICE | config set DEVICE --file PATH --revision N".into(),
-        )),
-    }
-}
-
 async fn auth(
     client: &NetbaIoTClient,
     arguments: &[String],
@@ -415,7 +367,6 @@ fn parse_event_type(value: &str) -> Result<EventType, CliError> {
         "heartbeat" => Ok(EventType::Heartbeat),
         "connected" => Ok(EventType::Connected),
         "disconnected" => Ok(EventType::Disconnected),
-        "config_ack" => Ok(EventType::ConfigAck),
         "command_ack" => Ok(EventType::CommandAck),
         _ => Err(CliError::Usage(format!("unknown event type: {value}"))),
     }
@@ -468,7 +419,7 @@ async fn print_json_line<T: serde::Serialize>(
 fn usage() -> &'static str {
     "netbaiot [--endpoint URL] [--token TOKEN] [--output human|json] COMMAND\n\
      commands: server status | server drain --yes | device status DEVICE |\n\
-     command send DEVICE --json JSON | config get/set | auth invalidate | events subscribe\n\
+     command send DEVICE --json JSON | auth invalidate | events subscribe\n\
      device-scoped commands require --tenant and --product (or matching environment variables)"
 }
 

@@ -1,0 +1,18 @@
+[
+  {
+    "name": "udp",
+    "seconds": 30,
+    "repeats": 3,
+    "tls": false,
+    "groups": [
+      {
+        "label": "udp",
+        "protocol": "udp",
+        "rate": 80000,
+        "workers": 8,
+        "offset": 384,
+        "window": 128
+      }
+    ]
+  }
+]

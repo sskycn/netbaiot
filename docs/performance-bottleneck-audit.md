@@ -1,5 +1,8 @@
 # Performance bottleneck audit
 
+> Historical audit: device-configuration ownership described here was removed later.
+> Current behavior and migration: [Remove device configuration](remove-device-config.md).
+
 ## Latest EventId experiment (2026-09-22)
 
 **EXPERIMENT REVERTED — insufficient end-to-end gain.** The isolated EventId

@@ -15,10 +15,7 @@
 | `GET /api/v1/connections?offset=&limit=` | 分页查询本节点活动会话；最多 256 条 |
 | `POST /api/v1/devices/connection` | 按 `DeviceKey` 查询非敏感连接/在线信息 |
 | `POST /api/v1/devices/commands` | 立即向本节点活动会话发送命令 |
-| `POST /api/v1/devices/config` | 读取一份类型化设备配置 |
-| `PUT /api/v1/devices/config` | 设置 revision 更新的类型化设备配置 |
 | `POST /api/v1/auth/invalidate` | 使指定范围失效并断开受影响会话 |
-| `POST /api/v1/config/invalidate` | 移除一份设备配置缓存 |
 | `PUT /api/v1/control/snapshot` | 校验并原子替换带 revision 的快照 |
 | `PUT /api/v1/routes` | 按 revision 校验并替换路由 |
 | `POST /api/v1/drain` | 请求优雅关机 |

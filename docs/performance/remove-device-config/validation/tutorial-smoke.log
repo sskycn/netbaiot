@@ -1,0 +1,17 @@
+   Compiling netbaiot-client v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-client)
+   Compiling netbaiot-cli v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/apps/netbaiot-cli)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.14s
+{"ready":true}
+{"lifecycle":"running","event_count":0,"event_bytes":0,"pending_required":0,"auth_cache_entries":0,"auth_cache_bytes":0,"runtime_tasks":5,"active_connections":{"mqtt":0,"tcp":0,"udp":0}}
+  "results": {
+acceptance: {'event_id': 'd3df7578-8c3a-4971-827b-d1ec6c5d6748', 'accepted_at': 1790157223177, 'required_deliveries': 1, 'best_effort_deliveries': 0}
+EventAccepted: signed NBA1 sequence=11; business completion is separate
+{"command_id":"00000000-0000-0000-0000-000000000123","state":"queued"}
+{"command_id":"00000000-0000-0000-0000-000000000123","device":{"tenant_id":"demo","product_id":"sensor","device_id":"device-1"},"expires_at":1790157523438,"payload":{"name":"smoke","arguments":{}}}
+{"invalidated":1,"disconnected":0,"invalidated_cache_entries":1,"disconnected_connections":0,"invalidated_mqtt_sessions":2}
+{"duplicate": false, "event": {"device_id": "device-1", "event_id": "cffcd876-2227-4509-b16d-4bdd1476a266", "event_type": "heartbeat", "occurred_at": null, "payload": {"data": {"sequence": 1}, "kind": "heartbeat"}, "product_id": "sensor", "received_at": 1790157223141, "source_message_id": "demo:1", "tenant_id": "demo"}}
+{"draining":true}
+2026-09-23T09:53:43.501620Z  INFO netbaiot_server: shutdown complete
+{"draining":true}
+2026-09-23T09:53:46.447879Z  INFO netbaiot_server: shutdown complete
+tutorial smoke: PASS

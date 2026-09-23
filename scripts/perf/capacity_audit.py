@@ -218,7 +218,7 @@ def prepare(args):
                   development=not external, limits=limits, credentials=[credential(i) for i in range(args.connections)],
                   tls=dict(certificate=ca, private_key=str(pathlib.Path(args.private_key).resolve())) if ca else None,
                   delivery_url=('http://127.0.0.1:%d/events' % (base+6)) if args.sink_mode=='webhook' else None,
-                  auth_provider_url=None, spool_directory=str(root/'spool'), device_configs=[])
+                  auth_provider_url=None, spool_directory=str(root/'spool'))
     load = dict(audit_open_loop=args.rate > 0, transport='mqtt', address='%s:%d' % (args.host, base+2),
                 connections=args.connections, tenant_width=args.connections+1, ramp_per_sec=min(200,args.connections),
                 warmup_secs=args.warmup, duration_secs=args.duration, cooldown_secs=args.cooldown,

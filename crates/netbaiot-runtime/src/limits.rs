@@ -89,8 +89,10 @@ pub struct Limits {
     pub auth_cache_max_waiters: usize,
     pub auth_positive_ttl_ms: u64,
     pub auth_negative_ttl_ms: u64,
-    pub config_cache_max_entries: usize,
-    pub config_cache_max_bytes: usize,
+    /// Gateway product/codec profiles only; no per-device business state.
+    pub control_max_products: usize,
+    /// Serialized gateway product profiles and routes (not preallocated).
+    pub control_max_bytes: usize,
     pub max_sinks: usize,
     pub max_sinks_per_tenant: usize,
     pub max_routing_filters: usize,
@@ -209,8 +211,8 @@ impl Default for Limits {
             auth_cache_max_waiters: 256,
             auth_positive_ttl_ms: 300_000,
             auth_negative_ttl_ms: 5_000,
-            config_cache_max_entries: 4_096,
-            config_cache_max_bytes: 16_777_216,
+            control_max_products: 4_096,
+            control_max_bytes: 16_777_216,
             max_sinks: 32,
             max_sinks_per_tenant: 8,
             max_routing_filters: 256,
