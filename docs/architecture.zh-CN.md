@@ -1,5 +1,21 @@
 # 架构
 
+## Single Device Ingress（单设备入口）
+
+`device_ingress` 在同一个地址、相同端口号绑定一个 TCP listener 和一个 UDP socket。
+开发示例为 `127.0.0.1:8080`，生产可配置 `0.0.0.0:443`。TCP 通过同一证书承载
+HTTPS、标准 MQTT 3.1.1 TLS 和通用分帧 TLS TCP。TLS 握手后才识别应用协议，
+不要求 ALPN、自定义前导或修改客户端 wire protocol。UDP 同端口继续使用 NBI1/HMAC，
+只认证不加密，不涉及 DTLS/QUIC。
+
+Management HTTP（`management_http`，通常为 `127.0.0.1:9090`）和可选的
+`business_tcp` 继续独立监听与授权。设备 HTTP 不提供管理 API。
+非 loopback TCP 入口必须配置 TLS；开发模式强制 loopback，允许本地明文测试。
+
+配置中的 `device_http`、`mqtt`、`tcp`、`udp` 四个旧字段替换为 `device_ingress`。
+旧字段将触发配置错误；迁移时须明确选择新地址并修改所有设备目的端口和防火墙规则，
+不会静默选择旧配置中的某一个端口。
+
 NetbaIoT 是一个无数据库、事件驱动的 IoT 网关。运行路径如下：
 
 ```text
@@ -24,6 +40,20 @@ DeviceEvent(event_id)
           |
           +------ 需确认的分帧 TCP/RPC 流
 ```
+
+共享 TCP listener 在启动所属连接任务前预留现有全局数量/字节和每 IP 配额，并执行有界 IP 限流。
+分类后原 lease 转为协议计数，错误/EOF/取消只释放一次。HTTP slots、MQTT 配额和设备/租户 admission
+保持原语义；没有增加协议独占连接池，原有全局/IP 池仍共享，因此不承诺协议间绝对无饥饿。
+
+探测缓冲固定 12 字节。HTTP 必须匹配标准方法和空格；MQTT 复用 Remaining Length 解码，
+校验 `00 04 MQTT` 和版本字节，版本 4 正常处理，其他版本交原解析器返回标准 CONNACK=1 后关闭。
+通用 TCP 校验 1..max_tcp_frame_size 长度和 JSON 对象/空白起始。现有合法帧上限为 1 MiB，
+长度首字节为零，与 HTTP 方法、MQTT 0x10 不冲突。失败后不切换解析器，已读前缀完整回放。
+
+TLS、探测和首包/HTTP 请求头共享从接纳时开始的 `connect_timeout_ms` 截止时间。
+既有认证、HTTP 请求/写出阶段仍分别有界。探测失败/超时使用固定指标名与 debug 日志。
+Quiesce 关闭接纳，停止共享 TCP/UDP 并等待连接结束，然后进行 MQTT 恢复快照和必需投递 drain/spool，
+最后才停止管理监听器。
 
 普通 MQTT/TCP 遥测只使用 socket 解析状态、连接绑定的可信认证上下文、共享 codec/配置快照和有界内存路由。它不会访问数据库、文件系统、远程认证服务或控制平面。HTTP 仅在缓存未命中时可能调用认证 provider。UDP 会验证每个签名数据报，并维护有界的本地重放窗口。
 

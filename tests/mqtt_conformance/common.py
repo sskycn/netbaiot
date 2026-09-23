@@ -252,11 +252,8 @@ class BrokerProcess:
 
 def netbaiot_config(root: pathlib.Path, port: int) -> pathlib.Path:
     config = json.loads((ROOT / "configs/development.json").read_text())
-    config["device_http"] = f"127.0.0.1:{free_port()}"
     config["management_http"] = f"127.0.0.1:{free_port()}"
-    config["mqtt"] = f"127.0.0.1:{port}"
-    config["tcp"] = f"127.0.0.1:{free_port()}"
-    config["udp"] = f"127.0.0.1:{free_port()}"
+    config["device_ingress"] = f"127.0.0.1:{port}"
     config["spool_directory"] = str(root / "spool")
     config["limits"] = {
         "connect_timeout_ms": 1000,

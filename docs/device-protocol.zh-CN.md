@@ -1,5 +1,21 @@
 # 设备协议：netbaiot-json-v1
 
+## Single Device Ingress（单设备入口）
+
+`device_ingress` 在同一个地址、相同端口号绑定一个 TCP listener 和一个 UDP socket。
+开发示例为 `127.0.0.1:8080`，生产可配置 `0.0.0.0:443`。TCP 通过同一证书承载
+HTTPS、标准 MQTT 3.1.1 TLS 和通用分帧 TLS TCP。TLS 握手后才识别应用协议，
+不要求 ALPN、自定义前导或修改客户端 wire protocol。UDP 同端口继续使用 NBI1/HMAC，
+只认证不加密，不涉及 DTLS/QUIC。
+
+Management HTTP（`management_http`，通常为 `127.0.0.1:9090`）和可选的
+`business_tcp` 继续独立监听与授权。设备 HTTP 不提供管理 API。
+非 loopback TCP 入口必须配置 TLS；开发模式强制 loopback，允许本地明文测试。
+
+配置中的 `device_http`、`mqtt`、`tcp`、`udp` 四个旧字段替换为 `device_ingress`。
+旧字段将触发配置错误；迁移时须明确选择新地址并修改所有设备目的端口和防火墙规则，
+不会静默选择旧配置中的某一个端口。
+
 认证过程会选择 codec ID `netbaiot-json`、版本 `1`。HTTP/MQTT/TCP/UDP 载荷都由同一个同步 codec 解码。设备不能在载荷中自行声明可信身份；未知的信封字段会被拒绝。
 
 ```json

@@ -89,3 +89,10 @@ path = "fuzz_targets/business_stream.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "device_classifier"
+path = "fuzz_targets/device_classifier.rs"
+test = false
+doc = false
+bench = false

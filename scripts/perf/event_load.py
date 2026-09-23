@@ -102,8 +102,7 @@ def main():
         "--loadgen-bin", default=os.path.join(ROOT, "target/release/netbaiot-loadgen")
     )
     args = parser.parse_args()
-    ports = [free_port() for _ in range(6)]
-    device_http, management, mqtt, tcp, udp, sink_port = ports
+    device_ingress, management, sink_port = [free_port() for _ in range(3)]
     maximum = max(128, args.connections + 16)
     limits = {
         "max_connections": maximum,
@@ -142,11 +141,8 @@ def main():
         with open(server_config, "w", encoding="utf-8") as output:
             json.dump(
                 {
-                    "device_http": f"127.0.0.1:{device_http}",
+                    "device_ingress": f"127.0.0.1:{device_ingress}",
                     "management_http": f"127.0.0.1:{management}",
-                    "mqtt": f"127.0.0.1:{mqtt}",
-                    "tcp": f"127.0.0.1:{tcp}",
-                    "udp": f"127.0.0.1:{udp}",
                     "business_tcp": None,
                     "development": True,
                     "limits": limits,
@@ -173,7 +169,7 @@ def main():
         with open(load_config, "w", encoding="utf-8") as output:
             workload = {
                 "transport": "mqtt",
-                "address": f"127.0.0.1:{mqtt}",
+                "address": f"127.0.0.1:{device_ingress}",
                 "connections": args.connections,
                 "tenant_width": args.connections + 1,
                 # Stay below the host's small listen backlog when publisher

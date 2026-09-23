@@ -1,5 +1,24 @@
 # Architecture
 
+## Single Device Ingress
+
+`device_ingress` binds one TCP listener and one UDP socket at the same address and
+numeric port (development: `127.0.0.1:8080`; production example: `0.0.0.0:443`).
+TCP serves HTTPS, standard MQTT 3.1.1 over TLS, and generic framed TCP over TLS using
+one certificate. TLS finishes before application classification; no ALPN, custom
+preface, or client wire change is required. UDP on the same port remains NBI1/HMAC,
+authenticated but unencrypted; this does not add DTLS or QUIC.
+
+Management HTTP (`management_http`, normally `127.0.0.1:9090`) and optional
+`business_tcp` retain separate listeners and authorization. Device HTTP cannot
+serve management APIs. Non-loopback TCP ingress requires TLS. Development mode
+requires loopback and permits plaintext for local testing.
+
+Configuration replaces `device_http`, `mqtt`, `tcp`, and `udp` with
+`device_ingress`; legacy fields are rejected as configuration errors. Choose the
+new address explicitly and update every device destination/firewall rule. There is
+no silent conversion of differing old ports.
+
 NetbaIoT is a database-free, event-driven IoT gateway. Its runtime path is:
 
 ```text
@@ -24,6 +43,30 @@ bounded EventBus and atomic required-sink admission
           |
           +------ confirmed framed TCP/RPC stream
 ```
+
+The shared TCP listener reserves the existing global count/byte and per-IP
+connection lease before spawning its owned connection task, and applies the same
+bounded source-IP rate limiter. Classification converts that lease in place to
+HTTP/MQTT/TCP accounting; cancellation, EOF, TLS error and detection failure release
+it exactly once. Existing HTTP request slots, MQTT limits and per-device/tenant
+admission remain unchanged. There are no new per-protocol connection reservations:
+the original global/IP pool remains shared, so this is not starvation-proof QoS.
+
+Detection uses a fixed 12-byte buffer. HTTP requires a recognized method plus SP;
+MQTT reuses the bounded fixed-header/Remaining-Length decoder and requires the
+`00 04 MQTT` name plus a protocol level byte. Level 4 is supported; other levels go
+to the existing parser only to return standard CONNACK=1 and close. Generic TCP
+requires a valid 1..max_tcp_frame_size length and JSON object/whitespace start.
+Validated frames never exceed 1 MiB, so their first length byte is zero, disjoint
+from HTTP methods and MQTT's 0x10. No failed parser falls back to another protocol.
+The prefix is replayed unchanged before underlying reads, including through TLS.
+
+TLS, detection and first packet/HTTP headers share one `connect_timeout_ms`
+deadline starting at admission; detection cannot refresh it. The existing bounded
+authentication and HTTP request/write phases remain separate. Detection failures
+and timeouts use closed metric names and debug logging. Quiesce closes admission,
+stops shared TCP/UDP and waits for connection owners, then commits MQTT recovery
+and drains/spools required work; management stops only after durable completion.
 
 Normal MQTT/TCP telemetry uses only socket parser state, its bound trusted auth
 context, shared codec/config snapshots, and bounded memory routing. It performs no

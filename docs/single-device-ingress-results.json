@@ -1,0 +1,608 @@
+{
+  "performance": {
+    "environment": "macOS-26.6.2-arm64-arm-64bit",
+    "baseline": "bae843e302ce931f859523ae425ed17db0e4b820",
+    "binaries": {
+      "before": "f82c491b7ba689abe1c40beeb7bc1c32988492f065827f9ffce93b95b88a95bf",
+      "after": "000b142713ac013522422954f9e434cc22f0c4f0d4ab201a8f80aa927aef7495"
+    },
+    "runs": [
+      {
+        "label": "before",
+        "tls": false,
+        "repetition": 0,
+        "protocols": {
+          "http": {
+            "count": 500,
+            "seconds": 0.040065083,
+            "connections_events_per_second": 12479.694600907229
+          },
+          "mqtt": {
+            "count": 500,
+            "seconds": 0.05218670900000001,
+            "connections_events_per_second": 9580.983541230773
+          },
+          "tcp": {
+            "count": 500,
+            "seconds": 0.04760341599999998,
+            "connections_events_per_second": 10503.447903822704
+          }
+        }
+      },
+      {
+        "label": "after",
+        "tls": false,
+        "repetition": 0,
+        "protocols": {
+          "http": {
+            "count": 500,
+            "seconds": 0.03146024999999997,
+            "connections_events_per_second": 15893.071415516422
+          },
+          "mqtt": {
+            "count": 500,
+            "seconds": 0.05246220800000001,
+            "connections_events_per_second": 9530.670154027826
+          },
+          "tcp": {
+            "count": 500,
+            "seconds": 0.04796304200000001,
+            "connections_events_per_second": 10424.693246103945
+          }
+        }
+      },
+      {
+        "label": "after",
+        "tls": false,
+        "repetition": 1,
+        "protocols": {
+          "http": {
+            "count": 500,
+            "seconds": 0.03176345799999997,
+            "connections_events_per_second": 15741.359142949754
+          },
+          "mqtt": {
+            "count": 500,
+            "seconds": 0.05266900000000002,
+            "connections_events_per_second": 9493.250299037381
+          },
+          "tcp": {
+            "count": 500,
+            "seconds": 0.048106541999999974,
+            "connections_events_per_second": 10393.596779415162
+          }
+        }
+      },
+      {
+        "label": "before",
+        "tls": false,
+        "repetition": 1,
+        "protocols": {
+          "http": {
+            "count": 500,
+            "seconds": 0.03165291700000006,
+            "connections_events_per_second": 15796.332451761053
+          },
+          "mqtt": {
+            "count": 500,
+            "seconds": 0.052335958000000016,
+            "connections_events_per_second": 9553.660983907084
+          },
+          "tcp": {
+            "count": 500,
+            "seconds": 0.04745095799999999,
+            "connections_events_per_second": 10537.195055155686
+          }
+        }
+      },
+      {
+        "label": "before",
+        "tls": false,
+        "repetition": 2,
+        "protocols": {
+          "http": {
+            "count": 500,
+            "seconds": 0.037408125000000014,
+            "connections_events_per_second": 13366.080229896575
+          },
+          "mqtt": {
+            "count": 500,
+            "seconds": 0.05193625000000002,
+            "connections_events_per_second": 9627.187176586678
+          },
+          "tcp": {
+            "count": 500,
+            "seconds": 0.04756329199999998,
+            "connections_events_per_second": 10512.308525658826
+          }
+        }
+      },
+      {
+        "label": "after",
+        "tls": false,
+        "repetition": 2,
+        "protocols": {
+          "http": {
+            "count": 500,
+            "seconds": 0.03212258400000001,
+            "connections_events_per_second": 15565.372947581049
+          },
+          "mqtt": {
+            "count": 500,
+            "seconds": 0.053451833999999976,
+            "connections_events_per_second": 9354.215984431894
+          },
+          "tcp": {
+            "count": 500,
+            "seconds": 0.04801620900000003,
+            "connections_events_per_second": 10413.150275982838
+          }
+        }
+      },
+      {
+        "label": "after",
+        "tls": false,
+        "repetition": 3,
+        "protocols": {
+          "http": {
+            "count": 500,
+            "seconds": 0.0318203749999999,
+            "connections_events_per_second": 15713.202625676207
+          },
+          "mqtt": {
+            "count": 500,
+            "seconds": 0.05240591600000011,
+            "connections_events_per_second": 9540.907557078079
+          },
+          "tcp": {
+            "count": 500,
+            "seconds": 0.047997459000000076,
+            "connections_events_per_second": 10417.21812815131
+          }
+        }
+      },
+      {
+        "label": "before",
+        "tls": false,
+        "repetition": 3,
+        "protocols": {
+          "http": {
+            "count": 500,
+            "seconds": 0.03178945899999985,
+            "connections_events_per_second": 15728.484086501829
+          },
+          "mqtt": {
+            "count": 500,
+            "seconds": 0.05250924999999995,
+            "connections_events_per_second": 9522.131814870721
+          },
+          "tcp": {
+            "count": 500,
+            "seconds": 0.048747499999999944,
+            "connections_events_per_second": 10256.936253141199
+          }
+        }
+      },
+      {
+        "label": "before",
+        "tls": false,
+        "repetition": 4,
+        "protocols": {
+          "http": {
+            "count": 500,
+            "seconds": 0.03171045800000005,
+            "connections_events_per_second": 15767.668823957041
+          },
+          "mqtt": {
+            "count": 500,
+            "seconds": 0.05297054100000009,
+            "connections_events_per_second": 9439.208861393337
+          },
+          "tcp": {
+            "count": 500,
+            "seconds": 0.048818792000000055,
+            "connections_events_per_second": 10241.95764614576
+          }
+        }
+      },
+      {
+        "label": "after",
+        "tls": false,
+        "repetition": 4,
+        "protocols": {
+          "http": {
+            "count": 500,
+            "seconds": 0.03270495800000006,
+            "connections_events_per_second": 15288.201868352775
+          },
+          "mqtt": {
+            "count": 500,
+            "seconds": 0.054010749999999996,
+            "connections_events_per_second": 9257.41634767153
+          },
+          "tcp": {
+            "count": 500,
+            "seconds": 0.04878799999999983,
+            "connections_events_per_second": 10248.421743051606
+          }
+        }
+      },
+      {
+        "label": "before",
+        "tls": true,
+        "repetition": 0,
+        "protocols": {
+          "http": {
+            "count": 500,
+            "seconds": 0.3231297500000001,
+            "connections_events_per_second": 1547.3660348513247
+          },
+          "mqtt": {
+            "count": 500,
+            "seconds": 0.3372764589999999,
+            "connections_events_per_second": 1482.4633817683675
+          },
+          "tcp": {
+            "count": 500,
+            "seconds": 0.423819709,
+            "connections_events_per_second": 1179.7469286639523
+          }
+        }
+      },
+      {
+        "label": "after",
+        "tls": true,
+        "repetition": 0,
+        "protocols": {
+          "http": {
+            "count": 500,
+            "seconds": 0.40048220899999976,
+            "connections_events_per_second": 1248.4949112933011
+          },
+          "mqtt": {
+            "count": 500,
+            "seconds": 0.4820097080000001,
+            "connections_events_per_second": 1037.3235055257433
+          },
+          "tcp": {
+            "count": 500,
+            "seconds": 0.4392382079999999,
+            "connections_events_per_second": 1138.3344866027687
+          }
+        }
+      },
+      {
+        "label": "after",
+        "tls": true,
+        "repetition": 1,
+        "protocols": {
+          "http": {
+            "count": 500,
+            "seconds": 0.40104295800000056,
+            "connections_events_per_second": 1246.7492322854832
+          },
+          "mqtt": {
+            "count": 500,
+            "seconds": 0.47207158299999996,
+            "connections_events_per_second": 1059.1614026468526
+          },
+          "tcp": {
+            "count": 500,
+            "seconds": 0.44132108300000006,
+            "connections_events_per_second": 1132.9619618467218
+          }
+        }
+      },
+      {
+        "label": "before",
+        "tls": true,
+        "repetition": 1,
+        "protocols": {
+          "http": {
+            "count": 500,
+            "seconds": 0.4005372500000002,
+            "connections_events_per_second": 1248.3233457062977
+          },
+          "mqtt": {
+            "count": 500,
+            "seconds": 0.47221058299999985,
+            "connections_events_per_second": 1058.8496276882472
+          },
+          "tcp": {
+            "count": 500,
+            "seconds": 0.4372420410000002,
+            "connections_events_per_second": 1143.5313924902289
+          }
+        }
+      },
+      {
+        "label": "before",
+        "tls": true,
+        "repetition": 2,
+        "protocols": {
+          "http": {
+            "count": 500,
+            "seconds": 0.40205049999999964,
+            "connections_events_per_second": 1243.624868020312
+          },
+          "mqtt": {
+            "count": 500,
+            "seconds": 0.46777554099999996,
+            "connections_events_per_second": 1068.8887215674238
+          },
+          "tcp": {
+            "count": 500,
+            "seconds": 0.35571754100000064,
+            "connections_events_per_second": 1405.6096266559964
+          }
+        }
+      },
+      {
+        "label": "after",
+        "tls": true,
+        "repetition": 2,
+        "protocols": {
+          "http": {
+            "count": 500,
+            "seconds": 0.4124707499999989,
+            "connections_events_per_second": 1212.2071686295365
+          },
+          "mqtt": {
+            "count": 500,
+            "seconds": 0.4754523749999997,
+            "connections_events_per_second": 1051.630039706922
+          },
+          "tcp": {
+            "count": 500,
+            "seconds": 0.45224483299999996,
+            "connections_events_per_second": 1105.5958266747075
+          }
+        }
+      },
+      {
+        "label": "after",
+        "tls": true,
+        "repetition": 3,
+        "protocols": {
+          "http": {
+            "count": 500,
+            "seconds": 0.402073957999999,
+            "connections_events_per_second": 1243.5523118361255
+          },
+          "mqtt": {
+            "count": 500,
+            "seconds": 0.4839089999999988,
+            "connections_events_per_second": 1033.2521197167262
+          },
+          "tcp": {
+            "count": 500,
+            "seconds": 0.4437358749999998,
+            "connections_events_per_second": 1126.7964304215886
+          }
+        }
+      },
+      {
+        "label": "before",
+        "tls": true,
+        "repetition": 3,
+        "protocols": {
+          "http": {
+            "count": 500,
+            "seconds": 0.39628012499999876,
+            "connections_events_per_second": 1261.733729391555
+          },
+          "mqtt": {
+            "count": 500,
+            "seconds": 0.46018579200000076,
+            "connections_events_per_second": 1086.5176819713704
+          },
+          "tcp": {
+            "count": 500,
+            "seconds": 0.4422832079999992,
+            "connections_events_per_second": 1130.4973622240727
+          }
+        }
+      },
+      {
+        "label": "before",
+        "tls": true,
+        "repetition": 4,
+        "protocols": {
+          "http": {
+            "count": 500,
+            "seconds": 0.40487300000000026,
+            "connections_events_per_second": 1234.9551587781839
+          },
+          "mqtt": {
+            "count": 500,
+            "seconds": 0.4761367090000004,
+            "connections_events_per_second": 1050.1185700428732
+          },
+          "tcp": {
+            "count": 500,
+            "seconds": 0.4426943750000003,
+            "connections_events_per_second": 1129.4473755172507
+          }
+        }
+      },
+      {
+        "label": "after",
+        "tls": true,
+        "repetition": 4,
+        "protocols": {
+          "http": {
+            "count": 500,
+            "seconds": 0.41375583299999974,
+            "connections_events_per_second": 1208.442178022419
+          },
+          "mqtt": {
+            "count": 500,
+            "seconds": 0.47312587499999914,
+            "connections_events_per_second": 1056.801215955481
+          },
+          "tcp": {
+            "count": 500,
+            "seconds": 0.44826095799999877,
+            "connections_events_per_second": 1115.4217004105037
+          }
+        }
+      }
+    ],
+    "summary": {
+      "http_plain": {
+        "before": 15728.484086501829,
+        "after": 15713.202625676207,
+        "delta_percent": -0.09715787447523994
+      },
+      "mqtt_plain": {
+        "before": 9553.660983907084,
+        "after": 9493.250299037381,
+        "delta_percent": -0.6323302132184017
+      },
+      "tcp_plain": {
+        "before": 10503.447903822704,
+        "after": 10413.150275982838,
+        "delta_percent": -0.8596951083748583
+      },
+      "http_tls": {
+        "before": 1248.3233457062977,
+        "after": 1243.5523118361255,
+        "delta_percent": -0.38219535720313
+      },
+      "mqtt_tls": {
+        "before": 1068.8887215674238,
+        "after": 1051.630039706922,
+        "delta_percent": -1.6146378488486213
+      },
+      "tcp_tls": {
+        "before": 1143.5313924902289,
+        "after": 1126.7964304215886,
+        "delta_percent": -1.463445794189966
+      }
+    }
+  },
+  "memory": [
+    {
+      "connections_active": 100,
+      "connections_requested": 100,
+      "fd_base": 15,
+      "fd_loaded": 115,
+      "logical_bytes_per_connection": 524288,
+      "measurement_state": "active",
+      "persistent": false,
+      "rss_base_kib": 4912,
+      "rss_delta_bytes_per_connection": 28344.3,
+      "rss_delta_kib": 2768,
+      "rss_loaded_kib": 7680,
+      "runtime_tasks_base": 5,
+      "runtime_tasks_loaded": 105,
+      "subscribed": false,
+      "tasks_delta_per_connection": 1.0,
+      "tls": false,
+      "transport": "mqtt"
+    },
+    {
+      "connections_active": 100,
+      "connections_requested": 100,
+      "fd_base": 15,
+      "fd_loaded": 115,
+      "logical_bytes_per_connection": 524288,
+      "measurement_state": "active",
+      "persistent": false,
+      "rss_base_kib": 5904,
+      "rss_delta_bytes_per_connection": 40140.8,
+      "rss_delta_kib": 3920,
+      "rss_loaded_kib": 9824,
+      "runtime_tasks_base": 5,
+      "runtime_tasks_loaded": 105,
+      "subscribed": false,
+      "tasks_delta_per_connection": 1.0,
+      "tls": true,
+      "transport": "mqtt"
+    },
+    {
+      "connections_active": 100,
+      "connections_requested": 100,
+      "fd_base": 15,
+      "fd_loaded": 115,
+      "logical_bytes_per_connection": 524288,
+      "measurement_state": "active",
+      "persistent": false,
+      "rss_base_kib": 4944,
+      "rss_delta_bytes_per_connection": 21626.9,
+      "rss_delta_kib": 2112,
+      "rss_loaded_kib": 7056,
+      "runtime_tasks_base": 5,
+      "runtime_tasks_loaded": 105,
+      "subscribed": false,
+      "tasks_delta_per_connection": 1.0,
+      "tls": false,
+      "transport": "tcp"
+    }
+  ],
+  "slow_sink": {
+    "command": "python3 scripts/perf/event_load.py --rate 1000 --duration 5 --warmup 1 --cooldown 1 --connections 32 --sink-mode webhook --sink-delay-ms 10",
+    "load": {
+      "elapsed_s": 8.006615458,
+      "epoch_ms": 1790127163546,
+      "event": "final",
+      "stats": {
+        "counters": {
+          "connect_attempts": 32,
+          "connected": 32,
+          "disconnected": 32,
+          "payload_bytes": 1279744,
+          "pending_at_disconnect": 0,
+          "pubacks": 4999,
+          "published": 4999,
+          "wire_bytes_sent": 1416010
+        },
+        "error_samples": [],
+        "inflight": 0,
+        "inflight_peak": 0,
+        "latencies": {
+          "connect": {
+            "count": 32,
+            "max_ms": 0.384,
+            "mean_ms": 0.2244375,
+            "p50_ms": 0.23,
+            "p95_ms": 0.26,
+            "p99_ms": 0.39
+          },
+          "generator_schedule_lag": {
+            "count": 4999,
+            "max_ms": 2.532,
+            "mean_ms": 1.1333282656531305,
+            "p50_ms": 1.14,
+            "p95_ms": 1.66,
+            "p99_ms": 1.72
+          },
+          "puback": {
+            "count": 4999,
+            "max_ms": 0.995,
+            "mean_ms": 0.07253950790158033,
+            "p50_ms": 0.07,
+            "p95_ms": 0.12,
+            "p99_ms": 0.16
+          },
+          "ramp_schedule_lag": {
+            "count": 32,
+            "max_ms": 2.699,
+            "mean_ms": 1.8678125,
+            "p50_ms": 1.69,
+            "p95_ms": 2.53,
+            "p99_ms": 2.7
+          }
+        }
+      }
+    }
+  },
+  "validation": {
+    "workspace_tests_passed": 152,
+    "mqtt_release_gate_passed": 76,
+    "mqtt_normative_requirements": 125,
+    "classifier_fuzz_executions": 506597,
+    "classifier_fuzz_seconds": 31,
+    "restart_soak_seconds": 62.51
+  }
+}

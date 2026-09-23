@@ -94,3 +94,17 @@ producer window; `--overload` blocks one sink, verifies independent fast complet
 forces explicit rejection, opens the sink, and verifies zero residual accounting.
 Its process RSS is distinct from the real server's RSS. Results are diagnostics,
 not production capacity certification.
+
+## Single device ingress comparison
+
+`ingress_compare.py` performs five alternating before/after repetitions, with
+50 warmup connections per protocol and 500 measured connections each. Every
+connection completes one accepted HTTP request, MQTT CONNECT + QoS1 publish, or
+framed TCP authentication + message. Both plaintext and verified TLS are covered;
+the shared build also checks unmodified Mosquitto 3.1.1 QoS0/1/2 clients.
+The before binary must use the former four-address configuration. This experiment
+reports local sequential connection/event rate, not sustainable production capacity.
+
+```bash
+python3 scripts/perf/ingress_compare.py --before target/single-ingress/baseline-server --after target/release/netbaiot-server --count 500 --repetitions 5 --output target/single-ingress/performance.json
+```

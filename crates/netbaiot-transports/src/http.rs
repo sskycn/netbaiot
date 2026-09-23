@@ -456,6 +456,10 @@ pub async fn connection(
     lease: ConnectionLease,
     stop: CancellationToken,
 ) -> Result<()> {
+    let connect_remaining = lease
+        .connect_deadline()
+        .checked_duration_since(tokio::time::Instant::now())
+        .ok_or(Error::Timeout)?;
     let lease = Arc::new(Mutex::new(lease));
     let handler = services.clone();
     let service = service_fn(move |request| {
@@ -480,16 +484,13 @@ pub async fn connection(
         .max_headers(services.ingress.limits.max_http_headers)
         .max_buf_size(services.ingress.limits.max_http_header_bytes)
         .timer(TokioTimer::new())
-        .header_read_timeout(Duration::from_millis(
-            services.ingress.limits.connect_timeout_ms,
-        ));
+        .header_read_timeout(connect_remaining);
     let connection = builder.serve_connection(TokioIo::new(stream), service);
     tokio::pin!(connection);
     tokio::select! {
         result = tokio::time::timeout(
-            Duration::from_millis(
-                services.ingress.limits.connect_timeout_ms
-                    + services.ingress.limits.request_timeout_ms
+            connect_remaining + Duration::from_millis(
+                services.ingress.limits.request_timeout_ms
                     + services.ingress.limits.write_timeout_ms,
             ),
             connection.as_mut(),

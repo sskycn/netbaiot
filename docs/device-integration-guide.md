@@ -80,7 +80,7 @@ MQTT 标准规定根级 `#`/`+` 不匹配 `$` 开头 topic；broker matcher遵�
 
 ```bash
 for qos in 0 1 2; do
-  mosquitto_pub -h 127.0.0.1 -p 1883 -V mqttv311 \
+  mosquitto_pub -h 127.0.0.1 -p 8080 -V mqttv311 \
     -u demo-device -P "$DEVICE_SECRET" -i "qos-$qos" \
     -t "$UP_TOPIC" -q "$qos" \
     -m "{\"schema_version\":1,\"source_message_id\":\"qos:$qos\",\"kind\":\"heartbeat\",\"data\":{\"sequence\":$qos}}"
@@ -96,7 +96,7 @@ Mosquitto CLI 的 `-c` 表示 MQTT 3.1.1 `CleanSession=0`，且必须使用稳�
 1. 建立持久订阅并在 SUBACK 后断开：
 
    ```bash
-   mosquitto_sub -h 127.0.0.1 -p 1883 -V mqttv311 \
+   mosquitto_sub -h 127.0.0.1 -p 8080 -V mqttv311 \
      -u demo-device -P "$DEVICE_SECRET" -i persistent-demo -c \
      -t "$UP_TOPIC" -q 1 -E
    ```
@@ -104,7 +104,7 @@ Mosquitto CLI 的 `-c` 表示 MQTT 3.1.1 `CleanSession=0`，且必须使用稳�
 2. 订阅者离线时发布 QoS1：
 
    ```bash
-   mosquitto_pub -h 127.0.0.1 -p 1883 -V mqttv311 \
+   mosquitto_pub -h 127.0.0.1 -p 8080 -V mqttv311 \
      -u demo-device -P "$DEVICE_SECRET" -i offline-publisher \
      -t "$UP_TOPIC" -q 1 \
      -m '{"schema_version":1,"source_message_id":"offline:1","kind":"heartbeat","data":{"sequence":10}}'
@@ -113,7 +113,7 @@ Mosquitto CLI 的 `-c` 表示 MQTT 3.1.1 `CleanSession=0`，且必须使用稳�
 3. 用同一 ClientId 和 `-c` 恢复，读取一条后退出：
 
    ```bash
-   mosquitto_sub -h 127.0.0.1 -p 1883 -V mqttv311 \
+   mosquitto_sub -h 127.0.0.1 -p 8080 -V mqttv311 \
      -u demo-device -P "$DEVICE_SECRET" -i persistent-demo -c \
      -t "$UP_TOPIC" -q 1 -C 1 -v
    ```
@@ -125,7 +125,7 @@ CONNACK 的 Session Present 应为 1（加 `-d` 可查看）。离线队列只�
 Mosquitto 2.0.x 拒绝只有 `-U` 而没有任何 `-t` 的调用，2.1.x 则接受。可移植写法提供一个**不同的、合法且不匹配目标的** `-t`：
 
 ```bash
-mosquitto_sub -h 127.0.0.1 -p 1883 -V mqttv311 \
+mosquitto_sub -h 127.0.0.1 -p 8080 -V mqttv311 \
   -u demo-device -P "$DEVICE_SECRET" -i persistent-demo -c -d -E \
   -t "$DOWN_TOPIC" -q 1 -U "$UP_TOPIC"
 ```
@@ -138,21 +138,21 @@ Retain 使用普通、合法的上行 payload：
 
 ```bash
 # 创建
-mosquitto_pub -h 127.0.0.1 -p 1883 -V mqttv311 -u demo-device -P "$DEVICE_SECRET" \
+mosquitto_pub -h 127.0.0.1 -p 8080 -V mqttv311 -u demo-device -P "$DEVICE_SECRET" \
   -t "$UP_TOPIC" -q 1 -r \
   -m '{"schema_version":1,"source_message_id":"retain:1","kind":"heartbeat","data":{"sequence":1}}'
 
 # 新订阅者立即得到 retained replay（其 PUBLISH retain flag 为 1）
-mosquitto_sub -h 127.0.0.1 -p 1883 -V mqttv311 -u demo-device -P "$DEVICE_SECRET" \
+mosquitto_sub -h 127.0.0.1 -p 8080 -V mqttv311 -u demo-device -P "$DEVICE_SECRET" \
   -t "$UP_TOPIC" -q 1 -C 1 -v
 
 # 替换
-mosquitto_pub -h 127.0.0.1 -p 1883 -V mqttv311 -u demo-device -P "$DEVICE_SECRET" \
+mosquitto_pub -h 127.0.0.1 -p 8080 -V mqttv311 -u demo-device -P "$DEVICE_SECRET" \
   -t "$UP_TOPIC" -q 1 -r \
   -m '{"schema_version":1,"source_message_id":"retain:2","kind":"heartbeat","data":{"sequence":2}}'
 
 # MQTT 3.1.1 用 retained zero-length payload 删除；此特殊操作不会生成 DeviceEvent
-mosquitto_pub -h 127.0.0.1 -p 1883 -V mqttv311 -u demo-device -P "$DEVICE_SECRET" \
+mosquitto_pub -h 127.0.0.1 -p 8080 -V mqttv311 -u demo-device -P "$DEVICE_SECRET" \
   -t "$UP_TOPIC" -q 1 -r -n
 ```
 
@@ -163,11 +163,11 @@ mosquitto_pub -h 127.0.0.1 -p 1883 -V mqttv311 -u demo-device -P "$DEVICE_SECRET
 另开一个订阅者观察 `$UP_TOPIC`，再启动带 Will 的客户端：
 
 ```bash
-mosquitto_sub -h 127.0.0.1 -p 1883 -V mqttv311 \
+mosquitto_sub -h 127.0.0.1 -p 8080 -V mqttv311 \
   -u demo-device -P "$DEVICE_SECRET" -t "$UP_TOPIC" -q 1 -v &
 WATCH_PID=$!
 
-mosquitto_sub -h 127.0.0.1 -p 1883 -V mqttv311 \
+mosquitto_sub -h 127.0.0.1 -p 8080 -V mqttv311 \
   -u demo-device -P "$DEVICE_SECRET" -i will-demo -t "$DOWN_TOPIC" \
   --will-topic "$UP_TOPIC" --will-qos 1 \
   --will-payload '{"schema_version":1,"source_message_id":"will:1","kind":"event","data":{"name":"unexpected_disconnect","value":true}}' &
@@ -237,7 +237,7 @@ SDK 不创建 runtime、数据库或无界离线队列；调用方必须已有 T
 export NETBAIOT_DEVICE_CREDENTIAL_ID=demo-device
 export NETBAIOT_DEVICE_SECRET=$DEVICE_SECRET
 export NETBAIOT_DEVICE_HTTP_ENDPOINT=http://127.0.0.1:8080
-export NETBAIOT_MQTT_ENDPOINT=mqtt://127.0.0.1:1883
+export NETBAIOT_MQTT_ENDPOINT=mqtt://127.0.0.1:8080
 cargo run -p netbaiot-device-sdk --example device_http_upload
 cargo run -p netbaiot-device-sdk --example device_config_pull
 cargo run -p netbaiot-device-sdk --example device_mqtt
