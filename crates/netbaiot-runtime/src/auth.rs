@@ -33,6 +33,18 @@ pub struct AuthenticatedSessionCandidate {
     epoch: u64,
 }
 
+/// A single verified request and its invalidation fence. Never exposes key material.
+pub struct VerifiedDatagram {
+    verifier: DeviceVerifier,
+    epoch: u64,
+}
+
+impl VerifiedDatagram {
+    pub fn identity(&self) -> &AuthenticatedDevice {
+        self.verifier.identity()
+    }
+}
+
 /// Identity plus HMAC verification material cached by the gateway. The key is
 /// intentionally opaque and this type does not implement `Debug` or serialization.
 #[derive(Clone)]
@@ -48,6 +60,13 @@ impl DeviceVerifier {
 
     pub fn identity(&self) -> &AuthenticatedDevice {
         &self.identity
+    }
+
+    pub fn sign(&self, message: &[u8]) -> Result<[u8; 32]> {
+        let mut mac =
+            Hmac::<Sha256>::new_from_slice(&self.key).map_err(|_| Error::Authentication)?;
+        mac.update(message);
+        Ok(mac.finalize().into_bytes().into())
     }
 
     pub fn verify(&self, message: &[u8], tag: &[u8]) -> Result<()> {
@@ -342,6 +361,34 @@ impl AuthCache {
         message: &[u8],
         tag: &[u8],
     ) -> Result<AuthenticatedDevice> {
+        Ok(self
+            .verify_signed_with_verifier(credential_id, message, tag)
+            .await?
+            .identity()
+            .clone())
+    }
+
+    /// Finish a verified request synchronously, fenced against invalidation. The callback
+    /// runs under the cache lock: it must not block, await, or reenter the auth cache.
+    /// Unrelated invalidations conservatively fence outstanding datagrams too.
+    pub fn with_current_verifier<T>(
+        &self,
+        verified: &VerifiedDatagram,
+        finish: impl FnOnce(&DeviceVerifier) -> Result<T>,
+    ) -> Result<T> {
+        let state = lock(&self.state)?;
+        if state.epoch != verified.epoch {
+            return Err(Error::Authentication);
+        }
+        finish(&verified.verifier)
+    }
+
+    pub async fn verify_signed_with_verifier(
+        &self,
+        credential_id: &str,
+        message: &[u8],
+        tag: &[u8],
+    ) -> Result<VerifiedDatagram> {
         let key = verifier_cache_key(credential_id)?;
         loop {
             let follower = {
@@ -352,7 +399,10 @@ impl AuthCache {
                         CachedAuth::Verifier(verifier) => {
                             verifier.verify(message, tag)?;
                             self.metrics.inc(Metric::AuthCacheHits);
-                            return Ok(verifier.identity().clone());
+                            return Ok(VerifiedDatagram {
+                                verifier: verifier.clone(),
+                                epoch: state.epoch,
+                            });
                         }
                         CachedAuth::Negative => {
                             self.metrics.inc(Metric::AuthNegativeHits);
@@ -458,7 +508,10 @@ impl AuthCache {
             let _ = completed.completed.send(true);
             if let Some(verifier) = verifier {
                 verifier.verify(message, tag)?;
-                return Ok(verifier.identity().clone());
+                return Ok(VerifiedDatagram {
+                    verifier,
+                    epoch: state.epoch,
+                });
             }
             return Err(Error::Authentication);
         }

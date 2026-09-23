@@ -80,3 +80,14 @@ Quiesce 关闭接纳，停止共享 TCP/UDP 并等待连接结束，然后进行
 公共客户端 crate 只依赖 `netbaiot-protocol` 和网络依赖，不依赖 runtime、transport、broker、session 或 server 实现 crate。
 
 系统刻意不包含存储 crate、SQL migration、数据库连接池、持久 outbox、持久命令状态或运行时消息历史。
+
+## UDP 接纳回执
+
+```text
+设备 -- NBI1 --> HMAC + 版本 + 时钟 + 有界 replay
+  New:               ingest -> EventAccepted -> replay commit -> 签名 NBA1
+  AcceptedDuplicate: 跳过 codec/presence/EventBus -------------> 签名 NBA1
+设备 <-- NBA1 -- 非阻塞发送（失败绝不回滚接纳）
+```
+
+单一接收循环拥有 replay 与回执处理，无 ACK queue、每包任务、UDP session、命令 endpoint 或 ACK spool。Quiesce 等待活跃数据报接纳 guard，只有已接纳业务投递需要 drain/spool。认证失效阻止旧 signer 发回执，不做第二次 provider 查询。详见 [wire、重试和安全边界](device-protocol.zh-CN.md#udp-acknowledgement-nba1)。
