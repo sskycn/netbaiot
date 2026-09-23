@@ -19,10 +19,8 @@ pub mod paths {
     pub const STATUS: &str = "/api/v1/status";
     pub const CONNECTIONS: &str = "/api/v1/connections";
     pub const DEVICE_CONNECTION: &str = "/api/v1/devices/connection";
-    pub const DEVICE_CONFIG_MANAGEMENT: &str = "/api/v1/devices/config";
     pub const COMMANDS: &str = "/api/v1/devices/commands";
     pub const AUTH_INVALIDATE: &str = "/api/v1/auth/invalidate";
-    pub const CONFIG_INVALIDATE: &str = "/api/v1/config/invalidate";
     pub const CONTROL_SNAPSHOT: &str = "/api/v1/control/snapshot";
     pub const ROUTES: &str = "/api/v1/routes";
     pub const DRAIN: &str = "/api/v1/drain";
@@ -113,44 +111,6 @@ uuid_identifier!(DeliveryId);
 uuid_identifier!(SubscriptionId);
 pub type MessageId = EventId;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
-#[serde(transparent)]
-pub struct ConfigRevision(u64);
-
-impl ConfigRevision {
-    pub const fn new(value: u64) -> Option<Self> {
-        if value == 0 { None } else { Some(Self(value)) }
-    }
-
-    pub const fn get(self) -> u64 {
-        self.0
-    }
-}
-
-impl TryFrom<u64> for ConfigRevision {
-    type Error = ProtocolError;
-
-    fn try_from(value: u64) -> Result<Self, Self::Error> {
-        Self::new(value).ok_or(ProtocolError)
-    }
-}
-
-impl<'de> Deserialize<'de> for ConfigRevision {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        let value = u64::deserialize(deserializer)?;
-        Self::new(value).ok_or_else(|| serde::de::Error::custom("revision must be non-zero"))
-    }
-}
-
-impl fmt::Display for ConfigRevision {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.fmt(formatter)
-    }
-}
-
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct DeviceKey {
@@ -177,7 +137,6 @@ pub enum DeviceEventKind {
     Heartbeat(Heartbeat),
     Connected(DeviceConnected),
     Disconnected(DeviceDisconnected),
-    ConfigAck(ConfigAck),
     CommandAck(CommandAck),
 }
 
@@ -189,7 +148,6 @@ impl DeviceEventKind {
             Self::Heartbeat(_) => EventType::Heartbeat,
             Self::Connected(_) => EventType::Connected,
             Self::Disconnected(_) => EventType::Disconnected,
-            Self::ConfigAck(_) => EventType::ConfigAck,
             Self::CommandAck(_) => EventType::CommandAck,
         }
     }
@@ -203,7 +161,6 @@ pub enum EventType {
     Heartbeat,
     Connected,
     Disconnected,
-    ConfigAck,
     CommandAck,
 }
 
@@ -238,22 +195,6 @@ pub struct DeviceConnected {
 #[serde(deny_unknown_fields)]
 pub struct DeviceDisconnected {
     pub session_generation: u64,
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct ConfigAck {
-    pub revision: ConfigRevision,
-    pub status: ConfigApplyStatus,
-    #[serde(default)]
-    pub error: Option<String>,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum ConfigApplyStatus {
-    Applied,
-    Failed,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -297,7 +238,6 @@ pub enum DeviceUplinkKind {
     Telemetry(BTreeMap<String, Scalar>),
     Event(DeviceEventPayload),
     Heartbeat(Heartbeat),
-    ConfigAck(ConfigAck),
     CommandAck(CommandAck),
 }
 
@@ -381,25 +321,6 @@ pub struct DeviceConnectionInfo {
     pub last_seen: Option<Timestamp>,
     #[serde(default)]
     pub session_generation: Option<u64>,
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct DeviceConfig {
-    pub device: DeviceKey,
-    pub revision: ConfigRevision,
-    pub payload: Arc<serde_json::Value>,
-}
-
-pub type DeviceConfigSnapshot = DeviceConfig;
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum ConfigStatus {
-    Current,
-    Updated,
-    Applied,
-    Failed,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -573,8 +494,6 @@ pub struct RuntimeStatus {
     pub pending_required: usize,
     pub auth_cache_entries: usize,
     pub auth_cache_bytes: usize,
-    pub config_cache_entries: usize,
-    pub config_cache_bytes: usize,
     pub runtime_tasks: usize,
     pub active_connections: ConnectionCounts,
 }
@@ -623,7 +542,6 @@ pub struct RouteDefinition {
 pub struct ControlSnapshot {
     pub revision: u64,
     pub products: Vec<ProductRuntimeConfig>,
-    pub devices: Vec<DeviceConfig>,
     pub routes: Vec<RouteDefinition>,
 }
 
@@ -738,13 +656,7 @@ mod tests {
     }
 
     #[test]
-    fn revision_rejects_zero_and_response_types_accept_additive_fields() {
-        assert!(serde_json::from_str::<ConfigRevision>("0").is_err());
-        assert_eq!(
-            serde_json::from_str::<ConfigRevision>("7").unwrap().get(),
-            7
-        );
-
+    fn response_types_accept_additive_fields() {
         let accepted = serde_json::json!({
             "event_id": Uuid::nil(),
             "accepted_at": 1,
@@ -761,5 +673,28 @@ mod tests {
             "future_client_field": true
         });
         assert!(serde_json::from_value::<StreamClientFrame>(strict_client).is_err());
+    }
+    #[test]
+    fn removed_business_configuration_is_not_a_public_wire_variant() {
+        assert!(serde_json::from_str::<EventType>(r#""config_ack""#).is_err());
+        assert!(
+            serde_json::from_value::<DeviceUplink>(serde_json::json!({
+                "schema_version":1, "source_message_id":"old", "kind":"config_ack",
+                "data":{"revision":42,"status":"applied"}
+            }))
+            .is_err()
+        );
+        assert!(
+            serde_json::from_value::<DeviceEventKind>(serde_json::json!({
+                "kind":"config_ack", "data":{"revision":42,"status":"applied"}
+            }))
+            .is_err()
+        );
+        assert!(
+            serde_json::from_value::<ControlSnapshot>(serde_json::json!({
+                "revision":1, "products":[], "routes":[], "devices":[]
+            }))
+            .is_err()
+        );
     }
 }

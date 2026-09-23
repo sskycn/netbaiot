@@ -1,0 +1,15 @@
+{
+  "revision": "eb20e865b368b14f32bceac580c7215ed1ae2634",
+  "command": "cargo +1.88.0 build --release -p netbaiot-server -p netbaiot-client -p netbaiot-loadgen",
+  "artifacts": {
+    "target/remove-device-config/after-server": {
+      "bytes": 8375536,
+      "sha256": "a70915e1f7eb6d7009add9a229c2151abec8e9f6ff9e515be0e4fde9ac91dfb5"
+    },
+    "target/remove-device-config/after-client.rlib": {
+      "bytes": 554440,
+      "sha256": "c323510bdb5ab88160e67dbfc7e1123e643ac1d4b8f9da7e48809ae9aee1de5d"
+    }
+  },
+  "client_normal_dependency_count": 103
+}

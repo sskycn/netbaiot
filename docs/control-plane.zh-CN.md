@@ -1,9 +1,20 @@
-# 控制平面与配置缓存
+# 网关控制平面
 
-控制平面负责设备定义、凭据、产品/codec 绑定、设备配置、路由和 sink 定义。NetbaIoT 运行时只保留有界快照。
+网关控制负责凭据、可信身份、权限、auth generation、产品/codec 映射、路由及已安装 sink。
+`GatewayControl` 通过 `Arc` 共享不可变快照，与认证缓存分别设限。
+`ControlSnapshot` 仅包含 `revision`、`products`、`routes`，不存储设备业务期望或上报状态。
 
-启动时会校验静态引导快照、创建 sinks 和路由、恢复已提交的重启 spool 记录，然后才进入 `RUNNING`/就绪状态。可配置外部 HTTP 认证 provider；其请求有超时和并发上限，不会无限重试。
+启动时校验控制快照、构建 sink/路由并恢复已提交的重启工作，然后进入 ready。
+外部认证请求有超时和并发边界；MQTT/TCP 会话绑定认证结果，普通报文不调用 provider。
 
-`ControlSnapshot` 有单调递增的 revision，并包含产品、设备配置和路由。替换快照前会完整校验数量、字节数、唯一键、产品引用和 revision，然后再原子替换不可变索引快照。路由更新会串行执行，并在修改配置/事件路由状态前针对已安装的 sinks 完成校验。
+快照替换校验 revision、产品键唯一性、非零 profile/codec 版本、产品数量和序列化字节数。
+管理更新串行校验已安装 sink 和 fanout 上限，再修改控制/路由状态。
+仅替换路由会保留产品映射；过期或超限更新不改变现有快照。
+默认 `control_max_products=4096`、`control_max_bytes=16 MiB`、`max_routing_filters=256`。
+认证缓存及控制快照在重启后重建，不写入投递 spool。
 
-设备配置值以 `Arc<DeviceConfigSnapshot>` 共享。设备 GET 使用 revision/ETag；设备应用结果通过独立的 `ConfigAck` 事件返回。重启后认证/配置缓存均为空，并且不会写入投递 spool。
+产品映射元数据不会覆盖已建立会话的不可变认证 codec 绑定；撤销会话仍使用 auth invalidation。
+
+设备配置持久化、desired/reported revision、历史、重试、发布/回滚及离线协调由业务系统负责。
+在线变更使用普通 MQTT/TCP `DeviceCommand`，结果通过 `CommandAck` 返回。
+网关不解释命令名，也不比较业务 revision。详见[迁移说明](remove-device-config.md)。

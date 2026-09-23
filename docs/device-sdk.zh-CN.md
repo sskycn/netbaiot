@@ -4,11 +4,14 @@
 
 Builder 必须配置 `mqtt_endpoint`；SDK 定位为 MQTT 便捷客户端。SDK 在调用方的 Tokio runtime 上运行，仅在内存中保留凭据，并对 `Debug` 输出进行脱敏；它会校验所有资源上限，并为 `mqtts` endpoint 启用 TLS 验证。MQTT 使用维护中的 `rumqttc` 0.25 客户端（Apache-2.0）、有界请求 channel、MQTT 3.1.1，以及对已进入有界应用 channel 的命令进行 broker 手动确认。连接时，`connect().await` 会等到收到初始 CONNACK 和成功的命令 topic SUBACK，或达到配置的连接超时时间。SUBACK `0x80` 属于终止性授权失败，不会被呈现为 Connected。因此，connect 成功后可以安全地立即发布。
 
-支持的流程包括 QoS0/QoS1 事件发布、QoS1 遥测、接收命令、命令执行 ACK、通过 `publish(DeviceUplink, PublishQos)` 发布 heartbeat 和配置应用 ACK。规范 topic 使用现有的 `v1/t/.../up`、`down` 和 `down_ack` 命名空间。
+支持的流程包括 QoS0/QoS1 事件发布、QoS1 遥测、接收命令、命令执行 ACK、通过 `publish(DeviceUplink, PublishQos)` 发布 heartbeat。规范 topic 使用现有的 `v1/t/.../up`、`down` 和 `down_ack` 命名空间。
 
 当前唯一且默认的策略是 `OfflinePublishPolicy::Reject`。MQTT 断开时发布会返回 `Offline`；SDK 不会积累离线 RAM 队列。`publish` 成功表示消息已进入有界 MQTT 客户端，不代表服务器已经接纳或业务存储已完成。
 
-SDK 不再提供设备配置拉取。管理客户端仍可读写带 revision 的配置，但当前没有等价的 MQTT/TCP 自动配置下载。应用可按已有的命令业务约定携带配置，并在应用后发布 `ConfigAck`。详见[破坏性变更及迁移](remove-device-http.md)。
+NetbaIoT 不持有或持久化设备期望配置。业务系统负责 desired/reported 状态、版本历史、
+重试、发布/回滚及离线协调。配置变更可作为普通 `DeviceCommand` 发往在线 MQTT/TCP 设备，
+设备通过 `CommandAck` 返回执行结果；是否收敛由业务系统判断。命令仅支持在线投递，
+UDP 无会话且没有下行。参阅[职责迁移](remove-device-config.md)。
 
 丢弃最后一个客户端会取消唯一的 MQTT event-loop 任务。命令缓冲默认最多 16 条。命令格式错误或命令队列溢出会强制断开连接，且不确认 MQTT 投递，以便 broker 对持久会话重新投递。
 

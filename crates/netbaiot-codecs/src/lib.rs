@@ -32,7 +32,6 @@ enum Kind {
     Telemetry,
     Event,
     Heartbeat,
-    ConfigAck,
     CommandAck,
 }
 struct UniqueFields(std::collections::BTreeMap<String, Scalar>);
@@ -147,10 +146,6 @@ impl JsonV1 {
                     && e.value.as_ref().is_none_or(|v| scalar(v, l.field_bytes))
             }
             DeviceEventKind::Heartbeat(_) => true,
-            DeviceEventKind::ConfigAck(a) => a
-                .error
-                .as_ref()
-                .is_none_or(|value| valid_text(value, l.field_bytes)),
             DeviceEventKind::CommandAck(a) => a.execution != ExecutionState::Unknown,
             DeviceEventKind::Connected(_) | DeviceEventKind::Disconnected(_) => false,
         }
@@ -181,9 +176,6 @@ impl DeviceCodec for JsonV1 {
                 serde_json::from_str(wire.data.get()).map_err(|_| CodecError)?,
             ),
             Kind::Heartbeat => DeviceEventKind::Heartbeat(
-                serde_json::from_str(wire.data.get()).map_err(|_| CodecError)?,
-            ),
-            Kind::ConfigAck => DeviceEventKind::ConfigAck(
                 serde_json::from_str(wire.data.get()).map_err(|_| CodecError)?,
             ),
             Kind::CommandAck => DeviceEventKind::CommandAck(
@@ -262,6 +254,8 @@ mod tests {
         for bad in [
             b"{".as_slice(),
             b"[]",
+            br#"{"schema_version":1,"source_message_id":"x","kind":"config_ack","data":{}}"#,
+            br#"{"schema_version":1,"source_message_id":"x","kind":"config_ack","data":{"revision":42,"status":"applied"}}"#,
             b"\xff",
             b"{\"data\": [[[[[[[[[0]]]]]]]]]}",
         ] {

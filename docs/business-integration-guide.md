@@ -148,7 +148,7 @@ Manual 是 correctness-first 默认。`AckMode::Immediate` 只适合应用明确
 
 断线重连使用 cancellation-aware full-jitter exponential backoff，默认 100 ms–5 s；重新认证并用同一个 subscription ID 订阅。终止性 auth/forbidden/version/protocol 错误不会无穷重试。`client.shutdown()`、丢弃 stream 或最后一个 client 会停止 owned task。
 
-API 模块：`events()`、`commands()`、`devices()`、`configs()`、`runtime()`、`auth_cache()`、`routes()`。Token 的 Debug 输出脱敏，响应体和所有 timeout 有界。
+API 模块：`events()`、`commands()`、`devices()`、`runtime()`、`auth_cache()`、`routes()`。Token 的 Debug 输出脱敏，响应体和所有 timeout 有界。
 
 ## CLI
 
@@ -162,7 +162,6 @@ export NETBAIOT_PRODUCT=sensor
 
 cargo run -p netbaiot-cli -- --output json server status
 cargo run -p netbaiot-cli -- device status device-1
-cargo run -p netbaiot-cli -- config get device-1
 cargo run -p netbaiot-cli -- auth invalidate --device device-1
 cargo run -p netbaiot-cli -- server drain --yes
 ```
@@ -180,8 +179,9 @@ CLI 刷新 stdout 后才 ACK。`--output json` 输出 JSON/JSONL。命令：
 cargo run -p netbaiot-cli -- command send device-1 \
   --json '{"name":"relay","arguments":{"enabled":true}}'
 
-cargo run -p netbaiot-cli -- config set device-1 \
-  --file ./device-config.json --revision 2
+# apply_config 是业务应用自行约定的普通命令名
+cargo run -p netbaiot-cli -- command send device-1 \
+  --json '{"name":"apply_config","arguments":{"revision":42,"sample_interval_seconds":5}}'
 ```
 
 主要退出码：0 success、2 usage、3 auth、4 forbidden、5 device offline、6 unavailable/其他 runtime failure。
@@ -222,7 +222,7 @@ cargo run -p netbaiot-cli -- config set device-1 \
 | `service_draining` | 正在 quiesce/drain | 切换实例或等重启完成 |
 | `timeout` | 截止时间到；结果可能不确定 | 查询状态；命令尤其不能盲重试 |
 | `connection_lost` | stream/HTTP 连接中断 | 事件流可重连并按 event_id 去重 |
-| `not_found` | 配置等资源不存在 | 校验完整 DeviceKey |
+| `not_found` | 请求资源不存在 | 校验完整 DeviceKey |
 | `conflict` | revision、stream owner 或 replay 状态冲突 | 读取最新状态后重新决策 |
 | `server_unavailable` | provider/sink/server/storage 暂时不可用 | 有界退避；观察 readiness/metrics |
 | `internal` | 安全的内部错误 | 记录 request_id，检查 server 日志 |
@@ -236,3 +236,8 @@ cargo run -p netbaiot-cli -- config set device-1 \
 3. Stream consumer：先 ready，事务后 ACK；断线让官方 client 重连，同 event ID 去重。
 4. 离线命令：业务系统持有命令意图，先查询 `devices().connection()`，在线后显式发送；不要期待 gateway 排队。
 5. Credential rotation：更新 provider/snapshot，调用对应 auth invalidation，受影响 live/session 状态被移除，设备用新凭据重连。
+
+NetbaIoT 不持有或持久化设备期望配置。业务系统负责 desired/reported 状态、版本历史、
+重试、发布/回滚及离线协调。配置变更可作为普通 `DeviceCommand` 发往在线 MQTT/TCP 设备，
+设备通过 `CommandAck` 返回执行结果；是否收敛由业务系统判断。命令仅支持在线投递，
+UDP 无会话且没有下行。参阅[职责迁移](remove-device-config.md)。

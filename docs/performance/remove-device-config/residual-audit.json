@@ -1,0 +1,120 @@
+{
+  "roots": [
+    "crates",
+    "apps",
+    "tools",
+    "benches",
+    "fuzz/fuzz_targets",
+    "configs",
+    "scripts",
+    "examples"
+  ],
+  "patterns": {
+    "deleted_types_and_state": "DeviceConfig|ConfigRevision|ConfigAck|ConfigApplyStatus|ConfigStatus|ConfigCache|require_config_ack|device_configs|configs\\(\\)|config_cache_entries|config_cache_bytes",
+    "removed_routes": "/api/v1/devices/config|/api/v1/config/invalidate|/v1/device/config",
+    "legacy_wire": "config_ack"
+  },
+  "remaining": [
+    {
+      "path": "crates/netbaiot-protocol/src/lib.rs",
+      "category": "legacy_wire",
+      "reason": "Negative compatibility/recovery regression tests",
+      "matches": [
+        {
+          "line": 679,
+          "text": "assert!(serde_json::from_str::<EventType>(r#\"\"config_ack\"\"#).is_err());"
+        },
+        {
+          "line": 682,
+          "text": "\"schema_version\":1, \"source_message_id\":\"old\", \"kind\":\"config_ack\","
+        },
+        {
+          "line": 689,
+          "text": "\"kind\":\"config_ack\", \"data\":{\"revision\":42,\"status\":\"applied\"}"
+        }
+      ]
+    },
+    {
+      "path": "crates/netbaiot-runtime/src/spool.rs",
+      "category": "legacy_wire",
+      "reason": "Negative compatibility/recovery regression tests",
+      "matches": [
+        {
+          "line": 425,
+          "text": "\"kind\":\"config_ack\", \"data\":{\"revision\":42,\"status\":\"applied\",\"error\":null}"
+        }
+      ]
+    },
+    {
+      "path": "crates/netbaiot-codecs/src/lib.rs",
+      "category": "legacy_wire",
+      "reason": "Negative compatibility/recovery regression tests",
+      "matches": [
+        {
+          "line": 257,
+          "text": "br#\"{\"schema_version\":1,\"source_message_id\":\"x\",\"kind\":\"config_ack\",\"data\":{}}\"#,"
+        },
+        {
+          "line": 258,
+          "text": "br#\"{\"schema_version\":1,\"source_message_id\":\"x\",\"kind\":\"config_ack\",\"data\":{\"revision\":42,\"status\":\"applied\"}}\"#,"
+        }
+      ]
+    },
+    {
+      "path": "apps/netbaiot-server/tests/server.rs",
+      "category": "deleted_types_and_state",
+      "reason": "Negative compatibility/recovery regression tests",
+      "matches": [
+        {
+          "line": 1442,
+          "text": "assert!(value.get(\"config_cache_entries\").is_none());"
+        },
+        {
+          "line": 1443,
+          "text": "assert!(value.get(\"config_cache_bytes\").is_none());"
+        },
+        {
+          "line": 1860,
+          "text": "legacy[\"device_configs\"] = serde_json::json!([]);"
+        }
+      ]
+    },
+    {
+      "path": "apps/netbaiot-server/tests/server.rs",
+      "category": "removed_routes",
+      "reason": "Negative compatibility/recovery regression tests",
+      "matches": [
+        {
+          "line": 1451,
+          "text": "(reqwest::Method::GET, \"/api/v1/devices/config\"),"
+        },
+        {
+          "line": 1452,
+          "text": "(reqwest::Method::POST, \"/api/v1/devices/config\"),"
+        },
+        {
+          "line": 1453,
+          "text": "(reqwest::Method::PUT, \"/api/v1/devices/config\"),"
+        },
+        {
+          "line": 1454,
+          "text": "(reqwest::Method::POST, \"/api/v1/config/invalidate\"),"
+        }
+      ]
+    },
+    {
+      "path": "scripts/perf/device_config_summary.py",
+      "category": "deleted_types_and_state",
+      "reason": "Benchmark verifier asserts deleted status fields are absent",
+      "matches": [
+        {
+          "line": 53,
+          "text": "assert 'config_cache_entries' not in cool and 'config_cache_bytes' not in cool, path"
+        }
+      ]
+    }
+  ],
+  "production_declarations": 0,
+  "historical_evidence": "Older docs/performance JSON/logs and annotated historical Markdown remain unchanged as evidence. Current migration/protocol docs mention removed names only to explain rejection.",
+  "negative_fixture": "spool-fuzz-seeds.json includes a deleted config_ack variant to verify rejection after length/checksum validation; it is test evidence, not a supported protocol example."
+}

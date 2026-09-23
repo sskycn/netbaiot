@@ -17,8 +17,6 @@ netbaiot device status DEVICE --tenant TENANT --product PRODUCT
 netbaiot events subscribe [--tenant ...] [--product ...] [--device ...] [--type ...]
 netbaiot command send DEVICE --json JSON
 netbaiot command send DEVICE --payload-file PATH
-netbaiot config get DEVICE
-netbaiot config set DEVICE --file PATH --revision N
 netbaiot auth invalidate --device DEVICE
 ```
 

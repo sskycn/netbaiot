@@ -2,8 +2,8 @@
 
 The recovery directory has two independent atomic responsibility domains during a
 planned restart: the EventBus authoritative snapshot (`eventbus-recovery.spool`) and the MQTT broker
-snapshot (`mqtt-runtime.state`). Normal traffic never writes either. Auth/config
-caches and business offline commands are never spooled.
+snapshot (`mqtt-runtime.state`). Normal traffic never writes either. The auth cache, gateway control
+snapshots and business offline commands are never spooled.
 
 The current EventBus snapshot contains:
 
@@ -49,3 +49,8 @@ is complete and independently replay-safe before successful shutdown. Failure of
 either commit keeps the process alive and unready with bounded retry; failed EventBus
 attempts remove their private temporary file. SIGKILL, OS crash, or power loss may
 discard recent in-memory changes and must not be described as crash durability.
+
+Before upgrading across removed event variants, drain pending deliveries with the
+old binary and consumers first. An old config-ACK record cannot be decoded by this
+release. Never delete committed pending work to force an upgrade; see
+[ownership migration](remove-device-config.md). Framing and spool versions are unchanged.

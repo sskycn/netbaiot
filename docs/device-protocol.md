@@ -36,7 +36,6 @@ Other `kind` / `data` pairs:
 ```json
 {"kind":"event","data":{"name":"boot","value":true}}
 {"kind":"heartbeat","data":{"sequence":42}}
-{"kind":"config_ack","data":{"revision":7,"status":"applied","error":null}}
 {"kind":"command_ack","data":{"command_id":"00000000-0000-0000-0000-000000000001","execution":"succeeded"}}
 ```
 
@@ -161,3 +160,8 @@ Counters `udp_datagrams`, `udp_accepted`, `udp_accepted_duplicates`, `udp_acks_s
 `udp_ack_send_failures` distinguish incoming traffic, new accepted datagrams, duplicate fast paths, local
 socket emission, and dropped/suppressed receipts. Local emission does not prove
 receipt at the device. No device IDs or other high-cardinality labels are added.
+
+Breaking cleanup in the current 0.x release: `config_ack` is no longer a supported
+DeviceEvent kind and is rejected. `schema_version=1` remains the unchanged envelope
+version; there is no compatibility alias. Application configuration operations use
+ordinary MQTT/TCP commands and `command_ack`. See [migration](remove-device-config.md).

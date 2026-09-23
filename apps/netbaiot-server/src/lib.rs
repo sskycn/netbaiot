@@ -47,8 +47,6 @@ pub struct Config {
     pub delivery_url: Option<String>,
     pub auth_provider_url: Option<String>,
     pub spool_directory: PathBuf,
-    #[serde(default)]
-    pub device_configs: Vec<DeviceConfigSnapshot>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -811,7 +809,6 @@ fn bootstrap_snapshot(config: &Config, sink_id: SinkId) -> Result<ControlSnapsho
     Ok(ControlSnapshot {
         revision: 1,
         products: products.into_values().collect(),
-        devices: config.device_configs.clone(),
         routes: vec![RouteDefinition {
             tenant: None,
             sinks: vec![sink_id],
@@ -925,8 +922,8 @@ pub async fn run_with_credentials(
         sink_definition.timeout = Duration::from_millis(limits.sink_timeout_ms);
     }
     let snapshot = bootstrap_snapshot(&config, sink_id)?;
-    let config_cache = ConfigCache::empty(limits.clone());
-    config_cache.apply(snapshot.clone())?;
+    let control = GatewayControl::empty(limits.clone());
+    control.apply(snapshot.clone())?;
     let events = EventBus::new(
         limits.clone(),
         metrics.clone(),
@@ -947,7 +944,7 @@ pub async fn run_with_credentials(
         auth_cache,
         registry,
         events.clone(),
-        config_cache,
+        control,
         metrics.clone(),
         sessions,
         lifecycle.clone(),

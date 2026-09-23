@@ -406,6 +406,38 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn removed_event_kind_fails_recovery_without_deleting_committed_work() {
+        let directory =
+            std::env::temp_dir().join(format!("netbaiot-spool-old-kind-{}", Uuid::new_v4()));
+        let spool = RestartSpool::new(directory.clone(), Arc::new(Limits::default()));
+        spool.commit(vec![record()]).await.unwrap();
+        let committed = fs::read_dir(&directory)
+            .unwrap()
+            .map(|entry| entry.unwrap().path())
+            .find(|path| {
+                path.extension()
+                    .is_some_and(|extension| extension == "spool")
+            })
+            .unwrap();
+        let current = fs::read(&committed).unwrap();
+        let mut legacy = serde_json::to_value(record()).unwrap();
+        legacy["event"]["kind"] = serde_json::json!({
+            "kind":"config_ack", "data":{"revision":42,"status":"applied","error":null}
+        });
+        let payload = serde_json::to_vec(&legacy).unwrap();
+        // Preserve the actual header and a valid length/checksum: only the removed
+        // event variant is incompatible, not the spool container format.
+        let mut bytes = current[..16].to_vec();
+        bytes.extend_from_slice(&(payload.len() as u32).to_be_bytes());
+        bytes.extend_from_slice(&payload);
+        bytes.extend_from_slice(&Sha256::digest(&payload));
+        fs::write(&committed, &bytes).unwrap();
+        assert!(matches!(spool.recover().await, Err(Error::Invalid)));
+        assert_eq!(fs::read(&committed).unwrap(), bytes);
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[tokio::test]
     async fn repeated_failed_restarts_replace_one_generation_without_duplicates() {
         let directory =
             std::env::temp_dir().join(format!("netbaiot-spool-generations-{}", Uuid::new_v4()));

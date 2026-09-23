@@ -7,7 +7,6 @@ use std::{
     collections::BTreeMap,
     path::{Path, PathBuf},
     process::Stdio,
-    sync::Arc,
     time::{Duration, Instant},
 };
 use tokio::{
@@ -148,9 +147,12 @@ fn rss_kib(pid: u32) -> Option<u64> {
 }
 
 #[tokio::test]
-async fn official_clients_cover_event_command_config_status_and_offline_contracts() {
+async fn official_clients_cover_mqtt_tcp_command_ack_status_and_offline_contracts() {
     let root = std::env::temp_dir().join(format!("netbaiot-official-e2e-{}", uuid::Uuid::new_v4()));
-    let config = test_config(&root).await;
+    let mut config = test_config(&root).await;
+    // This contract test performs many loopback management queries; admission
+    // charges both accept and HTTP request. Rate-limit behavior has separate tests.
+    config.limits.requests_per_ip_second = 256;
     let path = write_config(&root, &config);
     let admin = "d".repeat(64);
     let stream_token = "business-e2e-secret";
@@ -237,18 +239,21 @@ async fn official_clients_cover_event_command_config_status_and_offline_contract
             device: device_key(),
             expires_at: None,
             payload: DeviceCommandPayload {
-                name: "relay".into(),
-                arguments: Default::default(),
+                name: "apply_config".into(),
+                arguments: [("revision".into(), Scalar::Number(42.0))].into(),
             },
         })
         .await
         .unwrap();
     assert_eq!(dispatch.command_id, command_id);
+    assert_eq!(dispatch.state, DeliveryState::Queued);
     let command = tokio::time::timeout(Duration::from_secs(5), commands.next())
         .await
         .unwrap()
         .unwrap();
     assert_eq!(command.command_id, command_id);
+    assert_eq!(command.payload.name, "apply_config");
+    assert_eq!(command.payload.arguments["revision"], Scalar::Number(42.0));
     device
         .ack_command(command_id, ExecutionState::Succeeded)
         .await
@@ -258,48 +263,9 @@ async fn official_clients_cover_event_command_config_status_and_offline_contract
         panic!("expected command ACK event");
     };
     assert_eq!(ack.command_id, command_id);
+    assert_eq!(ack.execution, ExecutionState::Succeeded);
     delivery.ack().await.unwrap();
 
-    let config_value = DeviceConfig {
-        device: device_key(),
-        revision: ConfigRevision::new(42).unwrap(),
-        payload: Arc::new(serde_json::json!({"sample_interval_seconds": 5})),
-    };
-    business
-        .configs()
-        .set_device_config(&config_value)
-        .await
-        .unwrap();
-    let read_back = business
-        .configs()
-        .get_device_config(&device_key())
-        .await
-        .unwrap();
-    assert_eq!(read_back.revision, ConfigRevision::new(42).unwrap());
-    // Config storage remains a management API; there is no device pull API.
-    // An applied revision can still be acknowledged through the existing codec.
-    device
-        .publish(
-            DeviceUplink::new(
-                SourceMessageId::new("config-applied:42").unwrap(),
-                DeviceUplinkKind::ConfigAck(ConfigAck {
-                    revision: ConfigRevision::new(42).unwrap(),
-                    status: ConfigApplyStatus::Applied,
-                    error: None,
-                }),
-            ),
-            netbaiot_device_sdk::PublishQos::AtLeastOnce,
-        )
-        .await
-        .unwrap();
-    let delivery = next_event(&mut events).await;
-    assert!(matches!(
-        &delivery.event().kind,
-        DeviceEventKind::ConfigAck(ack)
-            if ack.revision == ConfigRevision::new(42).unwrap()
-                && ack.status == ConfigApplyStatus::Applied
-    ));
-    delivery.ack().await.unwrap();
     assert_eq!(
         business.runtime().status().await.unwrap().lifecycle,
         LifecycleState::Running
@@ -335,6 +301,88 @@ async fn official_clients_cover_event_command_config_status_and_offline_contract
         })
         .await;
     assert!(matches!(offline, Err(ClientError::DeviceOffline { .. })));
+
+    // Generic framed TCP carries the same application-defined command and ACK.
+    // Reconnect creates a newer session and never triggers automatic configuration delivery.
+    let mut previous_generation = 0;
+    for cycle in 0..2 {
+        use netbaiot_transports::tcp::{LengthPrefixFramer, TcpFramer};
+        let framer = LengthPrefixFramer { maximum: 65_536 };
+        let mut socket = TcpStream::connect(config.device_ingress).await.unwrap();
+        let handshake = serde_json::to_vec(&serde_json::json!({
+            "credential_id":"demo-device", "secret": DEVICE_SECRET
+        }))
+        .unwrap();
+        socket
+            .write_all(&framer.encode(&handshake).unwrap())
+            .await
+            .unwrap();
+        assert_eq!(
+            tcp_device_frame(&mut socket).await,
+            br#"{"authenticated":true}"#
+        );
+        let connection = business.devices().connection(&device_key()).await.unwrap();
+        assert!(connection.connected);
+        let generation = connection.session_generation.unwrap();
+        assert!(generation > previous_generation);
+        previous_generation = generation;
+        let command = DeviceCommand {
+            command_id: CommandId::generate(),
+            device: device_key(),
+            expires_at: None,
+            payload: DeviceCommandPayload {
+                name: "apply_config".into(),
+                arguments: [("revision".into(), Scalar::Number(42.0))].into(),
+            },
+        };
+        let dispatch = business.commands().send(&command).await.unwrap();
+        assert_eq!(dispatch.command_id, command.command_id);
+        assert_eq!(dispatch.state, DeliveryState::Queued);
+        let received: DeviceCommand =
+            serde_json::from_slice(&tcp_device_frame(&mut socket).await).unwrap();
+        assert_eq!(received.command_id, command.command_id);
+        assert_eq!(received.device, command.device);
+        assert_eq!(received.payload, command.payload);
+        assert!(received.expires_at.is_some()); // Router supplies its bounded default TTL.
+        let ack = DeviceUplink::new(
+            SourceMessageId::new(format!("tcp-command-ack:{cycle}")).unwrap(),
+            DeviceUplinkKind::CommandAck(CommandAck {
+                command_id: command.command_id,
+                execution: ExecutionState::Succeeded,
+            }),
+        );
+        socket
+            .write_all(&framer.encode(&serde_json::to_vec(&ack).unwrap()).unwrap())
+            .await
+            .unwrap();
+        let accepted: EventAccepted =
+            serde_json::from_slice(&tcp_device_frame(&mut socket).await).unwrap();
+        let delivery = next_event(&mut events).await;
+        assert_eq!(delivery.event().event_id, accepted.event_id);
+        assert!(
+            matches!(&delivery.event().kind, DeviceEventKind::CommandAck(ack)
+            if ack.command_id == command.command_id && ack.execution == ExecutionState::Succeeded)
+        );
+        delivery.ack().await.unwrap();
+        drop(socket);
+        tokio::time::timeout(Duration::from_secs(5), async {
+            while business
+                .devices()
+                .connection(&device_key())
+                .await
+                .unwrap()
+                .connected
+            {
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .unwrap();
+        assert!(matches!(
+            business.commands().send(&command).await,
+            Err(ClientError::DeviceOffline { .. })
+        ));
+    }
 
     events.close();
     business.runtime().drain().await.unwrap();
@@ -526,4 +574,16 @@ async fn official_client_throughput_latency_and_idle_memory_measurement() {
             .success()
     );
     let _ = std::fs::remove_dir_all(root);
+}
+
+async fn tcp_device_frame(socket: &mut TcpStream) -> Vec<u8> {
+    tokio::time::timeout(Duration::from_secs(5), async {
+        let length = socket.read_u32().await.unwrap() as usize;
+        assert!((1..=65_536).contains(&length));
+        let mut payload = vec![0; length];
+        socket.read_exact(&mut payload).await.unwrap();
+        payload
+    })
+    .await
+    .unwrap()
 }

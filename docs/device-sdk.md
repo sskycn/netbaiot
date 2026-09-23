@@ -16,7 +16,7 @@ never exposed as Connected. This makes immediate publication after a successful
 connect safe.
 
 Supported workflows are QoS0/QoS1 event publish, QoS1 telemetry, command receive,
-command execution ACK, and heartbeat/config application ACK via `publish(DeviceUplink, PublishQos)`. Canonical topics are the existing `v1/t/.../up`, `down`,
+command execution ACK, and heartbeat via `publish(DeviceUplink, PublishQos)`. Canonical topics are the existing `v1/t/.../up`, `down`,
 and `down_ack` namespace.
 
 `OfflinePublishPolicy::Reject` is the only current policy and the default. An MQTT
@@ -24,11 +24,13 @@ publish while disconnected returns `Offline`; the SDK never accumulates an offli
 RAM queue. Successful `publish` means admission to the bounded MQTT client, not a server
 acceptance receipt or business storage.
 
-The SDK has no device configuration pull API. Management clients can read/write
-revisioned configuration; no automatic MQTT/TCP config download currently replaces
-the removed HTTP GET. Applications may use their existing command contract to
-carry configuration, then publish `ConfigAck` after applying it. See the
-[breaking change and migration](remove-device-http.md).
+NetbaIoT does not own or persist device desired configuration. Applications own
+persistent desired/reported state, revisions/history, retries, rollout, rollback,
+and offline reconciliation. Configuration changes can travel to online MQTT/TCP
+devices as ordinary `DeviceCommand` values. Devices return `CommandAck`; the
+application decides whether its desired state has converged. Commands remain
+online-only; UDP remains sessionless with no downlink. See the
+[ownership migration](remove-device-config.md).
 
 Dropping the final client cancels the one MQTT event-loop task. Command buffering is
 16 items by default. Malformed commands or command overflow force disconnect without

@@ -138,7 +138,7 @@ def main():
         "delivery_url": None,
         "auth_provider_url": None,
         "spool_directory": "spool",
-        "device_configs": [],
+
     }
     workload = {
         "transport": args.transport,
