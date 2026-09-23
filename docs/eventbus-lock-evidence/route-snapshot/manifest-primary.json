@@ -1,0 +1,164 @@
+{
+  "binaries": {
+    "before": "/private/tmp/netbaiot-eventbus-lock/baseline-target/release/netbaiot-server",
+    "after": "/Users/sam/Dev/work/sskycn/netbaiot/target/release/netbaiot-server",
+    "loadgen": "/private/tmp/netbaiot-eventbus-lock/baseline-target/release/netbaiot-loadgen"
+  },
+  "sha256": {
+    "before": "06a8865957e3737301c0232177f3fae72ff2a3c58f42f9079984e3f05a47be58",
+    "after": "3d975177e9060771acc6c17671d211c668ca351d5e046562b39a87224a2f7062",
+    "loadgen": "0c870a866d88e84dd4a52100453f0bab9dfdf8537dd178a271f797ba1f96260a"
+  },
+  "runs": [
+    {
+      "file": "before-q1-20k-1.json",
+      "command": [
+        "/Applications/Xcode.app/Contents/Developer/usr/bin/python3",
+        "/Users/sam/Dev/work/sskycn/netbaiot/scripts/perf/event_load.py",
+        "--server-bin",
+        "/private/tmp/netbaiot-eventbus-lock/baseline-target/release/netbaiot-server",
+        "--loadgen-bin",
+        "/private/tmp/netbaiot-eventbus-lock/baseline-target/release/netbaiot-loadgen",
+        "--rate",
+        "20000",
+        "--qos",
+        "1",
+        "--connections",
+        "64",
+        "--duration",
+        "20",
+        "--warmup",
+        "5",
+        "--payload-bytes",
+        "256",
+        "--sink-mode",
+        "none"
+      ]
+    },
+    {
+      "file": "after-q1-20k-1.json",
+      "command": [
+        "/Applications/Xcode.app/Contents/Developer/usr/bin/python3",
+        "/Users/sam/Dev/work/sskycn/netbaiot/scripts/perf/event_load.py",
+        "--server-bin",
+        "/Users/sam/Dev/work/sskycn/netbaiot/target/release/netbaiot-server",
+        "--loadgen-bin",
+        "/private/tmp/netbaiot-eventbus-lock/baseline-target/release/netbaiot-loadgen",
+        "--rate",
+        "20000",
+        "--qos",
+        "1",
+        "--connections",
+        "64",
+        "--duration",
+        "20",
+        "--warmup",
+        "5",
+        "--payload-bytes",
+        "256",
+        "--sink-mode",
+        "none"
+      ]
+    },
+    {
+      "file": "after-q1-20k-2.json",
+      "command": [
+        "/Applications/Xcode.app/Contents/Developer/usr/bin/python3",
+        "/Users/sam/Dev/work/sskycn/netbaiot/scripts/perf/event_load.py",
+        "--server-bin",
+        "/Users/sam/Dev/work/sskycn/netbaiot/target/release/netbaiot-server",
+        "--loadgen-bin",
+        "/private/tmp/netbaiot-eventbus-lock/baseline-target/release/netbaiot-loadgen",
+        "--rate",
+        "20000",
+        "--qos",
+        "1",
+        "--connections",
+        "64",
+        "--duration",
+        "20",
+        "--warmup",
+        "5",
+        "--payload-bytes",
+        "256",
+        "--sink-mode",
+        "none"
+      ]
+    },
+    {
+      "file": "before-q1-20k-2.json",
+      "command": [
+        "/Applications/Xcode.app/Contents/Developer/usr/bin/python3",
+        "/Users/sam/Dev/work/sskycn/netbaiot/scripts/perf/event_load.py",
+        "--server-bin",
+        "/private/tmp/netbaiot-eventbus-lock/baseline-target/release/netbaiot-server",
+        "--loadgen-bin",
+        "/private/tmp/netbaiot-eventbus-lock/baseline-target/release/netbaiot-loadgen",
+        "--rate",
+        "20000",
+        "--qos",
+        "1",
+        "--connections",
+        "64",
+        "--duration",
+        "20",
+        "--warmup",
+        "5",
+        "--payload-bytes",
+        "256",
+        "--sink-mode",
+        "none"
+      ]
+    },
+    {
+      "file": "before-q1-20k-3.json",
+      "command": [
+        "/Applications/Xcode.app/Contents/Developer/usr/bin/python3",
+        "/Users/sam/Dev/work/sskycn/netbaiot/scripts/perf/event_load.py",
+        "--server-bin",
+        "/private/tmp/netbaiot-eventbus-lock/baseline-target/release/netbaiot-server",
+        "--loadgen-bin",
+        "/private/tmp/netbaiot-eventbus-lock/baseline-target/release/netbaiot-loadgen",
+        "--rate",
+        "20000",
+        "--qos",
+        "1",
+        "--connections",
+        "64",
+        "--duration",
+        "20",
+        "--warmup",
+        "5",
+        "--payload-bytes",
+        "256",
+        "--sink-mode",
+        "none"
+      ]
+    },
+    {
+      "file": "after-q1-20k-3.json",
+      "command": [
+        "/Applications/Xcode.app/Contents/Developer/usr/bin/python3",
+        "/Users/sam/Dev/work/sskycn/netbaiot/scripts/perf/event_load.py",
+        "--server-bin",
+        "/Users/sam/Dev/work/sskycn/netbaiot/target/release/netbaiot-server",
+        "--loadgen-bin",
+        "/private/tmp/netbaiot-eventbus-lock/baseline-target/release/netbaiot-loadgen",
+        "--rate",
+        "20000",
+        "--qos",
+        "1",
+        "--connections",
+        "64",
+        "--duration",
+        "20",
+        "--warmup",
+        "5",
+        "--payload-bytes",
+        "256",
+        "--sink-mode",
+        "none"
+      ]
+    }
+  ]
+}

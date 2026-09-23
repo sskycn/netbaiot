@@ -1,0 +1,14 @@
+{
+  "binaries": {
+    "before": "/tmp/netbaiot-eventbus-lock/baseline-target/release/examples/eventbus_probe",
+    "after": "/tmp/netbaiot-eventbus-lock/completion-retirement-probe"
+  },
+  "sha256": {
+    "before": "7a4ceb6203ec4b268160d1f73cd3a46e989b853875d37b0d5ba3811723e7b5ac",
+    "after": "be83566868569861e0f88a91ccc397ad92684fd0a8c69abf869b6b0d4aef851e"
+  },
+  "commands": [
+    "python3 docs/eventbus-lock-evidence/completion-retirement/reproduce_micro.py"
+  ],
+  "order_log": "micro-order.log"
+}
