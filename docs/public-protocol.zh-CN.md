@@ -2,9 +2,9 @@
 
 `netbaiot-protocol` 是 NetbaIoT 公共 wire 契约的权威、独立于 runtime 的 Rust 模型。它仅依赖序列化、JSON、UUID 和错误模型相关 crate，不依赖 Tokio、HTTP、MQTT、服务端或 runtime 内部实现。Crate SemVer 与 wire `PROTOCOL_VERSION` 是两个独立的兼容性维度；当前 wire 版本为 `1`。
 
-强类型公共标识包括 `TenantId`、`ProductId`、`DeviceId`、`DeviceKey`、`EventId`、`DeliveryId`、`CommandId`、`ConfigRevision`、`SinkId` 和 `SubscriptionId`。使用前会验证这些标识。UTC 时间戳使用 Unix 毫秒。
+强类型公共标识包括 `TenantId`、`ProductId`、`DeviceId`、`DeviceKey`、`EventId`、`DeliveryId`、`CommandId`、`SinkId` 和 `SubscriptionId`。使用前会验证这些标识。UTC 时间戳使用 Unix 毫秒。
 
-`DeviceEvent` 包含稳定的 `event_id`、来源消息 ID、权威设备身份、接收/发生时间，以及一种有类型的事件：telemetry、heartbeat、设备事件、连接/断开、配置 ACK 或命令 ACK。重启重放会保留 event ID。`DeliveryId` 标识一次流投递尝试，重连后可能变化。
+`DeviceEvent` 包含稳定的 `event_id`、来源消息 ID、权威设备身份、接收/发生时间，以及一种有类型的事件：telemetry、heartbeat、设备事件、连接/断开或命令 ACK。重启重放会保留 event ID。`DeliveryId` 标识一次流投递尝试，重连后可能变化。
 
 需确认流使用四字节大端序长度帧封装有界 JSON。客户端先发送包含版本/认证信息的 `hello`，再发送包含有界 `EventFilter` 的 `subscribe`。服务端回复 `ready`，随后发送包含 `EventDelivery` 的 `event` 帧。客户端通过 `ack` 确认处理结果；其中必须包含 `delivery_id`、`subscription_id` 和 `event_id`。写入成功或解码成功都不算 ACK。
 

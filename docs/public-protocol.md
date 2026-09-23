@@ -7,13 +7,13 @@ internals. Crate SemVer and wire `PROTOCOL_VERSION` are separate compatibility
 dimensions; the current wire version is `1`.
 
 Strong public identifiers include `TenantId`, `ProductId`, `DeviceId`, `DeviceKey`,
-`EventId`, `DeliveryId`, `CommandId`, `ConfigRevision`, `SinkId`, and
+`EventId`, `DeliveryId`, `CommandId`, `SinkId`, and
 `SubscriptionId`. IDs are validated before use. UTC timestamps are Unix
 milliseconds.
 
 `DeviceEvent` contains a stable `event_id`, source message ID, authoritative device
 identity, receive/occurrence times, and one typed event kind: telemetry, heartbeat,
-device event, connect/disconnect, config ACK, or command ACK. Restart replay retains
+device event, connect/disconnect, or command ACK. Restart replay retains
 the event ID. `DeliveryId` instead identifies one stream delivery attempt and may
 change after reconnect.
 

@@ -71,9 +71,9 @@ while let Some(delivery) = events.next().await {
 }
 ```
 
-命令通过 `client.commands().send(&command)` 发送，配置使用 `client.configs()`，运行操作使用 `client.runtime()`。离线设备会返回类型化的 `ClientError::DeviceOffline`；NetbaIoT 不会存储命令。
+命令通过 `client.commands().send(&command)` 发送，运行操作使用 `client.runtime()`。离线设备会返回类型化的 `ClientError::DeviceOffline`；NetbaIoT 不会存储命令。
 
-可选的 `netbaiot-device-sdk` 支持标准 MQTT 遥测/命令，不造成厂商锁定。标准 MQTT 3.1.1 客户端仍是一等支持对象。`netbaiot` CLI 提供状态、事件订阅、命令、配置、缓存失效和显式 drain 操作。参阅 [SDK 概览](docs/sdk.zh-CN.md)、[业务客户端](docs/client.zh-CN.md)、[设备 SDK](docs/device-sdk.zh-CN.md)和 [CLI](docs/cli.zh-CN.md)。
+可选的 `netbaiot-device-sdk` 支持标准 MQTT 遥测/命令，不造成厂商锁定。标准 MQTT 3.1.1 客户端仍是一等支持对象。`netbaiot` CLI 提供状态、事件订阅、命令、认证缓存失效和显式 drain 操作。参阅 [SDK 概览](docs/sdk.zh-CN.md)、[业务客户端](docs/client.zh-CN.md)、[设备 SDK](docs/device-sdk.zh-CN.md)和 [CLI](docs/cli.zh-CN.md)。
 
 UDP v1.1 在 EventAccepted 后返回固定 64 字节签名 NBA1 回执。ACK 丢失时重发原始 NBI1 数据报，在有效进程内 replay 窗口内不会重复摄取。详见 [UDP 协议与重试边界](docs/device-protocol.zh-CN.md#udp-acknowledgement-nba1)。
 
@@ -86,3 +86,8 @@ scripts/release.sh v0.1.1
 ```
 
 脚本会更新 `Cargo.toml` 和 `Cargo.lock` 中的 workspace 版本，单独提交版本变更，再推送当前分支和标签。标签推送后，GitHub Actions 会构建 Linux x86_64/ARM64、macOS Intel/Apple Silicon 和 Windows x86_64 发布包，生成 `SHA256SUMS`，并创建 GitHub Release。预发布版本可使用 `vX.Y.Z-...` 格式；完整用法见 `scripts/release.sh --help`。
+
+NetbaIoT 不持有或持久化设备期望配置。业务系统负责 desired/reported 状态、版本历史、
+重试、发布/回滚及离线协调。配置变更可作为普通 `DeviceCommand` 发往在线 MQTT/TCP 设备，
+设备通过 `CommandAck` 返回执行结果；是否收敛由业务系统判断。命令仅支持在线投递，
+UDP 无会话且没有下行。参阅[职责迁移](docs/remove-device-config.md)。

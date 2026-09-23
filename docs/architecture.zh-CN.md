@@ -54,13 +54,13 @@ TLS、探测和首包共享从接纳时开始的 `connect_timeout_ms` 截止时�
 Quiesce 关闭接纳，停止共享 TCP/UDP 并等待连接结束，然后进行 MQTT 恢复快照和必需投递 drain/spool，
 最后才停止管理监听器。
 
-普通 MQTT/TCP 遥测只使用 socket 解析状态、连接绑定的可信认证上下文、共享 codec/配置快照和有界内存路由。它不会访问数据库、文件系统、远程认证服务或控制平面。UDP 会验证每个签名数据报，并维护有界的本地重放窗口。
+普通 MQTT/TCP 遥测只使用 socket 解析状态、连接绑定的可信认证上下文、共享 codec 和路由快照和有界内存路由。它不会访问数据库、文件系统、远程认证服务或控制平面。UDP 会验证每个签名数据报，并维护有界的本地重放窗口。
 
 在 MQTT 传输内部，报文解析、协议状态、会话存储、订阅路由、retain 状态和 QoS 与 IoT 绑定相互隔离。持久 MQTT 会话使用已认证的 DeviceKey 和 ClientId 作为键，只保存有界协议状态，不持有已断开的 socket 或任意 `DeviceEvent` 历史。MQTT QoS 和 EventBus 投递语义是独立契约。
 
 命令沿相反方向流动：从管理 HTTP 到 `CommandRouter`，然后直接进入本地活动 MQTT/TCP 会话的有界命令队列（按数量和字节数限制）。设备离线时返回不可用；不会保留离线命令。
 
-管理 HTTP 使用独立监听器和管理授权。运行时配置是带 revision 的不可变控制快照。认证和配置缓存分别设限，并在重启后重建。
+管理 HTTP 使用独立监听器和管理授权。运行时配置是带 revision 的不可变控制快照。认证缓存与网关控制状态分别设限，并在重启后重建；二者均不拥有设备期望配置。
 
 计划关机过程为 `RUNNING -> QUIESCING -> DRAINING -> SPOOLING -> DRAINED`。在关闭监听器前先关闭接纳闸门。已接受的必需投递要么收到 ACK，要么通过文件 fsync、原子重命名和目录 fsync 写入有界本地重启 spool。同一恢复目录还保存单独的原子 MQTT 协议快照，用于 retain 和持久会话状态。突发崩溃可能丢失有界的、尚未写入 spool 的内存流量以及最近的 MQTT 修改。
 
@@ -90,3 +90,16 @@ Quiesce 关闭接纳，停止共享 TCP/UDP 并等待连接结束，然后进行
 ```
 
 单一接收循环拥有 replay 与回执处理，无 ACK queue、每包任务、UDP session、命令 endpoint 或 ACK spool。Quiesce 等待活跃数据报接纳 guard，只有已接纳业务投递需要 drain/spool。认证失效阻止旧 signer 发回执，不做第二次 provider 查询。详见 [wire、重试和安全边界](device-protocol.zh-CN.md#udp-acknowledgement-nba1)。
+
+```text
+Device -- MQTT/TCP/UDP --> NetbaIoT -- DeviceEvent --> Business System
+Business System -- DeviceCommand --> NetbaIoT -- MQTT/TCP --> Device
+Device -- CommandAck --> NetbaIoT -- DeviceEvent --> Business System
+```
+
+NetbaIoT 不持有或持久化设备期望配置。业务系统负责 desired/reported 状态、版本历史、
+重试、发布/回滚及离线协调。配置变更可作为普通 `DeviceCommand` 发往在线 MQTT/TCP 设备，
+设备通过 `CommandAck` 返回执行结果；是否收敛由业务系统判断。命令仅支持在线投递，
+UDP 无会话且没有下行。参阅[职责迁移](remove-device-config.md)。
+
+Connected/Disconnected 类型保留，但当前 MQTT/TCP 会话不会自动产生对应事件。业务系统应使用自己的 presence/heartbeat 逻辑或管理连接查询来触发协调。

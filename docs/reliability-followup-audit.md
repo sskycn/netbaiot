@@ -1,5 +1,7 @@
 # Reliability follow-up audit
 
+> Historical audit: device configuration was subsequently removed; see [current ownership](remove-device-config.md).
+
 > Historical report: describes the revision measured when it was written, not the
 > current device protocol surface. Device HTTP has since been removed. Current
 > behavior, migration, tests and measurements: [removal report](remove-device-http.md).

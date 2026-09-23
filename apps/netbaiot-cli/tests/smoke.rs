@@ -110,7 +110,7 @@ fn device_key() -> DeviceKey {
 }
 
 #[tokio::test]
-async fn cli_smoke_covers_status_device_command_config_events_auth_and_drain() {
+async fn cli_smoke_covers_status_device_command_events_auth_and_drain() {
     let root = std::env::temp_dir().join(format!("netbaiot-cli-smoke-{}", uuid::Uuid::new_v4()));
     let config = config(&root).await;
     let stop = CancellationToken::new();
@@ -174,25 +174,9 @@ async fn cli_smoke_covers_status_device_command_config_events_auth_and_drain() {
         .unwrap();
     assert_eq!(received.command_id, command_id);
 
-    let initial = json_cli(&config, &["--output", "json", "config", "get", "device-1"]).await;
-    assert_eq!(initial["revision"], 1);
-    let config_file = root.join("device-config.json");
-    std::fs::create_dir_all(&root).unwrap();
-    std::fs::write(&config_file, br#"{"sample_interval_seconds":15}"#).unwrap();
-    let updated = cli(
-        &config,
-        &[
-            "config",
-            "set",
-            "device-1",
-            "--file",
-            config_file.to_str().unwrap(),
-            "--revision",
-            "2",
-        ],
-    )
-    .await;
-    assert!(updated.status.success());
+    let removed = cli(&config, &["config", "get", "device-1"]).await;
+    assert_eq!(removed.status.code(), Some(2));
+    assert!(String::from_utf8_lossy(&removed.stderr).contains("unknown command group"));
 
     let mut monitor_command = command(&config);
     monitor_command
