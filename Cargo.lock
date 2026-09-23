@@ -655,7 +655,7 @@ dependencies = [
 
 [[package]]
 name = "netbaiot-cli"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "futures-util",
  "netbaiot-client",
@@ -671,7 +671,7 @@ dependencies = [
 
 [[package]]
 name = "netbaiot-client"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "futures-core",
  "futures-util",
@@ -687,7 +687,7 @@ dependencies = [
 
 [[package]]
 name = "netbaiot-codecs"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "netbaiot-core",
  "serde",
@@ -696,7 +696,7 @@ dependencies = [
 
 [[package]]
 name = "netbaiot-core"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "netbaiot-protocol",
  "serde",
@@ -706,7 +706,7 @@ dependencies = [
 
 [[package]]
 name = "netbaiot-device-sdk"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "futures-core",
  "netbaiot-protocol",
@@ -721,7 +721,7 @@ dependencies = [
 
 [[package]]
 name = "netbaiot-loadgen"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "bytes",
  "hmac",
@@ -739,7 +739,7 @@ dependencies = [
 
 [[package]]
 name = "netbaiot-protocol"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "serde",
  "serde_json",
@@ -749,7 +749,7 @@ dependencies = [
 
 [[package]]
 name = "netbaiot-runtime"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "async-trait",
  "bytes",
@@ -769,7 +769,7 @@ dependencies = [
 
 [[package]]
 name = "netbaiot-server"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "async-trait",
  "futures-util",
@@ -797,7 +797,7 @@ dependencies = [
 
 [[package]]
 name = "netbaiot-transports"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "async-trait",
  "bytes",
