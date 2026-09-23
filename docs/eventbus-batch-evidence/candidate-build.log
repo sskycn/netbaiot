@@ -1,0 +1,4 @@
+   Compiling netbaiot-runtime v0.1.0 (/private/tmp/netbaiot-eventbus-c/worktree/crates/netbaiot-runtime)
+   Compiling netbaiot-transports v0.1.0 (/private/tmp/netbaiot-eventbus-c/worktree/crates/netbaiot-transports)
+   Compiling netbaiot-server v0.1.0 (/private/tmp/netbaiot-eventbus-c/worktree/apps/netbaiot-server)
+    Finished `release` profile [optimized] target(s) in 9.32s
