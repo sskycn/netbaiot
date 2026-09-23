@@ -2,7 +2,7 @@
   "platform": "macOS-26.6.2-arm64-arm-64bit",
   "machine": "arm64",
   "cpu_count": 10,
-  "sysctl": "Command '['sysctl', 'hw.model', 'hw.memsize', 'hw.ncpu', 'machdep.cpu.brand_string', 'kern.somaxconn', 'net.inet.tcp.msl', 'net.inet.udp.recvspace', 'net.inet.udp.maxdgram']' returned non-zero exit status 1.",
+  "sysctl": "hw.model: Mac16,10\nhw.memsize: 17179869184\nhw.ncpu: 10\nmachdep.cpu.brand_string: Apple M4\nkern.ipc.somaxconn: 128\nnet.inet.tcp.msl: 15000\nnet.inet.udp.recvspace: 786896\nnet.inet.udp.maxdgram: 9216",
   "limits": "core file size          (blocks, -c) 0\ndata seg size           (kbytes, -d) unlimited\nfile size               (blocks, -f) unlimited\nmax locked memory       (kbytes, -l) unlimited\nmax memory size         (kbytes, -m) unlimited\nopen files                      (-n) 1048575\npipe size            (512 bytes, -p) 1\nstack size              (kbytes, -s) 8176\ncpu time               (seconds, -t) unlimited\nmax user processes              (-u) 2666\nvirtual memory          (kbytes, -v) unlimited",
   "rust": "rustc 1.88.0 (6b00bc388 2025-06-23)\nbinary: rustc\ncommit-hash: 6b00bc3880198600130e1cf62b8f8a93494488cc\ncommit-date: 2025-06-23\nhost: aarch64-apple-darwin\nrelease: 1.88.0\nLLVM version: 20.1.5",
   "server_tokio_workers": 10,

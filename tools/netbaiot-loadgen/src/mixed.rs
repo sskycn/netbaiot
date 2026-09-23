@@ -71,13 +71,21 @@ impl Audit {
             || !(0.0..=60.0).contains(&self.warmup_secs)
             || !self.ramp_secs.is_finite()
             || !(0.0..=60.0).contains(&self.ramp_secs)
-            || self.groups.iter().map(|g| g.workers).sum::<usize>() > 2048
+            || self
+                .groups
+                .iter()
+                .try_fold(0usize, |n, g| n.checked_add(g.workers))
+                .is_none_or(|n| n > 2048)
         {
             return Err("invalid bounded mixed audit configuration".into());
         }
         let mut labels = std::collections::HashSet::new();
+        let mut devices = std::collections::HashSet::new();
         for g in &self.groups {
             if !labels.insert(&g.label)
+                || g.label.is_empty()
+                || (g.mode == "normal" && g.rate == 0.0)
+                || (g.mode == "idle" && !["mqtt", "tcp"].contains(&g.protocol.as_str()))
                 || g.label.len() > 48
                 || g.workers == 0
                 || g.workers > 1024
@@ -100,6 +108,11 @@ impl Audit {
                 .contains(&g.mode.as_str())
             {
                 return Err("invalid mixed audit group".into());
+            }
+            for id in g.offset..g.offset + g.workers {
+                if !devices.insert(id) {
+                    return Err("overlapping audit device identities".into());
+                }
             }
         }
         Ok(())
@@ -375,7 +388,12 @@ async fn stream_session(
         let wake = if now >= w.end {
             w.end + w.timeout()
         } else {
-            if w.group.mode == "idle" { ping } else { *due }.min(w.end)
+            if w.group.mode == "idle" {
+                Instant::now() + Duration::from_secs(1)
+            } else {
+                *due
+            }
+            .min(w.end)
         }
         .min(Instant::now() + w.timeout());
         tokio::select! {r=read_more(&mut stream,&mut buffer)=>{
@@ -600,28 +618,32 @@ async fn interference(w: Worker, connector: Option<TlsConnector>) -> Result<()> 
         }
         if w.group.mode == "tls_pending" {
             w.counter("connect_attempts", 1);
-            if let Ok(Ok(mut s)) = timeout(w.timeout(), TcpStream::connect(&w.config.address)).await
-            {
-                w.counter("connected", 1);
-                let _ = timeout_at(w.end, s.read(&mut [0; 16])).await;
+            match timeout(w.timeout(), TcpStream::connect(&w.config.address)).await {
+                Ok(Ok(mut s)) => {
+                    w.counter("connected", 1);
+                    let _ = timeout_at(w.end, s.read(&mut [0; 16])).await;
+                }
+                Ok(Err(error)) => w.failure(io_error(&error)),
+                Err(_) => w.failure("connect_timeout"),
             }
         } else {
             match dial(&w, &connector).await {
                 Ok(mut s) => {
-                    match w.group.mode.as_str() {
-                        "tls_storm" => {}
+                    let sent = match w.group.mode.as_str() {
                         "slow_http" => {
                             send(
                                 &w,
                                 &mut s,
                                 b"POST /v1/device/data HTTP/1.1\r\nHost: localhost\r\n",
                             )
-                            .await?;
+                            .await
                         }
-                        "slow_tcp" => {
-                            send(&w, &mut s, &[0, 0, 0, 128, b'{']).await?;
-                        }
-                        _ => {}
+                        "slow_tcp" => send(&w, &mut s, &[0, 0, 0, 128, b'{']).await,
+                        _ => Ok(()),
+                    };
+                    if sent.is_err() {
+                        tokio::time::sleep(Duration::from_millis(20)).await;
+                        continue;
                     }
                     if w.group.mode != "tls_storm" {
                         let _ = timeout_at(w.end, s.read(&mut [0; 16])).await;
@@ -631,6 +653,9 @@ async fn interference(w: Worker, connector: Option<TlsConnector>) -> Result<()> 
                     tokio::time::sleep(Duration::from_millis(20)).await;
                 }
             }
+        }
+        if w.group.rate == 0.0 {
+            tokio::time::sleep(Duration::from_millis(20)).await;
         }
     }
     Ok(())
@@ -642,6 +667,9 @@ pub(super) async fn run(path: &str) -> Result<()> {
     if config.start_ms == 0 {
         config.start_ms =
             now_ms() + ((config.warmup_secs + config.ramp_secs + 1.0) * 1000.0) as u64;
+    }
+    if config.start_ms > now_ms().saturating_add(120_000) {
+        return Err("start time more than two minutes ahead".into());
     }
     let config = Arc::new(config);
     let connector = tls(&super::Config {
@@ -744,6 +772,19 @@ mod tests {
         assert!(c.validate().is_err());
         c.groups[0].window = 32;
         c.groups[0].rate = f64::NAN;
+        assert!(c.validate().is_err());
+        c.groups[0].rate = 0.0;
+        assert!(c.validate().is_err());
+        c.groups[0].mode = "idle".into();
+        assert!(c.validate().is_ok());
+        c.groups[0].workers = usize::MAX;
+        assert!(c.validate().is_err());
+        c.groups[0] = Group::default();
+        let overlapping = Group {
+            label: "another".into(),
+            ..Group::default()
+        };
+        c.groups.push(overlapping);
         assert!(c.validate().is_err());
     }
 }

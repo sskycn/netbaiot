@@ -44,9 +44,9 @@ def digest(path):
 
 
 def environment():
-    return dict(platform=platform.platform(), machine=platform.machine(), cpu_count=os.cpu_count(),
+    return dict(checkout_revision=command(['git','rev-parse','HEAD']), platform=platform.platform(), machine=platform.machine(), cpu_count=os.cpu_count(),
                 sysctl=command(['sysctl', 'hw.model', 'hw.memsize', 'hw.ncpu', 'machdep.cpu.brand_string',
-                                'kern.somaxconn', 'net.inet.tcp.msl', 'net.inet.udp.recvspace', 'net.inet.udp.maxdgram']),
+                                'kern.ipc.somaxconn', 'net.inet.tcp.msl', 'net.inet.udp.recvspace', 'net.inet.udp.maxdgram']),
                 limits=command(['sh', '-c', 'ulimit -a']), rust=command(['rustc', '+1.88.0', '-Vv']),
                 server_tokio_workers=10, loadgen_tokio_workers=2, path='loopback',
                 limitations=['Shared server/loadgen host; no separate-host capacity claim.',
@@ -154,7 +154,7 @@ def run(plan, repeat, args):
     files = []
     samples = []
     row = dict(name=name, plan=plan, repeat=repeat, label=args.label, timestamp=time.time(),
-               baseline=BASELINE, server_sha256=args.server_hash, loadgen_sha256=args.loadgen_hash,
+               baseline=BASELINE, production_revision=plan.get('production_revision', BASELINE), server_sha256=args.server_hash, loadgen_sha256=args.loadgen_hash,
                server_config=config, network_before=command(['netstat', '-s', '-p', 'udp']),
                tcp_before=command(['netstat', '-s', '-p', 'tcp']))
     try:
@@ -179,6 +179,8 @@ def run(plan, repeat, args):
         else:
             raise RuntimeError('readiness timeout')
         row['idle'] = control.sample()
+        row['idle_process'] = process_usage(server.pid)
+        row['idle_fds'] = command(['lsof', '-a', '-p', str(server.pid), '-F', 'f'])
         start = time.time() + plan.get('warmup', 5) + plan.get('ramp', 1) + 2
         workload = dict(address=f'127.0.0.1:{device}', tls_ca=str(CERT) if plan.get('tls', True) else None,
                         start_ms=round(start * 1000), duration_secs=plan['seconds'], warmup_secs=plan.get('warmup', 5),
@@ -196,7 +198,10 @@ def run(plan, repeat, args):
             now = time.time()
             if now > start + plan['seconds'] + 15:
                 raise RuntimeError('load generator exceeded bounded deadline')
-            if plan.get('sink') and not restored and now >= start + plan['seconds'] * .5:
+            if 'host_cpu_sample' not in row and now >= start + plan['seconds'] * .5:
+                row['host_cpu_sample'] = command(['top', '-l', '2', '-s', '1', '-n', '0'])
+                now = time.time()
+            if plan.get('sink') and not restored and now >= start + plan.get('sink_restore_at', plan['seconds'] * .5):
                 (folder / 'sink-control.json').write_text(json.dumps(dict(delay=0, status=204)))
                 row['sink_restored_at'] = now - start
                 restored = True
@@ -227,6 +232,8 @@ def run(plan, repeat, args):
         time.sleep(1)
         try:
             row['cooldown'] = control.sample()
+            row['cooldown_process'] = process_usage(server.pid)
+            row['cooldown_fds'] = command(['lsof', '-a', '-p', str(server.pid), '-F', 'f'])
         except (OSError, ValueError, http.client.HTTPException) as exc:
             row['cooldown_error'] = str(exc)
         row['network_after'] = command(['netstat', '-s', '-p', 'udp'])
@@ -264,8 +271,10 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--plan', type=Path, required=True)
     parser.add_argument('--server', type=Path, default=ROOT / 'target/mixed-audit/baseline-server')
+    parser.add_argument('--candidate', type=Path, help='Optional candidate server for interleaved paired plans')
     parser.add_argument('--loadgen', type=Path, default=ROOT / 'target/release/netbaiot-loadgen')
     parser.add_argument('--label', default='baseline')
+    parser.add_argument('--resume', action='store_true', help='Skip only matching, completed successful raw records')
     parser.add_argument('--output', type=Path, default=ROOT / 'docs/performance/mixed-ingress')
     args = parser.parse_args()
     args.server = args.server.resolve(); args.loadgen = args.loadgen.resolve()
@@ -279,8 +288,28 @@ def main():
         if len(plans) > 100:
             raise ValueError('plan count bound')
         for plan in plans:
+            selected = argparse.Namespace(**vars(args))
+            if plan.get('binary', plan.get('variant')) == 'candidate':
+                if args.candidate is None:
+                    raise ValueError('candidate plan requires --candidate')
+                selected.server = args.candidate.resolve()
+                selected.server_hash = digest(selected.server)
+            selected.label = plan.get('variant', args.label)
             for repeat in range(plan.get('repeats', 1)):
-                run(plan, repeat, args)
+                if (ROOT / 'target/mixed-audit/stop-after-run').exists():
+                    print('Stopped at completed-run boundary.', flush=True)
+                    return
+                previous = args.output / f'{selected.label}-{plan["name"]}-{repeat}.json'
+                if args.resume and previous.exists():
+                    old = json.loads(previous.read_text())
+                    if (old.get('plan') != plan or old.get('server_sha256') != selected.server_hash
+                            or old.get('loadgen_sha256') != selected.loadgen_hash
+                            or old.get('loadgen_exit') != 0 or 'result' not in old
+                            or old.get('server_stop') != {'exit_code': 0, 'forced': False}):
+                        raise ValueError(f'Cannot resume mismatched or unsuccessful result: {previous}')
+                    print(json.dumps(dict(resumed_completed=old['name'])), flush=True)
+                    continue
+                run(plan, repeat, selected)
 
 
 if __name__ == '__main__':
