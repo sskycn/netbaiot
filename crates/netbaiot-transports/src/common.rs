@@ -221,7 +221,12 @@ async fn serve_listener(
             accepted=listener.accept()=>{
                 let (socket,peer)=accepted.map_err(|_|Error::Unavailable)?;
                 if tasks.len()>=l.max_connections||services.rates.take(peer.ip()).is_err(){services.ingress.metrics.inc(Metric::ConnectionsRejected);continue;}
-                let lease=match services.connections.acquire_pending(peer.ip()){Ok(l)=>l,Err(_)=>{services.ingress.metrics.inc(Metric::ConnectionsRejected);continue;}};
+                let reservation = if transport.is_none() {
+                    services.connections.acquire_device_pending(peer.ip())
+                } else {
+                    services.connections.acquire_pending(peer.ip())
+                };
+                let lease=match reservation{Ok(l)=>l,Err(_)=>{services.ingress.metrics.inc(Metric::ConnectionsRejected);continue;}};
                 tasks.spawn(serve_accepted(socket, peer, transport, services.clone(), lease, tls.clone(), stop.child_token()));
             }
         }
@@ -284,7 +289,9 @@ async fn serve_accepted(
             })?
         };
         transport = Some(classified);
-        let lease = lease.classify(classified)?;
+        let lease = lease.classify(classified).inspect_err(|_| {
+            services.ingress.metrics.inc(Metric::ConnectionsRejected);
+        })?;
         match classified {
             Transport::Http => crate::http::connection(stream, peer, services.clone(), lease, stop).await,
             Transport::Mqtt => crate::mqtt::connection(stream, services.clone(), lease, stop).await,
