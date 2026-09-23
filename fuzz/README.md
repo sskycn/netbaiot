@@ -23,3 +23,6 @@ The MQTT target asserts forward progress/NeedMore behavior and output bounds;
 TCP asserts consumption and frame bounds; JSON asserts a single trusted-device output.
 The 2026-09-19 audit used 500,000 MQTT packet iterations and 100,000 for each other
 target with ASan. See `docs/correctness-resource-reliability-audit.md` for results.
+
+The `device_classifier` target exercises every partial prefix (at most 12 bytes),
+malformed/ambiguous inputs and frame-limit boundaries without network or allocation.

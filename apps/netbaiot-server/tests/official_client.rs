@@ -29,13 +29,10 @@ async fn test_config(root: &Path) -> Config {
         .iter()
         .map(|listener| listener.local_addr().unwrap())
         .collect::<Vec<_>>();
-    let udp = UdpSocket::bind("127.0.0.1:0").await.unwrap();
-    config.device_http = addresses[0];
+    let udp = UdpSocket::bind(addresses[0]).await.unwrap();
+    config.device_ingress = addresses[0];
     config.management_http = addresses[1];
-    config.mqtt = addresses[2];
-    config.tcp = addresses[3];
     config.business_tcp = Some(addresses[4]);
-    config.udp = udp.local_addr().unwrap();
     drop(reservations);
     drop(udp);
     config.delivery_url = None;
@@ -101,8 +98,8 @@ async fn device_client(config: &Config) -> DeviceClient {
     DeviceClient::builder()
         .device(device_key())
         .credentials(DeviceCredentials::new("demo-device", DEVICE_SECRET).unwrap())
-        .mqtt_endpoint(format!("mqtt://{}", config.mqtt))
-        .http_endpoint(format!("http://{}", config.device_http))
+        .mqtt_endpoint(format!("mqtt://{}", config.device_ingress))
+        .http_endpoint(format!("http://{}", config.device_ingress))
         .client_id("official-sdk-e2e")
         .connect()
         .await
@@ -173,7 +170,7 @@ async fn official_clients_cover_event_command_config_status_and_offline_contract
     let rejected_device = DeviceClient::builder()
         .device(device_key())
         .credentials(DeviceCredentials::new("unknown-device", DEVICE_SECRET).unwrap())
-        .mqtt_endpoint(format!("mqtt://{}", config.mqtt))
+        .mqtt_endpoint(format!("mqtt://{}", config.device_ingress))
         .client_id("official-sdk-rejected")
         .mqtt_connect_timeout(Duration::from_secs(2))
         .connect()

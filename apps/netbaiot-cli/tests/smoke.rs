@@ -25,13 +25,10 @@ async fn config(root: &Path) -> Config {
         .iter()
         .map(|listener| listener.local_addr().unwrap())
         .collect::<Vec<_>>();
-    let udp = UdpSocket::bind("127.0.0.1:0").await.unwrap();
-    config.device_http = addresses[0];
+    let udp = UdpSocket::bind(addresses[0]).await.unwrap();
+    config.device_ingress = addresses[0];
     config.management_http = addresses[1];
-    config.mqtt = addresses[2];
-    config.tcp = addresses[3];
     config.business_tcp = Some(addresses[4]);
-    config.udp = udp.local_addr().unwrap();
     config.delivery_url = None;
     config.spool_directory = root.join("spool");
     drop(reservations);
@@ -112,8 +109,8 @@ async fn cli_smoke_covers_status_device_command_config_events_auth_and_drain() {
     let device = DeviceClient::builder()
         .device(device_key())
         .credentials(DeviceCredentials::new("demo-device", DEVICE_SECRET).unwrap())
-        .mqtt_endpoint(format!("mqtt://{}", config.mqtt))
-        .http_endpoint(format!("http://{}", config.device_http))
+        .mqtt_endpoint(format!("mqtt://{}", config.device_ingress))
+        .http_endpoint(format!("http://{}", config.device_ingress))
         .client_id("cli-smoke-device")
         .connect()
         .await

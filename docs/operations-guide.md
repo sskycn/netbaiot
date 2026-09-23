@@ -13,11 +13,8 @@ netbaiot-server --print-default-limits
 
 | 字段 | 含义 | development | production |
 |---|---|---|---|
-| `device_http` | `/v1/device/...` listener | loopback `8080` | TLS listener，按网络边界绑定 |
+| `device_ingress` | TCP：设备 HTTP/MQTT/通用 TCP；UDP：NBI1 | loopback `8080` | 同号 TCP/UDP `443`；TCP 必须 TLS，UDP 只认证不加密 |
 | `management_http` | `/api/v1/...` listener | loopback `9090` | 优先 loopback/管理网；非 loopback 必须 TLS |
-| `mqtt` | embedded MQTT 3.1.1 | loopback `1883` | 公网/跨机必须 TLS；通常 `8883` |
-| `tcp` | generic framed device TCP | loopback `9000` | 公网/跨机必须 TLS |
-| `udp` | NBI1 HMAC datagram | loopback `9001` | HMAC 只认证不加密；自行提供受控网络 |
 | `business_tcp` | confirmed stream listener | null | 当前只允许 loopback，且与 webhook 二选一 |
 | `development` | 强制所有 listener loopback | true | false |
 | `limits` | `Limits` 的覆盖字段 | `{}` 使用默认 | 按测量调优，不可设无界 |
@@ -46,11 +43,8 @@ Environment variables：
 
 ```json
 {
-  "device_http": "0.0.0.0:8443",
+  "device_ingress": "0.0.0.0:443",
   "management_http": "127.0.0.1:9090",
-  "mqtt": "0.0.0.0:8883",
-  "tcp": "0.0.0.0:9443",
-  "udp": "0.0.0.0:9001",
   "business_tcp": null,
   "development": false,
   "limits": {},
@@ -232,7 +226,7 @@ cargo build --release --locked -p netbaiot-loadgen
 ```json
 {
   "transport":"mqtt",
-  "address":"127.0.0.1:1883",
+  "address":"127.0.0.1:8080",
   "connections":10,
   "ramp_per_sec":10.0,
   "warmup_secs":2.0,

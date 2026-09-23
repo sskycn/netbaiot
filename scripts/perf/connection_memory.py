@@ -89,8 +89,8 @@ def main():
     if args.disconnected and (args.transport != "mqtt" or not args.persistent):
         raise SystemExit("--disconnected requires --transport mqtt --persistent")
 
-    device_http, management, mqtt, tcp, udp = [free_port() for _ in range(5)]
-    stream_port = mqtt if args.transport == "mqtt" else tcp
+    device_ingress, management = [free_port() for _ in range(2)]
+    stream_port = device_ingress
     maximum = max(128, args.connections + 32)
     limits = {
         "max_connections": maximum,
@@ -121,11 +121,8 @@ def main():
         limits["connection_memory_reservation"] = 65536
         limits["global_connection_logical_bytes"] = maximum * 65536
     config = {
-        "device_http": f"127.0.0.1:{device_http}",
+        "device_ingress": f"127.0.0.1:{device_ingress}",
         "management_http": f"127.0.0.1:{management}",
-        "mqtt": f"127.0.0.1:{mqtt}",
-        "tcp": f"127.0.0.1:{tcp}",
-        "udp": f"127.0.0.1:{udp}",
         "business_tcp": None,
         "development": True,
         "limits": limits,

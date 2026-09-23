@@ -70,7 +70,7 @@ def main():
     ):
         raise SystemExit("warmup/cooldown must be nonnegative and sample-every positive")
 
-    device_http, management, mqtt, tcp, udp, sink_port = [free_port() for _ in range(6)]
+    device_ingress, management, sink_port = [free_port() for _ in range(3)]
     maximum = 1100 if args.scenario == "mixed" else 256
     limits = {
         "max_connections": maximum,
@@ -127,11 +127,8 @@ def main():
         with open(server_config, "w", encoding="utf-8") as output:
             json.dump(
                 {
-                    "device_http": f"127.0.0.1:{device_http}",
+                    "device_ingress": f"127.0.0.1:{device_ingress}",
                     "management_http": f"127.0.0.1:{management}",
-                    "mqtt": f"127.0.0.1:{mqtt}",
-                    "tcp": f"127.0.0.1:{tcp}",
-                    "udp": f"127.0.0.1:{udp}",
                     "business_tcp": None,
                     "development": True,
                     "limits": limits,
@@ -153,7 +150,7 @@ def main():
             path = os.path.join(temporary, f"{name}.json")
             workload = {
                 "transport": "mqtt",
-                "address": f"127.0.0.1:{mqtt}",
+                "address": f"127.0.0.1:{device_ingress}",
                 "management_url": f"http://127.0.0.1:{management}",
                 "connections": connections,
                 "offset": offset,
