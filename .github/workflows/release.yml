@@ -1,0 +1,121 @@
+name: GitHub Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            builder: cargo
+          - runner: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            builder: cross
+          - runner: macos-latest
+            target: x86_64-apple-darwin
+            builder: cargo
+          - runner: macos-latest
+            target: aarch64-apple-darwin
+            builder: cargo
+          - runner: windows-latest
+            target: x86_64-pc-windows-msvc
+            builder: cargo
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify tag matches workspace version
+        shell: bash
+        run: |
+          version="$(awk '
+            /^\[workspace\.package\]$/ { in_workspace_package = 1; next }
+            /^\[/ { in_workspace_package = 0 }
+            in_workspace_package && $1 == "version" {
+              gsub(/"/, "", $3)
+              print $3
+              exit
+            }
+          ' Cargo.toml)"
+          test -n "$version"
+          test "$GITHUB_REF_NAME" = "v$version"
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install cross
+        if: matrix.builder == 'cross'
+        run: cargo install cross --locked
+
+      - name: Build release binaries
+        shell: bash
+        run: |
+          if [[ "${{ matrix.builder }}" == "cross" ]]; then
+            cross build --locked --release --target "${{ matrix.target }}" \
+              -p netbaiot-server -p netbaiot-cli
+          else
+            cargo build --locked --release --target "${{ matrix.target }}" \
+              -p netbaiot-server -p netbaiot-cli
+          fi
+
+      - name: Package release archive
+        shell: bash
+        run: |
+          suffix=''
+          if [[ "${{ matrix.target }}" == *windows* ]]; then
+            suffix='.exe'
+          fi
+          package_name="netbaiot-${GITHUB_REF_NAME}-${{ matrix.target }}"
+          package_dir="dist/$package_name"
+          build_dir="target/${{ matrix.target }}/release"
+          mkdir -p "$package_dir"
+          cp "$build_dir/netbaiot-server$suffix" "$package_dir/"
+          cp "$build_dir/netbaiot$suffix" "$package_dir/"
+          cp LICENSE NOTICE README.md README.zh-CN.md "$package_dir/"
+          tar -czf "dist/$package_name.tar.gz" -C dist "$package_name"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.target }}
+          path: dist/*.tar.gz
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    name: Publish GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Generate checksums and publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd dist
+          sha256sum *.tar.gz > SHA256SUMS
+          cd ..
+          args=(release create "$GITHUB_REF_NAME" dist/*
+            --repo "$GITHUB_REPOSITORY"
+            --title "NetbaIoT $GITHUB_REF_NAME"
+            --generate-notes
+            --target "$GITHUB_SHA")
+          if [[ "$GITHUB_REF_NAME" == *-* ]]; then
+            args+=(--prerelease)
+          fi
+          gh "${args[@]}"
