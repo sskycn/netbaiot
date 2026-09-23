@@ -95,14 +95,13 @@ impl Audit {
                 || !(0.0..=500_000.0).contains(&g.rate)
                 || !g.delay_secs.is_finite()
                 || !(0.0..=3600.0).contains(&g.delay_secs)
-                || !["http", "mqtt", "tcp", "udp"].contains(&g.protocol.as_str())
+                || !["mqtt", "tcp", "udp"].contains(&g.protocol.as_str())
                 || ![
                     "normal",
                     "idle",
                     "tls_storm",
                     "tls_pending",
                     "unclassified",
-                    "slow_http",
                     "slow_tcp",
                 ]
                 .contains(&g.mode.as_str())
@@ -406,119 +405,6 @@ async fn stream_session(
     }
     Ok(())
 }
-async fn http_response(w: &Worker, stream: &mut Stream) -> Result<(u16, bool)> {
-    let result = timeout(w.timeout(), async {
-        let mut input = Vec::with_capacity(1024);
-        let mut header = None;
-        loop {
-            if let Some((end, size)) = header {
-                if input.len() >= end + size {
-                    break;
-                }
-            }
-            if input.len() > 65536 {
-                return Err("HTTP response too large".into());
-            }
-            let mut chunk = [0; 4096];
-            let n = stream.read(&mut chunk).await?;
-            if n == 0 {
-                return Err("HTTP remote close".into());
-            }
-            input.extend_from_slice(&chunk[..n]);
-            if header.is_none() {
-                if let Some(at) = input.windows(4).position(|b| b == b"\r\n\r\n") {
-                    let head = std::str::from_utf8(&input[..at])?;
-                    let size = head
-                        .lines()
-                        .find_map(|line| {
-                            line.to_ascii_lowercase()
-                                .strip_prefix("content-length:")
-                                .map(str::trim)
-                                .and_then(|v| v.parse::<usize>().ok())
-                        })
-                        .ok_or("missing content length")?;
-                    if size > 65536 {
-                        return Err("HTTP body limit".into());
-                    }
-                    header = Some((at + 4, size));
-                }
-            }
-        }
-        let closes = std::str::from_utf8(&input[..header.ok_or("HTTP header")?.0])?
-            .lines()
-            .any(|line| line.eq_ignore_ascii_case("connection: close"));
-        let status = std::str::from_utf8(
-            &input[..input.iter().position(|b| *b == b'\r').ok_or("HTTP line")?],
-        )?
-        .split_whitespace()
-        .nth(1)
-        .ok_or("HTTP status")?
-        .parse::<u16>()?;
-        Ok((status, closes))
-    })
-    .await;
-    match result {
-        Ok(Ok(status)) => Ok(status),
-        Ok(Err(e)) => {
-            w.failure("remote_close");
-            Err(e)
-        }
-        Err(_) => {
-            w.failure("read_timeout");
-            Err("HTTP timeout".into())
-        }
-    }
-}
-async fn http_worker(w: Worker, connector: Option<TlsConnector>) {
-    let mut stream = None;
-    let mut seq = 0;
-    let mut due = w.due();
-    while Instant::now() < w.end {
-        sleep_until(due.min(w.end)).await;
-        if w.scheduled(&mut due, 1) == 0 {
-            continue;
-        }
-        let at = Instant::now();
-        w.counter("attempted", 1);
-        if stream.is_none() {
-            match dial(&w, &connector).await {
-                Ok(s) => stream = Some(s),
-                Err(_) => continue,
-            }
-        }
-        let Some(socket) = stream.as_mut() else {
-            continue;
-        };
-        seq += 1;
-        let payload = body(&w.run, w.id, seq, w.config.payload_bytes, 0);
-        let mut request=format!("POST /v1/device/data HTTP/1.1\r\nHost: localhost\r\nAuthorization: Bearer a{}:{}\r\nContent-Length: {}\r\nConnection: {}\r\n\r\n",w.id,SECRET,payload.len(),if w.group.reuse {"keep-alive"}else{"close"}).into_bytes();
-        request.extend_from_slice(&payload);
-        if send(&w, socket, &request).await.is_err() {
-            stream = None;
-            continue;
-        }
-        let (status, closes) = match http_response(&w, socket).await {
-            Ok(result) => result,
-            Err(_) => {
-                stream = None;
-                continue;
-            }
-        };
-        match status {
-            202 => w.ack(at),
-            401 | 403 => w.failure("auth_failure"),
-            429 | 503 => w.failure("http_overloaded"),
-            _ => w.failure("http_status_error"),
-        }
-        if closes {
-            w.counter("http_server_close", 1);
-        }
-        if !w.group.reuse || closes {
-            let _ = timeout(Duration::from_millis(100), socket.read(&mut [0; 1])).await;
-            stream = None;
-        }
-    }
-}
 async fn udp_worker(w: Worker) -> Result<()> {
     let socket = UdpSocket::bind("127.0.0.1:0").await?;
     socket.connect(&w.config.address).await?;
@@ -631,14 +517,6 @@ async fn interference(w: Worker, connector: Option<TlsConnector>) -> Result<()> 
             match dial(&w, &connector).await {
                 Ok(mut s) => {
                     let sent = match w.group.mode.as_str() {
-                        "slow_http" => {
-                            send(
-                                &w,
-                                &mut s,
-                                b"POST /v1/device/data HTTP/1.1\r\nHost: localhost\r\n",
-                            )
-                            .await
-                        }
                         "slow_tcp" => send(&w, &mut s, &[0, 0, 0, 128, b'{']).await,
                         _ => Ok(()),
                     };
@@ -712,10 +590,6 @@ pub(super) async fn run(path: &str) -> Result<()> {
                     return interference(w, connector).await;
                 }
                 match w.group.protocol.as_str() {
-                    "http" => {
-                        http_worker(w, connector).await;
-                        Ok(())
-                    }
                     "udp" => udp_worker(w).await,
                     _ => {
                         let mut sequence = 0;

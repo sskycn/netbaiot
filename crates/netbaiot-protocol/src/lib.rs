@@ -14,19 +14,13 @@ pub const MAX_IDENTIFIER_BYTES: usize = 64;
 pub const MAX_FILTER_EVENT_TYPES: usize = 16;
 
 pub mod paths {
-    pub const DEVICE_DATA: &str = "/v1/device/data";
-    pub const DEVICE_CONFIG: &str = "/v1/device/config";
-    pub const DEVICE_CONFIG_ACK: &str = "/v1/device/config/ack";
-    pub const DEVICE_HEARTBEAT: &str = "/v1/device/heartbeat";
-    pub const DEVICE_COMMAND_ACK: &str = "/v1/device/commands/ack";
-
     pub const HEALTH: &str = "/api/v1/health";
     pub const READY: &str = "/api/v1/ready";
     pub const STATUS: &str = "/api/v1/status";
     pub const CONNECTIONS: &str = "/api/v1/connections";
     pub const DEVICE_CONNECTION: &str = "/api/v1/devices/connection";
-    pub const COMMANDS: &str = "/api/v1/devices/commands";
     pub const DEVICE_CONFIG_MANAGEMENT: &str = "/api/v1/devices/config";
+    pub const COMMANDS: &str = "/api/v1/devices/commands";
     pub const AUTH_INVALIDATE: &str = "/api/v1/auth/invalidate";
     pub const CONFIG_INVALIDATE: &str = "/api/v1/config/invalidate";
     pub const CONTROL_SNAPSHOT: &str = "/api/v1/control/snapshot";
@@ -368,7 +362,6 @@ pub struct CommandDispatch {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TransportKind {
-    Http,
     Mqtt,
     Tcp,
     Udp,
@@ -588,7 +581,6 @@ pub struct RuntimeStatus {
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ConnectionCounts {
-    pub http: usize,
     pub mqtt: usize,
     pub tcp: usize,
     pub udp: usize,
@@ -596,7 +588,7 @@ pub struct ConnectionCounts {
 
 impl ConnectionCounts {
     pub const fn total(self) -> usize {
-        self.http + self.mqtt + self.tcp + self.udp
+        self.mqtt + self.tcp + self.udp
     }
 }
 
@@ -668,6 +660,35 @@ mod tests {
         assert_eq!(
             serde_json::from_str::<EventId>(&serde_json::to_string(&nil).unwrap()).unwrap(),
             nil
+        );
+    }
+
+    #[test]
+    fn device_transports_and_connection_counts_have_only_three_wire_fields() {
+        for (transport, wire) in [
+            (TransportKind::Mqtt, "mqtt"),
+            (TransportKind::Tcp, "tcp"),
+            (TransportKind::Udp, "udp"),
+        ] {
+            let value = serde_json::json!(wire);
+            assert_eq!(serde_json::to_value(transport).unwrap(), value);
+            assert_eq!(
+                serde_json::from_value::<TransportKind>(value).unwrap(),
+                transport
+            );
+        }
+        assert!(serde_json::from_str::<TransportKind>(r#""http""#).is_err());
+        let counts = ConnectionCounts {
+            mqtt: 1,
+            tcp: 2,
+            udp: 0,
+        };
+        assert_eq!(counts.total(), 3);
+        let value = serde_json::json!({"mqtt":1,"tcp":2,"udp":0});
+        assert_eq!(serde_json::to_value(counts).unwrap(), value);
+        assert_eq!(
+            serde_json::from_value::<ConnectionCounts>(value).unwrap(),
+            counts
         );
     }
 

@@ -31,7 +31,6 @@ struct Config {
     tls_server_name: String,
     transport: String,
     address: String,
-    http_url: String,
     management_url: String,
     tls_ca: Option<String>,
     tls_resumption: bool,
@@ -76,7 +75,6 @@ impl Default for Config {
             tls_server_name: "localhost".into(),
             transport: "mqtt".into(),
             address: "127.0.0.1:8080".into(),
-            http_url: "http://127.0.0.1:8080".into(),
             management_url: "http://127.0.0.1:9090".into(),
             tls_ca: None,
             tls_resumption: false,
@@ -180,7 +178,7 @@ impl Config {
         {
             return Err("invalid phases".into());
         }
-        if !["mqtt", "tcp", "http", "udp"].contains(&self.transport.as_str()) {
+        if !["mqtt", "tcp", "udp"].contains(&self.transport.as_str()) {
             return Err("unknown transport".into());
         }
         Ok(())
@@ -920,16 +918,6 @@ fn http_client(c: &Config) -> Result<reqwest::Client> {
     }
     Ok(b.build()?)
 }
-async fn consume_http_response(mut response: reqwest::Response) -> Result<()> {
-    let mut received = 0usize;
-    while let Some(chunk) = response.chunk().await? {
-        received = received
-            .checked_add(chunk.len())
-            .filter(|bytes| *bytes <= MAX_PACKET)
-            .ok_or("HTTP response size")?;
-    }
-    Ok(())
-}
 async fn stateless(
     c: &Config,
     id: usize,
@@ -939,12 +927,7 @@ async fn stateless(
     end: Instant,
     run: &str,
 ) -> Result<()> {
-    let http = http_client(c)?;
-    let udp = if c.transport == "udp" {
-        Some(UdpSocket::bind("127.0.0.1:0").await?)
-    } else {
-        None
-    };
+    let socket = UdpSocket::bind("127.0.0.1:0").await?;
     let mut seq = 0;
     let mut due = measure + Duration::from_secs_f64(relative as f64 / c.rate(0.0).max(1.0));
     let stop = end - Duration::from_secs_f64(c.cooldown_secs);
@@ -968,62 +951,30 @@ async fn stateless(
             "generator_schedule_lag",
             Instant::now().saturating_duration_since(due),
         );
-        let at = Instant::now();
         seq += 1;
         let payload = body(run, id, seq, c.payload_bytes, c.heartbeat_every);
         count(s, "published", 1);
         count(s, "payload_bytes", payload.len() as u64);
-        if let Some(socket) = &udp {
-            let name = format!("a{id}");
-            let mut wire = b"NBI1".to_vec();
-            wire.push(name.len() as u8);
-            wire.extend_from_slice(name.as_bytes());
-            wire.extend_from_slice(&1u32.to_be_bytes());
-            wire.extend_from_slice(&boot);
-            wire.extend_from_slice(&seq.to_be_bytes());
-            wire.extend_from_slice(&(now_ms() as i64).to_be_bytes());
-            wire.extend_from_slice(&(payload.len() as u16).to_be_bytes());
-            wire.extend_from_slice(&payload);
-            let key: Vec<u8> = (0..32).collect();
-            let mut mac = Hmac::<Sha256>::new_from_slice(&key)?;
-            mac.update(&wire);
-            wire.extend_from_slice(&mac.finalize().into_bytes());
+        let name = format!("a{id}");
+        let mut wire = b"NBI1".to_vec();
+        wire.push(name.len() as u8);
+        wire.extend_from_slice(name.as_bytes());
+        wire.extend_from_slice(&1u32.to_be_bytes());
+        wire.extend_from_slice(&boot);
+        wire.extend_from_slice(&seq.to_be_bytes());
+        wire.extend_from_slice(&(now_ms() as i64).to_be_bytes());
+        wire.extend_from_slice(&(payload.len() as u16).to_be_bytes());
+        wire.extend_from_slice(&payload);
+        let key: Vec<u8> = (0..32).collect();
+        let mut mac = Hmac::<Sha256>::new_from_slice(&key)?;
+        mac.update(&wire);
+        wire.extend_from_slice(&mac.finalize().into_bytes());
+        socket.send_to(&wire, &c.address).await?;
+        count(s, "wire_bytes_sent", wire.len() as u64);
+        if c.udp_replay_every > 0 && seq.is_multiple_of(c.udp_replay_every) {
             socket.send_to(&wire, &c.address).await?;
+            count(s, "replays_sent", 1);
             count(s, "wire_bytes_sent", wire.len() as u64);
-            if c.udp_replay_every > 0 && seq.is_multiple_of(c.udp_replay_every) {
-                socket.send_to(&wire, &c.address).await?;
-                count(s, "replays_sent", 1);
-                count(s, "wire_bytes_sent", wire.len() as u64);
-            }
-        } else {
-            let response = http
-                .post(format!("{}/v1/device/data", c.http_url))
-                .bearer_auth(format!("a{id}:{SECRET}"))
-                .body(payload)
-                .send()
-                .await;
-            match response {
-                Ok(r) => {
-                    if r.status() == 202 {
-                        consume_http_response(r).await?;
-                        observe(s, "application_ack", at.elapsed());
-                        count(s, "accepted", 1);
-                    } else {
-                        count(s, "http_rejected", 1);
-                        count(
-                            s,
-                            match r.status().as_u16() {
-                                401 => "http_401",
-                                429 => "http_429",
-                                503 => "http_503",
-                                _ => "http_other_status",
-                            },
-                            1,
-                        );
-                    }
-                }
-                Err(_) => count(s, "http_errors", 1),
-            }
         }
         let step = Duration::from_secs_f64(c.connections as f64 / rate);
         due = (due + step).max(Instant::now() + step.min(Duration::from_millis(1)));
@@ -1253,7 +1204,7 @@ async fn main() -> Result<()> {
                 "ramp_schedule_lag",
                 Instant::now().saturating_duration_since(due),
             );
-            if c.transport == "http" || c.transport == "udp" {
+            if c.transport == "udp" {
                 if stateless(&c, c.offset + relative, relative, &s, measure, end, &run)
                     .await
                     .is_err()
@@ -1412,44 +1363,5 @@ mod tests {
         assert!(!connack_accepted(&(0x20, vec![1, 0]), true));
         assert!(connack_accepted(&(0x20, vec![1, 0]), false));
         assert!(!connack_accepted(&(0x20, vec![2, 0]), false));
-    }
-    #[tokio::test]
-    async fn http_response_enforces_streamed_boundary() {
-        for size in [MAX_PACKET, MAX_PACKET + 1] {
-            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
-            let address = listener.local_addr().unwrap();
-            let server = tokio::spawn(async move {
-                timeout(Duration::from_secs(3), async move {
-                    let (mut socket, _) = listener.accept().await.unwrap();
-                    let mut request = [0u8; 1024];
-                    let mut used = 0;
-                    while !request[..used].windows(4).any(|bytes| bytes == b"\r\n\r\n") {
-                        assert!(used < request.len());
-                        let count = socket.read(&mut request[used..]).await.unwrap();
-                        assert!(count > 0);
-                        used += count;
-                    }
-                    let header = format!(
-                        "HTTP/1.1 202 Accepted\r\nContent-Length: {size}\r\nConnection: close\r\n\r\n"
-                    );
-                    socket.write_all(header.as_bytes()).await.unwrap();
-                    // The oversized response is intentionally closed by the reader.
-                    let _ = socket.write_all(&vec![b'x'; size]).await;
-                })
-                .await
-                .unwrap();
-            });
-            let response = http_client(&Config::default())
-                .unwrap()
-                .get(format!("http://{address}/"))
-                .send()
-                .await
-                .unwrap();
-            assert_eq!(
-                consume_http_response(response).await.is_ok(),
-                size <= MAX_PACKET
-            );
-            server.await.unwrap();
-        }
     }
 }

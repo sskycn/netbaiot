@@ -3,9 +3,9 @@ use netbaiot_codecs::JsonV1;
 use netbaiot_core::*;
 use netbaiot_runtime::*;
 use netbaiot_transports::{
-    HttpRole, Services,
+    Services,
     mqtt::broker::MqttBroker,
-    serve_device_ingress, serve_stream,
+    serve_device_ingress, serve_management_http,
     tcp::{LengthPrefixFramer, TcpFramer},
     udp,
 };
@@ -961,8 +961,6 @@ pub async fn run_with_credentials(
             .ok_or(Error::Internal)?
             .admin = Some(admin);
     }
-    let device_services = base_services.with_http_role(HttpRole::Device);
-    let management_services = base_services.with_http_role(HttpRole::Management);
     let tls = if let Some(files) = &config.tls {
         Some(tls_acceptor(files).await?)
     } else {
@@ -999,14 +997,13 @@ pub async fn run_with_credentials(
     let mut work_tasks = JoinSet::new();
     work_tasks.spawn(serve_device_ingress(
         device_ingress,
-        device_services,
+        base_services.clone(),
         tls.clone(),
         work_listeners.child_token(),
     ));
-    let mut management_task = tokio::spawn(serve_stream(
+    let mut management_task = tokio::spawn(serve_management_http(
         management_http,
-        Transport::Http,
-        management_services,
+        base_services.clone(),
         tls.clone(),
         management_listener.child_token(),
     ));
