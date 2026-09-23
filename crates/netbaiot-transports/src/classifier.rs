@@ -13,20 +13,8 @@ use tokio::{
 };
 
 pub const MAX_PREFIX: usize = 12; // fixed header (1 + 4) + MQTT name/level (7)
-const METHODS: &[&[u8]] = &[
-    b"GET ",
-    b"POST ",
-    b"PUT ",
-    b"DELETE ",
-    b"HEAD ",
-    b"OPTIONS ",
-    b"PATCH ",
-    b"CONNECT ",
-    b"TRACE ",
-];
-
 /// Limits::validate caps frames at 1 MiB: a legal TCP length starts with 0,
-/// MQTT CONNECT with 0x10, and HTTP with an uppercase method. No parser fallback.
+/// MQTT CONNECT with 0x10. Other application protocols have no parser fallback.
 pub fn classify_prefix(input: &[u8], max_tcp: usize, max_mqtt: usize) -> Result<Option<Transport>> {
     if max_tcp > 1_048_576 || input.len() > MAX_PREFIX {
         return Err(Error::Invalid);
@@ -68,14 +56,6 @@ pub fn classify_prefix(input: &[u8], max_tcp: usize, max_mqtt: usize) -> Result<
         return Ok((available.len() == signature.len()
             && input.get(header + signature.len()).is_some())
         .then_some(Transport::Mqtt));
-    }
-    for method in METHODS {
-        if input.starts_with(method) {
-            return Ok(Some(Transport::Http));
-        }
-        if method.starts_with(input) {
-            return Ok(None);
-        }
     }
     Err(Error::Invalid)
 }
@@ -198,14 +178,11 @@ mod tests {
 
     #[test]
     fn signatures_lengths_and_adversarial_collisions() {
-        for method in METHODS {
-            for end in 0..method.len() {
-                assert_eq!(prefix(&method[..end]).unwrap(), None);
-            }
-            assert_eq!(prefix(method).unwrap(), Some(Transport::Http));
-        }
         for malformed in [
-            b"GET/".as_slice(),
+            b"GET ".as_slice(),
+            b"POST ",
+            b"PATCH ",
+            b"GET/",
             b"POST\t",
             b"GETTING ",
             b"get ",
@@ -250,14 +227,7 @@ mod tests {
 
     #[tokio::test]
     async fn fragmented_and_coalesced_prefixes_preserve_all_bytes_and_writes() {
-        for (protocol, bytes) in [
-            (
-                Transport::Http,
-                b"POST /v1/device/data HTTP/1.1\r\nHost: localhost\r\n\r\npayload".to_vec(),
-            ),
-            (Transport::Mqtt, mqtt()),
-            (Transport::Tcp, tcp()),
-        ] {
+        for (protocol, bytes) in [(Transport::Mqtt, mqtt()), (Transport::Tcp, tcp())] {
             for capacity in [1, 4096] {
                 let (mut peer, stream) = tokio::io::duplex(capacity);
                 let sent = bytes.clone();
@@ -299,7 +269,7 @@ mod tests {
 
     #[tokio::test(start_paused = true)]
     async fn eof_slow_prefix_and_expired_ready_bytes() {
-        for partial in [b"".as_slice(), b"GE", b"\x10\x80", b"\x00\x00"] {
+        for partial in [b"".as_slice(), b"\x10", b"\x10\x80", b"\x00\x00"] {
             let (mut peer, stream) = tokio::io::duplex(64);
             peer.write_all(partial).await.unwrap();
             peer.shutdown().await.unwrap();
@@ -315,7 +285,7 @@ mod tests {
             ));
         }
         let (mut peer, stream) = tokio::io::duplex(64);
-        peer.write_all(b"GE").await.unwrap();
+        peer.write_all(b"\x10").await.unwrap();
         assert!(matches!(
             classify_device_stream(
                 Box::new(stream),

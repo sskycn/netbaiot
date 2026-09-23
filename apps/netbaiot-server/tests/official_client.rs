@@ -1,6 +1,6 @@
 use futures_util::StreamExt;
 use netbaiot_client::{ClientError, NetbaIoTClient};
-use netbaiot_device_sdk::{ConfigUpdate, DeviceClient, DeviceCredentials};
+use netbaiot_device_sdk::{DeviceClient, DeviceCredentials};
 use netbaiot_protocol::*;
 use netbaiot_server::Config;
 use std::{
@@ -86,6 +86,21 @@ async fn wait_ready(client: &NetbaIoTClient) {
     assert!(result.is_ok(), "server did not become ready");
 }
 
+async fn publish_heartbeat(device: &DeviceClient, sequence: u64) -> SourceMessageId {
+    let source = SourceMessageId::new(format!("sdk-heartbeat:{sequence}")).unwrap();
+    device
+        .publish(
+            DeviceUplink::new(
+                source.clone(),
+                DeviceUplinkKind::Heartbeat(Heartbeat { sequence }),
+            ),
+            netbaiot_device_sdk::PublishQos::AtLeastOnce,
+        )
+        .await
+        .unwrap();
+    source
+}
+
 fn device_key() -> DeviceKey {
     DeviceKey {
         tenant_id: TenantId::new("demo").unwrap(),
@@ -99,7 +114,6 @@ async fn device_client(config: &Config) -> DeviceClient {
         .device(device_key())
         .credentials(DeviceCredentials::new("demo-device", DEVICE_SECRET).unwrap())
         .mqtt_endpoint(format!("mqtt://{}", config.device_ingress))
-        .http_endpoint(format!("http://{}", config.device_ingress))
         .client_id("official-sdk-e2e")
         .connect()
         .await
@@ -206,9 +220,9 @@ async fn official_clients_cover_event_command_config_status_and_offline_contract
     })
     .await
     .unwrap();
-    let accepted = device.heartbeat(7).await.unwrap();
+    let source = publish_heartbeat(&device, 7).await;
     let delivery = next_event(&mut events).await;
-    assert_eq!(delivery.event_id(), accepted.event_id);
+    assert_eq!(delivery.event().source_message_id, source);
     assert!(matches!(
         delivery.event().kind,
         DeviceEventKind::Heartbeat(_)
@@ -262,16 +276,19 @@ async fn official_clients_cover_event_command_config_status_and_offline_contract
         .await
         .unwrap();
     assert_eq!(read_back.revision, ConfigRevision::new(42).unwrap());
-    let ConfigUpdate::Updated(device_config) = device.config().check(None).await.unwrap() else {
-        panic!("expected updated config");
-    };
-    assert_eq!(device_config.revision, ConfigRevision::new(42).unwrap());
+    // Config storage remains a management API; there is no device pull API.
+    // An applied revision can still be acknowledged through the existing codec.
     device
-        .config()
-        .ack(
-            ConfigRevision::new(42).unwrap(),
-            ConfigApplyStatus::Applied,
-            None,
+        .publish(
+            DeviceUplink::new(
+                SourceMessageId::new("config-applied:42").unwrap(),
+                DeviceUplinkKind::ConfigAck(ConfigAck {
+                    revision: ConfigRevision::new(42).unwrap(),
+                    status: ConfigApplyStatus::Applied,
+                    error: None,
+                }),
+            ),
+            netbaiot_device_sdk::PublishQos::AtLeastOnce,
         )
         .await
         .unwrap();
@@ -349,9 +366,9 @@ async fn official_client_reconnects_and_replays_unacked_event_with_same_id() {
         .unwrap();
     let device = device_client(&config).await;
     let mut commands = device.commands().unwrap();
-    let accepted = device.heartbeat(9).await.unwrap();
+    let source = publish_heartbeat(&device, 9).await;
     let first_delivery = next_event(&mut events).await;
-    assert_eq!(first_delivery.event_id(), accepted.event_id);
+    assert_eq!(first_delivery.event().source_message_id, source);
 
     business.runtime().drain().await.unwrap();
     assert!(
@@ -473,10 +490,10 @@ async fn official_client_throughput_latency_and_idle_memory_measurement() {
     let mut ack_us = Vec::with_capacity(EVENTS as usize);
     let started = Instant::now();
     for sequence in 0..EVENTS {
-        let accepted = device.heartbeat(sequence).await.unwrap();
+        let source = publish_heartbeat(&device, sequence).await;
         let accepted_at = Instant::now();
         let delivery = next_event(&mut events).await;
-        assert_eq!(delivery.event_id(), accepted.event_id);
+        assert_eq!(delivery.event().source_message_id, source);
         delivery_us.push(accepted_at.elapsed().as_micros());
         let ack_started = Instant::now();
         delivery.ack().await.unwrap();

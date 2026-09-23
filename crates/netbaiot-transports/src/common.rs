@@ -14,14 +14,8 @@ use tokio_util::sync::CancellationToken;
 pub trait Stream: AsyncRead + AsyncWrite + Unpin + Send {}
 impl<T: AsyncRead + AsyncWrite + Unpin + Send> Stream for T {}
 pub type BoxStream = Box<dyn Stream>;
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum HttpRole {
-    Device,
-    Management,
-}
 pub struct Services {
     pub admin: Option<Arc<AdminAccess>>,
-    pub http_role: HttpRole,
     pub shutdown: CancellationToken,
     pub control_lock: Arc<tokio::sync::Mutex<()>>,
     pub http_slots: Arc<tokio::sync::Semaphore>,
@@ -47,7 +41,6 @@ impl Services {
         let limits = ingress.limits.clone();
         Arc::new(Self {
             admin: None,
-            http_role: HttpRole::Device,
             shutdown,
             control_lock: Arc::new(tokio::sync::Mutex::new(())),
             http_slots: Arc::new(tokio::sync::Semaphore::new(limits.max_ingress)),
@@ -59,22 +52,6 @@ impl Services {
             protocol_admission: Admission::new(limits.clone()),
             mqtt,
             ingress,
-        })
-    }
-
-    pub fn with_http_role(self: &Arc<Self>, role: HttpRole) -> Arc<Self> {
-        Arc::new(Self {
-            admin: self.admin.clone(),
-            http_role: role,
-            shutdown: self.shutdown.clone(),
-            control_lock: self.control_lock.clone(),
-            http_slots: self.http_slots.clone(),
-            ingress: self.ingress.clone(),
-            router: self.router.clone(),
-            connections: self.connections.clone(),
-            rates: self.rates.clone(),
-            protocol_admission: self.protocol_admission.clone(),
-            mqtt: self.mqtt.clone(),
         })
     }
 }
@@ -185,29 +162,46 @@ pub async fn serve_stream(
     tls: Option<TlsAcceptor>,
     stop: CancellationToken,
 ) -> Result<()> {
-    serve_listener(listener, Some(transport), services, tls, stop).await
-}
-
-/// One device listener; HTTP is always dispatched with Device authorization/routing.
-pub async fn serve_device_ingress(
-    listener: TcpListener,
-    services: Arc<Services>,
-    tls: Option<TlsAcceptor>,
-    stop: CancellationToken,
-) -> Result<()> {
     serve_listener(
         listener,
-        None,
-        services.with_http_role(HttpRole::Device),
+        ListenerKind::Device(transport),
+        services,
         tls,
         stop,
     )
     .await
 }
 
+/// One device listener for MQTT and framed TCP.
+pub async fn serve_device_ingress(
+    listener: TcpListener,
+    services: Arc<Services>,
+    tls: Option<TlsAcceptor>,
+    stop: CancellationToken,
+) -> Result<()> {
+    serve_listener(listener, ListenerKind::DeviceIngress, services, tls, stop).await
+}
+
+/// Independent control-plane listener, never dispatched by device classification.
+pub async fn serve_management_http(
+    listener: TcpListener,
+    services: Arc<Services>,
+    tls: Option<TlsAcceptor>,
+    stop: CancellationToken,
+) -> Result<()> {
+    serve_listener(listener, ListenerKind::Management, services, tls, stop).await
+}
+
+#[derive(Clone, Copy, Debug)]
+enum ListenerKind {
+    DeviceIngress,
+    Device(Transport),
+    Management,
+}
+
 async fn serve_listener(
     listener: TcpListener,
-    transport: Option<Transport>,
+    kind: ListenerKind,
     services: Arc<Services>,
     tls: Option<TlsAcceptor>,
     stop: CancellationToken,
@@ -221,13 +215,13 @@ async fn serve_listener(
             accepted=listener.accept()=>{
                 let (socket,peer)=accepted.map_err(|_|Error::Unavailable)?;
                 if tasks.len()>=l.max_connections||services.rates.take(peer.ip()).is_err(){services.ingress.metrics.inc(Metric::ConnectionsRejected);continue;}
-                let reservation = if transport.is_none() {
+                let reservation = if matches!(kind, ListenerKind::DeviceIngress) {
                     services.connections.acquire_device_pending(peer.ip())
                 } else {
                     services.connections.acquire_pending(peer.ip())
                 };
                 let lease=match reservation{Ok(l)=>l,Err(_)=>{services.ingress.metrics.inc(Metric::ConnectionsRejected);continue;}};
-                tasks.spawn(serve_accepted(socket, peer, transport, services.clone(), lease, tls.clone(), stop.child_token()));
+                tasks.spawn(serve_accepted(socket, peer, kind, services.clone(), lease, tls.clone(), stop.child_token()));
             }
         }
     }
@@ -246,7 +240,7 @@ async fn serve_listener(
 async fn serve_accepted(
     socket: TcpStream,
     peer: SocketAddr,
-    mut transport: Option<Transport>,
+    kind: ListenerKind,
     services: Arc<Services>,
     lease: PendingConnectionLease,
     tls: Option<TlsAcceptor>,
@@ -269,7 +263,10 @@ async fn serve_accepted(
         } else {
             Box::new(socket)
         };
-        let (classified, stream) = if let Some(transport) = transport {
+        if matches!(kind, ListenerKind::Management) {
+            return crate::management_http::connection(stream, peer, services.clone(), lease.into_management()?, stop).await;
+        }
+        let (classified, stream) = if let ListenerKind::Device(transport) = kind {
             (transport, stream)
         } else {
             let limits = &services.ingress.limits;
@@ -288,12 +285,10 @@ async fn serve_accepted(
                 reason.error()
             })?
         };
-        transport = Some(classified);
         let lease = lease.classify(classified).inspect_err(|_| {
             services.ingress.metrics.inc(Metric::ConnectionsRejected);
         })?;
         match classified {
-            Transport::Http => crate::http::connection(stream, peer, services.clone(), lease, stop).await,
             Transport::Mqtt => crate::mqtt::connection(stream, services.clone(), lease, stop).await,
             Transport::Tcp => crate::tcp::connection(stream, services.clone(), lease, stop).await,
             Transport::Udp => Err(Error::Invalid),
@@ -303,7 +298,7 @@ async fn serve_accepted(
         if matches!(error, Error::Timeout) {
             services.ingress.metrics.inc(Metric::Timeouts);
         }
-        tracing::debug!(?transport, %error, "connection closed");
+        tracing::debug!(?kind, %error, "connection closed");
     }
 }
 
