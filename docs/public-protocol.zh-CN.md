@@ -4,7 +4,7 @@
 
 强类型公共标识包括 `TenantId`、`ProductId`、`DeviceId`、`DeviceKey`、`EventId`、`DeliveryId`、`CommandId`、`SinkId` 和 `SubscriptionId`。使用前会验证这些标识。UTC 时间戳使用 Unix 毫秒。
 
-`DeviceEvent` 包含稳定的 `event_id`、来源消息 ID、权威设备身份、接收/发生时间，以及一种有类型的事件：telemetry、heartbeat、设备事件、连接/断开或命令 ACK。重启重放会保留 event ID。`DeliveryId` 标识一次流投递尝试，重连后可能变化。
+`DeviceEvent` 包含稳定的 `event_id`、来源消息 ID、权威设备身份、接收/发生时间，以及一种有类型的事件：telemetry、heartbeat、设备事件或命令 ACK。重启重放会保留 event ID。`DeliveryId` 标识一次流投递尝试，重连后可能变化。
 
 需确认流使用四字节大端序长度帧封装有界 JSON。客户端先发送包含版本/认证信息的 `hello`，再发送包含有界 `EventFilter` 的 `subscribe`。服务端回复 `ready`，随后发送包含 `EventDelivery` 的 `event` 帧。客户端通过 `ack` 确认处理结果；其中必须包含 `delivery_id`、`subscription_id` 和 `event_id`。写入成功或解码成功都不算 ACK。
 
@@ -19,3 +19,9 @@
 不包含管理连接。UDP 无会话，活动连接数为零。设备 JSON v1、MQTT 3.1.1、TCP 分帧、
 NBI1/NBA1 以及业务确认流 v1 均不变，wire version 不变。公共客户端应与服务器一起重新构建。
 详见[迁移说明](remove-device-http.md)。
+
+连接 presence 属于 Sessions 和管理连接查询，不是业务事件。此次 0.x 清理从公共
+Rust/JSON 模型和筛选条件中移除了未使用的连接生命周期类型，属于公共 API 破坏性变更。
+请删除旧筛选条件并重新构建客户端；受支持的设备上报和业务流分帧仍使用 wire v1。
+参阅[兼容性说明](connection-events-spool-upgrade-cleanup.md)以及
+[旧 spool 升级步骤](restart-spool.md#legacy-configack-restart-spool-compatibility)。

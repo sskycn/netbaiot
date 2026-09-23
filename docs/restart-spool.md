@@ -50,7 +50,48 @@ either commit keeps the process alive and unready with bounded retry; failed Eve
 attempts remove their private temporary file. SIGKILL, OS crash, or power loss may
 discard recent in-memory changes and must not be described as crash durability.
 
-Before upgrading across removed event variants, drain pending deliveries with the
-old binary and consumers first. An old config-ACK record cannot be decoded by this
-release. Never delete committed pending work to force an upgrade; see
-[ownership migration](remove-device-config.md). Framing and spool versions are unchanged.
+## Legacy ConfigAck restart spool compatibility
+
+NBSP container versions 1 and 2 remain readable for supported event records:
+telemetry, device event, heartbeat, and command acknowledgement. These container
+versions do not independently version the embedded `DeviceEvent` JSON schema.
+This cleanup leaves framing, checksum, generation, and supported-record encoding
+unchanged; it does not modify the independent MQTT recovery format.
+
+A checksummed record whose exact `event.kind.kind` discriminator is `config_ack`
+cannot be delivered by this release. Recovery returns `Error::IncompatibleSpool`
+and logs:
+
+```text
+EventBus restart recovery failed; startup blocked error=restart spool contains legacy ConfigAck records created by an older NetbaIoT version; drain or complete the old spool with the previous release before upgrading; committed files are preserved
+```
+
+Startup fails before listeners bind or readiness becomes true. The new process
+neither skips nor converts the event, deletes the file, nor overwrites the pending
+responsibility. Unknown kinds, corrupt framing/checksums, malformed JSON, and
+excessively nested diagnostics remain invalid input rather than being mislabeled
+as ConfigAck. Inspection runs only after bounded record/checksum validation and
+current deserialization failure, without materializing a full JSON tree.
+
+If this error occurs, preserve the entire recovery directory and:
+
+1. Run the previous release with the original configuration/recovery directory and
+   compatible business consumers. Keep device traffic stopped externally so new
+   legacy records cannot arrive while existing required deliveries recover.
+2. Allow the required consumers to acknowledge replayed work. With the previous
+   release's CLI and existing admin credentials, inspect `netbaiot server status`
+   (using the deployment's `--endpoint` / `NETBAIOT_ENDPOINT` and `NETBAIOT_TOKEN`).
+   Wait for `pending_required` to reach zero and committed EventBus `.spool` files
+   to be removed by the gateway. Do not remove them yourself.
+3. Request planned shutdown with `netbaiot server drain --yes`, or send SIGTERM.
+   Verify successful exit and no remaining pending EventBus `.spool` records.
+   A successful drain can spool undelivered work, so exit alone is insufficient.
+4. Upgrade and restart with the same recovery directory, then restore device
+   traffic after readiness succeeds. Preserve `mqtt-runtime.state` for its
+   independent planned-restart responsibilities.
+
+The new release refuses to silently discard old required work. If the old consumer
+cannot acknowledge it, resolve that responsibility with the previous release before
+upgrading. Do not delete committed records to bypass the check. See the
+[configuration ownership migration](remove-device-config.md) and
+[connection event compatibility review](connection-events-spool-upgrade-cleanup.md).

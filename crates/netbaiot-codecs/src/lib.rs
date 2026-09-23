@@ -147,7 +147,6 @@ impl JsonV1 {
             }
             DeviceEventKind::Heartbeat(_) => true,
             DeviceEventKind::CommandAck(a) => a.execution != ExecutionState::Unknown,
-            DeviceEventKind::Connected(_) | DeviceEventKind::Disconnected(_) => false,
         }
     }
 }
@@ -255,6 +254,8 @@ mod tests {
             b"{".as_slice(),
             b"[]",
             br#"{"schema_version":1,"source_message_id":"x","kind":"config_ack","data":{}}"#,
+            br#"{"schema_version":1,"source_message_id":"x","kind":"connected","data":{"session_generation":1}}"#,
+            br#"{"schema_version":1,"source_message_id":"x","kind":"disconnected","data":{"session_generation":1}}"#,
             br#"{"schema_version":1,"source_message_id":"x","kind":"config_ack","data":{"revision":42,"status":"applied"}}"#,
             b"\xff",
             b"{\"data\": [[[[[[[[[0]]]]]]]]]}",

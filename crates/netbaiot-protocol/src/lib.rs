@@ -135,8 +135,6 @@ pub enum DeviceEventKind {
     Telemetry(BTreeMap<String, Scalar>),
     DeviceEvent(DeviceEventPayload),
     Heartbeat(Heartbeat),
-    Connected(DeviceConnected),
-    Disconnected(DeviceDisconnected),
     CommandAck(CommandAck),
 }
 
@@ -146,8 +144,6 @@ impl DeviceEventKind {
             Self::Telemetry(_) => EventType::Telemetry,
             Self::DeviceEvent(_) => EventType::DeviceEvent,
             Self::Heartbeat(_) => EventType::Heartbeat,
-            Self::Connected(_) => EventType::Connected,
-            Self::Disconnected(_) => EventType::Disconnected,
             Self::CommandAck(_) => EventType::CommandAck,
         }
     }
@@ -159,8 +155,6 @@ pub enum EventType {
     Telemetry,
     DeviceEvent,
     Heartbeat,
-    Connected,
-    Disconnected,
     CommandAck,
 }
 
@@ -183,18 +177,6 @@ pub struct Heartbeat {
 pub struct CommandAck {
     pub command_id: CommandId,
     pub execution: ExecutionState,
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct DeviceConnected {
-    pub session_generation: u64,
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct DeviceDisconnected {
-    pub session_generation: u64,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -674,6 +656,44 @@ mod tests {
         });
         assert!(serde_json::from_value::<StreamClientFrame>(strict_client).is_err());
     }
+    #[test]
+    fn connection_lifecycle_is_not_an_event_or_subscription_filter() {
+        for kind in ["connected", "disconnected"] {
+            assert!(serde_json::from_value::<EventType>(serde_json::json!(kind)).is_err());
+            assert!(
+                serde_json::from_value::<EventFilter>(serde_json::json!({
+                    "event_types": [kind]
+                }))
+                .is_err()
+            );
+            assert!(
+                serde_json::from_value::<DeviceEventKind>(serde_json::json!({
+                    "kind": kind, "data": {"session_generation": 1}
+                }))
+                .is_err()
+            );
+            assert!(
+                serde_json::from_value::<DeviceUplink>(serde_json::json!({
+                    "schema_version": 1, "source_message_id": "lifecycle",
+                    "kind": kind, "data": {"session_generation": 1}
+                }))
+                .is_err()
+            );
+        }
+        for (wire, kind) in [
+            ("telemetry", EventType::Telemetry),
+            ("device_event", EventType::DeviceEvent),
+            ("heartbeat", EventType::Heartbeat),
+            ("command_ack", EventType::CommandAck),
+        ] {
+            assert_eq!(serde_json::to_value(kind).unwrap(), wire);
+            assert_eq!(
+                serde_json::from_value::<EventType>(serde_json::json!(wire)).unwrap(),
+                kind
+            );
+        }
+    }
+
     #[test]
     fn removed_business_configuration_is_not_a_public_wire_variant() {
         assert!(serde_json::from_str::<EventType>(r#""config_ack""#).is_err());

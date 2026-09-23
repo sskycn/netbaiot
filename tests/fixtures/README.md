@@ -1,4 +1,9 @@
-# Test-only TLS fixture
+# Test fixtures
+
+Historical EventBus spool compatibility fixtures and their reproducible generator
+are documented in [restart-spool/README.md](restart-spool/README.md).
+
+## Test-only TLS fixture
 
 The published private key and self-signed certificate in this directory are solely
 for the TLS integration test. They are not credentials for any deployment. The
