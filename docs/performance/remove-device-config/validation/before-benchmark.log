@@ -1,0 +1,40 @@
+{"name": "config-before-mqtt-0", "cpu": 186.70253667503698, "groups": {"mqtt": {"rate": 43669.7, "success": 97.1, "p99": 2.1, "counters": {"accepted": 1310092, "attempted": 1349268, "authenticated": 13131, "authenticated_total": 15394, "connect_attempts": 13131, "connect_attempts_total": 15394, "connected": 13131, "connected_total": 15394, "disconnects": 13126, "remote_close": 13126, "schedule_missed": 638, "scheduled": 1350152, "unconfirmed": 37273}}}}
+{"name": "config-before-mqtt-1", "cpu": 166.75022661572845, "groups": {"mqtt": {"rate": 43657.1, "success": 97.13, "p99": 2.43, "counters": {"accepted": 1309712, "attempted": 1348403, "authenticated": 12774, "authenticated_total": 15084, "connect_attempts": 12777, "connect_attempts_total": 15084, "connected": 12774, "connected_total": 15084, "disconnects": 12776, "remote_close": 12776, "schedule_missed": 1079, "scheduled": 1349901, "unconfirmed": 36144}}}}
+{"name": "config-before-mqtt-2", "cpu": 200.10426261186595, "groups": {"mqtt": {"rate": 43595.5, "success": 96.96, "p99": 2.25, "counters": {"accepted": 1307865, "attempted": 1348868, "authenticated": 13134, "authenticated_total": 15326, "connect_attempts": 13134, "connect_attempts_total": 15326, "connected": 13134, "connected_total": 15326, "disconnects": 13134, "remote_close": 13134, "schedule_missed": 812, "scheduled": 1350004, "unconfirmed": 38934}}}}
+{"name": "config-before-tcp-0", "cpu": 177.89382850458972, "groups": {"tcp": {"rate": 43660.8, "success": 97.13, "p99": 2.39, "counters": {"accepted": 1309825, "attempted": 1348556, "authenticated": 13088, "authenticated_total": 15354, "connect_attempts": 13088, "connect_attempts_total": 15354, "connected": 13088, "connected_total": 15354, "disconnects": 13087, "remote_close": 13087, "schedule_missed": 895, "scheduled": 1350095, "unconfirmed": 35822}}}}
+{"name": "config-before-tcp-1", "cpu": 189.89822690895897, "groups": {"tcp": {"rate": 43650.1, "success": 97.07, "p99": 2.32, "counters": {"accepted": 1309503, "attempted": 1349061, "authenticated": 13112, "authenticated_total": 15353, "connect_attempts": 13112, "connect_attempts_total": 15353, "connected": 13112, "connected_total": 15353, "disconnects": 13109, "remote_close": 13109, "schedule_missed": 918, "scheduled": 1350094, "unconfirmed": 37532}}}}
+{"name": "config-before-tcp-2", "cpu": 174.2175070276923, "groups": {"tcp": {"rate": 43693.6, "success": 97.25, "p99": 2.53, "counters": {"accepted": 1310809, "attempted": 1347821, "authenticated": 12801, "authenticated_total": 14995, "connect_attempts": 12801, "connect_attempts_total": 14995, "connected": 12801, "connected_total": 14995, "disconnects": 12807, "remote_close": 12807, "schedule_missed": 1873, "scheduled": 1350041, "unconfirmed": 33789}}}}
+Traceback (most recent call last):
+  File "/Users/sam/Dev/work/sskycn/netbaiot/scripts/perf/device_protocol_benchmark.py", line 188, in run
+    control.get('ready')
+  File "/Users/sam/Dev/work/sskycn/netbaiot/scripts/perf/device_protocol_benchmark.py", line 79, in get
+    self.http.request('GET', '/api/v1/' + path, headers={'Authorization': 'Bearer ' + 'ab' * 32})
+  File "/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/http/client.py", line 1257, in request
+    self._send_request(method, url, body, headers, encode_chunked)
+  File "/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/http/client.py", line 1303, in _send_request
+    self.endheaders(body, encode_chunked=encode_chunked)
+  File "/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/http/client.py", line 1252, in endheaders
+    self._send_output(message_body, encode_chunked=encode_chunked)
+  File "/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/http/client.py", line 1012, in _send_output
+    self.send(msg)
+  File "/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/http/client.py", line 952, in send
+    self.connect()
+  File "/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/http/client.py", line 923, in connect
+    self.sock = self._create_connection(
+  File "/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/socket.py", line 843, in create_connection
+    raise err
+  File "/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/socket.py", line 831, in create_connection
+    sock.connect(sa)
+ConnectionRefusedError: [Errno 61] Connection refused
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/sam/Dev/work/sskycn/netbaiot/scripts/perf/device_protocol_benchmark.py", line 335, in <module>
+    main()
+  File "/Users/sam/Dev/work/sskycn/netbaiot/scripts/perf/device_protocol_benchmark.py", line 331, in main
+    run(plan, repeat, selected)
+  File "/Users/sam/Dev/work/sskycn/netbaiot/scripts/perf/device_protocol_benchmark.py", line 193, in run
+    raise RuntimeError((folder / 'server.log').read_text())
+RuntimeError: Error: Unavailable
+

@@ -1,0 +1,19 @@
+   Compiling netbaiot-fuzz v0.0.0 (/Users/sam/Dev/work/sskycn/netbaiot/fuzz)
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.28s
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.03s
+     Running `fuzz/target/aarch64-apple-darwin/release/device_classifier -artifact_prefix=/Users/sam/Dev/work/sskycn/netbaiot/fuzz/artifacts/device_classifier/ -max_total_time=60 -max_len=65537 /Users/sam/Dev/work/sskycn/netbaiot/fuzz/corpus/device_classifier`
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 2202625687
+INFO: Loaded 1 modules   (243080 inline 8-bit counters): 243080 [0x101c862d0, 0x101cc1858), 
+INFO: Loaded 1 PC tables (243080 PCs): 243080 [0x101cc1858,0x1020770d8), 
+INFO:      149 files found in /Users/sam/Dev/work/sskycn/netbaiot/fuzz/corpus/device_classifier
+INFO: seed corpus: files: 149 min: 1b max: 12b total: 846b rss: 43Mb
+#150	INITED cov: 80 ft: 249 corp: 106/644b exec/s: 0 rss: 45Mb
+#65536	pulse  cov: 80 ft: 249 corp: 106/644b lim: 656 exec/s: 21845 rss: 51Mb
+#131072	pulse  cov: 80 ft: 249 corp: 106/644b lim: 1305 exec/s: 18724 rss: 57Mb
+#262144	pulse  cov: 80 ft: 249 corp: 106/644b lim: 2616 exec/s: 18724 rss: 68Mb
+#524288	pulse  cov: 80 ft: 249 corp: 106/644b lim: 5229 exec/s: 18724 rss: 91Mb
+#874717	REDUCE cov: 80 ft: 249 corp: 106/642b lim: 8713 exec/s: 18611 rss: 122Mb L: 10/12 MS: 2 EraseBytes-CrossOver-
+#1048576	pulse  cov: 80 ft: 249 corp: 106/642b lim: 10442 exec/s: 18396 rss: 138Mb
+#1103173	DONE   cov: 80 ft: 249 corp: 106/642b lim: 10988 exec/s: 18084 rss: 142Mb
+Done 1103173 runs in 61 second(s)

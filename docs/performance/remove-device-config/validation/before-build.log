@@ -1,0 +1,9 @@
+   Compiling netbaiot-protocol v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-protocol)
+   Compiling netbaiot-core v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-core)
+   Compiling netbaiot-client v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-client)
+   Compiling netbaiot-runtime v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-runtime)
+   Compiling netbaiot-codecs v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-codecs)
+   Compiling netbaiot-transports v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-transports)
+   Compiling netbaiot-server v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/apps/netbaiot-server)
+   Compiling netbaiot-loadgen v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/tools/netbaiot-loadgen)
+    Finished `release` profile [optimized] target(s) in 9.72s

@@ -1,0 +1,24 @@
+   Compiling netbaiot-server v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/apps/netbaiot-server)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.81s
+     Running tests/official_client.rs (target/debug/deps/official_client-24561382717af871)
+
+running 3 tests
+test official_clients_cover_mqtt_tcp_command_ack_status_and_offline_contracts ... FAILED
+test official_client_throughput_latency_and_idle_memory_measurement ... ok
+test official_client_reconnects_and_replays_unacked_event_with_same_id ... ok
+
+failures:
+
+---- official_clients_cover_mqtt_tcp_command_ack_status_and_offline_contracts stdout ----
+
+thread 'official_clients_cover_mqtt_tcp_command_ack_status_and_offline_contracts' panicked at apps/netbaiot-server/tests/official_client.rs:385:38:
+called `Result::unwrap()` on an `Err` value: Transport("error sending request for url (http://127.0.0.1:58549/api/v1/drain)")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    official_clients_cover_mqtt_tcp_command_ack_status_and_offline_contracts
+
+test result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.88s
+
+error: test failed, to rerun pass `-p netbaiot-server --test official_client`
