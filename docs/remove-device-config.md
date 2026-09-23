@@ -24,7 +24,7 @@ Implementation: `eb20e865b368b14f32bceac580c7215ed1ae2634`.
 | Examples | `netbaiot-client/examples/update_device_config.rs`, development/tutorial JSON | Replace example with an application-defined ordinary command; tutorial remains MQTT/TCP/UDP events plus commands |
 | Benchmarks | Foundation config hit/miss microbench; performance generators emit `device_configs: []` | Delete obsolete config bench, keep auth/event/transport measurements; use same frozen loadgen for fresh before/after MQTT/TCP/UDP runs |
 
-`DeviceConnected` and `DeviceDisconnected` are public domain types, but baseline
+`DeviceConnected` and `DeviceDisconnected` were public domain types at this report’s baseline, but baseline
 MQTT/TCP session registration/drop do not emit these DeviceEvents. Session leases,
 generation fencing and management connection queries remain the actual presence
 mechanisms. This task will not add a presence subsystem.
@@ -75,7 +75,7 @@ comparison, reconciliation loop or UDP command path. See
 [`send_application_command.rs`](../crates/netbaiot-client/examples/send_application_command.rs).
 
 Business reconciliation may start from an application's presence/heartbeat logic
-or management connection queries. Connected/Disconnected public types remain, but
+or management connection queries. At this report’s baseline, Connected/Disconnected public types remained, but
 current MQTT/TCP register/drop paths **do not emit automatic presence DeviceEvents**.
 Do not wait for a built-in DeviceConnected event that this implementation does not
 produce. Session generation fencing, connection timestamps and offline command
@@ -308,3 +308,8 @@ tail latency do not show an evident regression in the measured scope.
 
 Implementation and evidence are integrated locally into `main`; the task branch
 is deleted after integration. Nothing is pushed.
+
+Follow-up: the dead connection event variants are now removed; see
+[connection event cleanup](connection-events-spool-upgrade-cleanup.md). Legacy
+ConfigAck spool failures now have a typed diagnostic and an explicit
+[pre-upgrade drain procedure](restart-spool.md#legacy-configack-restart-spool-compatibility).

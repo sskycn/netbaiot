@@ -13,9 +13,16 @@ milliseconds.
 
 `DeviceEvent` contains a stable `event_id`, source message ID, authoritative device
 identity, receive/occurrence times, and one typed event kind: telemetry, heartbeat,
-device event, connect/disconnect, or command ACK. Restart replay retains
+device event, or command ACK. Restart replay retains
 the event ID. `DeliveryId` instead identifies one stream delivery attempt and may
 change after reconnect.
+
+Connection presence belongs to Sessions and management connection queries, not the
+business event stream. The 0.x connection-event cleanup removes the unused lifecycle
+variants and filter strings from the public Rust/JSON model. Rebuild clients and
+remove obsolete filters; supported device uplinks and confirmed stream framing keep
+wire version 1. See the [compatibility review](connection-events-spool-upgrade-cleanup.md)
+and [legacy spool upgrade procedure](restart-spool.md#legacy-configack-restart-spool-compatibility).
 
 The confirmed stream uses four-byte big-endian length framing around bounded JSON.
 The client sends `hello` with version/authentication, then `subscribe` with a bounded

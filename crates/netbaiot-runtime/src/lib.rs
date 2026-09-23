@@ -45,6 +45,10 @@ pub enum Error {
     Draining,
     #[error("storage operation failed")]
     Storage,
+    #[error(
+        "restart spool contains legacy ConfigAck records created by an older NetbaIoT version; drain or complete the old spool with the previous release before upgrading; committed files are preserved"
+    )]
+    IncompatibleSpool,
     #[error("device unavailable")]
     Unavailable,
     #[error("internal synchronization failure")]

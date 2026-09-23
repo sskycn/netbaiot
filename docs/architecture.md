@@ -146,6 +146,10 @@ application decides whether its desired state has converged. Commands remain
 online-only; UDP remains sessionless with no downlink. See the
 [ownership migration](remove-device-config.md).
 
-Connected/Disconnected types remain, but current MQTT/TCP sessions do not emit
-automatic presence events. Applications use their own presence/heartbeat logic
-or management connection queries to initiate reconciliation.
+Connection presence is control-plane/runtime state, not a `DeviceEvent`.
+`Sessions`, presence timestamps, session generations, and management connection
+queries retain current MQTT/TCP online state and UDP `last_seen` observations.
+The business stream contains telemetry, device events, device-originated heartbeat,
+and command acknowledgements only. NetbaIoT does not emit durable online/offline
+events. Applications needing presence history own it through application heartbeat,
+management polling, external monitoring, or business-specific presence logic.
