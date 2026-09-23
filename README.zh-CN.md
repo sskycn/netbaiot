@@ -66,3 +66,13 @@ while let Some(delivery) = events.next().await {
 命令通过 `client.commands().send(&command)` 发送，配置使用 `client.configs()`，运行操作使用 `client.runtime()`。离线设备会返回类型化的 `ClientError::DeviceOffline`；NetbaIoT 不会存储命令。
 
 可选的 `netbaiot-device-sdk` 支持标准 MQTT 遥测/命令和设备 HTTP 上传/配置，不造成厂商锁定。标准 MQTT 3.1.1 客户端仍是一等支持对象。`netbaiot` CLI 提供状态、事件订阅、命令、配置、缓存失效和显式 drain 操作。参阅 [SDK 概览](docs/sdk.zh-CN.md)、[业务客户端](docs/client.zh-CN.md)、[设备 SDK](docs/device-sdk.zh-CN.md)和 [CLI](docs/cli.zh-CN.md)。
+
+## 发布到 GitHub Releases
+
+确认工作区干净且当前分支已同步到 `origin`，然后传入新版本运行：
+
+```bash
+scripts/release.sh v0.1.1
+```
+
+脚本会更新 `Cargo.toml` 和 `Cargo.lock` 中的 workspace 版本，单独提交版本变更，再推送当前分支和标签。标签推送后，GitHub Actions 会构建 Linux x86_64/ARM64、macOS Intel/Apple Silicon 和 Windows x86_64 发布包，生成 `SHA256SUMS`，并创建 GitHub Release。预发布版本可使用 `vX.Y.Z-...` 格式；完整用法见 `scripts/release.sh --help`。
