@@ -1,4 +1,5 @@
 //! Separate, bounded real-network workload process. Test credentials only.
+mod mixed;
 use bytes::{Buf, BytesMut};
 use hmac::{Hmac, Mac};
 use serde::{Deserialize, Serialize};
@@ -1209,6 +1210,14 @@ async fn run_audit(c: Config) -> Result<()> {
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 4)]
 async fn main() -> Result<()> {
+    if std::env::args().nth(1).as_deref() == Some("--mixed") {
+        return mixed::run(
+            &std::env::args()
+                .nth(2)
+                .ok_or("mixed config path required")?,
+        )
+        .await;
+    }
     let path = std::env::args()
         .nth(1)
         .ok_or("usage: netbaiot-loadgen CONFIG.json")?;
