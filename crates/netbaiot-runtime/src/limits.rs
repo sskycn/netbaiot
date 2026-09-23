@@ -9,8 +9,6 @@ pub struct Limits {
     /// Device ingress only. Effective ceiling is also bounded by the global maximum.
     /// Management/standalone transport listeners retain their existing global accounting.
     pub max_device_connections_per_protocol: usize,
-    /// Device connections still in TLS or protocol classification; shares global permits.
-    pub max_unclassified_device_connections: usize,
     pub max_connections_per_ip: usize,
     pub max_connections_per_device: usize,
     pub max_connections_per_tenant: usize,
@@ -130,7 +128,6 @@ impl Default for Limits {
         Self {
             max_connections: 256,
             max_device_connections_per_protocol: 192,
-            max_unclassified_device_connections: 64,
             max_connections_per_ip: 32,
             max_connections_per_device: 2,
             max_connections_per_tenant: 64,
