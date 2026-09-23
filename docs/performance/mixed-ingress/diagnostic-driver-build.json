@@ -1,0 +1,13 @@
+{
+  "source_parent_revision": "b107df1cc95d1081ce2da409dda5d8673110b998",
+  "source_file": "tools/netbaiot-loadgen/src/mixed.rs",
+  "source_sha256": "e3dc7d1c0a67a88ac19c022ac4125e453fb90adf83262c30162b0d6931a11865",
+  "binary_sha256": "f88bd128cbeeba8b95aedc83f5ef92216152744b76423203473c2125597fb559",
+  "command": "cargo +1.88.0 build --release --locked -p netbaiot-loadgen",
+  "checks": [
+    "cargo +1.88.0 fmt --all -- --check",
+    "cargo +1.88.0 clippy -p netbaiot-loadgen --all-targets -- -D warnings"
+  ],
+  "result": "PASS",
+  "changes": "Benchmark-only schema_version=2, monotonic final elapsed time, and AddrNotAvailable error classification; scheduling and server production code unchanged. Source changes were uncommitted at build time and are included in the final audit commit."
+}

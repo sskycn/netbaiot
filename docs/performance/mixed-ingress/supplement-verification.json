@@ -1,0 +1,14 @@
+{
+  "checked": 15,
+  "measurement_seconds": 450,
+  "missing": [],
+  "failures": [],
+  "clock_offsets": [],
+  "server_hashes": {
+    "baseline": [
+      "52507235fda2a7dad65156fb693023ab8c6c191bed38aa4dad4b263d334aafe8"
+    ]
+  },
+  "cleanup_policy": "Device connections and required work return to zero. Immediate sink tasks return to idle baseline; HTTP sink may retain <= sink concurrency idle connections plus one owned pool timer. Child exits must be normal.",
+  "passed": true
+}
