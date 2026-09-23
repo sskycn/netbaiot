@@ -18,5 +18,8 @@
     "Reproducible 9600 HTTP/s host-wide stall with EADDRNOTAVAIL; complete cause unresolved",
     "UDP-heavy offered load limited by bounded client windows/shared-host competition; no syscall attribution"
   ],
-  "push": false
+  "push": false,
+  "integration_revision": "0c804f0fcfc3d9fdea6a343a6f61617767e20d47",
+  "integration_validation_file": "performance/mixed-ingress/integration-validation.json",
+  "integration_semantics_file": "performance/mixed-ingress/integration-semantics.json"
 }
