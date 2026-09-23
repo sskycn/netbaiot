@@ -323,3 +323,10 @@ MQTT 3.1.1 behavior changes require conformance regression against raw
 state-machine tests and at least one mature external MQTT client. Mosquitto is a
 test/reference implementation only and must never become a NetbaIoT runtime
 dependency.
+
+## Git completion workflow
+
+Unless the user explicitly requests otherwise, finish repository change tasks by
+merging the task branch into `main`, committing the result, and pushing `main` to
+`origin` after the required validation passes. Then remove the merged local task
+branch and its clean worktree. Preserve unrelated branches and user changes.

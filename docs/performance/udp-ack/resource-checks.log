@@ -1,0 +1,3 @@
+All 112 baseline/final defaults identical; all 111 listed snapshot values match: PASS
+Pre-existing snapshot omission: presence_ttl_ms=3600000 in both baseline and final; not changed by this task
+example ACK verification: valid vector + 69 malformed/tampered/mismatched vectors PASS

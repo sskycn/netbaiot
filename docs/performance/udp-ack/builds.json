@@ -1,0 +1,8 @@
+{
+  "baseline_commit": "ef9a8837e39aafc7777997be2927a58fd051a071",
+  "baseline_binary_sha256": "2a9f737110cc33bc9a56d3cf3c436b2e8389f143cd45b3f71fdc521aa6a2938b",
+  "final_binary_sha256": "4119df64ee25a0d1fccdc90d4a11828254fced4294d447ba801fb11e482731a4",
+  "probe_binary_sha256": "ba41edb4a15fdd2ad4c62581dbf9b169894d91d847e270b6995a2c7b5ba0a0b8",
+  "note": "The measured feature commit precedes its merge with other main-branch work. Sign-only diagnostics precede the final UDP-new-acceptance counter; production always sends NBA1.",
+  "final_measured_commit": "bf9c611bc16d1fb9c95b21c939f9ef00e4530ddc"
+}

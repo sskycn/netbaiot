@@ -44,3 +44,10 @@ uses that order for cache removal, active cancellation, and persistent MQTT-sess
 removal, so a stale candidate cannot recreate state after revocation completes.
 Management results separately report cache entries, network connections, and
 persistent MQTT sessions; offline state is not a disconnected connection.
+
+Signed UDP ACKs reuse the verifier from the one lookup/HMAC verification. The raw
+32-byte key remains private, with no Debug/serialization. An epoch-fenced synchronous
+completion signs and tries to send NBA1 under the auth-cache lock, so invalidation
+cannot race an old signer past that boundary. Unrelated invalidations conservatively
+suppress outstanding receipts too; accepted work remains committed and may be
+confirmed by an authenticated retry.
