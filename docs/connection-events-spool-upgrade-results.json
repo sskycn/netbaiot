@@ -1,0 +1,1364 @@
+{
+  "baseline": "6595ebe6775ed630d691ca93f3551278525387b0",
+  "validation_logs": {
+    "fmt": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "check": {
+      "sha256": "19c46ac1973300cccfe1faedcd4b91462c2c4f232a4dce0678c8f5a9a68abfc2",
+      "bytes": 167
+    },
+    "clippy": {
+      "sha256": "ad885a1b5a20be3edeacbc2b74028fc52eaa49d01bd8b2c65b986f0a4603a177",
+      "bytes": 167
+    },
+    "tests-all-targets": {
+      "sha256": "5c4f3df8de28cfb5753c541a5f74fb850e90c985186528b1dfaac9691fdeecfb",
+      "bytes": 25166
+    },
+    "tests-all-features": {
+      "sha256": "95f09378b4e0d9cb0506bf6b60de0acb459f7fb9ac7a4af38d2fbdc8e650f907",
+      "bytes": 19252
+    },
+    "spool-tests": {
+      "sha256": "5a406085646cbbac21c4c99146237304b418ceb4f02fe14c10dd83c4f748d2d0",
+      "bytes": 1485
+    },
+    "restart-soak": {
+      "sha256": "d323af83c5826ad679a6395cb193d699e7dcf2b939fedc00a671bd33067e7cf5",
+      "bytes": 406
+    },
+    "mqtt-release-gate": {
+      "sha256": "45f47683f41b91f8d82575821ff6e5c0ee6fd0e501dbfb64c26b2dd6e66f2dcf",
+      "bytes": 8539
+    },
+    "tutorial-smoke": {
+      "sha256": "6c216d0ce4ddbf200e2f022f13626ab85e369cab97f22e452decfb584794107d",
+      "bytes": 1607
+    },
+    "fuzz-restart-spool": {
+      "sha256": "db418158a3638f8a2c0bdffdccee876397fd1637823d0e5a796f1fe5e1f915c4",
+      "bytes": 29254
+    },
+    "fuzz-json-codec": {
+      "sha256": "02b96edbab2b21ea90931fc12393e8ea74cbafb9936db38995cf0e81a51bc75e",
+      "bytes": 267987
+    },
+    "fuzz-classifier": {
+      "sha256": "170d115c61a2dd937af96406c930050593ca1e3f200a7786264e41d3581afb71",
+      "bytes": 1311
+    },
+    "fuzz-udp": {
+      "sha256": "662d4a10433241ec01ca02c57e476b35f5c5bf31500fb21185bfce89a0dce555",
+      "bytes": 13982
+    },
+    "legacy-startup": {
+      "sha256": "5ad6cd7bc703e5dc861206998b9c39f64c315b69a9fb27615883002af94ba9df",
+      "bytes": 324
+    },
+    "check-initial": {
+      "sha256": "187fd77437a26b1befd4b9f67b6b0e3dc88c9f0a7d2fed68569660cc8341fe74",
+      "bytes": 1385
+    },
+    "clippy-initial": {
+      "sha256": "a853e6819f51ae4380a3878ae4eaef33959931613e95a6975330cf4feee0bd62",
+      "bytes": 1402
+    },
+    "mqtt-release-gate-initial": {
+      "sha256": "97f08538fc6001cb28a763be4077da8dd9510c0bb7632128d30bb22e4a63bb6e",
+      "bytes": 1199
+    }
+  },
+  "server_artifacts": {
+    "baseline": {
+      "bytes": 8375536,
+      "sha256": "a70915e1f7eb6d7009add9a229c2151abec8e9f6ff9e515be0e4fde9ac91dfb5"
+    },
+    "candidate": {
+      "bytes": 8377600,
+      "sha256": "fa28f15ad80405ddb4074dcea7e9adb64f27d840de6df13c4c81eab3cb9d2c09"
+    }
+  },
+  "loadgen_sha256": "f13bb8ba99d6d99a0681bc7d266dd0a4b673e9828a4c8956ad981f5044601dc1",
+  "fuzz_executions": {
+    "restart_spool": 1101361,
+    "json_codec": 3679339,
+    "device_classifier": 520866,
+    "udp_envelope": 352936
+  },
+  "workspace_suites": {
+    "all_targets": {
+      "passed": 180,
+      "failed": 0,
+      "ignored": 4
+    },
+    "all_features": {
+      "passed": 180,
+      "failed": 0,
+      "ignored": 4
+    }
+  },
+  "mqtt_gate": {
+    "passed": 76,
+    "failed": 0,
+    "normative_requirements_passed": 125
+  },
+  "restart_soak_seconds": 62.71,
+  "performance": {
+    "method": "Three interleaved paired 10-second loopback runs per protocol/build, 2-second warmup, 1-second ramp; same frozen loadgen, default admission bounds, required AuditSink, plaintext streams; no concurrent compilation/test/fuzz work. Samples can shed work and are not capacity claims.",
+    "summary": {
+      "mqtt": {
+        "baseline": {
+          "accepted_per_second_median": 19908.4,
+          "accepted_per_second_range": [
+            19855.7,
+            19911.5
+          ],
+          "p99_ms_median": 0.86,
+          "p99_ms_range": [
+            0.79,
+            6.96
+          ]
+        },
+        "candidate": {
+          "accepted_per_second_median": 19591.3,
+          "accepted_per_second_range": [
+            19434.8,
+            19931.1
+          ],
+          "p99_ms_median": 9.01,
+          "p99_ms_range": [
+            1.62,
+            10.91
+          ]
+        },
+        "delta_percent": -1.592795001105074
+      },
+      "tcp": {
+        "baseline": {
+          "accepted_per_second_median": 19902.8,
+          "accepted_per_second_range": [
+            19412.5,
+            19945.3
+          ],
+          "p99_ms_median": 1.31,
+          "p99_ms_range": [
+            0.38,
+            9.34
+          ]
+        },
+        "candidate": {
+          "accepted_per_second_median": 19900.3,
+          "accepted_per_second_range": [
+            19887.9,
+            19922.1
+          ],
+          "p99_ms_median": 1.43,
+          "p99_ms_range": [
+            0.61,
+            3.13
+          ]
+        },
+        "delta_percent": -0.012561046686898614
+      },
+      "udp": {
+        "baseline": {
+          "accepted_per_second_median": 29999.9,
+          "accepted_per_second_range": [
+            29948.6,
+            30000.2
+          ],
+          "p99_ms_median": 1.48,
+          "p99_ms_range": [
+            0.98,
+            20.26
+          ]
+        },
+        "candidate": {
+          "accepted_per_second_median": 29999.8,
+          "accepted_per_second_range": [
+            29994.6,
+            30000.7
+          ],
+          "p99_ms_median": 0.87,
+          "p99_ms_range": [
+            0.63,
+            4.65
+          ]
+        },
+        "delta_percent": -0.00033333444445782234
+      }
+    },
+    "runs": [
+      {
+        "name": "baseline-connection-cleanup-mqtt-0-0",
+        "protocol": "mqtt",
+        "variant": "baseline",
+        "seconds": 10,
+        "offered_rate": 20000,
+        "accepted_per_second": 19908.4,
+        "counters": {
+          "accepted": 199084,
+          "attempted": 200008,
+          "authenticated": 780,
+          "authenticated_total": 995,
+          "connect_attempts": 780,
+          "connect_attempts_total": 995,
+          "connected": 780,
+          "connected_total": 995,
+          "disconnects": 785,
+          "remote_close": 785,
+          "schedule_missed": 0,
+          "scheduled": 200008,
+          "unconfirmed": 924
+        },
+        "p99_ms": 0.79,
+        "server_cpu_percent": 73.63098126511454,
+        "server_exit": {
+          "exit_code": 0,
+          "forced": false
+        },
+        "raw_sha256": "9cd4072dcfa8327a33052c4c17325315c0cd04291566e423a663b1c87d3f4e61"
+      },
+      {
+        "name": "baseline-connection-cleanup-mqtt-1-0",
+        "protocol": "mqtt",
+        "variant": "baseline",
+        "seconds": 10,
+        "offered_rate": 20000,
+        "accepted_per_second": 19855.7,
+        "counters": {
+          "accepted": 198557,
+          "attempted": 199978,
+          "authenticated": 400,
+          "authenticated_total": 733,
+          "connect_attempts": 400,
+          "connect_attempts_total": 733,
+          "connected": 400,
+          "connected_total": 733,
+          "disconnects": 415,
+          "remote_close": 415,
+          "schedule_missed": 0,
+          "scheduled": 199993,
+          "unconfirmed": 1341
+        },
+        "p99_ms": 6.96,
+        "server_cpu_percent": 62.61002715912245,
+        "server_exit": {
+          "exit_code": 0,
+          "forced": false
+        },
+        "raw_sha256": "fe0d6241a79df908d9fb75febd02a3e6141b8a5a723803d9cdbbeaf3ca41cb2b"
+      },
+      {
+        "name": "baseline-connection-cleanup-mqtt-2-0",
+        "protocol": "mqtt",
+        "variant": "baseline",
+        "seconds": 10,
+        "offered_rate": 20000,
+        "accepted_per_second": 19911.5,
+        "counters": {
+          "accepted": 199115,
+          "attempted": 200000,
+          "authenticated": 777,
+          "authenticated_total": 911,
+          "connect_attempts": 777,
+          "connect_attempts_total": 911,
+          "connected": 777,
+          "connected_total": 911,
+          "disconnects": 777,
+          "remote_close": 777,
+          "schedule_missed": 0,
+          "scheduled": 200000,
+          "unconfirmed": 885
+        },
+        "p99_ms": 0.86,
+        "server_cpu_percent": 77.60752877751231,
+        "server_exit": {
+          "exit_code": 0,
+          "forced": false
+        },
+        "raw_sha256": "384e679a49024cf0d7a055df05c13e18767f43ae6968706059a09c6c1f9ffcfa"
+      },
+      {
+        "name": "baseline-connection-cleanup-tcp-0-0",
+        "protocol": "tcp",
+        "variant": "baseline",
+        "seconds": 10,
+        "offered_rate": 20000,
+        "accepted_per_second": 19412.5,
+        "counters": {
+          "accepted": 194125,
+          "attempted": 200037,
+          "authenticated": 1615,
+          "authenticated_total": 2116,
+          "connect_attempts": 1615,
+          "connect_attempts_total": 2116,
+          "connected": 1615,
+          "connected_total": 2116,
+          "disconnects": 1601,
+          "remote_close": 1601,
+          "schedule_missed": 0,
+          "scheduled": 200169,
+          "unconfirmed": 5406
+        },
+        "p99_ms": 9.34,
+        "server_cpu_percent": 60.75244436722902,
+        "server_exit": {
+          "exit_code": 0,
+          "forced": false
+        },
+        "raw_sha256": "62673e1b3ed55a0c7b49fb7602d24960dbfabdffda6ca861afff89fcfc6b805e"
+      },
+      {
+        "name": "baseline-connection-cleanup-tcp-1-0",
+        "protocol": "tcp",
+        "variant": "baseline",
+        "seconds": 10,
+        "offered_rate": 20000,
+        "accepted_per_second": 19902.8,
+        "counters": {
+          "accepted": 199028,
+          "attempted": 200001,
+          "authenticated": 859,
+          "authenticated_total": 1065,
+          "connect_attempts": 859,
+          "connect_attempts_total": 1065,
+          "connected": 859,
+          "connected_total": 1065,
+          "disconnects": 860,
+          "remote_close": 860,
+          "schedule_missed": 0,
+          "scheduled": 200001,
+          "unconfirmed": 973
+        },
+        "p99_ms": 0.38,
+        "server_cpu_percent": 71.11161785722318,
+        "server_exit": {
+          "exit_code": 0,
+          "forced": false
+        },
+        "raw_sha256": "85c7b0d4501f3848a0818a5ae0ac72c35af8155746834d087cf3228c2071c9e4"
+      },
+      {
+        "name": "baseline-connection-cleanup-tcp-2-0",
+        "protocol": "tcp",
+        "variant": "baseline",
+        "seconds": 10,
+        "offered_rate": 20000,
+        "accepted_per_second": 19945.3,
+        "counters": {
+          "accepted": 199453,
+          "attempted": 199999,
+          "authenticated": 452,
+          "authenticated_total": 613,
+          "connect_attempts": 452,
+          "connect_attempts_total": 613,
+          "connected": 452,
+          "connected_total": 613,
+          "disconnects": 452,
+          "remote_close": 452,
+          "schedule_missed": 0,
+          "scheduled": 199999,
+          "unconfirmed": 540
+        },
+        "p99_ms": 1.31,
+        "server_cpu_percent": 86.5207548674625,
+        "server_exit": {
+          "exit_code": 0,
+          "forced": false
+        },
+        "raw_sha256": "7680775b827538f06d656622ddc27f740408e48a9e8f5329cb223b4dd41c00db"
+      },
+      {
+        "name": "baseline-connection-cleanup-udp-0-0",
+        "protocol": "udp",
+        "variant": "baseline",
+        "seconds": 10,
+        "offered_rate": 30000,
+        "accepted_per_second": 29948.6,
+        "counters": {
+          "accepted": 299486,
+          "attempted": 299486,
+          "client_window_full": 476,
+          "schedule_missed": 0,
+          "scheduled": 299962,
+          "udp_no_ack": 0
+        },
+        "p99_ms": 20.26,
+        "server_cpu_percent": 56.78115768595061,
+        "server_exit": {
+          "exit_code": 0,
+          "forced": false
+        },
+        "raw_sha256": "e09c6d70817d2de52a4effa5c239007b882f1109cbedd3f98d01a52af0f10d35"
+      },
+      {
+        "name": "baseline-connection-cleanup-udp-1-0",
+        "protocol": "udp",
+        "variant": "baseline",
+        "seconds": 10,
+        "offered_rate": 30000,
+        "accepted_per_second": 30000.2,
+        "counters": {
+          "accepted": 300002,
+          "attempted": 300002,
+          "schedule_missed": 0,
+          "scheduled": 300002,
+          "udp_no_ack": 0
+        },
+        "p99_ms": 1.48,
+        "server_cpu_percent": 54.77775310882455,
+        "server_exit": {
+          "exit_code": 0,
+          "forced": false
+        },
+        "raw_sha256": "0558e8edc37146014f474caee32a4a7bf8add7c3c8806e5088fbf1e77e86ac56"
+      },
+      {
+        "name": "baseline-connection-cleanup-udp-2-0",
+        "protocol": "udp",
+        "variant": "baseline",
+        "seconds": 10,
+        "offered_rate": 30000,
+        "accepted_per_second": 29999.9,
+        "counters": {
+          "accepted": 299999,
+          "attempted": 299999,
+          "schedule_missed": 0,
+          "scheduled": 299999,
+          "udp_no_ack": 0
+        },
+        "p99_ms": 0.98,
+        "server_cpu_percent": 51.90871661994041,
+        "server_exit": {
+          "exit_code": 0,
+          "forced": false
+        },
+        "raw_sha256": "b4277a8dbd4f1672787ffcb66658266de1e93921e06166dae8c6a8587a1da5b1"
+      },
+      {
+        "name": "candidate-connection-cleanup-mqtt-0-0",
+        "protocol": "mqtt",
+        "variant": "candidate",
+        "seconds": 10,
+        "offered_rate": 20000,
+        "accepted_per_second": 19591.3,
+        "counters": {
+          "accepted": 195913,
+          "attempted": 199968,
+          "authenticated": 1194,
+          "authenticated_total": 1373,
+          "connect_attempts": 1194,
+          "connect_attempts_total": 1373,
+          "connected": 1194,
+          "connected_total": 1373,
+          "disconnects": 1194,
+          "remote_close": 1194,
+          "schedule_missed": 0,
+          "scheduled": 199990,
+          "unconfirmed": 3896
+        },
+        "p99_ms": 9.01,
+        "server_cpu_percent": 63.85726537389491,
+        "server_exit": {
+          "exit_code": 0,
+          "forced": false
+        },
+        "raw_sha256": "e2b063f30164e01b0405ec4e5dee87406f18d1cdeec6d1dac2d5fe5e4918e406"
+      },
+      {
+        "name": "candidate-connection-cleanup-mqtt-1-0",
+        "protocol": "mqtt",
+        "variant": "candidate",
+        "seconds": 10,
+        "offered_rate": 20000,
+        "accepted_per_second": 19434.8,
+        "counters": {
+          "accepted": 194348,
+          "attempted": 199903,
+          "authenticated": 1482,
+          "authenticated_total": 2010,
+          "client_window_full": 2,
+          "connect_attempts": 1482,
+          "connect_attempts_total": 2010,
+          "connected": 1482,
+          "connected_total": 2010,
+          "disconnects": 1482,
+          "remote_close": 1482,
+          "schedule_missed": 0,
+          "scheduled": 200011,
+          "unconfirmed": 5192
+        },
+        "p99_ms": 10.91,
+        "server_cpu_percent": 64.15720557033414,
+        "server_exit": {
+          "exit_code": 0,
+          "forced": false
+        },
+        "raw_sha256": "246f81320a813bd4495a4056e6d877a032876b3448588f081de2d457ca46e03d"
+      },
+      {
+        "name": "candidate-connection-cleanup-mqtt-2-0",
+        "protocol": "mqtt",
+        "variant": "candidate",
+        "seconds": 10,
+        "offered_rate": 20000,
+        "accepted_per_second": 19931.1,
+        "counters": {
+          "accepted": 199311,
+          "attempted": 199988,
+          "authenticated": 478,
+          "authenticated_total": 583,
+          "connect_attempts": 478,
+          "connect_attempts_total": 583,
+          "connected": 478,
+          "connected_total": 583,
+          "disconnects": 478,
+          "remote_close": 478,
+          "schedule_missed": 0,
+          "scheduled": 199990,
+          "unconfirmed": 665
+        },
+        "p99_ms": 1.62,
+        "server_cpu_percent": 106.55592251539036,
+        "server_exit": {
+          "exit_code": 0,
+          "forced": false
+        },
+        "raw_sha256": "61f4c2c2ff4af21f2083ed8fa8c0e8d47d81fabf3900bd7b65405c25af7ac885"
+      },
+      {
+        "name": "candidate-connection-cleanup-tcp-0-0",
+        "protocol": "tcp",
+        "variant": "candidate",
+        "seconds": 10,
+        "offered_rate": 20000,
+        "accepted_per_second": 19900.3,
+        "counters": {
+          "accepted": 199003,
+          "attempted": 200005,
+          "authenticated": 502,
+          "authenticated_total": 636,
+          "connect_attempts": 502,
+          "connect_attempts_total": 636,
+          "connected": 502,
+          "connected_total": 636,
+          "disconnects": 501,
+          "remote_close": 501,
+          "schedule_missed": 0,
+          "scheduled": 200005,
+          "unconfirmed": 1002
+        },
+        "p99_ms": 3.13,
+        "server_cpu_percent": 63.46017637068634,
+        "server_exit": {
+          "exit_code": 0,
+          "forced": false
+        },
+        "raw_sha256": "4ed7f5d7b2c287230da463a7fc117aaea78730de9fc2b3a38f621193f22cdda1"
+      },
+      {
+        "name": "candidate-connection-cleanup-tcp-1-0",
+        "protocol": "tcp",
+        "variant": "candidate",
+        "seconds": 10,
+        "offered_rate": 20000,
+        "accepted_per_second": 19887.9,
+        "counters": {
+          "accepted": 198879,
+          "attempted": 199993,
+          "authenticated": 946,
+          "authenticated_total": 1074,
+          "connect_attempts": 946,
+          "connect_attempts_total": 1074,
+          "connected": 946,
+          "connected_total": 1074,
+          "disconnects": 947,
+          "remote_close": 947,
+          "schedule_missed": 0,
+          "scheduled": 199993,
+          "unconfirmed": 1114
+        },
+        "p99_ms": 0.61,
+        "server_cpu_percent": 68.01961192703814,
+        "server_exit": {
+          "exit_code": 0,
+          "forced": false
+        },
+        "raw_sha256": "55adb0f3e5f08493d408437563ef67fc4aeaf9c7f5d39205183f2b6ea47c298c"
+      },
+      {
+        "name": "candidate-connection-cleanup-tcp-2-0",
+        "protocol": "tcp",
+        "variant": "candidate",
+        "seconds": 10,
+        "offered_rate": 20000,
+        "accepted_per_second": 19922.1,
+        "counters": {
+          "accepted": 199221,
+          "attempted": 199990,
+          "authenticated": 666,
+          "authenticated_total": 829,
+          "connect_attempts": 666,
+          "connect_attempts_total": 829,
+          "connected": 666,
+          "connected_total": 829,
+          "disconnects": 666,
+          "remote_close": 666,
+          "schedule_missed": 0,
+          "scheduled": 199989,
+          "unconfirmed": 769
+        },
+        "p99_ms": 1.43,
+        "server_cpu_percent": 93.3093327998373,
+        "server_exit": {
+          "exit_code": 0,
+          "forced": false
+        },
+        "raw_sha256": "12bb1cdfca472b963ebc167ba9c5d177d34d9e5047bf243542b10ca942b1829c"
+      },
+      {
+        "name": "candidate-connection-cleanup-udp-0-0",
+        "protocol": "udp",
+        "variant": "candidate",
+        "seconds": 10,
+        "offered_rate": 30000,
+        "accepted_per_second": 29994.6,
+        "counters": {
+          "accepted": 299946,
+          "attempted": 299946,
+          "schedule_missed": 0,
+          "scheduled": 299946,
+          "udp_no_ack": 0
+        },
+        "p99_ms": 4.65,
+        "server_cpu_percent": 79.93169264070467,
+        "server_exit": {
+          "exit_code": 0,
+          "forced": false
+        },
+        "raw_sha256": "13b62b1115d61ca1a70d5b9351c59d21ee7e2823ea2c6f47b5688661a483872a"
+      },
+      {
+        "name": "candidate-connection-cleanup-udp-1-0",
+        "protocol": "udp",
+        "variant": "candidate",
+        "seconds": 10,
+        "offered_rate": 30000,
+        "accepted_per_second": 29999.8,
+        "counters": {
+          "accepted": 299998,
+          "attempted": 299998,
+          "schedule_missed": 0,
+          "scheduled": 299998,
+          "udp_no_ack": 0
+        },
+        "p99_ms": 0.63,
+        "server_cpu_percent": 50.115921073014135,
+        "server_exit": {
+          "exit_code": 0,
+          "forced": false
+        },
+        "raw_sha256": "d5110bdcefbc7ad6260ed8d2952adad656630cc4ac137c3a854f13dc13ee925d"
+      },
+      {
+        "name": "candidate-connection-cleanup-udp-2-0",
+        "protocol": "udp",
+        "variant": "candidate",
+        "seconds": 10,
+        "offered_rate": 30000,
+        "accepted_per_second": 30000.7,
+        "counters": {
+          "accepted": 300007,
+          "attempted": 300007,
+          "schedule_missed": 0,
+          "scheduled": 300007,
+          "udp_no_ack": 0
+        },
+        "p99_ms": 0.87,
+        "server_cpu_percent": 68.27148242438615,
+        "server_exit": {
+          "exit_code": 0,
+          "forced": false
+        },
+        "raw_sha256": "f4983320e0e2c52e0191b50a0ba45770a4683ec7dbe2a292791e8f62e44b2e87"
+      }
+    ],
+    "plans": [
+      {
+        "name": "connection-cleanup-mqtt-0",
+        "variant": "baseline",
+        "seconds": 10,
+        "warmup": 2,
+        "ramp": 1,
+        "tls": false,
+        "groups": [
+          {
+            "label": "mqtt",
+            "protocol": "mqtt",
+            "rate": 20000,
+            "workers": 32,
+            "offset": 128,
+            "window": 128
+          }
+        ],
+        "production_revision": "6595ebe6775ed630d691ca93f3551278525387b0"
+      },
+      {
+        "name": "connection-cleanup-mqtt-0",
+        "variant": "candidate",
+        "seconds": 10,
+        "warmup": 2,
+        "ramp": 1,
+        "tls": false,
+        "groups": [
+          {
+            "label": "mqtt",
+            "protocol": "mqtt",
+            "rate": 20000,
+            "workers": 32,
+            "offset": 128,
+            "window": 128
+          }
+        ],
+        "production_revision": "working-tree candidate on 6595ebe; binary SHA-256 recorded per run"
+      },
+      {
+        "name": "connection-cleanup-tcp-0",
+        "variant": "baseline",
+        "seconds": 10,
+        "warmup": 2,
+        "ramp": 1,
+        "tls": false,
+        "groups": [
+          {
+            "label": "tcp",
+            "protocol": "tcp",
+            "rate": 20000,
+            "workers": 32,
+            "offset": 256,
+            "window": 128
+          }
+        ],
+        "production_revision": "6595ebe6775ed630d691ca93f3551278525387b0"
+      },
+      {
+        "name": "connection-cleanup-tcp-0",
+        "variant": "candidate",
+        "seconds": 10,
+        "warmup": 2,
+        "ramp": 1,
+        "tls": false,
+        "groups": [
+          {
+            "label": "tcp",
+            "protocol": "tcp",
+            "rate": 20000,
+            "workers": 32,
+            "offset": 256,
+            "window": 128
+          }
+        ],
+        "production_revision": "working-tree candidate on 6595ebe; binary SHA-256 recorded per run"
+      },
+      {
+        "name": "connection-cleanup-udp-0",
+        "variant": "baseline",
+        "seconds": 10,
+        "warmup": 2,
+        "ramp": 1,
+        "tls": false,
+        "groups": [
+          {
+            "label": "udp",
+            "protocol": "udp",
+            "rate": 30000,
+            "workers": 8,
+            "offset": 384,
+            "window": 128
+          }
+        ],
+        "production_revision": "6595ebe6775ed630d691ca93f3551278525387b0"
+      },
+      {
+        "name": "connection-cleanup-udp-0",
+        "variant": "candidate",
+        "seconds": 10,
+        "warmup": 2,
+        "ramp": 1,
+        "tls": false,
+        "groups": [
+          {
+            "label": "udp",
+            "protocol": "udp",
+            "rate": 30000,
+            "workers": 8,
+            "offset": 384,
+            "window": 128
+          }
+        ],
+        "production_revision": "working-tree candidate on 6595ebe; binary SHA-256 recorded per run"
+      },
+      {
+        "name": "connection-cleanup-mqtt-1",
+        "variant": "candidate",
+        "seconds": 10,
+        "warmup": 2,
+        "ramp": 1,
+        "tls": false,
+        "groups": [
+          {
+            "label": "mqtt",
+            "protocol": "mqtt",
+            "rate": 20000,
+            "workers": 32,
+            "offset": 128,
+            "window": 128
+          }
+        ],
+        "production_revision": "working-tree candidate on 6595ebe; binary SHA-256 recorded per run"
+      },
+      {
+        "name": "connection-cleanup-mqtt-1",
+        "variant": "baseline",
+        "seconds": 10,
+        "warmup": 2,
+        "ramp": 1,
+        "tls": false,
+        "groups": [
+          {
+            "label": "mqtt",
+            "protocol": "mqtt",
+            "rate": 20000,
+            "workers": 32,
+            "offset": 128,
+            "window": 128
+          }
+        ],
+        "production_revision": "6595ebe6775ed630d691ca93f3551278525387b0"
+      },
+      {
+        "name": "connection-cleanup-tcp-1",
+        "variant": "candidate",
+        "seconds": 10,
+        "warmup": 2,
+        "ramp": 1,
+        "tls": false,
+        "groups": [
+          {
+            "label": "tcp",
+            "protocol": "tcp",
+            "rate": 20000,
+            "workers": 32,
+            "offset": 256,
+            "window": 128
+          }
+        ],
+        "production_revision": "working-tree candidate on 6595ebe; binary SHA-256 recorded per run"
+      },
+      {
+        "name": "connection-cleanup-tcp-1",
+        "variant": "baseline",
+        "seconds": 10,
+        "warmup": 2,
+        "ramp": 1,
+        "tls": false,
+        "groups": [
+          {
+            "label": "tcp",
+            "protocol": "tcp",
+            "rate": 20000,
+            "workers": 32,
+            "offset": 256,
+            "window": 128
+          }
+        ],
+        "production_revision": "6595ebe6775ed630d691ca93f3551278525387b0"
+      },
+      {
+        "name": "connection-cleanup-udp-1",
+        "variant": "candidate",
+        "seconds": 10,
+        "warmup": 2,
+        "ramp": 1,
+        "tls": false,
+        "groups": [
+          {
+            "label": "udp",
+            "protocol": "udp",
+            "rate": 30000,
+            "workers": 8,
+            "offset": 384,
+            "window": 128
+          }
+        ],
+        "production_revision": "working-tree candidate on 6595ebe; binary SHA-256 recorded per run"
+      },
+      {
+        "name": "connection-cleanup-udp-1",
+        "variant": "baseline",
+        "seconds": 10,
+        "warmup": 2,
+        "ramp": 1,
+        "tls": false,
+        "groups": [
+          {
+            "label": "udp",
+            "protocol": "udp",
+            "rate": 30000,
+            "workers": 8,
+            "offset": 384,
+            "window": 128
+          }
+        ],
+        "production_revision": "6595ebe6775ed630d691ca93f3551278525387b0"
+      },
+      {
+        "name": "connection-cleanup-mqtt-2",
+        "variant": "baseline",
+        "seconds": 10,
+        "warmup": 2,
+        "ramp": 1,
+        "tls": false,
+        "groups": [
+          {
+            "label": "mqtt",
+            "protocol": "mqtt",
+            "rate": 20000,
+            "workers": 32,
+            "offset": 128,
+            "window": 128
+          }
+        ],
+        "production_revision": "6595ebe6775ed630d691ca93f3551278525387b0"
+      },
+      {
+        "name": "connection-cleanup-mqtt-2",
+        "variant": "candidate",
+        "seconds": 10,
+        "warmup": 2,
+        "ramp": 1,
+        "tls": false,
+        "groups": [
+          {
+            "label": "mqtt",
+            "protocol": "mqtt",
+            "rate": 20000,
+            "workers": 32,
+            "offset": 128,
+            "window": 128
+          }
+        ],
+        "production_revision": "working-tree candidate on 6595ebe; binary SHA-256 recorded per run"
+      },
+      {
+        "name": "connection-cleanup-tcp-2",
+        "variant": "baseline",
+        "seconds": 10,
+        "warmup": 2,
+        "ramp": 1,
+        "tls": false,
+        "groups": [
+          {
+            "label": "tcp",
+            "protocol": "tcp",
+            "rate": 20000,
+            "workers": 32,
+            "offset": 256,
+            "window": 128
+          }
+        ],
+        "production_revision": "6595ebe6775ed630d691ca93f3551278525387b0"
+      },
+      {
+        "name": "connection-cleanup-tcp-2",
+        "variant": "candidate",
+        "seconds": 10,
+        "warmup": 2,
+        "ramp": 1,
+        "tls": false,
+        "groups": [
+          {
+            "label": "tcp",
+            "protocol": "tcp",
+            "rate": 20000,
+            "workers": 32,
+            "offset": 256,
+            "window": 128
+          }
+        ],
+        "production_revision": "working-tree candidate on 6595ebe; binary SHA-256 recorded per run"
+      },
+      {
+        "name": "connection-cleanup-udp-2",
+        "variant": "baseline",
+        "seconds": 10,
+        "warmup": 2,
+        "ramp": 1,
+        "tls": false,
+        "groups": [
+          {
+            "label": "udp",
+            "protocol": "udp",
+            "rate": 30000,
+            "workers": 8,
+            "offset": 384,
+            "window": 128
+          }
+        ],
+        "production_revision": "6595ebe6775ed630d691ca93f3551278525387b0"
+      },
+      {
+        "name": "connection-cleanup-udp-2",
+        "variant": "candidate",
+        "seconds": 10,
+        "warmup": 2,
+        "ramp": 1,
+        "tls": false,
+        "groups": [
+          {
+            "label": "udp",
+            "protocol": "udp",
+            "rate": 30000,
+            "workers": 8,
+            "offset": 384,
+            "window": 128
+          }
+        ],
+        "production_revision": "working-tree candidate on 6595ebe; binary SHA-256 recorded per run"
+      }
+    ],
+    "environment": {
+      "checkout_revision": "6595ebe6775ed630d691ca93f3551278525387b0",
+      "platform": "macOS-26.6.2-arm64-arm-64bit",
+      "machine": "arm64",
+      "cpu_count": 10,
+      "sysctl": "hw.model: Mac16,10\nhw.memsize: 17179869184\nhw.ncpu: 10\nmachdep.cpu.brand_string: Apple M4\nkern.ipc.somaxconn: 128\nnet.inet.tcp.msl: 15000\nnet.inet.udp.recvspace: 786896\nnet.inet.udp.maxdgram: 9216",
+      "limits": "core file size          (blocks, -c) 0\ndata seg size           (kbytes, -d) unlimited\nfile size               (blocks, -f) unlimited\nmax locked memory       (kbytes, -l) unlimited\nmax memory size         (kbytes, -m) unlimited\nopen files                      (-n) 1048575\npipe size            (512 bytes, -p) 1\nstack size              (kbytes, -s) 8176\ncpu time               (seconds, -t) unlimited\nmax user processes              (-u) 2666\nvirtual memory          (kbytes, -v) unlimited",
+      "rust": "rustc 1.88.0 (6b00bc388 2025-06-23)\nbinary: rustc\ncommit-hash: 6b00bc3880198600130e1cf62b8f8a93494488cc\ncommit-date: 2025-06-23\nhost: aarch64-apple-darwin\nrelease: 1.88.0\nLLVM version: 20.1.5",
+      "server_tokio_workers": 10,
+      "loadgen_tokio_workers": 4,
+      "path": "loopback",
+      "limitations": [
+        "Shared server/loadgen host; no separate-host capacity claim.",
+        "Process CPU time; no per-thread scheduler or syscall profiling.",
+        "No per-sink gauge; one required sink, pending_required is its depth.",
+        "TCP/MQTT remote close does not identify the cause on wire; use server counters."
+      ]
+    }
+  },
+  "mqtt_confirmation": {
+    "summary": {
+      "baseline": {
+        "accepted_per_second_median": 19925.8,
+        "accepted_per_second_range": [
+          19924.6,
+          19936.2
+        ],
+        "p99_ms_median": 1.67,
+        "p99_ms_range": [
+          1.59,
+          1.74
+        ]
+      },
+      "candidate": {
+        "accepted_per_second_median": 19932.8,
+        "accepted_per_second_range": [
+          19909.6,
+          19943.7
+        ],
+        "p99_ms_median": 1.26,
+        "p99_ms_range": [
+          0.61,
+          1.76
+        ]
+      },
+      "delta_percent": 0.03513033353741424
+    },
+    "runs": [
+      {
+        "name": "baseline-connection-cleanup-mqtt-confirm-0-0",
+        "variant": "baseline",
+        "accepted_per_second": 19925.8,
+        "counters": {
+          "accepted": 199258,
+          "attempted": 199969,
+          "authenticated": 512,
+          "authenticated_total": 660,
+          "connect_attempts": 512,
+          "connect_attempts_total": 660,
+          "connected": 512,
+          "connected_total": 660,
+          "disconnects": 512,
+          "remote_close": 512,
+          "schedule_missed": 0,
+          "scheduled": 199974,
+          "unconfirmed": 698
+        },
+        "p99_ms": 1.74,
+        "server_exit": {
+          "exit_code": 0,
+          "forced": false
+        },
+        "raw_sha256": "857a1c293ba983beece133f39e69b2590cf2daaa8d1e4f66cdb31f1c1782ae5d"
+      },
+      {
+        "name": "baseline-connection-cleanup-mqtt-confirm-1-0",
+        "variant": "baseline",
+        "accepted_per_second": 19936.2,
+        "counters": {
+          "accepted": 199362,
+          "attempted": 199977,
+          "authenticated": 452,
+          "authenticated_total": 604,
+          "connect_attempts": 452,
+          "connect_attempts_total": 604,
+          "connected": 452,
+          "connected_total": 604,
+          "disconnects": 452,
+          "remote_close": 452,
+          "schedule_missed": 0,
+          "scheduled": 199979,
+          "unconfirmed": 575
+        },
+        "p99_ms": 1.67,
+        "server_exit": {
+          "exit_code": 0,
+          "forced": false
+        },
+        "raw_sha256": "e0f48d42b7566ad03f1e3c87df1792e2c28c3d28fe0d95d1e8a02093e56aa611"
+      },
+      {
+        "name": "baseline-connection-cleanup-mqtt-confirm-2-0",
+        "variant": "baseline",
+        "accepted_per_second": 19924.6,
+        "counters": {
+          "accepted": 199246,
+          "attempted": 200010,
+          "authenticated": 480,
+          "authenticated_total": 634,
+          "connect_attempts": 480,
+          "connect_attempts_total": 634,
+          "connected": 480,
+          "connected_total": 634,
+          "disconnects": 480,
+          "remote_close": 480,
+          "schedule_missed": 0,
+          "scheduled": 200014,
+          "unconfirmed": 764
+        },
+        "p99_ms": 1.59,
+        "server_exit": {
+          "exit_code": 0,
+          "forced": false
+        },
+        "raw_sha256": "a2c7096b6acd477ef6e4bf51355ed8ed8592c1353e664716fc4b04bba298d022"
+      },
+      {
+        "name": "candidate-connection-cleanup-mqtt-confirm-0-0",
+        "variant": "candidate",
+        "accepted_per_second": 19932.8,
+        "counters": {
+          "accepted": 199328,
+          "attempted": 199991,
+          "authenticated": 515,
+          "authenticated_total": 644,
+          "connect_attempts": 515,
+          "connect_attempts_total": 644,
+          "connected": 515,
+          "connected_total": 644,
+          "disconnects": 516,
+          "remote_close": 516,
+          "schedule_missed": 0,
+          "scheduled": 199990,
+          "unconfirmed": 663
+        },
+        "p99_ms": 1.76,
+        "server_exit": {
+          "exit_code": 0,
+          "forced": false
+        },
+        "raw_sha256": "ecb79b107a8a80379705b2df150eb3c8a3e6a3b23df59df0287d87874cd95e85"
+      },
+      {
+        "name": "candidate-connection-cleanup-mqtt-confirm-1-0",
+        "variant": "candidate",
+        "accepted_per_second": 19943.7,
+        "counters": {
+          "accepted": 199437,
+          "attempted": 200001,
+          "authenticated": 490,
+          "authenticated_total": 618,
+          "connect_attempts": 490,
+          "connect_attempts_total": 618,
+          "connected": 490,
+          "connected_total": 618,
+          "disconnects": 491,
+          "remote_close": 491,
+          "schedule_missed": 0,
+          "scheduled": 200001,
+          "unconfirmed": 564
+        },
+        "p99_ms": 1.26,
+        "server_exit": {
+          "exit_code": 0,
+          "forced": false
+        },
+        "raw_sha256": "6cf4658286124ce540b0b0740b478bf3017900b0ec06dbb73d657d9765ee7292"
+      },
+      {
+        "name": "candidate-connection-cleanup-mqtt-confirm-2-0",
+        "variant": "candidate",
+        "accepted_per_second": 19909.6,
+        "counters": {
+          "accepted": 199096,
+          "attempted": 200002,
+          "authenticated": 773,
+          "authenticated_total": 934,
+          "connect_attempts": 773,
+          "connect_attempts_total": 934,
+          "connected": 773,
+          "connected_total": 934,
+          "disconnects": 771,
+          "remote_close": 771,
+          "schedule_missed": 0,
+          "scheduled": 200002,
+          "unconfirmed": 906
+        },
+        "p99_ms": 0.61,
+        "server_exit": {
+          "exit_code": 0,
+          "forced": false
+        },
+        "raw_sha256": "75786d7d634b7b7b0bd3de4e74db899cb1df937c060ee0d0c76ba9d2870c9015"
+      }
+    ],
+    "plans": [
+      {
+        "name": "connection-cleanup-mqtt-confirm-0",
+        "variant": "candidate",
+        "seconds": 10,
+        "warmup": 2,
+        "ramp": 1,
+        "tls": false,
+        "production_revision": "working-tree candidate on 6595ebe; binary SHA-256 recorded per run",
+        "groups": [
+          {
+            "label": "mqtt",
+            "protocol": "mqtt",
+            "rate": 20000,
+            "workers": 32,
+            "offset": 128,
+            "window": 128
+          }
+        ]
+      },
+      {
+        "name": "connection-cleanup-mqtt-confirm-0",
+        "variant": "baseline",
+        "seconds": 10,
+        "warmup": 2,
+        "ramp": 1,
+        "tls": false,
+        "production_revision": "6595ebe6775ed630d691ca93f3551278525387b0",
+        "groups": [
+          {
+            "label": "mqtt",
+            "protocol": "mqtt",
+            "rate": 20000,
+            "workers": 32,
+            "offset": 128,
+            "window": 128
+          }
+        ]
+      },
+      {
+        "name": "connection-cleanup-mqtt-confirm-1",
+        "variant": "baseline",
+        "seconds": 10,
+        "warmup": 2,
+        "ramp": 1,
+        "tls": false,
+        "production_revision": "6595ebe6775ed630d691ca93f3551278525387b0",
+        "groups": [
+          {
+            "label": "mqtt",
+            "protocol": "mqtt",
+            "rate": 20000,
+            "workers": 32,
+            "offset": 128,
+            "window": 128
+          }
+        ]
+      },
+      {
+        "name": "connection-cleanup-mqtt-confirm-1",
+        "variant": "candidate",
+        "seconds": 10,
+        "warmup": 2,
+        "ramp": 1,
+        "tls": false,
+        "production_revision": "working-tree candidate on 6595ebe; binary SHA-256 recorded per run",
+        "groups": [
+          {
+            "label": "mqtt",
+            "protocol": "mqtt",
+            "rate": 20000,
+            "workers": 32,
+            "offset": 128,
+            "window": 128
+          }
+        ]
+      },
+      {
+        "name": "connection-cleanup-mqtt-confirm-2",
+        "variant": "candidate",
+        "seconds": 10,
+        "warmup": 2,
+        "ramp": 1,
+        "tls": false,
+        "production_revision": "working-tree candidate on 6595ebe; binary SHA-256 recorded per run",
+        "groups": [
+          {
+            "label": "mqtt",
+            "protocol": "mqtt",
+            "rate": 20000,
+            "workers": 32,
+            "offset": 128,
+            "window": 128
+          }
+        ]
+      },
+      {
+        "name": "connection-cleanup-mqtt-confirm-2",
+        "variant": "baseline",
+        "seconds": 10,
+        "warmup": 2,
+        "ramp": 1,
+        "tls": false,
+        "production_revision": "6595ebe6775ed630d691ca93f3551278525387b0",
+        "groups": [
+          {
+            "label": "mqtt",
+            "protocol": "mqtt",
+            "rate": 20000,
+            "workers": 32,
+            "offset": 128,
+            "window": 128
+          }
+        ]
+      }
+    ]
+  },
+  "candidate_source_revision": "a93b7eee24ed8ac94a8abfefda0d6756dc10ea64",
+  "implementation_diff": {
+    "files": 24,
+    "lines_added": 562,
+    "lines_removed": 64,
+    "rust_files": 9,
+    "rust_lines_added": 342,
+    "rust_lines_removed": 51
+  }
+}
