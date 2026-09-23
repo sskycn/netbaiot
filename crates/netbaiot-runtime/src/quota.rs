@@ -69,6 +69,8 @@ struct ConnectionCounts {
     tenants: HashMap<TenantId, usize>,
     devices: HashMap<DeviceKey, usize>,
     transports: [usize; 4],
+    device_transports: [usize; 4],
+    device_pending: usize,
 }
 pub struct Connections {
     limits: Arc<Limits>,
@@ -82,6 +84,7 @@ pub struct ConnectionLease {
     ip: IpAddr,
     device: Option<DeviceKey>,
     transport: Option<Transport>,
+    device_ingress: bool,
     connect_deadline: tokio::time::Instant,
     _slot: OwnedSemaphorePermit,
     _bytes: BytesPermit,
@@ -101,6 +104,18 @@ impl Connections {
     }
     /// Reserve count, bytes and peer capacity before TLS or protocol detection.
     pub fn acquire_pending(self: &Arc<Self>, ip: IpAddr) -> Result<PendingConnectionLease> {
+        self.reserve_connection(ip, false)
+    }
+    /// Device listener admission before its protocol is known. No extra semaphore:
+    /// pending and classified owners retain the same global count/byte/IP permits.
+    pub fn acquire_device_pending(self: &Arc<Self>, ip: IpAddr) -> Result<PendingConnectionLease> {
+        self.reserve_connection(ip, true)
+    }
+    fn reserve_connection(
+        self: &Arc<Self>,
+        ip: IpAddr,
+        device_ingress: bool,
+    ) -> Result<PendingConnectionLease> {
         let slot = self
             .slots
             .clone()
@@ -110,17 +125,26 @@ impl Connections {
             .memory
             .reserve(self.limits.connection_memory_reservation)?;
         let mut counts = lock(&self.counts)?;
+        if device_ingress
+            && counts.device_pending >= self.limits.max_unclassified_device_connections
+        {
+            return Err(Error::Overloaded);
+        }
         let count = counts.ips.entry(ip).or_default();
         if *count >= self.limits.max_connections_per_ip {
             return Err(Error::Overloaded);
         }
         *count += 1;
+        if device_ingress {
+            counts.device_pending += 1;
+        }
         self.metrics.inc(Metric::ConnectionsAccepted);
         Ok(PendingConnectionLease(ConnectionLease {
             owner: self.clone(),
             ip,
             device: None,
             transport: None,
+            device_ingress,
             connect_deadline: tokio::time::Instant::now()
                 + Duration::from_millis(self.limits.connect_timeout_ms),
             _slot: slot,
@@ -140,9 +164,22 @@ impl PendingConnectionLease {
     pub fn classify(mut self, transport: Transport) -> Result<ConnectionLease> {
         {
             let mut counts = lock(&self.0.owner.counts)?;
+            if self.0.device_ingress {
+                if transport == Transport::Udp {
+                    return Err(Error::Invalid);
+                }
+                if counts.device_transports[transport as usize]
+                    >= self.0.owner.limits.max_device_connections_per_protocol
+                {
+                    return Err(Error::Overloaded);
+                }
+                counts.device_pending -= 1;
+                counts.device_transports[transport as usize] += 1;
+            }
             counts.transports[transport as usize] += 1;
+            // The accounting transition and owner state change share one lock.
+            self.0.transport = Some(transport);
         }
-        self.0.transport = Some(transport);
         Ok(self.0)
     }
 }
@@ -190,6 +227,12 @@ impl Drop for ConnectionLease {
             if let Some(transport) = self.transport {
                 counts.transports[transport as usize] =
                     counts.transports[transport as usize].saturating_sub(1);
+                if self.device_ingress {
+                    counts.device_transports[transport as usize] =
+                        counts.device_transports[transport as usize].saturating_sub(1);
+                }
+            } else if self.device_ingress {
+                counts.device_pending = counts.device_pending.saturating_sub(1);
             }
         }
     }
@@ -569,6 +612,114 @@ mod tests {
         );
         assert!(lock(&connections.counts).unwrap().ips.is_empty());
         assert!(connections.acquire(ip, Transport::Http).is_ok());
+    }
+    #[tokio::test]
+    async fn device_protocol_and_pending_caps_share_global_ownership_and_release_on_failure() {
+        let limits = Arc::new(Limits {
+            max_connections: 5,
+            max_connections_per_ip: 5,
+            max_device_connections_per_protocol: 3,
+            max_unclassified_device_connections: 2,
+            global_connection_logical_bytes: 5 * Limits::default().connection_memory_reservation,
+            ..Limits::default()
+        });
+        let owner = Connections::new(limits.clone(), Arc::new(Metrics::default()));
+        let ip = "127.0.0.1".parse().unwrap();
+        let mut mqtt = Vec::new();
+        for _ in 0..3 {
+            mqtt.push(
+                owner
+                    .acquire_device_pending(ip)
+                    .unwrap()
+                    .classify(Transport::Mqtt)
+                    .unwrap(),
+            );
+        }
+        // A protocol at its ceiling cannot take the remaining shared capacity.
+        let pending = owner.acquire_device_pending(ip).unwrap();
+        assert!(matches!(
+            pending.classify(Transport::Mqtt),
+            Err(Error::Overloaded)
+        ));
+        assert_eq!(owner.slots.available_permits(), 2);
+        assert_eq!(lock(&owner.counts).unwrap().device_pending, 0);
+        let http = owner
+            .acquire_device_pending(ip)
+            .unwrap()
+            .classify(Transport::Http)
+            .unwrap();
+        let tcp = owner
+            .acquire_device_pending(ip)
+            .unwrap()
+            .classify(Transport::Tcp)
+            .unwrap();
+        assert!(owner.acquire_pending(ip).is_err()); // Management still shares global capacity.
+        drop((http, tcp, mqtt));
+        let first = owner.acquire_device_pending(ip).unwrap();
+        let second = owner.acquire_device_pending(ip).unwrap();
+        assert!(owner.acquire_device_pending(ip).is_err());
+        // Known management/standalone listeners do not acquire the device pending cap.
+        let management = owner.acquire(ip, Transport::Http).unwrap();
+        assert!(matches!(
+            second.classify(Transport::Udp),
+            Err(Error::Invalid)
+        ));
+        drop(first); // TLS/EOF/cancellation before detection must release pending ownership.
+        let mqtt = owner
+            .acquire_device_pending(ip)
+            .unwrap()
+            .classify(Transport::Mqtt)
+            .unwrap();
+        drop((mqtt, management));
+        let counts = lock(&owner.counts).unwrap();
+        assert_eq!(counts.device_pending, 0);
+        assert_eq!(counts.device_transports, [0; 4]);
+        assert_eq!(counts.transports, [0; 4]);
+        assert!(counts.ips.is_empty());
+        assert_eq!(owner.slots.available_permits(), 5);
+        assert_eq!(
+            owner.memory.available(),
+            limits.global_connection_logical_bytes
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn concurrent_classification_cannot_exceed_protocol_cap() {
+        let owner = Connections::new(
+            Arc::new(Limits {
+                max_connections: 4,
+                max_connections_per_ip: 4,
+                max_device_connections_per_protocol: 1,
+                max_unclassified_device_connections: 4,
+                ..Limits::default()
+            }),
+            Arc::new(Metrics::default()),
+        );
+        let barrier = Arc::new(tokio::sync::Barrier::new(4));
+        let mut tasks = tokio::task::JoinSet::new();
+        for _ in 0..4 {
+            let pending = owner
+                .acquire_device_pending("127.0.0.1".parse().unwrap())
+                .unwrap();
+            let barrier = barrier.clone();
+            tasks.spawn(async move {
+                barrier.wait().await;
+                pending.classify(Transport::Mqtt)
+            });
+        }
+        let mut winners = Vec::new();
+        while let Some(result) = tasks.join_next().await {
+            match result.unwrap() {
+                Ok(lease) => winners.push(lease),
+                Err(error) => assert!(matches!(error, Error::Overloaded)),
+            }
+        }
+        assert_eq!(winners.len(), 1);
+        assert_eq!(owner.active().unwrap()[Transport::Mqtt as usize], 1);
+        assert_eq!(lock(&owner.counts).unwrap().device_pending, 0);
+        drop(winners);
+        assert_eq!(owner.slots.available_permits(), 4);
+        assert_eq!(lock(&owner.counts).unwrap().device_transports, [0; 4]);
     }
     #[test]
     fn expired_tenant_identity_replacement_is_shared() {
