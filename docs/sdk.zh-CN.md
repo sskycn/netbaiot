@@ -18,3 +18,5 @@ cargo check --workspace --all-targets
 ```
 
 业务示例位于 `crates/netbaiot-client/examples`；设备示例位于 `crates/netbaiot-device-sdk/examples`。
+
+UDP 详见 [NBI1/NBA1 可靠上行](device-protocol.zh-CN.md#udp-acknowledgement-nba1)。Rust 设备 SDK 仍使用 MQTT/设备 HTTP；Python UDP 示例演示有界原包重试和签名接纳回执。

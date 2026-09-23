@@ -78,10 +78,11 @@ has command_id, device, expires_at, and payload `{name,arguments}`. Execution AC
 use the shared codec. Partial frames survive fragmented reads; EOF closes and drops
 connection-owned resources. Vendor framing can implement `TcpFramer` separately.
 
-## UDP v1
+## UDP v1.1 signed reliable uplink
 
-No sessions, replies, command downlink or application fragmentation. Datagrams
-are at most 1200 bytes. Network byte order:
+NBI1 (device → gateway) is unchanged. No sessions, command downlink, endpoint
+registry, encryption, or application fragmentation. Datagrams are at most 1200
+bytes. All integer fields use network byte order:
 
 | Field | Bytes |
 |---|---:|
@@ -96,18 +97,80 @@ are at most 1200 bytes. Network byte order:
 | JSON v1 payload | length |
 | HMAC-SHA256 | 32 |
 
-HMAC covers all preceding bytes and uses the **decoded 32-byte key**, not the ASCII
-hex text. Credential version must match provisioning. Timestamp skew is at most
-30 seconds. Each device/boot has a 64-sequence bitmap, supporting bounded reorder
-while rejecting duplicates and older packets. Replay records expire after 120
-seconds, longer than twice timestamp skew; only expired records are evicted.
-New boots are rejected when device/tenant/global capacity is full. Replay is
-committed after ingestion succeeds, so failed ingestion does not consume sequence.
+HMAC covers all preceding bytes using the **decoded 32-byte credential key**, not
+ASCII hex. Credential version must match provisioning. Every datagram, including
+retries, must pass HMAC, authorization, and timestamp skew (default ±30 seconds).
 
-A client retry after a lost/uncertain UDP send should use a new sequence. No datagram gets
-a response, including unauthenticated traffic; there is no amplification or forged
-application-receipt channel. Use HTTP/MQTT/TCP if receipts are required. Payloads
-are authenticated, not encrypted. Replay state is process-local and rebuilt after
-restart, so a valid signed packet still inside the timestamp window can be accepted
-again; business consumers must deduplicate stable application identifiers when that
-risk matters.
+Each `(DeviceKey, credential_version, boot_id)` has a bounded 64-sequence bitmap.
+A new sequence enters the codec/Ingress/EventBus, then commits replay **only after
+EventAccepted**. An accepted duplicate skips codec, event ID generation, presence,
+and EventBus entirely and receives another ACK. Sequences outside the 64-slot
+window are silently dropped, even if previously accepted. Records expire after
+120 seconds by default (strictly longer than twice clock skew); only expired
+records are evicted. Duplicate ACKs do not extend expiry. Device/tenant/global
+limits also count separate credential versions; full capacity rejects new records.
+Failed ingestion never consumes a sequence.
+
+## UDP acknowledgement: NBA1
+
+NBA1 (gateway → device) is a fixed **64-byte signed acceptance receipt**:
+
+| Offset | Bytes | Field |
+|---:|---:|---|
+| 0 | 4 | magic `NBA1` |
+| 4 | 4 | credential_version, u32 big-endian |
+| 8 | 16 | boot_id |
+| 24 | 8 | sequence, u64 big-endian |
+| 32 | 32 | HMAC-SHA256 over bytes `[0..32)` |
+
+The HMAC uses the same decoded 32-byte key as NBI1. NBA1 means **EventAccepted**,
+at the same acceptance level as HTTP 202, MQTT QoS1 PUBACK, and the generic TCP
+acceptance receipt. It does **not** mean final required-sink ACK, database commit,
+business processing, or device command execution. A codec `CommandAck` is a
+separate application event; NBA1 may acknowledge acceptance of that event.
+
+The device must check: length exactly 64; magic NBA1; expected credential version;
+current boot ID; an outstanding sequence; and a valid constant-time HMAC. Source
+IP or a matching sequence alone is insufficient. NBA1 has no status or event_id.
+
+### Retry and message identity
+
+Within an authenticated device, `(credential_version, boot_id, sequence)` identifies
+one immutable message. If no valid NBA1 arrives, **resend the exact original NBI1
+datagram**, preserving credential version, boot ID, sequence, timestamp, payload,
+and HMAC. Do not refresh the timestamp or use a new sequence for an ACK retry.
+Reusing an accepted identity for different content violates the protocol: the
+first accepted message wins, without storing payload copies or per-sequence IDs.
+
+Use bounded exponential backoff (for example 100, 200, 400, 800, 1600 ms) with
+jitter. Finish retries before the original timestamp becomes invalid, allowing for
+actual clock skew, and before newer traffic moves the sequence out of the 64-slot
+window. Beyond either bound, delivery is **uncertain**, not known to have failed.
+
+Replay state is memory-only. Reliable UDP ACK prevents duplicate ingestion during
+the lifetime of the replay window in the same runtime instance. It does not provide
+exactly-once semantics across unexpected process restart. Planned restart also
+rebuilds replay state. Preserve a stable `source_message_id` for business idempotency;
+EventBus replay preserves event_id, but renewed UDP ingestion may create a new one.
+
+### Failure, resource, and security boundaries
+
+Malformed, unauthenticated, unknown/stale credentials, bad clocks, too-old replay,
+codec/authorization/admission/EventBus failures and draining receive **no response**.
+There are no NACKs. After acceptance, replay is committed before a nonblocking
+`try_send_to`. Send pressure/failure drops the ACK and increments a counter; it never
+rolls back acceptance. A subsequent accepted duplicate can retry the receipt.
+Credential invalidation fences in-progress signing. There is no server ACK queue,
+retransmission task, ACK drain, or ACK spool, and UDP never registers a session.
+
+NBA1 is 64 bytes versus at least 76 bytes for a structurally valid authenticated
+NBI1 request: payload-byte amplification is at most **64/76 ≈ 0.842**. Unauthenticated
+traffic never receives a reply. Captured valid signed datagrams with spoofed source
+addresses can still cause authenticated reflection within the time window; smaller
+fixed responses and the existing source-IP/process rate limits prevent byte
+amplification. Duplicate ACKs pass those same limits. Payloads remain unencrypted.
+
+Counters `udp_datagrams`, `udp_accepted`, `udp_accepted_duplicates`, `udp_acks_sent`, and
+`udp_ack_send_failures` distinguish incoming traffic, new accepted datagrams, duplicate fast paths, local
+socket emission, and dropped/suppressed receipts. Local emission does not prove
+receipt at the device. No device IDs or other high-cardinality labels are added.

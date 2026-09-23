@@ -61,3 +61,11 @@ byte limits.
 
 TLS, allocator-retained pages, Tokio, and kernel socket buffers are not exactly
 represented by logical accounting and require process-level measurement.
+
+UDP NBA1 uses a fixed 64-byte stack buffer and no queue/tasks. Replay values remain
+24 bytes; including the key, bucket payload grows from 88 to 96 bytes on the
+measured 64-bit host because credential version is now part of identity. At 1024
+entries this is 8192 extra live-entry bytes; HashMap spare buckets/allocator costs
+are additional (about 16 KiB extra bucket payload including spare slots at the
+default ceiling with the measured toolchain; not an RSS bound). No payload or
+event_id is retained for duplicate ACKs. See [measurements](udp-reliable-ack.md).

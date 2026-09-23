@@ -51,23 +51,55 @@ Codec 默认限制：输入/编码后字节数 64 KiB、每次输出一条消息
 
 服务端返回分帧的 `{"authenticated":true}`。后续帧是 JSON 上行消息。服务端帧包含回执或通用 `DeviceCommand` JSON。命令包含 command_id、device、expires_at 和 `{name,arguments}` 载荷。执行 ACK 使用共享 codec。读取分片时会保留未收全的帧；EOF 会关闭连接并释放连接所属资源。厂商自有分帧格式可单独实现 `TcpFramer`。
 
-## UDP v1
+## UDP v1.1 签名可靠上行
 
-UDP 不维护会话，不发送回复，不支持命令下行或应用层分片。数据报最大为 1200 字节。字段采用网络字节序：
+NBI1（设备 → 网关）请求格式保持不变。不建立 session、endpoint registry，不支持命令下行、加密或应用层分片。数据报最大 1200 字节；整数采用网络字节序：
 
 | 字段 | 字节数 |
 |---|---:|
 | magic `NBI1` | 4 |
 | credential ID 长度 | 1 |
-| credential ID | 长度，1–64 |
+| credential ID | 1–64 |
 | credential version | 4 |
 | boot ID | 16 |
 | sequence | 8 |
 | Unix 毫秒时间戳（有符号 i64） | 8 |
 | payload 长度 | 2 |
-| JSON v1 payload | 长度 |
+| JSON v1 payload | length |
 | HMAC-SHA256 | 32 |
 
-HMAC 覆盖此前所有字节，使用**解码后的 32 字节密钥**，而不是 ASCII 十六进制文本。credential version 必须与设备注册配置一致。时间戳偏差最多 30 秒。每台设备/每个 boot 使用一个 64 序号位图；它允许有限乱序，同时拒绝重复包和更旧的包。重放记录在 120 秒后过期（超过时间戳偏差的两倍）；只会淘汰已过期记录。设备/租户/全局容量已满时会拒绝新 boot。只有摄取成功后才提交重放状态，因此失败的摄取不会消耗序号。
+HMAC 覆盖此前所有字节，密钥是**解码后的 32 字节 credential key**，不是 hex ASCII。每个包（包括重复包）都必须通过 HMAC、权限、credential version 和时间戳检查；默认时钟偏差为 ±30 秒。
 
-若 UDP 发送结果丢失或不确定，客户端重试时应使用新序号。服务端不会响应任何数据报，包括未认证流量；因此不存在放大攻击或伪造应用回执的通道。需要回执时应使用 HTTP/MQTT/TCP。载荷经过认证但不加密。重放状态仅保存在进程内，重启后会重建；因此在时间戳有效期内重放的有效签名包仍可能再次被接受。存在该风险时，业务消费者应按稳定的应用标识去重。
+每个 `(DeviceKey, credential_version, boot_id)` 保留有界的 64 序号位图。新序号进入 codec/Ingress/EventBus，只有 **EventAccepted 后**才提交 replay。已接受的重复序号直接重新 ACK，不解码、不生成 event_id、不更新 presence、不再次发布事件。滑出 64 槽窗口的序号静默丢弃。记录默认 120 秒过期（严格大于两倍时钟偏差），仅删除过期记录；重复 ACK 不刷新过期时间。设备/租户/全局容量限制也计算不同凭据版本，满载时拒绝新记录。摄取失败不消耗序号。
+
+## UDP acknowledgement: NBA1
+
+NBA1（网关 → 设备）是固定 **64 字节签名接纳回执**：
+
+| 偏移 | 字节数 | 字段 |
+|---:|---:|---|
+| 0 | 4 | magic `NBA1` |
+| 4 | 4 | credential_version，u32 大端 |
+| 8 | 16 | boot_id |
+| 24 | 8 | sequence，u64 大端 |
+| 32 | 32 | 对前 32 字节的 HMAC-SHA256 |
+
+HMAC 使用与 NBI1 相同的已解码 32 字节密钥。NBA1 仅表示 **EventAccepted**，与 HTTP 202、MQTT QoS1 PUBACK、通用 TCP acceptance receipt 处于同一接纳层级；不表示 required sink 最终 ACK、数据库提交、业务处理完成或设备命令执行。codec 的 `CommandAck` 是另一类应用事件，NBA1 仅确认该事件被接纳。
+
+设备必须依次检查：长度恰好 64、magic 为 NBA1、预期 credential version、当前 boot ID、待确认 sequence，以及常量时间 HMAC 验证。不能只信任来源 IP 或序号。NBA1 不携带 status 或 event_id。
+
+### 重试与消息身份
+
+在认证设备范围内，`(credential_version, boot_id, sequence)` 表示同一条不可变消息。没有收到合法 NBA1 时，在有效窗口内**重发完全相同的 NBI1 数据报**，包括相同 credential version、boot ID、sequence、timestamp、payload 和 HMAC。不要刷新时间戳，也不要为 ACK 重试换新序号。复用已接纳身份表达不同内容属于协议违规；服务器采用 first accepted message wins，不复制 payload 或保存每序号 event_id。
+
+使用有界指数退避和少量 jitter，例如 100、200、400、800、1600 ms。考虑实际时钟偏差，在原时间戳失效前结束重试，也要避免新流量将待确认序号推出 64 槽窗口。超过任一边界仍未确认，状态是 **uncertain**，不能断言失败。
+
+Replay 只存在内存中。这一保证限于同一 runtime 实例、同一有效 replay 窗口；不提供跨意外重启 exactly-once。计划重启也重建 replay。必须保留稳定的 `source_message_id` 并由业务消费者幂等处理；EventBus replay 保持 event_id，但重启后重新摄取 UDP 可能生成新的 event_id。
+
+### 失败、资源和安全边界
+
+格式错误、未认证、未知/过期凭据、错误时钟、过旧 replay、codec/权限/admission/EventBus 失败及 draining 全部**静默丢弃**，无 NACK。接纳后先提交 replay，再非阻塞 `try_send_to`；发送失败只计数并丢弃 ACK，不撤销接纳，重复包可以再次获得回执。凭据失效会阻止在途旧 signer 发送 ACK。服务端没有 ACK queue、重传任务、ACK drain 或 ACK spool；UDP 不注册 session。
+
+NBA1 固定 64 字节，最小结构有效 NBI1 为 76 字节，载荷字节放大比最多 **64/76 ≈ 0.842**。未认证流量绝不回复。捕获的有效签名包仍可在有效时间窗内被伪造来源地址重放，造成有限 authenticated reflection；固定小回包及原有来源 IP/进程限速阻止字节放大。重复 ACK 同样经过限速。载荷仍未加密。
+
+`udp_datagrams`、`udp_accepted`、`udp_accepted_duplicates`、`udp_acks_sent`、`udp_ack_send_failures` 分别统计入包、新接纳数据报、已接受重复包、发送成功、发送失败或被抑制回执。socket 发送成功不等于设备收到。指标不新增设备 ID 等高基数标签。

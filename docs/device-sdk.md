@@ -39,3 +39,5 @@ exponential full-jitter backoff (100 ms to 5 s by default). Every successful
 reconnect explicitly resubscribes the command topic, including when the broker no
 longer has the previous persistent session. `mqtt_connected()` and
 `wait_until_connected()` let applications coordinate work after later outages.
+
+UDP is specified separately as [NBI1/NBA1 reliable uplink](device-protocol.md#udp-acknowledgement-nba1). The Rust device SDK remains MQTT/device HTTP; the bounded Python UDP example demonstrates exact-datagram retries and authenticated acceptance receipts.

@@ -129,9 +129,9 @@ curl --noproxy '*' http://127.0.0.1:9090/api/v1/metrics \
 
 **症状**：`sendto` 成功但业务无事件。
 
-**原因**：这是无响应设计；HMAC key 错把 hex ASCII 当 key、timestamp 超 30 秒、credential version 错、重复 sequence/boot、datagram 超 1200 B、codec/ingress 拒绝。
+**原因**：未通过验证或接纳时静默丢弃；HMAC key 错把 hex ASCII 当 key、timestamp 超 30 秒、credential version 错、序号已滑出 replay 窗口、datagram 超 1200 B、codec/ingress 拒绝。
 
-**解决**：对照 `examples/device_udp.py`；同步时钟；每 boot 使用单调 sequence；查 `udp_datagrams` 与 auth/codec/ingress counters。需要确认就改用 HTTP/MQTT/TCP。
+**解决**：对照 `examples/device_udp.py`；同步时钟；每 boot 使用单调 sequence；查 `udp_datagrams`、`udp_accepted_duplicates`、`udp_acks_sent`、`udp_ack_send_failures` 与 auth/codec/ingress counters。有效窗口内重发原始数据报；只有验证通过的 NBA1 才确认 EventAccepted，超窗未确认属于 uncertain。
 
 ## 18. Confirmed TCP stream 连接后无事件
 

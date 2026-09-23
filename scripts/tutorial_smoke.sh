@@ -86,7 +86,7 @@ curl --noproxy '*' -fsS "http://127.0.0.1:$HTTP_PORT/v1/device/data" \
   --data '{"schema_version":1,"source_message_id":"smoke:http","kind":"heartbeat","data":{"sequence":10}}' \
   | rg '"event_id"'
 python3 examples/device_tcp.py --address "127.0.0.1:$TCP_PORT" | rg 'event_id'
-python3 examples/device_udp.py --address "127.0.0.1:$UDP_PORT" --sequence 11 | rg 'intentionally has no response'
+python3 examples/device_udp.py --address "127.0.0.1:$UDP_PORT" --sequence 11 | rg 'EventAccepted: signed NBA1'
 
 mosquitto_sub -h 127.0.0.1 -p "$MQTT_PORT" -V mqttv311 \
   -u demo-device -P "$SECRET" -i tutorial-smoke-command -t "$DOWN" -q 1 -C 1 \

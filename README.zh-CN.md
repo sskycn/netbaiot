@@ -68,3 +68,5 @@ while let Some(delivery) = events.next().await {
 命令通过 `client.commands().send(&command)` 发送，配置使用 `client.configs()`，运行操作使用 `client.runtime()`。离线设备会返回类型化的 `ClientError::DeviceOffline`；NetbaIoT 不会存储命令。
 
 可选的 `netbaiot-device-sdk` 支持标准 MQTT 遥测/命令和设备 HTTP 上传/配置，不造成厂商锁定。标准 MQTT 3.1.1 客户端仍是一等支持对象。`netbaiot` CLI 提供状态、事件订阅、命令、配置、缓存失效和显式 drain 操作。参阅 [SDK 概览](docs/sdk.zh-CN.md)、[业务客户端](docs/client.zh-CN.md)、[设备 SDK](docs/device-sdk.zh-CN.md)和 [CLI](docs/cli.zh-CN.md)。
+
+UDP v1.1 在 EventAccepted 后返回固定 64 字节签名 NBA1 回执。ACK 丢失时重发原始 NBI1 数据报，在有效进程内 replay 窗口内不会重复摄取。详见 [UDP 协议与重试边界](docs/device-protocol.zh-CN.md#udp-acknowledgement-nba1)。

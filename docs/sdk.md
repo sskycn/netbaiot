@@ -24,3 +24,5 @@ cargo check --workspace --all-targets
 
 Business examples are under `crates/netbaiot-client/examples`; device examples are
 under `crates/netbaiot-device-sdk/examples`.
+
+UDP is specified separately as [NBI1/NBA1 reliable uplink](device-protocol.md#udp-acknowledgement-nba1). The Rust device SDK remains MQTT/device HTTP; the bounded Python UDP example demonstrates exact-datagram retries and authenticated acceptance receipts.
