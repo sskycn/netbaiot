@@ -141,11 +141,18 @@ def stop(child, seconds):
 def run(plan, repeat, args):
     if not 0 < plan['seconds'] <= 3600:
         raise ValueError('duration bound')
+    workers = plan.get('loadgen_workers', 2)
+    settling = plan.get('settle_before', 0)
+    if not isinstance(workers, int) or not 1 <= workers <= 32 or not 0 <= settling <= 60:
+        raise ValueError('worker/settling bound')
     name = f'{args.label}-{plan["name"]}-{repeat}'
     if any(c not in 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_' for c in name):
         raise ValueError('run name must be alphanumeric')
     folder = ROOT / 'target/mixed-audit' / name
     folder.mkdir(parents=True, exist_ok=False)
+    if settling:
+        print(json.dumps(dict(name=name, settling_seconds=settling)), flush=True)
+        time.sleep(settling)
     # Reserve dynamic ports; close immediately before spawning owned listener.
     reservations = [socket.socket() for _ in range(3)]
     for sock in reservations:
@@ -160,7 +167,7 @@ def run(plan, repeat, args):
     samples = []
     row = dict(name=name, plan=plan, repeat=repeat, label=args.label, timestamp=time.time(),
                baseline=BASELINE, production_revision=plan.get('production_revision', BASELINE), server_sha256=args.server_hash, loadgen_sha256=args.loadgen_hash,
-               harness_version=2, harness_sha256=digest(Path(__file__)), server_config=config, network_before=command(['netstat', '-s', '-p', 'udp']),
+               harness_version=3, loadgen_tokio_workers=workers, server_tokio_workers=10, harness_sha256=digest(Path(__file__)), server_config=config, network_before=command(['netstat', '-s', '-p', 'udp']),
                tcp_before=command(['netstat', '-s', '-p', 'tcp']))
     try:
         for s in reservations:
@@ -195,7 +202,7 @@ def run(plan, repeat, args):
         row['workload'] = workload
         log = open(folder / 'loadgen.jsonl', 'w'); files.append(log)
         load = subprocess.Popen([str(args.loadgen), '--mixed', str(folder / 'loadgen.json')], cwd=ROOT,
-                                env={**env, 'TOKIO_WORKER_THREADS': '2'}, stdout=log, stderr=log)
+                                env={**env, 'TOKIO_WORKER_THREADS': str(workers)}, stdout=log, stderr=log)
         next_sample = time.time()
         restored = False
         shutdown = False
@@ -232,6 +239,8 @@ def run(plan, repeat, args):
         finals = [v for v in values if v.get('event') == 'final']
         if row['loadgen_exit'] != 0 or not finals:
             raise RuntimeError('loadgen failed: ' + (folder / 'loadgen.jsonl').read_text()[-2000:])
+        starts = [v for v in values if v.get('event') == 'start']
+        row['loadgen_schema_version'] = starts[0].get('schema_version', 1) if starts else 1
         row['result'] = finals[-1]
         row['client_samples'] = [v for v in values if v.get('event') == 'sample' and v['measurement_secs'] > 0]
         time.sleep(1)

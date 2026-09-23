@@ -180,6 +180,7 @@ fn io_error(e: &io::Error) -> &'static str {
     match e.kind() {
         io::ErrorKind::ConnectionRefused => "connect_refused",
         io::ErrorKind::TimedOut => "connect_timeout",
+        io::ErrorKind::AddrNotAvailable => "connect_address_unavailable",
         _ => "remote_close",
     }
 }
@@ -685,7 +686,7 @@ pub(super) async fn run(path: &str) -> Result<()> {
     let mut groups = Vec::new();
     println!(
         "{}",
-        json!({"event":"start","pid":std::process::id(),"config":&*config,"epoch_ms":now_ms()})
+        json!({"event":"start","schema_version":2,"pid":std::process::id(),"config":&*config,"epoch_ms":now_ms()})
     );
     for group in &config.groups {
         let stats: Shared = Arc::new(Mutex::new(Stats::default()));
@@ -749,7 +750,7 @@ pub(super) async fn run(path: &str) -> Result<()> {
     }
     println!(
         "{}",
-        json!({"event":"final","epoch_ms":now_ms(),"duration_secs":config.duration_secs,"groups":snapshot_all()})
+        json!({"event":"final","epoch_ms":now_ms(),"duration_secs":config.duration_secs,"measurement_secs":Instant::now().saturating_duration_since(measure).as_secs_f64(),"groups":snapshot_all()})
     );
     Ok(())
 }
