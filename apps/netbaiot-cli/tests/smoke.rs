@@ -1,6 +1,9 @@
 use futures_util::StreamExt;
 use netbaiot_device_sdk::{DeviceClient, DeviceCredentials};
-use netbaiot_protocol::{CommandId, DeviceEvent, DeviceId, DeviceKey, ProductId, TenantId};
+use netbaiot_protocol::{
+    CommandId, DeviceEvent, DeviceId, DeviceKey, DeviceUplink, DeviceUplinkKind, Heartbeat,
+    ProductId, SourceMessageId, TenantId,
+};
 use netbaiot_server::{Config, run_with_credentials};
 use std::{path::Path, process::Stdio, time::Duration};
 use tokio::{
@@ -83,6 +86,21 @@ async fn wait_status(config: &Config) {
     .unwrap();
 }
 
+async fn publish_heartbeat(device: &DeviceClient, sequence: u64) -> SourceMessageId {
+    let source = SourceMessageId::new(format!("sdk-heartbeat:{sequence}")).unwrap();
+    device
+        .publish(
+            DeviceUplink::new(
+                source.clone(),
+                DeviceUplinkKind::Heartbeat(Heartbeat { sequence }),
+            ),
+            netbaiot_device_sdk::PublishQos::AtLeastOnce,
+        )
+        .await
+        .unwrap();
+    source
+}
+
 fn device_key() -> DeviceKey {
     DeviceKey {
         tenant_id: TenantId::new("demo").unwrap(),
@@ -110,7 +128,6 @@ async fn cli_smoke_covers_status_device_command_config_events_auth_and_drain() {
         .device(device_key())
         .credentials(DeviceCredentials::new("demo-device", DEVICE_SECRET).unwrap())
         .mqtt_endpoint(format!("mqtt://{}", config.device_ingress))
-        .http_endpoint(format!("http://{}", config.device_ingress))
         .client_id("cli-smoke-device")
         .connect()
         .await
@@ -192,7 +209,7 @@ async fn cli_smoke_covers_status_device_command_config_events_auth_and_drain() {
     let mut monitor: Child = monitor_command.spawn().unwrap();
     let stdout = monitor.stdout.take().unwrap();
     tokio::time::sleep(Duration::from_millis(100)).await;
-    let accepted = device.heartbeat(99).await.unwrap();
+    let source = publish_heartbeat(&device, 99).await;
     let mut line = String::new();
     tokio::time::timeout(
         Duration::from_secs(5),
@@ -202,7 +219,7 @@ async fn cli_smoke_covers_status_device_command_config_events_auth_and_drain() {
     .unwrap()
     .unwrap();
     let event: DeviceEvent = serde_json::from_str(line.trim()).unwrap();
-    assert_eq!(event.event_id, accepted.event_id);
+    assert_eq!(event.source_message_id, source);
     tokio::time::sleep(Duration::from_millis(50)).await;
     monitor.kill().await.unwrap();
     let _ = monitor.wait().await;

@@ -8,7 +8,7 @@ for every confirmed-required sink. Before that point the producer remains
 responsible for retry. After it, planned shutdown must ACK or restart-spool every
 pending required responsibility.
 
-MQTT QoS1 PUBACK and HTTP `202 Accepted` mean exactly this boundary. Neither means a
+MQTT QoS1 PUBACK, TCP acceptance and signed UDP NBA1 mean exactly this boundary. None means a
 business application processed or durably stored the event.
 
 ## Normal and restart delivery

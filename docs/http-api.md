@@ -1,21 +1,9 @@
-# HTTP API
+# Management HTTP API
 
-Device and management HTTP bind independently. Both enforce bounded headers, body,
-handler concurrency, timeouts, and reject content encoding. Device bearer format is
-`credential_id:secret`; management uses a separate 64-character secret configured
-through `NETBAIOT_ADMIN_SECRET`.
-
-## Device listener
-
-| Method/path | Meaning |
-|---|---|
-| `POST /v1/device/data` | Decode and route collected data; `202` means EventAccepted |
-| `GET /v1/device/config` | Return revisioned config; supports `If-None-Match`/304 |
-| `POST /v1/device/config/ack` | Route typed `ConfigAck` as a normal event |
-| `POST /v1/device/heartbeat` | Route a heartbeat event |
-| `POST /v1/device/commands/ack` | Route typed command execution ACK |
-
-Upload success does not mean business persistence or application processing.
+Management HTTP has its own listener and 64-character admin secret configured
+through `NETBAIOT_ADMIN_SECRET`. Headers, bodies, handler concurrency, responses
+and deadlines are bounded; content encoding is rejected. Device credentials cannot
+authorize these operations. The device ingress does not dispatch HTTP.
 
 ## Management listener
 

@@ -1,6 +1,8 @@
 use async_trait::async_trait;
 use netbaiot_codecs::JsonV1;
-use netbaiot_core::{CodecId, EventId, SinkId, Transport};
+use netbaiot_core::{
+    CodecId, ControlSnapshot, EventId, ProductId, ProductRuntimeConfig, SinkId, TenantId, Transport,
+};
 use netbaiot_protocol::RouteDefinition;
 use netbaiot_runtime::{
     AuthCache, CodecRegistry, ConfigCache, DeliveryEnvelope, Error, EventAcceptance, EventBus,
@@ -8,7 +10,9 @@ use netbaiot_runtime::{
     SinkDefinition, SinkDeliveryMode, SinkError, StaticAuthenticator,
 };
 use netbaiot_server::{Config, TlsFiles, read_config, run, tls_acceptor};
-use netbaiot_transports::{BoxStream, HttpRole, Services, serve_device_ingress, serve_stream};
+use netbaiot_transports::{
+    BoxStream, Services, serve_device_ingress, serve_management_http, serve_stream,
+};
 use std::{
     collections::HashSet,
     process::Stdio,
@@ -119,8 +123,23 @@ fn non_loopback_management_requires_tls_while_loopback_development_allows_http()
     });
     assert!(public.validate().is_ok());
 }
+async fn tcp_accept(address: std::net::SocketAddr, payload: &[u8]) -> EventAcceptance {
+    use netbaiot_transports::tcp::{LengthPrefixFramer, TcpFramer};
+    let mut socket: BoxStream = Box::new(TcpStream::connect(address).await.unwrap());
+    let framer = LengthPrefixFramer { maximum: 65_536 };
+    socket.write_all(&framer.encode(br#"{"credential_id":"demo-device","secret":"000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"}"#).unwrap()).await.unwrap();
+    assert_eq!(read_frame(&mut socket).await, br#"{"authenticated":true}"#);
+    socket
+        .write_all(&framer.encode(payload).unwrap())
+        .await
+        .unwrap();
+    let receipt = serde_json::from_slice(&read_frame(&mut socket).await).unwrap();
+    socket.shutdown().await.unwrap();
+    receipt
+}
+
 #[tokio::test]
-async fn composition_root_serves_http_and_stops_all_listeners() {
+async fn composition_root_serves_tcp_and_stops_all_listeners() {
     let _port_guard = EPHEMERAL_PORT_TEST_LOCK.lock().await;
     let mut c = config();
     let mut reservations = Vec::new();
@@ -135,31 +154,15 @@ async fn composition_root_serves_http_and_stops_all_listeners() {
     drop(reservations);
     let stop = CancellationToken::new();
     let server = tokio::spawn(run(c, stop.clone()));
-    let client = reqwest::Client::builder()
-        .no_proxy()
-        .timeout(Duration::from_secs(2))
-        .build()
-        .unwrap();
-    let body = r#"{"schema_version":1,"source_message_id":"root:1","kind":"heartbeat","data":{"sequence":1}}"#;
-    let response = tokio::time::timeout(Duration::from_secs(3), async {
-        loop {
-            match client
-                .post(format!("http://{}/v1/device/data", addresses[0]))
-                .bearer_auth(
-                    "demo-device:000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
-                )
-                .body(body)
-                .send()
-                .await
-            {
-                Ok(r) => break r,
-                Err(_) => tokio::time::sleep(Duration::from_millis(10)).await,
-            }
+    tokio::time::timeout(Duration::from_secs(3), async {
+        while TcpStream::connect(addresses[0]).await.is_err() {
+            tokio::time::sleep(Duration::from_millis(10)).await;
         }
     })
     .await
     .unwrap();
-    assert_eq!(response.status(), 202);
+    let receipt = tcp_accept(addresses[0], br#"{"schema_version":1,"source_message_id":"root:1","kind":"heartbeat","data":{"sequence":1}}"#).await;
+    assert!(!receipt.event_id.0.is_nil());
     // Observe the sockets owned by this server instance. Reconnecting to the released ephemeral
     // addresses after shutdown is racy because another concurrent test may legitimately receive
     // one of those ports before this assertion runs.
@@ -944,15 +947,8 @@ async fn exercise_graceful_restart_spool_replay(healthy_cycles: u32, dwell_per_c
     drop(mqtt_publisher);
     let mut accepted = HashSet::new();
     for sequence in 0..3 {
-        let response = client
-            .post(format!("http://{}/v1/device/data", c.device_ingress))
-            .bearer_auth("demo-device:000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f")
-            .body(format!(r#"{{"schema_version":1,"source_message_id":"restart:{sequence}","kind":"heartbeat","data":{{"sequence":{sequence}}}}}"#))
-            .send()
-            .await
-            .unwrap();
-        assert_eq!(response.status(), reqwest::StatusCode::ACCEPTED);
-        accepted.insert(response.json::<EventAcceptance>().await.unwrap().event_id);
+        let receipt = tcp_accept(c.device_ingress, format!(r#"{{"schema_version":1,"source_message_id":"restart:{sequence}","kind":"heartbeat","data":{{"sequence":{sequence}}}}}"#).as_bytes()).await;
+        accepted.insert(receipt.event_id);
     }
     client
         .post(format!("http://{}/api/v1/drain", c.management_http))
@@ -1073,15 +1069,8 @@ async fn exercise_graceful_restart_spool_replay(healthy_cycles: u32, dwell_per_c
     for cycle in 0..healthy_cycles {
         let mut child = start_child(&config_path, &admin).await;
         wait_ready(&client, c.management_http, &admin).await;
-        let response = client
-            .post(format!("http://{}/v1/device/data", c.device_ingress))
-            .bearer_auth("demo-device:000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f")
-            .body(format!(r#"{{"schema_version":1,"source_message_id":"cycle:{cycle}","kind":"heartbeat","data":{{"sequence":{cycle}}}}}"#))
-            .send()
-            .await
-            .unwrap();
-        assert_eq!(response.status(), reqwest::StatusCode::ACCEPTED);
-        let event_id = response.json::<EventAcceptance>().await.unwrap().event_id;
+        let receipt = tcp_accept(c.device_ingress, format!(r#"{{"schema_version":1,"source_message_id":"cycle:{cycle}","kind":"heartbeat","data":{{"sequence":{cycle}}}}}"#).as_bytes()).await;
+        let event_id = receipt.event_id;
         accepted.insert(event_id);
         tokio::time::timeout(Duration::from_secs(5), async {
             loop {
@@ -1156,15 +1145,8 @@ async fn subprocess_sigkill_exposes_the_documented_three_event_loss_window() {
     wait_ready(&client, c.management_http, &admin).await;
     let mut accepted = HashSet::new();
     for sequence in 0..3 {
-        let response = client
-            .post(format!("http://{}/v1/device/data", c.device_ingress))
-            .bearer_auth("demo-device:000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f")
-            .body(format!(r#"{{"schema_version":1,"source_message_id":"kill:{sequence}","kind":"heartbeat","data":{{"sequence":{sequence}}}}}"#))
-            .send()
-            .await
-            .unwrap();
-        assert_eq!(response.status(), reqwest::StatusCode::ACCEPTED);
-        accepted.insert(response.json::<EventAcceptance>().await.unwrap().event_id);
+        let receipt = tcp_accept(c.device_ingress, format!(r#"{{"schema_version":1,"source_message_id":"kill:{sequence}","kind":"heartbeat","data":{{"sequence":{sequence}}}}}"#).as_bytes()).await;
+        accepted.insert(receipt.event_id);
     }
     assert_eq!(accepted.len(), 3);
     std::fs::create_dir_all(&c.spool_directory).unwrap();
@@ -1211,15 +1193,8 @@ async fn subprocess_spool_failure_stays_alive_until_repaired_then_replays_same_e
     let client = reqwest::Client::builder().no_proxy().build().unwrap();
     let mut child = start_child(&config_path, &admin).await;
     wait_ready(&client, c.management_http, &admin).await;
-    let response = client
-        .post(format!("http://{}/v1/device/data", c.device_ingress))
-        .bearer_auth("demo-device:000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f")
-        .body(r#"{"schema_version":1,"source_message_id":"spool-failure","kind":"heartbeat","data":{"sequence":1}}"#)
-        .send()
-        .await
-        .unwrap();
-    assert_eq!(response.status(), reqwest::StatusCode::ACCEPTED);
-    let accepted = response.json::<EventAcceptance>().await.unwrap().event_id;
+    let receipt = tcp_accept(c.device_ingress, r#"{"schema_version":1,"source_message_id":"spool-failure","kind":"heartbeat","data":{"sequence":1}}"#.as_bytes()).await;
+    let accepted = receipt.event_id;
     std::fs::create_dir_all(&c.spool_directory).unwrap();
     std::fs::remove_dir(&c.spool_directory).unwrap();
     std::fs::write(&c.spool_directory, b"not a directory").unwrap();
@@ -1368,6 +1343,24 @@ async fn exercise_shared_listener(tls: bool) {
     use sha2::Sha256;
     let stop = CancellationToken::new();
     let (ingress, mut services) = tls_test_services(Limits::default(), stop.clone());
+    ingress
+        .config
+        .apply(ControlSnapshot {
+            revision: 1,
+            products: vec![ProductRuntimeConfig {
+                tenant_id: TenantId::new("demo").unwrap(),
+                product_id: ProductId::new("sensor").unwrap(),
+                codec_id: CodecId::new("netbaiot-json").unwrap(),
+                codec_version: 1,
+                revision: 1,
+            }],
+            devices: vec![],
+            routes: vec![RouteDefinition {
+                tenant: None,
+                sinks: vec![SinkId::new("tls-test").unwrap()],
+            }],
+        })
+        .unwrap();
     let admin = "d".repeat(64);
     Arc::get_mut(&mut services).unwrap().admin = Some(Arc::new(
         AdminAccess::new(&admin, Default::default(), &ingress.limits).unwrap(),
@@ -1388,10 +1381,10 @@ async fn exercise_shared_listener(tls: bool) {
     } else {
         None
     };
-    // Deliberately pass Management services: shared ingress must force Device role.
+    // Sharing Services must never expose management HTTP on the device listener.
     let task = tokio::spawn(serve_device_ingress(
         listener,
-        services.with_http_role(HttpRole::Management),
+        services.clone(),
         acceptor.clone(),
         stop.child_token(),
     ));
@@ -1400,10 +1393,9 @@ async fn exercise_shared_listener(tls: bool) {
         services.clone(),
         stop.child_token(),
     ));
-    let management_task = tokio::spawn(serve_stream(
+    let management_task = tokio::spawn(serve_management_http(
         management,
-        Transport::Http,
-        services.with_http_role(HttpRole::Management),
+        services.clone(),
         acceptor,
         stop.child_token(),
     ));
@@ -1419,52 +1411,59 @@ async fn exercise_shared_listener(tls: bool) {
         .timeout(Duration::from_secs(2))
         .build()
         .unwrap();
-    let device_url = format!("{scheme}://localhost:{}", address.port());
-    assert_eq!(
-        client
-            .post(format!("{device_url}/v1/device/data"))
-            .bearer_auth(format!("demo-device:{secret}"))
-            .body(payload.to_vec())
+    // Application bytes are rejected after TLS, without any HTTP response or fallback.
+    for request in [
+        "POST /v1/device/data HTTP/1.1\r\nHost: localhost\r\n\r\n",
+        "GET /api/v1/ready HTTP/1.1\r\nHost: localhost\r\n\r\n",
+        "PATCH /api/v1/routes HTTP/1.1\r\nHost: localhost\r\n\r\n",
+    ] {
+        let mut socket = device_socket(address, tls).await;
+        socket.write_all(request.as_bytes()).await.unwrap();
+        let mut response = [0; 64];
+        assert!(matches!(
+            tokio::time::timeout(Duration::from_secs(2), socket.read(&mut response))
+                .await
+                .unwrap(),
+            Ok(0) | Err(_)
+        ));
+    }
+    assert_eq!(ingress.metrics.get(Metric::ProtocolDetectionFailures), 3);
+    for path in ["health", "ready", "status"] {
+        let response = client
+            .get(format!(
+                "{scheme}://localhost:{}/api/v1/{path}",
+                management_address.port()
+            ))
+            .bearer_auth(&admin)
             .send()
             .await
-            .unwrap()
-            .status(),
-        202
-    );
-    for path in ["/api/v1/ready", "/api/v1/stats", "/v1/admin/ready"] {
-        assert_eq!(
-            client
-                .get(format!("{device_url}{path}"))
-                .bearer_auth(format!("demo-device:{secret}"))
-                .send()
-                .await
-                .unwrap()
-                .status(),
-            404
-        );
-        assert_eq!(
-            client
-                .get(format!("{device_url}{path}"))
-                .bearer_auth(&admin)
-                .send()
-                .await
-                .unwrap()
-                .status(),
-            401
-        );
+            .unwrap();
+        assert_eq!(response.status(), 200);
+        if path == "status" {
+            let value: serde_json::Value = response.json().await.unwrap();
+            assert_eq!(
+                value["active_connections"],
+                serde_json::json!({"mqtt":0,"tcp":0,"udp":0})
+            );
+        }
     }
+    let mutation = client.put(format!("{scheme}://localhost:{}/api/v1/devices/config", management_address.port()))
+        .bearer_auth(&admin)
+        .json(&serde_json::json!({"device":{"tenant_id":"demo","product_id":"sensor","device_id":"device-1"},"revision":2,"payload":{"sample_interval_seconds":10}}))
+        .send().await.unwrap();
+    assert_eq!(mutation.status(), 204);
     assert_eq!(
         client
             .get(format!(
                 "{scheme}://localhost:{}/api/v1/ready",
                 management_address.port()
             ))
-            .bearer_auth(&admin)
+            .bearer_auth(format!("demo-device:{secret}"))
             .send()
             .await
             .unwrap()
             .status(),
-        200
+        401
     );
     // Preserve the existing standard version-rejection response through the classifier.
     let mut unsupported = device_socket(address, tls).await;
@@ -1522,7 +1521,7 @@ async fn exercise_shared_listener(tls: bool) {
     let sender = tokio::net::UdpSocket::bind("127.0.0.1:0").await.unwrap();
     sender.send_to(&datagram, address).await.unwrap();
     tokio::time::timeout(Duration::from_secs(2), async {
-        while ingress.metrics.get(Metric::EventsAccepted) < 4 {
+        while ingress.metrics.get(Metric::EventsAccepted) < 3 {
             tokio::task::yield_now().await;
         }
     })
@@ -1533,15 +1532,15 @@ async fn exercise_shared_listener(tls: bool) {
     task.await.unwrap().unwrap();
     udp_task.await.unwrap().unwrap();
     management_task.await.unwrap().unwrap();
-    assert_eq!(services.connections.active().unwrap(), [0; 4]);
+    assert_eq!(services.connections.active().unwrap(), [0; 3]);
     ingress.events.stop_workers().await.unwrap();
 }
 #[tokio::test]
-async fn shared_plaintext_http_mqtt_tcp_udp_and_management_isolation() {
+async fn shared_plaintext_mqtt_tcp_udp_rejects_http_and_preserves_management() {
     exercise_shared_listener(false).await;
 }
 #[tokio::test]
-async fn shared_tls_https_mqtts_tcp_without_alpn_and_udp() {
+async fn shared_tls_mqtts_tcp_udp_rejects_https_without_alpn() {
     exercise_shared_listener(true).await;
 }
 
@@ -1570,7 +1569,7 @@ async fn shared_ingress_releases_unknown_slow_eof_and_tls_failure_leases() {
             acceptor,
             stop.clone(),
         ));
-        for prefix in [b"G".as_slice(), b"garbage", b""] {
+        for prefix in [b"\x10".as_slice(), b"garbage", b""] {
             let mut socket = TcpStream::connect(address).await.unwrap();
             if !prefix.is_empty() {
                 socket.write_all(prefix).await.unwrap();
@@ -1599,7 +1598,7 @@ async fn shared_ingress_releases_unknown_slow_eof_and_tls_failure_leases() {
             }
         }
         assert_eq!(ingress.metrics.get(Metric::ConnectionsAccepted), 3);
-        assert_eq!(services.connections.active().unwrap(), [0; 4]);
+        assert_eq!(services.connections.active().unwrap(), [0; 3]);
         if !tls {
             assert_eq!(ingress.metrics.get(Metric::ProtocolDetectionTimeouts), 2);
         }
@@ -1621,7 +1620,7 @@ async fn shared_ingress_releases_unknown_slow_eof_and_tls_failure_leases() {
         assert_eq!(ingress.metrics.get(Metric::ConnectionsRejected), 1);
         stop.cancel();
         task.await.unwrap().unwrap();
-        assert_eq!(services.connections.active().unwrap(), [0; 4]);
+        assert_eq!(services.connections.active().unwrap(), [0; 3]);
         ingress.events.stop_workers().await.unwrap();
     }
 }
@@ -1640,11 +1639,7 @@ fn legacy_device_addresses_are_rejected_without_ambiguous_conversion() {
 async fn classification_does_not_refresh_first_packet_deadline() {
     use netbaiot_transports::classifier::classify_device_stream;
     use tokio::time::Instant;
-    for prefix in [
-        b"POST ".as_slice(),
-        b"\x10\x7f\x00\x04MQTT\x04",
-        b"\x00\x00\x00\x7f{",
-    ] {
+    for prefix in [b"\x10\x7f\x00\x04MQTT\x04".as_slice(), b"\x00\x00\x00\x7f{"] {
         let stop = CancellationToken::new();
         let (ingress, services) = tls_test_services(
             Limits {
@@ -1666,16 +1661,6 @@ async fn classification_does_not_refresh_first_packet_deadline() {
             .unwrap();
         let lease = lease.classify(protocol).unwrap();
         let result = match protocol {
-            Transport::Http => {
-                netbaiot_transports::http::connection(
-                    stream,
-                    "127.0.0.1:1234".parse().unwrap(),
-                    services.clone(),
-                    lease,
-                    stop.clone(),
-                )
-                .await
-            }
             Transport::Mqtt => {
                 netbaiot_transports::mqtt::connection(stream, services.clone(), lease, stop.clone())
                     .await
@@ -1688,7 +1673,7 @@ async fn classification_does_not_refresh_first_packet_deadline() {
         };
         assert!(result.is_err());
         assert!(Instant::now() <= deadline + Duration::from_millis(1));
-        assert_eq!(services.connections.active().unwrap(), [0; 4]);
+        assert_eq!(services.connections.active().unwrap(), [0; 3]);
         ingress.events.stop_workers().await.unwrap();
     }
 }
@@ -1716,7 +1701,7 @@ async fn unclassified_connections_enforce_global_peer_and_rate_limits() {
             stop.clone(),
         ));
         let mut pending = TcpStream::connect(address).await.unwrap();
-        pending.write_all(b"G").await.unwrap();
+        pending.write_all(b"\x10").await.unwrap();
         tokio::time::timeout(Duration::from_secs(1), async {
             while ingress.metrics.get(Metric::ConnectionsAccepted) == 0 {
                 tokio::task::yield_now().await;
@@ -1724,7 +1709,7 @@ async fn unclassified_connections_enforce_global_peer_and_rate_limits() {
         })
         .await
         .unwrap();
-        assert_eq!(services.connections.active().unwrap(), [0; 4]);
+        assert_eq!(services.connections.active().unwrap(), [0; 3]);
         let mut rejected = TcpStream::connect(address).await.unwrap();
         let mut byte = [0];
         assert!(matches!(
@@ -1746,7 +1731,6 @@ async fn unclassified_connections_enforce_global_peer_and_rate_limits() {
 #[tokio::test]
 async fn device_protocol_ceiling_preserves_other_tls_protocols_and_management() {
     use netbaiot_runtime::{AdminAccess, Metric};
-    use netbaiot_transports::tcp::{LengthPrefixFramer, TcpFramer};
     let stop = CancellationToken::new();
     let (ingress, mut services) = tls_test_services(
         Limits {
@@ -1772,22 +1756,18 @@ async fn device_protocol_ceiling_preserves_other_tls_protocols_and_management() 
     ));
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let management = listener.local_addr().unwrap();
-    let management_task = tokio::spawn(serve_stream(
+    let management_task = tokio::spawn(serve_management_http(
         listener,
-        Transport::Http,
-        services.with_http_role(HttpRole::Management),
+        services.clone(),
         Some(tls_acceptor(&test_tls_files()).await.unwrap()),
         stop.child_token(),
     ));
     let mut slow = Vec::new();
     for count in 1..=2 {
         let mut socket = device_socket(address, true).await;
-        socket
-            .write_all(b"POST /v1/device/data HTTP/1.1\r\nHost: localhost\r\n")
-            .await
-            .unwrap();
+        socket.write_all(b"\x00\x00\x00\x7f{").await.unwrap();
         tokio::time::timeout(Duration::from_secs(2), async {
-            while services.connections.active().unwrap()[0] < count {
+            while services.connections.active().unwrap()[Transport::Tcp as usize] < count {
                 tokio::task::yield_now().await;
             }
         })
@@ -1796,10 +1776,7 @@ async fn device_protocol_ceiling_preserves_other_tls_protocols_and_management() 
         slow.push(socket);
     }
     let mut rejected = device_socket(address, true).await;
-    rejected
-        .write_all(b"POST /v1/device/data HTTP/1.1\r\n")
-        .await
-        .unwrap();
+    rejected.write_all(b"\x00\x00\x00\x7f{").await.unwrap();
     assert!(matches!(
         tokio::time::timeout(Duration::from_secs(2), rejected.read(&mut [0; 1]))
             .await
@@ -1823,16 +1800,7 @@ async fn device_protocol_ceiling_preserves_other_tls_protocols_and_management() 
     .await
     .unwrap();
     assert_eq!(mqtt_read(&mut *mqtt).await, (0x40, vec![0, 1]));
-    let mut tcp = device_socket(address, true).await;
-    let framer = LengthPrefixFramer { maximum: 65_536 };
-    tcp.write_all(&framer.encode(br#"{"credential_id":"demo-device","secret":"000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"}"#).unwrap()).await.unwrap();
-    assert_eq!(read_frame(&mut tcp).await, br#"{"authenticated":true}"#);
-    tcp.write_all(&framer.encode(payload).unwrap())
-        .await
-        .unwrap();
-    let accepted: EventAcceptance = serde_json::from_slice(&read_frame(&mut tcp).await).unwrap();
-    assert!(!accepted.event_id.0.is_nil());
-    // Even with the device HTTP ceiling reached, known management HTTP is unaffected.
+    // Management remains independent of the classified TCP ceiling.
     let mut admin_socket = device_socket(management, true).await;
     admin_socket.write_all(format!("GET /api/v1/ready HTTP/1.1\r\nHost: localhost\r\nAuthorization: Bearer {admin}\r\n\r\n").as_bytes()).await.unwrap();
     let mut response = Vec::new();
@@ -1847,7 +1815,7 @@ async fn device_protocol_ceiling_preserves_other_tls_protocols_and_management() 
     stop.cancel();
     task.await.unwrap().unwrap();
     management_task.await.unwrap().unwrap();
-    assert_eq!(services.connections.active().unwrap(), [0; 4]);
+    assert_eq!(services.connections.active().unwrap(), [0; 3]);
     // Repeated pending acquire/drop catches leaked global/IP/byte ownership at shutdown.
     for _ in 0..8 {
         drop(

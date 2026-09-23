@@ -17,7 +17,7 @@ curl --noproxy '*' http://127.0.0.1:9090/api/v1/metrics \
 
 **症状**：`Configuration`、listener bind 或 recovery error。
 
-**常见原因**：JSON 未知字段/类型错误；`development:true` 却绑定非 loopback；非 loopback HTTP/MQTT/TCP/management 没有 TLS；production 没有 required sink；端口占用；credentials/provider 均为空；spool 空路径。
+**常见原因**：JSON 未知字段/类型错误；`development:true` 却绑定非 loopback；非 loopback MQTT/TCP/management HTTP 没有 TLS；production 没有 required sink；端口占用；credentials/provider 均为空；spool 空路径。
 
 **确认/解决**：从 `configs/development.json` 最小差异修改；用 `lsof -nP -iTCP:<port> -sTCP:LISTEN` 查冲突；检查 PEM、目录权限和 server 日志。不要删除损坏 spool 来“修复”，除非明确接受丢失责任并经过事故审批。
 
@@ -53,7 +53,7 @@ curl --noproxy '*' http://127.0.0.1:9090/api/v1/metrics \
 
 **确认/解决**：先用文档中的 heartbeat payload 和 exact `/up`；查看 `codec_failures`、`ingress_rejected`、`queue_rejects`、`events_rejected`、sink counters。PUBACK 被延迟/缺失意味着不能假定 EventAccepted，客户端应按 MQTT 语义重试。
 
-## 6. HTTP 返回 401/403/400/413/415/429/503/504
+## 6. 管理 HTTP 返回 401/403/400/413/415/429/503/504
 
 **症状与处理**：401 检查精确 `Bearer credential-id:secret`；403 检查 permission/management token；400 检查严格 JSON/endpoint kind；413 降低 body；415 移除 `Content-Encoding`；429 是 admission/rate/queue overload，退避；503 检查 draining/provider/device offline/storage；504 检查 request/sink timeout。
 
@@ -75,13 +75,13 @@ curl --noproxy '*' http://127.0.0.1:9090/api/v1/metrics \
 
 **症状**：command HTTP 503，code 为 `device_offline`；CLI exit 5。
 
-**原因**：没有当前本节点 live MQTT/TCP session；只有 persistent offline session；设备只用 HTTP/UDP；旧 generation 已被新连接替换。
+**原因**：没有当前本节点 live MQTT/TCP session；只有 persistent offline session；设备只用 UDP；旧 generation 已被新连接替换。
 
 **解决**：查询 `/api/v1/devices/connection`；让设备建立 live MQTT/TCP；业务系统保留离线命令意图。NetbaIoT 不会把管理命令塞进 MQTT offline queue。
 
 ## 10. `overloaded`
 
-**症状**：HTTP 429、MQTT 无成功 ACK、connection 被拒绝。
+**症状**：管理 HTTP 429、MQTT 无成功 ACK、connection 被拒绝。
 
 **原因**：connections、ingress wait、rate、EventBus、sink、command、subscription、offline、retain 或 replay state 任一 count/byte limit 满。
 
@@ -149,7 +149,7 @@ curl --noproxy '*' http://127.0.0.1:9090/api/v1/metrics \
 
 **原因**：连错 device port、未设置 server 进程的 `NETBAIOT_ADMIN_SECRET`、token 不是 64-hex、缺少 Bearer、非 loopback 未配置 TLS、防火墙。
 
-**解决**：management 默认 `9090`、device HTTP 默认 `8080`；即使 health/ready 也带 management bearer。设置环境变量后必须重启 server。
+**解决**：management 默认 `9090`、device ingress 默认 `8080`；即使 health/ready 也带 management bearer。设置环境变量后必须重启 server。
 
 ## 21. TLS hostname / CA 错误
 

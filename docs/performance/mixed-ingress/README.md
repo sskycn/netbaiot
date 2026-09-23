@@ -1,3 +1,12 @@
+> Historical four-protocol evidence. Device HTTP and its runners have been removed;
+> retrieve the original tools at `945fe5e386d623c32e2c7d2d0568fe0c058107ec` to
+> reproduce these old runs. See [current report](../../remove-device-http.md).
+>
+> Worker-count correction: all generator binaries explicitly used four Tokio
+> workers. Raw metadata and diagnostic labels requesting two workers were ineffective;
+> the alleged 2→4 scaling experiment is invalid. Raw measurements are unchanged.
+> See [erratum](../../mixed-ingress-capacity-audit.md#worker-count-erratum-device-http-removal-review).
+
 # Mixed ingress audit evidence
 
 The human report is [mixed-ingress-capacity-audit.md](../../mixed-ingress-capacity-audit.md).
@@ -67,5 +76,5 @@ matching, successful results. Do not run a compiler, tests or another load gener
 concurrently. Server and client executable hashes, not the working checkout's HEAD,
 identify the measured implementation. Dynamic ports and public fixture credentials
 are generated per run. The final harness adds optional bounded settling time and
-generator worker count for the separately labeled diagnostic plan; default formal
-settings remain unchanged.
+a requested generator worker environment for the separately labeled diagnostic
+plan; this did not override the four-worker runtime (see erratum).

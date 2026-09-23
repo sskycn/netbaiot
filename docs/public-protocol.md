@@ -38,4 +38,12 @@ semantics deterministically instead of racing an invalidate or replacement.
 
 Device JSON v1 is represented by `DeviceUplink`. Its stable fields are
 `schema_version`, `source_message_id`, optional `occurred_at`, `kind`, and `data`.
-HTTP 202 and MQTT QoS acknowledgement mean only `EventAccepted`.
+MQTT QoS1 PUBACK, TCP acceptance and signed UDP NBA1 mean only `EventAccepted`.
+
+The 0.x device-HTTP removal is an intentional source/control-API breaking change:
+`TransportKind::Http` and `ConnectionCounts.http` are removed. Transport strings
+are now `mqtt`, `tcp`, `udp`; the status summary serializes exactly those three
+counts and excludes management connections. UDP remains sessionless (active count
+zero). Device JSON v1, MQTT 3.1.1, TCP framing, NBI1/NBA1 and confirmed business
+stream v1 are unchanged; their wire versions do not change. Rebuild public clients
+together with the server. See [migration](remove-device-http.md).

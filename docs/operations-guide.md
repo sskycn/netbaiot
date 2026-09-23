@@ -13,12 +13,12 @@ netbaiot-server --print-default-limits
 
 | 字段 | 含义 | development | production |
 |---|---|---|---|
-| `device_ingress` | TCP：设备 HTTP/MQTT/通用 TCP；UDP：NBI1 | loopback `8080` | 同号 TCP/UDP `443`；TCP 必须 TLS，UDP 只认证不加密 |
+| `device_ingress` | TCP：MQTT/通用 TCP；UDP：NBI1/NBA1 | loopback `8080` | 同号 TCP/UDP `443`；TCP 必须 TLS，UDP 只认证不加密 |
 | `management_http` | `/api/v1/...` listener | loopback `9090` | 优先 loopback/管理网；非 loopback 必须 TLS |
 | `business_tcp` | confirmed stream listener | null | 当前只允许 loopback，且与 webhook 二选一 |
 | `development` | 强制所有 listener loopback | true | false |
 | `limits` | `Limits` 的覆盖字段 | `{}` 使用默认 | 按测量调优，不可设无界 |
-| `tls` | PEM certificate/private key | null | 对非 loopback HTTP/MQTT/TCP 必填 |
+| `tls` | PEM certificate/private key | null | 对非 loopback management HTTP/MQTT/TCP 必填 |
 | `delivery_url` | required webhook | tutorial 为 loopback | HTTPS business endpoint |
 | `auth_provider_url` | 外部认证 provider | null + static credentials | HTTPS provider；loopback 可 HTTP |
 | `spool_directory` | planned-restart recovery | `./var/...` | 独立、本地、受监控、权限受限目录 |
@@ -60,7 +60,7 @@ Environment variables：
 }
 ```
 
-同一 `tls` 接受器用于 device HTTP、management HTTP、MQTT 和 generic TCP。TLS 验证必须使用真实 CA/hostname；不要在生产客户端长期使用 insecure 选项。UDP payload 不加密。
+同一 `tls` 接受器用于 management HTTP、MQTT 和 generic TCP。TLS 验证必须使用真实 CA/hostname；不要在生产客户端长期使用 insecure 选项。UDP payload 不加密。
 
 ## 资源限制与 backpressure
 
@@ -69,7 +69,7 @@ Environment variables：
 | 类别 | 默认值摘要 |
 |---|---|
 | connections | 256 node / 64 tenant / 32 IP / 2 device |
-| packet/body/frame | MQTT/HTTP/TCP 64 KiB；UDP 1200 B |
+| packet/body/frame | MQTT/TCP 帧及管理 HTTP body 64 KiB；UDP 1200 B |
 | ingress | 16 active、2 MiB；16 waiters、25 ms |
 | commands | 16/device、128/tenant、1024/process；16 KiB/command；TTL 5 min |
 | persistent sessions | 4096 global / 512 tenant；idle policy 24 h |
@@ -144,7 +144,7 @@ RUST_LOG=info netbaiot-server /etc/netbaiot/server.json
 curl -H "Authorization: Bearer $ADMIN" http://127.0.0.1:9090/api/v1/metrics
 ```
 
-稳定、低基数 counters 包括 connections accepted/rejected、MQTT connect/packets/publishes/subscriptions/PUBACK/protocol violations、HTTP/TCP/UDP traffic、auth cache/failures、codec/ingress/admission/queue rejects、command lifecycle、events accepted/rejected/bytes、sink ACK/retry/failure/drop、spool/recovery 和 timeouts。Histogram 提供关键阶段延迟。
+稳定、低基数 counters 包括 connections accepted/rejected、MQTT connect/packets/publishes/subscriptions/PUBACK/protocol violations、management HTTP requests（`management_http_requests`）及 TCP/UDP traffic、auth cache/failures、codec/ingress/admission/queue rejects、command lifecycle、events accepted/rejected/bytes、sink ACK/retry/failure/drop、spool/recovery 和 timeouts。Histogram 提供关键阶段延迟。
 
 `/status` 提供当前 transport connection counts、EventBus `event_count/event_bytes/pending_required`、auth/config cache 和 runtime task 数。当前公共 metrics **没有直接导出** persistent session 数、offline message 数、QoS inflight 数、retained 数或逐 sink backlog gauge；不要在 dashboard 中假装这些指标存在。可用 rejection/sink counters、status、日志和外部 black-box probe 监控，若运维必须精确观测这些状态，应单独提出受控指标扩展。
 

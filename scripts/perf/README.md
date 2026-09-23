@@ -95,16 +95,19 @@ forces explicit rejection, opens the sink, and verifies zero residual accounting
 Its process RSS is distinct from the real server's RSS. Results are diagnostics,
 not production capacity certification.
 
-## Single device ingress comparison
+## Device protocol removal comparison
 
-`ingress_compare.py` performs five alternating before/after repetitions, with
-50 warmup connections per protocol and 500 measured connections each. Every
-connection completes one accepted HTTP request, MQTT CONNECT + QoS1 publish, or
-framed TCP authentication + message. Both plaintext and verified TLS are covered;
-the shared build also checks unmodified Mosquitto 3.1.1 QoS0/1/2 clients.
-The before binary must use the former four-address configuration. This experiment
-reports local sequential connection/event rate, not sustainable production capacity.
+`device_protocol_benchmark.py` measures MQTT, framed TCP and signed UDP NBA1
+receipts, with optional verified TLS for MQTT/TCP. The load generator explicitly
+runs four Tokio workers; changing `TOKIO_WORKER_THREADS` does not override that.
+The server uses ten workers in this loopback harness. Freeze the same generator
+binary for both sides; run serialized without compilation or concurrent tests.
 
 ```bash
-python3 scripts/perf/ingress_compare.py --before target/single-ingress/baseline-server --after target/release/netbaiot-server --count 500 --repetitions 5 --output target/single-ingress/performance.json
+python3 scripts/perf/device_protocol_benchmark.py --server target/remove-device-http/before-server --loadgen target/remove-device-http/loadgen --plan docs/performance/remove-device-http/before-plan.json --label before --output docs/performance/remove-device-http
 ```
+
+See [results and limits](../../docs/remove-device-http.md). The old four-protocol
+and Device HTTP comparison runners were removed; historical measurements and their
+exact tools remain reproducible from baseline `945fe5e386d623c32e2c7d2d0568fe0c058107ec`.
+Those measurements are not current protocol capacity claims.

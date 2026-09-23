@@ -4,19 +4,18 @@
 
 `device_ingress` 在同一个地址、相同端口号绑定一个 TCP listener 和一个 UDP socket。
 开发示例为 `127.0.0.1:8080`，生产可配置 `0.0.0.0:443`。TCP 通过同一证书承载
-HTTPS、标准 MQTT 3.1.1 TLS 和通用分帧 TLS TCP。TLS 握手后才识别应用协议，
+标准 MQTT 3.1.1 TLS 和通用分帧 TLS TCP。TLS 握手后才识别应用协议，
 不要求 ALPN、自定义前导或修改客户端 wire protocol。UDP 同端口继续使用 NBI1/HMAC，
 只认证不加密，不涉及 DTLS/QUIC。
 
 Management HTTP（`management_http`，通常为 `127.0.0.1:9090`）和可选的
-`business_tcp` 继续独立监听与授权。设备 HTTP 不提供管理 API。
+`business_tcp` 继续独立监听与授权。管理 HTTP 是控制面协议，不参与设备协议分类。
 非 loopback TCP 入口必须配置 TLS；开发模式强制 loopback，允许本地明文测试。
 
-配置中的 `device_http`、`mqtt`、`tcp`、`udp` 四个旧字段替换为 `device_ingress`。
-旧字段将触发配置错误；迁移时须明确选择新地址并修改所有设备目的端口和防火墙规则，
-不会静默选择旧配置中的某一个端口。
+`device_ingress` 是唯一设备地址，旧分离监听字段会触发配置错误。443 只是部署选择，不代表 HTTPS。
+设备入口收到 HTTP 字节后直接关闭，不返回 HTTP 响应。详见[迁移说明](remove-device-http.md)。
 
-认证过程会选择 codec ID `netbaiot-json`、版本 `1`。HTTP/MQTT/TCP/UDP 载荷都由同一个同步 codec 解码。设备不能在载荷中自行声明可信身份；未知的信封字段会被拒绝。
+认证过程会选择 codec ID `netbaiot-json`、版本 `1`。MQTT/TCP/UDP 载荷都由同一个同步 codec 解码。设备不能在载荷中自行声明可信身份；未知的信封字段会被拒绝。
 
 ```json
 {"schema_version":1,"source_message_id":"boot-7:42","kind":"telemetry","data":{"temperature":25.3,"humidity":61.2}}
@@ -36,10 +35,6 @@ Management HTTP（`management_http`，通常为 `127.0.0.1:9090`）和可选的
 这些示例仅展示 kind/data 部分；实际请求还需包含 `schema_version` 和 `source_message_id`。命令执行状态可以是 running/succeeded/failed。需要时由业务系统按 `command_id` 关联并持久化命令/应用结果。
 
 Codec 默认限制：输入/编码后字节数 64 KiB、每次输出一条消息、遥测字段 64 个、字段名/文本 256 字节、嵌套深度 8。结构成员数预检会在 serde 分配前限制内存；遥测字段名重复时会被拒绝。无效 UTF-8、未知字段、格式错误的 JSON 和超限结构都会失败。未来若支持多消息 codec，还需配套设计原子批量回执；当前入口每次只接受一条消息。
-
-## HTTP
-
-发送 `POST /v1/device/data`，并携带 `Authorization: Bearer <credential-id>:<key>`。成功接受时返回 202；错误映射为 400/401/403/409/413/429/503/504。Hyper 和适配器负责限制请求和请求头大小。任何 `Content-Encoding` 请求头都会导致 415；不支持请求解压缩。认证后的请求阶段许可会在设备、租户和节点层面限制慢速请求体。在当前版本中，HTTP/1 每条连接只处理一个请求；请求头/请求体/响应截止时间用于限制慢客户端。HTTP 设备没有离线命令队列。应将类型化的配置和命令结果分别 POST 到 `/v1/device/config/ack` 和 `/v1/device/commands/ack`。
 
 ## 通用 TCP
 
@@ -84,7 +79,7 @@ NBA1（网关 → 设备）是固定 **64 字节签名接纳回执**：
 | 24 | 8 | sequence，u64 大端 |
 | 32 | 32 | 对前 32 字节的 HMAC-SHA256 |
 
-HMAC 使用与 NBI1 相同的已解码 32 字节密钥。NBA1 仅表示 **EventAccepted**，与 HTTP 202、MQTT QoS1 PUBACK、通用 TCP acceptance receipt 处于同一接纳层级；不表示 required sink 最终 ACK、数据库提交、业务处理完成或设备命令执行。codec 的 `CommandAck` 是另一类应用事件，NBA1 仅确认该事件被接纳。
+HMAC 使用与 NBI1 相同的已解码 32 字节密钥。NBA1 仅表示 **EventAccepted**，与 MQTT QoS1 PUBACK、通用 TCP acceptance receipt 处于同一接纳层级；不表示 required sink 最终 ACK、数据库提交、业务处理完成或设备命令执行。codec 的 `CommandAck` 是另一类应用事件，NBA1 仅确认该事件被接纳。
 
 设备必须依次检查：长度恰好 64、magic 为 NBA1、预期 credential version、当前 boot ID、待确认 sequence，以及常量时间 HMAC 验证。不能只信任来源 IP 或序号。NBA1 不携带 status 或 event_id。
 

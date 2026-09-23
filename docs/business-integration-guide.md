@@ -4,7 +4,7 @@
 
 ## DeviceEvent 契约
 
-业务 sink 收到的是与 MQTT/HTTP/TCP/UDP 无关的统一事件：
+业务 sink 收到的是与 MQTT/TCP/UDP 无关的统一事件：
 
 ```json
 {
@@ -201,7 +201,7 @@ cargo run -p netbaiot-cli -- config set device-1 \
 
 - MQTT session：发送到 `v1/t/.../down`，默认 QoS1；设备订阅 QoS 可降低实际 QoS。
 - Generic TCP session：发送一个 length-prefixed `DeviceCommand` JSON frame。
-- HTTP/UDP 设备：没有 live downlink session，因此返回 device offline。
+- UDP 设备：没有 live downlink session，因此返回 device offline。
 
 队列按 device、tenant、process 的 count/bytes 和 TTL 有界。没有当前本地 live session 时立即返回 `DEVICE_OFFLINE`；不会写数据库、MQTT 离线队列或 restart spool。多节点 session routing 不在当前范围。
 
@@ -227,12 +227,12 @@ cargo run -p netbaiot-cli -- config set device-1 \
 | `server_unavailable` | provider/sink/server/storage 暂时不可用 | 有界退避；观察 readiness/metrics |
 | `internal` | 安全的内部错误 | 记录 request_id，检查 server 日志 |
 
-管理错误响应为 `{code,message,request_id,required_scope}`；不要解析 message 文本。设备 HTTP 典型映射为 400/401/403/409/413/429/503/504。
+管理错误响应为 `{code,message,request_id,required_scope}`；不要解析 message 文本。管理 HTTP 典型映射为 400/401/403/409/413/429/503/504。
 
 ## 常用场景
 
 1. 100 个 MQTT sensor：每设备独立 credential/ClientId，QoS1 上报；业务 webhook 按 event ID 幂等；用实际 payload、TLS、sink latency 做负载验证。
-2. HTTP 设备：每次 POST bearer + codec payload；202 后可丢弃设备侧重试状态，业务仍处理重复。
+2. TCP 设备：连接时认证，此后发送分帧 codec payload 并等待 EventAccepted；业务仍处理重复。
 3. Stream consumer：先 ready，事务后 ACK；断线让官方 client 重连，同 event ID 去重。
 4. 离线命令：业务系统持有命令意图，先查询 `devices().connection()`，在线后显式发送；不要期待 gateway 排队。
 5. Credential rotation：更新 provider/snapshot，调用对应 auth invalidation，受影响 live/session 状态被移除，设备用新凭据重连。

@@ -386,7 +386,7 @@ mod tests {
                 .ingest(
                     &candidate,
                     IngressEnvelope {
-                        transport: Transport::Http,
+                        transport: Transport::Tcp,
                         payload: b"x",
                         require_command_ack: false,
                         require_config_ack: false,

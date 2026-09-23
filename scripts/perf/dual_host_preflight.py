@@ -70,7 +70,7 @@ def main():
     server = args.server.resolve()
     args.output.parent.mkdir(parents=True, exist_ok=True)
     config = json.loads((ROOT / 'configs/development.json').read_text())
-    for offset, key in enumerate(('device_http', 'management_http', 'mqtt', 'tcp', 'udp')):
+    for offset, key in enumerate(('device_ingress', 'management_http')):
         config[key] = '127.0.0.1:%d' % (24000 + offset)
     rows = []
     # Serialize this tool's fixed-port control; never reserve then hand off a port.
@@ -81,14 +81,14 @@ def main():
             config['spool_directory'] = str(directory / 'spool')
             rows.append(check(server, config, directory, 'loopback-development-control', True))
             remote = copy.deepcopy(config)
-            remote['mqtt'] = '0.0.0.0:24002'
+            remote['device_ingress'] = '0.0.0.0:24002'
             rows.append(check(server, remote, directory, 'remote-development-plaintext', False))
             remote['development'] = False
             # A configured required sink isolates the independent TLS guard. It is
             # never contacted: validation precedes listener and sink construction.
             remote['delivery_url'] = 'http://127.0.0.1:24006/events'
             rows.append(check(server, remote, directory, 'remote-production-plaintext-ipv4', False))
-            remote['mqtt'] = '[::]:24002'
+            remote['device_ingress'] = '[::]:24002'
             rows.append(check(server, remote, directory, 'remote-production-plaintext-ipv6', False))
             config['development'] = False
             rows.append(check(server, config, directory, 'production-without-required-sink', False))
