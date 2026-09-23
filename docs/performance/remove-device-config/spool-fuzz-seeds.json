@@ -1,0 +1,66 @@
+[
+  {
+    "name": "heartbeat",
+    "record": {
+      "event": {
+        "event_id": "00000000-0000-0000-0000-000000000001",
+        "source_message_id": "source",
+        "device": {
+          "tenant_id": "t",
+          "product_id": "p",
+          "device_id": "d"
+        },
+        "received_at": 1,
+        "occurred_at": null,
+        "kind": {
+          "kind": "heartbeat",
+          "data": {
+            "sequence": 1
+          }
+        }
+      },
+      "pending_sinks": [
+        "required"
+      ],
+      "routing_revision": 1,
+      "accepted_at": 1,
+      "attempts": {}
+    },
+    "bytes": 367,
+    "sha256": "40d2ce4c87d6850edbddf6b2ed98a9046b82fd1b4e7d19338c686c32a81e6bb0",
+    "encoding": "NBSP + u32 version=2 + u64 generation=1 + u32 payload length + compact JSON + SHA256(payload); integers big endian"
+  },
+  {
+    "name": "removed-kind",
+    "record": {
+      "event": {
+        "event_id": "00000000-0000-0000-0000-000000000001",
+        "source_message_id": "source",
+        "device": {
+          "tenant_id": "t",
+          "product_id": "p",
+          "device_id": "d"
+        },
+        "received_at": 1,
+        "occurred_at": null,
+        "kind": {
+          "kind": "config_ack",
+          "data": {
+            "revision": 42,
+            "status": "applied",
+            "error": null
+          }
+        }
+      },
+      "pending_sinks": [
+        "required"
+      ],
+      "routing_revision": 1,
+      "accepted_at": 1,
+      "attempts": {}
+    },
+    "bytes": 401,
+    "sha256": "3e630131333e6cb4dd09b78487d10608e3317f6c2a1081e89a3348a4e7a34d05",
+    "encoding": "NBSP + u32 version=2 + u64 generation=1 + u32 payload length + compact JSON + SHA256(payload); integers big endian"
+  }
+]

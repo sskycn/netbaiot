@@ -1,0 +1,53 @@
+[
+  {
+    "name": "mqtt",
+    "seconds": 30,
+    "repeats": 3,
+    "tls": false,
+    "groups": [
+      {
+        "label": "mqtt",
+        "protocol": "mqtt",
+        "rate": 45000,
+        "workers": 32,
+        "offset": 128,
+        "window": 128
+      }
+    ],
+    "production_revision": "eb20e865b368b14f32bceac580c7215ed1ae2634"
+  },
+  {
+    "name": "tcp",
+    "seconds": 30,
+    "repeats": 3,
+    "tls": false,
+    "groups": [
+      {
+        "label": "tcp",
+        "protocol": "tcp",
+        "rate": 45000,
+        "workers": 32,
+        "offset": 256,
+        "window": 128
+      }
+    ],
+    "production_revision": "eb20e865b368b14f32bceac580c7215ed1ae2634"
+  },
+  {
+    "name": "udp",
+    "seconds": 30,
+    "repeats": 3,
+    "tls": false,
+    "groups": [
+      {
+        "label": "udp",
+        "protocol": "udp",
+        "rate": 80000,
+        "workers": 8,
+        "offset": 384,
+        "window": 128
+      }
+    ],
+    "production_revision": "eb20e865b368b14f32bceac580c7215ed1ae2634"
+  }
+]
