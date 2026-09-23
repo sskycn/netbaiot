@@ -1,0 +1,18 @@
+   Compiling netbaiot-protocol v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-protocol)
+   Compiling netbaiot-core v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-core)
+   Compiling netbaiot-client v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-client)
+   Compiling netbaiot-device-sdk v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-device-sdk)
+   Compiling netbaiot-runtime v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-runtime)
+   Compiling netbaiot-codecs v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-codecs)
+   Compiling netbaiot-transports v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-transports)
+   Compiling netbaiot-server v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/apps/netbaiot-server)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.76s
+     Running tests/official_client.rs (target/debug/deps/official_client-8f4eecfd9f3a130a)
+
+running 3 tests
+test official_clients_cover_event_command_config_status_and_offline_contracts ... ok
+test official_client_throughput_latency_and_idle_memory_measurement ... ok
+test official_client_reconnects_and_replays_unacked_event_with_same_id ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.96s
+

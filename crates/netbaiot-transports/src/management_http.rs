@@ -1,3 +1,4 @@
+//! Bounded management HTTP only; device ingress never dispatches here.
 use crate::common::*;
 use bytes::Bytes;
 use http_body_util::{BodyExt, Full, Limited};
@@ -7,12 +8,7 @@ use hyper::{
 use hyper_util::rt::{TokioIo, TokioTimer};
 use netbaiot_core::*;
 use netbaiot_runtime::*;
-use std::{
-    convert::Infallible,
-    net::SocketAddr,
-    sync::{Arc, Mutex},
-    time::Duration,
-};
+use std::{convert::Infallible, net::SocketAddr, sync::Arc, time::Duration};
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
@@ -115,14 +111,13 @@ async fn handle(
     req: Request<Incoming>,
     peer: SocketAddr,
     services: Arc<Services>,
-    lease: Arc<Mutex<ConnectionLease>>,
 ) -> Result<Response<Full<Bytes>>> {
     let _slot = services
         .http_slots
         .clone()
         .try_acquire_owned()
         .map_err(|_| Error::Overloaded)?;
-    services.ingress.metrics.inc(Metric::HttpRequests);
+    services.ingress.metrics.inc(Metric::ManagementHttpRequests);
     services.rates.take(peer.ip())?;
     let limits = &services.ingress.limits;
     let header_bytes = req
@@ -141,85 +136,7 @@ async fn handle(
     if req.headers().contains_key(hyper::header::CONTENT_ENCODING) {
         return Ok(response(StatusCode::UNSUPPORTED_MEDIA_TYPE, b"{}".to_vec()));
     }
-    match services.http_role {
-        HttpRole::Device => handle_device(req, services, lease).await,
-        HttpRole::Management => handle_management(req, services).await,
-    }
-}
-
-async fn handle_device(
-    req: Request<Incoming>,
-    services: Arc<Services>,
-    lease: Arc<Mutex<ConnectionLease>>,
-) -> Result<Response<Full<Bytes>>> {
-    let authorization = authorization(&req)?;
-    let (credential_id, secret) = authorization.split_once(':').ok_or(Error::Authentication)?;
-    let limits = &services.ingress.limits;
-    if credential_id.len() > limits.max_username_bytes || secret.len() > limits.max_password_bytes {
-        return Err(Error::Authentication);
-    }
-    let auth = services
-        .ingress
-        .authenticate(AuthenticationRequest::Secret {
-            credential_id,
-            secret: secret.as_bytes(),
-        })
-        .await?;
-    lock(&lease)?.authenticate(&auth.device_key)?;
-    let _request = services.protocol_admission.acquire(&auth.device_key, 0)?;
-    let path = req.uri().path().to_owned();
-    let method = req.method().clone();
-    if method == hyper::Method::GET && path == "/v1/device/config" {
-        let config = services
-            .ingress
-            .config
-            .device(&auth.device_key)?
-            .ok_or(Error::Unavailable)?;
-        let etag = format!("\"{}\"", config.revision);
-        if req
-            .headers()
-            .get(hyper::header::IF_NONE_MATCH)
-            .and_then(|value| value.to_str().ok())
-            == Some(etag.as_str())
-        {
-            return Ok(response(StatusCode::NOT_MODIFIED, Vec::new()));
-        }
-        let mut result = response(
-            StatusCode::OK,
-            serde_json::to_vec(&config).map_err(|_| Error::Internal)?,
-        );
-        result.headers_mut().insert(
-            hyper::header::ETAG,
-            hyper::header::HeaderValue::from_str(&etag).map_err(|_| Error::Internal)?,
-        );
-        return Ok(result);
-    }
-    let (require_command_ack, require_config_ack) = match (method, path.as_str()) {
-        (hyper::Method::POST, "/v1/device/data")
-        | (hyper::Method::POST, "/v1/device/heartbeat") => (false, false),
-        (hyper::Method::POST, "/v1/device/config/ack") => (false, true),
-        (hyper::Method::POST, "/v1/device/commands/ack") => (true, false),
-        _ => return Ok(response(StatusCode::NOT_FOUND, b"{}".to_vec())),
-    };
-    let payload = body(req, limits.max_http_body_size).await?;
-    let acceptance = services
-        .ingress
-        .ingest(
-            &auth,
-            IngressEnvelope {
-                transport: Transport::Http,
-                payload: &payload,
-                require_command_ack,
-                require_config_ack,
-                validated_at: std::time::Instant::now(),
-                validation_us: 0,
-            },
-        )
-        .await?;
-    Ok(response(
-        StatusCode::ACCEPTED,
-        serde_json::to_vec(&acceptance.receipt).map_err(|_| Error::Internal)?,
-    ))
+    handle_management(req, services).await
 }
 
 async fn handle_management(
@@ -255,10 +172,9 @@ async fn handle_management(
             let (config_entries, config_bytes) = services.ingress.config.usage()?;
             let active = services.connections.active()?;
             let active_connections = ConnectionCounts {
-                http: active[0],
-                mqtt: active[1],
-                tcp: active[2],
-                udp: active[3],
+                mqtt: active[0],
+                tcp: active[1],
+                udp: active[2],
             };
             Ok(response(
                 StatusCode::OK,
@@ -460,16 +376,15 @@ pub async fn connection(
         .connect_deadline()
         .checked_duration_since(tokio::time::Instant::now())
         .ok_or(Error::Timeout)?;
-    let lease = Arc::new(Mutex::new(lease));
+    let _lease = lease; // Retain the global/IP/byte permits through connection shutdown.
     let handler = services.clone();
     let service = service_fn(move |request| {
         let services = handler.clone();
-        let lease = lease.clone();
         async move {
             let request_id = Uuid::new_v4().to_string();
             let result = deadline(
                 services.ingress.limits.request_timeout_ms,
-                handle(request, peer, services, lease),
+                handle(request, peer, services),
             )
             .await;
             Ok::<_, Infallible>(match result {

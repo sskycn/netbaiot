@@ -1,5 +1,11 @@
 # Pure EventBus database-free refactor implementation report
 
+> Historical report: describes the revision measured when it was written, not the
+> current device protocol surface. Device HTTP has since been removed. Current
+> behavior, migration, tests and measurements: [removal report](remove-device-http.md).
+> Original measurements are retained; old HTTP benchmark tools can be retrieved
+> from baseline `945fe5e386d623c32e2c7d2d0568fe0c058107ec`.
+
 This report is the acceptance record for the database-free gateway refactor. It
 describes the current source tree, not the retired PostgreSQL design. Detailed
 protocol evidence is also available in the

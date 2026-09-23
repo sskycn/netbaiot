@@ -68,8 +68,8 @@ struct ConnectionCounts {
     ips: HashMap<IpAddr, usize>,
     tenants: HashMap<TenantId, usize>,
     devices: HashMap<DeviceKey, usize>,
-    transports: [usize; 4],
-    device_transports: [usize; 4],
+    transports: [usize; 3],
+    device_transports: [usize; 3],
 }
 pub struct Connections {
     limits: Arc<Limits>,
@@ -142,7 +142,7 @@ impl Connections {
             _bytes: bytes,
         }))
     }
-    pub fn active(&self) -> Result<[usize; 4]> {
+    pub fn active(&self) -> Result<[usize; 3]> {
         Ok(lock(&self.counts)?.transports)
     }
 }
@@ -151,6 +151,13 @@ pub struct PendingConnectionLease(ConnectionLease);
 impl PendingConnectionLease {
     pub fn connect_deadline(&self) -> tokio::time::Instant {
         self.0.connect_deadline
+    }
+    /// Management keeps global/IP/byte ownership without entering device counts.
+    pub fn into_management(self) -> Result<ConnectionLease> {
+        if self.0.device_ingress {
+            return Err(Error::Invalid);
+        }
+        Ok(self.0)
     }
     pub fn classify(mut self, transport: Transport) -> Result<ConnectionLease> {
         {
@@ -576,7 +583,7 @@ mod tests {
         let ip = "127.0.0.1".parse().unwrap();
         let other = "127.0.0.2".parse().unwrap();
         let a = connections.acquire_pending(ip).unwrap();
-        assert_eq!(connections.active().unwrap(), [0; 4]);
+        assert_eq!(connections.active().unwrap(), [0; 3]);
         assert!(connections.acquire_pending(ip).is_err());
         let b = connections.acquire_pending(other).unwrap();
         assert_eq!(connections.slots.available_permits(), 0);
@@ -592,14 +599,14 @@ mod tests {
         drop(b);
         assert_eq!(connections.slots.available_permits(), 1);
         drop(a);
-        assert_eq!(connections.active().unwrap(), [0; 4]);
+        assert_eq!(connections.active().unwrap(), [0; 3]);
         assert_eq!(connections.slots.available_permits(), 2);
         assert_eq!(
             connections.memory.available(),
             limits.global_connection_logical_bytes
         );
         assert!(lock(&connections.counts).unwrap().ips.is_empty());
-        assert!(connections.acquire(ip, Transport::Http).is_ok());
+        assert!(connections.acquire(ip, Transport::Tcp).is_ok());
     }
     #[tokio::test]
     async fn device_protocol_ceiling_shares_global_ownership_and_releases_on_failure() {
@@ -629,10 +636,10 @@ mod tests {
             Err(Error::Overloaded)
         ));
         assert_eq!(owner.slots.available_permits(), 2);
-        let http = owner
-            .acquire_device_pending(ip)
+        let management = owner
+            .acquire_pending(ip)
             .unwrap()
-            .classify(Transport::Http)
+            .into_management()
             .unwrap();
         let tcp = owner
             .acquire_device_pending(ip)
@@ -640,11 +647,20 @@ mod tests {
             .classify(Transport::Tcp)
             .unwrap();
         assert!(owner.acquire_pending(ip).is_err()); // Management still shares global capacity.
-        drop((http, tcp, mqtt));
+        assert_eq!(owner.active().unwrap(), [3, 1, 0]);
+        drop((management, tcp, mqtt));
+        assert!(matches!(
+            owner.acquire_device_pending(ip).unwrap().into_management(),
+            Err(Error::Invalid)
+        ));
         let first = owner.acquire_device_pending(ip).unwrap();
         let second = owner.acquire_device_pending(ip).unwrap();
         // Known management/standalone listeners retain shared global accounting.
-        let management = owner.acquire(ip, Transport::Http).unwrap();
+        let management = owner
+            .acquire_pending(ip)
+            .unwrap()
+            .into_management()
+            .unwrap();
         assert!(matches!(
             second.classify(Transport::Udp),
             Err(Error::Invalid)
@@ -657,8 +673,8 @@ mod tests {
             .unwrap();
         drop((mqtt, management));
         let counts = lock(&owner.counts).unwrap();
-        assert_eq!(counts.device_transports, [0; 4]);
-        assert_eq!(counts.transports, [0; 4]);
+        assert_eq!(counts.device_transports, [0; 3]);
+        assert_eq!(counts.transports, [0; 3]);
         assert!(counts.ips.is_empty());
         assert_eq!(owner.slots.available_permits(), 5);
         assert_eq!(
@@ -701,7 +717,7 @@ mod tests {
         assert_eq!(owner.active().unwrap()[Transport::Mqtt as usize], 1);
         drop(winners);
         assert_eq!(owner.slots.available_permits(), 4);
-        assert_eq!(lock(&owner.counts).unwrap().device_transports, [0; 4]);
+        assert_eq!(lock(&owner.counts).unwrap().device_transports, [0; 3]);
     }
     #[test]
     fn expired_tenant_identity_replacement_is_shared() {
@@ -807,7 +823,7 @@ mod tests {
         assert!(second.authenticate(&key("t", "1")).is_err());
         second.authenticate(&key("t", "2")).unwrap();
         drop((first, second));
-        assert_eq!(c.active().unwrap(), [0; 4]);
+        assert_eq!(c.active().unwrap(), [0; 3]);
         assert!(c.acquire(ip, Transport::Mqtt).is_ok());
     }
     #[test]

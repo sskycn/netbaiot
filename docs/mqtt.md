@@ -4,20 +4,19 @@
 
 `device_ingress` binds one TCP listener and one UDP socket at the same address and
 numeric port (development: `127.0.0.1:8080`; production example: `0.0.0.0:443`).
-TCP serves HTTPS, standard MQTT 3.1.1 over TLS, and generic framed TCP over TLS using
+TCP serves standard MQTT 3.1.1 over TLS, and generic framed TCP over TLS using
 one certificate. TLS finishes before application classification; no ALPN, custom
 preface, or client wire change is required. UDP on the same port remains NBI1/HMAC,
 authenticated but unencrypted; this does not add DTLS or QUIC.
 
 Management HTTP (`management_http`, normally `127.0.0.1:9090`) and optional
-`business_tcp` retain separate listeners and authorization. Device HTTP cannot
-serve management APIs. Non-loopback TCP ingress requires TLS. Development mode
+`business_tcp` retain separate listeners and authorization. Management HTTP is a
+control-plane protocol and never participates in device classification. Non-loopback TCP ingress requires TLS. Development mode
 requires loopback and permits plaintext for local testing.
 
-Configuration replaces `device_http`, `mqtt`, `tcp`, and `udp` with
-`device_ingress`; legacy fields are rejected as configuration errors. Choose the
-new address explicitly and update every device destination/firewall rule. There is
-no silent conversion of differing old ports.
+`device_ingress` is the only device address. Legacy separate-listener fields are
+rejected. Port 443 is only a deployment choice, not an HTTPS endpoint. HTTP bytes
+on device ingress close without an HTTP response; see [migration](remove-device-http.md).
 
 NetbaIoT implements MQTT 3.1.1 directly. It does not require an external broker or
 database. The subsystem is layered as incremental packet codec, connection state

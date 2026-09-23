@@ -3,7 +3,7 @@
 [简体中文](README.zh-CN.md)
 
 NetbaIoT is a database-free, memory-first IoT protocol gateway and real-time event
-router. It accepts device traffic over HTTP, embedded MQTT 3.1.1, generic framed
+router. It accepts device traffic over embedded MQTT 3.1.1, generic framed
 TCP, and authenticated UDP; normalizes it into `DeviceEvent`; and sends it to
 confirmed or best-effort business sinks.
 
@@ -14,7 +14,7 @@ all already accepted required deliveries.
 
 ## Quick start
 
-Requirements: Rust 1.88 or newer, Python 3, `curl`, and optional Mosquitto client
+Requirements: Rust 1.88 or newer, Python 3, `curl`, and Mosquitto client
 tools. Mosquitto is only a client here; NetbaIoT includes its own MQTT 3.1.1
 broker.
 
@@ -35,25 +35,27 @@ cargo run -p netbaiot-server -- configs/tutorial.json
 
 Development listeners are:
 
-- single device ingress: `127.0.0.1:8080` (TCP: HTTP/MQTT/framed TCP; UDP: NBI1)
+- single device ingress: `127.0.0.1:8080` (TCP: MQTT/framed TCP; UDP: NBI1/NBA1)
 - separate management HTTP: `127.0.0.1:9090`
 - optional `business_tcp` remains separate.
 
-Production can use `device_ingress=0.0.0.0:443`: HTTPS, MQTTS and TLS TCP share
+Port 443 is a deployment choice for firewall compatibility, not an HTTPS promise.
+Production can use `device_ingress=0.0.0.0:443`: MQTTS and TLS TCP share
 one certificate; UDP uses the same numeric port and remains HMAC authenticated,
 not encrypted. No ALPN or custom preface is required. The four old device address
 fields are replaced by `device_ingress`; see [migration details](docs/architecture.md).
 
-Publish the first device event (HTTP requires no additional client package):
+Publish the first device event with a standard MQTT 3.1.1 client:
 
 ```bash
-curl --noproxy '*' -i http://127.0.0.1:8080/v1/device/data \
-  -H 'Authorization: Bearer demo-device:000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f' \
-  --data '{"schema_version":1,"source_message_id":"demo:1","kind":"heartbeat","data":{"sequence":1}}'
+mosquitto_pub -h 127.0.0.1 -p 8080 -V mqttv311 \
+  -u demo-device -P 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f \
+  -i quickstart -t v1/t/demo/p/sensor/d/device-1/up -q 1 \
+  -m '{"schema_version":1,"source_message_id":"demo:1","kind":"heartbeat","data":{"sequence":1}}'
 ```
 
-HTTP `202` and MQTT QoS1 PUBACK mean the event crossed the bounded
-`EventAccepted` boundary. They do not mean that a business database stored it.
+MQTT QoS1 PUBACK means the event crossed the bounded
+`EventAccepted` boundary. It does not mean that a business database stored it.
 The Python terminal prints the normalized event and acknowledges it with HTTP
 204. Continue with the Chinese [10-minute end-to-end tutorial](docs/getting-started.md)
 for MQTT publish and subscribe, a live command, CLI usage, and graceful shutdown.
@@ -66,6 +68,11 @@ replay can duplicate delivery.
 See the [complete user guide](docs/user-guide.md), [architecture](docs/architecture.md), [delivery semantics](docs/delivery-semantics.md),
 [HTTP API](docs/http-api.md), [MQTT profile](docs/mqtt.md), and the
 [refactor report](docs/pure-event-bus-refactor.md).
+
+
+Device HTTP has been removed. Existing clients must migrate to MQTT, framed TCP or
+UDP; automatic device config pull has no replacement. See the
+[breaking changes and migration](docs/remove-device-http.md).
 
 ## Official Rust clients
 
@@ -91,8 +98,8 @@ Commands use `client.commands().send(&command)`, configuration uses
 `client.configs()`, and operations use `client.runtime()`. An offline device returns
 typed `ClientError::DeviceOffline`; commands are never stored by NetbaIoT.
 
-The optional `netbaiot-device-sdk` supports standard MQTT telemetry/commands and
-device HTTP upload/config without lock-in. Standard MQTT 3.1.1 clients remain
+The optional `netbaiot-device-sdk` supports standard MQTT telemetry/commands
+without lock-in. Standard MQTT 3.1.1 clients remain
 first-class. The `netbaiot` CLI exposes status, event subscribe, command, config,
 cache invalidation, and explicit drain operations. See [SDK overview](docs/sdk.md),
 [business client](docs/client.md), [device SDK](docs/device-sdk.md), and

@@ -1,0 +1,15 @@
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.09s
+{"ready":true}
+{"lifecycle":"running","event_count":0,"event_bytes":0,"pending_required":0,"auth_cache_entries":0,"auth_cache_bytes":0,"config_cache_entries":2,"config_cache_bytes":267,"runtime_tasks":5,"active_connections":{"mqtt":0,"tcp":0,"udp":0}}
+  "results": {
+acceptance: {'event_id': '4f16a12b-6ad2-4827-863d-65e13abf5c1c', 'accepted_at': 1790149884161, 'required_deliveries': 1, 'best_effort_deliveries': 0}
+EventAccepted: signed NBA1 sequence=11; business completion is separate
+{"command_id":"00000000-0000-0000-0000-000000000123","state":"queued"}
+{"command_id":"00000000-0000-0000-0000-000000000123","device":{"tenant_id":"demo","product_id":"sensor","device_id":"device-1"},"expires_at":1790150184427,"payload":{"name":"smoke","arguments":{}}}
+{"invalidated":1,"disconnected":0,"invalidated_cache_entries":1,"disconnected_connections":0,"invalidated_mqtt_sessions":2}
+{"duplicate": false, "event": {"device_id": "device-1", "event_id": "81676627-f423-4bf9-835d-0482540c09b4", "event_type": "heartbeat", "occurred_at": null, "payload": {"data": {"sequence": 1}, "kind": "heartbeat"}, "product_id": "sensor", "received_at": 1790149884125, "source_message_id": "demo:1", "tenant_id": "demo"}}
+{"draining":true}
+2026-09-23T07:51:24.471643Z  INFO netbaiot_server: shutdown complete
+{"draining":true}
+2026-09-23T07:51:25.844746Z  INFO netbaiot_server: shutdown complete
+tutorial smoke: PASS

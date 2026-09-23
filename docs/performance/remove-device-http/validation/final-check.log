@@ -1,0 +1,11 @@
+    Checking netbaiot-protocol v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-protocol)
+    Checking netbaiot-core v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-core)
+    Checking netbaiot-client v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-client)
+    Checking netbaiot-device-sdk v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-device-sdk)
+    Checking netbaiot-runtime v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-runtime)
+    Checking netbaiot-codecs v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-codecs)
+    Checking netbaiot-cli v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/apps/netbaiot-cli)
+    Checking netbaiot-transports v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-transports)
+    Checking netbaiot-loadgen v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/tools/netbaiot-loadgen)
+    Checking netbaiot-server v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/apps/netbaiot-server)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.55s

@@ -1,5 +1,8 @@
 # EventId generation experiment (2026-09-22)
 
+> Historical measurements from the revision stated below. Device HTTP has since
+> been removed; see the [current migration and verification report](remove-device-http.md).
+
 ## Current contract, inspected before selecting the candidate
 
 Starting local HEAD was `43d76c3ccb7271b6b82b1c058c3f879c383ebd22`, with a clean

@@ -1,6 +1,6 @@
 pub mod classifier;
 pub mod common;
-pub mod http;
+pub mod management_http;
 pub mod mqtt;
 pub mod tcp;
 pub mod udp;

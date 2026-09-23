@@ -1,0 +1,10 @@
+{
+  "correction": "Generator runtime explicitly fixes four workers; TOKIO_WORKER_THREADS was ignored. Raw metadata records requested settings.",
+  "actual_loadgen_workers_before": 4,
+  "actual_loadgen_workers_after": 4,
+  "incorrect_before_raw_field": "loadgen_tokio_workers: 2",
+  "frozen_driver_sha256": "910f063013a21c06e00b70caf147e33d4c034ab523bee0cfcc90939eeb925c4d",
+  "evidence_source": "tools/netbaiot-loadgen/src/main.rs #[tokio::main(flavor = \"multi_thread\", worker_threads = 4)] at baseline 945fe5e and prior audit adf3383",
+  "raw_measurements_modified": false,
+  "harness_changes": "Correct worker metadata, explicitly restrict groups to MQTT/TCP/UDP, adjust default output paths; timing/sampling/limits unchanged."
+}

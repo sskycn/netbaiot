@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Owned, serialized, TLS four-protocol contention audit; not network capacity.
+"""Owned, serialized device-protocol benchmark; not production network capacity.
 
 Plans are JSON arrays of {name, seconds, groups, repeats?, tls?, sink?, limits?}.
 Uses public fixture credentials only. Every child, socket and output has a bound.
@@ -23,7 +23,7 @@ import time
 ROOT = Path(__file__).resolve().parents[2]
 CERT = ROOT / 'tests/fixtures/localhost-cert.pem'
 SECRET = bytes(range(32)).hex()
-BASELINE = 'bf9c611bc16d1fb9c95b21c939f9ef00e4530ddc'
+BASELINE = '945fe5e386d623c32e2c7d2d0568fe0c058107ec'
 
 
 def command(args):
@@ -48,7 +48,7 @@ def environment():
                 sysctl=command(['sysctl', 'hw.model', 'hw.memsize', 'hw.ncpu', 'machdep.cpu.brand_string',
                                 'kern.ipc.somaxconn', 'net.inet.tcp.msl', 'net.inet.udp.recvspace', 'net.inet.udp.maxdgram']),
                 limits=command(['sh', '-c', 'ulimit -a']), rust=command(['rustc', '+1.88.0', '-Vv']),
-                server_tokio_workers=10, loadgen_tokio_workers=2, path='loopback',
+                server_tokio_workers=10, loadgen_tokio_workers=4, path='loopback',
                 limitations=['Shared server/loadgen host; no separate-host capacity claim.',
                              'Process CPU time; no per-thread scheduler or syscall profiling.',
                              'No per-sink gauge; one required sink, pending_required is its depth.',
@@ -100,8 +100,8 @@ class Control:
 
 def group(protocol, rate, workers=None, **kwargs):
     return dict(label=protocol, protocol=protocol, rate=rate,
-                workers=workers or dict(http=32, mqtt=32, tcp=32, udp=8)[protocol],
-                offset=dict(http=0, mqtt=128, tcp=256, udp=384)[protocol], window=128, **kwargs)
+                workers=workers or dict(mqtt=32, tcp=32, udp=8)[protocol],
+                offset=dict(mqtt=128, tcp=256, udp=384)[protocol], window=128, **kwargs)
 
 
 def server_config(folder, plan, device, management, sink):
@@ -141,7 +141,11 @@ def stop(child, seconds):
 def run(plan, repeat, args):
     if not 0 < plan['seconds'] <= 3600:
         raise ValueError('duration bound')
-    workers = plan.get('loadgen_workers', 2)
+    if any(g['protocol'] not in ('mqtt', 'tcp', 'udp') for g in plan['groups']):
+        raise ValueError('device protocols are MQTT, TCP and UDP only')
+    if plan.get('loadgen_workers', 4) != 4:
+        raise ValueError('loadgen runtime fixes four workers; environment cannot override it')
+    workers = 4  # Frozen and current loadgen main explicitly fixes the Tokio runtime to four.
     settling = plan.get('settle_before', 0)
     if not isinstance(workers, int) or not 1 <= workers <= 32 or not 0 <= settling <= 60:
         raise ValueError('worker/settling bound')
@@ -167,7 +171,7 @@ def run(plan, repeat, args):
     samples = []
     row = dict(name=name, plan=plan, repeat=repeat, label=args.label, timestamp=time.time(),
                baseline=BASELINE, production_revision=plan.get('production_revision', BASELINE), server_sha256=args.server_hash, loadgen_sha256=args.loadgen_hash,
-               harness_version=3, loadgen_tokio_workers=workers, server_tokio_workers=10, harness_sha256=digest(Path(__file__)), server_config=config, network_before=command(['netstat', '-s', '-p', 'udp']),
+               harness_version=3, loadgen_tokio_workers=workers, loadgen_worker_source='main tokio macro (environment ignored)', server_tokio_workers=10, harness_sha256=digest(Path(__file__)), server_config=config, network_before=command(['netstat', '-s', '-p', 'udp']),
                tcp_before=command(['netstat', '-s', '-p', 'tcp']))
     try:
         for s in reservations:
@@ -284,12 +288,12 @@ def run(plan, repeat, args):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--plan', type=Path, required=True)
-    parser.add_argument('--server', type=Path, default=ROOT / 'target/mixed-audit/baseline-server')
+    parser.add_argument('--server', type=Path, default=ROOT / 'target/remove-device-http/before-server')
     parser.add_argument('--candidate', type=Path, help='Optional candidate server for interleaved paired plans')
     parser.add_argument('--loadgen', type=Path, default=ROOT / 'target/release/netbaiot-loadgen')
     parser.add_argument('--label', default='baseline')
     parser.add_argument('--resume', action='store_true', help='Skip only matching, completed successful raw records')
-    parser.add_argument('--output', type=Path, default=ROOT / 'docs/performance/mixed-ingress')
+    parser.add_argument('--output', type=Path, default=ROOT / 'docs/performance/remove-device-http')
     args = parser.parse_args()
     args.server = args.server.resolve(); args.loadgen = args.loadgen.resolve()
     args.server_hash = digest(args.server); args.loadgen_hash = digest(args.loadgen)

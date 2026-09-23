@@ -10,7 +10,7 @@ spool relationship values.
 | Connections | 256 node / 64 tenant / 32 IP / 2 device |
 | Device connections per classified protocol | 192 each; shares the 256 global maximum |
 | Logical connection memory | 512 KiB reservation / 128 MiB global |
-| MQTT/HTTP/TCP maximum | 64 KiB |
+| MQTT/TCP frame and management HTTP body maximum | 64 KiB |
 | Initial stream read buffer | at most 4 KiB; grows incrementally |
 | UDP datagram | 1,200 B |
 | Ingress active | 16 / 2 MiB; tenant 4; device 1 |
@@ -50,7 +50,7 @@ byte limits.
 |---|---|
 | OS accept → connection owner | reject/close by IP, tenant, node, logical bytes |
 | stream → incremental parser | close malformed, oversized, slow, or incomplete input |
-| HTTP → handler/body | 429/413/timeout; no hidden waiting task |
+| Management HTTP → handler/body | 429/413/timeout; no hidden waiting task |
 | codec → event router | bounded wait then reject; no success ACK |
 | router → required sink | all-or-nothing reject before acceptance |
 | router → best-effort sink | drop and metric |
@@ -71,11 +71,11 @@ are additional (about 16 KiB extra bucket payload including spare slots at the
 default ceiling with the measured toolchain; not an RSS bound). No payload or
 event_id is retained for duplicate ACKs. See [measurements](udp-reliable-ack.md).
 
-Device ingress admission has a connection-level anti-monopoly ceiling. HTTP, MQTT
+Device ingress admission has a connection-level anti-monopoly ceiling. MQTT
 and TCP each default to at most 192 classified device connections. Pending TLS and
 classification retain the existing shared global/IP/byte bounds. Classification
 charges the protocol counter while retaining the same permits. A failed transition
-releases all ownership. These are overlapping maxima, not three fixed partitions
+releases all ownership. These are overlapping maxima, not two fixed partitions
 or guaranteed reservations. Management and standalone transport listeners retain
 existing admission and still share the process global ceiling. No new packet-level
 lock is introduced.

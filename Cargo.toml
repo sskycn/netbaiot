@@ -10,6 +10,7 @@ license = "AGPL-3.0-or-later"
 rust-version = "1.88"
 
 [workspace.dependencies]
+url = "2"
 netbaiot-protocol = { path = "crates/netbaiot-protocol" }
 netbaiot-core = { path = "crates/netbaiot-core" }
 netbaiot-client = { path = "crates/netbaiot-client" }
