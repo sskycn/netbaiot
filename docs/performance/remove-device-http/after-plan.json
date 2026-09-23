@@ -1,0 +1,92 @@
+[
+  {
+    "name": "remove-http-mqtt",
+    "seconds": 30,
+    "repeats": 3,
+    "tls": false,
+    "variant": "after",
+    "production_revision": "dda8027df0499dfb173f47e43cda08aa02359158",
+    "groups": [
+      {
+        "label": "mqtt",
+        "protocol": "mqtt",
+        "rate": 45000,
+        "workers": 32,
+        "offset": 0,
+        "window": 128
+      }
+    ]
+  },
+  {
+    "name": "remove-http-tcp",
+    "seconds": 30,
+    "repeats": 3,
+    "tls": false,
+    "variant": "after",
+    "production_revision": "dda8027df0499dfb173f47e43cda08aa02359158",
+    "groups": [
+      {
+        "label": "tcp",
+        "protocol": "tcp",
+        "rate": 45000,
+        "workers": 32,
+        "offset": 0,
+        "window": 128
+      }
+    ]
+  },
+  {
+    "name": "remove-http-udp",
+    "seconds": 30,
+    "repeats": 3,
+    "tls": false,
+    "variant": "after",
+    "production_revision": "dda8027df0499dfb173f47e43cda08aa02359158",
+    "groups": [
+      {
+        "label": "udp",
+        "protocol": "udp",
+        "rate": 80000,
+        "workers": 8,
+        "offset": 0,
+        "window": 128
+      }
+    ]
+  },
+  {
+    "name": "remove-http-mqtts",
+    "seconds": 30,
+    "repeats": 3,
+    "tls": true,
+    "variant": "after",
+    "production_revision": "dda8027df0499dfb173f47e43cda08aa02359158",
+    "groups": [
+      {
+        "label": "mqtt",
+        "protocol": "mqtt",
+        "rate": 45000,
+        "workers": 32,
+        "offset": 0,
+        "window": 128
+      }
+    ]
+  },
+  {
+    "name": "remove-http-tls-tcp",
+    "seconds": 30,
+    "repeats": 3,
+    "tls": true,
+    "variant": "after",
+    "production_revision": "dda8027df0499dfb173f47e43cda08aa02359158",
+    "groups": [
+      {
+        "label": "tcp",
+        "protocol": "tcp",
+        "rate": 45000,
+        "workers": 32,
+        "offset": 0,
+        "window": 128
+      }
+    ]
+  }
+]

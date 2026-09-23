@@ -1,5 +1,11 @@
 # UDP v1.1 signed acceptance ACK: implementation and validation
 
+> Historical report: describes the revision measured when it was written, not the
+> current device protocol surface. Device HTTP has since been removed. Current
+> behavior, migration, tests and measurements: [removal report](remove-device-http.md).
+> Original measurements are retained; old HTTP benchmark tools can be retrieved
+> from baseline `945fe5e386d623c32e2c7d2d0568fe0c058107ec`.
+
 Baseline: `ef9a8837e39aafc7777997be2927a58fd051a071`.
 Measured final source: `bf9c611bc16d1fb9c95b21c939f9ef00e4530ddc`.
 Decision: **KEEP**. Measurement date: 2026-09-23. The measurements describe the

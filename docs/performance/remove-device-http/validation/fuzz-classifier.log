@@ -1,0 +1,23 @@
+   Compiling netbaiot-protocol v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-protocol)
+   Compiling netbaiot-core v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-core)
+   Compiling netbaiot-runtime v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-runtime)
+   Compiling netbaiot-codecs v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-codecs)
+   Compiling netbaiot-transports v0.1.0 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-transports)
+   Compiling netbaiot-fuzz v0.0.0 (/Users/sam/Dev/work/sskycn/netbaiot/fuzz)
+    Finished `release` profile [optimized + debuginfo] target(s) in 11.80s
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.10s
+     Running `fuzz/target/aarch64-apple-darwin/release/device_classifier -artifact_prefix=/Users/sam/Dev/work/sskycn/netbaiot/fuzz/artifacts/device_classifier/ -max_total_time=60 -max_len=65537 /Users/sam/Dev/work/sskycn/netbaiot/fuzz/corpus/device_classifier`
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 3234921172
+INFO: Loaded 1 modules   (245797 inline 8-bit counters): 245797 [0x105e66910, 0x105ea2935), 
+INFO: Loaded 1 PC tables (245797 PCs): 245797 [0x105ea2938,0x106262b88), 
+INFO:      149 files found in /Users/sam/Dev/work/sskycn/netbaiot/fuzz/corpus/device_classifier
+INFO: seed corpus: files: 149 min: 1b max: 12b total: 846b rss: 43Mb
+#150	INITED cov: 80 ft: 249 corp: 101/613b exec/s: 0 rss: 45Mb
+#65536	pulse  cov: 80 ft: 249 corp: 101/613b lim: 656 exec/s: 21845 rss: 51Mb
+#131072	pulse  cov: 80 ft: 249 corp: 101/613b lim: 1305 exec/s: 18724 rss: 57Mb
+#262144	pulse  cov: 80 ft: 249 corp: 101/613b lim: 2616 exec/s: 18724 rss: 68Mb
+#524288	pulse  cov: 80 ft: 249 corp: 101/613b lim: 5229 exec/s: 18724 rss: 91Mb
+#1048576	pulse  cov: 80 ft: 249 corp: 101/613b lim: 10442 exec/s: 18396 rss: 137Mb
+#1120415	DONE   cov: 80 ft: 249 corp: 101/613b lim: 11157 exec/s: 18367 rss: 143Mb
+Done 1120415 runs in 61 second(s)

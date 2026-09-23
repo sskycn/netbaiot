@@ -214,8 +214,8 @@ def main():
                 "subscribed": args.subscribe,
                 "measurement_state": "disconnected" if args.disconnected else "active",
                 "connections_requested": args.connections,
-                # The status request itself holds one short-lived management HTTP lease.
-                "connections_active": max(0, active_connection_count - 1),
+                # Management leases are excluded from device connection counts.
+                "connections_active": active_connection_count,
                 "rss_base_kib": base_rss,
                 "rss_loaded_kib": loaded_rss,
                 "rss_delta_kib": loaded_rss - base_rss,

@@ -7,13 +7,13 @@
 
 ## NetbaIoT 是什么
 
-NetbaIoT 是无数据库、以内存为主的 IoT 协议网关和实时事件路由器。它直接实现 MQTT 3.1.1 broker，同时接收 HTTP、分帧 TCP 和带 HMAC 的 UDP 设备流量，把它们转换为统一的 `DeviceEvent`，再投递到有明确容量上限的业务 sink。
+NetbaIoT 是无数据库、以内存为主的 IoT 协议网关和实时事件路由器。它直接实现 MQTT 3.1.1 broker，同时接收分帧 TCP 和带 HMAC 的 UDP 设备流量，把它们转换为统一的 `DeviceEvent`，再投递到有明确容量上限的业务 sink。
 
 它不是遥测仓库、工作流引擎、通用消息持久化系统或离线命令队列。长期业务数据、分析、工作流、离线命令和幂等记录由业务系统负责。唯一运行时持久化是计划重启所用的本地 recovery spool。
 
 ```text
 Device
-  │  MQTT / HTTP / TCP / UDP
+  │  MQTT / TCP / UDP
   ▼
 NetbaIoT
   ├─ Authenticate
@@ -34,7 +34,7 @@ Business System ── Command ──> NetbaIoT ──> Live MQTT/TCP Session
 ## 从哪里开始
 
 1. [10 分钟端到端教程](getting-started.md)：编译、启动、收到首个事件、下发首个命令。
-2. [设备接入指南](device-integration-guide.md)：认证、codec、MQTT QoS/持久会话/retain/Will、HTTP/TCP/UDP、设备 SDK。
+2. [设备接入指南](device-integration-guide.md)：认证、codec、MQTT QoS/持久会话/retain/Will、TCP/UDP、设备 SDK。
 3. [业务系统集成指南](business-integration-guide.md)：DeviceEvent、webhook、confirmed TCP、Rust 客户端、CLI、命令和错误处理。
 4. [运维与生产部署](operations-guide.md)：配置、资源上限、TLS、管理 API、监控、重启、systemd、性能与压测。
 5. [故障排查](troubleshooting.md)：按症状定位认证、ACK、会话、sink、spool 和 TLS 问题。
@@ -47,7 +47,7 @@ Business System ── Command ──> NetbaIoT ──> Live MQTT/TCP Session
 | EventAccepted | 认证、codec、路由、数量/字节准入完成，所有 required sink 容量已原子预留且入队 | 不代表业务数据库已处理或持久化 |
 | ConsumerAccepted | required webhook 返回配置认可的 2xx，或 confirmed TCP 客户端发回完整匹配的 ACK | 不代表全系统 exactly-once |
 
-HTTP `202`、MQTT QoS1 的 PUBACK、QoS2 的完成握手都围绕 `EventAccepted`，而不是业务持久化。业务投递是 **at-least-once**：重试、ACK 丢失和计划重启重放都可能带来重复；消费者必须按稳定的 `event_id` 幂等。
+TCP/NBA1 回执、MQTT QoS1 的 PUBACK、QoS2 的完成握手都围绕 `EventAccepted`，而不是业务持久化。业务投递是 **at-least-once**：重试、ACK 丢失和计划重启重放都可能带来重复；消费者必须按稳定的 `event_id` 幂等。
 
 ```text
 if event_id already processed:

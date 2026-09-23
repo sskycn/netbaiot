@@ -27,27 +27,27 @@ command -v mosquitto_pub >/dev/null
 command -v mosquitto_sub >/dev/null
 cargo build --locked -p netbaiot-server -p netbaiot-cli
 
-read -r HTTP_PORT MGMT_PORT MQTT_PORT TCP_PORT UDP_PORT WEBHOOK_PORT BUSINESS_PORT <<<"$(python3 -c '
+read -r DEVICE_PORT MGMT_PORT WEBHOOK_PORT BUSINESS_PORT <<<"$(python3 -c '
 import socket
 sockets=[]
-for kind in [socket.SOCK_STREAM]*4+[socket.SOCK_DGRAM,socket.SOCK_STREAM,socket.SOCK_STREAM]:
+for kind in [socket.SOCK_STREAM]*4:
     sock=socket.socket(socket.AF_INET,kind); sock.bind(("127.0.0.1",0)); sockets.append(sock)
 print(*(sock.getsockname()[1] for sock in sockets))
 ')"
-MQTT_PORT=$HTTP_PORT
-TCP_PORT=$HTTP_PORT
-UDP_PORT=$HTTP_PORT
+MQTT_PORT=$DEVICE_PORT
+TCP_PORT=$DEVICE_PORT
+UDP_PORT=$DEVICE_PORT
 python3 -c '
 import json,sys
 c=json.load(open(sys.argv[1]))
 ports=list(map(int,sys.argv[4:]))
 for field,port in zip(("device_ingress","management_http"),ports[:2]):
     c[field]=f"127.0.0.1:{port}"
-c["delivery_url"]=f"http://127.0.0.1:{ports[5]}/events"
+c["delivery_url"]=f"http://127.0.0.1:{ports[2]}/events"
 c["spool_directory"]=sys.argv[3]
 json.dump(c,open(sys.argv[2],"w"))
 ' configs/tutorial.json "$RUN_DIR/config.json" "$RUN_DIR/spool" \
-  "$HTTP_PORT" "$MGMT_PORT" "$MQTT_PORT" "$TCP_PORT" "$UDP_PORT" "$WEBHOOK_PORT" "$BUSINESS_PORT"
+  "$DEVICE_PORT" "$MGMT_PORT" "$WEBHOOK_PORT" "$BUSINESS_PORT"
 
 python3 examples/business_http_sink.py --port "$WEBHOOK_PORT" >"$RUN_DIR/webhook.log" 2>&1 &
 WEBHOOK_PID=$!
@@ -81,10 +81,10 @@ for qos in 0 1 2; do
     -m "{\"schema_version\":1,\"source_message_id\":\"smoke:qos:$qos\",\"kind\":\"heartbeat\",\"data\":{\"sequence\":$qos}}"
 done
 
-curl --noproxy '*' -fsS "http://127.0.0.1:$HTTP_PORT/v1/device/data" \
-  -H "Authorization: Bearer demo-device:$SECRET" \
-  --data '{"schema_version":1,"source_message_id":"smoke:http","kind":"heartbeat","data":{"sequence":10}}' \
-  | rg '"event_id"'
+# README Quick Start payload, with only the dynamically allocated test port changed.
+mosquitto_pub -h 127.0.0.1 -p "$MQTT_PORT" -V mqttv311 \
+  -u demo-device -P "$SECRET" -i quickstart -t "$UP" -q 1 \
+  -m '{"schema_version":1,"source_message_id":"demo:1","kind":"heartbeat","data":{"sequence":1}}'
 python3 examples/device_tcp.py --address "127.0.0.1:$TCP_PORT" | rg 'event_id'
 python3 examples/device_udp.py --address "127.0.0.1:$UDP_PORT" --sequence 11 | rg 'EventAccepted: signed NBA1'
 
@@ -106,12 +106,12 @@ curl --noproxy '*' -fsS -X POST "http://127.0.0.1:$MGMT_PORT/api/v1/auth/invalid
   | rg '"invalidated_cache_entries"'
 
 for _ in $(seq 1 100); do
-  if [[ $(rg -c '"event"' "$RUN_DIR/webhook.log" || true) -ge 6 ]]; then
+  if rg -q '"source_message_id": "demo:1"' "$RUN_DIR/webhook.log"; then
     break
   fi
   sleep 0.05
 done
-[[ $(rg -c '"event"' "$RUN_DIR/webhook.log" || true) -ge 6 ]]
+rg '"source_message_id": "demo:1"' "$RUN_DIR/webhook.log"
 
 curl --noproxy '*' -fsS -X POST "http://127.0.0.1:$MGMT_PORT/api/v1/drain" \
   -H "Authorization: Bearer $ADMIN" | rg '"draining":true'
@@ -141,21 +141,15 @@ for _ in $(seq 1 100); do
   sleep 0.05
 done
 python3 examples/business_tcp_client.py --address "127.0.0.1:$BUSINESS_PORT" \
-  --token business-stream-demo-token --count 3 >"$RUN_DIR/business-stream.log" &
+  --token business-stream-demo-token --count 1 >"$RUN_DIR/business-stream.log" &
 BUSINESS_PID=$!
 sleep 0.2
-NETBAIOT_DEVICE_CREDENTIAL_ID=demo-device NETBAIOT_DEVICE_SECRET=$SECRET \
-  NETBAIOT_DEVICE_HTTP_ENDPOINT="http://127.0.0.1:$HTTP_PORT" \
-  cargo run --quiet -p netbaiot-device-sdk --example device_http_upload
-NETBAIOT_DEVICE_CREDENTIAL_ID=demo-device NETBAIOT_DEVICE_SECRET=$SECRET \
-  NETBAIOT_DEVICE_HTTP_ENDPOINT="http://127.0.0.1:$HTTP_PORT" \
-  cargo run --quiet -p netbaiot-device-sdk --example device_config_pull
 NETBAIOT_DEVICE_CREDENTIAL_ID=demo-device NETBAIOT_DEVICE_SECRET=$SECRET \
   NETBAIOT_MQTT_ENDPOINT="mqtt://127.0.0.1:$MQTT_PORT" \
   cargo run --quiet -p netbaiot-device-sdk --example device_mqtt
 wait "$BUSINESS_PID"
 BUSINESS_PID=
-[[ $(rg -c '"delivery"' "$RUN_DIR/business-stream.log") -eq 3 ]]
+[[ $(rg -c '"delivery"' "$RUN_DIR/business-stream.log") -eq 1 ]]
 curl --noproxy '*' -fsS -X POST "http://127.0.0.1:$MGMT_PORT/api/v1/drain" \
   -H "Authorization: Bearer $ADMIN" | rg '"draining":true'
 wait "$SERVER_PID"

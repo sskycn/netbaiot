@@ -268,7 +268,7 @@ pub struct DeviceEvent {
     pub kind: DeviceEventKind,
 }
 
-/// Versioned device-to-gateway JSON v1 envelope used by HTTP and MQTT uplinks.
+/// Versioned device-to-gateway JSON v1 envelope used by MQTT, TCP and UDP uplinks.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct DeviceUplink {

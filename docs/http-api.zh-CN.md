@@ -1,18 +1,8 @@
-# HTTP API
+# 管理 HTTP API
 
-设备 HTTP 和管理 HTTP 使用独立监听器。两者都会限制请求头、请求体、处理器并发和超时，并拒绝内容编码。设备 bearer 格式为 `credential_id:secret`；管理接口使用单独的 64 字符密钥，通过 `NETBAIOT_ADMIN_SECRET` 配置。
-
-## 设备监听器
-
-| 方法/路径 | 说明 |
-|---|---|
-| `POST /v1/device/data` | 解码并路由采集数据；`202` 表示达到 EventAccepted |
-| `GET /v1/device/config` | 返回带 revision 的配置；支持 `If-None-Match`/304 |
-| `POST /v1/device/config/ack` | 将类型化 `ConfigAck` 作为普通事件路由 |
-| `POST /v1/device/heartbeat` | 路由 heartbeat 事件 |
-| `POST /v1/device/commands/ack` | 路由类型化命令执行 ACK |
-
-上传成功不代表业务系统已持久化或处理该事件。
+管理 HTTP 使用独立监听器和通过 `NETBAIOT_ADMIN_SECRET` 配置的 64 字符管理密钥。
+请求头、请求体、处理器并发、响应和超时均有界，不接受内容编码。设备凭据不能授权管理操作；
+设备入口不分派 HTTP。
 
 ## 管理监听器
 

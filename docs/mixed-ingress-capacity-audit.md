@@ -1,5 +1,11 @@
 # Mixed protocol capacity and fairness audit
 
+> Historical report: describes the revision measured when it was written, not the
+> current device protocol surface. Device HTTP has since been removed. Current
+> behavior, migration, tests and measurements: [removal report](remove-device-http.md).
+> Original measurements are retained; old HTTP benchmark tools can be retrieved
+> from baseline `945fe5e386d623c32e2c7d2d0568fe0c058107ec`.
+
 **Decision: KEEP_FIX** for the classified-protocol anti-monopoly ceiling.
 The separate pending-cap experiment was reverted. This decision does not claim
 complete fairness under every shared resource limit.
@@ -13,6 +19,19 @@ This is a contention/fairness audit, not a production network capacity claim.
 Server and generator share a macOS loopback host. TLS authenticates the checked-in
 localhost certificate. HTTPS, standard MQTT 3.1.1 QoS1, and length-framed TCP use the
 same TLS TCP listener; signed NBI1/NBA1 uses UDP on the same numerical port.
+
+## Worker-count erratum (device-HTTP removal review)
+
+Both the baseline `adf3383` and integrated `945fe5e` load generators explicitly
+use `#[tokio::main(flavor = "multi_thread", worker_threads = 4)]`. The mixed driver
+runs inside this runtime. `TOKIO_WORKER_THREADS=2` was ignored. All formal and
+worker-diagnostic runs therefore used **four actual generator workers**; raw JSON
+worker labels describe the requested environment, not effective runtime threads.
+The former causal claim that doubling workers improved UDP by 4.64% is withdrawn:
+that observed difference is repeat-to-repeat variation under the same worker count.
+It cannot diagnose generator scaling. Server worker count remains ten. Raw counts,
+latencies and executable hashes are unchanged. The protocol-cap comparison did not
+change actual generator workers between its two sides.
 
 ## Actual baseline resource topology
 
@@ -78,7 +97,7 @@ separately; a TCP close cannot reliably identify which internal gate rejected it
 `scripts/perf/mixed_ingress_audit.py` owns server, generator and optional real HTTP
 sink, captures one-second samples, and serializes runs with a lock. TLS resumption
 is disabled in the Rust client. Server Tokio worker count is 10; generator count is
-2. Configuration and binary SHA256 are saved for every run. Public demo credentials
+4 (corrected; requested environment was 2). Configuration and binary SHA256 are saved for every run. Public demo credentials
 only are generated. Per-IP and tenant connections are raised to 256 for the
 single-IP experiment; deliberate rate limits are raised to 2,000,000/s. Other
 bounds are recorded explicitly. Immediate required AuditSink isolates ingress CPU;
@@ -95,7 +114,7 @@ telemetry dependency. The single required sink's pending depth is represented by
 
 The host is a Mac mini `Mac16,10`, Apple M4, 10 logical CPUs, 16 GiB RAM, macOS
 26.6.2 arm64. The release toolchain is Rust 1.88.0. Server and generator both use
-loopback; server Tokio workers are fixed at 10 and the formal generator at 2.
+loopback; server Tokio workers are fixed at 10 and the formal generator at 4 (see erratum).
 No kernel tuning was performed. `somaxconn=128`, TCP MSL is 15,000 ms, UDP receive
 space is 786,896 bytes, and maximum UDP datagram is 9,216 bytes. The shell reports
 an open-file limit of 1,048,575, while kernel file limits are 122,880 globally and
@@ -548,10 +567,10 @@ about 74,230/74,310 UDP events/s; the finite client window limits actual injecti
 All TCP-side probes stay approximately 100%, with MQTT/TCP P99 around 0.16–0.19 ms.
 The 70% UDP heavy mixture instead has approximately 25,151 UDP ACK/s out of 49,000
 offered, many client-window drops, server CPU 6.52 cores and generator CPU about
-1.78 of its two workers. The first host snapshot has only 8.43% CPU idle. UDP P99
+1.78 CPU cores with four runtime workers. The first host snapshot has only 8.43% CPU idle. UDP P99
 rises to 56.61–65.12 ms, while MQTT/TCP P99 remains 2.24–2.39 ms (below ten times
 solo). No UDP full-socket-buffer drop was reported in that first trial, but the
-counter is host-wide. The generator-worker diagnostic below only modestly changes the result;
+counter is host-wide. The mislabeled generator-worker diagnostic below did not vary runtime workers;
 neither experiment identifies NBA1 send syscall cost. No UDP batching/sendmmsg change was
 made.
 
@@ -605,7 +624,7 @@ of the combined main revision; integration correctness checks are recorded
 separately. The no-push instruction applies to this audit.
 
 All capacity/fairness measurements are same-host macOS loopback with 10 server
-workers, two formal generator workers, 256-byte payloads and public fixture
+workers, four actual generator workers, 256-byte payloads and public fixture
 identities. Key mixed trials are three times five minutes, the final soak is one
 15-minute trial, and short adversarial/solo comparisons are three times 30 seconds;
 exploratory staircase points are single 30-second windows. There is no separate
@@ -627,8 +646,8 @@ The original anomalous run is retained.
 |---|---:|---:|---:|---:|---:|
 | MQTT-heavy, tenant ingress 4 | 4,856 | 32,098 | 4,817 | 4,951 | 4.87 |
 | MQTT-heavy, tenant ingress 16 | 3,812 | 8,508 | 3,036 | 1,766 | 5.86 |
-| UDP-heavy, generator workers 2 | 6,832 | 6,891 | 6,895 | 23,364 | 6.59 |
-| UDP-heavy, generator workers 4 | 6,836 | 6,907 | 6,902 | 24,447 | 6.51 |
+| UDP-heavy, requested workers 2 (actual 4) | 6,832 | 6,891 | 6,895 | 23,364 | 6.59 |
+| UDP-heavy, requested workers 4 (actual 4) | 6,836 | 6,907 | 6,902 | 24,447 | 6.51 |
 | HTTP offered 9,600/s after settling | 4,160 | 476 | 485 | 518 | 3.29 |
 
 Raising tenant admission 4 → 16 keeps global admission at 16. At four, all observed
@@ -641,12 +660,12 @@ why raising one concurrency setting is unsafe as a general fairness remedy. It
 also shows that a tenant admission bottleneck is not the only capacity limit.
 No new contention instrumentation isolates the precise downstream CPU/lock cost.
 
-Doubling generator runtime workers improves median UDP ACK rate by 4.64%, but
-coverage remains only 49.89% of 49,000/s, versus 47.68% with two workers. Generator
-CPU rises from 1.71 to 1.79 cores, and host samples remain only 8.4–9.9% idle.
-Finite windows and shared-host competition remain material. MQTT/TCP P99 is about
-2.3–2.8 ms. The diagnostic does not establish that a UDP send syscall optimization
-would benefit the gateway or that the generator is the sole bottleneck.
+The second set has 4.64% higher median UDP ACK rate, but both sets used four
+runtime workers. Coverage was 49.89% versus 47.68% of 49,000/s; generator CPU was
+1.79 versus 1.71 cores, with host samples only 8.4–9.9% idle. These are observed
+run variations, not a worker-count treatment. Finite windows and shared-host
+competition remain material. MQTT/TCP P99 was about 2.3–2.8 ms. No conclusion
+about generator scaling or UDP send syscall optimization follows from this pair.
 
 The high-HTTP anomaly reproduces in all three post-settling trials. HTTPS coverage
 is 42.24–49.98%; existing MQTT/TCP coverage is 46.88–55.52% / 46.35–56.68%, UDP

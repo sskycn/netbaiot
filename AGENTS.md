@@ -5,7 +5,7 @@
 NetbaIoT is a high-performance, low-memory, database-free, event-driven IoT
 protocol gateway and real-time event router written in Rust.
 
-Supported device transports are HTTP, embedded MQTT, generic TCP, and UDP.
+Supported device transports are embedded MQTT, generic TCP, and UDP.
 NetbaIoT implements MQTT directly; do not introduce an external broker.
 
 Priority order:
@@ -43,10 +43,10 @@ Device
 
 Transport adapters own connections, framing, network I/O, transport lifecycle,
 and transport metadata only. Vendor parsing belongs in synchronous, replaceable,
-versioned codecs. MQTT packets/topics, raw sockets, HTTP headers, and UDP socket
+versioned codecs. MQTT packets/topics, raw sockets, and UDP socket
 state must not leak into core business events.
 
-All HTTP/MQTT/TCP/UDP uplinks converge on `DeviceEvent`. Every event has a stable
+All MQTT/TCP/UDP uplinks converge on `DeviceEvent`. Every event has a stable
 `event_id`; retries and restart replay must preserve it.
 
 ## EventAccepted
@@ -61,7 +61,7 @@ One exact boundary applies to every transport. An event is accepted only after:
 6. all required sink deliveries are enqueued.
 
 Required-sink fanout admission is all-or-nothing and uses deterministic `SinkId`
-ordering. A QoS1 MQTT PUBACK or successful device HTTP upload response means only
+ordering. A QoS1 MQTT PUBACK, TCP acceptance receipt or signed UDP NBA1 means only
 that this boundary was crossed. It does not mean business persistence or processing.
 
 Required sinks need explicit acknowledgement. Best-effort sinks may drop according
@@ -180,12 +180,14 @@ durability.
 
 ## HTTP boundaries
 
-Device HTTP and management HTTP use separately configurable listeners and separate
-authorization. Device endpoints live under `/v1/device/...`; management endpoints
-live under `/api/v1/...`. Device credentials never authorize management operations.
+Management HTTP uses an independent listener and admin authorization under
+`/api/v1/...`. It is not a device transport. Device ingress classifies MQTT/TCP only
+and closes HTTP input without a response or fallback. Device credentials never
+authorize management operations.
 
 HTTP bodies, headers, concurrency, response bodies, and deadlines are bounded.
-Device configuration uses explicit revision/ETag semantics. Delivering configuration
+Management configuration uses explicit revisions; no device config pull API exists.
+Delivering configuration
 is not the same as the device applying it; application ACK is a `ConfigAck` event.
 
 Webhook success is a configured 2xx ACK. Confirmed TCP/RPC streams require an
@@ -242,7 +244,7 @@ wire changes require compatibility review and focused serialization tests.
 
 `netbaiot-client` must not depend on server/runtime internals. `netbaiot-cli` must
 use `netbaiot-client` instead of duplicating HTTP or stream implementations.
-`netbaiot-device-sdk` is optional and uses standard MQTT/device HTTP; ordinary MQTT
+`netbaiot-device-sdk` is optional and uses standard MQTT; ordinary MQTT
 3.1.1 clients remain first-class and must never require the SDK.
 
 Public clients expose structured errors. Tokens and device credentials never appear

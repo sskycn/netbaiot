@@ -1,5 +1,11 @@
 # Reliability follow-up audit
 
+> Historical report: describes the revision measured when it was written, not the
+> current device protocol surface. Device HTTP has since been removed. Current
+> behavior, migration, tests and measurements: [removal report](remove-device-http.md).
+> Original measurements are retained; old HTTP benchmark tools can be retrieved
+> from baseline `945fe5e386d623c32e2c7d2d0568fe0c058107ec`.
+
 Date: 2026-09-20  
 Baseline: `e0687a63a9d99abb6e0ff0d43bc2621e69843d97`  
 Scope: auth cache, UDP authentication, EventBus retry/recovery, MQTT QoS2 and
