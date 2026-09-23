@@ -1753,7 +1753,6 @@ async fn device_protocol_ceiling_preserves_other_tls_protocols_and_management() 
             max_connections: 8,
             max_connections_per_ip: 8,
             max_device_connections_per_protocol: 2,
-            max_unclassified_device_connections: 2,
             requests_per_ip_second: 1000,
             ..Limits::default()
         },
@@ -1849,7 +1848,7 @@ async fn device_protocol_ceiling_preserves_other_tls_protocols_and_management() 
     task.await.unwrap().unwrap();
     management_task.await.unwrap().unwrap();
     assert_eq!(services.connections.active().unwrap(), [0; 4]);
-    // Repeated pending acquire/drop catches a leaked pending transition at shutdown.
+    // Repeated pending acquire/drop catches leaked global/IP/byte ownership at shutdown.
     for _ in 0..8 {
         drop(
             services

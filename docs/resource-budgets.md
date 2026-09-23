@@ -9,7 +9,6 @@ spool relationship values.
 |---|---:|
 | Connections | 256 node / 64 tenant / 32 IP / 2 device |
 | Device connections per classified protocol | 192 each; shares the 256 global maximum |
-| Unclassified device connections (TLS + detection) | 64; shares global count/bytes; no extra semaphore |
 | Logical connection memory | 512 KiB reservation / 128 MiB global |
 | MQTT/HTTP/TCP maximum | 64 KiB |
 | Initial stream read buffer | at most 4 KiB; grows incrementally |
@@ -73,17 +72,18 @@ default ceiling with the measured toolchain; not an RSS bound). No payload or
 event_id is retained for duplicate ACKs. See [measurements](udp-reliable-ack.md).
 
 Device ingress admission has a connection-level anti-monopoly ceiling. HTTP, MQTT
-and TCP each default to at most 192 classified device connections, and TLS plus
-classification may hold at most 64 pending device connections. Classification
-atomically transfers the same global/IP/byte ownership from pending to protocol
-accounting. A failed transition releases all its ownership. These are overlapping
-maxima, not three fixed partitions or guaranteed reservations. Management and
-standalone transport listeners retain existing admission; they still share the
-process global ceiling. No new packet-level lock is introduced.
+and TCP each default to at most 192 classified device connections. Pending TLS and
+classification retain the existing shared global/IP/byte bounds. Classification
+charges the protocol counter while retaining the same permits. A failed transition
+releases all ownership. These are overlapping maxima, not three fixed partitions
+or guaranteed reservations. Management and standalone transport listeners retain
+existing admission and still share the process global ceiling. No new packet-level
+lock is introduced.
 
-Both ceilings are positive absolute configuration values. The global maximum also
-applies, so a ceiling above it has no additional effect. Raising `max_connections`
-does not automatically raise the device ceilings: size both explicitly. Multiple
-protocols together can still exhaust global capacity. A pending TLS flood can still
-win new-connection races; unknown clients cannot be distinguished by protocol.
-See the mixed-ingress audit for the measured scope and remaining limitations.
+The ceiling is a positive absolute configuration value. The global maximum also
+applies, so a protocol ceiling above it has no additional effect. Raising
+`max_connections` does not automatically raise the device protocol ceiling: size
+both explicitly. Multiple protocols, unclassified clients, or tighter shared IP
+limits can still exhaust available capacity. A separately reduced pending pool was
+rejected after paired measurements worsened legitimate new-connection admission.
+See the mixed-ingress audit for measured scope and remaining limitations.

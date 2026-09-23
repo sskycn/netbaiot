@@ -70,7 +70,6 @@ struct ConnectionCounts {
     devices: HashMap<DeviceKey, usize>,
     transports: [usize; 4],
     device_transports: [usize; 4],
-    device_pending: usize,
 }
 pub struct Connections {
     limits: Arc<Limits>,
@@ -125,19 +124,11 @@ impl Connections {
             .memory
             .reserve(self.limits.connection_memory_reservation)?;
         let mut counts = lock(&self.counts)?;
-        if device_ingress
-            && counts.device_pending >= self.limits.max_unclassified_device_connections
-        {
-            return Err(Error::Overloaded);
-        }
         let count = counts.ips.entry(ip).or_default();
         if *count >= self.limits.max_connections_per_ip {
             return Err(Error::Overloaded);
         }
         *count += 1;
-        if device_ingress {
-            counts.device_pending += 1;
-        }
         self.metrics.inc(Metric::ConnectionsAccepted);
         Ok(PendingConnectionLease(ConnectionLease {
             owner: self.clone(),
@@ -173,7 +164,6 @@ impl PendingConnectionLease {
                 {
                     return Err(Error::Overloaded);
                 }
-                counts.device_pending -= 1;
                 counts.device_transports[transport as usize] += 1;
             }
             counts.transports[transport as usize] += 1;
@@ -231,8 +221,6 @@ impl Drop for ConnectionLease {
                     counts.device_transports[transport as usize] =
                         counts.device_transports[transport as usize].saturating_sub(1);
                 }
-            } else if self.device_ingress {
-                counts.device_pending = counts.device_pending.saturating_sub(1);
             }
         }
     }
@@ -614,12 +602,11 @@ mod tests {
         assert!(connections.acquire(ip, Transport::Http).is_ok());
     }
     #[tokio::test]
-    async fn device_protocol_and_pending_caps_share_global_ownership_and_release_on_failure() {
+    async fn device_protocol_ceiling_shares_global_ownership_and_releases_on_failure() {
         let limits = Arc::new(Limits {
             max_connections: 5,
             max_connections_per_ip: 5,
             max_device_connections_per_protocol: 3,
-            max_unclassified_device_connections: 2,
             global_connection_logical_bytes: 5 * Limits::default().connection_memory_reservation,
             ..Limits::default()
         });
@@ -642,7 +629,6 @@ mod tests {
             Err(Error::Overloaded)
         ));
         assert_eq!(owner.slots.available_permits(), 2);
-        assert_eq!(lock(&owner.counts).unwrap().device_pending, 0);
         let http = owner
             .acquire_device_pending(ip)
             .unwrap()
@@ -657,8 +643,7 @@ mod tests {
         drop((http, tcp, mqtt));
         let first = owner.acquire_device_pending(ip).unwrap();
         let second = owner.acquire_device_pending(ip).unwrap();
-        assert!(owner.acquire_device_pending(ip).is_err());
-        // Known management/standalone listeners do not acquire the device pending cap.
+        // Known management/standalone listeners retain shared global accounting.
         let management = owner.acquire(ip, Transport::Http).unwrap();
         assert!(matches!(
             second.classify(Transport::Udp),
@@ -672,7 +657,6 @@ mod tests {
             .unwrap();
         drop((mqtt, management));
         let counts = lock(&owner.counts).unwrap();
-        assert_eq!(counts.device_pending, 0);
         assert_eq!(counts.device_transports, [0; 4]);
         assert_eq!(counts.transports, [0; 4]);
         assert!(counts.ips.is_empty());
@@ -690,7 +674,6 @@ mod tests {
                 max_connections: 4,
                 max_connections_per_ip: 4,
                 max_device_connections_per_protocol: 1,
-                max_unclassified_device_connections: 4,
                 ..Limits::default()
             }),
             Arc::new(Metrics::default()),
@@ -716,7 +699,6 @@ mod tests {
         }
         assert_eq!(winners.len(), 1);
         assert_eq!(owner.active().unwrap()[Transport::Mqtt as usize], 1);
-        assert_eq!(lock(&owner.counts).unwrap().device_pending, 0);
         drop(winners);
         assert_eq!(owner.slots.available_permits(), 4);
         assert_eq!(lock(&owner.counts).unwrap().device_transports, [0; 4]);
