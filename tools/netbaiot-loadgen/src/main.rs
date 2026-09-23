@@ -74,7 +74,7 @@ impl Default for Config {
             audit_open_loop: false,
             tls_server_name: "localhost".into(),
             transport: "mqtt".into(),
-            address: "127.0.0.1:1883".into(),
+            address: "127.0.0.1:8080".into(),
             http_url: "http://127.0.0.1:8080".into(),
             management_url: "http://127.0.0.1:9090".into(),
             tls_ca: None,

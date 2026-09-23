@@ -1,3 +1,4 @@
+pub mod classifier;
 pub mod common;
 pub mod http;
 pub mod mqtt;

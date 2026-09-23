@@ -8,7 +8,7 @@ use netbaiot_runtime::{
     SinkDefinition, SinkDeliveryMode, SinkError, StaticAuthenticator,
 };
 use netbaiot_server::{Config, TlsFiles, read_config, run, tls_acceptor};
-use netbaiot_transports::{Services, serve_stream};
+use netbaiot_transports::{BoxStream, HttpRole, Services, serve_device_ingress, serve_stream};
 use std::{
     collections::HashSet,
     process::Stdio,
@@ -88,7 +88,7 @@ fn tls_test_services(limits: Limits, stop: CancellationToken) -> (Arc<Ingress>, 
 #[test]
 fn public_streams_require_tls_and_volatile_store_requires_loopback() {
     let mut c = config();
-    c.device_http = "0.0.0.0:8080".parse().unwrap();
+    c.device_ingress = "0.0.0.0:8080".parse().unwrap();
     assert!(c.validate().is_err());
     c.development = false;
     c.delivery_url = Some("https://example.invalid/ingress".into());
@@ -127,14 +127,11 @@ async fn composition_root_serves_http_and_stops_all_listeners() {
     for _ in 0..5 {
         reservations.push(TcpListener::bind("127.0.0.1:0").await.unwrap());
     }
-    c.device_http = reservations[0].local_addr().unwrap();
+    c.device_ingress = reservations[0].local_addr().unwrap();
     c.management_http = reservations[1].local_addr().unwrap();
-    c.mqtt = reservations[2].local_addr().unwrap();
-    c.tcp = reservations[3].local_addr().unwrap();
-    c.udp = reservations[4].local_addr().unwrap();
     c.spool_directory =
         std::env::temp_dir().join(format!("netbaiot-server-{}", uuid::Uuid::new_v4()));
-    let addresses = [c.device_http, c.management_http, c.mqtt, c.tcp];
+    let addresses = [c.device_ingress, c.management_http];
     drop(reservations);
     let stop = CancellationToken::new();
     let server = tokio::spawn(run(c, stop.clone()));
@@ -393,7 +390,7 @@ fn mqtt_publish(packet_id: u16, topic: &str, payload: &[u8], qos: u8, retain: bo
     mqtt_packet(0x30 | (qos << 1) | u8::from(retain), &body)
 }
 
-async fn mqtt_read(stream: &mut TcpStream) -> (u8, Vec<u8>) {
+async fn mqtt_read(stream: &mut (impl tokio::io::AsyncRead + Unpin + ?Sized)) -> (u8, Vec<u8>) {
     let first = stream.read_u8().await.unwrap();
     let mut multiplier = 1usize;
     let mut remaining = 0usize;
@@ -576,11 +573,8 @@ async fn external_auth_outage_preserves_bound_session_and_recovers_new_authentic
     ));
 
     let mut c = config();
-    c.device_http = free_address().await;
+    c.device_ingress = free_address().await;
     c.management_http = free_address().await;
-    c.mqtt = free_address().await;
-    c.tcp = free_address().await;
-    c.udp = free_address().await;
     c.credentials.clear();
     c.device_configs.clear();
     c.auth_provider_url = Some(format!("http://{provider_address}/auth"));
@@ -588,7 +582,7 @@ async fn external_auth_outage_preserves_bound_session_and_recovers_new_authentic
     c.spool_directory =
         std::env::temp_dir().join(format!("netbaiot-auth-outage-{}", uuid::Uuid::new_v4()));
     let spool_directory = c.spool_directory.clone();
-    let mqtt_address = c.mqtt;
+    let mqtt_address = c.device_ingress;
     let server_stop = CancellationToken::new();
     let server_task = tokio::spawn(run(c, server_stop.clone()));
     tokio::time::timeout(Duration::from_secs(5), async {
@@ -656,11 +650,8 @@ async fn external_auth_outage_preserves_bound_session_and_recovers_new_authentic
 async fn subprocess_mqtt_session_retained_and_qos1_inflight_survive_graceful_restart() {
     let _port_guard = EPHEMERAL_PORT_TEST_LOCK.lock().await;
     let mut c = config();
-    c.device_http = free_address().await;
+    c.device_ingress = free_address().await;
     c.management_http = free_address().await;
-    c.mqtt = free_address().await;
-    c.tcp = free_address().await;
-    c.udp = free_address().await;
     let root = std::env::temp_dir().join(format!("netbaiot-mqtt-restart-{}", uuid::Uuid::new_v4()));
     std::fs::create_dir_all(&root).unwrap();
     c.spool_directory = root.join("recovery");
@@ -674,7 +665,7 @@ async fn subprocess_mqtt_session_retained_and_qos1_inflight_survive_graceful_res
 
     let mut first = start_child(&config_path, &admin).await;
     wait_ready(&client, c.management_http, &admin).await;
-    let mut persistent = mqtt_open(c.mqtt, "persistent-client", false).await;
+    let mut persistent = mqtt_open(c.device_ingress, "persistent-client", false).await;
     assert_eq!(mqtt_read(&mut persistent).await, (0x20, vec![0, 0]));
     persistent
         .write_all(&mqtt_subscribe(1, filter, 1))
@@ -701,7 +692,7 @@ async fn subprocess_mqtt_session_retained_and_qos1_inflight_survive_graceful_res
 
     let mut second = start_child(&config_path, &admin).await;
     wait_ready(&client, c.management_http, &admin).await;
-    let mut resumed = mqtt_open(c.mqtt, "persistent-client", false).await;
+    let mut resumed = mqtt_open(c.device_ingress, "persistent-client", false).await;
     assert_eq!(mqtt_read(&mut resumed).await, (0x20, vec![1, 0]));
     let (retry_first, retry_body) = mqtt_read(&mut resumed).await;
     assert_eq!(retry_first & 0x0f, 0x0a, "QoS1 retry must set DUP");
@@ -711,7 +702,7 @@ async fn subprocess_mqtt_session_retained_and_qos1_inflight_survive_graceful_res
         .await
         .unwrap();
 
-    let mut retained_reader = mqtt_open(c.mqtt, "retained-reader", true).await;
+    let mut retained_reader = mqtt_open(c.device_ingress, "retained-reader", true).await;
     assert_eq!(mqtt_read(&mut retained_reader).await, (0x20, vec![0, 0]));
     retained_reader
         .write_all(&mqtt_subscribe(2, filter, 0))
@@ -737,11 +728,8 @@ async fn subprocess_mqtt_session_retained_and_qos1_inflight_survive_graceful_res
 async fn subprocess_mqtt_qos2_resumes_outbound_and_inbound_restart_stages() {
     let _port_guard = EPHEMERAL_PORT_TEST_LOCK.lock().await;
     let mut c = config();
-    c.device_http = free_address().await;
+    c.device_ingress = free_address().await;
     c.management_http = free_address().await;
-    c.mqtt = free_address().await;
-    c.tcp = free_address().await;
-    c.udp = free_address().await;
     let root = std::env::temp_dir().join(format!(
         "netbaiot-mqtt-qos2-restart-{}",
         uuid::Uuid::new_v4()
@@ -759,7 +747,7 @@ async fn subprocess_mqtt_qos2_resumes_outbound_and_inbound_restart_stages() {
 
     let mut generation_one = start_child(&config_path, &admin).await;
     wait_ready(&client, c.management_http, &admin).await;
-    let mut mqtt = mqtt_open(c.mqtt, "qos2-persistent", false).await;
+    let mut mqtt = mqtt_open(c.device_ingress, "qos2-persistent", false).await;
     assert_eq!(mqtt_read(&mut mqtt).await, (0x20, vec![0, 0]));
     mqtt.write_all(&mqtt_subscribe(1, filter, 2)).await.unwrap();
     assert_eq!(mqtt_read(&mut mqtt).await, (0x90, vec![0, 1, 2]));
@@ -777,7 +765,7 @@ async fn subprocess_mqtt_qos2_resumes_outbound_and_inbound_restart_stages() {
 
     let mut generation_two = start_child(&config_path, &admin).await;
     wait_ready(&client, c.management_http, &admin).await;
-    let mut mqtt = mqtt_open(c.mqtt, "qos2-persistent", false).await;
+    let mut mqtt = mqtt_open(c.device_ingress, "qos2-persistent", false).await;
     assert_eq!(mqtt_read(&mut mqtt).await, (0x20, vec![1, 0]));
     let (retry_first, retry_body) = mqtt_read(&mut mqtt).await;
     assert_eq!(retry_first & 0x0e, 0x0c, "QoS2 PUBLISH retry sets DUP");
@@ -794,7 +782,7 @@ async fn subprocess_mqtt_qos2_resumes_outbound_and_inbound_restart_stages() {
 
     let mut generation_three = start_child(&config_path, &admin).await;
     wait_ready(&client, c.management_http, &admin).await;
-    let mut mqtt = mqtt_open(c.mqtt, "qos2-persistent", false).await;
+    let mut mqtt = mqtt_open(c.device_ingress, "qos2-persistent", false).await;
     assert_eq!(mqtt_read(&mut mqtt).await, (0x20, vec![1, 0]));
     assert_eq!(
         mqtt_read(&mut mqtt).await,
@@ -812,7 +800,7 @@ async fn subprocess_mqtt_qos2_resumes_outbound_and_inbound_restart_stages() {
 
     let mut generation_four = start_child(&config_path, &admin).await;
     wait_ready(&client, c.management_http, &admin).await;
-    let mut mqtt = mqtt_open(c.mqtt, "qos2-persistent", false).await;
+    let mut mqtt = mqtt_open(c.device_ingress, "qos2-persistent", false).await;
     assert_eq!(mqtt_read(&mut mqtt).await, (0x20, vec![1, 0]));
     mqtt.write_all(&[0x62, 2, 0, 11]).await.unwrap();
     assert_eq!(mqtt_read(&mut mqtt).await, (0x70, vec![0, 11]));
@@ -918,11 +906,8 @@ async fn exercise_graceful_restart_spool_replay(healthy_cycles: u32, dwell_per_c
     };
 
     let mut c = config();
-    c.device_http = free_address().await;
+    c.device_ingress = free_address().await;
     c.management_http = free_address().await;
-    c.mqtt = free_address().await;
-    c.tcp = free_address().await;
-    c.udp = free_address().await;
     c.delivery_url = Some(format!("http://{sink_address}/events"));
     c.limits.sink_max_attempts = 1;
     c.limits.shutdown_drain_timeout_ms = 50;
@@ -939,7 +924,7 @@ async fn exercise_graceful_restart_spool_replay(healthy_cycles: u32, dwell_per_c
     wait_ready(&client, c.management_http, &admin).await;
     let mqtt_topic = "v1/t/demo/p/sensor/d/device-1/up";
     let mqtt_payload = br#"{"schema_version":1,"source_message_id":"combined-restart","kind":"heartbeat","data":{"sequence":99}}"#;
-    let mut persistent = mqtt_open(c.mqtt, "combined-restart", false).await;
+    let mut persistent = mqtt_open(c.device_ingress, "combined-restart", false).await;
     assert_eq!(mqtt_read(&mut persistent).await, (0x20, vec![0, 0]));
     persistent
         .write_all(&mqtt_subscribe(1, mqtt_topic, 1))
@@ -948,7 +933,7 @@ async fn exercise_graceful_restart_spool_replay(healthy_cycles: u32, dwell_per_c
     assert_eq!(mqtt_read(&mut persistent).await, (0x90, vec![0, 1, 1]));
     persistent.write_all(&[0xe0, 0]).await.unwrap();
     drop(persistent);
-    let mut mqtt_publisher = mqtt_open(c.mqtt, "combined-publisher", true).await;
+    let mut mqtt_publisher = mqtt_open(c.device_ingress, "combined-publisher", true).await;
     assert_eq!(mqtt_read(&mut mqtt_publisher).await, (0x20, vec![0, 0]));
     mqtt_publisher
         .write_all(&mqtt_publish(2, mqtt_topic, mqtt_payload, 1, true))
@@ -960,7 +945,7 @@ async fn exercise_graceful_restart_spool_replay(healthy_cycles: u32, dwell_per_c
     let mut accepted = HashSet::new();
     for sequence in 0..3 {
         let response = client
-            .post(format!("http://{}/v1/device/data", c.device_http))
+            .post(format!("http://{}/v1/device/data", c.device_ingress))
             .bearer_auth("demo-device:000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f")
             .body(format!(r#"{{"schema_version":1,"source_message_id":"restart:{sequence}","kind":"heartbeat","data":{{"sequence":{sequence}}}}}"#))
             .send()
@@ -1017,7 +1002,7 @@ async fn exercise_graceful_restart_spool_replay(healthy_cycles: u32, dwell_per_c
     healthy.store(true, Ordering::Relaxed);
     let mut second = start_child(&config_path, &admin).await;
     wait_ready(&client, c.management_http, &admin).await;
-    let mut persistent = mqtt_open(c.mqtt, "combined-restart", false).await;
+    let mut persistent = mqtt_open(c.device_ingress, "combined-restart", false).await;
     assert_eq!(mqtt_read(&mut persistent).await, (0x20, vec![1, 0]));
     let (first, body) = mqtt_read(&mut persistent).await;
     assert_eq!(first & 0xf0, 0x30);
@@ -1089,7 +1074,7 @@ async fn exercise_graceful_restart_spool_replay(healthy_cycles: u32, dwell_per_c
         let mut child = start_child(&config_path, &admin).await;
         wait_ready(&client, c.management_http, &admin).await;
         let response = client
-            .post(format!("http://{}/v1/device/data", c.device_http))
+            .post(format!("http://{}/v1/device/data", c.device_ingress))
             .bearer_auth("demo-device:000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f")
             .body(format!(r#"{{"schema_version":1,"source_message_id":"cycle:{cycle}","kind":"heartbeat","data":{{"sequence":{cycle}}}}}"#))
             .send()
@@ -1153,11 +1138,8 @@ async fn subprocess_graceful_restart_sixty_second_soak() {
 async fn subprocess_sigkill_exposes_the_documented_three_event_loss_window() {
     let _port_guard = EPHEMERAL_PORT_TEST_LOCK.lock().await;
     let mut c = config();
-    c.device_http = free_address().await;
+    c.device_ingress = free_address().await;
     c.management_http = free_address().await;
-    c.mqtt = free_address().await;
-    c.tcp = free_address().await;
-    c.udp = free_address().await;
     let unavailable_sink = free_address().await;
     c.delivery_url = Some(format!("http://{unavailable_sink}/events"));
     c.limits.sink_max_attempts = 1;
@@ -1175,7 +1157,7 @@ async fn subprocess_sigkill_exposes_the_documented_three_event_loss_window() {
     let mut accepted = HashSet::new();
     for sequence in 0..3 {
         let response = client
-            .post(format!("http://{}/v1/device/data", c.device_http))
+            .post(format!("http://{}/v1/device/data", c.device_ingress))
             .bearer_auth("demo-device:000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f")
             .body(format!(r#"{{"schema_version":1,"source_message_id":"kill:{sequence}","kind":"heartbeat","data":{{"sequence":{sequence}}}}}"#))
             .send()
@@ -1213,11 +1195,8 @@ async fn subprocess_sigkill_exposes_the_documented_three_event_loss_window() {
 async fn subprocess_spool_failure_stays_alive_until_repaired_then_replays_same_event_id() {
     let _port_guard = EPHEMERAL_PORT_TEST_LOCK.lock().await;
     let mut c = config();
-    c.device_http = free_address().await;
+    c.device_ingress = free_address().await;
     c.management_http = free_address().await;
-    c.mqtt = free_address().await;
-    c.tcp = free_address().await;
-    c.udp = free_address().await;
     let unavailable_sink = free_address().await;
     c.delivery_url = Some(format!("http://{unavailable_sink}/events"));
     c.limits.sink_max_attempts = 1;
@@ -1233,7 +1212,7 @@ async fn subprocess_spool_failure_stays_alive_until_repaired_then_replays_same_e
     let mut child = start_child(&config_path, &admin).await;
     wait_ready(&client, c.management_http, &admin).await;
     let response = client
-        .post(format!("http://{}/v1/device/data", c.device_http))
+        .post(format!("http://{}/v1/device/data", c.device_ingress))
         .bearer_auth("demo-device:000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f")
         .body(r#"{"schema_version":1,"source_message_id":"spool-failure","kind":"heartbeat","data":{"sequence":1}}"#)
         .send()
@@ -1263,6 +1242,11 @@ async fn subprocess_spool_failure_stays_alive_until_repaired_then_replays_same_e
         .unwrap();
     assert_eq!(ready.status(), reqwest::StatusCode::SERVICE_UNAVAILABLE);
 
+    // Device TCP and UDP close before durable recovery succeeds; management stays reachable.
+    let stopped_tcp = TcpListener::bind(c.device_ingress).await.unwrap();
+    let stopped_udp = tokio::net::UdpSocket::bind(c.device_ingress).await.unwrap();
+    drop((stopped_tcp, stopped_udp));
+
     std::fs::remove_file(&c.spool_directory).unwrap();
     std::fs::create_dir_all(&c.spool_directory).unwrap();
     let status = tokio::time::timeout(Duration::from_secs(5), child.wait())
@@ -1270,6 +1254,9 @@ async fn subprocess_spool_failure_stays_alive_until_repaired_then_replays_same_e
         .unwrap()
         .unwrap();
     assert!(status.success());
+    let stopped_management = TcpListener::bind(c.management_http).await.unwrap();
+    drop(stopped_management);
+
     let recovered = RestartSpool::new(c.spool_directory.clone(), Arc::new(c.limits.clone()))
         .recover()
         .await
@@ -1327,4 +1314,431 @@ async fn subprocess_spool_failure_stays_alive_until_repaired_then_replays_same_e
     request_drain(&client, c.management_http, &admin).await;
     assert!(restarted.wait().await.unwrap().success());
     let _ = std::fs::remove_dir_all(root);
+}
+
+fn test_tls_files() -> TlsFiles {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures");
+    TlsFiles {
+        certificate: root.join("localhost-cert.pem").to_str().unwrap().into(),
+        private_key: root.join("localhost-key.pem").to_str().unwrap().into(),
+    }
+}
+fn test_tls_connector() -> TlsConnector {
+    let pem = std::fs::read(test_tls_files().certificate).unwrap();
+    let mut roots = rustls::RootCertStore::empty();
+    for cert in rustls_pemfile::certs(&mut pem.as_slice()) {
+        roots.add(cert.unwrap()).unwrap();
+    }
+    let client = rustls::ClientConfig::builder_with_provider(Arc::new(
+        rustls::crypto::ring::default_provider(),
+    ))
+    .with_safe_default_protocol_versions()
+    .unwrap()
+    .with_root_certificates(roots)
+    .with_no_client_auth();
+    assert!(client.alpn_protocols.is_empty());
+    TlsConnector::from(Arc::new(client))
+}
+async fn device_socket(address: std::net::SocketAddr, tls: bool) -> BoxStream {
+    let socket = TcpStream::connect(address).await.unwrap();
+    socket.set_nodelay(true).unwrap();
+    if tls {
+        Box::new(
+            test_tls_connector()
+                .connect("localhost".try_into().unwrap(), socket)
+                .await
+                .unwrap(),
+        )
+    } else {
+        Box::new(socket)
+    }
+}
+async fn read_frame(socket: &mut BoxStream) -> Vec<u8> {
+    let length = socket.read_u32().await.unwrap() as usize;
+    assert!(length <= 65_536);
+    let mut bytes = vec![0; length];
+    socket.read_exact(&mut bytes).await.unwrap();
+    bytes
+}
+
+async fn exercise_shared_listener(tls: bool) {
+    use hmac::{Hmac, Mac};
+    use netbaiot_runtime::{AdminAccess, Metric};
+    use netbaiot_transports::tcp::{LengthPrefixFramer, TcpFramer};
+    use sha2::Sha256;
+    let stop = CancellationToken::new();
+    let (ingress, mut services) = tls_test_services(Limits::default(), stop.clone());
+    let admin = "d".repeat(64);
+    Arc::get_mut(&mut services).unwrap().admin = Some(Arc::new(
+        AdminAccess::new(&admin, Default::default(), &ingress.limits).unwrap(),
+    ));
+    // Exactly ONE TCP listener for every device protocol; bind UDP while it is held.
+    let (listener, udp) = loop {
+        let tcp = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        if let Ok(udp) = tokio::net::UdpSocket::bind(tcp.local_addr().unwrap()).await {
+            break (tcp, udp);
+        }
+    };
+    let address = listener.local_addr().unwrap();
+    assert_eq!(address, udp.local_addr().unwrap());
+    let management = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let management_address = management.local_addr().unwrap();
+    let acceptor = if tls {
+        Some(tls_acceptor(&test_tls_files()).await.unwrap())
+    } else {
+        None
+    };
+    // Deliberately pass Management services: shared ingress must force Device role.
+    let task = tokio::spawn(serve_device_ingress(
+        listener,
+        services.with_http_role(HttpRole::Management),
+        acceptor.clone(),
+        stop.child_token(),
+    ));
+    let udp_task = tokio::spawn(netbaiot_transports::udp::serve(
+        udp,
+        services.clone(),
+        stop.child_token(),
+    ));
+    let management_task = tokio::spawn(serve_stream(
+        management,
+        Transport::Http,
+        services.with_http_role(HttpRole::Management),
+        acceptor,
+        stop.child_token(),
+    ));
+    let secret = "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f";
+    let payload = br#"{"schema_version":1,"source_message_id":"shared","kind":"heartbeat","data":{"sequence":1}}"#;
+    let scheme = if tls { "https" } else { "http" };
+    let cert =
+        reqwest::Certificate::from_pem(&std::fs::read(test_tls_files().certificate).unwrap())
+            .unwrap();
+    let client = reqwest::Client::builder()
+        .no_proxy()
+        .add_root_certificate(cert)
+        .timeout(Duration::from_secs(2))
+        .build()
+        .unwrap();
+    let device_url = format!("{scheme}://localhost:{}", address.port());
+    assert_eq!(
+        client
+            .post(format!("{device_url}/v1/device/data"))
+            .bearer_auth(format!("demo-device:{secret}"))
+            .body(payload.to_vec())
+            .send()
+            .await
+            .unwrap()
+            .status(),
+        202
+    );
+    for path in ["/api/v1/ready", "/api/v1/stats", "/v1/admin/ready"] {
+        assert_eq!(
+            client
+                .get(format!("{device_url}{path}"))
+                .bearer_auth(format!("demo-device:{secret}"))
+                .send()
+                .await
+                .unwrap()
+                .status(),
+            404
+        );
+        assert_eq!(
+            client
+                .get(format!("{device_url}{path}"))
+                .bearer_auth(&admin)
+                .send()
+                .await
+                .unwrap()
+                .status(),
+            401
+        );
+    }
+    assert_eq!(
+        client
+            .get(format!(
+                "{scheme}://localhost:{}/api/v1/ready",
+                management_address.port()
+            ))
+            .bearer_auth(&admin)
+            .send()
+            .await
+            .unwrap()
+            .status(),
+        200
+    );
+    // Preserve the existing standard version-rejection response through the classifier.
+    let mut unsupported = device_socket(address, tls).await;
+    let mut hello = mqtt_connect("wrong-version", true);
+    let level = hello.windows(4).position(|part| part == b"MQTT").unwrap() + 4;
+    hello[level] = 5;
+    unsupported.write_all(&hello).await.unwrap();
+    assert_eq!(mqtt_read(&mut *unsupported).await, (0x20, vec![0, 1]));
+    drop(unsupported);
+    let mut mqtt = device_socket(address, tls).await;
+    mqtt.write_all(&mqtt_connect("shared", true)).await.unwrap();
+    assert_eq!(mqtt_read(&mut *mqtt).await, (0x20, vec![0, 0]));
+    mqtt.write_all(&mqtt_publish(
+        1,
+        "v1/t/demo/p/sensor/d/device-1/up",
+        payload,
+        1,
+        false,
+    ))
+    .await
+    .unwrap();
+    assert_eq!(mqtt_read(&mut *mqtt).await, (0x40, vec![0, 1]));
+    assert_eq!(
+        services.connections.active().unwrap()[Transport::Mqtt as usize],
+        1
+    );
+    let mut tcp = device_socket(address, tls).await;
+    let framer = LengthPrefixFramer { maximum: 65_536 };
+    // Leading JSON whitespace remains valid. Authentication and first event are pipelined.
+    let mut wire = framer
+        .encode(
+            format!(" \n{{\"credential_id\":\"demo-device\",\"secret\":\"{secret}\"}}").as_bytes(),
+        )
+        .unwrap();
+    wire.extend(framer.encode(payload).unwrap());
+    tcp.write_all(&wire).await.unwrap();
+    assert_eq!(read_frame(&mut tcp).await, br#"{"authenticated":true}"#);
+    let receipt: EventAcceptance = serde_json::from_slice(&read_frame(&mut tcp).await).unwrap();
+    assert!(!receipt.event_id.0.is_nil());
+    assert_eq!(
+        services.connections.active().unwrap()[Transport::Tcp as usize],
+        1
+    );
+    let mut datagram = b"NBI1\x0bdemo-device".to_vec();
+    datagram.extend(1u32.to_be_bytes());
+    datagram.extend([1; 16]);
+    datagram.extend(1u64.to_be_bytes());
+    datagram.extend(netbaiot_runtime::now_ms().to_be_bytes());
+    datagram.extend((payload.len() as u16).to_be_bytes());
+    datagram.extend(payload);
+    let key: Vec<u8> = (0..32).collect();
+    let mut mac = Hmac::<Sha256>::new_from_slice(&key).unwrap();
+    mac.update(&datagram);
+    datagram.extend(mac.finalize().into_bytes());
+    let sender = tokio::net::UdpSocket::bind("127.0.0.1:0").await.unwrap();
+    sender.send_to(&datagram, address).await.unwrap();
+    tokio::time::timeout(Duration::from_secs(2), async {
+        while ingress.metrics.get(Metric::EventsAccepted) < 4 {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .unwrap();
+    mqtt.write_all(&[0xe0, 0]).await.unwrap();
+    stop.cancel();
+    task.await.unwrap().unwrap();
+    udp_task.await.unwrap().unwrap();
+    management_task.await.unwrap().unwrap();
+    assert_eq!(services.connections.active().unwrap(), [0; 4]);
+    ingress.events.stop_workers().await.unwrap();
+}
+#[tokio::test]
+async fn shared_plaintext_http_mqtt_tcp_udp_and_management_isolation() {
+    exercise_shared_listener(false).await;
+}
+#[tokio::test]
+async fn shared_tls_https_mqtts_tcp_without_alpn_and_udp() {
+    exercise_shared_listener(true).await;
+}
+
+#[tokio::test]
+async fn shared_ingress_releases_unknown_slow_eof_and_tls_failure_leases() {
+    use netbaiot_runtime::Metric;
+    for tls in [false, true] {
+        let stop = CancellationToken::new();
+        let limits = Limits {
+            max_connections: 1,
+            max_connections_per_ip: 1,
+            connect_timeout_ms: 100,
+            ..Limits::default()
+        };
+        let (ingress, services) = tls_test_services(limits, stop.clone());
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let acceptor = if tls {
+            Some(tls_acceptor(&test_tls_files()).await.unwrap())
+        } else {
+            None
+        };
+        let task = tokio::spawn(serve_device_ingress(
+            listener,
+            services.clone(),
+            acceptor,
+            stop.clone(),
+        ));
+        for prefix in [b"G".as_slice(), b"garbage", b""] {
+            let mut socket = TcpStream::connect(address).await.unwrap();
+            if !prefix.is_empty() {
+                socket.write_all(prefix).await.unwrap();
+            }
+            let mut response = Vec::new();
+            let result = tokio::time::timeout(
+                Duration::from_secs(1),
+                (&mut socket).take(64).read_to_end(&mut response),
+            )
+            .await
+            .unwrap();
+            if let Err(error) = result {
+                assert!(matches!(
+                    error.kind(),
+                    std::io::ErrorKind::ConnectionReset | std::io::ErrorKind::ConnectionAborted
+                ));
+            }
+            assert!(
+                response.len() < 64,
+                "connection did not close within the bounded TLS alert"
+            );
+            if tls && !response.is_empty() {
+                assert_eq!(response[0], 21, "only a TLS alert may precede close");
+            } else {
+                assert!(response.is_empty());
+            }
+        }
+        assert_eq!(ingress.metrics.get(Metric::ConnectionsAccepted), 3);
+        assert_eq!(services.connections.active().unwrap(), [0; 4]);
+        if !tls {
+            assert_eq!(ingress.metrics.get(Metric::ProtocolDetectionTimeouts), 2);
+        }
+        // The released slot can admit a real protocol next, then shutdown releases it too.
+        let mut socket = device_socket(address, tls).await;
+        socket
+            .write_all(&mqtt_connect("after-failures", true))
+            .await
+            .unwrap();
+        assert_eq!(mqtt_read(&mut *socket).await, (0x20, vec![0, 0]));
+        let mut rejected = TcpStream::connect(address).await.unwrap();
+        let mut byte = [0];
+        assert!(matches!(
+            tokio::time::timeout(Duration::from_secs(1), rejected.read(&mut byte))
+                .await
+                .unwrap(),
+            Ok(0) | Err(_)
+        ));
+        assert_eq!(ingress.metrics.get(Metric::ConnectionsRejected), 1);
+        stop.cancel();
+        task.await.unwrap().unwrap();
+        assert_eq!(services.connections.active().unwrap(), [0; 4]);
+        ingress.events.stop_workers().await.unwrap();
+    }
+}
+
+#[test]
+fn legacy_device_addresses_are_rejected_without_ambiguous_conversion() {
+    let mut value = serde_json::to_value(config()).unwrap();
+    value["mqtt"] = serde_json::json!("127.0.0.1:1883");
+    assert!(serde_json::from_value::<Config>(value.clone()).is_err());
+    value.as_object_mut().unwrap().remove("device_ingress");
+    value["device_http"] = serde_json::json!("127.0.0.1:8080");
+    assert!(serde_json::from_value::<Config>(value).is_err());
+}
+
+#[tokio::test(start_paused = true)]
+async fn classification_does_not_refresh_first_packet_deadline() {
+    use netbaiot_transports::classifier::classify_device_stream;
+    use tokio::time::Instant;
+    for prefix in [
+        b"POST ".as_slice(),
+        b"\x10\x7f\x00\x04MQTT\x04",
+        b"\x00\x00\x00\x7f{",
+    ] {
+        let stop = CancellationToken::new();
+        let (ingress, services) = tls_test_services(
+            Limits {
+                connect_timeout_ms: 100,
+                ..Limits::default()
+            },
+            stop.clone(),
+        );
+        let lease = services
+            .connections
+            .acquire_pending("127.0.0.1".parse().unwrap())
+            .unwrap();
+        let deadline = lease.connect_deadline();
+        let (mut peer, stream) = tokio::io::duplex(128);
+        tokio::time::advance(Duration::from_millis(90)).await;
+        peer.write_all(prefix).await.unwrap();
+        let (protocol, stream) = classify_device_stream(Box::new(stream), 65_536, 65_536, deadline)
+            .await
+            .unwrap();
+        let lease = lease.classify(protocol).unwrap();
+        let result = match protocol {
+            Transport::Http => {
+                netbaiot_transports::http::connection(
+                    stream,
+                    "127.0.0.1:1234".parse().unwrap(),
+                    services.clone(),
+                    lease,
+                    stop.clone(),
+                )
+                .await
+            }
+            Transport::Mqtt => {
+                netbaiot_transports::mqtt::connection(stream, services.clone(), lease, stop.clone())
+                    .await
+            }
+            Transport::Tcp => {
+                netbaiot_transports::tcp::connection(stream, services.clone(), lease, stop.clone())
+                    .await
+            }
+            Transport::Udp => unreachable!(),
+        };
+        assert!(result.is_err());
+        assert!(Instant::now() <= deadline + Duration::from_millis(1));
+        assert_eq!(services.connections.active().unwrap(), [0; 4]);
+        ingress.events.stop_workers().await.unwrap();
+    }
+}
+
+#[tokio::test]
+async fn unclassified_connections_enforce_global_peer_and_rate_limits() {
+    use netbaiot_runtime::Metric;
+    for (global, peer, rate) in [(1, 1, 100), (2, 1, 100), (2, 2, 1)] {
+        let stop = CancellationToken::new();
+        let (ingress, services) = tls_test_services(
+            Limits {
+                max_connections: global,
+                max_connections_per_ip: peer,
+                requests_per_ip_second: rate,
+                ..Limits::default()
+            },
+            stop.clone(),
+        );
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let task = tokio::spawn(serve_device_ingress(
+            listener,
+            services.clone(),
+            None,
+            stop.clone(),
+        ));
+        let mut pending = TcpStream::connect(address).await.unwrap();
+        pending.write_all(b"G").await.unwrap();
+        tokio::time::timeout(Duration::from_secs(1), async {
+            while ingress.metrics.get(Metric::ConnectionsAccepted) == 0 {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        assert_eq!(services.connections.active().unwrap(), [0; 4]);
+        let mut rejected = TcpStream::connect(address).await.unwrap();
+        let mut byte = [0];
+        assert!(matches!(
+            tokio::time::timeout(Duration::from_secs(1), rejected.read(&mut byte))
+                .await
+                .unwrap(),
+            Ok(0) | Err(_)
+        ));
+        assert_eq!(ingress.metrics.get(Metric::ConnectionsRejected), 1);
+        stop.cancel();
+        task.await.unwrap().unwrap();
+        assert!(matches!(pending.read(&mut byte).await, Ok(0) | Err(_)));
+        // Re-acquisition proves pending cancellation released the global/IP/byte permits.
+        assert!(services.connections.acquire_pending(address.ip()).is_ok());
+        ingress.events.stop_workers().await.unwrap();
+    }
 }

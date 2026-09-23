@@ -27,7 +27,7 @@ curl --noproxy '*' http://127.0.0.1:9090/api/v1/metrics \
 
 **原因**：server 未 ready、地址/端口错误、TLS/plaintext 混用、防火墙、connection/IP/global capacity 满。
 
-**确认/解决**：检查 `runtime ready`、`/ready`、`connections_rejected`；loopback 教程用 `127.0.0.1:1883` plaintext，生产 `mqtts` 客户端需正确 CA/hostname。
+**确认/解决**：检查 `runtime ready`、`/ready`、`connections_rejected`；loopback 教程用 `127.0.0.1:8080` plaintext，生产 `mqtts` 客户端需正确 CA/hostname。
 
 ## 3. Bad username or password / CONNACK 4
 

@@ -5,7 +5,7 @@ use netbaiot_runtime::*;
 use netbaiot_transports::{
     HttpRole, Services,
     mqtt::broker::MqttBroker,
-    serve_stream,
+    serve_device_ingress, serve_stream,
     tcp::{LengthPrefixFramer, TcpFramer},
     udp,
 };
@@ -34,11 +34,8 @@ use tokio_util::sync::CancellationToken;
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Config {
-    pub device_http: SocketAddr,
+    pub device_ingress: SocketAddr,
     pub management_http: SocketAddr,
-    pub mqtt: SocketAddr,
-    pub tcp: SocketAddr,
-    pub udp: SocketAddr,
     pub business_tcp: Option<SocketAddr>,
     #[serde(default)]
     pub development: bool,
@@ -83,21 +80,11 @@ pub async fn read_config(path: &str) -> Result<Config> {
 impl Config {
     pub fn validate(&self) -> Result<()> {
         self.limits.validate()?;
-        let listeners = [
-            self.device_http,
-            self.management_http,
-            self.mqtt,
-            self.tcp,
-            self.udp,
-        ];
+        let listeners = [self.device_ingress, self.management_http];
         if self.development && listeners.iter().any(|address| !address.ip().is_loopback()) {
             return Err(Error::Configuration);
         }
-        if [self.device_http, self.mqtt, self.tcp]
-            .iter()
-            .any(|address| !address.ip().is_loopback())
-            && self.tls.is_none()
-        {
+        if !self.device_ingress.ip().is_loopback() && self.tls.is_none() {
             return Err(Error::Configuration);
         }
         if !self.management_http.ip().is_loopback() && self.tls.is_none() {
@@ -982,19 +969,17 @@ pub async fn run_with_credentials(
         None
     };
 
-    let device_http = TcpListener::bind(config.device_http)
+    let device_ingress = TcpListener::bind(config.device_ingress)
         .await
         .map_err(|_| Error::Unavailable)?;
     let management_http = TcpListener::bind(config.management_http)
         .await
         .map_err(|_| Error::Unavailable)?;
-    let mqtt = TcpListener::bind(config.mqtt)
-        .await
+    // Resolve port zero once: UDP must use the port actually assigned to TCP.
+    let device_address = device_ingress
+        .local_addr()
         .map_err(|_| Error::Unavailable)?;
-    let tcp = TcpListener::bind(config.tcp)
-        .await
-        .map_err(|_| Error::Unavailable)?;
-    let udp = UdpSocket::bind(config.udp)
+    let udp = UdpSocket::bind(device_address)
         .await
         .map_err(|_| Error::Unavailable)?;
     let business = if let Some((address, sink)) = tcp_sink {
@@ -1012,9 +997,8 @@ pub async fn run_with_credentials(
     let work_listeners = CancellationToken::new();
     let management_listener = CancellationToken::new();
     let mut work_tasks = JoinSet::new();
-    work_tasks.spawn(serve_stream(
-        device_http,
-        Transport::Http,
+    work_tasks.spawn(serve_device_ingress(
+        device_ingress,
         device_services,
         tls.clone(),
         work_listeners.child_token(),
@@ -1025,20 +1009,6 @@ pub async fn run_with_credentials(
         management_services,
         tls.clone(),
         management_listener.child_token(),
-    ));
-    work_tasks.spawn(serve_stream(
-        mqtt,
-        Transport::Mqtt,
-        base_services.clone(),
-        tls.clone(),
-        work_listeners.child_token(),
-    ));
-    work_tasks.spawn(serve_stream(
-        tcp,
-        Transport::Tcp,
-        base_services.clone(),
-        tls,
-        work_listeners.child_token(),
     ));
     work_tasks.spawn(udp::serve(udp, base_services, work_listeners.child_token()));
     if let Some((listener, sink)) = business {
@@ -1052,7 +1022,7 @@ pub async fn run_with_credentials(
             work_listeners.child_token(),
         ));
     }
-    tracing::info!(device_http=%config.device_http,management_http=%config.management_http,mqtt=%config.mqtt,tcp=%config.tcp,udp=%config.udp,"runtime ready");
+    tracing::info!(device_ingress=%device_address,management_http=%config.management_http,business_tcp=?config.business_tcp,"runtime ready");
     let mut management_running = true;
     let failure = tokio::select! {
         _ = shutdown.cancelled() => None,

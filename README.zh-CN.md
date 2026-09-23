@@ -23,11 +23,13 @@ cargo run -p netbaiot-server -- configs/tutorial.json
 
 开发环境监听地址：
 
-- 设备 HTTP：`127.0.0.1:8080`
-- 管理 HTTP：`127.0.0.1:9090`
-- 内嵌 MQTT：`127.0.0.1:1883`
-- 通用 TCP：`127.0.0.1:9000`
-- UDP：`127.0.0.1:9001`
+- 单设备入口：`127.0.0.1:8080`（TCP：HTTP/MQTT/通用 TCP；UDP：NBI1）
+- 独立管理 HTTP：`127.0.0.1:9090`
+- 可选 `business_tcp` 保持独立。
+
+生产可配置 `device_ingress=0.0.0.0:443`：TCP 使用同一证书承载 HTTPS、MQTTS、TLS TCP；
+UDP 使用同号端口，仍为 HMAC 认证、不加密。无需 ALPN 或自定义前导。
+旧四地址字段已替换为 `device_ingress`，迁移说明见[架构](docs/architecture.zh-CN.md)。
 
 上传设备事件：
 

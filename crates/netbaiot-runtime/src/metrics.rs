@@ -47,9 +47,11 @@ pub enum Metric {
     SpoolBytes,
     RecoveryRecords,
     Timeouts,
+    ProtocolDetectionFailures,
+    ProtocolDetectionTimeouts,
 }
 
-const NAMES: [&str; 43] = [
+const NAMES: [&str; 45] = [
     "connections_accepted",
     "connections_rejected",
     "mqtt_connect_success",
@@ -93,6 +95,8 @@ const NAMES: [&str; 43] = [
     "spool_bytes",
     "recovery_records",
     "timeouts",
+    "protocol_detection_failures",
+    "protocol_detection_timeouts",
 ];
 
 /// Opt-in experiment counters, inactive unless lock timing is enabled.
