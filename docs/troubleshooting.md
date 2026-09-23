@@ -145,6 +145,22 @@ curl --noproxy '*' http://127.0.0.1:9090/api/v1/metrics \
 
 **解决**：保留文件做事故证据；检查 owner/mode、free space、inode 和 server 精确错误。EventBus v2 可读 v1；MQTT writer v3 可读 v1/v2/v3。未知/部分/损坏状态会 fail loudly，不能静默忽略责任。
 
+### Legacy ConfigAck 升级不兼容
+
+**症状**：启动日志包含 `restart spool contains legacy ConfigAck records` 和
+`startup blocked`，进程以 `IncompatibleSpool` 退出，尚未开放 listener/readiness。
+
+**原因**：旧版本尚有 ConfigAck required delivery 未获业务 ACK。新版本已移除该业务类型，
+不能把旧责任转换为 CommandAck、跳过记录或清空文件后继续启动。
+
+**处理**：保留整个 recovery 目录，用旧版本及原配置恢复，外部停止新设备流量，
+让兼容的业务消费者 ACK 完旧 spool。用旧版 `netbaiot server status` 确认
+`pending_required=0` 且 EventBus `.spool` 已由网关清理，再执行
+`netbaiot server drain --yes`（或 SIGTERM）。确认成功退出且没有剩余 EventBus spool
+后再升级。单纯成功 drain 可能仍将未完成工作写入 spool，不能作为完成迁移的证据。
+新版本失败时会保留文件字节，支持回退旧 binary；独立的 `mqtt-runtime.state` 不应删除。
+见[完整升级步骤](restart-spool.md#legacy-configack-restart-spool-compatibility)。
+
 ## 20. Management endpoint 无法访问
 
 **原因**：连错 device port、未设置 server 进程的 `NETBAIOT_ADMIN_SECRET`、token 不是 64-hex、缺少 Bearer、非 loopback 未配置 TLS、防火墙。

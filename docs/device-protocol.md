@@ -165,3 +165,13 @@ Breaking cleanup in the current 0.x release: `config_ack` is no longer a support
 DeviceEvent kind and is rejected. `schema_version=1` remains the unchanged envelope
 version; there is no compatibility alias. Application configuration operations use
 ordinary MQTT/TCP commands and `command_ack`. See [migration](remove-device-config.md).
+
+## Connection presence
+
+The JSON v1 device uplink kinds remain `telemetry`, `event`, `heartbeat`, and
+`command_ack`. The normalized business event kinds are `telemetry`, `device_event`,
+`heartbeat`, and `command_ack`. Connection lifecycle kinds are not accepted in
+uplinks, business events, or subscription filters. Query current connection state
+through `/api/v1/connections` and `/api/v1/devices/connection`; UDP updates
+`last_seen` without creating a connected session. Presence history belongs to the
+business application, not the EventBus.

@@ -934,7 +934,10 @@ pub async fn run_with_credentials(
     let spool = RestartSpool::new(config.spool_directory.clone(), limits.clone());
     let mqtt_broker = MqttBroker::new_with_metrics(limits.clone(), metrics.clone());
     mqtt_broker.recover_from(&config.spool_directory).await?;
-    let recovery = spool.recover().await?;
+    let recovery = spool.recover().await.inspect_err(|error| {
+        // Display only our typed diagnostic, never the serialized record or serde error.
+        tracing::error!(%error, "EventBus restart recovery failed; startup blocked");
+    })?;
     let recovered_files = recovery.committed_files;
     let recovered_count = events.restore(recovery.records)?;
     metrics.add(Metric::RecoveryRecords, recovered_count as u64);

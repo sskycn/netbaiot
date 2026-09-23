@@ -102,4 +102,4 @@ NetbaIoT 不持有或持久化设备期望配置。业务系统负责 desired/re
 设备通过 `CommandAck` 返回执行结果；是否收敛由业务系统判断。命令仅支持在线投递，
 UDP 无会话且没有下行。参阅[职责迁移](remove-device-config.md)。
 
-Connected/Disconnected 类型保留，但当前 MQTT/TCP 会话不会自动产生对应事件。业务系统应使用自己的 presence/heartbeat 逻辑或管理连接查询来触发协调。
+连接 presence 属于 Sessions 和控制面的运行时状态，不属于 `DeviceEvent`。MQTT/TCP 的连接状态、session generation、管理连接查询，以及 UDP 的 `last_seen` 继续保留。业务事件流仅包含遥测、设备事件、设备主动心跳和命令执行确认。NetbaIoT 不提供可靠、持久的上下线事件流；需要在线历史的应用应自行通过业务心跳、管理 API 轮询、外部监控或业务 presence 逻辑维护。
