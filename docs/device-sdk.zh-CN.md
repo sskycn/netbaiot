@@ -13,3 +13,5 @@ Builder 可配置 MQTT、HTTP 或同时启用两者。SDK 在调用方的 Tokio 
 丢弃最后一个客户端会取消唯一的 MQTT event-loop 任务。命令缓冲默认最多 16 条。命令格式错误或命令队列溢出会强制断开连接，且不确认 MQTT 投递，以便 broker 对持久会话重新投递。
 
 连接丢失时会清除可观察到的连接状态，然后使用有界指数全抖动退避重试（默认 100 ms 至 5 s）。每次成功重连都会显式重新订阅命令 topic，即使 broker 已不再保留上一个持久会话。应用可通过 `mqtt_connected()` 和 `wait_until_connected()` 协调后续断线恢复期间的工作。
+
+UDP 详见 [NBI1/NBA1 可靠上行](device-protocol.zh-CN.md#udp-acknowledgement-nba1)。Rust 设备 SDK 仍使用 MQTT/设备 HTTP；Python UDP 示例演示有界原包重试和签名接纳回执。

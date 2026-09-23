@@ -253,3 +253,7 @@ cargo build --release --locked -p netbaiot-loadgen
 - 部署工具等待 graceful exit；演练 SIGTERM 与 unavailable sink。
 - 验证 command offline/timeout 策略；业务拥有离线队列。
 - 在目标环境完成负载、故障、重启和 soak；baseline 不当作 SLA。
+
+## UDP v1.1 回执观测
+
+NBA1 仅确认 EventAccepted。观察 `udp_accepted`、`udp_accepted_duplicates`、`udp_acks_sent`、`udp_ack_send_failures`，结合 `udp_datagrams` 与 ingress/codec/admission counters 判断重试及丢回执；发送成功不等于设备收到。未认证及其他拒绝均静默，socket 压力下不排队 ACK。重复包仍受来源 IP/进程限速。捕获合法包后的来源伪造仍可能有限反射，但 64 字节 ACK 小于最小 76 字节 NBI1，无字节放大。详见 [协议与安全边界](device-protocol.zh-CN.md#udp-acknowledgement-nba1)。

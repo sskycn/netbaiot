@@ -217,9 +217,9 @@ python3 examples/device_tcp.py --wait-command
 
 第二种方式保持连接最多 60 秒等待命令，可在另一终端调用 management command endpoint。示例的 `recv_exact` 演示了 TCP 分片读取；不要假设一次 `recv()` 等于一帧。
 
-## UDP v1 ingress
+## UDP v1.1 ingress
 
-UDP 无连接、无响应、无命令、无分片。运行：
+UDP 无连接、无命令下行、无分片；接纳后返回签名 NBA1。运行：
 
 ```bash
 python3 examples/device_udp.py --sequence 1
@@ -227,7 +227,7 @@ python3 examples/device_udp.py --sequence 1
 
 数据报为网络字节序：`NBI1`、1-byte credential ID 长度、credential ID、u32 credential version、16-byte boot ID、u64 sequence、i64 Unix 毫秒、u16 payload 长度、payload、32-byte HMAC-SHA256。HMAC 覆盖此前全部字节，key 是 secret hex 解码后的 32 字节，不是 64 个 ASCII 字符。
 
-默认 datagram 上限 1200 bytes、clock skew 30 秒；每 `(DeviceKey, boot ID)` 保留 64-bit replay window，允许有限乱序、拒绝重复/过旧序号。窗口仅在进程内，重启后有效签名包在时间窗内可能再次被接纳；业务仍须按稳定应用标识和 `event_id` 幂等。由于服务端从不回复，发送成功不等于 EventAccepted；需要明确回执时用 HTTP/MQTT/TCP。
+默认 datagram 上限 1200 bytes、clock skew ±30 秒；每 `(DeviceKey, credential_version, boot ID)` 保留 64-bit replay window。未收到有效 NBA1 时，在有效时间和序号窗口内重发完全相同的 NBI1（含原时间戳及 HMAC）；已接纳重复包重新 ACK，不再次摄取。NBA1 只表示 EventAccepted，不表示业务最终处理。重启会丢失 replay，仍需稳定 source_message_id 和业务幂等。设备必须验证 ACK 长度、magic、版本、boot、待确认序号及 HMAC；详见 [完整协议](device-protocol.zh-CN.md#udp-acknowledgement-nba1)。
 
 ## 官方 Rust 设备 SDK
 

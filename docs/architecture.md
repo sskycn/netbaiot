@@ -116,3 +116,18 @@ implementation crates.
 
 There is deliberately no storage crate, SQL migration, database pool, durable
 outbox, persistent command state, or runtime message history.
+
+## UDP acceptance receipt
+
+```text
+Device -- NBI1 --> HMAC + version + clock + bounded replay
+  New:               ingest -> EventAccepted -> replay commit -> sign NBA1
+  AcceptedDuplicate: skip codec/presence/EventBus -------------> sign NBA1
+Device <-- NBA1 -- nonblocking send (failure never rolls back acceptance)
+```
+
+A single receive-loop owner keeps replay and receipt work bounded. No ACK queue,
+per-packet task, UDP session, command endpoint, or ACK spool is created. Quiesce
+waits for active datagram admission guards; only required business work drains or
+spools. Auth invalidation fences receipt signing without a second provider lookup.
+See [wire format, retry and security boundaries](device-protocol.md#udp-acknowledgement-nba1).

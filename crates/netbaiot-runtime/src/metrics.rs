@@ -49,9 +49,13 @@ pub enum Metric {
     Timeouts,
     ProtocolDetectionFailures,
     ProtocolDetectionTimeouts,
+    UdpAcksSent,
+    UdpAckSendFailures,
+    UdpAcceptedDuplicates,
+    UdpAccepted,
 }
 
-const NAMES: [&str; 45] = [
+const NAMES: [&str; 49] = [
     "connections_accepted",
     "connections_rejected",
     "mqtt_connect_success",
@@ -97,6 +101,10 @@ const NAMES: [&str; 45] = [
     "timeouts",
     "protocol_detection_failures",
     "protocol_detection_timeouts",
+    "udp_acks_sent",
+    "udp_ack_send_failures",
+    "udp_accepted_duplicates",
+    "udp_accepted",
 ];
 
 /// Opt-in experiment counters, inactive unless lock timing is enabled.

@@ -97,3 +97,5 @@ first-class. The `netbaiot` CLI exposes status, event subscribe, command, config
 cache invalidation, and explicit drain operations. See [SDK overview](docs/sdk.md),
 [business client](docs/client.md), [device SDK](docs/device-sdk.md), and
 [CLI](docs/cli.md).
+
+UDP v1.1 returns a signed 64-byte NBA1 receipt after EventAccepted. Lost ACKs can be retried with the exact original NBI1 datagram without duplicate ingestion within the live replay window. See [UDP protocol and retry limits](docs/device-protocol.md#udp-acknowledgement-nba1).
