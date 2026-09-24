@@ -1,10 +1,13 @@
-//! Optional Rust convenience SDK for standard NetbaIoT MQTT 3.1.1.
+//! Optional Rust convenience SDK for standard NetbaIoT MQTT 3.1.1 and MQTT 5.0.
 //!
 //! The SDK does not create a runtime or local database. MQTT publishes are rejected
 //! while disconnected by default; it never creates an unbounded offline queue.
 
 use futures_core::Stream;
 use netbaiot_protocol::*;
+use rumqttc::v5;
+use rumqttc::v5::mqttbytes::QoS as V5Qos;
+use rumqttc::v5::mqttbytes::v5::ConnectReturnCode as V5ConnectReturnCode;
 use rumqttc::{
     AsyncClient, ConnectReturnCode, ConnectionError, Event, Incoming, MqttOptions, QoS,
     SubscribeReasonCode, Transport as MqttTransport,
@@ -93,11 +96,27 @@ pub enum PublishQos {
     AtLeastOnce,
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum MqttProtocolVersion {
+    #[default]
+    V311,
+    V5,
+}
+
 impl From<PublishQos> for QoS {
     fn from(value: PublishQos) -> Self {
         match value {
             PublishQos::AtMostOnce => QoS::AtMostOnce,
             PublishQos::AtLeastOnce => QoS::AtLeastOnce,
+        }
+    }
+}
+
+impl From<PublishQos> for V5Qos {
+    fn from(value: PublishQos) -> Self {
+        match value {
+            PublishQos::AtMostOnce => Self::AtMostOnce,
+            PublishQos::AtLeastOnce => Self::AtLeastOnce,
         }
     }
 }
@@ -139,11 +158,63 @@ struct Metrics {
 }
 
 struct MqttState {
-    client: AsyncClient,
+    client: MqttClient,
     connected: Arc<AtomicBool>,
     connection_state: watch::Receiver<MqttConnectionState>,
     command_receiver: Mutex<Option<mpsc::Receiver<DeviceCommand>>>,
     task: Mutex<Option<tokio::task::JoinHandle<()>>>,
+}
+
+enum MqttClient {
+    V311(AsyncClient),
+    V5(v5::AsyncClient),
+}
+
+impl MqttClient {
+    fn try_publish(
+        &self,
+        topic: String,
+        qos: PublishQos,
+        payload: Vec<u8>,
+        expiry: Option<u32>,
+    ) -> Result<(), DeviceSdkError> {
+        match self {
+            Self::V311(client) => client
+                .try_publish(topic, qos.into(), false, payload)
+                .map_err(|_| DeviceSdkError::Overloaded),
+            Self::V5(client) => {
+                if let Some(seconds) = expiry {
+                    client
+                        .try_publish_with_properties(
+                            topic,
+                            qos.into(),
+                            false,
+                            payload,
+                            v5::mqttbytes::v5::PublishProperties {
+                                message_expiry_interval: Some(seconds),
+                                ..Default::default()
+                            },
+                        )
+                        .map_err(|_| DeviceSdkError::Overloaded)
+                } else {
+                    client
+                        .try_publish(topic, qos.into(), false, payload)
+                        .map_err(|_| DeviceSdkError::Overloaded)
+                }
+            }
+        }
+    }
+
+    fn try_disconnect(&self) {
+        match self {
+            Self::V311(client) => {
+                let _ = client.try_disconnect();
+            }
+            Self::V5(client) => {
+                let _ = client.try_disconnect();
+            }
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -158,6 +229,7 @@ struct DeviceInner {
     credentials: Arc<DeviceCredentials>,
     mqtt: MqttState,
     max_payload_bytes: usize,
+    message_expiry_interval: Option<u32>,
     shutdown: CancellationToken,
     metrics: Arc<Metrics>,
 }
@@ -200,6 +272,9 @@ pub struct DeviceClientBuilder {
     command_items: usize,
     offline_policy: OfflinePublishPolicy,
     reconnect: DeviceReconnectPolicy,
+    protocol_version: MqttProtocolVersion,
+    session_expiry_interval: u32,
+    message_expiry_interval: Option<u32>,
 }
 
 impl fmt::Debug for DeviceClientBuilder {
@@ -226,11 +301,28 @@ impl Default for DeviceClientBuilder {
             command_items: DEFAULT_COMMAND_ITEMS,
             offline_policy: OfflinePublishPolicy::Reject,
             reconnect: DeviceReconnectPolicy::default(),
+            protocol_version: MqttProtocolVersion::V311,
+            session_expiry_interval: 3_600,
+            message_expiry_interval: None,
         }
     }
 }
 
 impl DeviceClientBuilder {
+    pub fn protocol_version(mut self, version: MqttProtocolVersion) -> Self {
+        self.protocol_version = version;
+        self
+    }
+
+    pub fn session_expiry_interval(mut self, seconds: u32) -> Self {
+        self.session_expiry_interval = seconds;
+        self
+    }
+
+    pub fn message_expiry_interval(mut self, seconds: Option<u32>) -> Self {
+        self.message_expiry_interval = seconds;
+        self
+    }
     pub fn device(mut self, device: DeviceKey) -> Self {
         self.device = Some(device);
         self
@@ -325,51 +417,279 @@ impl DeviceClientBuilder {
                     "MQTT client ID must contain 1..=64 bytes".into(),
                 ));
             }
-            let mut options = MqttOptions::new(client_id, host, port);
-            options
-                .set_credentials(&credentials.credential_id, &credentials.secret)
-                .set_keep_alive(Duration::from_secs(15))
-                .set_clean_session(false)
-                .set_manual_acks(true)
-                .set_max_packet_size(self.max_payload_bytes, self.max_payload_bytes);
-            if url.scheme() == "mqtts" {
-                options.set_transport(MqttTransport::tls_with_default_config());
-            }
-            let (client, mut eventloop) = AsyncClient::new(options, self.mqtt_queue_items);
-            eventloop
-                .network_options
-                .set_connection_timeout(self.mqtt_connect_timeout.as_secs().max(1));
-            let down_topic = topic(&device, "down");
-            let (command_sender, command_receiver) = mpsc::channel(self.command_items);
-            let connected = Arc::new(AtomicBool::new(false));
-            let (connection_sender, connection_state) =
-                watch::channel(MqttConnectionState::Connecting);
-            let task_connected = connected.clone();
-            let task_client = client.clone();
-            let task_shutdown = shutdown.child_token();
-            let task_metrics = metrics.clone();
-            let task_device = device.clone();
-            let reconnect = self.reconnect;
-            let reconnect_seed = EventId::generate().0.as_u128() as u64;
-            let task = tokio::spawn(async move {
-                let mut connected_once = false;
-                let mut reconnect_attempt = 0u32;
-                let mut awaiting_suback = false;
-                loop {
-                    let event = tokio::select! {
-                        _ = task_shutdown.cancelled() => break,
-                        event = eventloop.poll() => event,
-                    };
-                    match event {
-                        Ok(Event::Incoming(Incoming::ConnAck(_))) => {
-                            task_connected.store(false, Ordering::Release);
-                            let _ = connection_sender.send(MqttConnectionState::Connecting);
-                            if task_client
-                                .try_subscribe(down_topic.clone(), QoS::AtLeastOnce)
-                                .is_err()
-                            {
-                                eventloop.clean();
+            if self.protocol_version == MqttProtocolVersion::V5 {
+                let mut options = v5::MqttOptions::new(client_id, host, port);
+                options
+                    .set_credentials(&credentials.credential_id, &credentials.secret)
+                    .set_keep_alive(Duration::from_secs(15))
+                    .set_clean_start(false)
+                    .set_manual_acks(true)
+                    .set_session_expiry_interval(Some(self.session_expiry_interval))
+                    .set_max_packet_size(Some(self.max_payload_bytes as u32));
+                options.set_connection_timeout(self.mqtt_connect_timeout.as_secs().max(1));
+                if url.scheme() == "mqtts" {
+                    options.set_transport(MqttTransport::tls_with_default_config());
+                }
+                let (client, mut eventloop) = v5::AsyncClient::new(options, self.mqtt_queue_items);
+                let down_topic = topic(&device, "down");
+                let (command_sender, command_receiver) = mpsc::channel(self.command_items);
+                let connected = Arc::new(AtomicBool::new(false));
+                let (connection_sender, connection_state) =
+                    watch::channel(MqttConnectionState::Connecting);
+                let task_connected = connected.clone();
+                let task_client = client.clone();
+                let task_shutdown = shutdown.child_token();
+                let task_metrics = metrics.clone();
+                let task_device = device.clone();
+                let reconnect = self.reconnect;
+                let reconnect_seed = EventId::generate().0.as_u128() as u64;
+                let task = tokio::spawn(async move {
+                    let mut connected_once = false;
+                    let mut reconnect_attempt = 0u32;
+                    let mut awaiting_suback = false;
+                    loop {
+                        let event = tokio::select! {
+                            _ = task_shutdown.cancelled() => break,
+                            event = eventloop.poll() => event,
+                        };
+                        match event {
+                            Ok(v5::Event::Incoming(v5::Incoming::ConnAck(_))) => {
                                 task_connected.store(false, Ordering::Release);
+                                let _ = connection_sender.send(MqttConnectionState::Connecting);
+                                if task_client
+                                    .try_subscribe(down_topic.clone(), V5Qos::AtLeastOnce)
+                                    .is_err()
+                                {
+                                    eventloop.clean();
+                                    reconnect_attempt = reconnect_attempt.saturating_add(1);
+                                    let delay = device_reconnect_delay(
+                                        reconnect,
+                                        reconnect_attempt,
+                                        reconnect_seed,
+                                    );
+                                    tokio::select! { _ = task_shutdown.cancelled() => break, _ = tokio::time::sleep(delay) => {} }
+                                    continue;
+                                }
+                                awaiting_suback = true;
+                            }
+                            Ok(v5::Event::Incoming(v5::Incoming::SubAck(suback))) => {
+                                if !awaiting_suback
+                                    || !matches!(
+                                        suback.return_codes.as_slice(),
+                                        [v5::mqttbytes::v5::SubscribeReasonCode::Success(
+                                            V5Qos::AtMostOnce | V5Qos::AtLeastOnce
+                                        )]
+                                    )
+                                {
+                                    task_connected.store(false, Ordering::Release);
+                                    let _ = connection_sender.send(MqttConnectionState::Terminal(
+                                        DeviceSdkError::Forbidden,
+                                    ));
+                                    let _ = task_client.try_disconnect();
+                                    return;
+                                }
+                                awaiting_suback = false;
+                                if connected_once {
+                                    task_metrics.mqtt_reconnects.fetch_add(1, Ordering::Relaxed);
+                                }
+                                connected_once = true;
+                                reconnect_attempt = 0;
+                                task_connected.store(true, Ordering::Release);
+                                let _ = connection_sender.send(MqttConnectionState::Connected);
+                            }
+                            Ok(v5::Event::Incoming(v5::Incoming::Publish(publish)))
+                                if publish.topic.as_ref() == down_topic.as_bytes() =>
+                            {
+                                let command =
+                                    serde_json::from_slice::<DeviceCommand>(&publish.payload);
+                                match command {
+                                    Ok(command) if command.device == task_device => {
+                                        if command_sender.try_send(command).is_ok() {
+                                            task_metrics
+                                                .commands_received
+                                                .fetch_add(1, Ordering::Relaxed);
+                                            if task_client.try_ack(&publish).is_err() {
+                                                task_connected.store(false, Ordering::Release);
+                                                let _ = connection_sender
+                                                    .send(MqttConnectionState::Connecting);
+                                                let _ = task_client.try_disconnect();
+                                            }
+                                        } else {
+                                            task_connected.store(false, Ordering::Release);
+                                            let _ = connection_sender
+                                                .send(MqttConnectionState::Connecting);
+                                            let _ = task_client.try_disconnect();
+                                        }
+                                    }
+                                    _ => {
+                                        task_connected.store(false, Ordering::Release);
+                                        let _ =
+                                            connection_sender.send(MqttConnectionState::Connecting);
+                                        let _ = task_client.try_disconnect();
+                                    }
+                                }
+                            }
+                            Ok(_) => {}
+                            Err(error) => {
+                                awaiting_suback = false;
+                                task_connected.store(false, Ordering::Release);
+                                if let v5::ConnectionError::ConnectionRefused(code) = error
+                                    && let Some(error) = terminal_v5_connect_error(code)
+                                {
+                                    let _ = connection_sender
+                                        .send(MqttConnectionState::Terminal(error));
+                                    return;
+                                }
+                                let _ = connection_sender.send(MqttConnectionState::Connecting);
+                                reconnect_attempt = reconnect_attempt.saturating_add(1);
+                                let delay = device_reconnect_delay(
+                                    reconnect,
+                                    reconnect_attempt,
+                                    reconnect_seed,
+                                );
+                                tokio::select! { _ = task_shutdown.cancelled() => break, _ = tokio::time::sleep(delay) => {} }
+                            }
+                        }
+                    }
+                    task_connected.store(false, Ordering::Release);
+                    let _ = connection_sender.send(MqttConnectionState::Connecting);
+                });
+                MqttState {
+                    client: MqttClient::V5(client),
+                    connected,
+                    connection_state,
+                    command_receiver: Mutex::new(Some(command_receiver)),
+                    task: Mutex::new(Some(task)),
+                }
+            } else {
+                let mut options = MqttOptions::new(client_id, host, port);
+                options
+                    .set_credentials(&credentials.credential_id, &credentials.secret)
+                    .set_keep_alive(Duration::from_secs(15))
+                    .set_clean_session(false)
+                    .set_manual_acks(true)
+                    .set_max_packet_size(self.max_payload_bytes, self.max_payload_bytes);
+                if url.scheme() == "mqtts" {
+                    options.set_transport(MqttTransport::tls_with_default_config());
+                }
+                let (client, mut eventloop) = AsyncClient::new(options, self.mqtt_queue_items);
+                eventloop
+                    .network_options
+                    .set_connection_timeout(self.mqtt_connect_timeout.as_secs().max(1));
+                let down_topic = topic(&device, "down");
+                let (command_sender, command_receiver) = mpsc::channel(self.command_items);
+                let connected = Arc::new(AtomicBool::new(false));
+                let (connection_sender, connection_state) =
+                    watch::channel(MqttConnectionState::Connecting);
+                let task_connected = connected.clone();
+                let task_client = client.clone();
+                let task_shutdown = shutdown.child_token();
+                let task_metrics = metrics.clone();
+                let task_device = device.clone();
+                let reconnect = self.reconnect;
+                let reconnect_seed = EventId::generate().0.as_u128() as u64;
+                let task = tokio::spawn(async move {
+                    let mut connected_once = false;
+                    let mut reconnect_attempt = 0u32;
+                    let mut awaiting_suback = false;
+                    loop {
+                        let event = tokio::select! {
+                            _ = task_shutdown.cancelled() => break,
+                            event = eventloop.poll() => event,
+                        };
+                        match event {
+                            Ok(Event::Incoming(Incoming::ConnAck(_))) => {
+                                task_connected.store(false, Ordering::Release);
+                                let _ = connection_sender.send(MqttConnectionState::Connecting);
+                                if task_client
+                                    .try_subscribe(down_topic.clone(), QoS::AtLeastOnce)
+                                    .is_err()
+                                {
+                                    eventloop.clean();
+                                    task_connected.store(false, Ordering::Release);
+                                    let _ = connection_sender.send(MqttConnectionState::Connecting);
+                                    reconnect_attempt = reconnect_attempt.saturating_add(1);
+                                    let delay = device_reconnect_delay(
+                                        reconnect,
+                                        reconnect_attempt,
+                                        reconnect_seed,
+                                    );
+                                    tokio::select! {
+                                        _ = task_shutdown.cancelled() => break,
+                                        _ = tokio::time::sleep(delay) => {}
+                                    }
+                                    continue;
+                                }
+                                awaiting_suback = true;
+                            }
+                            Ok(Event::Incoming(Incoming::SubAck(suback))) => {
+                                if !awaiting_suback
+                                    || !matches!(
+                                        suback.return_codes.as_slice(),
+                                        [SubscribeReasonCode::Success(
+                                            QoS::AtMostOnce | QoS::AtLeastOnce
+                                        )]
+                                    )
+                                {
+                                    task_connected.store(false, Ordering::Release);
+                                    let _ = connection_sender.send(MqttConnectionState::Terminal(
+                                        DeviceSdkError::Forbidden,
+                                    ));
+                                    let _ = task_client.try_disconnect();
+                                    return;
+                                }
+                                awaiting_suback = false;
+                                if connected_once {
+                                    task_metrics.mqtt_reconnects.fetch_add(1, Ordering::Relaxed);
+                                }
+                                connected_once = true;
+                                reconnect_attempt = 0;
+                                task_connected.store(true, Ordering::Release);
+                                let _ = connection_sender.send(MqttConnectionState::Connected);
+                            }
+                            Ok(Event::Incoming(Incoming::Publish(publish)))
+                                if publish.topic == down_topic =>
+                            {
+                                let command =
+                                    serde_json::from_slice::<DeviceCommand>(&publish.payload);
+                                match command {
+                                    Ok(command) if command.device == task_device => {
+                                        if command_sender.try_send(command).is_ok() {
+                                            task_metrics
+                                                .commands_received
+                                                .fetch_add(1, Ordering::Relaxed);
+                                            if task_client.try_ack(&publish).is_err() {
+                                                task_connected.store(false, Ordering::Release);
+                                                let _ = connection_sender
+                                                    .send(MqttConnectionState::Connecting);
+                                                let _ = task_client.try_disconnect();
+                                            }
+                                        } else {
+                                            task_connected.store(false, Ordering::Release);
+                                            let _ = connection_sender
+                                                .send(MqttConnectionState::Connecting);
+                                            let _ = task_client.try_disconnect();
+                                        }
+                                    }
+                                    _ => {
+                                        task_connected.store(false, Ordering::Release);
+                                        let _ =
+                                            connection_sender.send(MqttConnectionState::Connecting);
+                                        let _ = task_client.try_disconnect();
+                                    }
+                                }
+                            }
+                            Ok(_) => {}
+                            Err(error) => {
+                                awaiting_suback = false;
+                                task_connected.store(false, Ordering::Release);
+                                if let ConnectionError::ConnectionRefused(code) = error
+                                    && let Some(error) = terminal_connect_error(code)
+                                {
+                                    let _ = connection_sender
+                                        .send(MqttConnectionState::Terminal(error));
+                                    return;
+                                }
                                 let _ = connection_sender.send(MqttConnectionState::Connecting);
                                 reconnect_attempt = reconnect_attempt.saturating_add(1);
                                 let delay = device_reconnect_delay(
@@ -381,98 +701,19 @@ impl DeviceClientBuilder {
                                     _ = task_shutdown.cancelled() => break,
                                     _ = tokio::time::sleep(delay) => {}
                                 }
-                                continue;
-                            }
-                            awaiting_suback = true;
-                        }
-                        Ok(Event::Incoming(Incoming::SubAck(suback))) => {
-                            if !awaiting_suback
-                                || !matches!(
-                                    suback.return_codes.as_slice(),
-                                    [SubscribeReasonCode::Success(
-                                        QoS::AtMostOnce | QoS::AtLeastOnce
-                                    )]
-                                )
-                            {
-                                task_connected.store(false, Ordering::Release);
-                                let _ = connection_sender
-                                    .send(MqttConnectionState::Terminal(DeviceSdkError::Forbidden));
-                                let _ = task_client.try_disconnect();
-                                return;
-                            }
-                            awaiting_suback = false;
-                            if connected_once {
-                                task_metrics.mqtt_reconnects.fetch_add(1, Ordering::Relaxed);
-                            }
-                            connected_once = true;
-                            reconnect_attempt = 0;
-                            task_connected.store(true, Ordering::Release);
-                            let _ = connection_sender.send(MqttConnectionState::Connected);
-                        }
-                        Ok(Event::Incoming(Incoming::Publish(publish)))
-                            if publish.topic == down_topic =>
-                        {
-                            let command = serde_json::from_slice::<DeviceCommand>(&publish.payload);
-                            match command {
-                                Ok(command) if command.device == task_device => {
-                                    if command_sender.try_send(command).is_ok() {
-                                        task_metrics
-                                            .commands_received
-                                            .fetch_add(1, Ordering::Relaxed);
-                                        if task_client.try_ack(&publish).is_err() {
-                                            task_connected.store(false, Ordering::Release);
-                                            let _ = connection_sender
-                                                .send(MqttConnectionState::Connecting);
-                                            let _ = task_client.try_disconnect();
-                                        }
-                                    } else {
-                                        task_connected.store(false, Ordering::Release);
-                                        let _ =
-                                            connection_sender.send(MqttConnectionState::Connecting);
-                                        let _ = task_client.try_disconnect();
-                                    }
-                                }
-                                _ => {
-                                    task_connected.store(false, Ordering::Release);
-                                    let _ = connection_sender.send(MqttConnectionState::Connecting);
-                                    let _ = task_client.try_disconnect();
-                                }
-                            }
-                        }
-                        Ok(_) => {}
-                        Err(error) => {
-                            awaiting_suback = false;
-                            task_connected.store(false, Ordering::Release);
-                            if let ConnectionError::ConnectionRefused(code) = error
-                                && let Some(error) = terminal_connect_error(code)
-                            {
-                                let _ =
-                                    connection_sender.send(MqttConnectionState::Terminal(error));
-                                return;
-                            }
-                            let _ = connection_sender.send(MqttConnectionState::Connecting);
-                            reconnect_attempt = reconnect_attempt.saturating_add(1);
-                            let delay = device_reconnect_delay(
-                                reconnect,
-                                reconnect_attempt,
-                                reconnect_seed,
-                            );
-                            tokio::select! {
-                                _ = task_shutdown.cancelled() => break,
-                                _ = tokio::time::sleep(delay) => {}
                             }
                         }
                     }
+                    task_connected.store(false, Ordering::Release);
+                    let _ = connection_sender.send(MqttConnectionState::Connecting);
+                });
+                MqttState {
+                    client: MqttClient::V311(client),
+                    connected,
+                    connection_state,
+                    command_receiver: Mutex::new(Some(command_receiver)),
+                    task: Mutex::new(Some(task)),
                 }
-                task_connected.store(false, Ordering::Release);
-                let _ = connection_sender.send(MqttConnectionState::Connecting);
-            });
-            MqttState {
-                client,
-                connected,
-                connection_state,
-                command_receiver: Mutex::new(Some(command_receiver)),
-                task: Mutex::new(Some(task)),
             }
         };
         let _ = self.offline_policy;
@@ -482,6 +723,7 @@ impl DeviceClientBuilder {
                 credentials,
                 mqtt,
                 max_payload_bytes: self.max_payload_bytes,
+                message_expiry_interval: self.message_expiry_interval,
                 shutdown,
                 metrics,
             }),
@@ -572,9 +814,12 @@ impl DeviceClient {
         if payload.len() > self.inner.max_payload_bytes {
             return Err(DeviceSdkError::Overloaded);
         }
-        mqtt.client
-            .try_publish(topic(&self.inner.device, "up"), qos.into(), false, payload)
-            .map_err(|_| DeviceSdkError::Overloaded)?;
+        mqtt.client.try_publish(
+            topic(&self.inner.device, "up"),
+            qos,
+            payload,
+            self.inner.message_expiry_interval,
+        )?;
         self.inner
             .metrics
             .publishes_accepted
@@ -618,19 +863,17 @@ impl DeviceClient {
         if payload.len() > self.inner.max_payload_bytes {
             return Err(DeviceSdkError::Overloaded);
         }
-        mqtt.client
-            .try_publish(
-                topic(&self.inner.device, "down_ack"),
-                QoS::AtLeastOnce,
-                false,
-                payload,
-            )
-            .map_err(|_| DeviceSdkError::Overloaded)
+        mqtt.client.try_publish(
+            topic(&self.inner.device, "down_ack"),
+            PublishQos::AtLeastOnce,
+            payload,
+            self.inner.message_expiry_interval,
+        )
     }
 
     pub fn shutdown(&self) {
         self.inner.shutdown.cancel();
-        let _ = self.inner.mqtt.client.try_disconnect();
+        self.inner.mqtt.client.try_disconnect();
     }
 }
 
@@ -676,6 +919,31 @@ fn terminal_connect_error(code: ConnectReturnCode) -> Option<DeviceSdkError> {
         ConnectReturnCode::RefusedProtocolVersion => Some(DeviceSdkError::Protocol(
             "MQTT broker rejected protocol version 3.1.1".into(),
         )),
+    }
+}
+
+fn terminal_v5_connect_error(code: V5ConnectReturnCode) -> Option<DeviceSdkError> {
+    use V5ConnectReturnCode as Code;
+    match code {
+        Code::Success
+        | Code::ServerBusy
+        | Code::ServerUnavailable
+        | Code::ServiceUnavailable
+        | Code::QuotaExceeded
+        | Code::ConnectionRateExceeded => None,
+        Code::BadUserNamePassword
+        | Code::NotAuthorized
+        | Code::Banned
+        | Code::BadAuthenticationMethod => Some(DeviceSdkError::Unauthenticated),
+        Code::BadClientId | Code::ClientIdentifierNotValid => Some(
+            DeviceSdkError::InvalidConfiguration("MQTT broker rejected the client ID".into()),
+        ),
+        Code::RefusedProtocolVersion | Code::UnsupportedProtocolVersion => Some(
+            DeviceSdkError::Protocol("MQTT broker rejected protocol version 5.0".into()),
+        ),
+        _ => Some(DeviceSdkError::Protocol(format!(
+            "MQTT 5 CONNACK: {code:?}"
+        ))),
     }
 }
 
@@ -893,5 +1161,50 @@ mod tests {
             .await;
         assert!(matches!(result, Err(DeviceSdkError::Forbidden)));
         broker.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn v5_sdk_connects_subscribes_and_publishes_with_expiry() {
+        tokio::time::timeout(Duration::from_secs(3), async {
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let address = listener.local_addr().unwrap();
+            let broker = tokio::spawn(async move {
+                let (mut socket, _) = listener.accept().await.unwrap();
+                let connect = read_mqtt_packet(&mut socket).await;
+                assert_eq!(connect[7], 5);
+                assert!(connect.windows(5).any(|part| part == [0x11, 0, 0, 0, 60]));
+                socket.write_all(&[0x20, 0x03, 0, 0, 0]).await.unwrap();
+                let subscribe = read_mqtt_packet(&mut socket).await;
+                assert_eq!(subscribe[0], 0x82);
+                socket
+                    .write_all(&[0x90, 0x04, subscribe[1], subscribe[2], 0, 1])
+                    .await
+                    .unwrap();
+                let publish = read_mqtt_packet(&mut socket).await;
+                assert_eq!(publish[0] & 0xf0, 0x30);
+                let topic_end = 3 + usize::from(u16::from_be_bytes([publish[1], publish[2]]));
+                assert_eq!(publish[topic_end + 2], 5);
+                assert_eq!(&publish[topic_end + 3..topic_end + 8], &[0x02, 0, 0, 0, 9]);
+                socket
+                    .write_all(&[0x40, 0x02, publish[topic_end], publish[topic_end + 1]])
+                    .await
+                    .unwrap();
+            });
+            let client = DeviceClient::builder()
+                .device(device())
+                .credentials(DeviceCredentials::new("credential", "secret").unwrap())
+                .mqtt_endpoint(format!("mqtt://{address}"))
+                .protocol_version(MqttProtocolVersion::V5)
+                .session_expiry_interval(60)
+                .message_expiry_interval(Some(9))
+                .connect()
+                .await
+                .unwrap();
+            client.publish_telemetry(BTreeMap::new()).await.unwrap();
+            broker.await.unwrap();
+            client.shutdown();
+        })
+        .await
+        .unwrap();
     }
 }
