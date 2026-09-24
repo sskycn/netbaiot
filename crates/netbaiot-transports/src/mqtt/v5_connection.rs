@@ -504,7 +504,7 @@ pub(super) async fn connection(
                             send_v5(&mut stream, &services, &bytes, client_maximum, Some(&mut error_disconnect_sent)).await?;
                             services.mqtt.finish_inbound_pubcomp(&attachment.key, attachment.generation, packet_id)?;
                         }
-                        Packet::Publish { topic, payload, qos, packet_id, retain, dup, properties } => {
+                        Packet::Publish { topic, payload, qos, packet_id, retain, dup: _, properties } => {
                             services.ingress.metrics.inc(Metric::MqttPublishes);
                             let message = BrokerMessage { topic, payload: payload.to_vec(), qos, retain,
                                 properties: PublishProperties::from_wire(&properties) };
@@ -515,11 +515,6 @@ pub(super) async fn connection(
                             if qos == 2 {
                                 let id = packet_id.ok_or(Error::Invalid)?;
                                 match services.mqtt.inbound_qos2(&attachment.key, attachment.generation, id, message) {
-                                    Ok(false) if !dup => {
-                                        let bytes = v5::ack(v5::AckReason::Pubrec(v5::PubrecReason::PacketIdentifierInUse), id, limits.max_mqtt_packet_size)?;
-                                        send_v5(&mut stream, &services, &bytes, client_maximum, Some(&mut error_disconnect_sent)).await?;
-                                        continue;
-                                    }
                                     Ok(_) => {}
                                     Err(Error::Invalid) => {
                                         let bytes = v5::ack(v5::AckReason::Pubrec(v5::PubrecReason::PacketIdentifierInUse), id, limits.max_mqtt_packet_size)?;
@@ -557,10 +552,8 @@ pub(super) async fn connection(
     if let Some(will) = &mut will_guard {
         if suppress_will {
             will.suppress()?;
-        } else {
-            if let Some(message) = will.publish_v5()? {
-                bind_will(&services, &auth, &message).await;
-            }
+        } else if let Some(message) = will.publish_v5()? {
+            bind_will(&services, &auth, &message).await;
         }
     }
     result

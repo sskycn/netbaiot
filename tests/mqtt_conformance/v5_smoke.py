@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import pathlib
+import json
 import socket
 import tempfile
 import time
+import urllib.request
 
 from common import (
     PASSWORD,
@@ -67,10 +69,55 @@ def no_packet(client: RawClient, timeout: float = 0.25) -> None:
     raise AssertionError(f"unexpected MQTT packet: {packet}")
 
 
+def v5_password_only_connect_reaches_auth_rejection(port: int) -> None:
+    client = RawClient("127.0.0.1", port)
+    try:
+        body = (binary(b"MQTT") + b"\x05\x42\0\x1e\0"
+                + binary(b"v5-password-only") + binary(PASSWORD.encode()))
+        client.send(frame(0x10, body))
+        assert client.recv() == (0x20, b"\0\x86\0")
+        client.expect_closed()
+    finally:
+        client.close()
+
+
+def events_accepted(broker) -> int:
+    assert broker.config_path is not None
+    address = json.loads(broker.config_path.read_text())["management_http"]
+    request = urllib.request.Request(
+        f"http://{address}/api/v1/metrics",
+        headers={"Authorization": f"Bearer {'d' * 64}"},
+    )
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    with opener.open(request, timeout=2) as response:
+        metrics = response.read().decode()
+    prefix = "netbaiot_events_accepted_total "
+    return int(next(line.removeprefix(prefix) for line in metrics.splitlines()
+                    if line.startswith(prefix)))
+
+
+def takeover_without_will_sends_0x8e_only(port: int) -> None:
+    old = RawClient("127.0.0.1", port)
+    new = RawClient("127.0.0.1", port)
+    try:
+        connect(old, "v5-no-will-takeover", clean=False, expiry=60)
+        assert connect(new, "v5-no-will-takeover", clean=False, expiry=60)[0] == 1
+        assert old.recv() == (0xe0, b"\x8e\0")
+        old.expect_closed()
+        new.send(frame(0xc0))
+        assert new.recv() == (0xd0, b"")
+        new.send(frame(0xe0))
+    finally:
+        old.close()
+        new.close()
+
+
 def main() -> None:
     with tempfile.TemporaryDirectory(prefix="netbaiot-v5-") as temporary:
         broker = start_netbaiot(pathlib.Path(temporary))
         try:
+            v5_password_only_connect_reaches_auth_rejection(broker.port)
+            takeover_without_will_sends_0x8e_only(broker.port)
             for name, wire, expected in (
                 ("unknown-puback", frame(0x40, b"\0\x07"), 0x82),
                 ("invalid-topic", frame(0x30, binary(b"bad/+topic") + b"\0"), 0x90),
@@ -213,23 +260,32 @@ def main() -> None:
             try:
                 connect(qos2, "v5-qos2")
                 subscribe(qos2, 3, options=2)
+                accepted_before = events_accepted(broker)
                 body = binary(TOPIC_A.encode()) + b"\0\4\x05\x02\0\0\0\x05" + event(9003)
                 qos2.send(frame(0x34, body))
                 assert qos2.recv() == (0x50, b"\0\4")
                 time.sleep(0.02)
                 qos2.send(frame(0x34, body))
-                assert qos2.recv() == (0x50, b"\0\4\x91\0")
-                qos2.send(frame(0x3c, body))
                 assert qos2.recv() == (0x50, b"\0\4")
+                changed = binary(TOPIC_A.encode()) + b"\0\4\0" + event(9303)
+                qos2.send(frame(0x34, changed))
+                assert qos2.recv() == (0x50, b"\0\4")
+                qos2.send(frame(0x3c, changed))
+                assert qos2.recv() == (0x50, b"\0\4")
+                assert events_accepted(broker) == accepted_before
                 qos2.send(frame(0x62, b"\0\4"))
                 assert qos2.recv() == (0x70, b"\0\4")
+                assert events_accepted(broker) == accepted_before + 1
                 first, body = qos2.recv()
                 assert first >> 4 == 3 and (first >> 1) & 3 == 2
+                assert body.endswith(event(9003)), body
                 topic_end = 2 + int.from_bytes(body[:2], "big")
                 delivery_id = body[topic_end:topic_end + 2]
                 qos2.send(frame(0x50, delivery_id))
                 assert qos2.recv() == (0x62, delivery_id)
                 qos2.send(frame(0x70, delivery_id))
+                no_packet(qos2)
+                assert events_accepted(broker) == accepted_before + 1
                 qos2.send(frame(0x62, b"\0\x64"))
                 assert qos2.recv() == (0x70, b"\0\x64\x92\0")
                 qos2.send(frame(0xe0))
@@ -353,7 +409,7 @@ def main() -> None:
                 connect(observer, "v5-takeover-observer")
                 subscribe(observer, 99)
                 first, body = observer.recv()
-                assert first >> 4 == 3 and body.endswith(event(9182)), (first, body)
+                assert first >> 4 == 3 and body.endswith(event(9199)), (first, body)
                 topic_end = 2 + int.from_bytes(body[:2], "big")
                 observer.send(frame(0x40, body[topic_end:topic_end + 2]))
                 observer.send(frame(0xe0))

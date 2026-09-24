@@ -530,11 +530,7 @@ fn decode_connect(cursor: &mut Cursor, limits: &Limits) -> Result<Packet> {
     let keep_alive = cursor.short()?;
     let has_will = flags & 4 != 0;
     let will_qos = (flags >> 3) & 3;
-    if flags & 1 != 0
-        || will_qos == 3
-        || (!has_will && flags & 0x38 != 0)
-        || (flags & 0x40 != 0 && flags & 0x80 == 0)
-    {
+    if flags & 1 != 0 || will_qos == 3 || (!has_will && flags & 0x38 != 0) {
         return Err(malformed());
     }
     let properties = cursor.properties(PropertyContext::Connect, limits)?;
@@ -1111,6 +1107,25 @@ mod tests {
     fn packet(first: u8, body: &[u8]) -> Result<Packet> {
         let wire = encode(first, body, 65_536).unwrap();
         decode(&mut BytesMut::from(wire.as_slice()), &Limits::default())?.ok_or_else(malformed)
+    }
+
+    #[test]
+    fn v5_connect_password_without_username_is_well_formed() {
+        let mut body = Vec::new();
+        string(&mut body, b"MQTT");
+        body.extend_from_slice(&[5, 0x42, 0, 30, 0]);
+        string(&mut body, b"client");
+        string(&mut body, b"secret");
+        let wire = encode(0x10, &body, 65_536).unwrap();
+        let Packet::Connect(connect) =
+            decode(&mut BytesMut::from(wire.as_slice()), &Limits::default())
+                .unwrap()
+                .unwrap()
+        else {
+            panic!("expected CONNECT")
+        };
+        assert!(connect.username.is_none());
+        assert_eq!(connect.password.as_deref(), Some(b"secret".as_slice()));
     }
 
     #[test]
