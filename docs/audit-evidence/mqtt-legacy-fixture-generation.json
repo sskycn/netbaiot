@@ -1,0 +1,50 @@
+[
+  {
+    "version": 1,
+    "source_rev": "953f428",
+    "binary_sha256": "9f4eb8fbc1dff307c543fb2eea60f21120eeddc8fc4de60bfb44ed9be7c99c7e",
+    "sample_sha256": "abddf0ec2cceff3dfc98dd5907d86769ace6f000ef1758572ec7b5f0e338af8a",
+    "bytes": 1413,
+    "connack": "0000",
+    "suback": "000101",
+    "puback": "0002",
+    "pubrec": "0007",
+    "exit": 0
+  },
+  {
+    "version": 2,
+    "source_rev": "564583e",
+    "binary_sha256": "1e6e099fe78fbcd4c021798458d26261f070ce4cb73d565bbb23767b7623ad53",
+    "sample_sha256": "d02ddbb5bd999ff75c349835dd1c55a655b1b700b3b908d8dd8c7512a2856e85",
+    "bytes": 602,
+    "connack": "0000",
+    "suback": "000101",
+    "puback": "0002",
+    "pubrec": "0007",
+    "exit": 0
+  },
+  {
+    "version": 3,
+    "source_rev": "cbbad11",
+    "binary_sha256": "fc41ab15c6a416aecc5c32df6e91c7bff1284a107015fd50c697da6bc5d048b8",
+    "sample_sha256": "6c239f2355a72cf5901c0c64eb81ea09a661494ad0c83edfa1abba8970a75d18",
+    "bytes": 671,
+    "connack": "0000",
+    "suback": "000101",
+    "puback": "0002",
+    "pubrec": "0007",
+    "exit": 0
+  },
+  {
+    "version": 4,
+    "source_rev": "0a7b8c8",
+    "binary_sha256": "036a5de6aaa68d7565a0cb0dd25cb10377de09c5594f9a6e80174e9592a5adac",
+    "sample_sha256": "6f4e0e05d1e0cb7f6342e69ba0c96b2e48f93f35391f24b3d6a9380c81ed3793",
+    "bytes": 757,
+    "connack": "0000",
+    "suback": "000101",
+    "puback": "0002",
+    "pubrec": "0007",
+    "exit": 0
+  }
+]

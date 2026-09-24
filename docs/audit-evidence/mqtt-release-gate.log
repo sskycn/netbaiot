@@ -1,0 +1,81 @@
+{
+  "total": 76,
+  "pass": 76,
+  "fail": 0
+}
+CONNECT-001: PASS — accepted; Session Present=0
+CONNECT-002: PASS — CONNACK=1 then close
+CONNECT-003: PASS — reserved/password-without-username/WillQoS=3 closed
+CONNACK-001: PASS — bad password CONNACK=4, Session Present=0
+CONNECT-004: PASS — zero ClientId rejected for CleanSession=0 and generated for CleanSession=1
+CONNECT-005: PASS — second CONNECT closed
+SEQUENCE-001: PASS — PINGREQ/PUBLISH/SUBSCRIBE/DISCONNECT before CONNECT closed
+HEADER-001: PASS — all client-sendable packet flag families rejected invalid fixed flags
+FRAMING-001: PASS — bytewise CONNECT and two coalesced PINGREQ packets
+REMAINING-001: PASS — unterminated/fifth/over-product-limit Remaining Length closed
+UTF8-001: PASS — NUL and surrogate encoding closed
+SESSION-001: PASS — 0,new; 1,resume; 0,CleanSession=1; 0,post-reset
+SUB-001: PASS — SUBACK order 0/1/2 and per-filter ACL failure 0x80
+SUB-002: PASS — packet ID 0, invalid filter, and empty payload closed
+UNSUB-001: PASS — existing/non-existing/multiple filters acknowledged with same ID
+PERSISTENT-UNSUB-RECONNECT-001: PASS — Session Present=1; UNSUBACK committed; no stale offline delivery; resubscribe delivered only fresh publication
+QOS0-001: PASS — no PUBACK; subscriber received QoS0
+QOS1-001: PASS — PUBACK preserved id=42; outgoing QoS=min(1,2)
+QOS1-DUP-001: PASS — same incoming id after PUBACK treated as a new publication
+QOS2-IN-001: PASS — duplicate PUBLISH=>PUBREC; duplicate PUBREL=>PUBCOMP; one routed delivery
+RETAIN-001: PASS — create/replay(RETAIN=1), replace/live(RETAIN=0), zero-delete/no future replay
+SUB-RESUB-001: PASS — identical filter replacement re-sent retained message and changed max QoS
+SESSION-OFFLINE-001: PASS — ordered offline QoS1/QoS2 and Session Present=1
+WILL-001: PASS — EOF published retained Will; DISCONNECT removed Will without publication
+WILL-TAKEOVER-001: PASS — old connection closed and its Will delivered once to replacement session
+KEEPALIVE-001: PASS — PINGRESP and KeepAlive close at 1.501s
+SLOWLORIS-001: PASS — incomplete packet closed at 1.004s by whole-packet deadline
+SEQUENCE-002: PASS — unknown PUBREL received PUBCOMP; other unknown/server-only packets closed
+SECURITY-ACL-001: PASS — cross-device/tenant publish closed before retained effect; subscriptions 0x80
+SECURITY-SESSION-001: PASS — same ClientId under different authenticated DeviceKey did not resume or clear state
+WILL-SHUTDOWN-001: PASS — server shutdown published retained Will before snapshot; restart replayed it
+DIFF-CONNECT-001: PASS — NetbaIoT=(32, b'\x00\x00'); Mosquitto=(32, b'\x00\x00')
+DIFF-PING-001: PASS — NetbaIoT=(208, b''); Mosquitto=(208, b'')
+DIFF-FLAGS-001: PASS — NetbaIoT='CLOSED'; Mosquitto='CLOSED'
+DIFF-UNKNOWN-PUBACK-001: PASS — NetbaIoT='CLOSED'; Mosquitto='NO_RESPONSE'; IMPLEMENTATION_DEFINED_ALLOWED
+DIFF-SESSION-001: PASS — NetbaIoT=(0, 1, 0, 0); Mosquitto=(0, 1, 0, 0)
+DIFF-SUB-001: PASS — NetbaIoT=((144, b'\x00\x01\x00\x01\x02'), (144, b'\x00\x02\x02'), (176, b'\x00\x03')); Mosquitto=((144, b'\x00\x01\x00\x01\x02'), (144, b'\x00\x02\x02'), (176, b'\x00\x03'))
+DIFF-QOS-001: PASS — NetbaIoT=[(b'{"schema_version":1,"source_message_id":"conformance-200","kind":"heartbeat","data":{"sequence":200}}', 0), (b'{"schema_version":1,"source_message_id":"conformance-201","kind":"heartbeat","data":{"sequence":201}}', 1), (b'{"schema_version":1,"source_message_id":"conformance-202","kind":"heartbeat","data":{"sequence":202}}', 2)]; Mosquitto=[(b'{"schema_version":1,"source_message_id":"conformance-200","kind":"heartbeat","data":{"sequence":200}}', 0), (b'{"schema_version":1,"source_message_id":"conformance-201","kind":"heartbeat","data":{"sequence":201}}', 1), (b'{"schema_version":1,"source_message_id":"conformance-202","kind":"heartbeat","data":{"sequence":202}}', 2)]
+DIFF-RETAIN-001: PASS — NetbaIoT=(True, 1, True); Mosquitto=(True, 1, True)
+DIFF-WILL-001: PASS — NetbaIoT=(True, 1, True); Mosquitto=(True, 1, True)
+DIFF-DUPLICATE-CLIENT-001: PASS — NetbaIoT=(1, 'old-closed'); Mosquitto=(1, 'old-closed')
+DIFF-KEEPALIVE-001: PASS — NetbaIoT='closed-at-1.5x'; Mosquitto='closed-at-1.5x'
+MOSQUITTO-CLIENT-001: PASS — MOSQUITTO-PERSISTENT-UNSUB-001: PASS — mosquitto_sub version 2.1.2 running on libmosquitto 2.1.0.; target unsubscribe persisted without stale delivery
+MOSQUITTO-PERSISTENT-UNSUB-001: PASS — MOSQUITTO-PERSISTENT-UNSUB-001: PASS — mosquitto_sub version 2.1.2 running on libmosquitto 2.1.0.; target unsubscribe persisted without stale delivery
+TLS-001: PASS —     Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.35s
+QOS2-OUT-WRONG-PUBACK-001: PASS —      Running tests/end_to_end.rs (target/debug/deps/end_to_end-86d20c0f6c3be1d6)
+QOS2-OUT-WRONG-PUBCOMP-001: PASS —      Running tests/end_to_end.rs (target/debug/deps/end_to_end-86d20c0f6c3be1d6)
+QOS2-IN-SESSION-TAKEOVER-001: PASS —      Running tests/end_to_end.rs (target/debug/deps/end_to_end-86d20c0f6c3be1d6)
+AUTH-REGISTER-REVOKE-RACE-001: PASS —      Running tests/end_to_end.rs (target/debug/deps/end_to_end-86d20c0f6c3be1d6)
+MQTT-CONNACK-WRITE-FAIL-CLEANUP-001: PASS —      Running tests/end_to_end.rs (target/debug/deps/end_to_end-86d20c0f6c3be1d6)
+MQTT-TENANT-INFLIGHT-WAKE-QOS1-001: PASS —      Running tests/end_to_end.rs (target/debug/deps/end_to_end-86d20c0f6c3be1d6)
+MQTT-TENANT-INFLIGHT-WAKE-QOS2-001: PASS —      Running tests/end_to_end.rs (target/debug/deps/end_to_end-86d20c0f6c3be1d6)
+MQTT-RECOVERY-BINARY-WORSTCASE-001: PASS —      Running tests/end_to_end.rs (target/debug/deps/end_to_end-86d20c0f6c3be1d6)
+WILL-RESOURCE-FAILURE-001: PASS —      Running tests/end_to_end.rs (target/debug/deps/end_to_end-86d20c0f6c3be1d6)
+EVENTBUS-CONCURRENCY-NOSPIN-001: PASS —      Running tests/end_to_end.rs (target/debug/deps/end_to_end-86d20c0f6c3be1d6)
+MQTT-PERSISTENT-OVERLOAD-QOS1-001: PASS —      Running tests/end_to_end.rs (target/debug/deps/end_to_end-86d20c0f6c3be1d6)
+MQTT-PERSISTENT-OVERLOAD-QOS2-001: PASS —      Running tests/end_to_end.rs (target/debug/deps/end_to_end-86d20c0f6c3be1d6)
+QOS2-CLEAN-SESSION-INCARNATION-001: PASS —      Running tests/end_to_end.rs (target/debug/deps/end_to_end-86d20c0f6c3be1d6)
+MQTT-AUTHZ-PERSISTENT-RESET-001: PASS —      Running tests/end_to_end.rs (target/debug/deps/end_to_end-86d20c0f6c3be1d6)
+MQTT-RECOVERY-STRUCTURAL-EVENTBUS-SAFETY-001: PASS —      Running tests/end_to_end.rs (target/debug/deps/end_to_end-86d20c0f6c3be1d6)
+MQTT-RECOVERY-V2-ROUNDTRIP-001: PASS —      Running tests/end_to_end.rs (target/debug/deps/end_to_end-86d20c0f6c3be1d6)
+MQTT-RECOVERY-V3-ROUNDTRIP-001: PASS —      Running tests/end_to_end.rs (target/debug/deps/end_to_end-86d20c0f6c3be1d6)
+MQTT-RECOVERY-V1-COMPAT-001: PASS —      Running tests/end_to_end.rs (target/debug/deps/end_to_end-86d20c0f6c3be1d6)
+MQTT-RECOVERY-SEMANTIC-INVALID-001: PASS —      Running tests/end_to_end.rs (target/debug/deps/end_to_end-86d20c0f6c3be1d6)
+RETAIN-REPLACEMENT-RESERVATION-001: PASS —      Running tests/end_to_end.rs (target/debug/deps/end_to_end-86d20c0f6c3be1d6)
+EVENTBUS-SINK-PANIC-RECOVERY-001: PASS —      Running tests/end_to_end.rs (target/debug/deps/end_to_end-86d20c0f6c3be1d6)
+WILL-SUBSCRIBER-PRESSURE-001: PASS —      Running tests/end_to_end.rs (target/debug/deps/end_to_end-86d20c0f6c3be1d6)
+AUTH-MQTT-ATTACH-REVOKE-RACE-001: PASS —      Running tests/end_to_end.rs (target/debug/deps/end_to_end-86d20c0f6c3be1d6)
+MQTT-RECOVERY-V1-LARGE-COMPAT-001: PASS —      Running tests/end_to_end.rs (target/debug/deps/end_to_end-86d20c0f6c3be1d6)
+MQTT-RECOVERY-WHOLE-IMAGE-INTEGRITY-001: PASS —      Running tests/end_to_end.rs (target/debug/deps/end_to_end-86d20c0f6c3be1d6)
+MQTT-PERSISTENT-CODEC-PROVENANCE-001: PASS —      Running tests/end_to_end.rs (target/debug/deps/end_to_end-86d20c0f6c3be1d6)
+MQTT-ROUTE-PREFLIGHT-BOUNDED-MEMORY-001: PASS —      Running tests/end_to_end.rs (target/debug/deps/end_to_end-86d20c0f6c3be1d6)
+MQTT-RECOVERY-ACL-OWNERSHIP-001: PASS —      Running tests/end_to_end.rs (target/debug/deps/end_to_end-86d20c0f6c3be1d6)
+AUTH-INVALIDATION-COUNTING-001: PASS —      Running tests/end_to_end.rs (target/debug/deps/end_to_end-86d20c0f6c3be1d6)
+RESTART-001: PASS —      Running tests/end_to_end.rs (target/debug/deps/end_to_end-86d20c0f6c3be1d6)
+NORMATIVE-COVERAGE-001: PASS — 125/125 requirements have current PASS evidence

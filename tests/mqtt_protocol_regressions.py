@@ -10,7 +10,8 @@ Usage:
   cargo build --locked -p netbaiot-server
   python3 mqtt_protocol_regressions.py --repo /path/to/netbaiot --output results.json
 
-The binary must be rebuilt from the checkout being tested. The output records
+The binary must be rebuilt from the checkout being tested. Set
+NETBAIOT_TEST_SERVER to use an isolated binary. The output records
 the binary hash and source-diff hashes; they identify artifacts but cannot prove
 which source produced a preexisting binary without a witnessed build.
 """
@@ -20,6 +21,7 @@ import argparse
 import hashlib
 import importlib
 import json
+import os
 import pathlib
 import subprocess
 import sys
@@ -323,7 +325,10 @@ def main() -> int:
     test_directory = repo / "tests/mqtt_conformance"
     if not (test_directory / "common.py").is_file():
         parser.error("--repo must point to the netbaiot checkout containing its conformance fixtures")
-    if not (repo / "target/debug/netbaiot-server").is_file():
+    binary_path = pathlib.Path(os.environ.get(
+        "NETBAIOT_TEST_SERVER", str(repo / "target/debug/netbaiot-server")
+    )).resolve()
+    if not binary_path.is_file():
         parser.error("Build the tested checkout first: cargo build --locked -p netbaiot-server")
     sys.path.insert(0, str(test_directory))
     global C, V, R
@@ -333,7 +338,7 @@ def main() -> int:
     head_result = subprocess.run(["git", "-C", str(repo), "rev-parse", "HEAD"],
                                  text=True, capture_output=True, check=False)
     head = head_result.stdout.strip() if head_result.returncode == 0 else "unknown"
-    binary_sha256 = hashlib.sha256((repo / "target/debug/netbaiot-server").read_bytes()).hexdigest()
+    binary_sha256 = hashlib.sha256(binary_path.read_bytes()).hexdigest()
     diff = subprocess.run(["git", "-C", str(repo), "diff", "HEAD", "--binary"],
                           capture_output=True, check=False)
     diff_sha256 = hashlib.sha256(diff.stdout).hexdigest() if diff.returncode == 0 else None
@@ -389,6 +394,7 @@ def main() -> int:
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps({"audit_baseline": AUDIT_SHA,
                                       "checkout_head": head,
+                                      "binary_path": str(binary_path),
                                       "binary_sha256": binary_sha256,
                                       "tracked_diff_sha256": diff_sha256,
                                       "untracked_manifest_sha256": untracked_sha256,

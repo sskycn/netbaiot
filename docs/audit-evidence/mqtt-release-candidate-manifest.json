@@ -1,0 +1,291 @@
+{
+  "schema_version": 1,
+  "captured_at_utc": "2026-09-24T13:22:29.915654+00:00",
+  "baseline_sha": "d4f7612a350d8c66e670ec897f3e7263ed2f00ff",
+  "m01_m07_fix_commit": "65f6ba6a8dbc0796a1d14d8f67d33815372c9a8f",
+  "head": "a75faded1c770fac8d67c0e9c226dfcc22ff384c",
+  "origin_main_observed": "a75faded1c770fac8d67c0e9c226dfcc22ff384c",
+  "candidate_identity": {
+    "definition": "HEAD plus binary Git diff and every untracked delivery file except this manifest",
+    "fingerprint_sha256": "734ce0cdf762af3b8ebad482cff5f67365b79a8bbe1e5aa7f3d4f2b366342597",
+    "tracked_diff_sha256": "98814412aa038d77ebae1995c081bbf426b911452c3b59428cbc01d35028abcc",
+    "tracked_diff_bytes": 27306,
+    "tracked_diff_paths": [
+      "crates/netbaiot-runtime/src/limits.rs",
+      "crates/netbaiot-transports/src/mqtt/broker.rs",
+      "docs/mqtt-protocol-fix-report.md",
+      "docs/mqtt-session-recovery.md",
+      "tests/mqtt_conformance/common.py",
+      "tests/mqtt_protocol_regressions.py"
+    ],
+    "untracked_files": [
+      {
+        "path": "docs/audit-evidence/mqtt-candidate-build-stable.log",
+        "bytes": 273,
+        "sha256": "11f8cabf849f3ce23c6703ed57df5e8ef178cc390c629f9354560d65d1c567c2"
+      },
+      {
+        "path": "docs/audit-evidence/mqtt-candidate-build.log",
+        "bytes": 371,
+        "sha256": "31725e7e2e055025e9b632e3954bf0b59feba5138c1cdae2dfb5325832809e83"
+      },
+      {
+        "path": "docs/audit-evidence/mqtt-candidate-regressions.json",
+        "bytes": 54483,
+        "sha256": "8f67cdb3a1ee4610e16ae2fca6876fa29c510afef559261bb9fc0cadd9589dbc"
+      },
+      {
+        "path": "docs/audit-evidence/mqtt-candidate-regressions.log",
+        "bytes": 514,
+        "sha256": "e1df4bbb64cf0cbe8a70d750ec76cd99bb78bc8d6f5c38185b0e3501c8db3441"
+      },
+      {
+        "path": "docs/audit-evidence/mqtt-clippy-1.88.log",
+        "bytes": 361,
+        "sha256": "2094b1a34e67265c3bcbc5c03f7f487980dc3a974237e6508fa241e4de9fd675"
+      },
+      {
+        "path": "docs/audit-evidence/mqtt-clippy-stable.log",
+        "bytes": 361,
+        "sha256": "b5e342d853cda1012363ebee2e63bdeadc260b51fe3562755ca1e7cbfbe3c9b6"
+      },
+      {
+        "path": "docs/audit-evidence/mqtt-isolated-build.log",
+        "bytes": 4620,
+        "sha256": "6e020b78ab206669fb519e96bd56886c3abe3cb53a6c0c028b9eadcb9a9d2b59"
+      },
+      {
+        "path": "docs/audit-evidence/mqtt-legacy-fixture-generation.json",
+        "bytes": 1432,
+        "sha256": "02f03c6be2951b266577487217d1b68881b0d979afc65da3873c4dc5d6597011"
+      },
+      {
+        "path": "docs/audit-evidence/mqtt-old-baseline-payload_format_reason.json",
+        "bytes": 2020,
+        "sha256": "a8b0bbdfbc34d54244906e2e33945acba4ce32c33bc3e5612da1b86fed977522"
+      },
+      {
+        "path": "docs/audit-evidence/mqtt-release-gate-results.json",
+        "bytes": 26384,
+        "sha256": "075940bcf098132bd4a6e11b7822d37c622ab5f7f3b1ab90d24cab7fb182b333"
+      },
+      {
+        "path": "docs/audit-evidence/mqtt-release-gate.log",
+        "bytes": 8467,
+        "sha256": "24e3e4c2ed2498d6f7a2674b40657711a4874a46b61934ec91c4de2d852fbf69"
+      },
+      {
+        "path": "docs/audit-evidence/mqtt-test-1.88.log",
+        "bytes": 25716,
+        "sha256": "8a619a9046ae3d2e6f975220ba099a73e36a568af6c8e9176f8fc922bb717893"
+      },
+      {
+        "path": "docs/audit-evidence/mqtt-test-stable.log",
+        "bytes": 31189,
+        "sha256": "8a80488381f435f9a80633efaa50de0e20fd2b21789e8b387309c59b691af6c2"
+      },
+      {
+        "path": "docs/audit-evidence/mqtt-v5-mosquitto.log",
+        "bytes": 76,
+        "sha256": "1b839f63ecc77c6dc44a678027538b39a940498f59971a0a7adfe131878e4b78"
+      },
+      {
+        "path": "docs/audit-evidence/mqtt-v5-smoke.log",
+        "bytes": 80,
+        "sha256": "6b84af0aced1681912ef9d4eb4b09ec5918acfbb2ff7261f09534a05e8bbe0be"
+      },
+      {
+        "path": "docs/audit-evidence/mqtt-v6-near-capacity.log",
+        "bytes": 852,
+        "sha256": "a43d1d2e101f0c254b41ebaa961192004cb8bc02d314fb86c39d3d75d37e9c54"
+      },
+      {
+        "path": "docs/audit-evidence/mqtt-v6-recovery-fuzz.log",
+        "bytes": 6952,
+        "sha256": "6d14e6106364d1144f0cc724dfe6c202566c054eec41a3f8f0be8e2fe6d92022"
+      },
+      {
+        "path": "docs/audit-evidence/mqtt-v6-rollback.json",
+        "bytes": 844,
+        "sha256": "7db9fb5351e4384a6d88656667446f899404516f1beecd6875bbcd5f4a7e0e10"
+      },
+      {
+        "path": "tests/mqtt_conformance/fixtures/mqtt_recovery/README.md",
+        "bytes": 4902,
+        "sha256": "4d209601f8a961e72b9d7dae0f1498ca37adc2db02f953aa1ad04b613bc91fa8"
+      },
+      {
+        "path": "tests/mqtt_conformance/fixtures/mqtt_recovery/v1-session-retained.nbmq",
+        "bytes": 1413,
+        "sha256": "abddf0ec2cceff3dfc98dd5907d86769ace6f000ef1758572ec7b5f0e338af8a"
+      },
+      {
+        "path": "tests/mqtt_conformance/fixtures/mqtt_recovery/v2-session-retained.nbmq",
+        "bytes": 602,
+        "sha256": "d02ddbb5bd999ff75c349835dd1c55a655b1b700b3b908d8dd8c7512a2856e85"
+      },
+      {
+        "path": "tests/mqtt_conformance/fixtures/mqtt_recovery/v3-session-retained.nbmq",
+        "bytes": 671,
+        "sha256": "6c239f2355a72cf5901c0c64eb81ea09a661494ad0c83edfa1abba8970a75d18"
+      },
+      {
+        "path": "tests/mqtt_conformance/fixtures/mqtt_recovery/v4-session-retained.nbmq",
+        "bytes": 757,
+        "sha256": "6f4e0e05d1e0cb7f6342e69ba0c96b2e48f93f35391f24b3d6a9380c81ed3793"
+      },
+      {
+        "path": "tests/mqtt_conformance/fixtures/mqtt_recovery/v6-empty-rollback.nbmq",
+        "bytes": 100,
+        "sha256": "b4bbdd15bd1f2a2b58ba734426f183a6e2f38a8347087da2bf0e1559f39727af"
+      }
+    ],
+    "manifest_self_excluded": true
+  },
+  "committed_patch_since_baseline": {
+    "sha256": "26dc57d7707c2aaf2f09d0e2d13f36553d80f5a74b8d2879076dcbd1858f0fbe",
+    "bytes": 393869,
+    "paths": [
+      ".github/workflows/mqtt-interop.yml",
+      "crates/netbaiot-codecs/src/lib.rs",
+      "crates/netbaiot-core/src/lib.rs",
+      "crates/netbaiot-runtime/src/ingress.rs",
+      "crates/netbaiot-runtime/src/limits.rs",
+      "crates/netbaiot-transports/src/mqtt/broker.rs",
+      "crates/netbaiot-transports/src/mqtt/broker_hotspot_bench.rs",
+      "crates/netbaiot-transports/src/mqtt/codec/v5.rs",
+      "crates/netbaiot-transports/src/mqtt/mod.rs",
+      "crates/netbaiot-transports/src/mqtt/v5_connection.rs",
+      "docs/audit-evidence/mqtt-hotspots-baseline-concurrent-65f-r2.log",
+      "docs/audit-evidence/mqtt-hotspots-baseline-concurrent-65f-r3.log",
+      "docs/audit-evidence/mqtt-hotspots-baseline-concurrent-65f.log",
+      "docs/audit-evidence/mqtt-hotspots-baseline-core-65f.log",
+      "docs/audit-evidence/mqtt-hotspots-baseline-extra-65f.log",
+      "docs/audit-evidence/mqtt-hotspots-baseline-foundation-65f.log",
+      "docs/audit-evidence/mqtt-hotspots-baseline-pending-65f.log",
+      "docs/audit-evidence/mqtt-hotspots-baseline-retained-65f.log",
+      "docs/audit-evidence/mqtt-hotspots-baseline-single-65f.log",
+      "docs/audit-evidence/mqtt-hotspots-baseline-will-50k-65f.log",
+      "docs/audit-evidence/mqtt-hotspots-baseline-will-owned-65f.log",
+      "docs/audit-evidence/mqtt-hotspots-final-concurrent-r2.log",
+      "docs/audit-evidence/mqtt-hotspots-final-concurrent-r3.log",
+      "docs/audit-evidence/mqtt-hotspots-final-concurrent.log",
+      "docs/audit-evidence/mqtt-hotspots-final-core.log",
+      "docs/audit-evidence/mqtt-hotspots-final-extra.log",
+      "docs/audit-evidence/mqtt-hotspots-final-foundation.log",
+      "docs/audit-evidence/mqtt-hotspots-final-retained.log",
+      "docs/audit-evidence/mqtt-hotspots-final-single.log",
+      "docs/audit-evidence/mqtt-hotspots-final-will-50k.log",
+      "docs/audit-evidence/mqtt-m01-m07-after.json",
+      "docs/audit-evidence/mqtt-m01-m07-before.json",
+      "docs/audit-evidence/mqtt-old-baseline-qos2_business_validation.json",
+      "docs/audit-evidence/mqtt-old-baseline-receive_maximum_resume.json",
+      "docs/audit-evidence/mqtt-old-baseline-v311_duplicate_packet_id.json",
+      "docs/mqtt-protocol-fix-report.md",
+      "docs/mqtt-session-recovery.md",
+      "docs/mqtt.md",
+      "docs/performance-mqtt-broker-hotspots-2026-09-24.md",
+      "fuzz/fuzz_targets/mqtt_recovery.rs",
+      "tests/mqtt_conformance/fixtures/mqtt_recovery/v1-empty.nbmq",
+      "tests/mqtt_conformance/fixtures/mqtt_recovery/v2-empty.nbmq",
+      "tests/mqtt_conformance/fixtures/mqtt_recovery/v3-empty.nbmq",
+      "tests/mqtt_conformance/fixtures/mqtt_recovery/v4-empty.nbmq",
+      "tests/mqtt_conformance/fixtures/mqtt_recovery/v5-qos2-no-local-delayed-will.nbmq",
+      "tests/mqtt_protocol_regressions.py"
+    ]
+  },
+  "toolchain": {
+    "platform": "macOS-26.6.2-arm64-arm-64bit",
+    "rustc_1_88": "rustc 1.88.0 (6b00bc388 2025-06-23)",
+    "cargo_1_88": "cargo 1.88.0 (873a06493 2025-05-10)",
+    "rustc_stable": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
+    "cargo_stable": "cargo 1.97.1 (c980f4866 2026-06-30)",
+    "python": "Python 3.9.6"
+  },
+  "tested_binaries": {
+    "isolated_candidate": {
+      "path": "/private/tmp/netbaiot-accept-final-target/debug/netbaiot-server",
+      "sha256": "93a1dcee678a4aa60eb9ec011049378cd2f14e6ba634e322837a2fb869137e32",
+      "bytes": 30319232,
+      "build_log": "docs/audit-evidence/mqtt-isolated-build.log"
+    },
+    "old_baseline": {
+      "path": "/private/tmp/netbaiot-accept-old-target/debug/netbaiot-server",
+      "sha256": "a879b781823bc4f56d71373df7a98bdd4e7a5bba5ba86e7f17380acb7ae22bea",
+      "bytes": 29957616,
+      "source_sha": "d4f7612a350d8c66e670ec897f3e7263ed2f00ff"
+    }
+  },
+  "checks": [
+    {
+      "command": "cargo fmt --all -- --check",
+      "result": "PASS",
+      "evidence": null
+    },
+    {
+      "command": "cargo +1.88.0 clippy --locked --workspace --all-targets --all-features -- -D warnings",
+      "result": "PASS",
+      "evidence": "docs/audit-evidence/mqtt-clippy-1.88.log"
+    },
+    {
+      "command": "cargo +1.88.0 test --locked --workspace --all-features",
+      "result": "PASS",
+      "evidence": "docs/audit-evidence/mqtt-test-1.88.log"
+    },
+    {
+      "command": "cargo clippy --locked --workspace --all-targets --all-features -- -D warnings",
+      "result": "PASS",
+      "evidence": "docs/audit-evidence/mqtt-clippy-stable.log"
+    },
+    {
+      "command": "cargo test --locked --workspace --all-targets --all-features",
+      "result": "PASS",
+      "evidence": "docs/audit-evidence/mqtt-test-stable.log"
+    },
+    {
+      "command": "cargo +1.88.0 test --locked -p netbaiot-transports mqtt_recovery_v6_near_default_capacity_manual -- --ignored --nocapture",
+      "result": "PASS",
+      "evidence": "docs/audit-evidence/mqtt-v6-near-capacity.log"
+    },
+    {
+      "command": "NETBAIOT_TEST_SERVER=<isolated binary> python3 tests/mqtt_conformance/run.py --release-gate --no-build",
+      "result": "PASS 76/76; normative coverage 125/125",
+      "evidence": "docs/audit-evidence/mqtt-release-gate.log"
+    },
+    {
+      "command": "NETBAIOT_TEST_SERVER=<isolated binary> python3 tests/mqtt_conformance/v5_smoke.py",
+      "result": "PASS",
+      "evidence": "docs/audit-evidence/mqtt-v5-smoke.log"
+    },
+    {
+      "command": "NETBAIOT_TEST_SERVER=<isolated binary> python3 tests/mqtt_conformance/v5_mosquitto.py",
+      "result": "PASS",
+      "evidence": "docs/audit-evidence/mqtt-v5-mosquitto.log"
+    },
+    {
+      "command": "NETBAIOT_TEST_SERVER=<isolated binary> python3 tests/mqtt_protocol_regressions.py --repo . --output docs/audit-evidence/mqtt-candidate-regressions.json",
+      "result": "PASS 7/7",
+      "evidence": "docs/audit-evidence/mqtt-candidate-regressions.json"
+    },
+    {
+      "command": "cargo +nightly fuzz run mqtt_recovery -- -runs=5000",
+      "result": "PASS 5000 runs",
+      "evidence": "docs/audit-evidence/mqtt-v6-recovery-fuzz.log"
+    },
+    {
+      "command": "real d4f7612 server reading isolated copy of final v6 image",
+      "result": "PASS: Error: Invalid; SHA-256 unchanged",
+      "evidence": "docs/audit-evidence/mqtt-v6-rollback.json"
+    }
+  ],
+  "not_run": [
+    "GitHub Actions for the exact uncommitted acceptance diff",
+    "60-second multi-generation soak in this acceptance pass",
+    "upgrade rehearsal against production recovery data"
+  ],
+  "limits": [
+    "NBMQ v1-v2 codec provenance is unavailable; restored sessions reset on authenticated attach",
+    "Old immediate Will records without cancellation key have unknown origin and cannot reconstruct No Local",
+    "An old binary rejects v6; direct downgrade or v6-to-v5 conversion is unsupported"
+  ]
+}

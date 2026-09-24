@@ -4993,6 +4993,8 @@ fn recovery_record_max(limits: &Limits) -> Result<usize> {
         .max_mqtt_packet_size
         .checked_add(limits.max_topic_bytes.saturating_mul(2))
         .and_then(|value| value.checked_add(limits.max_mqtt_property_bytes))
+        // A delayed v6 Will may contain both a cancellation and an origin ClientId.
+        .and_then(|value| value.checked_add(limits.max_client_id_bytes.saturating_mul(2)))
         .and_then(|value| value.checked_add(2_048))
         .ok_or(Error::Configuration)
 }
@@ -5101,7 +5103,11 @@ fn encode_session_meta(output: &mut Vec<u8>, session: &StoredSession) -> Result<
     put_string(output, session.key.device.device_id.as_str())?;
     put_string(output, &session.key.client_id)?;
     output.extend_from_slice(&session.incarnation.to_be_bytes());
-    if let Some(authorization) = &session.authorization {
+    if let Some(authorization) = session
+        .authorization
+        .as_ref()
+        .filter(|profile| profile.codec_id.is_some() && profile.codec_version.is_some())
+    {
         output.push(1);
         output.extend_from_slice(&authorization.credential_version.to_be_bytes());
         output.extend_from_slice(&authorization.auth_generation.to_be_bytes());
@@ -5116,6 +5122,8 @@ fn encode_session_meta(output: &mut Vec<u8>, session: &StoredSession) -> Result<
                 .to_be_bytes(),
         );
     } else {
+        // NBMQ v2 had no codec provenance. Mark it unknown in v6 so attach still
+        // resets the session instead of inventing a profile or blocking shutdown.
         output.push(0);
     }
     output.extend_from_slice(&session.next_packet_id.to_be_bytes());
@@ -10343,19 +10351,55 @@ mod tests {
     #[tokio::test]
     async fn mqtt_recovery_historical_binary_fixtures_upgrade_to_v6() {
         let limits = Arc::new(Limits::default());
-        let fixtures: [(u32, &[u8]); 5] = [
-            (1, include_bytes!("../../../../tests/mqtt_conformance/fixtures/mqtt_recovery/v1-empty.nbmq")),
-            (2, include_bytes!("../../../../tests/mqtt_conformance/fixtures/mqtt_recovery/v2-empty.nbmq")),
-            (3, include_bytes!("../../../../tests/mqtt_conformance/fixtures/mqtt_recovery/v3-empty.nbmq")),
-            (4, include_bytes!("../../../../tests/mqtt_conformance/fixtures/mqtt_recovery/v4-empty.nbmq")),
-            (5, include_bytes!("../../../../tests/mqtt_conformance/fixtures/mqtt_recovery/v5-qos2-no-local-delayed-will.nbmq")),
+        let fixtures: [(u32, &[u8]); 6] = [
+            (
+                1,
+                include_bytes!(
+                    "../../../../tests/mqtt_conformance/fixtures/mqtt_recovery/v1-empty.nbmq"
+                ),
+            ),
+            (
+                2,
+                include_bytes!(
+                    "../../../../tests/mqtt_conformance/fixtures/mqtt_recovery/v2-empty.nbmq"
+                ),
+            ),
+            (
+                3,
+                include_bytes!(
+                    "../../../../tests/mqtt_conformance/fixtures/mqtt_recovery/v3-empty.nbmq"
+                ),
+            ),
+            (
+                4,
+                include_bytes!(
+                    "../../../../tests/mqtt_conformance/fixtures/mqtt_recovery/v4-empty.nbmq"
+                ),
+            ),
+            (
+                5,
+                include_bytes!(
+                    "../../../../tests/mqtt_conformance/fixtures/mqtt_recovery/v5-qos2-no-local-delayed-will.nbmq"
+                ),
+            ),
+            (
+                6,
+                include_bytes!(
+                    "../../../../tests/mqtt_conformance/fixtures/mqtt_recovery/v6-empty-rollback.nbmq"
+                ),
+            ),
         ];
         for (version, bytes) in fixtures {
             let decoded = decode_mqtt_recovery(bytes, &limits).unwrap();
             assert_eq!(decoded.format_version, version);
             if version == 5 {
                 assert_eq!(decoded.sessions.len(), 1);
-                assert!(decoded.sessions[0].subscriptions.values().any(|s| s.no_local));
+                assert!(
+                    decoded.sessions[0]
+                        .subscriptions
+                        .values()
+                        .any(|s| s.no_local)
+                );
                 assert!(matches!(
                     decoded.sessions[0].inbound_qos2.get(&7),
                     Some(InboundQos2State::AwaitPubrel(_))
@@ -10380,7 +10424,12 @@ mod tests {
             let snapshot = upgraded.snapshot().unwrap();
             assert_eq!(snapshot.format_version, RECOVERY_VERSION);
             if version == 5 {
-                assert!(snapshot.sessions[0].subscriptions.values().any(|s| s.no_local));
+                assert!(
+                    snapshot.sessions[0]
+                        .subscriptions
+                        .values()
+                        .any(|s| s.no_local)
+                );
                 assert!(matches!(
                     snapshot.sessions[0].inbound_qos2.get(&7),
                     Some(InboundQos2State::AwaitPubrel(_))
@@ -10393,9 +10442,195 @@ mod tests {
                         .as_ref()
                         .map(|(key, _)| key.clone())
                 );
+                let original_key = snapshot.sessions[0].key.clone();
+                let will_topic = snapshot.pending_wills[0].message.topic.clone();
+                let authorization = snapshot.sessions[0].authorization.as_ref().unwrap();
+                let identity = AuthenticatedDevice {
+                    device_key: original_key.device.clone(),
+                    credential_version: authorization.credential_version,
+                    auth_generation: authorization.auth_generation,
+                    codec_id: authorization.codec_id.clone().unwrap(),
+                    codec_version: authorization.codec_version.unwrap(),
+                    permissions: authorization.permissions.clone(),
+                };
+                let mut observer = upgraded
+                    .attach_v5(&identity, "fixture-observer".into(), false, 60, 4)
+                    .unwrap();
+                upgraded
+                    .subscribe_v5(
+                        &observer.key,
+                        observer.generation,
+                        &will_topic,
+                        v5::SubscriptionOptions {
+                            qos: 1,
+                            no_local: true,
+                            retain_as_published: false,
+                            retain_handling: 0,
+                        },
+                    )
+                    .unwrap();
+                {
+                    let mut state = lock(&upgraded.state).unwrap();
+                    let mut will = take_owned_future_wills(&mut state, &original_key)
+                        .pop()
+                        .unwrap();
+                    will.due_at_ms = Some(now_ms() - 1);
+                    insert_pending_will(&mut state, will);
+                }
+                upgraded.tick().unwrap();
+                let BrokerFrame::Publish(delivery) = observer.receiver.try_recv().unwrap() else {
+                    panic!("observer should receive the recovered Will")
+                };
+                assert_eq!(delivery.message.payload, b"fixed-will");
+                assert!(
+                    upgraded
+                        .state
+                        .lock()
+                        .unwrap()
+                        .sessions
+                        .get(&original_key)
+                        .unwrap()
+                        .offline
+                        .is_empty()
+                );
+                observer.detach().unwrap();
             }
             fs::remove_dir_all(directory).unwrap();
         }
+    }
+
+    #[tokio::test]
+    async fn mqtt_recovery_historical_nonempty_fixtures_preserve_qos_and_retained() {
+        let limits = Arc::new(Limits::default());
+        let fixtures: [(u32, &[u8]); 4] = [
+            (
+                1,
+                include_bytes!(
+                    "../../../../tests/mqtt_conformance/fixtures/mqtt_recovery/v1-session-retained.nbmq"
+                ),
+            ),
+            (
+                2,
+                include_bytes!(
+                    "../../../../tests/mqtt_conformance/fixtures/mqtt_recovery/v2-session-retained.nbmq"
+                ),
+            ),
+            (
+                3,
+                include_bytes!(
+                    "../../../../tests/mqtt_conformance/fixtures/mqtt_recovery/v3-session-retained.nbmq"
+                ),
+            ),
+            (
+                4,
+                include_bytes!(
+                    "../../../../tests/mqtt_conformance/fixtures/mqtt_recovery/v4-session-retained.nbmq"
+                ),
+            ),
+        ];
+        for (version, image) in fixtures {
+            let decoded = decode_mqtt_recovery(image, &limits).unwrap();
+            assert_eq!(decoded.format_version, version);
+            assert_eq!(decoded.sessions.len(), 1);
+            assert_eq!(decoded.sessions[0].subscriptions.len(), 1);
+            assert!(matches!(
+                decoded.sessions[0].inbound_qos2.get(&7),
+                Some(InboundQos2State::AwaitPubrel(_))
+            ));
+            assert_eq!(decoded.retained.len(), 1);
+            let directory = std::env::temp_dir().join(format!(
+                "netbaiot-historical-state-v{version}-{}",
+                uuid::Uuid::new_v4()
+            ));
+            let broker = MqttBroker::new(limits.clone());
+            broker.restore(decoded).unwrap();
+            broker
+                .commit_to(&directory)
+                .await
+                .unwrap_or_else(|error| panic!("v{version} commit failed: {error:?}"));
+            let recovered = MqttBroker::new(limits.clone());
+            assert!(recovered.recover_from(&directory).await.unwrap());
+            let snapshot = recovered.snapshot().unwrap();
+            assert_eq!(snapshot.format_version, RECOVERY_VERSION);
+            assert_eq!(snapshot.sessions.len(), 1);
+            assert_eq!(snapshot.sessions[0].subscriptions.len(), 1);
+            assert!(matches!(
+                snapshot.sessions[0].inbound_qos2.get(&7),
+                Some(InboundQos2State::AwaitPubrel(_))
+            ));
+            assert_eq!(snapshot.retained.len(), 1);
+            if version == 2 {
+                assert!(snapshot.sessions[0].authorization.is_none());
+                let key = snapshot.sessions[0].key.clone();
+                let mut identity = auth("device-1");
+                identity.device_key = key.device.clone();
+                let mut attached = recovered
+                    .attach(&identity, key.client_id.clone(), false)
+                    .unwrap();
+                assert!(!attached.session_present);
+                attached.detach().unwrap();
+            }
+            fs::remove_dir_all(directory).unwrap();
+        }
+    }
+
+    #[tokio::test]
+    async fn mqtt_recovery_v6_large_client_id_will_fits_admitted_bounds() {
+        let mut configured = Limits {
+            max_client_id_bytes: 40_000,
+            ..Limits::default()
+        };
+        configured.mqtt_recovery_max_bytes = configured.mqtt_recovery_upper_bound().unwrap();
+        configured.validate().unwrap();
+        let limits = Arc::new(configured);
+        let broker = MqttBroker::new(limits.clone());
+        let owner = auth("wide-will").device_key;
+        let origin = SessionKey {
+            device: owner.clone(),
+            client_id: "c".repeat(limits.max_client_id_bytes),
+        };
+        let pending = PendingWill {
+            owner: owner.clone(),
+            origin: Some(origin.clone()),
+            message: BrokerMessage {
+                topic: "v1/t/t/p/p/d/wide-will/up".into(),
+                // ClientId and Will payload together fit the configured 65,536-byte packet.
+                payload: vec![0x7a; 20_000],
+                qos: 1,
+                retain: false,
+                properties: Default::default(),
+            },
+            due_at_ms: Some(i64::MAX),
+            cancel_on_resume: Some((origin.clone(), 1)),
+            message_expiry_interval: None,
+            retained_reservation: RetainedReservation::default(),
+        };
+        {
+            let mut state = lock(&broker.state).unwrap();
+            reserve_will_capacity(&mut state, &owner.tenant_id, pending.bytes(), &limits).unwrap();
+            insert_pending_will(&mut state, pending);
+        }
+        let directory =
+            std::env::temp_dir().join(format!("netbaiot-wide-will-{}", uuid::Uuid::new_v4()));
+        broker.commit_to(&directory).await.unwrap();
+        let image = fs::read(directory.join(RECOVERY_FILE)).unwrap();
+        let first_record_bytes = u32::from_be_bytes(image[49..53].try_into().unwrap()) as usize;
+        let previous_record_ceiling = limits.max_mqtt_packet_size
+            + limits.max_topic_bytes * 2
+            + limits.max_mqtt_property_bytes
+            + 2_048;
+        assert!(first_record_bytes > previous_record_ceiling);
+        let recovered = MqttBroker::new(limits);
+        assert!(recovered.recover_from(&directory).await.unwrap());
+        assert_eq!(recovered.pending_will_count().unwrap(), 1);
+        assert_eq!(
+            all_pending_wills(&recovered.state.lock().unwrap())
+                .next()
+                .unwrap()
+                .origin,
+            Some(origin)
+        );
+        fs::remove_dir_all(directory).unwrap();
     }
 
     #[tokio::test]

@@ -1,0 +1,63 @@
+   Compiling netbaiot-runtime v0.1.1 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-runtime)
+   Compiling netbaiot-transports v0.1.1 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-transports)
+   Compiling netbaiot-fuzz v0.0.0 (/Users/sam/Dev/work/sskycn/netbaiot/fuzz)
+    Finished `release` profile [optimized + debuginfo] target(s) in 19.10s
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.13s
+     Running `fuzz/target/aarch64-apple-darwin/release/mqtt_recovery -artifact_prefix=/Users/sam/Dev/work/sskycn/netbaiot/fuzz/artifacts/mqtt_recovery/ -runs=5000 /Users/sam/Dev/work/sskycn/netbaiot/fuzz/corpus/mqtt_recovery`
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 1027987156
+INFO: Loaded 1 modules   (261996 inline 8-bit counters): 261996 [0x1015a9610, 0x1015e957c), 
+INFO: Loaded 1 PC tables (261996 PCs): 261996 [0x1015e9580,0x1019e8c40), 
+INFO:      493 files found in /Users/sam/Dev/work/sskycn/netbaiot/fuzz/corpus/mqtt_recovery
+INFO: -max_len is not provided; libFuzzer will not generate inputs larger than 4096 bytes
+INFO: seed corpus: files: 493 min: 1b max: 46b total: 5385b rss: 45Mb
+#494	INITED cov: 1027 ft: 1537 corp: 337/3647b exec/s: 0 rss: 55Mb
+#761	NEW    cov: 1027 ft: 1538 corp: 338/3684b lim: 51 exec/s: 0 rss: 57Mb L: 37/46 MS: 2 CopyPart-CrossOver-
+#897	NEW    cov: 1027 ft: 1539 corp: 339/3717b lim: 51 exec/s: 0 rss: 58Mb L: 33/46 MS: 1 CopyPart-
+#923	NEW    cov: 1028 ft: 1540 corp: 340/3719b lim: 51 exec/s: 0 rss: 59Mb L: 2/46 MS: 1 CrossOver-
+#961	NEW    cov: 1028 ft: 1543 corp: 341/3756b lim: 51 exec/s: 0 rss: 59Mb L: 37/46 MS: 3 InsertRepeatedBytes-ShuffleBytes-InsertRepeatedBytes-
+#1163	REDUCE cov: 1028 ft: 1543 corp: 341/3747b lim: 51 exec/s: 0 rss: 60Mb L: 19/46 MS: 2 ChangeBit-CrossOver-
+#1257	NEW    cov: 1028 ft: 1547 corp: 342/3759b lim: 51 exec/s: 0 rss: 61Mb L: 12/46 MS: 4 CopyPart-ChangeBit-ChangeBit-CopyPart-
+#1292	NEW    cov: 1028 ft: 1550 corp: 343/3796b lim: 51 exec/s: 0 rss: 61Mb L: 37/46 MS: 5 ChangeASCIIInt-ChangeBit-InsertByte-EraseBytes-InsertRepeatedBytes-
+#1323	NEW    cov: 1028 ft: 1551 corp: 344/3845b lim: 51 exec/s: 0 rss: 61Mb L: 49/49 MS: 1 InsertRepeatedBytes-
+#1389	REDUCE cov: 1028 ft: 1551 corp: 344/3843b lim: 51 exec/s: 1389 rss: 62Mb L: 2/49 MS: 1 EraseBytes-
+#1437	NEW    cov: 1028 ft: 1552 corp: 345/3849b lim: 51 exec/s: 1437 rss: 62Mb L: 6/49 MS: 3 CopyPart-ChangeBit-CrossOver-
+#1464	REDUCE cov: 1028 ft: 1552 corp: 345/3848b lim: 51 exec/s: 1464 rss: 62Mb L: 16/49 MS: 2 ChangeByte-CrossOver-
+#1528	NEW    cov: 1029 ft: 1553 corp: 346/3865b lim: 51 exec/s: 1528 rss: 64Mb L: 17/49 MS: 3 ChangeByte-ChangeASCIIInt-CrossOver-
+#1644	REDUCE cov: 1029 ft: 1553 corp: 346/3862b lim: 51 exec/s: 1644 rss: 64Mb L: 4/49 MS: 1 EraseBytes-
+#1671	REDUCE cov: 1029 ft: 1553 corp: 346/3861b lim: 51 exec/s: 1671 rss: 65Mb L: 11/49 MS: 2 CopyPart-EraseBytes-
+#1672	REDUCE cov: 1029 ft: 1553 corp: 346/3860b lim: 51 exec/s: 1672 rss: 65Mb L: 5/49 MS: 1 EraseBytes-
+#1989	REDUCE cov: 1029 ft: 1553 corp: 346/3859b lim: 51 exec/s: 1989 rss: 67Mb L: 3/49 MS: 2 ChangeByte-EraseBytes-
+#2085	REDUCE cov: 1029 ft: 1553 corp: 346/3858b lim: 51 exec/s: 2085 rss: 67Mb L: 24/49 MS: 1 EraseBytes-
+#2106	NEW    cov: 1029 ft: 1554 corp: 347/3866b lim: 51 exec/s: 2106 rss: 67Mb L: 8/49 MS: 1 ChangeBit-
+#2151	NEW    cov: 1030 ft: 1555 corp: 348/3917b lim: 51 exec/s: 2151 rss: 68Mb L: 51/51 MS: 5 ChangeBinInt-InsertRepeatedBytes-CopyPart-CopyPart-CopyPart-
+#2361	REDUCE cov: 1030 ft: 1555 corp: 348/3915b lim: 51 exec/s: 1180 rss: 69Mb L: 14/51 MS: 5 EraseBytes-ChangeBinInt-InsertByte-InsertRepeatedBytes-EraseBytes-
+#2514	NEW    cov: 1030 ft: 1557 corp: 349/3942b lim: 51 exec/s: 1257 rss: 70Mb L: 27/51 MS: 3 ShuffleBytes-ChangeBit-CopyPart-
+#2550	REDUCE cov: 1030 ft: 1557 corp: 349/3939b lim: 51 exec/s: 1275 rss: 70Mb L: 6/51 MS: 1 EraseBytes-
+#2656	REDUCE cov: 1030 ft: 1557 corp: 349/3936b lim: 51 exec/s: 1328 rss: 71Mb L: 8/51 MS: 1 EraseBytes-
+#2942	NEW    cov: 1030 ft: 1558 corp: 350/3952b lim: 51 exec/s: 1471 rss: 74Mb L: 16/51 MS: 1 CopyPart-
+#3044	NEW    cov: 1030 ft: 1559 corp: 351/3964b lim: 51 exec/s: 1522 rss: 74Mb L: 12/51 MS: 2 ChangeByte-CrossOver-
+#3090	NEW    cov: 1030 ft: 1560 corp: 352/4010b lim: 51 exec/s: 1545 rss: 75Mb L: 46/51 MS: 1 ChangeBinInt-
+#3271	REDUCE cov: 1030 ft: 1560 corp: 352/4008b lim: 51 exec/s: 1635 rss: 76Mb L: 13/51 MS: 1 EraseBytes-
+#3309	NEW    cov: 1030 ft: 1561 corp: 353/4049b lim: 51 exec/s: 1654 rss: 76Mb L: 41/51 MS: 3 InsertRepeatedBytes-InsertByte-CopyPart-
+#3668	NEW    cov: 1030 ft: 1562 corp: 354/4088b lim: 51 exec/s: 1834 rss: 78Mb L: 39/51 MS: 4 InsertByte-ChangeByte-CrossOver-CrossOver-
+#4096	pulse  cov: 1030 ft: 1562 corp: 354/4088b lim: 51 exec/s: 2048 rss: 81Mb
+#4106	REDUCE cov: 1030 ft: 1562 corp: 354/4087b lim: 51 exec/s: 2053 rss: 81Mb L: 45/51 MS: 3 InsertByte-CopyPart-EraseBytes-
+#4117	REDUCE cov: 1030 ft: 1562 corp: 354/4083b lim: 51 exec/s: 2058 rss: 81Mb L: 7/51 MS: 1 EraseBytes-
+#4119	NEW    cov: 1033 ft: 1565 corp: 355/4092b lim: 51 exec/s: 1373 rss: 81Mb L: 9/51 MS: 2 ShuffleBytes-CrossOver-
+#4121	REDUCE cov: 1033 ft: 1565 corp: 355/4091b lim: 51 exec/s: 1373 rss: 81Mb L: 15/51 MS: 2 InsertRepeatedBytes-EraseBytes-
+#4170	NEW    cov: 1033 ft: 1575 corp: 356/4105b lim: 51 exec/s: 1390 rss: 81Mb L: 14/51 MS: 4 CopyPart-CopyPart-ShuffleBytes-InsertRepeatedBytes-
+#4191	REDUCE cov: 1033 ft: 1575 corp: 356/4094b lim: 51 exec/s: 1397 rss: 82Mb L: 26/51 MS: 1 EraseBytes-
+#4429	NEW    cov: 1033 ft: 1577 corp: 357/4134b lim: 51 exec/s: 1476 rss: 84Mb L: 40/51 MS: 3 ShuffleBytes-ShuffleBytes-CopyPart-
+	NEW_FUNC[1/1]: ==76522==WARNING: external symbolizer didn't start up correctly!
+==76522==WARNING: Can't read from symbolizer at fd 3
+==76522==WARNING: atos failed to symbolize address "0x101282c0c"
+0x000101282c0c in _RNvMs3_NtCsgQytFmGJ9bY_10serde_json2deINtB5_12DeserializerNtNtB7_4read9SliceReadE22parse_decimal_overflowCs7EFnU3aRuxf_16netbaiot_runtime+0x0 (/Users/sam/Dev/work/sskycn/netbaiot/fuzz/target/aarch64-apple-darwin/release/mqtt_recovery:arm64+0x100d66c0c)
+#4490	NEW    cov: 1048 ft: 1595 corp: 358/4161b lim: 51 exec/s: 1496 rss: 85Mb L: 27/51 MS: 1 ChangeByte-
+#4533	NEW    cov: 1048 ft: 1597 corp: 359/4178b lim: 51 exec/s: 1511 rss: 86Mb L: 17/51 MS: 3 ChangeByte-InsertByte-CrossOver-
+#4566	REDUCE cov: 1048 ft: 1597 corp: 359/4177b lim: 51 exec/s: 1522 rss: 86Mb L: 4/51 MS: 3 ShuffleBytes-ChangeASCIIInt-EraseBytes-
+#4598	NEW    cov: 1048 ft: 1598 corp: 360/4192b lim: 51 exec/s: 1532 rss: 86Mb L: 15/51 MS: 2 ShuffleBytes-ChangeBit-
+#4766	REDUCE cov: 1048 ft: 1598 corp: 360/4188b lim: 51 exec/s: 1588 rss: 87Mb L: 10/51 MS: 3 ShuffleBytes-ChangeBit-EraseBytes-
+#4806	NEW    cov: 1048 ft: 1599 corp: 361/4215b lim: 51 exec/s: 1602 rss: 87Mb L: 27/51 MS: 5 ShuffleBytes-ChangeBit-ChangeBit-ChangeBinInt-ChangeBit-
+#5000	DONE   cov: 1048 ft: 1599 corp: 361/4215b lim: 51 exec/s: 1666 rss: 89Mb
+Done 5000 runs in 4 second(s)

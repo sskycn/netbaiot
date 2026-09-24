@@ -1,0 +1,15 @@
+{
+  "new_source_commit": "a75faded1c770fac8d67c0e9c226dfcc22ff384c + uncommitted acceptance diff",
+  "new_binary_sha256": "93a1dcee678a4aa60eb9ec011049378cd2f14e6ba634e322837a2fb869137e32",
+  "old_source_commit": "d4f7612a350d8c66e670ec897f3e7263ed2f00ff",
+  "old_binary_sha256": "a879b781823bc4f56d71373df7a98bdd4e7a5bba5ba86e7f17380acb7ae22bea",
+  "new_exit": 0,
+  "old_exit": 1,
+  "old_output": "Error: Invalid",
+  "v6_file_bytes": 100,
+  "v6_source_sha256": "b4bbdd15bd1f2a2b58ba734426f183a6e2f38a8347087da2bf0e1559f39727af",
+  "old_copy_before_sha256": "b4bbdd15bd1f2a2b58ba734426f183a6e2f38a8347087da2bf0e1559f39727af",
+  "old_copy_after_sha256": "b4bbdd15bd1f2a2b58ba734426f183a6e2f38a8347087da2bf0e1559f39727af",
+  "old_copy_unchanged": true,
+  "isolation": "all runtime and copy paths under /private/tmp; production spool untouched"
+}

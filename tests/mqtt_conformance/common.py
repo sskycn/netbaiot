@@ -14,7 +14,10 @@ from dataclasses import dataclass, field
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-SERVER = ROOT / "target/debug/netbaiot-server"
+# Pin a witnessed build during local acceptance; CI keeps the checkout default.
+SERVER = pathlib.Path(os.environ.get(
+    "NETBAIOT_TEST_SERVER", str(ROOT / "target/debug/netbaiot-server")
+)).resolve()
 MOSQUITTO = pathlib.Path(shutil.which("mosquitto") or "/usr/local/sbin/mosquitto")
 USERNAME_A = "demo-device"
 USERNAME_B = "demo-device-b"

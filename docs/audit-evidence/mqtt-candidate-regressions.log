@@ -1,0 +1,11 @@
+Audit baseline: e9c9b06658ed811b1261c0cd40bf07a8df485ee6
+Checkout HEAD:  a75faded1c770fac8d67c0e9c226dfcc22ff384c
+Only isolated loopback test processes are started. Rebuild the binary before testing.
+PASS  assigned_id_collision: 
+PASS  will_no_local_takeover: 
+PASS  v311_started_expiry: 
+PASS  receive_maximum_resume: 
+PASS  v311_duplicate_packet_id: 
+PASS  payload_format_reason: 
+PASS  qos2_business_validation: 
+Evidence: /Users/sam/Dev/work/sskycn/netbaiot/docs/audit-evidence/mqtt-candidate-regressions.json
