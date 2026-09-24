@@ -189,6 +189,26 @@ def main() -> None:
             finally:
                 limited_qos0.close()
 
+            following = RawClient("127.0.0.1", broker.port)
+            try:
+                connect(following, "v5-small-after-large", maximum_packet_size=150)
+                subscribe(following, 14)
+                large = event(9010) + b" " * 200
+                body = binary(TOPIC_A.encode()) + b"\0\x0f\0" + large
+                following.send(frame(0x32, body))
+                assert following.recv() == (0x40, b"\0\x0f")
+                no_packet(following)
+                publish(following, 9011, 16)
+                received = [following.recv(), following.recv()]
+                assert (0x40, b"\0\x10") in received, received
+                first, body = next(item for item in received if item[0] >> 4 == 3)
+                assert first >> 4 == 3 and body.endswith(event(9011)), (first, body)
+                topic_end = 2 + int.from_bytes(body[:2], "big")
+                following.send(frame(0x40, body[topic_end:topic_end + 2]))
+                following.send(frame(0xe0))
+            finally:
+                following.close()
+
             qos2 = RawClient("127.0.0.1", broker.port)
             try:
                 connect(qos2, "v5-qos2")
