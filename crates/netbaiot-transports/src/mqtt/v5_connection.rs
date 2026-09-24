@@ -2,6 +2,21 @@ use super::*;
 use broker::PublishProperties;
 use codec::v5::{self, Packet};
 
+fn authorize_inbound_qos2_publish(
+    mqtt: &broker::MqttBroker,
+    auth: &AuthenticatedDevice,
+    key: &broker::SessionKey,
+    generation: u64,
+    packet_id: u16,
+    topic: &str,
+) -> Result<broker::InboundQos2PublishState> {
+    let state = mqtt.classify_inbound_qos2_publish(key, generation, packet_id)?;
+    if state == broker::InboundQos2PublishState::NeedsNewMessageAdmission {
+        publish_acl(auth, topic)?;
+    }
+    Ok(state)
+}
+
 async fn next_v5(
     reader: &mut Reader,
     stream: &mut BoxStream,
@@ -506,9 +521,19 @@ pub(super) async fn connection(
                         }
                         Packet::Publish { topic, payload, qos, packet_id, retain, dup: _, properties } => {
                             services.ingress.metrics.inc(Metric::MqttPublishes);
+                            if qos == 2 {
+                                let id = packet_id.ok_or(Error::Invalid)?;
+                                if authorize_inbound_qos2_publish(&services.mqtt, &auth, &attachment.key, attachment.generation, id, &topic)?
+                                    == broker::InboundQos2PublishState::ExistingTransaction {
+                                    let bytes = v5::ack(v5::AckReason::Pubrec(v5::PubrecReason::Success), id, limits.max_mqtt_packet_size)?;
+                                    send_v5(&mut stream, &services, &bytes, client_maximum, Some(&mut error_disconnect_sent)).await?;
+                                    continue;
+                                }
+                            } else {
+                                publish_acl(&auth, &topic)?;
+                            }
                             let message = BrokerMessage { topic, payload: payload.to_vec(), qos, retain,
                                 properties: PublishProperties::from_wire(&properties) };
-                            publish_acl(&auth, &message.topic)?;
                             if qos > 0 && !services.mqtt.inbound_receive_available(&attachment.key, attachment.generation, qos, packet_id.ok_or(Error::Invalid)?)? {
                                 fail_with_reason(&mut stream, &services, client_maximum, &mut error_disconnect_sent, v5::DisconnectReason::ReceiveMaximumExceeded, Error::Overloaded).await?;
                             }
@@ -557,4 +582,118 @@ pub(super) async fn connection(
         }
     }
     result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn existing_qos2_only_skips_duplicate_acl_until_identifier_is_released() {
+        let auth = AuthenticatedDevice {
+            device_key: DeviceKey {
+                tenant_id: TenantId::new("t").unwrap(),
+                product_id: ProductId::new("p").unwrap(),
+                device_id: DeviceId::new("d").unwrap(),
+            },
+            credential_version: 1,
+            auth_generation: 1,
+            codec_id: CodecId::new("json").unwrap(),
+            codec_version: 1,
+            permissions: Permissions {
+                publish: true,
+                commands: false,
+            },
+        };
+        let mqtt = broker::MqttBroker::new(Arc::new(Limits::default()));
+        let mut attachment = mqtt
+            .attach_v5(&auth, "client".into(), false, 60, 2)
+            .unwrap();
+        let forbidden = "v1/t/t/p/p/d/another/up";
+        let allowed = "v1/t/t/p/p/d/d/up";
+        assert!(matches!(
+            authorize_inbound_qos2_publish(
+                &mqtt,
+                &auth,
+                &attachment.key,
+                attachment.generation,
+                7,
+                forbidden
+            ),
+            Err(Error::Forbidden)
+        ));
+        let original = broker::BrokerMessage {
+            topic: allowed.into(),
+            payload: b"first".to_vec(),
+            qos: 2,
+            retain: false,
+            properties: Default::default(),
+        };
+        assert!(
+            mqtt.inbound_qos2(&attachment.key, attachment.generation, 7, original)
+                .unwrap()
+        );
+        assert_eq!(
+            authorize_inbound_qos2_publish(
+                &mqtt,
+                &auth,
+                &attachment.key,
+                attachment.generation,
+                7,
+                forbidden
+            )
+            .unwrap(),
+            broker::InboundQos2PublishState::ExistingTransaction
+        );
+        assert!(matches!(
+            authorize_inbound_qos2_publish(
+                &mqtt,
+                &auth,
+                &attachment.key,
+                attachment.generation,
+                8,
+                forbidden
+            ),
+            Err(Error::Forbidden)
+        ));
+        let broker::InboundQos2Action::Deliver {
+            session_incarnation,
+            operation_id,
+            ..
+        } = mqtt
+            .begin_inbound_qos2_delivery(&attachment.key, attachment.generation, 7)
+            .unwrap()
+        else {
+            panic!("PUBREL must start original delivery")
+        };
+        assert!(matches!(
+            authorize_inbound_qos2_publish(
+                &mqtt,
+                &auth,
+                &attachment.key,
+                attachment.generation,
+                7,
+                forbidden
+            ),
+            Err(Error::Forbidden)
+        ));
+        mqtt.finish_inbound_qos2_delivery(&attachment.key, session_incarnation, 7, operation_id)
+            .unwrap();
+        mqtt.complete_inbound_qos2(&attachment.key, attachment.generation, 7)
+            .unwrap();
+        mqtt.finish_inbound_pubcomp(&attachment.key, attachment.generation, 7)
+            .unwrap();
+        assert!(matches!(
+            authorize_inbound_qos2_publish(
+                &mqtt,
+                &auth,
+                &attachment.key,
+                attachment.generation,
+                7,
+                forbidden
+            ),
+            Err(Error::Forbidden)
+        ));
+        attachment.detach().unwrap();
+    }
 }

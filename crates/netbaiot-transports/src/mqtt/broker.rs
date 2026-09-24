@@ -264,6 +264,12 @@ pub enum InboundQos2Action {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum InboundQos2PublishState {
+    ExistingTransaction,
+    NeedsNewMessageAdmission,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum OutboundAck {
     Puback,
     Pubcomp,
@@ -1509,6 +1515,37 @@ impl MqttBroker {
             .max_inflight_qos1_per_session
             .min(self.limits.max_inflight_qos2_per_session);
         Ok(session.inbound_window.len() < limit)
+    }
+
+    /// Classify a MQTT 5 QoS 2 PUBLISH before authorizing its topic. Only a
+    /// transaction still awaiting PUBREL can bypass the second packet's ACL.
+    /// The connection processes packets serially; `inbound_qos2` rechecks
+    /// ownership and inserts under the broker lock after new-message admission.
+    pub(crate) fn classify_inbound_qos2_publish(
+        &self,
+        key: &SessionKey,
+        generation: u64,
+        packet_id: u16,
+    ) -> Result<InboundQos2PublishState> {
+        if packet_id == 0 {
+            return Err(Error::Invalid);
+        }
+        let state = lock(&self.state)?;
+        check_owner(&state, key, generation)?;
+        let session = state.sessions.get(key).ok_or(Error::Internal)?;
+        if session.version != MqttVersion::V5 {
+            return Err(Error::Invalid);
+        }
+        Ok(
+            if matches!(
+                session.inbound_qos2.get(&packet_id),
+                Some(InboundQos2State::AwaitPubrel(_))
+            ) {
+                InboundQos2PublishState::ExistingTransaction
+            } else {
+                InboundQos2PublishState::NeedsNewMessageAdmission
+            },
+        )
     }
 
     pub fn inbound_qos2(
@@ -5733,6 +5770,44 @@ mod tests {
                 .unwrap()
         );
         (broker, attachment, message)
+    }
+
+    #[test]
+    fn inbound_qos2_classification_is_read_only_and_generation_fenced() {
+        let (broker, mut old, _) = qos2_duplicate_case();
+        let before = transaction_accounting(&broker, &old.key);
+        assert_eq!(
+            broker
+                .classify_inbound_qos2_publish(&old.key, old.generation, 7)
+                .unwrap(),
+            InboundQos2PublishState::ExistingTransaction
+        );
+        assert_eq!(
+            broker
+                .classify_inbound_qos2_publish(&old.key, old.generation, 8)
+                .unwrap(),
+            InboundQos2PublishState::NeedsNewMessageAdmission
+        );
+        assert_eq!(transaction_accounting(&broker, &old.key), before);
+
+        let device = auth("qos2-duplicate");
+        let mut replacement = broker
+            .attach_v5(&device, "client".into(), false, 60, 2)
+            .unwrap();
+        assert!(matches!(
+            broker.classify_inbound_qos2_publish(&old.key, old.generation, 7),
+            Err(Error::Conflict)
+        ));
+        let resumed = transaction_accounting(&broker, &replacement.key);
+        assert_eq!(
+            broker
+                .classify_inbound_qos2_publish(&replacement.key, replacement.generation, 7)
+                .unwrap(),
+            InboundQos2PublishState::ExistingTransaction
+        );
+        assert_eq!(transaction_accounting(&broker, &replacement.key), resumed);
+        old.detach().unwrap();
+        replacement.detach().unwrap();
     }
 
     #[test]
