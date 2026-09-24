@@ -339,6 +339,10 @@ struct StoredSession {
     send_quota: u16,
     #[serde(skip)]
     sent: HashSet<u16>,
+    /// QoS PUBLISH packets occupying this network connection's Receive Maximum.
+    /// A successful QoS2 PUBREC does not release the slot; PUBCOMP does.
+    #[serde(skip)]
+    send_window: HashSet<u16>,
 }
 
 impl StoredSession {
@@ -369,6 +373,7 @@ impl StoredSession {
             active_generation: None,
             send_quota: u16::MAX,
             sent: HashSet::new(),
+            send_window: HashSet::new(),
         }
     }
 
@@ -406,16 +411,7 @@ impl StoredSession {
     }
 
     fn has_send_quota(&self) -> bool {
-        self.sent
-            .iter()
-            .filter(|id| {
-                matches!(
-                    self.outbound.get(id),
-                    Some(OutboundState::AwaitPuback(_) | OutboundState::AwaitPubrec(_))
-                )
-            })
-            .count()
-            < usize::from(self.send_quota)
+        self.send_window.len() < usize::from(self.send_quota)
     }
 
     fn insert_outbound(&mut self, packet_id: u16, state: OutboundState) {
@@ -427,6 +423,7 @@ impl StoredSession {
 
     fn remove_outbound(&mut self, packet_id: u16) -> Option<OutboundState> {
         self.sent.remove(&packet_id);
+        self.send_window.remove(&packet_id);
         let removed = self.outbound.remove(&packet_id);
         if removed.is_some() {
             self.outbound_order
@@ -1044,6 +1041,7 @@ impl MqttBroker {
             session.session_expiry_interval = session_expiry_interval;
             session.send_quota = receive_maximum;
             session.sent.clear();
+            session.send_window.clear();
             resume_frames(session, &self.limits, available_qos1, available_qos2)
         };
         let (resumed, resumed_count, resumed_bytes) = match resumed {
@@ -1111,6 +1109,7 @@ impl MqttBroker {
         } else if let Some(session) = state.sessions.get_mut(key) {
             session.active_generation = None;
             session.sent.clear();
+            session.send_window.clear();
             session.last_seen_ms = now_ms();
             if session.version == MqttVersion::V5 && session.session_expiry_interval != u32::MAX {
                 session.expires_at_ms = Some(
@@ -1867,6 +1866,9 @@ impl MqttBroker {
                     },
                 };
                 session.sent.insert(id);
+                if !matches!(outbound, OutboundState::AwaitPubcomp(_)) {
+                    session.send_window.insert(id);
+                }
                 return Ok(Some(frame));
             }
         }
@@ -2645,6 +2647,7 @@ fn promote_offline(
         };
         session.insert_outbound(id, outbound);
         session.sent.insert(id);
+        session.send_window.insert(id);
         (
             BrokerFrame::Publish(BrokerDelivery {
                 message,
@@ -2838,6 +2841,9 @@ fn resume_frames(
             },
         });
         session.sent.insert(*packet_id);
+        if !matches!(state, OutboundState::AwaitPubcomp(_)) {
+            session.send_window.insert(*packet_id);
+        }
     }
     while frames.len() < limits.max_outbound_messages_per_connection {
         if !session.has_send_quota() {
@@ -2875,6 +2881,7 @@ fn resume_frames(
         };
         session.insert_outbound(id, state);
         session.sent.insert(id);
+        session.send_window.insert(id);
         frames.push(BrokerFrame::Publish(BrokerDelivery {
             message,
             packet_id: Some(id),
@@ -2942,6 +2949,7 @@ fn enqueue(
             };
             session.insert_outbound(id, outbound);
             session.sent.insert(id);
+            session.send_window.insert(id);
             session.state_bytes += charge;
             state.session_bytes += charge;
             (
@@ -3077,6 +3085,7 @@ fn preflight_retained_replay(
                 },
             );
             session.sent.insert(packet_id);
+            session.send_window.insert(packet_id);
             if message.qos == 1 {
                 tenant_qos1 += 1;
             } else {
@@ -3193,6 +3202,7 @@ fn route_locked(
                     },
                 );
                 session.sent.insert(packet_id);
+                session.send_window.insert(packet_id);
                 session.state_bytes += charge;
                 state.session_bytes += charge;
                 let frame = BrokerFrame::Publish(BrokerDelivery {
@@ -5133,6 +5143,164 @@ mod tests {
         assert_eq!(second.message.payload, b"second");
         assert_eq!(broker.state.lock().unwrap().offline_count, 0);
         attachment.detach().unwrap();
+    }
+
+    #[tokio::test]
+    async fn receive_maximum_1_qos2_waits_for_pubcomp() {
+        let broker = MqttBroker::new(Arc::new(Limits::default()));
+        let device = auth("qos2-window");
+        let topic = "v1/t/t/p/p/d/qos2-window/up";
+        let mut attachment = broker
+            .attach_v5(&device, "client".into(), false, 60, 1)
+            .unwrap();
+        broker
+            .subscribe(&attachment.key, attachment.generation, topic, 2)
+            .unwrap();
+        for payload in [b"first".to_vec(), b"second".to_vec()] {
+            broker
+                .route_from_session(
+                    &attachment.key,
+                    BrokerMessage {
+                        topic: topic.into(),
+                        payload,
+                        qos: 2,
+                        retain: false,
+                        properties: Default::default(),
+                    },
+                )
+                .unwrap();
+        }
+        let BrokerFrame::Publish(first) = attachment.receiver.try_recv().unwrap() else {
+            panic!("expected first QoS2 PUBLISH")
+        };
+        let id = first.packet_id.unwrap();
+        assert_eq!(first.message.payload, b"first");
+        assert!(attachment.receiver.try_recv().is_err());
+        assert!(matches!(
+            broker.pubrec(&attachment.key, attachment.generation, id).unwrap(),
+            BrokerFrame::Pubrel { packet_id, dup: false } if packet_id == id
+        ));
+        assert!(
+            broker
+                .next_offline(&attachment.key, attachment.generation)
+                .unwrap()
+                .is_none()
+        );
+        assert!(attachment.receiver.try_recv().is_err());
+        assert!(matches!(
+            broker.pubrec(&attachment.key, attachment.generation, id).unwrap(),
+            BrokerFrame::Pubrel { packet_id, dup: true } if packet_id == id
+        ));
+        assert!(!broker.state.lock().unwrap().sessions[&attachment.key].has_send_quota());
+        broker
+            .pubcomp(&attachment.key, attachment.generation, id)
+            .unwrap();
+        assert!(matches!(
+            broker.pubcomp(&attachment.key, attachment.generation, id),
+            Err(Error::Invalid)
+        ));
+        let second = match attachment.receiver.try_recv() {
+            Ok(frame) => frame,
+            Err(_) => broker
+                .next_offline(&attachment.key, attachment.generation)
+                .unwrap()
+                .unwrap(),
+        };
+        let BrokerFrame::Publish(second) = second else {
+            panic!("expected second QoS2 PUBLISH")
+        };
+        assert_eq!(second.message.payload, b"second");
+        attachment.detach().unwrap();
+    }
+
+    #[tokio::test]
+    async fn qos2_negative_pubrec_releases_send_quota() {
+        let broker = MqttBroker::new(Arc::new(Limits::default()));
+        let device = auth("qos2-rejected");
+        let topic = "v1/t/t/p/p/d/qos2-rejected/up";
+        let mut attachment = broker
+            .attach_v5(&device, "client".into(), false, 60, 1)
+            .unwrap();
+        broker
+            .subscribe(&attachment.key, attachment.generation, topic, 2)
+            .unwrap();
+        for payload in [b"first".to_vec(), b"second".to_vec()] {
+            broker
+                .route_from_session(
+                    &attachment.key,
+                    BrokerMessage {
+                        topic: topic.into(),
+                        payload,
+                        qos: 2,
+                        retain: false,
+                        properties: Default::default(),
+                    },
+                )
+                .unwrap();
+        }
+        let BrokerFrame::Publish(first) = attachment.receiver.try_recv().unwrap() else {
+            panic!("expected first PUBLISH")
+        };
+        broker
+            .pubrec_rejected(
+                &attachment.key,
+                attachment.generation,
+                first.packet_id.unwrap(),
+            )
+            .unwrap();
+        let second = broker
+            .next_offline(&attachment.key, attachment.generation)
+            .unwrap()
+            .or_else(|| attachment.receiver.try_recv().ok())
+            .unwrap();
+        assert!(
+            matches!(second, BrokerFrame::Publish(delivery) if delivery.message.payload == b"second")
+        );
+        attachment.detach().unwrap();
+    }
+
+    #[tokio::test]
+    async fn reconnect_await_pubcomp_does_not_consume_new_send_window() {
+        let broker = MqttBroker::new(Arc::new(Limits::default()));
+        let device = auth("qos2-resume-window");
+        let topic = "v1/t/t/p/p/d/qos2-resume-window/up";
+        let mut old = broker
+            .attach_v5(&device, "client".into(), false, 60, 1)
+            .unwrap();
+        broker
+            .subscribe(&old.key, old.generation, topic, 2)
+            .unwrap();
+        for payload in [b"first".to_vec(), b"second".to_vec()] {
+            broker
+                .route_from_session(
+                    &old.key,
+                    BrokerMessage {
+                        topic: topic.into(),
+                        payload,
+                        qos: 2,
+                        retain: false,
+                        properties: Default::default(),
+                    },
+                )
+                .unwrap();
+        }
+        let BrokerFrame::Publish(first) = old.receiver.try_recv().unwrap() else {
+            panic!("expected first PUBLISH")
+        };
+        let first_id = first.packet_id.unwrap();
+        broker.pubrec(&old.key, old.generation, first_id).unwrap();
+        old.detach().unwrap();
+        let mut resumed = broker
+            .attach_v5(&device, "client".into(), false, 60, 1)
+            .unwrap();
+        assert!(resumed.session_present);
+        assert!(matches!(
+            resumed.receiver.try_recv().unwrap(),
+            BrokerFrame::Pubrel { packet_id, dup: true } if packet_id == first_id
+        ));
+        let second = resumed.receiver.try_recv().unwrap();
+        assert!(matches!(second, BrokerFrame::Publish(_)));
+        resumed.detach().unwrap();
     }
 
     #[test]
