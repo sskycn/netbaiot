@@ -13,6 +13,12 @@ pub struct Limits {
     pub max_connections_per_device: usize,
     pub max_connections_per_tenant: usize,
     pub max_mqtt_packet_size: usize,
+    pub max_mqtt_property_bytes: usize,
+    pub max_mqtt_user_properties: usize,
+    pub max_mqtt_user_property_bytes: usize,
+    pub max_mqtt_content_type_bytes: usize,
+    pub max_mqtt_response_topic_bytes: usize,
+    pub max_mqtt_correlation_data_bytes: usize,
     pub max_http_body_size: usize,
     pub max_http_header_bytes: usize,
     pub max_http_headers: usize,
@@ -134,6 +140,12 @@ impl Default for Limits {
             max_connections_per_device: 2,
             max_connections_per_tenant: 64,
             max_mqtt_packet_size: 65_536,
+            max_mqtt_property_bytes: 4_096,
+            max_mqtt_user_properties: 16,
+            max_mqtt_user_property_bytes: 2_048,
+            max_mqtt_content_type_bytes: 256,
+            max_mqtt_response_topic_bytes: 256,
+            max_mqtt_correlation_data_bytes: 1_024,
             max_http_body_size: 65_536,
             max_http_header_bytes: 8_192,
             max_http_headers: 32,
@@ -281,6 +293,12 @@ impl Limits {
             .max(self.max_http_body_size)
             .max(self.max_tcp_frame_size);
         if max_frame > 1_048_576
+            || self.max_mqtt_property_bytes > self.max_mqtt_packet_size
+            || self.max_mqtt_user_property_bytes > self.max_mqtt_property_bytes
+            || self.max_mqtt_content_type_bytes > self.max_mqtt_property_bytes
+            || self.max_mqtt_response_topic_bytes > self.max_mqtt_property_bytes
+            || self.max_mqtt_correlation_data_bytes > self.max_mqtt_property_bytes
+            || self.max_mqtt_user_properties > self.max_mqtt_property_bytes
             || self.max_udp_datagram_size > 1_200
             || self.max_http_header_bytes < 8_192
             || self.max_http_header_bytes > max_frame
@@ -356,6 +374,9 @@ mod tests {
         assert!(limits.validate().is_err());
         let mut limits = Limits::default();
         limits.mqtt_recovery_max_bytes = limits.global_mqtt_session_bytes;
+        assert!(limits.validate().is_err());
+        let mut limits = Limits::default();
+        limits.max_mqtt_user_property_bytes = limits.max_mqtt_property_bytes + 1;
         assert!(limits.validate().is_err());
     }
 }

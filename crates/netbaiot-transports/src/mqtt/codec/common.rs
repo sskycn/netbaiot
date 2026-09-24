@@ -32,7 +32,7 @@ pub fn remaining_length(input: &[u8], maximum: usize) -> Result<Option<(usize, u
 
 fn valid_flags(kind: u8, flags: u8) -> bool {
     match kind {
-        1 | 2 | 4 | 5 | 7 | 9 | 11 | 12 | 13 | 14 => flags == 0,
+        1 | 2 | 4 | 5 | 7 | 9 | 11 | 12 | 13 | 14 | 15 => flags == 0,
         3 => {
             let qos = (flags >> 1) & 3;
             qos != 3 && !(qos == 0 && flags & 0x08 != 0)

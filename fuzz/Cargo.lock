@@ -358,7 +358,7 @@ dependencies = [
 
 [[package]]
 name = "netbaiot-codecs"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "netbaiot-core",
  "serde",
@@ -367,7 +367,7 @@ dependencies = [
 
 [[package]]
 name = "netbaiot-core"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "netbaiot-protocol",
  "serde",
@@ -391,7 +391,7 @@ dependencies = [
 
 [[package]]
 name = "netbaiot-protocol"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "serde",
  "thiserror",
@@ -400,7 +400,7 @@ dependencies = [
 
 [[package]]
 name = "netbaiot-runtime"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "async-trait",
  "bytes",
@@ -420,7 +420,7 @@ dependencies = [
 
 [[package]]
 name = "netbaiot-transports"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "async-trait",
  "bytes",
