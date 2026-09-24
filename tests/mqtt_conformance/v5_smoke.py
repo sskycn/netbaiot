@@ -12,6 +12,7 @@ import urllib.request
 from common import (
     PASSWORD,
     TOPIC_A,
+    TOPIC_B,
     USERNAME_A,
     RawClient,
     binary,
@@ -267,11 +268,14 @@ def main() -> None:
                 time.sleep(0.02)
                 qos2.send(frame(0x34, body))
                 assert qos2.recv() == (0x50, b"\0\4")
-                changed = binary(TOPIC_A.encode()) + b"\0\4\0" + event(9303)
+                # TOPIC_B is a valid MQTT topic, but this device may not publish to it.
+                changed = binary(TOPIC_B.encode()) + b"\0\4\0" + event(9303)
                 qos2.send(frame(0x34, changed))
                 assert qos2.recv() == (0x50, b"\0\4")
                 qos2.send(frame(0x3c, changed))
                 assert qos2.recv() == (0x50, b"\0\4")
+                qos2.send(frame(0xc0))
+                assert qos2.recv() == (0xd0, b"")
                 assert events_accepted(broker) == accepted_before
                 qos2.send(frame(0x62, b"\0\4"))
                 assert qos2.recv() == (0x70, b"\0\4")
@@ -288,7 +292,10 @@ def main() -> None:
                 assert events_accepted(broker) == accepted_before + 1
                 qos2.send(frame(0x62, b"\0\x64"))
                 assert qos2.recv() == (0x70, b"\0\x64\x92\0")
-                qos2.send(frame(0xe0))
+                qos2.send(frame(0x34, changed))
+                assert qos2.recv() == (0xe0, b"\x87\0")
+                qos2.expect_closed()
+                assert events_accepted(broker) == accepted_before + 1
             finally:
                 qos2.close()
 
