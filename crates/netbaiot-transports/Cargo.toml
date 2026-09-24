@@ -35,3 +35,8 @@ uuid.workspace = true
 name = "foundation"
 path = "../../benches/foundation.rs"
 harness = false
+
+[[bench]]
+name = "mqtt_broker_scale"
+path = "../../benches/mqtt_broker_scale.rs"
+harness = false

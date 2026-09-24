@@ -5099,6 +5099,45 @@ fn sync_directory(path: &Path) -> Result<()> {
 mod tests {
     use super::*;
     use std::time::Duration;
+
+    #[test]
+    #[ignore = "manual baseline for future delayed-Will retry cost"]
+    fn benchmark_future_pending_will_retry() {
+        let broker = MqttBroker::new(Arc::new(Limits::default()));
+        let owner = auth("future-will").device_key;
+        let message = BrokerMessage {
+            topic: "v1/t/t/p/p/d/future-will/up".into(),
+            payload: vec![1; 64],
+            qos: 1,
+            retain: false,
+            properties: Default::default(),
+        };
+        let mut state = lock(&broker.state).unwrap();
+        for _ in 0..10_000 {
+            state.pending_wills.push_back(PendingWill {
+                owner: owner.clone(),
+                message: message.clone(),
+                due_at_ms: Some(now_ms() + 3_600_000),
+                cancel_on_resume: None,
+                message_expiry_interval: None,
+                retained_reservation: RetainedReservation::default(),
+            });
+        }
+        for run in 1..=5 {
+            let mut samples = Vec::with_capacity(100);
+            for _ in 0..100 {
+                let started = std::time::Instant::now();
+                assert_eq!(retry_pending_wills(&mut state, &broker.limits), 0);
+                samples.push(started.elapsed().as_nanos());
+            }
+            samples.sort_unstable();
+            println!(
+                "WILL,future_10000,{run},{},{},{}",
+                samples[50], samples[95], samples[99]
+            );
+        }
+    }
+
     fn auth(device: &str) -> AuthenticatedDevice {
         AuthenticatedDevice {
             device_key: DeviceKey {
