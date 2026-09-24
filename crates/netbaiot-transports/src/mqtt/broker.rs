@@ -28,7 +28,8 @@ const RECOVERY_MAGIC: &[u8; 4] = b"NBMQ";
 const RECOVERY_VERSION_V1: u32 = 1;
 const RECOVERY_VERSION_V2: u32 = 2;
 const RECOVERY_VERSION_V3: u32 = 3;
-const RECOVERY_VERSION: u32 = 4;
+const RECOVERY_VERSION_V4: u32 = 4;
+const RECOVERY_VERSION: u32 = 5;
 const LEGACY_V1_RECOVERY_READ_MAX: usize = 1_342_177_280;
 const RECOVERY_FILE: &str = "mqtt-runtime.state";
 
@@ -343,6 +344,10 @@ struct StoredSession {
     /// A successful QoS2 PUBREC does not release the slot; PUBCOMP does.
     #[serde(skip)]
     send_window: HashSet<u16>,
+    /// A QoS PUBLISH whose first transfer has begun must finish its ACK exchange
+    /// even after Message Expiry. This state survives disconnect and NBMQ recovery.
+    #[serde(default)]
+    started_outbound: HashSet<u16>,
 }
 
 impl StoredSession {
@@ -374,6 +379,7 @@ impl StoredSession {
             send_quota: u16::MAX,
             sent: HashSet::new(),
             send_window: HashSet::new(),
+            started_outbound: HashSet::new(),
         }
     }
 
@@ -424,6 +430,7 @@ impl StoredSession {
     fn remove_outbound(&mut self, packet_id: u16) -> Option<OutboundState> {
         self.sent.remove(&packet_id);
         self.send_window.remove(&packet_id);
+        self.started_outbound.remove(&packet_id);
         let removed = self.outbound.remove(&packet_id);
         if removed.is_some() {
             self.outbound_order
@@ -1898,6 +1905,43 @@ impl MqttBroker {
         self.complete_outbound(key, generation, packet_id, OutboundAck::Puback)
     }
 
+    /// Atomically crosses the first-transfer boundary for a queued MQTT 5 PUBLISH.
+    /// A stale or expired unsent frame is skipped without consuming its Packet Identifier.
+    pub fn begin_outbound_transfer(
+        &self,
+        key: &SessionKey,
+        generation: u64,
+        delivery: &BrokerDelivery,
+    ) -> Result<bool> {
+        let packet_id = delivery.packet_id.ok_or(Error::Invalid)?;
+        let mut state = lock(&self.state)?;
+        check_owner(&state, key, generation)?;
+        let session = state.sessions.get_mut(key).ok_or(Error::Internal)?;
+        let matching = matches!(
+            session.outbound.get(&packet_id),
+            Some(OutboundState::AwaitPuback(message) | OutboundState::AwaitPubrec(message))
+                if message == &delivery.message
+        );
+        if !matching {
+            return Ok(false);
+        }
+        if delivery.message.expired(now_ms()) && !session.started_outbound.contains(&packet_id) {
+            let outbound = session.remove_outbound(packet_id).ok_or(Error::Internal)?;
+            let charge = outbound.bytes();
+            session.state_bytes = session.state_bytes.saturating_sub(charge);
+            state.session_bytes = state.session_bytes.saturating_sub(charge);
+            wake_tenant_pending(
+                &mut state,
+                &key.device.tenant_id,
+                delivery.message.qos,
+                &self.limits,
+            )?;
+            return Ok(false);
+        }
+        session.started_outbound.insert(packet_id);
+        Ok(true)
+    }
+
     pub fn pubrec(&self, key: &SessionKey, generation: u64, packet_id: u16) -> Result<BrokerFrame> {
         let mut state = lock(&self.state)?;
         check_owner(&state, key, generation)?;
@@ -1908,6 +1952,7 @@ impl MqttBroker {
                     return Err(Error::Internal);
                 };
                 *state = OutboundState::AwaitPubcomp(message);
+                session.started_outbound.insert(packet_id);
                 Ok(BrokerFrame::Pubrel {
                     packet_id,
                     dup: false,
@@ -2030,7 +2075,11 @@ impl MqttBroker {
     pub fn restore(&self, snapshot: MqttRecoverySnapshot) -> Result<()> {
         if !matches!(
             snapshot.format_version,
-            RECOVERY_VERSION_V1 | RECOVERY_VERSION_V2 | RECOVERY_VERSION_V3 | RECOVERY_VERSION
+            RECOVERY_VERSION_V1
+                | RECOVERY_VERSION_V2
+                | RECOVERY_VERSION_V3
+                | RECOVERY_VERSION_V4
+                | RECOVERY_VERSION
         ) || snapshot.sessions.len() > self.limits.max_persistent_sessions
             || snapshot.retained.len() > self.limits.max_retained_messages
         {
@@ -2059,7 +2108,8 @@ impl MqttBroker {
             pending_sessions: HashSet::new(),
         };
         for mut session in snapshot.sessions {
-            if snapshot.format_version < RECOVERY_VERSION && session.version != MqttVersion::V311 {
+            if snapshot.format_version < RECOVERY_VERSION_V4 && session.version != MqttVersion::V311
+            {
                 return Err(Error::Invalid);
             }
             if session.version == MqttVersion::V5 {
@@ -2189,12 +2239,19 @@ impl MqttBroker {
             session.offline_bytes = session.offline.iter().try_fold(0usize, |total, message| {
                 total.checked_add(message.bytes()).ok_or(Error::Overloaded)
             })?;
+            if !session
+                .started_outbound
+                .iter()
+                .all(|id| session.outbound.contains_key(id))
+            {
+                return Err(Error::Invalid);
+            }
             let expired_outbound = session
                 .outbound
                 .iter()
                 .filter_map(|(id, outbound)| match outbound {
                     OutboundState::AwaitPuback(message) | OutboundState::AwaitPubrec(message)
-                        if message.expired(now) =>
+                        if message.expired(now) && !session.started_outbound.contains(id) =>
                     {
                         Some(*id)
                     }
@@ -2761,7 +2818,7 @@ fn prune_expired_messages(state: &mut BrokerState, now: i64) -> HashSet<TenantId
             .iter()
             .filter_map(|(id, outbound)| match outbound {
                 OutboundState::AwaitPuback(message) | OutboundState::AwaitPubrec(message)
-                    if message.expired(now) =>
+                    if message.expired(now) && !session.started_outbound.contains(id) =>
                 {
                     Some(*id)
                 }
@@ -3970,6 +4027,7 @@ fn write_recovery(directory: &Path, limits: &Limits, broker: &MqttBroker) -> Res
                 OutboundState::AwaitPubcomp(message) => (2, message),
             };
             record.push(kind);
+            record.push(u8::from(session.started_outbound.contains(packet_id)));
             encode_message(&mut record, message)?;
             write_record(&mut file, RECORD_OUTBOUND, &record, limits, &mut recovery)?;
         }
@@ -4083,7 +4141,7 @@ fn decode_recovery_reader(
     }
     if !matches!(
         version,
-        RECOVERY_VERSION_V2 | RECOVERY_VERSION_V3 | RECOVERY_VERSION
+        RECOVERY_VERSION_V2 | RECOVERY_VERSION_V3 | RECOVERY_VERSION_V4 | RECOVERY_VERSION
     ) {
         return Err(Error::Invalid);
     }
@@ -4475,7 +4533,7 @@ fn decode_message(
     if qos > 2 || !valid_topic(&topic, limits, false) {
         return Err(Error::Invalid);
     }
-    let properties = if format_version >= RECOVERY_VERSION {
+    let properties = if format_version >= RECOVERY_VERSION_V4 {
         let payload_format = match reader.u8()? {
             value @ (0 | 1) => Some(value),
             2 => None,
@@ -4588,7 +4646,7 @@ fn decode_record(
             }
             let last_seen_ms = reader.i64()?;
             let (version, session_expiry_interval, expires_at_ms) =
-                if format_version >= RECOVERY_VERSION {
+                if format_version >= RECOVERY_VERSION_V4 {
                     let version = match reader.u8()? {
                         4 => MqttVersion::V311,
                         5 => MqttVersion::V5,
@@ -4638,7 +4696,7 @@ fn decode_record(
         RECORD_SUBSCRIPTION => {
             let filter = reader.string(limits.max_topic_bytes)?;
             let qos = reader.u8()?;
-            let options = if format_version >= RECOVERY_VERSION {
+            let options = if format_version >= RECOVERY_VERSION_V4 {
                 reader.u8()?
             } else {
                 0
@@ -4712,6 +4770,17 @@ fn decode_record(
         RECORD_OUTBOUND => {
             let packet_id = reader.u16()?;
             let stage = reader.u8()?;
+            let started = if format_version >= RECOVERY_VERSION {
+                match reader.u8()? {
+                    0 => false,
+                    1 => true,
+                    _ => return Err(Error::Invalid),
+                }
+            } else {
+                // v1-v4 did not record the transfer boundary. Conservatively retain
+                // protocol responsibility for every recovered outbound exchange.
+                true
+            };
             let message = decode_message(&mut reader, limits, format_version)?;
             reader.finish()?;
             if packet_id == 0
@@ -4749,6 +4818,9 @@ fn decode_record(
             if session.outbound.insert(packet_id, state).is_some() {
                 return Err(Error::Invalid);
             }
+            if started {
+                session.started_outbound.insert(packet_id);
+            }
             session.outbound_order.push_back(packet_id);
         }
         RECORD_PENDING_WILL => {
@@ -4762,7 +4834,7 @@ fn decode_record(
             };
             let message = decode_message(&mut reader, limits, format_version)?;
             let (due_at_ms, cancel_on_resume, message_expiry_interval) =
-                if format_version >= RECOVERY_VERSION {
+                if format_version >= RECOVERY_VERSION_V4 {
                     let (due_at_ms, cancel_on_resume) = match reader.u8()? {
                         0 => (None, None),
                         1 => {
@@ -4813,7 +4885,7 @@ fn decode_record(
             }
             let tenant = TenantId::new(reader.string(64)?).map_err(|_| Error::Invalid)?;
             let message = decode_message(&mut reader, limits, format_version)?;
-            let origin = if format_version >= RECOVERY_VERSION {
+            let origin = if format_version >= RECOVERY_VERSION_V4 {
                 match reader.u8()? {
                     0 => None,
                     1 => Some(SessionKey {
@@ -5395,6 +5467,310 @@ mod tests {
             broker.inbound_qos2(&attachment.key, attachment.generation, 7, retransmit),
             Err(Error::Invalid)
         ));
+        attachment.detach().unwrap();
+    }
+
+    #[test]
+    fn qos1_started_publish_survives_message_expiry_until_puback() {
+        let broker = MqttBroker::new(Arc::new(Limits::default()));
+        let device = auth("started-qos1");
+        let topic = "v1/t/t/p/p/d/started-qos1/up";
+        let mut attachment = broker
+            .attach_v5(&device, "client".into(), false, 60, 1)
+            .unwrap();
+        broker
+            .subscribe(&attachment.key, attachment.generation, topic, 1)
+            .unwrap();
+        broker
+            .route_from_session(
+                &attachment.key,
+                BrokerMessage {
+                    topic: topic.into(),
+                    payload: b"data".to_vec(),
+                    qos: 1,
+                    retain: false,
+                    properties: PublishProperties {
+                        expires_at_ms: Some(now_ms() + 10_000),
+                        ..Default::default()
+                    },
+                },
+            )
+            .unwrap();
+        let BrokerFrame::Publish(delivery) = attachment.receiver.try_recv().unwrap() else {
+            panic!("expected PUBLISH")
+        };
+        let id = delivery.packet_id.unwrap();
+        assert!(
+            broker
+                .begin_outbound_transfer(&attachment.key, attachment.generation, &delivery)
+                .unwrap()
+        );
+        {
+            let mut state = broker.state.lock().unwrap();
+            let session = state.sessions.get_mut(&attachment.key).unwrap();
+            let OutboundState::AwaitPuback(message) = session.outbound.get_mut(&id).unwrap() else {
+                panic!("expected AwaitPuback")
+            };
+            message.properties.expires_at_ms = Some(now_ms() - 1);
+        }
+        broker.tick().unwrap();
+        assert!(
+            broker.state.lock().unwrap().sessions[&attachment.key]
+                .outbound
+                .contains_key(&id)
+        );
+        broker
+            .puback(&attachment.key, attachment.generation, id)
+            .unwrap();
+        assert!(
+            broker.state.lock().unwrap().sessions[&attachment.key]
+                .outbound
+                .is_empty()
+        );
+        attachment.detach().unwrap();
+    }
+
+    #[test]
+    fn unsent_expired_message_is_dropped() {
+        let broker = MqttBroker::new(Arc::new(Limits::default()));
+        let device = auth("unsent-expiry");
+        let topic = "v1/t/t/p/p/d/unsent-expiry/up";
+        let mut attachment = broker
+            .attach_v5(&device, "client".into(), false, 60, 1)
+            .unwrap();
+        broker
+            .subscribe(&attachment.key, attachment.generation, topic, 1)
+            .unwrap();
+        broker
+            .route_from_session(
+                &attachment.key,
+                BrokerMessage {
+                    topic: topic.into(),
+                    payload: b"data".to_vec(),
+                    qos: 1,
+                    retain: false,
+                    properties: PublishProperties {
+                        expires_at_ms: Some(now_ms() + 10_000),
+                        ..Default::default()
+                    },
+                },
+            )
+            .unwrap();
+        let BrokerFrame::Publish(delivery) = attachment.receiver.try_recv().unwrap() else {
+            panic!("expected PUBLISH")
+        };
+        let id = delivery.packet_id.unwrap();
+        {
+            let mut state = broker.state.lock().unwrap();
+            let session = state.sessions.get_mut(&attachment.key).unwrap();
+            let OutboundState::AwaitPuback(message) = session.outbound.get_mut(&id).unwrap() else {
+                panic!("expected AwaitPuback")
+            };
+            message.properties.expires_at_ms = Some(now_ms() - 1);
+        }
+        broker.tick().unwrap();
+        assert!(
+            !broker
+                .begin_outbound_transfer(&attachment.key, attachment.generation, &delivery)
+                .unwrap()
+        );
+        assert!(
+            broker.state.lock().unwrap().sessions[&attachment.key]
+                .outbound
+                .is_empty()
+        );
+        attachment.detach().unwrap();
+    }
+
+    #[test]
+    fn qos2_started_publish_survives_message_expiry_until_pubcomp() {
+        let broker = MqttBroker::new(Arc::new(Limits::default()));
+        let device = auth("started-qos2");
+        let topic = "v1/t/t/p/p/d/started-qos2/up";
+        let mut attachment = broker
+            .attach_v5(&device, "client".into(), false, 60, 1)
+            .unwrap();
+        broker
+            .subscribe(&attachment.key, attachment.generation, topic, 2)
+            .unwrap();
+        broker
+            .route_from_session(
+                &attachment.key,
+                BrokerMessage {
+                    topic: topic.into(),
+                    payload: b"data".to_vec(),
+                    qos: 2,
+                    retain: false,
+                    properties: PublishProperties {
+                        expires_at_ms: Some(now_ms() + 10_000),
+                        ..Default::default()
+                    },
+                },
+            )
+            .unwrap();
+        let BrokerFrame::Publish(delivery) = attachment.receiver.try_recv().unwrap() else {
+            panic!("expected PUBLISH")
+        };
+        let id = delivery.packet_id.unwrap();
+        assert!(
+            broker
+                .begin_outbound_transfer(&attachment.key, attachment.generation, &delivery)
+                .unwrap()
+        );
+        {
+            let mut state = broker.state.lock().unwrap();
+            let session = state.sessions.get_mut(&attachment.key).unwrap();
+            let OutboundState::AwaitPubrec(message) = session.outbound.get_mut(&id).unwrap() else {
+                panic!("expected AwaitPubrec")
+            };
+            message.properties.expires_at_ms = Some(now_ms() - 1);
+        }
+        broker.tick().unwrap();
+        assert!(matches!(
+            broker.state.lock().unwrap().sessions[&attachment.key]
+                .outbound
+                .get(&id),
+            Some(OutboundState::AwaitPubrec(_))
+        ));
+        broker
+            .pubrec(&attachment.key, attachment.generation, id)
+            .unwrap();
+        broker.tick().unwrap();
+        assert!(matches!(
+            broker.state.lock().unwrap().sessions[&attachment.key].outbound.get(&id),
+            Some(OutboundState::AwaitPubcomp(message)) if message.payload.is_empty()
+        ));
+        broker
+            .pubcomp(&attachment.key, attachment.generation, id)
+            .unwrap();
+        assert!(
+            broker.state.lock().unwrap().sessions[&attachment.key]
+                .outbound
+                .is_empty()
+        );
+        attachment.detach().unwrap();
+    }
+
+    #[tokio::test]
+    async fn reconnect_preserves_started_qos_state_after_message_expiry() {
+        let limits = Arc::new(Limits::default());
+        let broker = MqttBroker::new(limits.clone());
+        let device = auth("recovered-started");
+        let topic = "v1/t/t/p/p/d/recovered-started/up";
+        let mut attachment = broker
+            .attach_v5(&device, "client".into(), false, 60, 2)
+            .unwrap();
+        broker
+            .subscribe(&attachment.key, attachment.generation, topic, 1)
+            .unwrap();
+        broker
+            .route_from_session(
+                &attachment.key,
+                BrokerMessage {
+                    topic: topic.into(),
+                    payload: b"first".to_vec(),
+                    qos: 1,
+                    retain: false,
+                    properties: PublishProperties {
+                        expires_at_ms: Some(now_ms() + 10_000),
+                        ..Default::default()
+                    },
+                },
+            )
+            .unwrap();
+        let BrokerFrame::Publish(delivery) = attachment.receiver.try_recv().unwrap() else {
+            panic!("expected PUBLISH")
+        };
+        let id = delivery.packet_id.unwrap();
+        broker
+            .begin_outbound_transfer(&attachment.key, attachment.generation, &delivery)
+            .unwrap();
+        {
+            let mut state = broker.state.lock().unwrap();
+            let session = state.sessions.get_mut(&attachment.key).unwrap();
+            let OutboundState::AwaitPuback(message) = session.outbound.get_mut(&id).unwrap() else {
+                panic!("expected AwaitPuback")
+            };
+            message.properties.expires_at_ms = Some(now_ms() - 1);
+        }
+        attachment.detach().unwrap();
+        let directory =
+            std::env::temp_dir().join(format!("netbaiot-started-expiry-{}", uuid::Uuid::new_v4()));
+        broker.commit_to(&directory).await.unwrap();
+        let recovered = MqttBroker::new(limits);
+        recovered.recover_from(&directory).await.unwrap();
+        let mut resumed = recovered
+            .attach_v5(&device, "client".into(), false, 60, 2)
+            .unwrap();
+        let BrokerFrame::Publish(retransmit) = resumed.receiver.try_recv().unwrap() else {
+            panic!("expected retransmitted PUBLISH")
+        };
+        assert_eq!(retransmit.packet_id, Some(id));
+        assert!(retransmit.dup);
+        assert!(
+            recovered
+                .begin_outbound_transfer(&resumed.key, resumed.generation, &retransmit)
+                .unwrap()
+        );
+        assert!(
+            recovered.state.lock().unwrap().sessions[&resumed.key]
+                .started_outbound
+                .contains(&id)
+        );
+        recovered
+            .puback(&resumed.key, resumed.generation, id)
+            .unwrap();
+        resumed.detach().unwrap();
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn packet_identifier_not_reused_before_qos_exchange_finishes() {
+        let broker = MqttBroker::new(Arc::new(Limits::default()));
+        let device = auth("packet-id-expiry");
+        let topic = "v1/t/t/p/p/d/packet-id-expiry/up";
+        let mut attachment = broker
+            .attach_v5(&device, "client".into(), false, 60, 2)
+            .unwrap();
+        broker
+            .subscribe(&attachment.key, attachment.generation, topic, 1)
+            .unwrap();
+        let message = BrokerMessage {
+            topic: topic.into(),
+            payload: b"data".to_vec(),
+            qos: 1,
+            retain: false,
+            properties: PublishProperties {
+                expires_at_ms: Some(now_ms() + 10_000),
+                ..Default::default()
+            },
+        };
+        broker
+            .route_from_session(&attachment.key, message.clone())
+            .unwrap();
+        let BrokerFrame::Publish(first) = attachment.receiver.try_recv().unwrap() else {
+            panic!("expected first PUBLISH")
+        };
+        let first_id = first.packet_id.unwrap();
+        broker
+            .begin_outbound_transfer(&attachment.key, attachment.generation, &first)
+            .unwrap();
+        {
+            let mut state = broker.state.lock().unwrap();
+            let session = state.sessions.get_mut(&attachment.key).unwrap();
+            session.next_packet_id = first_id;
+            let OutboundState::AwaitPuback(stored) = session.outbound.get_mut(&first_id).unwrap()
+            else {
+                panic!("expected AwaitPuback")
+            };
+            stored.properties.expires_at_ms = Some(now_ms() - 1);
+        }
+        broker.tick().unwrap();
+        broker.route_from_session(&attachment.key, message).unwrap();
+        let BrokerFrame::Publish(second) = attachment.receiver.try_recv().unwrap() else {
+            panic!("expected second PUBLISH")
+        };
+        assert_ne!(second.packet_id, Some(first_id));
         attachment.detach().unwrap();
     }
 

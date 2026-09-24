@@ -80,13 +80,22 @@ async fn fail_with_reason(
 async fn send_frame(
     stream: &mut BoxStream,
     services: &Services,
+    key: &broker::SessionKey,
+    generation: u64,
     frame: BrokerFrame,
     maximum: usize,
     disconnected: &mut bool,
 ) -> Result<()> {
     let bytes = match frame {
         BrokerFrame::Publish(delivery) => {
-            if delivery.message.expired(now_ms()) {
+            if delivery.packet_id.is_none() && delivery.message.expired(now_ms()) {
+                return Ok(());
+            }
+            if delivery.packet_id.is_some()
+                && !services
+                    .mqtt
+                    .begin_outbound_transfer(key, generation, &delivery)?
+            {
                 return Ok(());
             }
             let properties = &delivery.message.properties;
@@ -103,11 +112,8 @@ async fn send_frame(
             };
             if let Some(expiry) = properties.expires_at_ms {
                 let remaining = expiry.saturating_sub(now_ms());
-                if remaining <= 0 {
-                    return Ok(());
-                }
                 wire.message_expiry =
-                    Some(u32::try_from((remaining + 999) / 1_000).unwrap_or(u32::MAX));
+                    Some(u32::try_from((remaining.max(0) + 999) / 1_000).unwrap_or(u32::MAX));
             }
             match v5::publish(
                 v5::OutboundPublish {
@@ -304,7 +310,7 @@ pub(super) async fn connection(
                 }
                 frame = attachment.receiver.recv() => {
                     let Some(frame) = frame else { break };
-                    send_frame(&mut stream, &services, frame, client_maximum, &mut error_disconnect_sent).await?;
+                    send_frame(&mut stream, &services, &attachment.key, attachment.generation, frame, client_maximum, &mut error_disconnect_sent).await?;
                 }
                 packet = next_v5(&mut reader, &mut stream, limits, idle) => {
                     let (packet, validation_us, validated_at) = match packet {
@@ -362,7 +368,7 @@ pub(super) async fn connection(
                             services.router.transport_state(DeliveryState::Received);
                             services.ingress.metrics.inc(Metric::MqttPubacks);
                             if let Some(frame) = services.mqtt.next_offline(&attachment.key, attachment.generation)? {
-                                send_frame(&mut stream, &services, frame, client_maximum, &mut error_disconnect_sent).await?;
+                                send_frame(&mut stream, &services, &attachment.key, attachment.generation, frame, client_maximum, &mut error_disconnect_sent).await?;
                             }
                         }
                         Packet::Pubrec { packet_id, reason } => {
@@ -370,16 +376,16 @@ pub(super) async fn connection(
                                 outbound_ack_result(services.mqtt.pubrec_rejected(&attachment.key, attachment.generation, packet_id), &mut stream, &services, client_maximum, &mut error_disconnect_sent).await?;
                             } else {
                                 let frame = outbound_ack_result(services.mqtt.pubrec(&attachment.key, attachment.generation, packet_id), &mut stream, &services, client_maximum, &mut error_disconnect_sent).await?;
-                                send_frame(&mut stream, &services, frame, client_maximum, &mut error_disconnect_sent).await?;
+                                send_frame(&mut stream, &services, &attachment.key, attachment.generation, frame, client_maximum, &mut error_disconnect_sent).await?;
                             }
                             if let Some(frame) = services.mqtt.next_offline(&attachment.key, attachment.generation)? {
-                                send_frame(&mut stream, &services, frame, client_maximum, &mut error_disconnect_sent).await?;
+                                send_frame(&mut stream, &services, &attachment.key, attachment.generation, frame, client_maximum, &mut error_disconnect_sent).await?;
                             }
                         }
                         Packet::Pubcomp { packet_id, reason: _ } => {
                             outbound_ack_result(services.mqtt.pubcomp(&attachment.key, attachment.generation, packet_id), &mut stream, &services, client_maximum, &mut error_disconnect_sent).await?;
                             if let Some(frame) = services.mqtt.next_offline(&attachment.key, attachment.generation)? {
-                                send_frame(&mut stream, &services, frame, client_maximum, &mut error_disconnect_sent).await?;
+                                send_frame(&mut stream, &services, &attachment.key, attachment.generation, frame, client_maximum, &mut error_disconnect_sent).await?;
                             }
                         }
                         Packet::Pubrel { packet_id, .. } => {
