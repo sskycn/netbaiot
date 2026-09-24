@@ -995,6 +995,18 @@ pub async fn run_with_credentials(
     let work_listeners = CancellationToken::new();
     let management_listener = CancellationToken::new();
     let mut work_tasks = JoinSet::new();
+    let maintenance_broker = mqtt_broker.clone();
+    let maintenance_stop = work_listeners.child_token();
+    work_tasks.spawn(async move {
+        let mut interval = tokio::time::interval(Duration::from_secs(1));
+        interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        loop {
+            tokio::select! {
+                _ = maintenance_stop.cancelled() => return Ok(()),
+                _ = interval.tick() => maintenance_broker.tick()?,
+            }
+        }
+    });
     work_tasks.spawn(serve_device_ingress(
         device_ingress,
         base_services.clone(),

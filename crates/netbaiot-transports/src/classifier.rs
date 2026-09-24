@@ -50,9 +50,9 @@ pub fn classify_prefix(input: &[u8], max_tcp: usize, max_mqtt: usize) -> Result<
         if !signature.starts_with(available) {
             return Err(Error::Invalid);
         }
-        // Read the protocol level too. Level 4 proceeds normally; other levels
-        // must reach the authoritative parser to preserve MQTT-3.1.2-2's
-        // CONNACK=1 then close. This never accepts an unsupported session.
+        // Read the protocol level too. Levels 4 and 5 are accepted by their
+        // respective codecs; other levels reach the authoritative parser for
+        // version rejection. This never accepts an unsupported session.
         return Ok((available.len() == signature.len()
             && input.get(header + signature.len()).is_some())
         .then_some(Transport::Mqtt));
