@@ -114,8 +114,11 @@ def main() -> None:
             try:
                 connect(qos2, "v5-qos2")
                 subscribe(qos2, 3, options=2)
-                body = binary(TOPIC_A.encode()) + b"\0\4\0" + event(9003)
+                body = binary(TOPIC_A.encode()) + b"\0\4\x05\x02\0\0\0\x05" + event(9003)
                 qos2.send(frame(0x34, body))
+                assert qos2.recv() == (0x50, b"\0\4")
+                time.sleep(0.02)
+                qos2.send(frame(0x3c, body))
                 assert qos2.recv() == (0x50, b"\0\4")
                 qos2.send(frame(0x62, b"\0\4"))
                 assert qos2.recv() == (0x70, b"\0\4")

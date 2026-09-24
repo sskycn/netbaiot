@@ -222,6 +222,26 @@ impl BrokerMessage {
             .expires_at_ms
             .is_some_and(|expires| expires <= now)
     }
+
+    fn same_inbound_retransmission(&self, other: &Self, version: MqttVersion) -> bool {
+        if self == other {
+            return true;
+        }
+        // MQTT 5 retransmits the original Message Expiry Interval. The absolute
+        // deadline is calculated on receipt, so it naturally differs on a later
+        // duplicate. Keep the first deadline; a duplicate cannot extend it.
+        version == MqttVersion::V5
+            && self.topic == other.topic
+            && self.payload == other.payload
+            && self.qos == other.qos
+            && self.retain == other.retain
+            && self.properties.payload_format == other.properties.payload_format
+            && self.properties.expires_at_ms.is_some() == other.properties.expires_at_ms.is_some()
+            && self.properties.content_type == other.properties.content_type
+            && self.properties.response_topic == other.properties.response_topic
+            && self.properties.correlation_data == other.properties.correlation_data
+            && self.properties.user_properties == other.properties.user_properties
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -1519,7 +1539,7 @@ impl MqttBroker {
                         message: existing, ..
                     }
                     | InboundQos2State::EventAccepted(existing)
-                        if existing == &message =>
+                        if existing.same_inbound_retransmission(&message, session.version) =>
                     {
                         Ok(false)
                     }
@@ -5159,6 +5179,54 @@ mod tests {
                 .inbound_receive_available(&attachment.key, attachment.generation, 2, 3)
                 .unwrap()
         );
+        attachment.detach().unwrap();
+    }
+
+    #[test]
+    fn v5_qos2_retransmission_keeps_first_message_expiry_deadline() {
+        let broker = MqttBroker::new(Arc::new(Limits::default()));
+        let device = auth("qos2-expiry");
+        let mut attachment = broker
+            .attach_v5(&device, "client".into(), false, 60, 2)
+            .unwrap();
+        let deadline = now_ms() + 5_000;
+        let message = BrokerMessage {
+            topic: "v1/t/t/p/p/d/qos2-expiry/up".into(),
+            payload: b"first".to_vec(),
+            qos: 2,
+            retain: false,
+            properties: PublishProperties {
+                expires_at_ms: Some(deadline),
+                ..Default::default()
+            },
+        };
+        assert!(
+            broker
+                .inbound_qos2(&attachment.key, attachment.generation, 7, message.clone())
+                .unwrap()
+        );
+        let mut retransmit = message.clone();
+        retransmit.properties.expires_at_ms = Some(deadline + 1_000);
+        assert!(
+            !broker
+                .inbound_qos2(
+                    &attachment.key,
+                    attachment.generation,
+                    7,
+                    retransmit.clone()
+                )
+                .unwrap()
+        );
+        let stored = broker
+            .inbound_qos2_message(&attachment.key, attachment.generation, 7)
+            .unwrap()
+            .unwrap();
+        assert_eq!(stored.0.properties.expires_at_ms, Some(deadline));
+        retransmit.payload = b"different".to_vec();
+        assert!(matches!(
+            broker.inbound_qos2(&attachment.key, attachment.generation, 7, retransmit),
+            Err(Error::Invalid)
+        ));
         attachment.detach().unwrap();
     }
 
