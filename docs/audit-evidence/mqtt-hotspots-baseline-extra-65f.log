@@ -1,0 +1,66 @@
+   Compiling netbaiot-transports v0.1.1 (/private/tmp/netbaiot-perf-baseline/crates/netbaiot-transports)
+    Finished `release` profile [optimized] target(s) in 6.98s
+     Running unittests src/lib.rs (/Users/sam/Dev/work/sskycn/netbaiot/target/release/deps/netbaiot_transports-4651fe9140a278c8)
+
+running 7 tests
+test mqtt::broker::hotspot_bench::exact_subscribe_scaling ... HOTSPOT,subscribe_exact_no_replay,0,1,706507,1334,1500,2834
+HOTSPOT,subscribe_exact_no_replay,0,2,699913,1375,1708,2625
+HOTSPOT,subscribe_exact_no_replay,0,3,740171,1333,1667,1709
+HOTSPOT,subscribe_exact_no_replay,1000,1,3741,245625,409708,478083
+HOTSPOT,subscribe_exact_no_replay,1000,2,4575,217875,231833,236250
+HOTSPOT,subscribe_exact_no_replay,1000,3,4708,211625,223541,251750
+HOTSPOT,subscribe_exact_no_replay,4000,1,1162,857334,899125,943834
+HOTSPOT,subscribe_exact_no_replay,4000,2,1167,857250,887083,923292
+HOTSPOT,subscribe_exact_no_replay,4000,3,1158,860834,896916,986333
+ok
+test mqtt::broker::hotspot_bench::fanout_route_scaling ... FANOUT,1,64,0,549622,917,4042,17791
+FANOUT,1,64,1,426033,1375,1750,3791
+FANOUT,1,1024,0,1025641,792,1750,2250
+FANOUT,1,1024,1,566487,1250,1292,1625
+FANOUT,1,16384,0,750000,1125,1541,3417
+FANOUT,1,16384,1,401558,1708,2333,2875
+FANOUT,10,64,0,298137,2666,3875,4042
+FANOUT,10,64,1,77838,7292,10917,14333
+FANOUT,10,1024,0,261915,2875,4458,6958
+FANOUT,10,1024,1,70651,7709,14291,26250
+FANOUT,10,16384,0,161544,4917,9625,20250
+FANOUT,10,16384,1,59910,11125,15833,16042
+FANOUT,100,64,0,41647,19792,21541,22791
+FANOUT,100,64,1,7922,67542,110875,146125
+FANOUT,100,1024,0,35332,21792,38041,51542
+FANOUT,100,1024,1,7786,71916,83125,83167
+FANOUT,100,16384,0,20026,40750,51542,130083
+FANOUT,100,16384,1,5812,112958,141542,194916
+FANOUT,1000,64,0,3622,223625,278666,280042
+FANOUT,1000,64,1,776,711917,1001792,1113834
+FANOUT,1000,1024,0,3144,242333,357875,378125
+FANOUT,1000,1024,1,735,749917,986583,1036791
+FANOUT,1000,16384,0,1883,435584,589083,1167625
+FANOUT,1000,16384,1,516,1295083,1417166,2618458
+ok
+test mqtt::broker::hotspot_bench::future_will_reconnect_scaling ... ok
+test mqtt::broker::hotspot_bench::retained_lookup_scaling ... ok
+test mqtt::broker::hotspot_bench::session_recompute_scaling ... ok
+test mqtt::broker::hotspot_bench::single_session_route_ack_scaling ... HOTSPOT,single_route_puback,0,1,534701,1875,1917,2042
+HOTSPOT,single_route_puback,0,2,540966,1834,1917,2000
+HOTSPOT,single_route_puback,0,3,523389,1875,2000,2334
+HOTSPOT,single_route_pubcomp,0,1,454804,2167,2250,2250
+HOTSPOT,single_route_pubcomp,0,2,458760,2166,2209,2250
+HOTSPOT,single_route_pubcomp,0,3,459946,2166,2208,2250
+HOTSPOT,single_route_puback,100,1,467107,2084,2167,2667
+HOTSPOT,single_route_puback,100,2,468018,2125,2209,2291
+HOTSPOT,single_route_puback,100,3,457099,2084,2333,4875
+HOTSPOT,single_route_pubcomp,100,1,374152,2541,3125,7500
+HOTSPOT,single_route_pubcomp,100,2,382806,2542,2667,4416
+HOTSPOT,single_route_pubcomp,100,3,387440,2542,2958,3250
+HOTSPOT,single_route_puback,128,1,499325,1958,2167,2209
+HOTSPOT,single_route_puback,128,2,449354,2208,2291,2708
+HOTSPOT,single_route_puback,128,3,442927,2208,2625,2750
+HOTSPOT,single_route_pubcomp,128,1,390911,2625,2709,2875
+HOTSPOT,single_route_pubcomp,128,2,415476,2334,2584,2667
+HOTSPOT,single_route_pubcomp,128,3,389706,2583,2666,2708
+ok
+test mqtt::broker::hotspot_bench::tenant_pending_wake_scaling ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 123 filtered out; finished in 0.91s
+

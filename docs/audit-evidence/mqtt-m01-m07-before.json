@@ -1,0 +1,1152 @@
+{
+  "audit_baseline": "e9c9b06658ed811b1261c0cd40bf07a8df485ee6",
+  "checkout_head": "d4f7612a350d8c66e670ec897f3e7263ed2f00ff",
+  "binary_provenance": "must be rebuilt by operator",
+  "results": [
+    {
+      "case": "assigned_id_collision",
+      "result": "FAIL",
+      "details": "AssertionError: Assigned Client ID collided with another still-stored session",
+      "connections": [
+        {
+          "connection_index": 0,
+          "packets": [
+            {
+              "direction": "client_to_server",
+              "hex": "<redacted-connect>",
+              "at": 1.519065666
+            },
+            {
+              "direction": "server_to_client",
+              "first": 32,
+              "body_hex": "000013210020270001000029002a0022000025012801",
+              "at": 1.520780208
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "8226000100002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f757001",
+              "at": 1.520812708
+            },
+            {
+              "direction": "server_to_client",
+              "first": 144,
+              "body_hex": "00010001",
+              "at": 1.521367
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "e000",
+              "at": 1.521375625
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "e000",
+              "at": 1.524006791
+            }
+          ]
+        },
+        {
+          "connection_index": 1,
+          "packets": [
+            {
+              "direction": "client_to_server",
+              "hex": "<redacted-connect>",
+              "at": 1.521947375
+            },
+            {
+              "direction": "server_to_client",
+              "first": 32,
+              "body_hex": "000021210020270001000029002a0012000b67656e6572617465642d3222000025012801",
+              "at": 1.522634541
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "e000",
+              "at": 1.523725583
+            }
+          ]
+        }
+      ],
+      "traceback": "Traceback (most recent call last):\n  File \"/Users/sam/Dev/work/sskycn/netbaiot/tests/mqtt_protocol_regressions.py\", line 312, in main\n    test(case)\n  File \"/Users/sam/Dev/work/sskycn/netbaiot/tests/mqtt_protocol_regressions.py\", line 159, in assigned_id_collision\n    require(assigned != \"generated-2\",\n  File \"/Users/sam/Dev/work/sskycn/netbaiot/tests/mqtt_protocol_regressions.py\", line 38, in require\n    raise AssertionError(message)\nAssertionError: Assigned Client ID collided with another still-stored session\n",
+      "duration_seconds": 1.474
+    },
+    {
+      "case": "will_no_local_takeover",
+      "result": "FAIL",
+      "details": "AssertionError: unexpected MQTT packet: (50, b'\\x00 v1/t/demo/p/sensor/d/device-1/up\\x00\\x01\\x00{\"schema_version\":1,\"source_message_id\":\"conformance-8101\",\"kind\":\"heartbeat\",\"data\":{\"sequence\":8101}}')",
+      "connections": [
+        {
+          "connection_index": 0,
+          "packets": [
+            {
+              "direction": "client_to_server",
+              "hex": "<redacted-connect>",
+              "at": 1.586813291
+            },
+            {
+              "direction": "server_to_client",
+              "first": 32,
+              "body_hex": "000013210020270001000029002a0022000025012801",
+              "at": 1.587573833
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "8226000100002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f757005",
+              "at": 1.587601791
+            },
+            {
+              "direction": "server_to_client",
+              "first": 144,
+              "body_hex": "00010001",
+              "at": 1.587866791
+            },
+            {
+              "direction": "server_to_client",
+              "first": 224,
+              "body_hex": "8e00",
+              "at": 1.588491125
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "e000",
+              "at": 1.591087583
+            }
+          ]
+        },
+        {
+          "connection_index": 1,
+          "packets": [
+            {
+              "direction": "client_to_server",
+              "hex": "<redacted-connect>",
+              "at": 1.588095333
+            },
+            {
+              "direction": "server_to_client",
+              "first": 32,
+              "body_hex": "010013210020270001000029002a0022000025012801",
+              "at": 1.588465916
+            },
+            {
+              "direction": "server_to_client",
+              "first": 50,
+              "body_hex": "002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f75700001007b22736368656d615f76657273696f6e223a312c22736f757263655f6d6573736167655f6964223a22636f6e666f726d616e63652d38313031222c226b696e64223a22686561727462656174222c2264617461223a7b2273657175656e6365223a383130317d7d",
+              "at": 1.589226166
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "e000",
+              "at": 1.590795458
+            }
+          ]
+        }
+      ],
+      "traceback": "Traceback (most recent call last):\n  File \"/Users/sam/Dev/work/sskycn/netbaiot/tests/mqtt_protocol_regressions.py\", line 312, in main\n    test(case)\n  File \"/Users/sam/Dev/work/sskycn/netbaiot/tests/mqtt_protocol_regressions.py\", line 174, in will_no_local_takeover\n    V.no_packet(new, timeout=0.6)\n  File \"/Users/sam/Dev/work/sskycn/netbaiot/tests/mqtt_conformance/v5_smoke.py\", line 70, in no_packet\n    raise AssertionError(f\"unexpected MQTT packet: {packet}\")\nAssertionError: unexpected MQTT packet: (50, b'\\x00 v1/t/demo/p/sensor/d/device-1/up\\x00\\x01\\x00{\"schema_version\":1,\"source_message_id\":\"conformance-8101\",\"kind\":\"heartbeat\",\"data\":{\"sequence\":8101}}')\n",
+      "duration_seconds": 0.066
+    },
+    {
+      "case": "v311_started_expiry",
+      "result": "FAIL",
+      "details": "EOFError: connection closed",
+      "connections": [
+        {
+          "connection_index": 0,
+          "packets": [
+            {
+              "direction": "client_to_server",
+              "hex": "<redacted-connect>",
+              "at": 1.649777333
+            },
+            {
+              "direction": "server_to_client",
+              "first": 32,
+              "body_hex": "000013210020270001000029002a0022000025012801",
+              "at": 1.650305666
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "339101002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f757000070502000000037b22736368656d615f76657273696f6e223a312c22736f757263655f6d6573736167655f6964223a22636f6e666f726d616e63652d38313032222c226b696e64223a22686561727462656174222c2264617461223a7b2273657175656e6365223a383130327d7d",
+              "at": 1.650426916
+            },
+            {
+              "direction": "server_to_client",
+              "first": 64,
+              "body_hex": "0007",
+              "at": 1.650891
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "e000",
+              "at": 1.650917666
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "e000",
+              "at": 5.86154075
+            }
+          ]
+        },
+        {
+          "connection_index": 1,
+          "packets": [
+            {
+              "direction": "client_to_server",
+              "hex": "<redacted-connect>",
+              "at": 1.651255458
+            },
+            {
+              "direction": "server_to_client",
+              "first": 32,
+              "body_hex": "0000",
+              "at": 1.651585416
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "82250001002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f757001",
+              "at": 1.651597
+            },
+            {
+              "direction": "server_to_client",
+              "first": 144,
+              "body_hex": "000101",
+              "at": 1.651867291
+            },
+            {
+              "direction": "server_to_client",
+              "first": 51,
+              "body_hex": "002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f757000017b22736368656d615f76657273696f6e223a312c22736f757263655f6d6573736167655f6964223a22636f6e666f726d616e63652d38313032222c226b696e64223a22686561727462656174222c2264617461223a7b2273657175656e6365223a383130327d7d",
+              "at": 1.651886458
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "40020001",
+              "at": 5.856994666
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "c000",
+              "at": 5.857087666
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "e000",
+              "at": 5.861418
+            }
+          ]
+        }
+      ],
+      "traceback": "Traceback (most recent call last):\n  File \"/Users/sam/Dev/work/sskycn/netbaiot/tests/mqtt_protocol_regressions.py\", line 312, in main\n    test(case)\n  File \"/Users/sam/Dev/work/sskycn/netbaiot/tests/mqtt_protocol_regressions.py\", line 197, in v311_started_expiry\n    require(subscriber.recv() == (0xd0, b\"\"),\n  File \"/Users/sam/Dev/work/sskycn/netbaiot/tests/mqtt_conformance/common.py\", line 166, in recv\n    first = self._exact(1)[0]\n  File \"/Users/sam/Dev/work/sskycn/netbaiot/tests/mqtt_conformance/common.py\", line 193, in _exact\n    raise EOFError(\"connection closed\")\nEOFError: connection closed\n",
+      "duration_seconds": 4.273
+    },
+    {
+      "case": "receive_maximum_resume",
+      "result": "FAIL",
+      "details": "AssertionError: Expected Receive Maximum exceeded, got (64, b'\\x00!')",
+      "connections": [
+        {
+          "connection_index": 0,
+          "packets": [
+            {
+              "direction": "client_to_server",
+              "hex": "<redacted-connect>",
+              "at": 5.927340041
+            },
+            {
+              "direction": "server_to_client",
+              "first": 32,
+              "body_hex": "000013210020270001000029002a0022000025012801",
+              "at": 5.92792925
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "348c01002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f75700001007b22736368656d615f76657273696f6e223a312c22736f757263655f6d6573736167655f6964223a22636f6e666f726d616e63652d38323031222c226b696e64223a22686561727462656174222c2264617461223a7b2273657175656e6365223a383230317d7d",
+              "at": 5.928093833
+            },
+            {
+              "direction": "server_to_client",
+              "first": 80,
+              "body_hex": "0001",
+              "at": 5.9283415
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "348c01002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f75700002007b22736368656d615f76657273696f6e223a312c22736f757263655f6d6573736167655f6964223a22636f6e666f726d616e63652d38323032222c226b696e64223a22686561727462656174222c2264617461223a7b2273657175656e6365223a383230327d7d",
+              "at": 5.928403625
+            },
+            {
+              "direction": "server_to_client",
+              "first": 80,
+              "body_hex": "0002",
+              "at": 5.928623458
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "348c01002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f75700003007b22736368656d615f76657273696f6e223a312c22736f757263655f6d6573736167655f6964223a22636f6e666f726d616e63652d38323033222c226b696e64223a22686561727462656174222c2264617461223a7b2273657175656e6365223a383230337d7d",
+              "at": 5.928675458
+            },
+            {
+              "direction": "server_to_client",
+              "first": 80,
+              "body_hex": "0003",
+              "at": 5.928895875
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "348c01002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f75700004007b22736368656d615f76657273696f6e223a312c22736f757263655f6d6573736167655f6964223a22636f6e666f726d616e63652d38323034222c226b696e64223a22686561727462656174222c2264617461223a7b2273657175656e6365223a383230347d7d",
+              "at": 5.928945166
+            },
+            {
+              "direction": "server_to_client",
+              "first": 80,
+              "body_hex": "0004",
+              "at": 5.929131208
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "348c01002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f75700005007b22736368656d615f76657273696f6e223a312c22736f757263655f6d6573736167655f6964223a22636f6e666f726d616e63652d38323035222c226b696e64223a22686561727462656174222c2264617461223a7b2273657175656e6365223a383230357d7d",
+              "at": 5.929159458
+            },
+            {
+              "direction": "server_to_client",
+              "first": 80,
+              "body_hex": "0005",
+              "at": 5.929323916
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "348c01002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f75700006007b22736368656d615f76657273696f6e223a312c22736f757263655f6d6573736167655f6964223a22636f6e666f726d616e63652d38323036222c226b696e64223a22686561727462656174222c2264617461223a7b2273657175656e6365223a383230367d7d",
+              "at": 5.929342541
+            },
+            {
+              "direction": "server_to_client",
+              "first": 80,
+              "body_hex": "0006",
+              "at": 5.929505166
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "348c01002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f75700007007b22736368656d615f76657273696f6e223a312c22736f757263655f6d6573736167655f6964223a22636f6e666f726d616e63652d38323037222c226b696e64223a22686561727462656174222c2264617461223a7b2273657175656e6365223a383230377d7d",
+              "at": 5.929520875
+            },
+            {
+              "direction": "server_to_client",
+              "first": 80,
+              "body_hex": "0007",
+              "at": 5.929668041
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "348c01002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f75700008007b22736368656d615f76657273696f6e223a312c22736f757263655f6d6573736167655f6964223a22636f6e666f726d616e63652d38323038222c226b696e64223a22686561727462656174222c2264617461223a7b2273657175656e6365223a383230387d7d",
+              "at": 5.92968325
+            },
+            {
+              "direction": "server_to_client",
+              "first": 80,
+              "body_hex": "0008",
+              "at": 5.929840166
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "348c01002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f75700009007b22736368656d615f76657273696f6e223a312c22736f757263655f6d6573736167655f6964223a22636f6e666f726d616e63652d38323039222c226b696e64223a22686561727462656174222c2264617461223a7b2273657175656e6365223a383230397d7d",
+              "at": 5.929855375
+            },
+            {
+              "direction": "server_to_client",
+              "first": 80,
+              "body_hex": "0009",
+              "at": 5.930003708
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "348c01002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f7570000a007b22736368656d615f76657273696f6e223a312c22736f757263655f6d6573736167655f6964223a22636f6e666f726d616e63652d38323130222c226b696e64223a22686561727462656174222c2264617461223a7b2273657175656e6365223a383231307d7d",
+              "at": 5.930019166
+            },
+            {
+              "direction": "server_to_client",
+              "first": 80,
+              "body_hex": "000a",
+              "at": 5.930164625
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "348c01002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f7570000b007b22736368656d615f76657273696f6e223a312c22736f757263655f6d6573736167655f6964223a22636f6e666f726d616e63652d38323131222c226b696e64223a22686561727462656174222c2264617461223a7b2273657175656e6365223a383231317d7d",
+              "at": 5.930179541
+            },
+            {
+              "direction": "server_to_client",
+              "first": 80,
+              "body_hex": "000b",
+              "at": 5.930328583
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "348c01002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f7570000c007b22736368656d615f76657273696f6e223a312c22736f757263655f6d6573736167655f6964223a22636f6e666f726d616e63652d38323132222c226b696e64223a22686561727462656174222c2264617461223a7b2273657175656e6365223a383231327d7d",
+              "at": 5.930343041
+            },
+            {
+              "direction": "server_to_client",
+              "first": 80,
+              "body_hex": "000c",
+              "at": 5.930483125
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "348c01002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f7570000d007b22736368656d615f76657273696f6e223a312c22736f757263655f6d6573736167655f6964223a22636f6e666f726d616e63652d38323133222c226b696e64223a22686561727462656174222c2264617461223a7b2273657175656e6365223a383231337d7d",
+              "at": 5.930497375
+            },
+            {
+              "direction": "server_to_client",
+              "first": 80,
+              "body_hex": "000d",
+              "at": 5.930636041
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "348c01002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f7570000e007b22736368656d615f76657273696f6e223a312c22736f757263655f6d6573736167655f6964223a22636f6e666f726d616e63652d38323134222c226b696e64223a22686561727462656174222c2264617461223a7b2273657175656e6365223a383231347d7d",
+              "at": 5.930650166
+            },
+            {
+              "direction": "server_to_client",
+              "first": 80,
+              "body_hex": "000e",
+              "at": 5.930788791
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "348c01002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f7570000f007b22736368656d615f76657273696f6e223a312c22736f757263655f6d6573736167655f6964223a22636f6e666f726d616e63652d38323135222c226b696e64223a22686561727462656174222c2264617461223a7b2273657175656e6365223a383231357d7d",
+              "at": 5.930803208
+            },
+            {
+              "direction": "server_to_client",
+              "first": 80,
+              "body_hex": "000f",
+              "at": 5.930949291
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "348c01002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f75700010007b22736368656d615f76657273696f6e223a312c22736f757263655f6d6573736167655f6964223a22636f6e666f726d616e63652d38323136222c226b696e64223a22686561727462656174222c2264617461223a7b2273657175656e6365223a383231367d7d",
+              "at": 5.930980166
+            },
+            {
+              "direction": "server_to_client",
+              "first": 80,
+              "body_hex": "0010",
+              "at": 5.931124666
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "348c01002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f75700011007b22736368656d615f76657273696f6e223a312c22736f757263655f6d6573736167655f6964223a22636f6e666f726d616e63652d38323137222c226b696e64223a22686561727462656174222c2264617461223a7b2273657175656e6365223a383231377d7d",
+              "at": 5.9311435
+            },
+            {
+              "direction": "server_to_client",
+              "first": 80,
+              "body_hex": "0011",
+              "at": 5.93127425
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "348c01002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f75700012007b22736368656d615f76657273696f6e223a312c22736f757263655f6d6573736167655f6964223a22636f6e666f726d616e63652d38323138222c226b696e64223a22686561727462656174222c2264617461223a7b2273657175656e6365223a383231387d7d",
+              "at": 5.931289458
+            },
+            {
+              "direction": "server_to_client",
+              "first": 80,
+              "body_hex": "0012",
+              "at": 5.931410125
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "348c01002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f75700013007b22736368656d615f76657273696f6e223a312c22736f757263655f6d6573736167655f6964223a22636f6e666f726d616e63652d38323139222c226b696e64223a22686561727462656174222c2264617461223a7b2273657175656e6365223a383231397d7d",
+              "at": 5.93142675
+            },
+            {
+              "direction": "server_to_client",
+              "first": 80,
+              "body_hex": "0013",
+              "at": 5.931556833
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "348c01002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f75700014007b22736368656d615f76657273696f6e223a312c22736f757263655f6d6573736167655f6964223a22636f6e666f726d616e63652d38323230222c226b696e64223a22686561727462656174222c2264617461223a7b2273657175656e6365223a383232307d7d",
+              "at": 5.931571791
+            },
+            {
+              "direction": "server_to_client",
+              "first": 80,
+              "body_hex": "0014",
+              "at": 5.931691416
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "348c01002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f75700015007b22736368656d615f76657273696f6e223a312c22736f757263655f6d6573736167655f6964223a22636f6e666f726d616e63652d38323231222c226b696e64223a22686561727462656174222c2264617461223a7b2273657175656e6365223a383232317d7d",
+              "at": 5.931707541
+            },
+            {
+              "direction": "server_to_client",
+              "first": 80,
+              "body_hex": "0015",
+              "at": 5.931829583
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "348c01002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f75700016007b22736368656d615f76657273696f6e223a312c22736f757263655f6d6573736167655f6964223a22636f6e666f726d616e63652d38323232222c226b696e64223a22686561727462656174222c2264617461223a7b2273657175656e6365223a383232327d7d",
+              "at": 5.931844458
+            },
+            {
+              "direction": "server_to_client",
+              "first": 80,
+              "body_hex": "0016",
+              "at": 5.93196275
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "348c01002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f75700017007b22736368656d615f76657273696f6e223a312c22736f757263655f6d6573736167655f6964223a22636f6e666f726d616e63652d38323233222c226b696e64223a22686561727462656174222c2264617461223a7b2273657175656e6365223a383232337d7d",
+              "at": 5.93197825
+            },
+            {
+              "direction": "server_to_client",
+              "first": 80,
+              "body_hex": "0017",
+              "at": 5.932100375
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "348c01002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f75700018007b22736368656d615f76657273696f6e223a312c22736f757263655f6d6573736167655f6964223a22636f6e666f726d616e63652d38323234222c226b696e64223a22686561727462656174222c2264617461223a7b2273657175656e6365223a383232347d7d",
+              "at": 5.932115083
+            },
+            {
+              "direction": "server_to_client",
+              "first": 80,
+              "body_hex": "0018",
+              "at": 5.932235166
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "348c01002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f75700019007b22736368656d615f76657273696f6e223a312c22736f757263655f6d6573736167655f6964223a22636f6e666f726d616e63652d38323235222c226b696e64223a22686561727462656174222c2264617461223a7b2273657175656e6365223a383232357d7d",
+              "at": 5.932250458
+            },
+            {
+              "direction": "server_to_client",
+              "first": 80,
+              "body_hex": "0019",
+              "at": 5.9323725
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "348c01002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f7570001a007b22736368656d615f76657273696f6e223a312c22736f757263655f6d6573736167655f6964223a22636f6e666f726d616e63652d38323236222c226b696e64223a22686561727462656174222c2264617461223a7b2273657175656e6365223a383232367d7d",
+              "at": 5.932387583
+            },
+            {
+              "direction": "server_to_client",
+              "first": 80,
+              "body_hex": "001a",
+              "at": 5.932507583
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "348c01002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f7570001b007b22736368656d615f76657273696f6e223a312c22736f757263655f6d6573736167655f6964223a22636f6e666f726d616e63652d38323237222c226b696e64223a22686561727462656174222c2264617461223a7b2273657175656e6365223a383232377d7d",
+              "at": 5.932522583
+            },
+            {
+              "direction": "server_to_client",
+              "first": 80,
+              "body_hex": "001b",
+              "at": 5.932643416
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "348c01002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f7570001c007b22736368656d615f76657273696f6e223a312c22736f757263655f6d6573736167655f6964223a22636f6e666f726d616e63652d38323238222c226b696e64223a22686561727462656174222c2264617461223a7b2273657175656e6365223a383232387d7d",
+              "at": 5.932658291
+            },
+            {
+              "direction": "server_to_client",
+              "first": 80,
+              "body_hex": "001c",
+              "at": 5.932781791
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "348c01002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f7570001d007b22736368656d615f76657273696f6e223a312c22736f757263655f6d6573736167655f6964223a22636f6e666f726d616e63652d38323239222c226b696e64223a22686561727462656174222c2264617461223a7b2273657175656e6365223a383232397d7d",
+              "at": 5.932797166
+            },
+            {
+              "direction": "server_to_client",
+              "first": 80,
+              "body_hex": "001d",
+              "at": 5.93294475
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "348c01002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f7570001e007b22736368656d615f76657273696f6e223a312c22736f757263655f6d6573736167655f6964223a22636f6e666f726d616e63652d38323330222c226b696e64223a22686561727462656174222c2264617461223a7b2273657175656e6365223a383233307d7d",
+              "at": 5.932959875
+            },
+            {
+              "direction": "server_to_client",
+              "first": 80,
+              "body_hex": "001e",
+              "at": 5.93308225
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "348c01002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f7570001f007b22736368656d615f76657273696f6e223a312c22736f757263655f6d6573736167655f6964223a22636f6e666f726d616e63652d38323331222c226b696e64223a22686561727462656174222c2264617461223a7b2273657175656e6365223a383233317d7d",
+              "at": 5.933098166
+            },
+            {
+              "direction": "server_to_client",
+              "first": 80,
+              "body_hex": "001f",
+              "at": 5.933216875
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "348c01002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f75700020007b22736368656d615f76657273696f6e223a312c22736f757263655f6d6573736167655f6964223a22636f6e666f726d616e63652d38323332222c226b696e64223a22686561727462656174222c2264617461223a7b2273657175656e6365223a383233327d7d",
+              "at": 5.933232291
+            },
+            {
+              "direction": "server_to_client",
+              "first": 80,
+              "body_hex": "0020",
+              "at": 5.933349833
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "e000",
+              "at": 5.933355458
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "e000",
+              "at": 5.937899541
+            }
+          ]
+        },
+        {
+          "connection_index": 1,
+          "packets": [
+            {
+              "direction": "client_to_server",
+              "hex": "<redacted-connect>",
+              "at": 5.933697875
+            },
+            {
+              "direction": "server_to_client",
+              "first": 32,
+              "body_hex": "010013210020270001000029002a0022000025012801",
+              "at": 5.933912791
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "3c8c01002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f75700001007b22736368656d615f76657273696f6e223a312c22736f757263655f6d6573736167655f6964223a22636f6e666f726d616e63652d38323031222c226b696e64223a22686561727462656174222c2264617461223a7b2273657175656e6365223a383230317d7d",
+              "at": 5.933935958
+            },
+            {
+              "direction": "server_to_client",
+              "first": 80,
+              "body_hex": "0001",
+              "at": 5.934032
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "3c8c01002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f75700002007b22736368656d615f76657273696f6e223a312c22736f757263655f6d6573736167655f6964223a22636f6e666f726d616e63652d38323032222c226b696e64223a22686561727462656174222c2264617461223a7b2273657175656e6365223a383230327d7d",
+              "at": 5.934051375
+            },
+            {
+              "direction": "server_to_client",
+              "first": 80,
+              "body_hex": "0002",
+              "at": 5.934148208
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "3c8c01002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f75700003007b22736368656d615f76657273696f6e223a312c22736f757263655f6d6573736167655f6964223a22636f6e666f726d616e63652d38323033222c226b696e64223a22686561727462656174222c2264617461223a7b2273657175656e6365223a383230337d7d",
+              "at": 5.934163208
+            },
+            {
+              "direction": "server_to_client",
+              "first": 80,
+              "body_hex": "0003",
+              "at": 5.934259875
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "3c8c01002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f75700004007b22736368656d615f76657273696f6e223a312c22736f757263655f6d6573736167655f6964223a22636f6e666f726d616e63652d38323034222c226b696e64223a22686561727462656174222c2264617461223a7b2273657175656e6365223a383230347d7d",
+              "at": 5.934274208
+            },
+            {
+              "direction": "server_to_client",
+              "first": 80,
+              "body_hex": "0004",
+              "at": 5.934368458
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "3c8c01002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f75700005007b22736368656d615f76657273696f6e223a312c22736f757263655f6d6573736167655f6964223a22636f6e666f726d616e63652d38323035222c226b696e64223a22686561727462656174222c2264617461223a7b2273657175656e6365223a383230357d7d",
+              "at": 5.934382583
+            },
+            {
+              "direction": "server_to_client",
+              "first": 80,
+              "body_hex": "0005",
+              "at": 5.934476625
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "3c8c01002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f75700006007b22736368656d615f76657273696f6e223a312c22736f757263655f6d6573736167655f6964223a22636f6e666f726d616e63652d38323036222c226b696e64223a22686561727462656174222c2264617461223a7b2273657175656e6365223a383230367d7d",
+              "at": 5.934490416
+            },
+            {
+              "direction": "server_to_client",
+              "first": 80,
+              "body_hex": "0006",
+              "at": 5.93458525
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "3c8c01002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f75700007007b22736368656d615f76657273696f6e223a312c22736f757263655f6d6573736167655f6964223a22636f6e666f726d616e63652d38323037222c226b696e64223a22686561727462656174222c2264617461223a7b2273657175656e6365223a383230377d7d",
+              "at": 5.934599
+            },
+            {
+              "direction": "server_to_client",
+              "first": 80,
+              "body_hex": "0007",
+              "at": 5.934687208
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "3c8c01002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f75700008007b22736368656d615f76657273696f6e223a312c22736f757263655f6d6573736167655f6964223a22636f6e666f726d616e63652d38323038222c226b696e64223a22686561727462656174222c2264617461223a7b2273657175656e6365223a383230387d7d",
+              "at": 5.934702791
+            },
+            {
+              "direction": "server_to_client",
+              "first": 80,
+              "body_hex": "0008",
+              "at": 5.934796125
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "3c8c01002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f75700009007b22736368656d615f76657273696f6e223a312c22736f757263655f6d6573736167655f6964223a22636f6e666f726d616e63652d38323039222c226b696e64223a22686561727462656174222c2264617461223a7b2273657175656e6365223a383230397d7d",
+              "at": 5.9348105
+            },
+            {
+              "direction": "server_to_client",
+              "first": 80,
+              "body_hex": "0009",
+              "at": 5.934905416
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "3c8c01002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f7570000a007b22736368656d615f76657273696f6e223a312c22736f757263655f6d6573736167655f6964223a22636f6e666f726d616e63652d38323130222c226b696e64223a22686561727462656174222c2264617461223a7b2273657175656e6365223a383231307d7d",
+              "at": 5.934919916
+            },
+            {
+              "direction": "server_to_client",
+              "first": 80,
+              "body_hex": "000a",
+              "at": 5.9350145
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "3c8c01002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f7570000b007b22736368656d615f76657273696f6e223a312c22736f757263655f6d6573736167655f6964223a22636f6e666f726d616e63652d38323131222c226b696e64223a22686561727462656174222c2264617461223a7b2273657175656e6365223a383231317d7d",
+              "at": 5.935026625
+            },
+            {
+              "direction": "server_to_client",
+              "first": 80,
+              "body_hex": "000b",
+              "at": 5.935119583
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "3c8c01002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f7570000c007b22736368656d615f76657273696f6e223a312c22736f757263655f6d6573736167655f6964223a22636f6e666f726d616e63652d38323132222c226b696e64223a22686561727462656174222c2264617461223a7b2273657175656e6365223a383231327d7d",
+              "at": 5.935131458
+            },
+            {
+              "direction": "server_to_client",
+              "first": 80,
+              "body_hex": "000c",
+              "at": 5.935217208
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "3c8c01002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f7570000d007b22736368656d615f76657273696f6e223a312c22736f757263655f6d6573736167655f6964223a22636f6e666f726d616e63652d38323133222c226b696e64223a22686561727462656174222c2264617461223a7b2273657175656e6365223a383231337d7d",
+              "at": 5.935228833
+            },
+            {
+              "direction": "server_to_client",
+              "first": 80,
+              "body_hex": "000d",
+              "at": 5.935318166
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "3c8c01002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f7570000e007b22736368656d615f76657273696f6e223a312c22736f757263655f6d6573736167655f6964223a22636f6e666f726d616e63652d38323134222c226b696e64223a22686561727462656174222c2264617461223a7b2273657175656e6365223a383231347d7d",
+              "at": 5.935329916
+            },
+            {
+              "direction": "server_to_client",
+              "first": 80,
+              "body_hex": "000e",
+              "at": 5.9354275
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "3c8c01002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f7570000f007b22736368656d615f76657273696f6e223a312c22736f757263655f6d6573736167655f6964223a22636f6e666f726d616e63652d38323135222c226b696e64223a22686561727462656174222c2264617461223a7b2273657175656e6365223a383231357d7d",
+              "at": 5.935439291
+            },
+            {
+              "direction": "server_to_client",
+              "first": 80,
+              "body_hex": "000f",
+              "at": 5.935522
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "3c8c01002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f75700010007b22736368656d615f76657273696f6e223a312c22736f757263655f6d6573736167655f6964223a22636f6e666f726d616e63652d38323136222c226b696e64223a22686561727462656174222c2264617461223a7b2273657175656e6365223a383231367d7d",
+              "at": 5.935534916
+            },
+            {
+              "direction": "server_to_client",
+              "first": 80,
+              "body_hex": "0010",
+              "at": 5.935627458
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "3c8c01002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f75700011007b22736368656d615f76657273696f6e223a312c22736f757263655f6d6573736167655f6964223a22636f6e666f726d616e63652d38323137222c226b696e64223a22686561727462656174222c2264617461223a7b2273657175656e6365223a383231377d7d",
+              "at": 5.935641708
+            },
+            {
+              "direction": "server_to_client",
+              "first": 80,
+              "body_hex": "0011",
+              "at": 5.935711041
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "3c8c01002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f75700012007b22736368656d615f76657273696f6e223a312c22736f757263655f6d6573736167655f6964223a22636f6e666f726d616e63652d38323138222c226b696e64223a22686561727462656174222c2264617461223a7b2273657175656e6365223a383231387d7d",
+              "at": 5.93572375
+            },
+            {
+              "direction": "server_to_client",
+              "first": 80,
+              "body_hex": "0012",
+              "at": 5.935813083
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "3c8c01002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f75700013007b22736368656d615f76657273696f6e223a312c22736f757263655f6d6573736167655f6964223a22636f6e666f726d616e63652d38323139222c226b696e64223a22686561727462656174222c2264617461223a7b2273657175656e6365223a383231397d7d",
+              "at": 5.935826375
+            },
+            {
+              "direction": "server_to_client",
+              "first": 80,
+              "body_hex": "0013",
+              "at": 5.935910666
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "3c8c01002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f75700014007b22736368656d615f76657273696f6e223a312c22736f757263655f6d6573736167655f6964223a22636f6e666f726d616e63652d38323230222c226b696e64223a22686561727462656174222c2264617461223a7b2273657175656e6365223a383232307d7d",
+              "at": 5.935925958
+            },
+            {
+              "direction": "server_to_client",
+              "first": 80,
+              "body_hex": "0014",
+              "at": 5.936022291
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "3c8c01002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f75700015007b22736368656d615f76657273696f6e223a312c22736f757263655f6d6573736167655f6964223a22636f6e666f726d616e63652d38323231222c226b696e64223a22686561727462656174222c2264617461223a7b2273657175656e6365223a383232317d7d",
+              "at": 5.936034541
+            },
+            {
+              "direction": "server_to_client",
+              "first": 80,
+              "body_hex": "0015",
+              "at": 5.936153416
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "3c8c01002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f75700016007b22736368656d615f76657273696f6e223a312c22736f757263655f6d6573736167655f6964223a22636f6e666f726d616e63652d38323232222c226b696e64223a22686561727462656174222c2264617461223a7b2273657175656e6365223a383232327d7d",
+              "at": 5.936166
+            },
+            {
+              "direction": "server_to_client",
+              "first": 80,
+              "body_hex": "0016",
+              "at": 5.936262583
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "3c8c01002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f75700017007b22736368656d615f76657273696f6e223a312c22736f757263655f6d6573736167655f6964223a22636f6e666f726d616e63652d38323233222c226b696e64223a22686561727462656174222c2264617461223a7b2273657175656e6365223a383232337d7d",
+              "at": 5.936274708
+            },
+            {
+              "direction": "server_to_client",
+              "first": 80,
+              "body_hex": "0017",
+              "at": 5.936367833
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "3c8c01002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f75700018007b22736368656d615f76657273696f6e223a312c22736f757263655f6d6573736167655f6964223a22636f6e666f726d616e63652d38323234222c226b696e64223a22686561727462656174222c2264617461223a7b2273657175656e6365223a383232347d7d",
+              "at": 5.936379583
+            },
+            {
+              "direction": "server_to_client",
+              "first": 80,
+              "body_hex": "0018",
+              "at": 5.936473708
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "3c8c01002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f75700019007b22736368656d615f76657273696f6e223a312c22736f757263655f6d6573736167655f6964223a22636f6e666f726d616e63652d38323235222c226b696e64223a22686561727462656174222c2264617461223a7b2273657175656e6365223a383232357d7d",
+              "at": 5.936485458
+            },
+            {
+              "direction": "server_to_client",
+              "first": 80,
+              "body_hex": "0019",
+              "at": 5.936574291
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "3c8c01002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f7570001a007b22736368656d615f76657273696f6e223a312c22736f757263655f6d6573736167655f6964223a22636f6e666f726d616e63652d38323236222c226b696e64223a22686561727462656174222c2264617461223a7b2273657175656e6365223a383232367d7d",
+              "at": 5.936587291
+            },
+            {
+              "direction": "server_to_client",
+              "first": 80,
+              "body_hex": "001a",
+              "at": 5.9366765
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "3c8c01002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f7570001b007b22736368656d615f76657273696f6e223a312c22736f757263655f6d6573736167655f6964223a22636f6e666f726d616e63652d38323237222c226b696e64223a22686561727462656174222c2264617461223a7b2273657175656e6365223a383232377d7d",
+              "at": 5.936688875
+            },
+            {
+              "direction": "server_to_client",
+              "first": 80,
+              "body_hex": "001b",
+              "at": 5.936772708
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "3c8c01002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f7570001c007b22736368656d615f76657273696f6e223a312c22736f757263655f6d6573736167655f6964223a22636f6e666f726d616e63652d38323238222c226b696e64223a22686561727462656174222c2264617461223a7b2273657175656e6365223a383232387d7d",
+              "at": 5.9367855
+            },
+            {
+              "direction": "server_to_client",
+              "first": 80,
+              "body_hex": "001c",
+              "at": 5.936875416
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "3c8c01002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f7570001d007b22736368656d615f76657273696f6e223a312c22736f757263655f6d6573736167655f6964223a22636f6e666f726d616e63652d38323239222c226b696e64223a22686561727462656174222c2264617461223a7b2273657175656e6365223a383232397d7d",
+              "at": 5.936887666
+            },
+            {
+              "direction": "server_to_client",
+              "first": 80,
+              "body_hex": "001d",
+              "at": 5.936972791
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "3c8c01002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f7570001e007b22736368656d615f76657273696f6e223a312c22736f757263655f6d6573736167655f6964223a22636f6e666f726d616e63652d38323330222c226b696e64223a22686561727462656174222c2264617461223a7b2273657175656e6365223a383233307d7d",
+              "at": 5.93698475
+            },
+            {
+              "direction": "server_to_client",
+              "first": 80,
+              "body_hex": "001e",
+              "at": 5.937079291
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "3c8c01002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f7570001f007b22736368656d615f76657273696f6e223a312c22736f757263655f6d6573736167655f6964223a22636f6e666f726d616e63652d38323331222c226b696e64223a22686561727462656174222c2264617461223a7b2273657175656e6365223a383233317d7d",
+              "at": 5.93709125
+            },
+            {
+              "direction": "server_to_client",
+              "first": 80,
+              "body_hex": "001f",
+              "at": 5.937181291
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "3c8c01002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f75700020007b22736368656d615f76657273696f6e223a312c22736f757263655f6d6573736167655f6964223a22636f6e666f726d616e63652d38323332222c226b696e64223a22686561727462656174222c2264617461223a7b2273657175656e6365223a383233327d7d",
+              "at": 5.937194833
+            },
+            {
+              "direction": "server_to_client",
+              "first": 80,
+              "body_hex": "0020",
+              "at": 5.9372845
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "328c01002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f75700021007b22736368656d615f76657273696f6e223a312c22736f757263655f6d6573736167655f6964223a22636f6e666f726d616e63652d38343030222c226b696e64223a22686561727462656174222c2264617461223a7b2273657175656e6365223a383430307d7d",
+              "at": 5.937301583
+            },
+            {
+              "direction": "server_to_client",
+              "first": 64,
+              "body_hex": "0021",
+              "at": 5.93757275
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "e000",
+              "at": 5.937767
+            }
+          ]
+        }
+      ],
+      "traceback": "Traceback (most recent call last):\n  File \"/Users/sam/Dev/work/sskycn/netbaiot/tests/mqtt_protocol_regressions.py\", line 312, in main\n    test(case)\n  File \"/Users/sam/Dev/work/sskycn/netbaiot/tests/mqtt_protocol_regressions.py\", line 219, in receive_maximum_resume\n    require(first == 0xe0 and bool(body) and body[0] == 0x93,\n  File \"/Users/sam/Dev/work/sskycn/netbaiot/tests/mqtt_protocol_regressions.py\", line 38, in require\n    raise AssertionError(message)\nAssertionError: Expected Receive Maximum exceeded, got (64, b'\\x00!')\n",
+      "duration_seconds": 0.074
+    },
+    {
+      "case": "v311_duplicate_packet_id",
+      "result": "FAIL",
+      "details": "EOFError: connection closed",
+      "connections": [
+        {
+          "connection_index": 0,
+          "packets": [
+            {
+              "direction": "client_to_server",
+              "hex": "<redacted-connect>",
+              "at": 5.997796416
+            },
+            {
+              "direction": "server_to_client",
+              "first": 32,
+              "body_hex": "0000",
+              "at": 5.998265
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "348b01002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f757000077b22736368656d615f76657273696f6e223a312c22736f757263655f6d6573736167655f6964223a22636f6e666f726d616e63652d38353031222c226b696e64223a22686561727462656174222c2264617461223a7b2273657175656e6365223a383530317d7d",
+              "at": 5.998369875
+            },
+            {
+              "direction": "server_to_client",
+              "first": 80,
+              "body_hex": "0007",
+              "at": 5.99855425
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "3c8b01002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f757000077b22736368656d615f76657273696f6e223a312c22736f757263655f6d6573736167655f6964223a22636f6e666f726d616e63652d38353032222c226b696e64223a22686561727462656174222c2264617461223a7b2273657175656e6365223a383530327d7d",
+              "at": 5.998598625
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "e000",
+              "at": 5.998965708
+            }
+          ]
+        }
+      ],
+      "traceback": "Traceback (most recent call last):\n  File \"/Users/sam/Dev/work/sskycn/netbaiot/tests/mqtt_protocol_regressions.py\", line 312, in main\n    test(case)\n  File \"/Users/sam/Dev/work/sskycn/netbaiot/tests/mqtt_protocol_regressions.py\", line 229, in v311_duplicate_packet_id\n    ack(client.recv(), 0x50, 7)\n  File \"/Users/sam/Dev/work/sskycn/netbaiot/tests/mqtt_conformance/common.py\", line 166, in recv\n    first = self._exact(1)[0]\n  File \"/Users/sam/Dev/work/sskycn/netbaiot/tests/mqtt_conformance/common.py\", line 193, in _exact\n    raise EOFError(\"connection closed\")\nEOFError: connection closed\n",
+      "duration_seconds": 0.061
+    },
+    {
+      "case": "payload_format_reason",
+      "result": "FAIL",
+      "details": "AssertionError: Unused packet ID with invalid payload should not get 0x91",
+      "connections": [
+        {
+          "connection_index": 0,
+          "packets": [
+            {
+              "direction": "client_to_server",
+              "hex": "<redacted-connect>",
+              "at": 6.058950208
+            },
+            {
+              "direction": "server_to_client",
+              "first": 32,
+              "body_hex": "000013210020270001000029002a0022000025012801",
+              "at": 6.059606958
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "3428002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f75700007020101ff",
+              "at": 6.059623375
+            },
+            {
+              "direction": "server_to_client",
+              "first": 80,
+              "body_hex": "00079100",
+              "at": 6.059782416
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "e000",
+              "at": 6.060004416
+            }
+          ]
+        }
+      ],
+      "traceback": "Traceback (most recent call last):\n  File \"/Users/sam/Dev/work/sskycn/netbaiot/tests/mqtt_protocol_regressions.py\", line 312, in main\n    test(case)\n  File \"/Users/sam/Dev/work/sskycn/netbaiot/tests/mqtt_protocol_regressions.py\", line 243, in payload_format_reason\n    require(reason == 0x99,\n  File \"/Users/sam/Dev/work/sskycn/netbaiot/tests/mqtt_protocol_regressions.py\", line 38, in require\n    raise AssertionError(message)\nAssertionError: Unused packet ID with invalid payload should not get 0x91\n",
+      "duration_seconds": 0.061
+    },
+    {
+      "case": "qos2_business_validation",
+      "result": "FAIL",
+      "details": "AssertionError: Expected ACK 0x70/7, got (224, b'\\x99\\x00')",
+      "connections": [
+        {
+          "connection_index": 0,
+          "packets": [
+            {
+              "direction": "client_to_server",
+              "hex": "<redacted-connect>",
+              "at": 6.1199575
+            },
+            {
+              "direction": "server_to_client",
+              "first": 32,
+              "body_hex": "000013210020270001000029002a0022000025012801",
+              "at": 6.120460958
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "3426002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f75700007007b",
+              "at": 6.120479583
+            },
+            {
+              "direction": "server_to_client",
+              "first": 80,
+              "body_hex": "0007",
+              "at": 6.120680666
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "62020007",
+              "at": 6.120710041
+            },
+            {
+              "direction": "server_to_client",
+              "first": 224,
+              "body_hex": "9900",
+              "at": 6.120877666
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "e000",
+              "at": 6.121109958
+            }
+          ]
+        }
+      ],
+      "traceback": "Traceback (most recent call last):\n  File \"/Users/sam/Dev/work/sskycn/netbaiot/tests/mqtt_protocol_regressions.py\", line 312, in main\n    test(case)\n  File \"/Users/sam/Dev/work/sskycn/netbaiot/tests/mqtt_protocol_regressions.py\", line 264, in qos2_business_validation\n    ack(packet, 0x70, 7)  # A successful PUBREC must not lead to a poison reconnect loop.\n  File \"/Users/sam/Dev/work/sskycn/netbaiot/tests/mqtt_protocol_regressions.py\", line 79, in ack\n    require(first == kind and len(body) >= 2 and\n  File \"/Users/sam/Dev/work/sskycn/netbaiot/tests/mqtt_protocol_regressions.py\", line 38, in require\n    raise AssertionError(message)\nAssertionError: Expected ACK 0x70/7, got (224, b'\\x99\\x00')\n",
+      "duration_seconds": 0.06
+    }
+  ]
+}

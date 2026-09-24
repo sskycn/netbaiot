@@ -1,0 +1,145 @@
+   Compiling netbaiot-transports v0.1.1 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-transports)
+    Finished `release` profile [optimized] target(s) in 7.32s
+     Running unittests src/lib.rs (target/release/deps/netbaiot_transports-4651fe9140a278c8)
+
+running 8 tests
+test mqtt::broker::hotspot_bench::concurrent_route_ack_scaling ... ok
+test mqtt::broker::hotspot_bench::exact_subscribe_scaling ... ok
+test mqtt::broker::hotspot_bench::fanout_route_scaling ... ok
+test mqtt::broker::hotspot_bench::future_will_reconnect_scaling ... HOTSPOT,will_clean_unrelated,100,1,18735363,42,42,42
+HOTSPOT,will_clean_unrelated,100,2,16692749,42,42,125
+HOTSPOT,will_clean_unrelated,100,3,21333333,41,42,42
+HOTSPOT,will_resume_unrelated,100,1,16692749,42,42,42
+HOTSPOT,will_resume_unrelated,100,2,16000000,42,84,84
+HOTSPOT,will_resume_unrelated,100,3,15058824,42,83,84
+HOTSPOT,will_resume_owned,100,1,1714255,292,333,334
+HOTSPOT,will_resume_owned,100,2,1691600,292,334,541
+HOTSPOT,will_resume_owned,100,3,1706667,292,333,458
+HOTSPOT,will_clean_owned,100,1,2081301,167,208,208
+HOTSPOT,will_clean_owned,100,2,2048000,167,208,209
+HOTSPOT,will_clean_owned,100,3,2048000,167,209,209
+HOTSPOT,will_clean_unrelated,1000,1,19196161,42,42,42
+HOTSPOT,will_clean_unrelated,1000,2,3134796,167,334,375
+HOTSPOT,will_clean_unrelated,1000,3,21947874,41,42,42
+HOTSPOT,will_resume_unrelated,1000,1,13967700,42,84,84
+HOTSPOT,will_resume_unrelated,1000,2,12383901,42,84,84
+HOTSPOT,will_resume_unrelated,1000,3,11291461,42,83,167
+HOTSPOT,will_resume_owned,1000,1,1634070,291,334,334
+HOTSPOT,will_resume_owned,1000,2,1798561,250,250,292
+HOTSPOT,will_resume_owned,1000,3,1815603,250,291,292
+HOTSPOT,will_clean_owned,1000,1,1969231,167,209,209
+HOTSPOT,will_clean_owned,1000,2,1939394,167,209,209
+HOTSPOT,will_clean_owned,1000,3,1969231,167,167,209
+HOTSPOT,will_clean_unrelated,10000,1,11295447,42,84,84
+HOTSPOT,will_clean_unrelated,10000,2,6858123,42,84,3000
+HOTSPOT,will_clean_unrelated,10000,3,17867113,41,42,83
+HOTSPOT,will_resume_unrelated,10000,1,13967700,42,83,84
+HOTSPOT,will_resume_unrelated,10000,2,12800000,42,84,166
+HOTSPOT,will_resume_unrelated,10000,3,13710368,42,83,84
+HOTSPOT,will_resume_owned,10000,1,1777778,250,334,375
+HOTSPOT,will_resume_owned,10000,2,1623706,250,333,458
+HOTSPOT,will_resume_owned,10000,3,1757469,250,334,375
+HOTSPOT,will_clean_owned,10000,1,1954198,167,167,250
+HOTSPOT,will_clean_owned,10000,2,1910448,167,250,292
+HOTSPOT,will_clean_owned,10000,3,1939394,167,209,250
+ok
+test mqtt::broker::hotspot_bench::retained_lookup_scaling ... HOTSPOT,retained_exact,1000,1,3645192,250,292,334
+HOTSPOT,retained_exact,1000,2,3651874,250,292,334
+HOTSPOT,retained_exact,1000,3,3682102,250,250,292
+HOTSPOT,retained_plus,1000,1,4279,224125,303333,339167
+HOTSPOT,retained_plus,1000,2,4514,221167,235167,302750
+HOTSPOT,retained_plus,1000,3,4549,220167,232833,258583
+HOTSPOT,retained_selective_hash,1000,1,4971,201042,214083,241208
+HOTSPOT,retained_selective_hash,1000,2,5008,198750,211042,262000
+HOTSPOT,retained_selective_hash,1000,3,4914,202375,211542,290250
+HOTSPOT,retained_broad_hash,1000,1,7951,124792,129875,157250
+HOTSPOT,retained_broad_hash,1000,2,7976,125583,131209,153125
+HOTSPOT,retained_broad_hash,1000,3,7965,126042,131250,143208
+HOTSPOT,retained_exact,4000,1,3591748,250,292,292
+HOTSPOT,retained_exact,4000,2,3564021,250,292,292
+HOTSPOT,retained_exact,4000,3,3554519,250,292,333
+HOTSPOT,retained_plus,4000,1,1123,886917,961708,1030292
+HOTSPOT,retained_plus,4000,2,1140,873750,927917,980875
+HOTSPOT,retained_plus,4000,3,1133,878459,930958,1046959
+HOTSPOT,retained_selective_hash,4000,1,1232,807625,867792,960083
+HOTSPOT,retained_selective_hash,4000,2,1235,806417,857292,934750
+HOTSPOT,retained_selective_hash,4000,3,1249,796125,839875,934292
+HOTSPOT,retained_broad_hash,4000,1,1957,507459,545875,625583
+HOTSPOT,retained_broad_hash,4000,2,1971,502458,541166,626458
+HOTSPOT,retained_broad_hash,4000,3,1976,502375,527917,628833
+ok
+test mqtt::broker::hotspot_bench::session_recompute_scaling ... HOTSPOT,session_usage_offline,0,1,27057375,0,42,42
+HOTSPOT,session_usage_offline,0,2,27761969,0,42,42
+HOTSPOT,session_usage_offline,0,3,28707997,0,42,42
+HOTSPOT,message_deadline_offline,0,1,27570615,0,42,42
+HOTSPOT,message_deadline_offline,0,2,27242018,0,42,42
+HOTSPOT,message_deadline_offline,0,3,27319419,0,42,42
+HOTSPOT,session_usage_offline,10,1,31311155,0,42,42
+HOTSPOT,session_usage_offline,10,2,31516909,0,42,42
+HOTSPOT,session_usage_offline,10,3,31496063,0,42,42
+HOTSPOT,message_deadline_offline,10,1,24793593,0,42,42
+HOTSPOT,message_deadline_offline,10,2,24144966,0,42,42
+HOTSPOT,message_deadline_offline,10,3,26200988,0,42,42
+HOTSPOT,session_usage_offline,100,1,29574861,0,42,42
+HOTSPOT,session_usage_offline,100,2,31599570,0,42,42
+HOTSPOT,session_usage_offline,100,3,26578073,0,42,42
+HOTSPOT,message_deadline_offline,100,1,11220196,83,84,84
+HOTSPOT,message_deadline_offline,100,2,11549545,83,84,84
+HOTSPOT,message_deadline_offline,100,3,12896320,42,84,84
+HOTSPOT,session_usage_offline,128,1,31331756,0,42,42
+HOTSPOT,session_usage_offline,128,2,31434185,0,42,42
+HOTSPOT,session_usage_offline,128,3,31537285,0,42,42
+HOTSPOT,message_deadline_offline,128,1,7623898,83,125,416
+HOTSPOT,message_deadline_offline,128,2,6934404,84,167,167
+HOTSPOT,message_deadline_offline,128,3,8724100,83,125,125
+HOTSPOT,session_usage_outbound,1,1,26373395,0,42,42
+HOTSPOT,session_usage_outbound,1,2,27972028,0,42,42
+HOTSPOT,session_usage_outbound,1,3,28004537,0,42,42
+HOTSPOT,message_deadline_outbound,1,1,26636833,0,42,42
+HOTSPOT,message_deadline_outbound,1,2,25682183,0,42,42
+HOTSPOT,message_deadline_outbound,1,3,26755853,0,42,42
+HOTSPOT,session_usage_outbound,10,1,24156923,0,42,42
+HOTSPOT,session_usage_outbound,10,2,27241647,0,42,42
+HOTSPOT,session_usage_outbound,10,3,28102913,0,42,42
+HOTSPOT,message_deadline_outbound,10,1,25000000,0,42,42
+HOTSPOT,message_deadline_outbound,10,2,25210190,0,42,42
+HOTSPOT,message_deadline_outbound,10,3,21248340,41,42,125
+HOTSPOT,session_usage_outbound,32,1,22662890,41,42,42
+HOTSPOT,session_usage_outbound,32,2,22566996,41,42,42
+HOTSPOT,session_usage_outbound,32,3,24084488,41,42,42
+HOTSPOT,message_deadline_outbound,32,1,20330368,41,42,42
+HOTSPOT,message_deadline_outbound,32,2,20330368,41,42,42
+HOTSPOT,message_deadline_outbound,32,3,20134296,41,42,42
+ok
+test mqtt::broker::hotspot_bench::single_session_route_ack_scaling ... ok
+test mqtt::broker::hotspot_bench::tenant_pending_wake_scaling ... HOTSPOT,pending_wake_full_qos1,100,1,19357336,42,42,42
+HOTSPOT,pending_wake_full_qos1,100,2,6315524,42,292,1417
+HOTSPOT,pending_wake_full_qos1,100,3,15586035,42,42,42
+HOTSPOT,pending_wake_wrong_qos,100,1,15792798,42,42,84
+HOTSPOT,pending_wake_wrong_qos,100,2,15792798,42,42,83
+HOTSPOT,pending_wake_wrong_qos,100,3,16217970,42,42,83
+HOTSPOT,pending_unmark_mark_tail,100,1,3217089,292,333,333
+HOTSPOT,pending_unmark_mark_tail,100,2,3191421,292,333,375
+HOTSPOT,pending_unmark_mark_tail,100,3,3260728,292,292,292
+HOTSPOT,pending_wake_full_qos1,1000,1,19669552,42,42,83
+HOTSPOT,pending_wake_full_qos1,1000,2,13950893,41,84,375
+HOTSPOT,pending_wake_full_qos1,1000,3,19047619,42,42,83
+HOTSPOT,pending_wake_wrong_qos,1000,1,16217970,42,42,83
+HOTSPOT,pending_wake_wrong_qos,1000,2,16000000,42,42,125
+HOTSPOT,pending_wake_wrong_qos,1000,3,16000000,42,42,83
+HOTSPOT,pending_unmark_mark_tail,1000,1,2857143,333,334,375
+HOTSPOT,pending_unmark_mark_tail,1000,2,2385610,375,500,542
+HOTSPOT,pending_unmark_mark_tail,1000,3,2898551,333,334,417
+HOTSPOT,pending_wake_full_qos1,4000,1,15384615,42,42,83
+HOTSPOT,pending_wake_full_qos1,4000,2,18747657,42,42,84
+HOTSPOT,pending_wake_full_qos1,4000,3,19677292,42,42,83
+HOTSPOT,pending_wake_wrong_qos,4000,1,17140898,42,83,125
+HOTSPOT,pending_wake_wrong_qos,4000,2,14116318,42,84,458
+HOTSPOT,pending_wake_wrong_qos,4000,3,16436555,42,42,208
+HOTSPOT,pending_unmark_mark_tail,4000,1,2905625,333,334,375
+HOTSPOT,pending_unmark_mark_tail,4000,2,1548371,417,1042,5542
+HOTSPOT,pending_unmark_mark_tail,4000,3,2884504,333,334,417
+ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 124 filtered out; finished in 4.27s
+

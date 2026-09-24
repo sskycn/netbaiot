@@ -1,0 +1,133 @@
+   Compiling libc v0.2.189
+   Compiling proc-macro2 v1.0.107
+   Compiling quote v1.0.47
+   Compiling unicode-ident v1.0.24
+   Compiling cfg-if v1.0.4
+   Compiling pin-project-lite v0.2.17
+   Compiling serde_core v1.0.229
+   Compiling parking_lot_core v0.9.12
+   Compiling version_check v0.9.5
+   Compiling bytes v1.12.1
+   Compiling itoa v1.0.18
+   Compiling smallvec v1.15.2
+   Compiling find-msvc-tools v0.1.11
+   Compiling generic-array v0.14.7
+   Compiling shlex v2.0.1
+   Compiling scopeguard v1.2.0
+   Compiling typenum v1.20.1
+   Compiling lock_api v0.4.14
+   Compiling cc v1.4.4
+   Compiling getrandom v0.4.3
+   Compiling futures-core v0.3.34
+   Compiling serde v1.0.229
+   Compiling thiserror v2.0.20
+   Compiling subtle v2.6.1
+   Compiling zmij v1.0.23
+   Compiling once_cell v1.21.4
+   Compiling ring v0.17.14
+   Compiling http v1.5.0
+   Compiling untrusted v0.9.0
+   Compiling serde_json v1.0.151
+   Compiling zeroize v1.9.0
+   Compiling httparse v1.10.1
+   Compiling syn v3.0.4
+   Compiling syn v2.0.119
+   Compiling errno v0.3.14
+   Compiling parking_lot v0.12.5
+   Compiling signal-hook-registry v1.4.8
+   Compiling socket2 v0.6.5
+   Compiling mio v1.2.2
+   Compiling uuid v1.25.0
+   Compiling block-buffer v0.10.4
+   Compiling crypto-common v0.1.7
+   Compiling getrandom v0.2.17
+   Compiling digest v0.10.7
+   Compiling rustls-pki-types v1.15.1
+   Compiling http-body v1.1.0
+   Compiling slab v0.4.12
+   Compiling futures-task v0.3.34
+   Compiling rustls v0.23.43
+   Compiling memchr v2.8.3
+   Compiling cpufeatures v0.2.17
+   Compiling tracing-core v0.1.36
+   Compiling futures-channel v0.3.34
+   Compiling httpdate v1.0.3
+   Compiling tokio-macros v2.7.2
+   Compiling thiserror-impl v2.0.20
+   Compiling serde_derive v1.0.229
+   Compiling futures-macro v0.3.34
+   Compiling tokio v1.53.1
+   Compiling atomic-waker v1.1.2
+   Compiling futures-sink v0.3.34
+   Compiling async-trait v0.1.92
+   Compiling sha2 v0.10.9
+   Compiling tracing-attributes v0.1.31
+   Compiling futures-util v0.3.34
+   Compiling hmac v0.12.1
+   Compiling http-body-util v0.1.5
+   Compiling tracing v0.1.44
+   Compiling hyper v1.11.0
+   Compiling tokio-util v0.7.19
+   Compiling rustls-webpki v0.103.15
+   Compiling netbaiot-protocol v0.1.1 (/private/tmp/netbaiot-perf-baseline/crates/netbaiot-protocol)
+   Compiling hyper-util v0.1.20
+   Compiling netbaiot-core v0.1.1 (/private/tmp/netbaiot-perf-baseline/crates/netbaiot-core)
+   Compiling netbaiot-runtime v0.1.1 (/private/tmp/netbaiot-perf-baseline/crates/netbaiot-runtime)
+   Compiling netbaiot-codecs v0.1.1 (/private/tmp/netbaiot-perf-baseline/crates/netbaiot-codecs)
+   Compiling tokio-rustls v0.26.4
+   Compiling netbaiot-transports v0.1.1 (/private/tmp/netbaiot-perf-baseline/crates/netbaiot-transports)
+    Finished `bench` profile [optimized] target(s) in 15.74s
+     Running ../../benches/foundation.rs (target/release/deps/foundation-a7d212eeb1a78abb)
+auth_cache_hit: 20000 iterations, 1009676 ops/s, p50=917 ns p95=1125 ns p99=1291 ns
+udp_verifier_cache_hit_hmac_256: 20000 iterations, 556377 ops/s, p50=1708 ns p95=2375 ns p99=2417 ns
+auth_cache_miss_local_provider: 2000 iterations, 10138 ops/s, p50=98958 ns p95=141458 ns p99=149334 ns
+event_bus_publish: 10000 iterations, 751590 ops/s, p50=1250 ns p95=1583 ns p99=2125 ns
+mqtt_decode: 20000 iterations, 6824385 ops/s, p50=125 ns p95=167 ns p99=167 ns
+mqtt_encode: 20000 iterations, 9633911 ops/s, p50=83 ns p95=84 ns p99=125 ns
+topic_acl: 20000 iterations, 15811839 ops/s, p50=42 ns p95=42 ns p99=84 ns
+subscription_lookup: 20000 iterations, 4120631 ops/s, p50=209 ns p95=250 ns p99=250 ns
+mqtt_qos1_route_ack: 10000 iterations, 580398 ops/s, p50=1708 ns p95=1791 ns p99=2125 ns
+mqtt_qos2_inbound_accept_route: 10000 iterations, 772641 ops/s, p50=1250 ns p95=1333 ns p99=1583 ns
+json_codec: 20000 iterations, 833679 ops/s, p50=1167 ns p95=1250 ns p99=1542 ns
+tcp_frame: 20000 iterations, 14490129 ops/s, p50=42 ns p95=84 ns p99=84 ns
+ingress_admission: 20000 iterations, 3044932 ops/s, p50=292 ns p95=334 ns p99=417 ns
+mqtt_decode_small: 10000 iterations, 6614120 ops/s, p50=125 ns p95=167 ns p99=167 ns
+mqtt_decode_medium: 10000 iterations, 5103233 ops/s, p50=167 ns p95=209 ns p99=250 ns
+mqtt_decode_maximum: 10000 iterations, 874209 ops/s, p50=1167 ns p95=1333 ns p99=1375 ns
+json_codec_small: 10000 iterations, 671233 ops/s, p50=1500 ns p95=1542 ns p99=1792 ns
+json_codec_medium: 10000 iterations, 30638 ops/s, p50=32500 ns p95=35042 ns p99=40167 ns
+json_codec_maximum: 10000 iterations, 5817 ops/s, p50=172083 ns p95=182459 ns p99=194125 ns
+session_lookup_1: 10000 iterations, 15071590 ops/s, p50=42 ns p95=83 ns p99=84 ns
+subscription_lookup_1: 10000 iterations, 3958828 ops/s, p50=250 ns p95=250 ns p99=250 ns
+topic_acl_1: 10000 iterations, 9409188 ops/s, p50=83 ns p95=125 ns p99=125 ns
+ingress_bookkeeping_1: 10000 iterations, 3006050 ops/s, p50=333 ns p95=334 ns p99=334 ns
+session_lookup_64: 10000 iterations, 14870817 ops/s, p50=42 ns p95=83 ns p99=84 ns
+subscription_lookup_64: 10000 iterations, 3835581 ops/s, p50=250 ns p95=250 ns p99=333 ns
+topic_acl_64: 10000 iterations, 9090909 ops/s, p50=83 ns p95=125 ns p99=125 ns
+ingress_bookkeeping_64: 10000 iterations, 3072630 ops/s, p50=292 ns p95=334 ns p99=334 ns
+session_lookup_256: 10000 iterations, 15190850 ops/s, p50=42 ns p95=83 ns p99=84 ns
+subscription_lookup_256: 10000 iterations, 3951072 ops/s, p50=250 ns p95=250 ns p99=250 ns
+topic_acl_256: 10000 iterations, 9211632 ops/s, p50=83 ns p95=125 ns p99=125 ns
+ingress_bookkeeping_256: 10000 iterations, 2946666 ops/s, p50=292 ns p95=334 ns p99=417 ns
+admission_entries_10: 10000 iterations, 4593302 ops/s, p50=208 ns p95=209 ns p99=250 ns
+admission_entries_100: 10000 iterations, 4423555 ops/s, p50=208 ns p95=209 ns p99=250 ns
+admission_entries_1000: 10000 iterations, 4288089 ops/s, p50=208 ns p95=250 ns p99=250 ns
+admission_entries_10000: 10000 iterations, 4189652 ops/s, p50=208 ns p95=250 ns p99=292 ns
+disconnected_sessions_100: logical_bytes=17796 bytes/session=178.0
+subscription_router_100: 20000 iterations, 4800671 ops/s, p50=167 ns p95=209 ns p99=209 ns
+disconnected_sessions_1000: logical_bytes=181896 bytes/session=181.9
+subscription_router_1000: 20000 iterations, 4707359 ops/s, p50=167 ns p95=209 ns p99=250 ns
+disconnected_sessions_10000: logical_bytes=1858896 bytes/session=185.9
+subscription_router_10000: 20000 iterations, 4747352 ops/s, p50=208 ns p95=209 ns p99=209 ns
+retained_store_1000: logical_bytes=145890 bytes/message=145.9
+retained_exact_1000: 10000 iterations, 16484649 ops/s, p50=42 ns p95=42 ns p99=84 ns
+retained_wildcard_1000: 1000 iterations, 13623 ops/s, p50=72500 ns p95=77542 ns p99=82750 ns
+retained_store_4000: logical_bytes=586890 bytes/message=146.7
+retained_exact_4000: 10000 iterations, 15257462 ops/s, p50=42 ns p95=83 ns p99=84 ns
+retained_wildcard_4000: 1000 iterations, 3395 ops/s, p50=293208 ns p95=313458 ns p99=326958 ns
+mqtt_state_payload_64: offline_messages=1 offline_bytes=147 outbound_qos1_bytes=147 outbound_qos2_bytes=147 inbound_qos2_bytes=145
+mqtt_state_payload_256: offline_messages=1 offline_bytes=339 outbound_qos1_bytes=339 outbound_qos2_bytes=339 inbound_qos2_bytes=337
+mqtt_state_payload_1024: offline_messages=1 offline_bytes=1107 outbound_qos1_bytes=1107 outbound_qos2_bytes=1107 inbound_qos2_bytes=1105
+mqtt_state_payload_8192: offline_messages=1 offline_bytes=8275 outbound_qos1_bytes=8275 outbound_qos2_bytes=8275 inbound_qos2_bytes=8273
+mqtt_state_payload_32768: offline_messages=1 offline_bytes=32851 outbound_qos1_bytes=32851 outbound_qos2_bytes=32851 inbound_qos2_bytes=32849
+layout_bytes: session_endpoint=96 queued_command=104 device_event=152

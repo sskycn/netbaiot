@@ -1,0 +1,12 @@
+    Finished `release` profile [optimized] target(s) in 0.04s
+     Running unittests src/lib.rs (target/release/deps/netbaiot_transports-4651fe9140a278c8)
+
+running 1 test
+test mqtt::broker::hotspot_bench::concurrent_route_ack_scaling ... CONCURRENT,10000,1,298225,3041,4291,4958,4,1600,3026,1600
+CONCURRENT,10000,2,139468,8084,26292,131625,9089,1600,5727,1600
+CONCURRENT,10000,4,99596,36209,99125,208709,33769,1600,8110,1600
+CONCURRENT,10000,8,94988,36292,276375,482000,63379,1600,8455,1600
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 131 filtered out; finished in 0.13s
+

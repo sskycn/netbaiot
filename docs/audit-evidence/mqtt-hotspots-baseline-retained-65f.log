@@ -1,0 +1,33 @@
+   Compiling netbaiot-transports v0.1.1 (/private/tmp/netbaiot-perf-baseline/crates/netbaiot-transports)
+    Finished `release` profile [optimized] target(s) in 6.25s
+     Running unittests src/lib.rs (/Users/sam/Dev/work/sskycn/netbaiot/target/release/deps/netbaiot_transports-4651fe9140a278c8)
+
+running 1 test
+test mqtt::broker::hotspot_bench::retained_lookup_scaling ... HOTSPOT,retained_exact,1000,1,1405647,667,709,833
+HOTSPOT,retained_exact,1000,2,1425346,666,667,709
+HOTSPOT,retained_exact,1000,3,1398766,667,708,792
+HOTSPOT,retained_plus,1000,1,3986,214500,446208,584375
+HOTSPOT,retained_plus,1000,2,4865,205083,217750,280917
+HOTSPOT,retained_plus,1000,3,4791,209167,219333,275083
+HOTSPOT,retained_selective_hash,1000,1,5363,186416,198333,247625
+HOTSPOT,retained_selective_hash,1000,2,5269,189375,198583,239917
+HOTSPOT,retained_selective_hash,1000,3,5328,187667,196584,247167
+HOTSPOT,retained_broad_hash,1000,1,8639,116042,123250,145292
+HOTSPOT,retained_broad_hash,1000,2,8651,115292,121833,133917
+HOTSPOT,retained_broad_hash,1000,3,8683,114791,122416,134541
+HOTSPOT,retained_exact,4000,1,3883495,250,250,292
+HOTSPOT,retained_exact,4000,2,3851071,250,250,250
+HOTSPOT,retained_exact,4000,3,4048583,209,250,250
+HOTSPOT,retained_plus,4000,1,1255,793792,867125,904084
+HOTSPOT,retained_plus,4000,2,1241,801667,866625,907625
+HOTSPOT,retained_plus,4000,3,1130,810125,1037166,2728625
+HOTSPOT,retained_selective_hash,4000,1,1349,737250,805625,838625
+HOTSPOT,retained_selective_hash,4000,2,1357,734000,783167,844584
+HOTSPOT,retained_selective_hash,4000,3,1353,735041,796042,836625
+HOTSPOT,retained_broad_hash,4000,1,2100,471708,535583,573792
+HOTSPOT,retained_broad_hash,4000,2,2060,476833,539709,572541
+HOTSPOT,retained_broad_hash,4000,3,2136,464958,493750,548250
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 130 filtered out; finished in 3.88s
+

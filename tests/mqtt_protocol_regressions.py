@@ -10,12 +10,14 @@ Usage:
   cargo build --locked -p netbaiot-server
   python3 mqtt_protocol_regressions.py --repo /path/to/netbaiot --output results.json
 
-The binary must be rebuilt from the checkout being tested. This script records
-Git HEAD but cannot prove that an existing binary was built from that HEAD.
+The binary must be rebuilt from the checkout being tested. The output records
+the binary hash and source-diff hashes; they identify artifacts but cannot prove
+which source produced a preexisting binary without a witnessed build.
 """
 from __future__ import annotations
 
 import argparse
+import hashlib
 import importlib
 import json
 import pathlib
@@ -331,6 +333,21 @@ def main() -> int:
     head_result = subprocess.run(["git", "-C", str(repo), "rev-parse", "HEAD"],
                                  text=True, capture_output=True, check=False)
     head = head_result.stdout.strip() if head_result.returncode == 0 else "unknown"
+    binary_sha256 = hashlib.sha256((repo / "target/debug/netbaiot-server").read_bytes()).hexdigest()
+    diff = subprocess.run(["git", "-C", str(repo), "diff", "HEAD", "--binary"],
+                          capture_output=True, check=False)
+    diff_sha256 = hashlib.sha256(diff.stdout).hexdigest() if diff.returncode == 0 else None
+    untracked = subprocess.run(["git", "-C", str(repo), "ls-files", "--others",
+                                "--exclude-standard", "-z"], capture_output=True, check=False)
+    untracked_sha256 = None
+    if untracked.returncode == 0:
+        digest = hashlib.sha256()
+        for raw_path in sorted(path for path in untracked.stdout.split(b"\0") if path):
+            path = repo / raw_path.decode("utf-8")
+            if path.is_file():
+                digest.update(raw_path + b"\0")
+                digest.update(hashlib.sha256(path.read_bytes()).digest())
+        untracked_sha256 = digest.hexdigest()
     print(f"Audit baseline: {AUDIT_SHA}\nCheckout HEAD:  {head}")
     print("Only isolated loopback test processes are started. Rebuild the binary before testing.")
     results = []
@@ -372,7 +389,9 @@ def main() -> int:
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps({"audit_baseline": AUDIT_SHA,
                                       "checkout_head": head,
-                                      "binary_provenance": "must be rebuilt by operator",
+                                      "binary_sha256": binary_sha256,
+                                      "tracked_diff_sha256": diff_sha256,
+                                      "untracked_manifest_sha256": untracked_sha256,
                                       "results": results}, ensure_ascii=False, indent=2))
     print(f"Evidence: {args.output.resolve()}")
     return 0 if all(row["result"] == "PASS" for row in results) else 1

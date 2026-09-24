@@ -1,0 +1,13 @@
+   Compiling netbaiot-transports v0.1.1 (/private/tmp/netbaiot-perf-baseline/crates/netbaiot-transports)
+    Finished `release` profile [optimized] target(s) in 6.41s
+     Running unittests src/lib.rs (/Users/sam/Dev/work/sskycn/netbaiot/target/release/deps/netbaiot_transports-4651fe9140a278c8)
+
+running 1 test
+test mqtt::broker::hotspot_bench::concurrent_route_ack_scaling ... CONCURRENT,10000,1,331512,2709,3625,5208,4,1600,2341,1600
+CONCURRENT,10000,2,330013,2917,3666,17750,2729,1600,1866,1600
+CONCURRENT,10000,4,212610,18416,20958,41084,21390,1600,2947,1600
+CONCURRENT,10000,8,210159,36792,54208,82167,50929,1600,2976,1600
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 130 filtered out; finished in 0.10s
+
