@@ -15,44 +15,158 @@ pub const RECEIVE_MAXIMUM_EXCEEDED: u8 = 0x93;
 pub const SUBSCRIPTION_IDENTIFIERS_NOT_SUPPORTED: u8 = 0xa1;
 pub const SHARED_SUBSCRIPTIONS_NOT_SUPPORTED: u8 = 0x9e;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(u8)]
+pub enum ConnackReason {
+    Success = 0,
+    ImplementationSpecific = 0x83,
+    ClientIdentifierInvalid = 0x85,
+    BadCredentials = 0x86,
+    NotAuthorized = 0x87,
+    ServerUnavailable = 0x88,
+    ServerBusy = 0x89,
+    BadAuthenticationMethod = 0x8c,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(u8)]
+pub enum DisconnectReason {
+    ProtocolError = 0x82,
+    ImplementationSpecific = 0x83,
+    NotAuthorized = 0x87,
+    ServerBusy = 0x89,
+    ServerShuttingDown = 0x8b,
+    KeepAliveTimeout = 0x8d,
+    SessionTakenOver = 0x8e,
+    TopicFilterInvalid = 0x8f,
+    TopicNameInvalid = 0x90,
+    ReceiveMaximumExceeded = 0x93,
+    TopicAliasInvalid = 0x94,
+    PacketTooLarge = 0x95,
+    QuotaExceeded = 0x97,
+    PayloadFormatInvalid = 0x99,
+    SharedSubscriptionsNotSupported = 0x9e,
+    SubscriptionIdentifiersNotSupported = 0xa1,
+    MalformedPacket = 0x81,
+}
+
+impl DisconnectReason {
+    pub fn from_decode(code: u8) -> Self {
+        match code {
+            MALFORMED_PACKET => Self::MalformedPacket,
+            PACKET_TOO_LARGE => Self::PacketTooLarge,
+            TOPIC_ALIAS_INVALID => Self::TopicAliasInvalid,
+            TOPIC_NAME_INVALID => Self::TopicNameInvalid,
+            TOPIC_FILTER_INVALID => Self::TopicFilterInvalid,
+            SUBSCRIPTION_IDENTIFIERS_NOT_SUPPORTED => Self::SubscriptionIdentifiersNotSupported,
+            SHARED_SUBSCRIPTIONS_NOT_SUPPORTED => Self::SharedSubscriptionsNotSupported,
+            _ => Self::ProtocolError,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(u8)]
+pub enum PubackReason {
+    Success = 0,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(u8)]
+pub enum PubrecReason {
+    Success = 0,
+    PacketIdentifierInUse = 0x91,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(u8)]
+pub enum PubrelReason {
+    Success = 0,
+    PacketIdentifierNotFound = 0x92,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(u8)]
+pub enum PubcompReason {
+    Success = 0,
+    PacketIdentifierNotFound = 0x92,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AckReason {
+    Puback(PubackReason),
+    Pubrec(PubrecReason),
+    Pubrel(PubrelReason),
+    Pubcomp(PubcompReason),
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(u8)]
+pub enum SubackReason {
+    GrantedQos0 = 0,
+    GrantedQos1 = 1,
+    GrantedQos2 = 2,
+    UnspecifiedError = 0x80,
+    ImplementationSpecific = 0x83,
+    NotAuthorized = 0x87,
+    TopicFilterInvalid = 0x8f,
+    QuotaExceeded = 0x97,
+}
+
+impl SubackReason {
+    pub fn granted(qos: u8) -> std::result::Result<Self, Error> {
+        match qos {
+            0 => Ok(Self::GrantedQos0),
+            1 => Ok(Self::GrantedQos1),
+            2 => Ok(Self::GrantedQos2),
+            _ => Err(Error::Invalid),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(u8)]
+pub enum UnsubackReason {
+    Success = 0,
+    NoSubscriptionExisted = 0x11,
+}
+
 /// Transport-only mapping; the public runtime `Error` keeps its existing meaning.
-pub fn connect_reason(error: &Error) -> u8 {
+pub fn connect_reason(error: &Error) -> ConnackReason {
     match error {
-        Error::Authentication => 0x86,
-        Error::Forbidden => 0x87,
-        Error::Invalid => 0x85,
-        Error::Overloaded | Error::Draining => 0x89,
-        Error::Unavailable | Error::Timeout => 0x88,
+        Error::Authentication => ConnackReason::BadCredentials,
+        Error::Forbidden => ConnackReason::NotAuthorized,
+        Error::Invalid => ConnackReason::ClientIdentifierInvalid,
+        Error::Overloaded | Error::Draining => ConnackReason::ServerBusy,
+        Error::Unavailable | Error::Timeout => ConnackReason::ServerUnavailable,
         Error::Configuration
         | Error::Conflict
         | Error::Storage
         | Error::IncompatibleSpool
         | Error::Internal
-        | Error::Codec => 0x83,
+        | Error::Codec => ConnackReason::ImplementationSpecific,
     }
 }
 
-pub fn disconnect_reason(error: &Error) -> u8 {
+pub fn disconnect_reason(error: &Error) -> DisconnectReason {
     match error {
-        Error::Authentication | Error::Forbidden => 0x87,
-        Error::Invalid => PROTOCOL_ERROR,
-        Error::Overloaded => 0x97,
-        Error::Conflict => 0x91,
-        Error::Unavailable => 0x88,
-        Error::Timeout => 0x8d,
-        Error::Draining => 0x8b,
-        Error::Codec => 0x99,
-        Error::Configuration | Error::Storage | Error::IncompatibleSpool | Error::Internal => 0x83,
+        Error::Authentication | Error::Forbidden => DisconnectReason::NotAuthorized,
+        Error::Invalid | Error::Conflict => DisconnectReason::ProtocolError,
+        Error::Overloaded => DisconnectReason::QuotaExceeded,
+        Error::Unavailable => DisconnectReason::ServerBusy,
+        Error::Timeout => DisconnectReason::KeepAliveTimeout,
+        Error::Draining => DisconnectReason::ServerShuttingDown,
+        Error::Codec => DisconnectReason::PayloadFormatInvalid,
+        Error::Configuration | Error::Storage | Error::IncompatibleSpool | Error::Internal => {
+            DisconnectReason::ImplementationSpecific
+        }
     }
 }
 
-pub fn subscription_reason(error: &Error) -> u8 {
+pub fn subscription_reason(error: &Error) -> SubackReason {
     match error {
-        Error::Forbidden | Error::Authentication => 0x87,
-        Error::Invalid => 0x8f,
-        Error::Overloaded => 0x97,
-        Error::Draining | Error::Unavailable | Error::Timeout => 0x88,
-        _ => 0x83,
+        Error::Forbidden | Error::Authentication => SubackReason::NotAuthorized,
+        Error::Invalid => SubackReason::TopicFilterInvalid,
+        Error::Overloaded => SubackReason::QuotaExceeded,
+        Error::Draining | Error::Unavailable | Error::Timeout => SubackReason::UnspecifiedError,
+        _ => SubackReason::ImplementationSpecific,
     }
 }
 
@@ -508,6 +622,9 @@ pub fn decode(input: &mut BytesMut, limits: &Limits) -> Result<Option<Packet>> {
         1 => decode_connect(&mut cursor, limits)?,
         3 => {
             let qos = (first >> 1) & 3;
+            if qos == 0 && first & 8 != 0 {
+                return Err(protocol());
+            }
             let topic = cursor.string(limits.max_topic_bytes)?;
             if !valid_topic(&topic, limits, false) {
                 return Err(DecodeError {
@@ -679,12 +796,15 @@ pub fn decode(input: &mut BytesMut, limits: &Limits) -> Result<Option<Packet>> {
 
 pub fn connack(
     session_present: bool,
-    reason: u8,
+    reason: ConnackReason,
     limits: &Limits,
     assigned_client_id: Option<&str>,
+    client_maximum: usize,
 ) -> std::result::Result<Vec<u8>, Error> {
-    let mut properties = Vec::with_capacity(24 + assigned_client_id.map_or(0, str::len));
-    properties.extend_from_slice(&[0x21, 0, 0]);
+    let maximum = client_maximum.min(limits.max_mqtt_packet_size);
+    if reason != ConnackReason::Success {
+        return encode(0x20, &[0, reason as u8, 0], maximum);
+    }
     let receive_maximum = u16::try_from(
         limits
             .max_inflight_qos1_per_session
@@ -692,25 +812,46 @@ pub fn connack(
     )
     .map_err(|_| Error::Configuration)?
     .max(1);
-    properties[1..3].copy_from_slice(&receive_maximum.to_be_bytes());
+    let mut properties = vec![0x21];
+    properties.extend_from_slice(&receive_maximum.to_be_bytes());
+    let server_maximum =
+        u32::try_from(limits.max_mqtt_packet_size).map_err(|_| Error::Configuration)?;
     properties.push(0x27);
-    properties.extend_from_slice(
-        &u32::try_from(limits.max_mqtt_packet_size)
-            .map_err(|_| Error::Configuration)?
-            .to_be_bytes(),
-    );
-    // Maximum QoS 2 is represented by omitting 0x24; MQTT 5 permits only 0 or 1 there.
-    properties.extend_from_slice(&[0x22, 0, 0, 0x25, 1, 0x28, 1, 0x29, 0, 0x2a, 0]);
+    properties.extend_from_slice(&server_maximum.to_be_bytes());
+    // Absence of 0x29 or 0x2a advertises support by default, which this broker
+    // does not provide. They are part of the minimal truthful CONNACK.
+    properties.extend_from_slice(&[0x29, 0, 0x2a, 0]);
     if let Some(client_id) = assigned_client_id {
         properties.push(0x12);
         let length = u16::try_from(client_id.len()).map_err(|_| Error::Overloaded)?;
         properties.extend_from_slice(&length.to_be_bytes());
         properties.extend_from_slice(client_id.as_bytes());
     }
-    let mut body = vec![u8::from(session_present), reason];
+    // Receive Maximum, server packet bound, unsupported capability flags, and an
+    // assigned Client Identifier are essential. Defaults are optional.
+    let mut result = encode_connack_packet(session_present, reason, &properties, maximum)?;
+    for optional in [&[0x22, 0, 0][..], &[0x25, 1][..], &[0x28, 1][..]] {
+        let prior = properties.len();
+        properties.extend_from_slice(optional);
+        match encode_connack_packet(session_present, reason, &properties, maximum) {
+            Ok(encoded) => result = encoded,
+            Err(Error::Overloaded) => properties.truncate(prior),
+            Err(error) => return Err(error),
+        }
+    }
+    Ok(result)
+}
+
+fn encode_connack_packet(
+    session_present: bool,
+    reason: ConnackReason,
+    properties: &[u8],
+    maximum: usize,
+) -> std::result::Result<Vec<u8>, Error> {
+    let mut body = vec![u8::from(session_present), reason as u8];
     variable(properties.len(), &mut body);
-    body.extend_from_slice(&properties);
-    encode(0x20, &body, limits.max_mqtt_packet_size)
+    body.extend_from_slice(properties);
+    encode(0x20, &body, maximum)
 }
 
 fn variable(mut value: usize, output: &mut Vec<u8>) {
@@ -810,11 +951,16 @@ pub fn publish(packet: OutboundPublish<'_>, maximum: usize) -> std::result::Resu
 }
 
 pub fn ack(
-    first: u8,
+    reason: AckReason,
     packet_id: u16,
-    reason: u8,
     maximum: usize,
 ) -> std::result::Result<Vec<u8>, Error> {
+    let (first, reason) = match reason {
+        AckReason::Puback(reason) => (0x40, reason as u8),
+        AckReason::Pubrec(reason) => (0x50, reason as u8),
+        AckReason::Pubrel(reason) => (0x62, reason as u8),
+        AckReason::Pubcomp(reason) => (0x70, reason as u8),
+    };
     if reason == 0 {
         encode(first, &packet_id.to_be_bytes(), maximum)
     } else {
@@ -831,37 +977,103 @@ pub fn ack(
     }
 }
 
-pub fn disconnect(reason: u8, maximum: usize) -> std::result::Result<Vec<u8>, Error> {
-    encode(0xe0, &[reason, 0], maximum)
+pub fn disconnect(reason: DisconnectReason, maximum: usize) -> std::result::Result<Vec<u8>, Error> {
+    encode(0xe0, &[reason as u8, 0], maximum)
 }
 
 pub fn suback(
     packet_id: u16,
-    reasons: &[u8],
+    reasons: &[SubackReason],
     maximum: usize,
 ) -> std::result::Result<Vec<u8>, Error> {
     let mut body = Vec::with_capacity(3 + reasons.len());
     body.extend_from_slice(&packet_id.to_be_bytes());
     body.push(0); // Property Length
-    body.extend_from_slice(reasons);
+    body.extend(reasons.iter().map(|reason| *reason as u8));
     encode(0x90, &body, maximum)
 }
 
 pub fn unsuback(
     packet_id: u16,
-    reasons: &[u8],
+    reasons: &[UnsubackReason],
     maximum: usize,
 ) -> std::result::Result<Vec<u8>, Error> {
     let mut body = Vec::with_capacity(3 + reasons.len());
     body.extend_from_slice(&packet_id.to_be_bytes());
     body.push(0);
-    body.extend_from_slice(reasons);
+    body.extend(reasons.iter().map(|reason| *reason as u8));
     encode(0xb0, &body, maximum)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn packet_specific_reason_encoders() {
+        assert_eq!(
+            disconnect(DisconnectReason::ProtocolError, 16).unwrap(),
+            [0xe0, 2, 0x82, 0]
+        );
+        assert_eq!(
+            ack(
+                AckReason::Pubrel(PubrelReason::PacketIdentifierNotFound),
+                7,
+                16
+            )
+            .unwrap(),
+            [0x62, 4, 0, 7, 0x92, 0]
+        );
+        assert_eq!(
+            ack(
+                AckReason::Pubrec(PubrecReason::PacketIdentifierInUse),
+                7,
+                16
+            )
+            .unwrap(),
+            [0x50, 4, 0, 7, 0x91, 0]
+        );
+        assert_eq!(
+            unsuback(
+                7,
+                &[
+                    UnsubackReason::Success,
+                    UnsubackReason::NoSubscriptionExisted
+                ],
+                16
+            )
+            .unwrap(),
+            [0xb0, 5, 0, 7, 0, 0, 0x11]
+        );
+        assert_eq!(
+            disconnect_reason(&Error::Conflict),
+            DisconnectReason::ProtocolError
+        );
+        assert_eq!(
+            disconnect_reason(&Error::Unavailable),
+            DisconnectReason::ServerBusy
+        );
+    }
+
+    #[test]
+    fn connack_respects_tiny_client_packet_limit() {
+        let limits = Limits::default();
+        assert_eq!(
+            connack(false, ConnackReason::BadCredentials, &limits, None, 5).unwrap(),
+            [0x20, 3, 0, 0x86, 0]
+        );
+        assert!(matches!(
+            connack(false, ConnackReason::Success, &limits, None, 16),
+            Err(Error::Overloaded)
+        ));
+        assert_eq!(
+            connack(false, ConnackReason::Success, &limits, None, 17)
+                .unwrap()
+                .len(),
+            17
+        );
+        assert!(connack(false, ConnackReason::Success, &limits, Some("assigned"), 17).is_err());
+    }
 
     fn string(output: &mut Vec<u8>, value: &[u8]) {
         output.extend_from_slice(&(value.len() as u16).to_be_bytes());
@@ -1049,10 +1261,25 @@ mod tests {
 
     #[test]
     fn runtime_errors_map_to_v5_reasons_without_changing_runtime_errors() {
-        assert_eq!(connect_reason(&Error::Authentication), 0x86);
-        assert_eq!(connect_reason(&Error::Overloaded), 0x89);
-        assert_eq!(disconnect_reason(&Error::Overloaded), 0x97);
-        assert_eq!(disconnect_reason(&Error::Conflict), 0x91);
-        assert_eq!(disconnect_reason(&Error::Draining), 0x8b);
+        assert_eq!(
+            connect_reason(&Error::Authentication),
+            ConnackReason::BadCredentials
+        );
+        assert_eq!(
+            connect_reason(&Error::Overloaded),
+            ConnackReason::ServerBusy
+        );
+        assert_eq!(
+            disconnect_reason(&Error::Overloaded),
+            DisconnectReason::QuotaExceeded
+        );
+        assert_eq!(
+            disconnect_reason(&Error::Conflict),
+            DisconnectReason::ProtocolError
+        );
+        assert_eq!(
+            disconnect_reason(&Error::Draining),
+            DisconnectReason::ServerShuttingDown
+        );
     }
 }

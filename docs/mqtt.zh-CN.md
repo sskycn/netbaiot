@@ -46,6 +46,6 @@ SUBSCRIBE 会先针对会话、租户、全局、离线队列和活动 channel �
 
 持久会话会保存授权来源信息（credential version、auth generation、permissions、codec 标识和版本，不含密钥），以及单调递增的 session incarnation。CleanSession=0 接管会保留 incarnation；CleanSession=1 会创建新的 incarnation。入站 QoS2 完成和路由必须匹配相同的 incarnation、packet identifier 和 operation token。授权变更后重连会重置旧会话并返回 Session Present=0。管理失效操作会在同一个有界控制操作中删除匹配的持久状态。
 
-计划重启时会增量写入紧凑的 NBMQ v4 记录：带校验和的头部、每条有界记录的长度/校验和，以及包含权威记录数量、字节数和 SHA-256 摘要的全镜像校验尾部。v4 保存协议版本、会话/消息过期、订阅选项、发布属性及延迟 Will 状态。载荷字节保持二进制，不会复制完整快照或创建整个镜像的序列化缓冲区。仍可按各版本独立上限读取 NBMQ v1/v2/v3 镜像；所有新写入均使用 v4。缺少完整授权/codec 来源信息的旧会话不会暴露在订阅索引中，并会在连接挂接时安全重置。文件使用受限权限，并执行文件 fsync、原子重命名和目录 fsync。镜像不包含密码或 socket/TLS/task 状态。恢复 `(DeviceKey, ClientId)` 会话前必须重新认证。突发崩溃可能丢失上一次计划快照之后的修改；broker 不承诺崩溃持久性。
+计划重启时会增量写入紧凑的 NBMQ v5 记录：带校验和的头部、每条有界记录的长度/校验和，以及包含权威记录数量、字节数和 SHA-256 摘要的全镜像校验尾部。v5 保存协议版本、会话/消息过期、订阅选项、发布属性、下行 QoS 首次传输状态及延迟 Will 状态。载荷字节保持二进制，不会复制完整快照或创建整个镜像的序列化缓冲区。仍可按各版本独立上限读取 NBMQ v1/v2/v3/v4 镜像；所有新写入均使用 v5。缺少完整授权/codec 来源信息的旧会话不会暴露在订阅索引中，并会在连接挂接时安全重置。文件使用受限权限，并执行文件 fsync、原子重命名和目录 fsync。镜像不包含密码或 socket/TLS/task 状态。恢复 `(DeviceKey, ClientId)` 会话前必须重新认证。突发崩溃可能丢失上一次计划快照之后的修改；broker 不承诺崩溃持久性。
 
 实现证据和恢复细节见英文版 [MQTT 3.1.1 一致性清单](mqtt-3.1.1-conformance.md)和 [MQTT 会话恢复说明](mqtt-session-recovery.md)。

@@ -36,8 +36,8 @@ only then readiness is enabled. Recovered EventBus segment files are removed onl
 after required work drains. MQTT reconnect still authenticates before session
 resume; restored state never contains credentials.
 
-MQTT recovery writes NBMQ v4 incrementally as bounded typed records plus a final
-record-count, byte-count, and whole-stream-digest trailer. It reads v1, v2, and v3;
+MQTT recovery writes NBMQ v5 incrementally as bounded typed records plus a final
+record-count, byte-count, and whole-stream-digest trailer. It reads v1 through v5;
 the larger legacy v1 ceiling is selected only after the prefix identifies v1.
 Recovery validates topic/filter syntax, packet identifiers, legal QoS per
 state, non-QoS0 offline backlog, retained consistency, ordering, duplicates, and
