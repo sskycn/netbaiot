@@ -5228,6 +5228,448 @@ mod tests {
     use super::*;
     use std::time::Duration;
 
+    fn assert_accounting_consistent(state: &BrokerState) {
+        let mut sessions = HashMap::new();
+        let mut tenants = HashMap::<TenantId, TenantUsage>::new();
+        let mut device_subscriptions = HashMap::<DeviceKey, usize>::new();
+        let mut global_bytes = 0;
+        let mut global_subscriptions = 0;
+        let mut global_offline_count = 0;
+        let mut global_offline_bytes = 0;
+        let mut reserved_count = 0;
+        let mut reserved_bytes = 0;
+        let mut reserved_tenants = HashMap::<TenantId, (usize, usize)>::new();
+        for (key, session) in &state.sessions {
+            let usage = SessionUsage::from_session(session);
+            sessions.insert(key.clone(), usage);
+            let tenant = tenants.entry(key.device.tenant_id.clone()).or_default();
+            tenant.session_count += 1;
+            tenant.session_bytes += usage.state_bytes;
+            tenant.subscription_count += usage.subscriptions;
+            tenant.offline_count += usage.offline_count;
+            tenant.offline_bytes += usage.offline_bytes;
+            tenant.qos1_inflight += usage.qos1_inflight;
+            tenant.qos2_inflight += usage.qos2_inflight;
+            *device_subscriptions.entry(key.device.clone()).or_default() += usage.subscriptions;
+            global_bytes += usage.state_bytes;
+            global_subscriptions += usage.subscriptions;
+            global_offline_count += usage.offline_count;
+            global_offline_bytes += usage.offline_bytes;
+            for reservation in session.inbound_reservations.values() {
+                reserved_count += reservation.global_count;
+                reserved_bytes += reservation.global_bytes;
+                let tenant = reserved_tenants
+                    .entry(key.device.tenant_id.clone())
+                    .or_default();
+                tenant.0 += reservation.tenant_count;
+                tenant.1 += reservation.tenant_bytes;
+            }
+        }
+        device_subscriptions.retain(|_, count| *count != 0);
+        for pending in &state.pending_wills {
+            let reservation = pending.retained_reservation;
+            reserved_count += reservation.global_count;
+            reserved_bytes += reservation.global_bytes;
+            let tenant = reserved_tenants
+                .entry(pending.owner.tenant_id.clone())
+                .or_default();
+            tenant.0 += reservation.tenant_count;
+            tenant.1 += reservation.tenant_bytes;
+        }
+        reserved_tenants.retain(|_, usage| *usage != (0, 0));
+        assert_eq!(state.session_usage, sessions);
+        assert_eq!(state.tenant_usage, tenants);
+        assert_eq!(state.device_subscription_count, device_subscriptions);
+        assert_eq!(state.session_bytes, global_bytes);
+        assert_eq!(state.subscription_count, global_subscriptions);
+        assert_eq!(state.offline_count, global_offline_count);
+        assert_eq!(state.offline_bytes, global_offline_bytes);
+        assert_eq!(
+            state.retained_bytes,
+            state
+                .retained
+                .values()
+                .map(RetainedMessage::bytes)
+                .sum::<usize>()
+        );
+        assert_eq!(state.retained_reserved_count, reserved_count);
+        assert_eq!(state.retained_reserved_bytes, reserved_bytes);
+        assert_eq!(state.retained_reserved_tenants, reserved_tenants);
+    }
+
+    fn assert_broker_accounting(broker: &MqttBroker) {
+        let state = lock(&broker.state).unwrap();
+        assert_accounting_consistent(&state);
+    }
+
+    #[test]
+    fn derived_accounting_matches_authoritative_mutation_sequence() {
+        let broker = MqttBroker::new(Arc::new(Limits::default()));
+        let identity = auth("accounting-sequence");
+        let down = "v1/t/t/p/p/d/accounting-sequence/down";
+        let up = "v1/t/t/p/p/d/accounting-sequence/up";
+        let mut attachment = broker
+            .attach_v5(&identity, "accounting".into(), false, 3_600, 32)
+            .unwrap();
+        broker
+            .subscribe(&attachment.key, attachment.generation, down, 2)
+            .unwrap();
+        assert_broker_accounting(&broker);
+        for step in 0..1_000u16 {
+            let qos = if step % 2 == 0 { 1 } else { 2 };
+            broker
+                .route(
+                    &identity.device_key,
+                    BrokerMessage {
+                        topic: down.into(),
+                        payload: step.to_be_bytes().to_vec(),
+                        qos,
+                        retain: false,
+                        properties: Default::default(),
+                    },
+                )
+                .unwrap();
+            assert_broker_accounting(&broker);
+            let BrokerFrame::Publish(delivery) = attachment.receiver.try_recv().unwrap() else {
+                panic!("expected routed delivery")
+            };
+            let packet_id = delivery.packet_id.unwrap();
+            if qos == 1 {
+                broker
+                    .puback(&attachment.key, attachment.generation, packet_id)
+                    .unwrap();
+            } else {
+                broker
+                    .pubrec(&attachment.key, attachment.generation, packet_id)
+                    .unwrap();
+                assert_broker_accounting(&broker);
+                broker
+                    .pubcomp(&attachment.key, attachment.generation, packet_id)
+                    .unwrap();
+            }
+            assert_broker_accounting(&broker);
+            if step % 7 == 0 {
+                let inbound_id = step + 1;
+                let inbound = BrokerMessage {
+                    topic: up.into(),
+                    payload: step.to_be_bytes().to_vec(),
+                    qos: 2,
+                    retain: false,
+                    properties: Default::default(),
+                };
+                assert!(
+                    broker
+                        .inbound_qos2(
+                            &attachment.key,
+                            attachment.generation,
+                            inbound_id,
+                            inbound.clone(),
+                        )
+                        .unwrap()
+                );
+                assert_broker_accounting(&broker);
+                assert!(
+                    !broker
+                        .inbound_qos2(&attachment.key, attachment.generation, inbound_id, inbound,)
+                        .unwrap()
+                );
+                assert_broker_accounting(&broker);
+                broker
+                    .complete_inbound_qos2(&attachment.key, attachment.generation, inbound_id)
+                    .unwrap();
+                assert_broker_accounting(&broker);
+            }
+            if step % 11 == 0 {
+                broker
+                    .subscribe(&attachment.key, attachment.generation, down, 1)
+                    .unwrap();
+                assert_broker_accounting(&broker);
+                broker
+                    .unsubscribe(&attachment.key, attachment.generation, down)
+                    .unwrap();
+                assert_broker_accounting(&broker);
+                broker
+                    .subscribe(&attachment.key, attachment.generation, down, 2)
+                    .unwrap();
+                assert_broker_accounting(&broker);
+            }
+            if step % 19 == 0 {
+                broker
+                    .route(
+                        &identity.device_key,
+                        BrokerMessage {
+                            topic: up.into(),
+                            payload: vec![1, 2, 3],
+                            qos: 0,
+                            retain: true,
+                            properties: Default::default(),
+                        },
+                    )
+                    .unwrap();
+                assert_broker_accounting(&broker);
+                broker
+                    .route(
+                        &identity.device_key,
+                        BrokerMessage {
+                            topic: up.into(),
+                            payload: Vec::new(),
+                            qos: 0,
+                            retain: true,
+                            properties: Default::default(),
+                        },
+                    )
+                    .unwrap();
+                assert_broker_accounting(&broker);
+            }
+            if step % 23 == 0 {
+                attachment.detach().unwrap();
+                assert_broker_accounting(&broker);
+                broker
+                    .route(
+                        &identity.device_key,
+                        BrokerMessage {
+                            topic: down.into(),
+                            payload: vec![4, 5, 6],
+                            qos: 1,
+                            retain: false,
+                            properties: Default::default(),
+                        },
+                    )
+                    .unwrap();
+                assert_broker_accounting(&broker);
+                attachment = broker
+                    .attach_v5(&identity, "accounting".into(), false, 3_600, 32)
+                    .unwrap();
+                assert_broker_accounting(&broker);
+                let BrokerFrame::Publish(delivery) = attachment.receiver.try_recv().unwrap() else {
+                    panic!("expected resumed offline delivery")
+                };
+                broker
+                    .puback(
+                        &attachment.key,
+                        attachment.generation,
+                        delivery.packet_id.unwrap(),
+                    )
+                    .unwrap();
+                assert_broker_accounting(&broker);
+            }
+            if step % 101 == 0 {
+                attachment.detach().unwrap();
+                assert_broker_accounting(&broker);
+                let recovered = MqttBroker::new(Arc::new(Limits::default()));
+                recovered.restore(broker.snapshot().unwrap()).unwrap();
+                assert_broker_accounting(&recovered);
+                attachment = broker
+                    .attach_v5(&identity, "accounting".into(), false, 3_600, 32)
+                    .unwrap();
+                assert_broker_accounting(&broker);
+            }
+            if step % 173 == 0 {
+                attachment.detach().unwrap();
+                attachment = broker
+                    .attach_v5(&identity, "accounting".into(), true, 3_600, 32)
+                    .unwrap();
+                broker
+                    .subscribe(&attachment.key, attachment.generation, down, 2)
+                    .unwrap();
+                assert_broker_accounting(&broker);
+            }
+        }
+    }
+
+    #[test]
+    fn derived_accounting_tracks_tenant_device_and_restore() {
+        let broker = MqttBroker::new(Arc::new(Limits::default()));
+        let first = auth("shared-device");
+        let mut other_tenant = auth("other-device");
+        other_tenant.device_key.tenant_id = TenantId::new("other").unwrap();
+        let down = "v1/t/t/p/p/d/shared-device/down";
+        let mut a = broker.attach(&first, "a".into(), false).unwrap();
+        let mut b = broker.attach(&first, "b".into(), false).unwrap();
+        let mut c = broker.attach(&other_tenant, "c".into(), false).unwrap();
+        assert_broker_accounting(&broker);
+        broker.subscribe(&a.key, a.generation, down, 1).unwrap();
+        broker.subscribe(&b.key, b.generation, down, 1).unwrap();
+        broker
+            .subscribe(
+                &c.key,
+                c.generation,
+                "v1/t/other/p/p/d/other-device/down",
+                1,
+            )
+            .unwrap();
+        assert_broker_accounting(&broker);
+        b.detach().unwrap();
+        assert_broker_accounting(&broker);
+        broker
+            .route(
+                &first.device_key,
+                BrokerMessage {
+                    topic: down.into(),
+                    payload: b"first".to_vec(),
+                    qos: 1,
+                    retain: false,
+                    properties: Default::default(),
+                },
+            )
+            .unwrap();
+        assert_broker_accounting(&broker);
+        let BrokerFrame::Publish(live) = a.receiver.try_recv().unwrap() else {
+            panic!("expected live copy")
+        };
+        broker
+            .puback(&a.key, a.generation, live.packet_id.unwrap())
+            .unwrap();
+        assert_broker_accounting(&broker);
+        b = broker.attach(&first, "b".into(), false).unwrap();
+        assert_broker_accounting(&broker);
+        let BrokerFrame::Publish(resumed) = b.receiver.try_recv().unwrap() else {
+            panic!("expected resumed copy")
+        };
+        broker
+            .puback(&b.key, b.generation, resumed.packet_id.unwrap())
+            .unwrap();
+        assert_broker_accounting(&broker);
+        let inbound = BrokerMessage {
+            topic: "v1/t/t/p/p/d/shared-device/up".into(),
+            payload: b"inbound".to_vec(),
+            qos: 2,
+            retain: false,
+            properties: Default::default(),
+        };
+        assert!(
+            broker
+                .inbound_qos2(&a.key, a.generation, 77, inbound.clone())
+                .unwrap()
+        );
+        assert!(
+            !broker
+                .inbound_qos2(&a.key, a.generation, 77, inbound)
+                .unwrap()
+        );
+        assert_broker_accounting(&broker);
+        broker
+            .complete_inbound_qos2(&a.key, a.generation, 77)
+            .unwrap();
+        assert_broker_accounting(&broker);
+        b.detach().unwrap();
+        let mut replaced = broker.attach(&first, "b".into(), true).unwrap();
+        assert_broker_accounting(&broker);
+        a.detach().unwrap();
+        c.detach().unwrap();
+        replaced.detach().unwrap();
+        let restored = MqttBroker::new(Arc::new(Limits::default()));
+        restored.restore(broker.snapshot().unwrap()).unwrap();
+        assert_broker_accounting(&restored);
+    }
+
+    #[test]
+    fn derived_accounting_survives_local_discard_expiry_and_limit_rejection() {
+        let limits = Arc::new(Limits {
+            max_subscriptions_per_connection: 1,
+            max_subscriptions_per_session: 1,
+            ..Limits::default()
+        });
+        let broker = MqttBroker::new(limits);
+        let identity = auth("accounting-faults");
+        let down = "v1/t/t/p/p/d/accounting-faults/down";
+        let mut attachment = broker
+            .attach_v5(&identity, "faults".into(), false, 3_600, 32)
+            .unwrap();
+        broker
+            .subscribe(&attachment.key, attachment.generation, down, 2)
+            .unwrap();
+        assert!(matches!(
+            broker.subscribe(
+                &attachment.key,
+                attachment.generation,
+                "v1/t/t/p/p/d/accounting-faults/up",
+                1,
+            ),
+            Err(Error::Overloaded)
+        ));
+        assert_broker_accounting(&broker);
+        for qos in [1, 2] {
+            broker
+                .route(
+                    &identity.device_key,
+                    BrokerMessage {
+                        topic: down.into(),
+                        payload: vec![1; 64],
+                        qos,
+                        retain: false,
+                        properties: Default::default(),
+                    },
+                )
+                .unwrap();
+            let BrokerFrame::Publish(delivery) = attachment.receiver.try_recv().unwrap() else {
+                panic!("expected outbound publish")
+            };
+            assert_broker_accounting(&broker);
+            if qos == 1 {
+                assert!(
+                    broker
+                        .discard_outbound(&attachment.key, attachment.generation, &delivery)
+                        .unwrap()
+                );
+            } else {
+                broker
+                    .pubrec_rejected(
+                        &attachment.key,
+                        attachment.generation,
+                        delivery.packet_id.unwrap(),
+                    )
+                    .unwrap();
+            }
+            assert_broker_accounting(&broker);
+        }
+        broker
+            .route(
+                &identity.device_key,
+                BrokerMessage {
+                    topic: down.into(),
+                    payload: vec![2; 64],
+                    qos: 1,
+                    retain: false,
+                    properties: PublishProperties {
+                        expires_at_ms: Some(now_ms() + 10),
+                        ..Default::default()
+                    },
+                },
+            )
+            .unwrap();
+        let BrokerFrame::Publish(delivery) = attachment.receiver.try_recv().unwrap() else {
+            panic!("expected expiring publish")
+        };
+        std::thread::sleep(Duration::from_millis(15));
+        assert!(
+            !broker
+                .begin_outbound_transfer(&attachment.key, attachment.generation, &delivery)
+                .unwrap()
+        );
+        assert_broker_accounting(&broker);
+        attachment.detach().unwrap();
+        broker
+            .route(
+                &identity.device_key,
+                BrokerMessage {
+                    topic: down.into(),
+                    payload: vec![3; 64],
+                    qos: 1,
+                    retain: false,
+                    properties: PublishProperties {
+                        expires_at_ms: Some(now_ms() + 10),
+                        ..Default::default()
+                    },
+                },
+            )
+            .unwrap();
+        assert_broker_accounting(&broker);
+        std::thread::sleep(Duration::from_millis(15));
+        broker.tick().unwrap();
+        assert_broker_accounting(&broker);
+    }
+
     #[test]
     #[ignore = "manual baseline for future delayed-Will retry cost"]
     fn benchmark_future_pending_will_retry() {
