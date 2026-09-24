@@ -10,8 +10,9 @@ use netbaiot_runtime::{Error, Histogram, Limits, Metrics, Result, lock, now_ms};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
-    collections::{HashMap, HashSet, VecDeque},
+    collections::{BTreeMap, HashMap, HashSet, VecDeque},
     fs,
+    hash::Hash,
     io::{BufReader, Cursor, Read, Write},
     path::{Path, PathBuf},
     sync::{
@@ -32,6 +33,8 @@ const RECOVERY_VERSION_V4: u32 = 4;
 const RECOVERY_VERSION: u32 = 5;
 const LEGACY_V1_RECOVERY_READ_MAX: usize = 1_342_177_280;
 const RECOVERY_FILE: &str = "mqtt-runtime.state";
+const HOT_MAINTENANCE_BUDGET: usize = 64;
+const TICK_MAINTENANCE_BUDGET: usize = 1_024;
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SessionKey {
@@ -599,12 +602,71 @@ fn retained_charge(message: &BrokerMessage, origin: Option<&SessionKey>) -> usiz
     }))
 }
 
+/// One current deadline per owned key. Replacements remove the old bucket entry,
+/// so historical traffic cannot accumulate stale heap nodes.
+struct DeadlineIndex<K> {
+    by_deadline: BTreeMap<i64, HashSet<K>>,
+    by_key: HashMap<K, i64>,
+}
+
+impl<K> Default for DeadlineIndex<K> {
+    fn default() -> Self {
+        Self {
+            by_deadline: BTreeMap::new(),
+            by_key: HashMap::new(),
+        }
+    }
+}
+
+impl<K: Clone + Eq + Hash> DeadlineIndex<K> {
+    fn has_due(&self, now: i64) -> bool {
+        self.by_deadline
+            .first_key_value()
+            .is_some_and(|(&deadline, _)| deadline <= now)
+    }
+
+    fn update(&mut self, key: K, deadline: Option<i64>) {
+        if self.by_key.get(&key).copied() == deadline {
+            return;
+        }
+        if let Some(old) = self.by_key.remove(&key)
+            && let Some(bucket) = self.by_deadline.get_mut(&old)
+        {
+            bucket.remove(&key);
+            if bucket.is_empty() {
+                self.by_deadline.remove(&old);
+            }
+        }
+        if let Some(deadline) = deadline {
+            self.by_deadline
+                .entry(deadline)
+                .or_default()
+                .insert(key.clone());
+            self.by_key.insert(key, deadline);
+        }
+    }
+
+    fn pop_due(&mut self, now: i64) -> Option<K> {
+        let (&deadline, bucket) = self.by_deadline.first_key_value()?;
+        if deadline > now {
+            return None;
+        }
+        let key = bucket.iter().next()?.clone();
+        self.update(key.clone(), None);
+        Some(key)
+    }
+}
+
 struct BrokerState {
     sessions: HashMap<SessionKey, StoredSession>,
     /// Derived from sessions and rebuilt after recovery; never serialized.
     session_usage: HashMap<SessionKey, SessionUsage>,
     tenant_usage: HashMap<TenantId, TenantUsage>,
     device_subscription_count: HashMap<DeviceKey, usize>,
+    session_expiry: DeadlineIndex<SessionKey>,
+    message_expiry: DeadlineIndex<SessionKey>,
+    retained_expiry: DeadlineIndex<String>,
+    session_idle_ttl_ms: i64,
     active: HashMap<SessionKey, ActiveSession>,
     trie: SubscriptionTrie,
     retained: HashMap<String, RetainedMessage>,
@@ -679,11 +741,62 @@ fn apply_usage_delta(value: &mut usize, before: usize, after: usize) -> Result<(
     Ok(())
 }
 
+fn next_message_expiry(session: &StoredSession) -> Option<i64> {
+    session
+        .offline
+        .iter()
+        .filter_map(|message| message.properties.expires_at_ms)
+        .chain(
+            session
+                .outbound
+                .iter()
+                .filter_map(|(id, outbound)| match outbound {
+                    OutboundState::AwaitPuback(message) | OutboundState::AwaitPubrec(message)
+                        if !session.started_outbound.contains(id) =>
+                    {
+                        message.properties.expires_at_ms
+                    }
+                    OutboundState::AwaitPubcomp(message) => message.properties.expires_at_ms,
+                    _ => None,
+                }),
+        )
+        .min()
+}
+
+fn session_expiry_deadline(state: &BrokerState, key: &SessionKey) -> Option<i64> {
+    if state.active.contains_key(key) {
+        return None;
+    }
+    let session = state.sessions.get(key)?;
+    if session.version == MqttVersion::V5 {
+        session.expires_at_ms
+    } else {
+        Some(
+            session
+                .last_seen_ms
+                .saturating_add(state.session_idle_ttl_ms)
+                .saturating_add(1),
+        )
+    }
+}
+
+fn message_expiry_due(state: &BrokerState, key: &SessionKey, now: i64) -> bool {
+    state
+        .message_expiry
+        .by_key
+        .get(key)
+        .is_some_and(|&deadline| deadline <= now)
+}
+
 /// Reconcile one changed authoritative session while the broker mutex is held.
 /// The cached per-session value makes all callers independent of unrelated sessions.
 fn sync_session_usage(state: &mut BrokerState, key: &SessionKey) -> Result<()> {
     let before = state.session_usage.get(key).copied();
     let after = state.sessions.get(key).map(SessionUsage::from_session);
+    let message_deadline = state.sessions.get(key).and_then(next_message_expiry);
+    let expiry_deadline = session_expiry_deadline(state, key);
+    state.message_expiry.update(key.clone(), message_deadline);
+    state.session_expiry.update(key.clone(), expiry_deadline);
     if before == after {
         return Ok(());
     }
@@ -985,6 +1098,8 @@ impl MqttBroker {
     }
 
     fn new_inner(limits: Arc<Limits>, metrics: Option<Arc<Metrics>>) -> Arc<Self> {
+        let session_idle_ttl_ms =
+            i64::try_from(limits.mqtt_session_idle_ttl_ms).unwrap_or(i64::MAX);
         Arc::new(Self {
             limits,
             metrics,
@@ -994,6 +1109,10 @@ impl MqttBroker {
                 session_usage: HashMap::new(),
                 tenant_usage: HashMap::new(),
                 device_subscription_count: HashMap::new(),
+                session_expiry: DeadlineIndex::default(),
+                message_expiry: DeadlineIndex::default(),
+                retained_expiry: DeadlineIndex::default(),
+                session_idle_ttl_ms,
                 active: HashMap::new(),
                 trie: SubscriptionTrie::default(),
                 retained: HashMap::new(),
@@ -1068,8 +1187,14 @@ impl MqttBroker {
             client_id,
         };
         let mut state = lock(&self.state)?;
-        self.prune_expired(&mut state)?;
-        prune_expired_messages(&mut state, now_ms())?;
+        self.prune_expired(&mut state, HOT_MAINTENANCE_BUDGET)?;
+        prune_expired_messages(&mut state, now_ms(), HOT_MAINTENANCE_BUDGET)?;
+        if session_expiry_deadline(&state, &key).is_some_and(|deadline| deadline <= now_ms()) {
+            remove_session(&mut state, &key)?;
+        }
+        if message_expiry_due(&state, &key, now_ms()) {
+            prune_expired_messages_for_session(&mut state, &key, now_ms())?;
+        }
         let authorization = SessionAuthorization::from(auth);
         if clean_session {
             for pending in &mut state.pending_wills {
@@ -1240,6 +1365,7 @@ impl MqttBroker {
                 );
             }
         }
+        sync_session_usage(&mut state, key)?;
         self.publish_subscription_count(&state);
         Ok(())
     }
@@ -1306,17 +1432,22 @@ impl MqttBroker {
             return Err(Error::Invalid);
         }
         let mut state = lock(&self.state)?;
-        prune_expired_messages(&mut state, now_ms())?;
+        prune_expired_messages(&mut state, now_ms(), HOT_MAINTENANCE_BUDGET)?;
         check_owner(&state, key, generation)?;
+        if message_expiry_due(&state, key, now_ms()) {
+            prune_expired_messages_for_session(&mut state, key, now_ms())?;
+        }
         let replacement = state
             .sessions
             .get(key)
             .is_some_and(|session| session.subscriptions.contains_key(filter));
+        let now = now_ms();
         let retained = state
             .retained
             .values()
             .filter(|retained| {
-                topic_matches(filter, &retained.message.topic)
+                !retained.message.expired(now)
+                    && topic_matches(filter, &retained.message.topic)
                     && !(subscription.no_local && retained.origin.as_ref() == Some(key))
                     && match subscription.retain_handling {
                         0 => true,
@@ -1475,7 +1606,7 @@ impl MqttBroker {
             .filter(|metrics| metrics.lock_timing_enabled())
             .map(|_| Instant::now());
         let mut state = lock(&self.state)?;
-        prune_expired_messages(&mut state, now_ms())?;
+        prune_expired_messages(&mut state, now_ms(), HOT_MAINTENANCE_BUDGET)?;
         let lock_wait_us = lock_started.map(|started| started.elapsed().as_micros() as u64);
         let hold_started = lock_started.map(|_| Instant::now());
         let result = route_locked(&mut state, owner, origin, &message, &self.limits);
@@ -2034,7 +2165,9 @@ impl MqttBroker {
     pub fn next_offline(&self, key: &SessionKey, generation: u64) -> Result<Option<BrokerFrame>> {
         let mut state = lock(&self.state)?;
         check_owner(&state, key, generation)?;
-        if prune_expired_messages_for_session(&mut state, key, now_ms())? {
+        if message_expiry_due(&state, key, now_ms())
+            && prune_expired_messages_for_session(&mut state, key, now_ms())?
+        {
             wake_tenant_pending(&mut state, &key.device.tenant_id, 1, &self.limits)?;
             wake_tenant_pending(&mut state, &key.device.tenant_id, 2, &self.limits)?;
         }
@@ -2131,6 +2264,7 @@ impl MqttBroker {
             return Ok(false);
         }
         session.started_outbound.insert(packet_id);
+        sync_session_usage(&mut state, key)?;
         Ok(true)
     }
 
@@ -2173,7 +2307,7 @@ impl MqttBroker {
         let mut state = lock(&self.state)?;
         check_owner(&state, key, generation)?;
         let session = state.sessions.get_mut(key).ok_or(Error::Internal)?;
-        match session.outbound.get_mut(&packet_id) {
+        let frame = match session.outbound.get_mut(&packet_id) {
             Some(state @ OutboundState::AwaitPubrec(_)) => {
                 let OutboundState::AwaitPubrec(message) = state.clone() else {
                     return Err(Error::Internal);
@@ -2191,7 +2325,9 @@ impl MqttBroker {
             }),
             Some(OutboundState::AwaitPuback(_)) => Err(Error::Conflict),
             None => Err(Error::Invalid),
-        }
+        }?;
+        sync_session_usage(&mut state, key)?;
+        Ok(frame)
     }
 
     pub fn pubrec_rejected(&self, key: &SessionKey, generation: u64, packet_id: u16) -> Result<()> {
@@ -2318,6 +2454,11 @@ impl MqttBroker {
             session_usage: HashMap::new(),
             tenant_usage: HashMap::new(),
             device_subscription_count: HashMap::new(),
+            session_expiry: DeadlineIndex::default(),
+            message_expiry: DeadlineIndex::default(),
+            retained_expiry: DeadlineIndex::default(),
+            session_idle_ttl_ms: i64::try_from(self.limits.mqtt_session_idle_ttl_ms)
+                .unwrap_or(i64::MAX),
             active: HashMap::new(),
             trie: SubscriptionTrie::default(),
             retained: HashMap::new(),
@@ -2652,7 +2793,9 @@ impl MqttBroker {
                 .retained_bytes
                 .checked_add(retained.bytes())
                 .ok_or(Error::Overloaded)?;
-            replacement.retained.insert(topic, retained);
+            let deadline = retained.message.properties.expires_at_ms;
+            replacement.retained.insert(topic.clone(), retained);
+            replacement.retained_expiry.update(topic, deadline);
         }
         for mut pending in snapshot.pending_wills {
             if !valid_broker_message(&pending.message, &self.limits)
@@ -2754,8 +2897,9 @@ impl MqttBroker {
     /// One bounded maintenance pass. The server owns a single periodic task for this broker.
     pub fn tick(&self) -> Result<()> {
         let mut state = lock(&self.state)?;
-        self.prune_expired(&mut state)?;
-        let released_tenants = prune_expired_messages(&mut state, now_ms())?;
+        self.prune_expired(&mut state, TICK_MAINTENANCE_BUDGET)?;
+        let released_tenants =
+            prune_expired_messages(&mut state, now_ms(), TICK_MAINTENANCE_BUDGET)?;
         for tenant in released_tenants {
             wake_tenant_pending(&mut state, &tenant, 1, &self.limits)?;
             wake_tenant_pending(&mut state, &tenant, 2, &self.limits)?;
@@ -2812,15 +2956,21 @@ impl MqttBroker {
 
     pub fn matching_retained_count(&self, filter: &str) -> Result<usize> {
         let state = lock(&self.state)?;
+        let now = now_ms();
         Ok(state
             .retained
             .values()
-            .filter(|entry| topic_matches(filter, &entry.message.topic))
+            .filter(|entry| {
+                !entry.message.expired(now) && topic_matches(filter, &entry.message.topic)
+            })
             .count())
     }
 
     pub fn has_retained_topic(&self, topic: &str) -> Result<bool> {
-        Ok(lock(&self.state)?.retained.contains_key(topic))
+        Ok(lock(&self.state)?
+            .retained
+            .get(topic)
+            .is_some_and(|entry| !entry.message.expired(now_ms())))
     }
 
     fn check_new_session(
@@ -2850,26 +3000,17 @@ impl MqttBroker {
             .store(state.subscription_count, Ordering::Release);
     }
 
-    fn prune_expired(&self, state: &mut BrokerState) -> Result<()> {
+    fn prune_expired(&self, state: &mut BrokerState, budget: usize) -> Result<()> {
         let now = now_ms();
-        let cutoff = now.saturating_sub(
-            i64::try_from(self.limits.mqtt_session_idle_ttl_ms).unwrap_or(i64::MAX),
-        );
-        let expired = state
-            .sessions
-            .iter()
-            .filter(|(key, session)| {
-                !state.active.contains_key(*key)
-                    && if session.version == MqttVersion::V5 {
-                        session.expires_at_ms.is_some_and(|expiry| expiry <= now)
-                    } else {
-                        session.last_seen_ms < cutoff
-                    }
-            })
-            .map(|(key, _)| key.clone())
-            .collect::<Vec<_>>();
-        for key in expired {
-            remove_session(state, &key)?;
+        for _ in 0..budget {
+            let Some(key) = state.session_expiry.pop_due(now) else {
+                break;
+            };
+            if session_expiry_deadline(state, &key).is_some_and(|deadline| deadline <= now) {
+                remove_session(state, &key)?;
+            } else {
+                sync_session_usage(state, &key)?;
+            }
         }
         Ok(())
     }
@@ -2971,6 +3112,9 @@ fn wake_tenant_pending(
         } else {
             limits.max_inflight_qos2_per_tenant
         };
+        if message_expiry_due(state, &key, now_ms()) {
+            prune_expired_messages_for_session(state, &key, now_ms())?;
+        }
         let next_qos = state
             .sessions
             .get(&key)
@@ -3023,53 +3167,45 @@ fn remove_session(state: &mut BrokerState, key: &SessionKey) -> Result<()> {
     sync_session_usage(state, key)
 }
 
-fn prune_expired_messages(state: &mut BrokerState, now: i64) -> Result<HashSet<TenantId>> {
+fn prune_expired_messages(
+    state: &mut BrokerState,
+    now: i64,
+    budget: usize,
+) -> Result<HashSet<TenantId>> {
     let mut released_tenants = HashSet::new();
-    let mut changed_sessions = Vec::new();
-    let mut removed_count = 0usize;
-    let mut removed_offline_bytes = 0usize;
-    let mut removed_session_bytes = 0usize;
-    let mut empty_pending = Vec::new();
-    for (key, session) in &mut state.sessions {
-        let (count, released_bytes, released_state_bytes, released_outbound) =
-            prune_session_messages(session, now);
-        removed_count += count;
-        removed_offline_bytes = removed_offline_bytes.saturating_add(released_bytes);
-        removed_session_bytes = removed_session_bytes.saturating_add(released_state_bytes);
-        if count > 0 || released_state_bytes > 0 {
-            changed_sessions.push(key.clone());
-        }
-        if session.offline.is_empty() {
-            empty_pending.push(key.clone());
-        }
-        if released_outbound {
+    for _ in 0..budget {
+        let Some(key) = state.message_expiry.pop_due(now) else {
+            break;
+        };
+        if prune_expired_messages_for_session(state, &key, now)? {
             released_tenants.insert(key.device.tenant_id.clone());
         }
     }
-    for key in empty_pending {
-        unmark_pending(state, &key);
-    }
-    state.offline_count = state.offline_count.saturating_sub(removed_count);
-    state.offline_bytes = state.offline_bytes.saturating_sub(removed_offline_bytes);
-    state.session_bytes = state.session_bytes.saturating_sub(removed_session_bytes);
-    for key in changed_sessions {
-        sync_session_usage(state, &key)?;
-    }
-    let mut released_retained_bytes = 0usize;
-    state.retained.retain(|_, retained| {
-        if retained.message.expired(now) {
-            released_retained_bytes = released_retained_bytes.saturating_add(retained.bytes());
-            false
-        } else {
-            true
+    for _ in 0..budget {
+        let Some(topic) = state.retained_expiry.pop_due(now) else {
+            break;
+        };
+        let Some(retained) = state.retained.get(&topic) else {
+            continue;
+        };
+        if !retained.message.expired(now) {
+            state
+                .retained_expiry
+                .update(topic, retained.message.properties.expires_at_ms);
+            continue;
         }
-    });
-    state.retained_bytes = state.retained_bytes.saturating_sub(released_retained_bytes);
+        let remaining = state
+            .retained_bytes
+            .checked_sub(retained.bytes())
+            .ok_or(Error::Internal)?;
+        state.retained.remove(&topic);
+        state.retained_bytes = remaining;
+    }
     Ok(released_tenants)
 }
 
 /// Expiry work for one session. ACK-driven promotion calls this without scanning
-/// unrelated persistent sessions; the periodic tick still sweeps the full broker.
+/// unrelated persistent sessions.
 fn prune_expired_messages_for_session(
     state: &mut BrokerState,
     key: &SessionKey,
@@ -3479,8 +3615,14 @@ fn route_locked(
     message: &BrokerMessage,
     limits: &Limits,
 ) -> Result<usize> {
-    if message.expired(now_ms()) {
+    let now = now_ms();
+    if message.expired(now) {
         return Ok(0);
+    }
+    if state.message_expiry.has_due(now) {
+        for key in state.trie.matching(&message.topic).into_keys() {
+            prune_expired_messages_for_session(state, &key, now)?;
+        }
     }
     let plan = preflight_route(state, owner, origin, message, limits)?;
     if message.retain {
@@ -3852,6 +3994,7 @@ fn update_retained(
         if let Some(old) = state.retained.remove(&message.topic) {
             state.retained_bytes = state.retained_bytes.saturating_sub(old.bytes());
         }
+        state.retained_expiry.update(message.topic.clone(), None);
         return Ok(());
     }
     check_retained_update(state, owner, origin, message, limits)?;
@@ -3872,6 +4015,9 @@ fn update_retained(
             origin: origin.cloned(),
         },
     );
+    state
+        .retained_expiry
+        .update(message.topic.clone(), message.properties.expires_at_ms);
     Ok(())
 }
 
@@ -5226,7 +5372,24 @@ fn sync_directory(path: &Path) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fmt::Debug;
     use std::time::Duration;
+
+    fn assert_deadline_index<K: Clone + Debug + Eq + Hash>(
+        index: &DeadlineIndex<K>,
+        expected: &HashMap<K, i64>,
+    ) {
+        assert_eq!(&index.by_key, expected);
+        assert_eq!(
+            index.by_deadline.values().map(HashSet::len).sum::<usize>(),
+            expected.len()
+        );
+        for (&deadline, keys) in &index.by_deadline {
+            for key in keys {
+                assert_eq!(expected.get(key), Some(&deadline));
+            }
+        }
+    }
 
     fn assert_accounting_consistent(state: &BrokerState) {
         let mut sessions = HashMap::new();
@@ -5239,6 +5402,8 @@ mod tests {
         let mut reserved_count = 0;
         let mut reserved_bytes = 0;
         let mut reserved_tenants = HashMap::<TenantId, (usize, usize)>::new();
+        let mut session_expiry = HashMap::new();
+        let mut message_expiry = HashMap::new();
         for (key, session) in &state.sessions {
             let usage = SessionUsage::from_session(session);
             sessions.insert(key.clone(), usage);
@@ -5255,6 +5420,24 @@ mod tests {
             global_subscriptions += usage.subscriptions;
             global_offline_count += usage.offline_count;
             global_offline_bytes += usage.offline_bytes;
+            if let Some(deadline) = next_message_expiry(session) {
+                message_expiry.insert(key.clone(), deadline);
+            }
+            if !state.active.contains_key(key) {
+                let deadline = if session.version == MqttVersion::V5 {
+                    session.expires_at_ms
+                } else {
+                    Some(
+                        session
+                            .last_seen_ms
+                            .saturating_add(state.session_idle_ttl_ms)
+                            .saturating_add(1),
+                    )
+                };
+                if let Some(deadline) = deadline {
+                    session_expiry.insert(key.clone(), deadline);
+                }
+            }
             for reservation in session.inbound_reservations.values() {
                 reserved_count += reservation.global_count;
                 reserved_bytes += reservation.global_bytes;
@@ -5295,6 +5478,20 @@ mod tests {
         assert_eq!(state.retained_reserved_count, reserved_count);
         assert_eq!(state.retained_reserved_bytes, reserved_bytes);
         assert_eq!(state.retained_reserved_tenants, reserved_tenants);
+        let retained_expiry = state
+            .retained
+            .iter()
+            .filter_map(|(topic, retained)| {
+                retained
+                    .message
+                    .properties
+                    .expires_at_ms
+                    .map(|deadline| (topic.clone(), deadline))
+            })
+            .collect::<HashMap<_, _>>();
+        assert_deadline_index(&state.session_expiry, &session_expiry);
+        assert_deadline_index(&state.message_expiry, &message_expiry);
+        assert_deadline_index(&state.retained_expiry, &retained_expiry);
     }
 
     fn assert_broker_accounting(broker: &MqttBroker) {
@@ -5667,6 +5864,157 @@ mod tests {
         assert_broker_accounting(&broker);
         std::thread::sleep(Duration::from_millis(15));
         broker.tick().unwrap();
+        assert_broker_accounting(&broker);
+    }
+
+    #[test]
+    fn message_deadline_budget_cleans_only_due_sessions_and_reindexes() {
+        let broker = MqttBroker::new(Arc::new(Limits::default()));
+        let mut keys = Vec::new();
+        for index in 0..5 {
+            let identity = auth(&format!("expiry-index-{index}"));
+            let down = format!("v1/t/t/p/p/d/expiry-index-{index}/down");
+            let mut attachment = broker
+                .attach_v5(&identity, format!("client-{index}"), false, 3_600, 32)
+                .unwrap();
+            broker
+                .subscribe(&attachment.key, attachment.generation, &down, 1)
+                .unwrap();
+            attachment.detach().unwrap();
+            broker
+                .route(
+                    &identity.device_key,
+                    BrokerMessage {
+                        topic: down,
+                        payload: vec![index as u8],
+                        qos: 1,
+                        retain: false,
+                        properties: PublishProperties {
+                            expires_at_ms: Some(now_ms() + 10_000),
+                            ..Default::default()
+                        },
+                    },
+                )
+                .unwrap();
+            keys.push(attachment.key.clone());
+        }
+        let mut state = lock(&broker.state).unwrap();
+        for key in &keys {
+            state
+                .sessions
+                .get_mut(key)
+                .unwrap()
+                .offline
+                .front_mut()
+                .unwrap()
+                .properties
+                .expires_at_ms = Some(now_ms() - 1);
+            sync_session_usage(&mut state, key).unwrap();
+        }
+        drop(state);
+        assert_broker_accounting(&broker);
+        {
+            let mut state = lock(&broker.state).unwrap();
+            prune_expired_messages(&mut state, now_ms(), 3).unwrap();
+            assert_eq!(state.offline_count, 2);
+            assert_accounting_consistent(&state);
+            prune_expired_messages(&mut state, now_ms(), 3).unwrap();
+            assert_eq!(state.offline_count, 0);
+            assert_accounting_consistent(&state);
+        }
+    }
+
+    #[test]
+    fn target_session_expiry_is_checked_after_bounded_global_maintenance() {
+        let broker = MqttBroker::new(Arc::new(Limits::default()));
+        let mut identities = Vec::new();
+        for index in 0..=HOT_MAINTENANCE_BUDGET {
+            let identity = auth(&format!("session-deadline-{index}"));
+            let mut attachment = broker
+                .attach_v5(&identity, format!("client-{index}"), false, 3_600, 32)
+                .unwrap();
+            let key = attachment.key.clone();
+            attachment.detach().unwrap();
+            identities.push((identity, key));
+        }
+        let past = now_ms() - 1;
+        for (index, (_, key)) in identities.iter().enumerate() {
+            let mut state = lock(&broker.state).unwrap();
+            state.sessions.get_mut(key).unwrap().expires_at_ms =
+                Some(if index == HOT_MAINTENANCE_BUDGET {
+                    past
+                } else {
+                    past - 1
+                });
+            sync_session_usage(&mut state, key).unwrap();
+        }
+        assert_broker_accounting(&broker);
+        let identity = &identities[HOT_MAINTENANCE_BUDGET].0;
+        let attachment = broker
+            .attach_v5(
+                identity,
+                format!("client-{HOT_MAINTENANCE_BUDGET}"),
+                false,
+                3_600,
+                32,
+            )
+            .unwrap();
+        assert!(!attachment.session_present);
+        assert_broker_accounting(&broker);
+    }
+
+    #[test]
+    fn expired_retained_is_not_replayed_while_maintenance_is_budgeted() {
+        let broker = MqttBroker::new(Arc::new(Limits::default()));
+        let mut topics = Vec::new();
+        for index in 0..=(HOT_MAINTENANCE_BUDGET * 2) {
+            let identity = auth(&format!("retained-deadline-{index}"));
+            let topic = format!("v1/t/t/p/p/d/retained-deadline-{index}/up");
+            broker
+                .route(
+                    &identity.device_key,
+                    BrokerMessage {
+                        topic: topic.clone(),
+                        payload: vec![1],
+                        qos: 1,
+                        retain: true,
+                        properties: PublishProperties {
+                            expires_at_ms: Some(now_ms() + 10_000),
+                            ..Default::default()
+                        },
+                    },
+                )
+                .unwrap();
+            topics.push((identity, topic));
+        }
+        let past = now_ms() - 1;
+        {
+            let mut state = lock(&broker.state).unwrap();
+            for (index, (_, topic)) in topics.iter().enumerate() {
+                let deadline = if index == HOT_MAINTENANCE_BUDGET * 2 {
+                    past
+                } else {
+                    past - 1
+                };
+                state
+                    .retained
+                    .get_mut(topic)
+                    .unwrap()
+                    .message
+                    .properties
+                    .expires_at_ms = Some(deadline);
+                state.retained_expiry.update(topic.clone(), Some(deadline));
+            }
+        }
+        let (identity, topic) = &topics[HOT_MAINTENANCE_BUDGET * 2];
+        let attachment = broker
+            .attach_v5(identity, "retained-reader".into(), false, 3_600, 32)
+            .unwrap();
+        broker
+            .subscribe(&attachment.key, attachment.generation, topic, 1)
+            .unwrap();
+        assert!(attachment.receiver.is_empty());
+        assert!(!broker.has_retained_topic(topic).unwrap());
         assert_broker_accounting(&broker);
     }
 
@@ -6588,6 +6936,7 @@ mod tests {
                 panic!("expected AwaitPuback")
             };
             message.properties.expires_at_ms = Some(now_ms() - 1);
+            sync_session_usage(&mut state, &attachment.key).unwrap();
         }
         broker.tick().unwrap();
         assert!(
@@ -6643,6 +6992,7 @@ mod tests {
                 panic!("expected AwaitPuback")
             };
             message.properties.expires_at_ms = Some(now_ms() - 1);
+            sync_session_usage(&mut state, &attachment.key).unwrap();
         }
         broker.tick().unwrap();
         assert!(
@@ -6793,6 +7143,7 @@ mod tests {
                 .unwrap()
                 .properties
                 .expires_at_ms = Some(now_ms() - 1);
+            sync_session_usage(&mut state, &attachment.key).unwrap();
         }
         broker.tick().unwrap();
         assert!(
@@ -7328,6 +7679,9 @@ mod tests {
                 .properties
                 .expires_at_ms = Some(now_ms() - 1);
             state
+                .retained_expiry
+                .update(topic.to_owned(), Some(now_ms() - 1));
+            state
                 .sessions
                 .get_mut(&attachment.key)
                 .unwrap()
@@ -7336,6 +7690,7 @@ mod tests {
                 .unwrap()
                 .properties
                 .expires_at_ms = Some(now_ms() - 1);
+            sync_session_usage(&mut state, &attachment.key).unwrap();
         }
         let directory =
             std::env::temp_dir().join(format!("netbaiot-mqtt-v4-expiry-{}", uuid::Uuid::new_v4()));
