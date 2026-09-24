@@ -7,7 +7,7 @@ async fn next_v5(
     stream: &mut BoxStream,
     limits: &Limits,
     idle: Instant,
-) -> std::result::Result<(Packet, u64, Instant), (Error, u8)> {
+) -> std::result::Result<(Packet, u64, Instant), (Error, v5::DisconnectReason)> {
     loop {
         let started = Instant::now();
         match v5::decode(&mut reader.buffer, limits) {
@@ -18,7 +18,12 @@ async fn next_v5(
                 return Ok((packet, elapsed, validated));
             }
             Ok(None) => {}
-            Err(error) => return Err((Error::Invalid, error.reason)),
+            Err(error) => {
+                return Err((
+                    Error::Invalid,
+                    v5::DisconnectReason::from_decode(error.reason),
+                ));
+            }
         }
         reader.read_more(stream, idle).await.map_err(|error| {
             let reason = v5::disconnect_reason(&error);
@@ -35,7 +40,7 @@ async fn send_v5(
     disconnected: Option<&mut bool>,
 ) -> Result<()> {
     if bytes.len() > maximum {
-        if let Ok(reply) = v5::disconnect(v5::PACKET_TOO_LARGE, maximum) {
+        if let Ok(reply) = v5::disconnect(v5::DisconnectReason::PacketTooLarge, maximum) {
             if let Some(disconnected) = disconnected {
                 *disconnected = true;
             }
@@ -54,7 +59,7 @@ async fn outbound_ack_result<T>(
     disconnected: &mut bool,
 ) -> Result<T> {
     if matches!(result, Err(Error::Invalid))
-        && let Ok(bytes) = v5::disconnect(v5::PACKET_IDENTIFIER_NOT_FOUND, maximum)
+        && let Ok(bytes) = v5::disconnect(v5::DisconnectReason::ProtocolError, maximum)
     {
         *disconnected = true;
         let _ = send_v5(stream, services, &bytes, maximum, Some(disconnected)).await;
@@ -67,7 +72,7 @@ async fn fail_with_reason(
     services: &Services,
     maximum: usize,
     disconnected: &mut bool,
-    reason: u8,
+    reason: v5::DisconnectReason,
     error: Error,
 ) -> Result<()> {
     if let Ok(bytes) = v5::disconnect(reason, maximum) {
@@ -86,67 +91,91 @@ async fn send_frame(
     maximum: usize,
     disconnected: &mut bool,
 ) -> Result<()> {
-    let bytes = match frame {
-        BrokerFrame::Publish(delivery) => {
-            if delivery.packet_id.is_none() && delivery.message.expired(now_ms()) {
-                return Ok(());
-            }
-            if delivery.packet_id.is_some()
-                && !services
-                    .mqtt
-                    .begin_outbound_transfer(key, generation, &delivery)?
-            {
-                return Ok(());
-            }
-            let properties = &delivery.message.properties;
-            let mut wire = v5::Properties {
-                payload_format: properties.payload_format,
-                content_type: properties.content_type.clone(),
-                response_topic: properties.response_topic.clone(),
-                correlation_data: properties
-                    .correlation_data
-                    .as_ref()
-                    .map(|data| data.clone().into()),
-                user_properties: properties.user_properties.clone(),
-                ..Default::default()
-            };
-            if let Some(expiry) = properties.expires_at_ms {
-                let remaining = expiry.saturating_sub(now_ms());
-                wire.message_expiry =
-                    Some(u32::try_from((remaining.max(0) + 999) / 1_000).unwrap_or(u32::MAX));
-            }
-            match v5::publish(
-                v5::OutboundPublish {
-                    topic: &delivery.message.topic,
-                    payload: &delivery.message.payload,
-                    qos: delivery.message.qos,
-                    packet_id: delivery.packet_id,
-                    retain: delivery.message.retain,
-                    dup: delivery.dup,
-                    properties: &wire,
-                },
-                maximum.min(services.ingress.limits.max_mqtt_packet_size),
-            ) {
-                Ok(bytes) => bytes,
-                Err(Error::Overloaded) => {
-                    if let Ok(bytes) = v5::disconnect(v5::PACKET_TOO_LARGE, maximum) {
-                        *disconnected = true;
-                        let _ =
-                            send_v5(stream, services, &bytes, maximum, Some(disconnected)).await;
-                    }
-                    return Err(Error::Overloaded);
+    let mut pending = Some(frame);
+    while let Some(frame) = pending.take() {
+        let bytes = match frame {
+            BrokerFrame::Publish(delivery) => {
+                if delivery.packet_id.is_none() && delivery.message.expired(now_ms()) {
+                    return Ok(());
                 }
-                Err(error) => return Err(error),
+                if delivery.packet_id.is_some()
+                    && !services
+                        .mqtt
+                        .begin_outbound_transfer(key, generation, &delivery)?
+                {
+                    pending = services.mqtt.next_offline(key, generation)?;
+                    continue;
+                }
+                let properties = &delivery.message.properties;
+                let mut wire = v5::Properties {
+                    payload_format: properties.payload_format,
+                    content_type: properties.content_type.clone(),
+                    response_topic: properties.response_topic.clone(),
+                    correlation_data: properties
+                        .correlation_data
+                        .as_ref()
+                        .map(|data| data.clone().into()),
+                    user_properties: properties.user_properties.clone(),
+                    ..Default::default()
+                };
+                if let Some(expiry) = properties.expires_at_ms {
+                    let remaining = expiry.saturating_sub(now_ms());
+                    wire.message_expiry =
+                        Some(u32::try_from((remaining.max(0) + 999) / 1_000).unwrap_or(u32::MAX));
+                }
+                match v5::publish(
+                    v5::OutboundPublish {
+                        topic: &delivery.message.topic,
+                        payload: &delivery.message.payload,
+                        qos: delivery.message.qos,
+                        packet_id: delivery.packet_id,
+                        retain: delivery.message.retain,
+                        dup: delivery.dup,
+                        properties: &wire,
+                    },
+                    maximum.min(services.ingress.limits.max_mqtt_packet_size),
+                ) {
+                    Ok(bytes) => bytes,
+                    Err(Error::Overloaded) => {
+                        if delivery.packet_id.is_some() {
+                            services.mqtt.discard_outbound(key, generation, &delivery)?;
+                            pending = services.mqtt.next_offline(key, generation)?;
+                        }
+                        continue;
+                    }
+                    Err(error) => return Err(error),
+                }
             }
-        }
-        BrokerFrame::Pubrel { packet_id, .. } => v5::ack(0x62, packet_id, 0, maximum)?,
-    };
-    send_v5(stream, services, &bytes, maximum, Some(disconnected)).await
+            BrokerFrame::Pubrel { packet_id, .. } => v5::ack(
+                v5::AckReason::Pubrel(v5::PubrelReason::Success),
+                packet_id,
+                maximum,
+            )?,
+        };
+        send_v5(stream, services, &bytes, maximum, Some(disconnected)).await?;
+    }
+    Ok(())
 }
 
-async fn reject_connect(stream: &mut BoxStream, services: &Services, reason: u8) -> Result<()> {
-    let bytes = v5::connack(false, reason, &services.ingress.limits, None)?;
-    send(stream, services, &bytes).await
+async fn reject_connect(
+    stream: &mut BoxStream,
+    services: &Services,
+    reason: v5::ConnackReason,
+    client_maximum: usize,
+) -> Result<()> {
+    match v5::connack(
+        false,
+        reason,
+        &services.ingress.limits,
+        None,
+        client_maximum,
+    ) {
+        Ok(bytes) => send(stream, services, &bytes).await,
+        // A legal CONNACK needs five bytes. A peer advertising less cannot
+        // receive even a failure CONNACK, so the connection closes silently.
+        Err(Error::Overloaded) => Ok(()),
+        Err(error) => Err(error),
+    }
 }
 
 pub(super) async fn connection(
@@ -166,20 +195,45 @@ pub(super) async fn connection(
     let Packet::Connect(mut connect) = first else {
         return Err(Error::Invalid);
     };
+    let client_maximum = connect.properties.maximum_packet_size.unwrap_or(u32::MAX) as usize;
     if connect.client_id.is_empty() && !connect.clean_start {
-        reject_connect(&mut stream, &services, 0x85).await?;
+        reject_connect(
+            &mut stream,
+            &services,
+            v5::ConnackReason::ClientIdentifierInvalid,
+            client_maximum,
+        )
+        .await?;
         return Err(Error::Invalid);
     }
     if connect.properties.authentication_method.is_some() {
-        reject_connect(&mut stream, &services, 0x8c).await?;
+        reject_connect(
+            &mut stream,
+            &services,
+            v5::ConnackReason::BadAuthenticationMethod,
+            client_maximum,
+        )
+        .await?;
         return Err(Error::Authentication);
     }
     let Some(username) = connect.username.as_deref() else {
-        reject_connect(&mut stream, &services, 0x86).await?;
+        reject_connect(
+            &mut stream,
+            &services,
+            v5::ConnackReason::BadCredentials,
+            client_maximum,
+        )
+        .await?;
         return Err(Error::Authentication);
     };
     let Some(password) = connect.password.as_deref() else {
-        reject_connect(&mut stream, &services, 0x86).await?;
+        reject_connect(
+            &mut stream,
+            &services,
+            v5::ConnackReason::BadCredentials,
+            client_maximum,
+        )
+        .await?;
         return Err(Error::Authentication);
     };
     let candidate = match authenticate_stream(
@@ -197,18 +251,36 @@ pub(super) async fn connection(
         Ok(candidate) => candidate,
         Err(error) => {
             services.ingress.metrics.inc(Metric::MqttConnectFailure);
-            reject_connect(&mut stream, &services, v5::connect_reason(&error)).await?;
+            reject_connect(
+                &mut stream,
+                &services,
+                v5::connect_reason(&error),
+                client_maximum,
+            )
+            .await?;
             return Err(error);
         }
     };
     if let Some(will) = &connect.will
         && publish_acl(&candidate.auth, &will.topic).is_err()
     {
-        reject_connect(&mut stream, &services, 0x87).await?;
+        reject_connect(
+            &mut stream,
+            &services,
+            v5::ConnackReason::NotAuthorized,
+            client_maximum,
+        )
+        .await?;
         return Err(Error::Forbidden);
     }
     if let Err(error) = connection.authenticate(&candidate.auth.device_key) {
-        reject_connect(&mut stream, &services, v5::connect_reason(&error)).await?;
+        reject_connect(
+            &mut stream,
+            &services,
+            v5::connect_reason(&error),
+            client_maximum,
+        )
+        .await?;
         return Err(error);
     }
     let auth = Arc::new(candidate.auth.clone());
@@ -217,7 +289,6 @@ pub(super) async fn connection(
     let clean_start = connect.clean_start;
     let session_expiry = connect.properties.session_expiry.unwrap_or(0);
     let client_receive_maximum = connect.properties.receive_maximum.unwrap_or(u16::MAX);
-    let client_maximum = connect.properties.maximum_packet_size.unwrap_or(u32::MAX) as usize;
     let mqtt = services.mqtt.clone();
     let (live_session, mut commands, (mut attachment, client_id)) = services
         .ingress
@@ -227,6 +298,13 @@ pub(super) async fn connection(
             } else {
                 requested_client_id
             };
+            v5::connack(
+                false,
+                v5::ConnackReason::Success,
+                limits,
+                assigned.then_some(client_id.as_str()),
+                client_maximum,
+            )?;
             let attachment = mqtt.attach_v5(
                 bound_auth,
                 client_id.clone(),
@@ -270,9 +348,10 @@ pub(super) async fn connection(
         .transpose()?;
     let response = v5::connack(
         attachment.session_present,
-        0,
+        v5::ConnackReason::Success,
         limits,
         assigned.then_some(client_id.as_str()),
+        client_maximum,
     )?;
     send_v5(&mut stream, &services, &response, client_maximum, None).await?;
     services.ingress.metrics.inc(Metric::MqttConnectSuccess);
@@ -290,12 +369,12 @@ pub(super) async fn connection(
             tokio::select! {
                 biased;
                 _ = stop.cancelled() => break,
-                _ = live_session.cancel.cancelled() => break,
                 _ = attachment.cancel.cancelled() => {
-                    let bytes = v5::disconnect(0x8e, client_maximum)?;
+                    let bytes = v5::disconnect(v5::DisconnectReason::SessionTakenOver, client_maximum)?;
                     let _ = send_v5(&mut stream, &services, &bytes, client_maximum, Some(&mut error_disconnect_sent)).await;
                     break;
                 }
+                _ = live_session.cancel.cancelled() => break,
                 _ = tokio::time::sleep_until(idle) => return Err(Error::Timeout),
                 command = commands.recv() => {
                     let Some(command) = command else { break };
@@ -304,7 +383,10 @@ pub(super) async fn connection(
                     let qos = services.mqtt.subscription_qos(&attachment.key, &down)?.unwrap_or(1);
                     services.mqtt.send_live(&attachment.key, BrokerMessage {
                         topic: down, payload: command.bytes.to_vec(), qos, retain: false,
-                        properties: Default::default(),
+                        properties: PublishProperties {
+                            expires_at_ms: Some(command.expires_at),
+                            ..Default::default()
+                        },
                     })?;
                     services.router.transport_state(DeliveryState::Sent);
                 }
@@ -338,7 +420,7 @@ pub(super) async fn connection(
                                 services.mqtt.set_v5_disconnect_expiry(&attachment.key, attachment.generation, interval)?;
                                 if let Some(will) = &mut will_guard { will.set_v5_session_expiry(interval); }
                             }
-                            suppress_will = reason != 4;
+                            suppress_will = reason == 0;
                             break;
                         }
                         Packet::Subscribe { packet_id, filters, .. } => {
@@ -346,10 +428,10 @@ pub(super) async fn connection(
                             for (filter, options) in filters {
                                 let reason = if subscribe_acl(&auth, &filter, limits) {
                                     match services.mqtt.subscribe_v5(&attachment.key, attachment.generation, &filter, options) {
-                                        Ok(qos) => { services.ingress.metrics.inc(Metric::MqttSubscriptions); qos }
+                                        Ok(qos) => { services.ingress.metrics.inc(Metric::MqttSubscriptions); v5::SubackReason::granted(qos)? }
                                         Err(error) => v5::subscription_reason(&error),
                                     }
-                                } else { 0x87 };
+                                } else { v5::SubackReason::NotAuthorized };
                                 reasons.push(reason);
                             }
                             let bytes = v5::suback(packet_id, &reasons, limits.max_mqtt_packet_size)?;
@@ -358,7 +440,7 @@ pub(super) async fn connection(
                         Packet::Unsubscribe { packet_id, filters, .. } => {
                             let mut reasons = Vec::with_capacity(filters.len());
                             for filter in filters {
-                                reasons.push(if services.mqtt.unsubscribe(&attachment.key, attachment.generation, &filter).is_ok() { 0 } else { 0x11 });
+                                reasons.push(if services.mqtt.unsubscribe(&attachment.key, attachment.generation, &filter)? { v5::UnsubackReason::Success } else { v5::UnsubackReason::NoSubscriptionExisted });
                             }
                             let bytes = v5::unsuback(packet_id, &reasons, limits.max_mqtt_packet_size)?;
                             send_v5(&mut stream, &services, &bytes, client_maximum, Some(&mut error_disconnect_sent)).await?;
@@ -373,9 +455,21 @@ pub(super) async fn connection(
                         }
                         Packet::Pubrec { packet_id, reason } => {
                             if reason >= 0x80 {
-                                outbound_ack_result(services.mqtt.pubrec_rejected(&attachment.key, attachment.generation, packet_id), &mut stream, &services, client_maximum, &mut error_disconnect_sent).await?;
+                                let result = services.mqtt.pubrec_rejected(&attachment.key, attachment.generation, packet_id);
+                                if matches!(result, Err(Error::Invalid)) {
+                                    let bytes = v5::ack(v5::AckReason::Pubrel(v5::PubrelReason::PacketIdentifierNotFound), packet_id, limits.max_mqtt_packet_size)?;
+                                    send_v5(&mut stream, &services, &bytes, client_maximum, Some(&mut error_disconnect_sent)).await?;
+                                    continue;
+                                }
+                                result?;
                             } else {
-                                let frame = outbound_ack_result(services.mqtt.pubrec(&attachment.key, attachment.generation, packet_id), &mut stream, &services, client_maximum, &mut error_disconnect_sent).await?;
+                                let result = services.mqtt.pubrec(&attachment.key, attachment.generation, packet_id);
+                                if matches!(result, Err(Error::Invalid)) {
+                                    let bytes = v5::ack(v5::AckReason::Pubrel(v5::PubrelReason::PacketIdentifierNotFound), packet_id, limits.max_mqtt_packet_size)?;
+                                    send_v5(&mut stream, &services, &bytes, client_maximum, Some(&mut error_disconnect_sent)).await?;
+                                    continue;
+                                }
+                                let frame = result?;
                                 send_frame(&mut stream, &services, &attachment.key, attachment.generation, frame, client_maximum, &mut error_disconnect_sent).await?;
                             }
                             if let Some(frame) = services.mqtt.next_offline(&attachment.key, attachment.generation)? {
@@ -406,33 +500,41 @@ pub(super) async fn connection(
                                 InboundQos2Action::DeliveryInProgress => continue,
                                 InboundQos2Action::Unknown => true,
                             };
-                            let bytes = v5::ack(0x70, packet_id, if unknown { v5::PACKET_IDENTIFIER_NOT_FOUND } else { 0 }, limits.max_mqtt_packet_size)?;
+                            let bytes = v5::ack(v5::AckReason::Pubcomp(if unknown { v5::PubcompReason::PacketIdentifierNotFound } else { v5::PubcompReason::Success }), packet_id, limits.max_mqtt_packet_size)?;
                             send_v5(&mut stream, &services, &bytes, client_maximum, Some(&mut error_disconnect_sent)).await?;
+                            services.mqtt.finish_inbound_pubcomp(&attachment.key, attachment.generation, packet_id)?;
                         }
-                        Packet::Publish { topic, payload, qos, packet_id, retain, properties, .. } => {
+                        Packet::Publish { topic, payload, qos, packet_id, retain, dup, properties } => {
                             services.ingress.metrics.inc(Metric::MqttPublishes);
                             let message = BrokerMessage { topic, payload: payload.to_vec(), qos, retain,
                                 properties: PublishProperties::from_wire(&properties) };
                             publish_acl(&auth, &message.topic)?;
                             if qos > 0 && !services.mqtt.inbound_receive_available(&attachment.key, attachment.generation, qos, packet_id.ok_or(Error::Invalid)?)? {
-                                fail_with_reason(&mut stream, &services, client_maximum, &mut error_disconnect_sent, v5::RECEIVE_MAXIMUM_EXCEEDED, Error::Overloaded).await?;
+                                fail_with_reason(&mut stream, &services, client_maximum, &mut error_disconnect_sent, v5::DisconnectReason::ReceiveMaximumExceeded, Error::Overloaded).await?;
                             }
                             if qos == 2 {
                                 let id = packet_id.ok_or(Error::Invalid)?;
-                                if let Err(error) = services.mqtt.inbound_qos2(&attachment.key, attachment.generation, id, message) {
-                                    if matches!(error, Error::Invalid) {
-                                        fail_with_reason(&mut stream, &services, client_maximum, &mut error_disconnect_sent, v5::PACKET_IDENTIFIER_IN_USE, error).await?;
-                                    } else {
-                                        return Err(error);
+                                match services.mqtt.inbound_qos2(&attachment.key, attachment.generation, id, message) {
+                                    Ok(false) if !dup => {
+                                        let bytes = v5::ack(v5::AckReason::Pubrec(v5::PubrecReason::PacketIdentifierInUse), id, limits.max_mqtt_packet_size)?;
+                                        send_v5(&mut stream, &services, &bytes, client_maximum, Some(&mut error_disconnect_sent)).await?;
+                                        continue;
                                     }
+                                    Ok(_) => {}
+                                    Err(Error::Invalid) => {
+                                        let bytes = v5::ack(v5::AckReason::Pubrec(v5::PubrecReason::PacketIdentifierInUse), id, limits.max_mqtt_packet_size)?;
+                                        send_v5(&mut stream, &services, &bytes, client_maximum, Some(&mut error_disconnect_sent)).await?;
+                                        continue;
+                                    }
+                                    Err(error) => return Err(error),
                                 }
-                                let bytes = v5::ack(0x50, id, 0, limits.max_mqtt_packet_size)?;
+                                let bytes = v5::ack(v5::AckReason::Pubrec(v5::PubrecReason::Success), id, limits.max_mqtt_packet_size)?;
                                 send_v5(&mut stream, &services, &bytes, client_maximum, Some(&mut error_disconnect_sent)).await?;
                             } else {
                                 let _acceptance = process_publish(&services, &auth, &attachment.key, &message, validated_at, validation_us).await?;
                                 if let Some(id) = packet_id {
                                     let started = Instant::now();
-                                    let bytes = v5::ack(0x40, id, 0, limits.max_mqtt_packet_size)?;
+                                    let bytes = v5::ack(v5::AckReason::Puback(v5::PubackReason::Success), id, limits.max_mqtt_packet_size)?;
                                     send_v5(&mut stream, &services, &bytes, client_maximum, Some(&mut error_disconnect_sent)).await?;
                                     services.ingress.metrics.observe(Histogram::PubackWrite, started.elapsed().as_micros() as u64);
                                     services.ingress.metrics.inc(Metric::MqttPubacks);

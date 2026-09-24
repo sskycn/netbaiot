@@ -21,7 +21,9 @@ from run import event
 
 def connect(client: RawClient, client_id: str, *, clean: bool = True, expiry: int = 0,
             receive_maximum: int = 4, maximum_packet_size: int | None = None,
-            will: tuple[str, bytes, int] | None = None) -> bytes:
+            will: tuple[str, bytes, int] | None = None,
+            password: str = PASSWORD, expected_reason: int = 0,
+            will_retain: bool = True) -> bytes:
     properties = b"\x11" + expiry.to_bytes(4, "big") + b"\x21" + receive_maximum.to_bytes(2, "big")
     if maximum_packet_size is not None:
         properties += b"\x27" + maximum_packet_size.to_bytes(4, "big")
@@ -29,15 +31,15 @@ def connect(client: RawClient, client_id: str, *, clean: bool = True, expiry: in
     payload = binary(client_id.encode())
     if will:
         will_topic, will_payload, delay = will
-        flags |= 0x2c  # Will QoS1 and retain
+        flags |= 0x0c | (0x20 if will_retain else 0)  # Will QoS1
         payload += b"\x05\x18" + delay.to_bytes(4, "big")
         payload += binary(will_topic.encode()) + binary(will_payload)
-    payload += binary(USERNAME_A.encode()) + binary(PASSWORD.encode())
+    payload += binary(USERNAME_A.encode()) + binary(password.encode())
     body = (binary(b"MQTT") + bytes([5, flags, 0, 30])
             + bytes([len(properties)]) + properties + payload)
     client.send(frame(0x10, body))
     first, body = client.recv()
-    assert first == 0x20 and body[1] == 0, (first, body)
+    assert first == 0x20 and body[1] == expected_reason, (first, body)
     return body
 
 
@@ -70,7 +72,7 @@ def main() -> None:
         broker = start_netbaiot(pathlib.Path(temporary))
         try:
             for name, wire, expected in (
-                ("unknown-puback", frame(0x40, b"\0\x07"), 0x92),
+                ("unknown-puback", frame(0x40, b"\0\x07"), 0x82),
                 ("invalid-topic", frame(0x30, binary(b"bad/+topic") + b"\0"), 0x90),
                 ("invalid-filter", frame(0x82, b"\0\x08\0" + binary(b"bad/#/tail") + b"\x01"), 0x8f),
             ):
@@ -81,6 +83,67 @@ def main() -> None:
                     assert invalid.recv() == (0xe0, bytes([expected, 0])), name
                 finally:
                     invalid.close()
+
+            unknown_pubrec = RawClient("127.0.0.1", broker.port)
+            try:
+                connect(unknown_pubrec, "v5-unknown-pubrec")
+                unknown_pubrec.send(frame(0x50, b"\0\x07"))
+                assert unknown_pubrec.recv() == (0x62, b"\0\x07\x92\0")
+                unknown_pubrec.send(frame(0xc0))
+                assert unknown_pubrec.recv() == (0xd0, b"")
+                unknown_pubrec.send(frame(0xe0))
+            finally:
+                unknown_pubrec.close()
+
+            tiny_auth = RawClient("127.0.0.1", broker.port)
+            try:
+                response = connect(tiny_auth, "v5-tiny-auth", maximum_packet_size=5,
+                                   password="invalid", expected_reason=0x86)
+                assert response == b"\0\x86\0"
+                tiny_auth.expect_closed()
+            finally:
+                tiny_auth.close()
+
+            tiny_will = RawClient("127.0.0.1", broker.port)
+            try:
+                response = connect(tiny_will, "v5-tiny-forbidden-will", maximum_packet_size=5,
+                                   will=(TOPIC_A[:-2] + "down", b"will", 0),
+                                   expected_reason=0x87)
+                assert response == b"\0\x87\0"
+                tiny_will.expect_closed()
+            finally:
+                tiny_will.close()
+
+            tiny_success = RawClient("127.0.0.1", broker.port)
+            try:
+                response = connect(tiny_success, "v5-tiny-success", maximum_packet_size=17)
+                assert response[:3] == b"\0\0\x0c" and response[3] == 0x21, response
+                tiny_success.send(frame(0xe0))
+            finally:
+                tiny_success.close()
+
+            too_tiny = RawClient("127.0.0.1", broker.port)
+            try:
+                properties = b"\x11\0\0\0\0\x21\0\x04\x27\0\0\0\x04"
+                payload = binary(b"v5-too-tiny") + binary(USERNAME_A.encode()) + binary(PASSWORD.encode())
+                body = binary(b"MQTT") + b"\x05\xc2\0\x1e" + bytes([len(properties)]) + properties + payload
+                too_tiny.send(frame(0x10, body))
+                too_tiny.expect_closed()
+            finally:
+                too_tiny.close()
+
+            unsubscribe_client = RawClient("127.0.0.1", broker.port)
+            try:
+                connect(unsubscribe_client, "v5-unsubscribe")
+                subscribe(unsubscribe_client, 11)
+                body = b"\0\x0c\0" + binary(TOPIC_A.encode())
+                unsubscribe_client.send(frame(0xa2, body))
+                assert unsubscribe_client.recv() == (0xb0, b"\0\x0c\0\0")
+                unsubscribe_client.send(frame(0xa2, body))
+                assert unsubscribe_client.recv() == (0xb0, b"\0\x0c\0\x11")
+                unsubscribe_client.send(frame(0xe0))
+            finally:
+                unsubscribe_client.close()
 
             subscriber = RawClient("127.0.0.1", broker.port)
             try:
@@ -106,9 +169,25 @@ def main() -> None:
                 subscribe(limited, 2)
                 publish(limited, 9002, 2)
                 assert limited.recv() == (0x40, b"\0\2")
-                assert limited.recv() == (0xe0, b"\x95\0")
+                no_packet(limited)
+                limited.send(frame(0xc0))
+                assert limited.recv() == (0xd0, b"")
+                limited.send(frame(0xe0))
             finally:
                 limited.close()
+
+            limited_qos0 = RawClient("127.0.0.1", broker.port)
+            try:
+                connect(limited_qos0, "v5-small-qos0", maximum_packet_size=64)
+                subscribe(limited_qos0, 13, options=0)
+                body = binary(TOPIC_A.encode()) + b"\0" + event(9002)
+                limited_qos0.send(frame(0x30, body))
+                no_packet(limited_qos0)
+                limited_qos0.send(frame(0xc0))
+                assert limited_qos0.recv() == (0xd0, b"")
+                limited_qos0.send(frame(0xe0))
+            finally:
+                limited_qos0.close()
 
             qos2 = RawClient("127.0.0.1", broker.port)
             try:
@@ -118,6 +197,8 @@ def main() -> None:
                 qos2.send(frame(0x34, body))
                 assert qos2.recv() == (0x50, b"\0\4")
                 time.sleep(0.02)
+                qos2.send(frame(0x34, body))
+                assert qos2.recv() == (0x50, b"\0\4\x91\0")
                 qos2.send(frame(0x3c, body))
                 assert qos2.recv() == (0x50, b"\0\4")
                 qos2.send(frame(0x62, b"\0\4"))
@@ -206,6 +287,53 @@ def main() -> None:
                 subscribe(observer, 10)
                 first, body = observer.recv()
                 assert first >> 4 == 3 and first & 1 == 1
+                topic_end = 2 + int.from_bytes(body[:2], "big")
+                observer.send(frame(0x40, body[topic_end:topic_end + 2]))
+                observer.send(frame(0xe0))
+            finally:
+                observer.close()
+            for reason, sequence, expected_sequence in ((0, 9100, 9006), (4, 9104, 9104),
+                                                      (0x82, 9182, 9182)):
+                will_client = RawClient("127.0.0.1", broker.port)
+                try:
+                    connect(will_client, f"v5-will-reason-{reason}",
+                            will=(TOPIC_A, event(sequence), 0))
+                    will_client.send(frame(0xe0, b"" if reason == 0 else bytes([reason, 0])))
+                    will_client.expect_closed()
+                finally:
+                    will_client.close()
+                observer = RawClient("127.0.0.1", broker.port)
+                try:
+                    connect(observer, f"v5-will-reason-observer-{reason}")
+                    subscribe(observer, 20 + reason)
+                    first, body = observer.recv()
+                    assert first >> 4 == 3 and body.endswith(event(expected_sequence)), (first, body)
+                    topic_end = 2 + int.from_bytes(body[:2], "big")
+                    observer.send(frame(0x40, body[topic_end:topic_end + 2]))
+                    observer.send(frame(0xe0))
+                finally:
+                    observer.close()
+
+            old = RawClient("127.0.0.1", broker.port)
+            new = RawClient("127.0.0.1", broker.port)
+            try:
+                connect(old, "v5-takeover", clean=False, expiry=60,
+                        will=(TOPIC_A, event(9199), 0))
+                response = connect(new, "v5-takeover", clean=False, expiry=60)
+                assert response[0] == 1
+                assert old.recv() == (0xe0, b"\x8e\0")
+                new.send(frame(0xc0))
+                assert new.recv() == (0xd0, b"")
+                new.send(frame(0xe0))
+            finally:
+                old.close()
+                new.close()
+            observer = RawClient("127.0.0.1", broker.port)
+            try:
+                connect(observer, "v5-takeover-observer")
+                subscribe(observer, 99)
+                first, body = observer.recv()
+                assert first >> 4 == 3 and body.endswith(event(9182)), (first, body)
                 topic_end = 2 + int.from_bytes(body[:2], "big")
                 observer.send(frame(0x40, body[topic_end:topic_end + 2]))
                 observer.send(frame(0xe0))

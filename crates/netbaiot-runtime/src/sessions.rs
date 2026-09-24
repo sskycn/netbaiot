@@ -146,6 +146,18 @@ impl Sessions {
         auth: Arc<AuthenticatedDevice>,
         transport: Transport,
     ) -> Result<(SessionLease, mpsc::Receiver<QueuedCommand>)> {
+        let (lease, receiver, ()) = self.register_with(auth, transport, |_, _| Ok(()))?;
+        Ok((lease, receiver))
+    }
+
+    /// Finalize transport attachment before cancelling the replaced live socket.
+    /// Lock order: auth-registration gate (caller), Sessions, transport broker.
+    pub fn register_with<T>(
+        self: &Arc<Self>,
+        auth: Arc<AuthenticatedDevice>,
+        transport: Transport,
+        finalize: impl FnOnce(&AuthenticatedDevice, u64) -> Result<T>,
+    ) -> Result<(SessionLease, mpsc::Receiver<QueuedCommand>, T)> {
         if !matches!(transport, Transport::Mqtt | Transport::Tcp) {
             return Err(Error::Invalid);
         }
@@ -168,10 +180,16 @@ impl Sessions {
         {
             return Err(Error::Overloaded);
         }
-        let tenant = state.tenants.entry(device.tenant_id.clone()).or_default();
-        if !replacing && tenant.connections >= self.limits.max_connections_per_tenant {
+        if !replacing
+            && state
+                .tenants
+                .get(&device.tenant_id)
+                .is_some_and(|tenant| tenant.connections >= self.limits.max_connections_per_tenant)
+        {
             return Err(Error::Overloaded);
         }
+        let finalized = finalize(auth.as_ref(), generation)?;
+        let tenant = state.tenants.entry(device.tenant_id.clone()).or_default();
         if !replacing {
             tenant.connections += 1;
         }
@@ -222,6 +240,7 @@ impl Sessions {
                 cancel,
             },
             receiver,
+            finalized,
         ))
     }
 

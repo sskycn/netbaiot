@@ -254,7 +254,7 @@ impl Default for Limits {
             spool_max_bytes: 268_435_456,
             spool_segment_max_bytes: 67_108_864,
             spool_record_max_bytes: 1_048_576,
-            // NBMQ v3 stores raw payload bytes, bounded record envelopes, profile metadata, and a
+            // NBMQ v5 stores raw payload bytes, bounded record envelopes, profile metadata, and a
             // fixed integrity trailer. The checked upper-bound formula below covers admitted state.
             mqtt_recovery_max_bytes: 202_178_660,
         }
@@ -262,7 +262,7 @@ impl Default for Limits {
 }
 
 impl Limits {
-    /// Conservative upper bound for compact NBMQ v3. Logical state accounting covers payloads and
+    /// Conservative upper bound for compact NBMQ v5. Logical state accounting covers payloads and
     /// the common record envelope; these extra terms cover retained owners, session profile data,
     /// pending-Will owners, and the fixed header/trailer outside that accounting.
     pub fn mqtt_recovery_upper_bound(&self) -> Result<usize> {

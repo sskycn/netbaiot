@@ -139,9 +139,7 @@ impl Ingress {
             return Err(Error::Authentication);
         }
         let auth = Arc::new(candidate.auth);
-        let (lease, receiver) = self.sessions.register(auth.clone(), transport)?;
-        let finalized = finalize(auth.as_ref(), lease.generation)?;
-        Ok((lease, receiver, finalized))
+        self.sessions.register_with(auth, transport, finalize)
     }
 
     pub fn invalidate_auth(

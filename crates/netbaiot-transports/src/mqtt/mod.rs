@@ -355,7 +355,7 @@ pub async fn connection(
                             send(&mut stream, &services, &encode(0x90, &body, limits.max_mqtt_packet_size)?).await?;
                         }
                         Packet::Unsubscribe { packet_id, filters } => {
-                            for filter in filters { services.mqtt.unsubscribe(&attachment.key, attachment.generation, &filter)? }
+                            for filter in filters { services.mqtt.unsubscribe(&attachment.key, attachment.generation, &filter)?; }
                             send(&mut stream, &services, &ack(0xb0, packet_id)).await?;
                         }
                         Packet::Puback(id) => {
