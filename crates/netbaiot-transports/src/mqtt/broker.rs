@@ -10,7 +10,7 @@ use netbaiot_runtime::{Error, Histogram, Limits, Metrics, Result, lock, now_ms};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
-    collections::{BTreeMap, HashMap, HashSet, VecDeque},
+    collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque},
     fs,
     hash::Hash,
     io::{BufReader, Cursor, Read, Write},
@@ -700,12 +700,16 @@ struct BrokerState {
     retained_reserved_tenants: HashMap<TenantId, (usize, usize)>,
     /// Ready Wills only. Future delayed Wills live in `future_wills` until due.
     pending_wills: VecDeque<PendingWill>,
-    future_wills: BTreeMap<i64, VecDeque<PendingWill>>,
+    future_wills: BTreeMap<i64, BTreeMap<u64, PendingWill>>,
+    /// Derived owner lookup for delayed Wills; rebuilt from the recovery records.
+    future_wills_by_session: HashMap<SessionKey, BTreeSet<(i64, u64)>>,
+    next_will_token: u64,
     will_responsibility_count: usize,
     will_responsibility_bytes: usize,
     will_responsibility_tenants: HashMap<TenantId, (usize, usize)>,
-    pending_by_tenant: HashMap<TenantId, VecDeque<SessionKey>>,
-    pending_sessions: HashSet<SessionKey>,
+    pending_by_tenant: HashMap<(TenantId, u8), BTreeMap<u64, SessionKey>>,
+    pending_sessions: HashMap<SessionKey, (u8, u64)>,
+    next_pending_token: u64,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -1151,11 +1155,14 @@ impl MqttBroker {
                 retained_reserved_tenants: HashMap::new(),
                 pending_wills: VecDeque::new(),
                 future_wills: BTreeMap::new(),
+                future_wills_by_session: HashMap::new(),
+                next_will_token: 0,
                 will_responsibility_count: 0,
                 will_responsibility_bytes: 0,
                 will_responsibility_tenants: HashMap::new(),
                 pending_by_tenant: HashMap::new(),
-                pending_sessions: HashSet::new(),
+                pending_sessions: HashMap::new(),
+                next_pending_token: 0,
             }),
         })
     }
@@ -1264,16 +1271,6 @@ impl MqttBroker {
         let authorization = SessionAuthorization::from(auth);
         if clean_session {
             release_clean_start_delays(&mut state, &key);
-            for pending in &mut state.pending_wills {
-                if pending
-                    .cancel_on_resume
-                    .as_ref()
-                    .is_some_and(|(owner, _)| owner == &key)
-                {
-                    pending.due_at_ms = None;
-                    pending.cancel_on_resume = None;
-                }
-            }
             retry_pending_wills(&mut state, &self.limits);
         }
         if clean_session {
@@ -1488,25 +1485,38 @@ impl MqttBroker {
             .get(key)
             .is_some_and(|session| session.subscriptions.contains_key(filter));
         let now = now_ms();
-        let retained = state
-            .retained
-            .values()
-            .filter(|retained| {
-                !retained.message.expired(now)
-                    && topic_matches(filter, &retained.message.topic)
-                    && !(subscription.no_local && retained.origin.as_ref() == Some(key))
-                    && match subscription.retain_handling {
-                        0 => true,
-                        1 => !replacement,
-                        _ => false,
-                    }
-            })
-            .map(|retained| BrokerMessage {
-                qos: retained.message.qos.min(subscription.qos),
-                retain: true,
-                ..retained.message.clone()
-            })
-            .collect::<Vec<_>>();
+        let retained_allowed = |retained: &RetainedMessage| {
+            !(retained.message.expired(now)
+                || (subscription.no_local && retained.origin.as_ref() == Some(key)))
+                && match subscription.retain_handling {
+                    0 => true,
+                    1 => !replacement,
+                    _ => false,
+                }
+        };
+        let replay_message = |retained: &RetainedMessage| BrokerMessage {
+            qos: retained.message.qos.min(subscription.qos),
+            retain: true,
+            ..retained.message.clone()
+        };
+        let retained = if filter.contains(['+', '#']) {
+            state
+                .retained
+                .values()
+                .filter(|retained| {
+                    topic_matches(filter, &retained.message.topic) && retained_allowed(retained)
+                })
+                .map(replay_message)
+                .collect::<Vec<_>>()
+        } else {
+            state
+                .retained
+                .get(filter)
+                .filter(|retained| retained_allowed(retained))
+                .map(replay_message)
+                .into_iter()
+                .collect::<Vec<_>>()
+        };
         if !replacement {
             let tenant_count = state
                 .tenant_usage
@@ -1546,7 +1556,14 @@ impl MqttBroker {
         {
             return Err(Error::Overloaded);
         }
-        let before_session = state.sessions.get(key).cloned().ok_or(Error::Internal)?;
+        // Retained replay can fail after the subscription mutation and needs a full rollback.
+        // An empty replay cannot enter that failure path, so avoid copying the entire target
+        // Session (including its bounded offline queue and inflight payloads) for it.
+        let before_session = if retained.is_empty() {
+            None
+        } else {
+            Some(state.sessions.get(key).cloned().ok_or(Error::Internal)?)
+        };
         let before_subscription_count = state.subscription_count;
         let before_session_bytes = state.session_bytes;
         let before_offline_count = state.offline_count;
@@ -1578,6 +1595,7 @@ impl MqttBroker {
         sync_session_usage(&mut state, key)?;
         for message in retained {
             if let Err(error) = enqueue(&mut state, key, message, &self.limits) {
+                let before_session = before_session.as_ref().ok_or(Error::Internal)?;
                 // A concurrently closed receiver is the only expected post-preflight failure.
                 // Restore all broker metadata; frames queued to a now-closed receiver are dropped
                 // with that receiver and cannot create a hidden live subscription.
@@ -2571,11 +2589,14 @@ impl MqttBroker {
             retained_reserved_tenants: HashMap::new(),
             pending_wills: VecDeque::new(),
             future_wills: BTreeMap::new(),
+            future_wills_by_session: HashMap::new(),
+            next_will_token: 0,
             will_responsibility_count: 0,
             will_responsibility_bytes: 0,
             will_responsibility_tenants: HashMap::new(),
             pending_by_tenant: HashMap::new(),
-            pending_sessions: HashSet::new(),
+            pending_sessions: HashMap::new(),
+            next_pending_token: 0,
         };
         for mut session in snapshot.sessions {
             if snapshot.format_version < RECOVERY_VERSION_V4 && session.version != MqttVersion::V311
@@ -3131,27 +3152,46 @@ fn check_owner(state: &BrokerState, key: &SessionKey, generation: u64) -> Result
 }
 
 fn mark_pending(state: &mut BrokerState, key: &SessionKey) {
-    let eligible = state.active.contains_key(key)
-        && state
-            .sessions
-            .get(key)
-            .is_some_and(|session| !session.offline.is_empty());
-    if eligible && state.pending_sessions.insert(key.clone()) {
-        state
+    let qos = state
+        .active
+        .contains_key(key)
+        .then(|| {
+            state
+                .sessions
+                .get(key)
+                .and_then(|session| session.offline.front())
+                .map(|message| message.qos)
+        })
+        .flatten();
+    if state.pending_sessions.get(key).map(|(qos, _)| *qos) == qos {
+        return;
+    }
+    unmark_pending(state, key);
+    if let Some(qos) = qos {
+        let queue = state
             .pending_by_tenant
-            .entry(key.device.tenant_id.clone())
-            .or_default()
-            .push_back(key.clone());
+            .entry((key.device.tenant_id.clone(), qos))
+            .or_default();
+        let token = loop {
+            state.next_pending_token = state.next_pending_token.wrapping_add(1);
+            if !queue.contains_key(&state.next_pending_token) {
+                break state.next_pending_token;
+            }
+        };
+        queue.insert(token, key.clone());
+        state.pending_sessions.insert(key.clone(), (qos, token));
     }
 }
 
 fn unmark_pending(state: &mut BrokerState, key: &SessionKey) {
-    if state.pending_sessions.remove(key)
-        && let Some(queue) = state.pending_by_tenant.get_mut(&key.device.tenant_id)
-    {
-        queue.retain(|candidate| candidate != key);
+    let Some((qos, token)) = state.pending_sessions.remove(key) else {
+        return;
+    };
+    let queue_key = (key.device.tenant_id.clone(), qos);
+    if let Some(queue) = state.pending_by_tenant.get_mut(&queue_key) {
+        queue.remove(&token);
         if queue.is_empty() {
-            state.pending_by_tenant.remove(&key.device.tenant_id);
+            state.pending_by_tenant.remove(&queue_key);
         }
     }
 }
@@ -3202,18 +3242,28 @@ fn wake_tenant_pending(
     qos: u8,
     limits: &Limits,
 ) -> Result<()> {
-    let mut pending = state.pending_by_tenant.remove(tenant).unwrap_or_default();
+    let tenant_limit = if qos == 1 {
+        limits.max_inflight_qos1_per_tenant
+    } else {
+        limits.max_inflight_qos2_per_tenant
+    };
+    if tenant_inflight(state, tenant, qos) >= tenant_limit {
+        return Ok(());
+    }
+    let queue_key = (tenant.clone(), qos);
+    let mut pending = state
+        .pending_by_tenant
+        .remove(&queue_key)
+        .unwrap_or_default();
     let attempts = pending.len();
     for _ in 0..attempts {
-        let Some(key) = pending.pop_front() else {
+        if tenant_inflight(state, tenant, qos) >= tenant_limit {
+            break;
+        }
+        let Some((_, key)) = pending.pop_first() else {
             break;
         };
         state.pending_sessions.remove(&key);
-        let tenant_limit = if qos == 1 {
-            limits.max_inflight_qos1_per_tenant
-        } else {
-            limits.max_inflight_qos2_per_tenant
-        };
         if message_expiry_due(state, &key, now_ms()) {
             prune_expired_messages_for_session(state, &key, now_ms())?;
         }
@@ -3243,6 +3293,12 @@ fn wake_tenant_pending(
             }
         }
         mark_pending(state, &key);
+    }
+    if !pending.is_empty() {
+        if let Some(mut requeued) = state.pending_by_tenant.remove(&queue_key) {
+            pending.append(&mut requeued);
+        }
+        state.pending_by_tenant.insert(queue_key, pending);
     }
     Ok(())
 }
@@ -3566,8 +3622,8 @@ fn preflight_retained_replay(
     subscription_charge: usize,
     limits: &Limits,
 ) -> Result<usize> {
-    let mut session = state.sessions.get(key).cloned().ok_or(Error::Internal)?;
-    session.state_bytes = session
+    let session = state.sessions.get(key).ok_or(Error::Internal)?;
+    let session_state_bytes = session
         .state_bytes
         .checked_add(subscription_charge)
         .ok_or(Error::Overloaded)?;
@@ -3577,12 +3633,17 @@ fn preflight_retained_replay(
     let mut global_state_bytes = total_session_bytes(state)
         .checked_add(subscription_charge)
         .ok_or(Error::Overloaded)?;
-    if session.state_bytes > limits.max_mqtt_session_state_bytes
+    if session_state_bytes > limits.max_mqtt_session_state_bytes
         || tenant_state_bytes > limits.max_mqtt_session_state_bytes_per_tenant
         || global_state_bytes > limits.global_mqtt_session_bytes
     {
         return Err(Error::Overloaded);
     }
+    if messages.is_empty() {
+        return Ok(0);
+    }
+    let mut session = session.clone();
+    session.state_bytes = session_state_bytes;
     let mut tenant_qos1 = tenant_inflight(state, &key.device.tenant_id, 1);
     let mut tenant_qos2 = tenant_inflight(state, &key.device.tenant_id, 2);
     let mut tenant_offline_count = state
@@ -3851,7 +3912,7 @@ fn all_pending_wills(state: &BrokerState) -> impl Iterator<Item = &PendingWill> 
     state
         .pending_wills
         .iter()
-        .chain(state.future_wills.values().flat_map(|queue| queue.iter()))
+        .chain(state.future_wills.values().flat_map(|queue| queue.values()))
 }
 
 fn pending_will_count(state: &BrokerState) -> usize {
@@ -3859,47 +3920,62 @@ fn pending_will_count(state: &BrokerState) -> usize {
         + state
             .future_wills
             .values()
-            .map(VecDeque::len)
+            .map(BTreeMap::len)
             .sum::<usize>()
 }
 
 fn insert_pending_will(state: &mut BrokerState, pending: PendingWill) {
     if let Some(deadline) = pending.due_at_ms {
-        state
-            .future_wills
-            .entry(deadline)
-            .or_default()
-            .push_back(pending);
+        let bucket = state.future_wills.entry(deadline).or_default();
+        // A token is derived runtime metadata, never part of the recovery format.
+        let token = loop {
+            state.next_will_token = state.next_will_token.wrapping_add(1);
+            if !bucket.contains_key(&state.next_will_token) {
+                break state.next_will_token;
+            }
+        };
+        if let Some((owner, _)) = &pending.cancel_on_resume {
+            state
+                .future_wills_by_session
+                .entry(owner.clone())
+                .or_default()
+                .insert((deadline, token));
+        }
+        bucket.insert(token, pending);
     } else {
         state.pending_wills.push_back(pending);
     }
 }
 
-fn release_clean_start_delays(state: &mut BrokerState, key: &SessionKey) {
-    let future = std::mem::take(&mut state.future_wills);
-    for (_, bucket) in future {
-        for mut pending in bucket {
-            if pending
-                .cancel_on_resume
-                .as_ref()
-                .is_some_and(|(owner, _)| owner == key)
-            {
-                pending.due_at_ms = None;
-                pending.cancel_on_resume = None;
+fn take_owned_future_wills(state: &mut BrokerState, key: &SessionKey) -> Vec<PendingWill> {
+    let mut owned = Vec::new();
+    let Some(locations) = state.future_wills_by_session.remove(key) else {
+        return owned;
+    };
+    for (deadline, token) in locations {
+        if let Some(bucket) = state.future_wills.get_mut(&deadline) {
+            if let Some(pending) = bucket.remove(&token) {
+                owned.push(pending);
             }
-            insert_pending_will(state, pending);
+            if bucket.is_empty() {
+                state.future_wills.remove(&deadline);
+            }
         }
+    }
+    owned
+}
+
+fn release_clean_start_delays(state: &mut BrokerState, key: &SessionKey) {
+    for mut pending in take_owned_future_wills(state, key) {
+        pending.due_at_ms = None;
+        pending.cancel_on_resume = None;
+        state.pending_wills.push_back(pending);
     }
 }
 
 fn cancel_resumed_wills(state: &mut BrokerState, key: &SessionKey, incarnation: u64) {
-    let mut pending = std::mem::take(&mut state.pending_wills);
-    let future = std::mem::take(&mut state.future_wills);
-    for (_, bucket) in future {
-        pending.extend(bucket);
-    }
     let now = now_ms();
-    while let Some(mut will) = pending.pop_front() {
+    for mut will in take_owned_future_wills(state, key) {
         let matches = will
             .cancel_on_resume
             .as_ref()
@@ -3931,9 +4007,19 @@ fn promote_due_wills(state: &mut BrokerState, now: i64, mut budget: usize) {
             break;
         };
         while budget > 0 {
-            let Some(pending) = bucket.pop_front() else {
+            let Some((token, mut pending)) = bucket.pop_first() else {
                 break;
             };
+            if let Some((owner, _)) = &pending.cancel_on_resume
+                && let Some(locations) = state.future_wills_by_session.get_mut(owner)
+            {
+                locations.remove(&(deadline, token));
+                if locations.is_empty() {
+                    state.future_wills_by_session.remove(owner);
+                }
+            }
+            pending.due_at_ms = None;
+            pending.cancel_on_resume = None;
             state.pending_wills.push_back(pending);
             budget -= 1;
         }
@@ -5722,6 +5808,40 @@ mod tests {
         assert_eq!(state.will_responsibility_count, pending_will_count(state));
         assert_eq!(state.will_responsibility_bytes, will_bytes);
         assert_eq!(state.will_responsibility_tenants, will_tenants);
+        let mut will_owners = HashMap::<SessionKey, BTreeSet<(i64, u64)>>::new();
+        for (&deadline, bucket) in &state.future_wills {
+            for (&token, pending) in bucket {
+                assert_eq!(pending.due_at_ms, Some(deadline));
+                if let Some((owner, _)) = &pending.cancel_on_resume {
+                    will_owners
+                        .entry(owner.clone())
+                        .or_default()
+                        .insert((deadline, token));
+                }
+            }
+        }
+        assert_eq!(state.future_wills_by_session, will_owners);
+        let mut queued_pending = HashMap::new();
+        for ((tenant, qos), queue) in &state.pending_by_tenant {
+            for (token, key) in queue {
+                assert_eq!(&key.device.tenant_id, tenant);
+                assert!(
+                    queued_pending.insert(key.clone(), (*qos, *token)).is_none(),
+                    "duplicate pending session"
+                );
+                assert!(state.sessions.contains_key(key), "deleted pending session");
+                assert!(state.active.contains_key(key), "inactive pending session");
+                assert!(
+                    state
+                        .sessions
+                        .get(key)
+                        .and_then(|session| session.offline.front())
+                        .is_some_and(|message| message.qos == *qos),
+                    "pending session with wrong QoS or no offline work"
+                );
+            }
+        }
+        assert_eq!(state.pending_sessions, queued_pending);
         let retained_expiry = state
             .retained
             .iter()
@@ -5741,6 +5861,62 @@ mod tests {
     fn assert_broker_accounting(broker: &MqttBroker) {
         let state = lock(&broker.state).unwrap();
         assert_accounting_consistent(&state);
+    }
+
+    #[test]
+    fn future_will_owner_index_handles_shared_deadline_and_due_promotion() {
+        let limits = Arc::new(Limits::default());
+        let broker = MqttBroker::new(limits.clone());
+        let deadline = now_ms() + 3_600_000;
+        let mut keys = Vec::new();
+        {
+            let mut state = lock(&broker.state).unwrap();
+            for index in 0..64 {
+                let owner = auth(&format!("will-{index}")).device_key;
+                let key = SessionKey {
+                    device: owner.clone(),
+                    client_id: format!("client-{index}"),
+                };
+                let pending = PendingWill {
+                    owner: owner.clone(),
+                    origin: Some(key.clone()),
+                    message: BrokerMessage {
+                        topic: format!("v1/t/t/p/p/d/will-{index}/up"),
+                        payload: vec![7; 32],
+                        qos: 1,
+                        retain: false,
+                        properties: Default::default(),
+                    },
+                    due_at_ms: Some(deadline),
+                    cancel_on_resume: Some((key.clone(), 1)),
+                    message_expiry_interval: None,
+                    retained_reservation: RetainedReservation::default(),
+                };
+                reserve_will_capacity(&mut state, &owner.tenant_id, pending.bytes(), &limits)
+                    .unwrap();
+                insert_pending_will(&mut state, pending);
+                keys.push(key);
+            }
+        }
+        assert_broker_accounting(&broker);
+        {
+            let mut state = lock(&broker.state).unwrap();
+            let unrelated = SessionKey {
+                device: auth("unrelated").device_key,
+                client_id: "unrelated".into(),
+            };
+            release_clean_start_delays(&mut state, &unrelated);
+            cancel_resumed_wills(&mut state, &unrelated, 1);
+            assert_eq!(pending_will_count(&state), 64);
+            release_clean_start_delays(&mut state, &keys[0]);
+            assert_eq!(state.pending_wills.len(), 1);
+            cancel_resumed_wills(&mut state, &keys[1], 1);
+            assert_eq!(pending_will_count(&state), 63);
+            promote_due_wills(&mut state, deadline, 64);
+            assert!(state.future_wills.is_empty());
+            assert!(state.future_wills_by_session.is_empty());
+        }
+        assert_broker_accounting(&broker);
     }
 
     #[test]
@@ -6454,8 +6630,9 @@ mod tests {
         assert!(!recovered.has_retained_topic(topic).unwrap());
         {
             let mut state = recovered.state.lock().unwrap();
-            let (_, mut bucket) = state.future_wills.pop_first().unwrap();
-            let mut pending = bucket.pop_front().unwrap();
+            let mut pending = take_owned_future_wills(&mut state, &resumed.key)
+                .pop()
+                .unwrap();
             pending.due_at_ms = Some(now_ms() - 1);
             insert_pending_will(&mut state, pending);
         }
@@ -10164,6 +10341,64 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn mqtt_recovery_historical_binary_fixtures_upgrade_to_v6() {
+        let limits = Arc::new(Limits::default());
+        let fixtures: [(u32, &[u8]); 5] = [
+            (1, include_bytes!("../../../../tests/mqtt_conformance/fixtures/mqtt_recovery/v1-empty.nbmq")),
+            (2, include_bytes!("../../../../tests/mqtt_conformance/fixtures/mqtt_recovery/v2-empty.nbmq")),
+            (3, include_bytes!("../../../../tests/mqtt_conformance/fixtures/mqtt_recovery/v3-empty.nbmq")),
+            (4, include_bytes!("../../../../tests/mqtt_conformance/fixtures/mqtt_recovery/v4-empty.nbmq")),
+            (5, include_bytes!("../../../../tests/mqtt_conformance/fixtures/mqtt_recovery/v5-qos2-no-local-delayed-will.nbmq")),
+        ];
+        for (version, bytes) in fixtures {
+            let decoded = decode_mqtt_recovery(bytes, &limits).unwrap();
+            assert_eq!(decoded.format_version, version);
+            if version == 5 {
+                assert_eq!(decoded.sessions.len(), 1);
+                assert!(decoded.sessions[0].subscriptions.values().any(|s| s.no_local));
+                assert!(matches!(
+                    decoded.sessions[0].inbound_qos2.get(&7),
+                    Some(InboundQos2State::AwaitPubrel(_))
+                ));
+                assert_eq!(decoded.pending_wills.len(), 1);
+                let pending = &decoded.pending_wills[0];
+                assert!(pending.due_at_ms.is_some());
+                assert_eq!(
+                    pending.origin.as_ref(),
+                    pending.cancel_on_resume.as_ref().map(|(key, _)| key)
+                );
+            }
+            let directory = std::env::temp_dir().join(format!(
+                "netbaiot-historical-v{version}-{}",
+                uuid::Uuid::new_v4()
+            ));
+            let broker = MqttBroker::new(limits.clone());
+            broker.restore(decoded).unwrap();
+            broker.commit_to(&directory).await.unwrap();
+            let upgraded = MqttBroker::new(limits.clone());
+            assert!(upgraded.recover_from(&directory).await.unwrap());
+            let snapshot = upgraded.snapshot().unwrap();
+            assert_eq!(snapshot.format_version, RECOVERY_VERSION);
+            if version == 5 {
+                assert!(snapshot.sessions[0].subscriptions.values().any(|s| s.no_local));
+                assert!(matches!(
+                    snapshot.sessions[0].inbound_qos2.get(&7),
+                    Some(InboundQos2State::AwaitPubrel(_))
+                ));
+                assert_eq!(snapshot.pending_wills.len(), 1);
+                assert_eq!(
+                    snapshot.pending_wills[0].origin,
+                    snapshot.pending_wills[0]
+                        .cancel_on_resume
+                        .as_ref()
+                        .map(|(key, _)| key.clone())
+                );
+            }
+            fs::remove_dir_all(directory).unwrap();
+        }
+    }
+
+    #[tokio::test]
     async fn mqtt_recovery_whole_image_integrity_001() {
         let limits = Arc::new(Limits::default());
         let broker = MqttBroker::new(limits.clone());
@@ -10474,6 +10709,104 @@ mod tests {
             );
             fs::remove_dir_all(directory).unwrap();
         }
+    }
+
+    #[tokio::test]
+    #[ignore = "manual near-capacity NBMQ v6 commit and recovery"]
+    async fn mqtt_recovery_v6_near_default_capacity_manual() {
+        let limits = Arc::new(Limits::default());
+        limits.validate().unwrap();
+        let broker = MqttBroker::new(limits.clone());
+        for index in 0..128 {
+            let mut identity = auth(&format!("d{index}"));
+            identity.device_key.tenant_id = TenantId::new(format!("t{}", index / 16)).unwrap();
+            let topic = format!("v1/t/t{}/p/p/d/d{index}/up", index / 16);
+            let mut attachment = broker
+                .attach_v5(&identity, format!("client-{index}"), false, 3_600, 4)
+                .unwrap();
+            broker
+                .subscribe(&attachment.key, attachment.generation, &topic, 1)
+                .unwrap();
+            attachment.detach().unwrap();
+            for _ in 0..110 {
+                broker
+                    .route(
+                        &identity.device_key,
+                        BrokerMessage {
+                            topic: topic.clone(),
+                            payload: vec![0x5a; 8_192],
+                            qos: 1,
+                            retain: false,
+                            properties: Default::default(),
+                        },
+                    )
+                    .unwrap();
+            }
+        }
+        {
+            let mut state = lock(&broker.state).unwrap();
+            for index in 0..256 {
+                let mut owner = auth(&format!("w{index}")).device_key;
+                owner.tenant_id = TenantId::new(format!("t{}", index / 32)).unwrap();
+                let origin = SessionKey {
+                    device: owner.clone(),
+                    client_id: "c".repeat(limits.max_client_id_bytes),
+                };
+                let pending = PendingWill {
+                    owner: owner.clone(),
+                    origin: Some(origin.clone()),
+                    message: BrokerMessage {
+                        topic: format!("v1/t/t{}/p/p/d/w{index}/up", index / 32),
+                        payload: vec![0x77; 65_000],
+                        qos: 1,
+                        retain: false,
+                        properties: Default::default(),
+                    },
+                    due_at_ms: Some(i64::MAX),
+                    cancel_on_resume: Some((origin, 1)),
+                    message_expiry_interval: None,
+                    retained_reservation: RetainedReservation::default(),
+                };
+                reserve_will_capacity(&mut state, &owner.tenant_id, pending.bytes(), &limits)
+                    .unwrap();
+                insert_pending_will(&mut state, pending);
+            }
+        }
+        for index in 0..1_024 {
+            let mut owner = auth(&format!("r{index}")).device_key;
+            owner.tenant_id = TenantId::new(format!("t{}", index / 128)).unwrap();
+            broker
+                .route(
+                    &owner,
+                    BrokerMessage {
+                        topic: format!("v1/t/t{}/p/p/d/r{index}/up", index / 128),
+                        payload: vec![0x88; 64_900],
+                        qos: 1,
+                        retain: true,
+                        properties: Default::default(),
+                    },
+                )
+                .unwrap();
+        }
+        assert_broker_accounting(&broker);
+        let directory = std::env::temp_dir().join(format!(
+            "netbaiot-v6-near-capacity-{}",
+            uuid::Uuid::new_v4()
+        ));
+        broker.commit_to(&directory).await.unwrap();
+        let file_bytes = fs::metadata(directory.join(RECOVERY_FILE)).unwrap().len() as usize;
+        println!(
+            "NBMQ v6 file_bytes={file_bytes} configured_max={} proven_upper_bound={}",
+            limits.mqtt_recovery_max_bytes,
+            limits.mqtt_recovery_upper_bound().unwrap()
+        );
+        assert!(file_bytes > limits.mqtt_recovery_max_bytes * 95 / 100);
+        let recovered = MqttBroker::new(limits.clone());
+        assert!(recovered.recover_from(&directory).await.unwrap());
+        assert_broker_accounting(&recovered);
+        assert_eq!(recovered.pending_will_count().unwrap(), 256);
+        assert_eq!(recovered.usage().unwrap().3, 1_024);
+        fs::remove_dir_all(directory).unwrap();
     }
 
     #[tokio::test]

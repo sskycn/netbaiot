@@ -1,0 +1,55 @@
+{
+  "audit_baseline": "e9c9b06658ed811b1261c0cd40bf07a8df485ee6",
+  "checkout_head": "unknown",
+  "binary_sha256": "a879b781823bc4f56d71373df7a98bdd4e7a5bba5ba86e7f17380acb7ae22bea",
+  "tracked_diff_sha256": null,
+  "untracked_manifest_sha256": null,
+  "results": [
+    {
+      "case": "v311_duplicate_packet_id",
+      "result": "FAIL",
+      "details": "EOFError: connection closed",
+      "connections": [
+        {
+          "connection_index": 0,
+          "packets": [
+            {
+              "direction": "client_to_server",
+              "hex": "<redacted-connect>",
+              "at": 0.183814833
+            },
+            {
+              "direction": "server_to_client",
+              "first": 32,
+              "body_hex": "0000",
+              "at": 0.184021625
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "348b01002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f757000077b22736368656d615f76657273696f6e223a312c22736f757263655f6d6573736167655f6964223a22636f6e666f726d616e63652d38353031222c226b696e64223a22686561727462656174222c2264617461223a7b2273657175656e6365223a383530317d7d",
+              "at": 0.184046875
+            },
+            {
+              "direction": "server_to_client",
+              "first": 80,
+              "body_hex": "0007",
+              "at": 0.184133041
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "3c8b01002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f757000077b22736368656d615f76657273696f6e223a312c22736f757263655f6d6573736167655f6964223a22636f6e666f726d616e63652d38353032222c226b696e64223a22686561727462656174222c2264617461223a7b2273657175656e6365223a383530327d7d",
+              "at": 0.184146125
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "e000",
+              "at": 0.184672458
+            }
+          ]
+        }
+      ],
+      "traceback": "Traceback (most recent call last):\n  File \"/private/tmp/netbaiot-accept-old-d4f/tests/mqtt_protocol_regressions.py\", line 364, in main\n    test(case)\n  File \"/private/tmp/netbaiot-accept-old-d4f/tests/mqtt_protocol_regressions.py\", line 250, in v311_duplicate_packet_id\n    ack(client.recv(), 0x50, 7)\n  File \"/private/tmp/netbaiot-accept-old-d4f/tests/mqtt_conformance/common.py\", line 166, in recv\n    first = self._exact(1)[0]\n  File \"/private/tmp/netbaiot-accept-old-d4f/tests/mqtt_conformance/common.py\", line 193, in _exact\n    raise EOFError(\"connection closed\")\nEOFError: connection closed\n",
+      "duration_seconds": 0.26
+    }
+  ]
+}

@@ -1,0 +1,45 @@
+   Compiling netbaiot-transports v0.1.1 (/private/tmp/netbaiot-perf-baseline/crates/netbaiot-transports)
+    Finished `release` profile [optimized] target(s) in 7.82s
+     Running unittests src/lib.rs (/Users/sam/Dev/work/sskycn/netbaiot/target/release/deps/netbaiot_transports-4651fe9140a278c8)
+
+running 1 test
+test mqtt::broker::hotspot_bench::single_session_route_ack_scaling ... HOTSPOT,single_route_puback,0,1,511618,1875,2042,3334
+HOTSPOT,single_route_puback,0,2,406952,1958,4459,16917
+HOTSPOT,single_route_puback,0,3,419323,1917,2083,24542
+HOTSPOT,single_route_pubcomp,0,1,444033,2208,2291,2583
+HOTSPOT,single_route_pubcomp,0,2,303088,2333,5208,21416
+HOTSPOT,single_route_pubcomp,0,3,378399,2333,2500,28417
+HOTSPOT,single_subscribe_unsubscribe,0,1,328160,2750,3000,21416
+HOTSPOT,single_subscribe_unsubscribe,0,2,283487,2792,3084,21959
+HOTSPOT,single_subscribe_unsubscribe,0,3,266415,2917,5958,27083
+HOTSPOT,single_next_offline,0,1,2135224,250,292,1458
+HOTSPOT,single_next_offline,0,2,2988822,250,292,959
+HOTSPOT,single_next_offline,0,3,2678559,250,292,583
+HOTSPOT,single_route_puback,100,1,372700,2666,2709,2833
+HOTSPOT,single_route_puback,100,2,341297,2667,2834,23167
+HOTSPOT,single_route_puback,100,3,319404,2667,3333,23416
+HOTSPOT,single_route_pubcomp,100,1,301905,3167,3292,3583
+HOTSPOT,single_route_pubcomp,100,2,261352,3417,4375,17542
+HOTSPOT,single_route_pubcomp,100,3,222510,3417,11375,29166
+HOTSPOT,single_subscribe_unsubscribe,100,1,56100,16542,20291,46834
+HOTSPOT,single_subscribe_unsubscribe,100,2,58960,16500,16958,26417
+HOTSPOT,single_subscribe_unsubscribe,100,3,55864,16959,18500,55041
+HOTSPOT,single_next_offline,100,1,340016,1167,1250,23292
+HOTSPOT,single_next_offline,100,2,332525,1167,1250,17000
+HOTSPOT,single_next_offline,100,3,301811,1167,2000,13917
+HOTSPOT,single_route_puback,128,1,321996,2959,3083,4667
+HOTSPOT,single_route_puback,128,2,290574,3000,3166,24459
+HOTSPOT,single_route_puback,128,3,298452,3000,3208,29750
+HOTSPOT,single_route_pubcomp,128,1,222150,3583,3834,49042
+HOTSPOT,single_route_pubcomp,128,2,227068,3583,4792,25792
+HOTSPOT,single_route_pubcomp,128,3,229544,3917,4125,27333
+HOTSPOT,single_subscribe_unsubscribe,128,1,41673,23042,23584,53167
+HOTSPOT,single_subscribe_unsubscribe,128,2,41411,22875,25500,72709
+HOTSPOT,single_subscribe_unsubscribe,128,3,40768,22958,28416,93167
+HOTSPOT,single_next_offline,128,1,302229,1292,1375,16083
+HOTSPOT,single_next_offline,128,2,282303,1333,1417,4375
+HOTSPOT,single_next_offline,128,3,260827,1333,2042,9666
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 130 filtered out; finished in 0.26s
+

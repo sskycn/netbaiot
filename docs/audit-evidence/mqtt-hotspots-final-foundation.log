@@ -1,0 +1,56 @@
+   Compiling netbaiot-transports v0.1.1 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-transports)
+    Finished `bench` profile [optimized] target(s) in 4.77s
+     Running ../../benches/foundation.rs (target/release/deps/foundation-a7d212eeb1a78abb)
+auth_cache_hit: 20000 iterations, 1753213 ops/s, p50=375 ns p95=875 ns p99=1000 ns
+udp_verifier_cache_hit_hmac_256: 20000 iterations, 613662 ops/s, p50=1542 ns p95=2125 ns p99=2167 ns
+auth_cache_miss_local_provider: 2000 iterations, 9972 ops/s, p50=100916 ns p95=143333 ns p99=155625 ns
+event_bus_publish: 10000 iterations, 737601 ops/s, p50=1250 ns p95=1625 ns p99=2333 ns
+mqtt_decode: 20000 iterations, 7301159 ops/s, p50=125 ns p95=125 ns p99=167 ns
+mqtt_encode: 20000 iterations, 8913816 ops/s, p50=83 ns p95=125 ns p99=208 ns
+topic_acl: 20000 iterations, 16473895 ops/s, p50=42 ns p95=42 ns p99=84 ns
+subscription_lookup: 20000 iterations, 4071384 ops/s, p50=209 ns p95=250 ns p99=292 ns
+mqtt_qos1_route_ack: 10000 iterations, 535993 ops/s, p50=1833 ns p95=1917 ns p99=2333 ns
+mqtt_qos2_inbound_accept_route: 10000 iterations, 759256 ops/s, p50=1291 ns p95=1334 ns p99=1625 ns
+json_codec: 20000 iterations, 830857 ops/s, p50=1167 ns p95=1333 ns p99=1583 ns
+tcp_frame: 20000 iterations, 16185590 ops/s, p50=42 ns p95=42 ns p99=83 ns
+ingress_admission: 20000 iterations, 3011236 ops/s, p50=292 ns p95=334 ns p99=416 ns
+mqtt_decode_small: 10000 iterations, 6820315 ops/s, p50=125 ns p95=167 ns p99=167 ns
+mqtt_decode_medium: 10000 iterations, 5250951 ops/s, p50=167 ns p95=209 ns p99=250 ns
+mqtt_decode_maximum: 10000 iterations, 1118501 ops/s, p50=750 ns p95=1292 ns p99=1375 ns
+json_codec_small: 10000 iterations, 676034 ops/s, p50=1417 ns p95=1625 ns p99=1958 ns
+json_codec_medium: 10000 iterations, 29785 ops/s, p50=33375 ns p95=34958 ns p99=39417 ns
+json_codec_maximum: 10000 iterations, 5715 ops/s, p50=175000 ns p95=182709 ns p99=217667 ns
+session_lookup_1: 10000 iterations, 13140604 ops/s, p50=42 ns p95=84 ns p99=125 ns
+subscription_lookup_1: 10000 iterations, 3763466 ops/s, p50=250 ns p95=250 ns p99=292 ns
+topic_acl_1: 10000 iterations, 8403361 ops/s, p50=83 ns p95=125 ns p99=125 ns
+ingress_bookkeeping_1: 10000 iterations, 2837349 ops/s, p50=333 ns p95=334 ns p99=583 ns
+session_lookup_64: 10000 iterations, 14241626 ops/s, p50=42 ns p95=84 ns p99=84 ns
+subscription_lookup_64: 10000 iterations, 3785251 ops/s, p50=250 ns p95=250 ns p99=500 ns
+topic_acl_64: 10000 iterations, 8449214 ops/s, p50=84 ns p95=125 ns p99=125 ns
+ingress_bookkeeping_64: 10000 iterations, 2876836 ops/s, p50=333 ns p95=334 ns p99=583 ns
+session_lookup_256: 10000 iterations, 14529604 ops/s, p50=42 ns p95=84 ns p99=84 ns
+subscription_lookup_256: 10000 iterations, 3804752 ops/s, p50=250 ns p95=250 ns p99=292 ns
+topic_acl_256: 10000 iterations, 9312791 ops/s, p50=83 ns p95=125 ns p99=125 ns
+ingress_bookkeeping_256: 10000 iterations, 3053047 ops/s, p50=292 ns p95=334 ns p99=417 ns
+admission_entries_10: 10000 iterations, 4389816 ops/s, p50=208 ns p95=250 ns p99=333 ns
+admission_entries_100: 10000 iterations, 4190676 ops/s, p50=208 ns p95=250 ns p99=417 ns
+admission_entries_1000: 10000 iterations, 4393914 ops/s, p50=208 ns p95=250 ns p99=250 ns
+admission_entries_10000: 10000 iterations, 3975090 ops/s, p50=209 ns p95=250 ns p99=334 ns
+disconnected_sessions_100: logical_bytes=17796 bytes/session=178.0
+subscription_router_100: 20000 iterations, 4879239 ops/s, p50=167 ns p95=209 ns p99=250 ns
+disconnected_sessions_1000: logical_bytes=181896 bytes/session=181.9
+subscription_router_1000: 20000 iterations, 4688737 ops/s, p50=208 ns p95=209 ns p99=250 ns
+disconnected_sessions_10000: logical_bytes=1858896 bytes/session=185.9
+subscription_router_10000: 20000 iterations, 4735830 ops/s, p50=167 ns p95=209 ns p99=209 ns
+retained_store_1000: logical_bytes=145890 bytes/message=145.9
+retained_exact_1000: 10000 iterations, 13907413 ops/s, p50=42 ns p95=84 ns p99=84 ns
+retained_wildcard_1000: 1000 iterations, 13424 ops/s, p50=74042 ns p95=78958 ns p99=82333 ns
+retained_store_4000: logical_bytes=586890 bytes/message=146.7
+retained_exact_4000: 10000 iterations, 15104805 ops/s, p50=42 ns p95=83 ns p99=84 ns
+retained_wildcard_4000: 1000 iterations, 3231 ops/s, p50=307083 ns p95=330958 ns p99=395000 ns
+mqtt_state_payload_64: offline_messages=1 offline_bytes=147 outbound_qos1_bytes=147 outbound_qos2_bytes=147 inbound_qos2_bytes=145
+mqtt_state_payload_256: offline_messages=1 offline_bytes=339 outbound_qos1_bytes=339 outbound_qos2_bytes=339 inbound_qos2_bytes=337
+mqtt_state_payload_1024: offline_messages=1 offline_bytes=1107 outbound_qos1_bytes=1107 outbound_qos2_bytes=1107 inbound_qos2_bytes=1105
+mqtt_state_payload_8192: offline_messages=1 offline_bytes=8275 outbound_qos1_bytes=8275 outbound_qos2_bytes=8275 inbound_qos2_bytes=8273
+mqtt_state_payload_32768: offline_messages=1 offline_bytes=32851 outbound_qos1_bytes=32851 outbound_qos2_bytes=32851 inbound_qos2_bytes=32849
+layout_bytes: session_endpoint=96 queued_command=104 device_event=152

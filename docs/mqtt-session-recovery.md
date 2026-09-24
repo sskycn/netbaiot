@@ -88,3 +88,31 @@ This is planned-restart recovery, not crash durability. SIGKILL, OS crash, or po
 loss may lose recent retained updates, sessions, offline messages, QoS state, and
 EventBus deliveries that were not in an earlier committed image. Continuous disk
 checkpointing was intentionally not added to the hot path.
+
+## Upgrade and rollback across NBMQ v6
+
+Before upgrading, finish a planned shutdown and retain a verified copy of the
+committed v5 snapshot together with its EventBus restart spool. Start the v6
+binary with the original recovery directory. It reads v1–v5 and writes v6 on
+the next successful planned shutdown. Keep the v5 copy separate: the v6 file
+is the authoritative state after the new binary has run.
+
+A v1–v5 pending Will has no explicit publisher origin field. For a delayed Will,
+the reader uses the recorded `cancel_on_resume` SessionKey as its origin. For an
+immediate pending Will without that key, origin stays unknown (`None`); the
+reader does not invent a ClientId. A legacy immediate Will can therefore be
+forwarded to a matching No Local subscription after recovery. v6 records retain
+the origin explicitly, including when a recovered state is written again.
+
+An older binary rejects v6 rather than silently interpreting it. Direct
+downgrade with a v6 snapshot is unsupported; there is no v6-to-v5 converter that
+preserves the new Will-origin semantics. If the upgraded process has made **no**
+broker or business state change at all, an operator may evaluate restoring a
+verified pre-upgrade v5 snapshot and its paired EventBus spool in an isolated
+copy before restarting the old binary. This requires checking timers, Will
+publication, accepted events, subscriptions, ACKs, and retained changes, not
+merely checking that no client is currently connected. If the new version has
+processed business or protocol state, the old snapshot is stale and is **not**
+a lossless rollback. Preserve the v6 state and roll forward or use a separately
+validated migration procedure. Never delete or edit the v6 recovery file to
+make the old binary start.

@@ -1,0 +1,21 @@
+   Compiling netbaiot-transports v0.1.1 (/private/tmp/netbaiot-perf-baseline/crates/netbaiot-transports)
+    Finished `release` profile [optimized] target(s) in 6.39s
+     Running unittests src/lib.rs (/Users/sam/Dev/work/sskycn/netbaiot/target/release/deps/netbaiot_transports-4651fe9140a278c8)
+
+running 1 test
+test mqtt::broker::hotspot_bench::future_will_reconnect_scaling ... HOTSPOT,will_clean_unrelated,50000,1,105,9805667,10699291,11122917
+HOTSPOT,will_clean_unrelated,50000,2,106,9759625,10649708,10802917
+HOTSPOT,will_clean_unrelated,50000,3,106,9518667,10646125,10705667
+HOTSPOT,will_resume_unrelated,50000,1,78,13120292,13771916,13781625
+HOTSPOT,will_resume_unrelated,50000,2,74,13307833,14705083,16277583
+HOTSPOT,will_resume_unrelated,50000,3,78,12793750,13613084,14135625
+HOTSPOT,will_resume_owned,50000,1,78,12784208,13646792,13987375
+HOTSPOT,will_resume_owned,50000,2,77,12713750,14980875,17324333
+HOTSPOT,will_resume_owned,50000,3,78,12793208,14118833,14203666
+HOTSPOT,will_clean_owned,50000,1,104,9876709,10770166,10963416
+HOTSPOT,will_clean_owned,50000,2,105,9913000,10745584,11113167
+HOTSPOT,will_clean_owned,50000,3,105,9493709,10730833,10749666
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 130 filtered out; finished in 4.74s
+

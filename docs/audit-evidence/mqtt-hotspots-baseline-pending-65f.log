@@ -1,0 +1,36 @@
+   Compiling netbaiot-transports v0.1.1 (/private/tmp/netbaiot-perf-baseline/crates/netbaiot-transports)
+    Finished `release` profile [optimized] target(s) in 5.70s
+     Running unittests src/lib.rs (/Users/sam/Dev/work/sskycn/netbaiot/target/release/deps/netbaiot_transports-4651fe9140a278c8)
+
+running 1 test
+test mqtt::broker::hotspot_bench::tenant_pending_wake_scaling ... HOTSPOT,pending_wake_full_qos1,100,1,12508,75166,100708,127375
+HOTSPOT,pending_wake_full_qos1,100,2,13350,74541,83459,123083
+HOTSPOT,pending_wake_full_qos1,100,3,17621,47834,74334,130917
+HOTSPOT,pending_wake_wrong_qos,100,1,18045,58459,70291,70667
+HOTSPOT,pending_wake_wrong_qos,100,2,19463,46042,59584,60042
+HOTSPOT,pending_wake_wrong_qos,100,3,20606,48875,52916,59334
+HOTSPOT,pending_unmark_mark_tail,100,1,704632,1375,1417,1458
+HOTSPOT,pending_unmark_mark_tail,100,2,703809,1375,1417,1625
+HOTSPOT,pending_unmark_mark_tail,100,3,706304,1375,1417,1500
+HOTSPOT,pending_wake_full_qos1,1000,1,2639,373709,425250,447875
+HOTSPOT,pending_wake_full_qos1,1000,2,3190,311084,342292,343833
+HOTSPOT,pending_wake_full_qos1,1000,3,3533,285833,296709,299417
+HOTSPOT,pending_wake_wrong_qos,1000,1,3936,252250,263500,299583
+HOTSPOT,pending_wake_wrong_qos,1000,2,3941,252542,267916,272042
+HOTSPOT,pending_wake_wrong_qos,1000,3,3852,255333,275625,369916
+HOTSPOT,pending_unmark_mark_tail,1000,1,142501,7000,7083,7125
+HOTSPOT,pending_unmark_mark_tail,1000,2,155783,6375,6459,6500
+HOTSPOT,pending_unmark_mark_tail,1000,3,148625,6583,7084,7125
+HOTSPOT,pending_wake_full_qos1,4000,1,908,1090417,1211416,1268000
+HOTSPOT,pending_wake_full_qos1,4000,2,903,1090958,1260583,1302166
+HOTSPOT,pending_wake_full_qos1,4000,3,916,1084583,1151875,1248875
+HOTSPOT,pending_wake_wrong_qos,4000,1,958,1041125,1094375,1097375
+HOTSPOT,pending_wake_wrong_qos,4000,2,953,1045000,1099917,1112833
+HOTSPOT,pending_wake_wrong_qos,4000,3,938,1060875,1111625,1246041
+HOTSPOT,pending_unmark_mark_tail,4000,1,38645,26209,26416,28334
+HOTSPOT,pending_unmark_mark_tail,4000,2,38892,26208,26334,26750
+HOTSPOT,pending_unmark_mark_tail,4000,3,34743,26250,39042,73084
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 130 filtered out; finished in 0.79s
+

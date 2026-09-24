@@ -1,0 +1,61 @@
+{
+  "audit_baseline": "e9c9b06658ed811b1261c0cd40bf07a8df485ee6",
+  "checkout_head": "unknown",
+  "binary_sha256": "a879b781823bc4f56d71373df7a98bdd4e7a5bba5ba86e7f17380acb7ae22bea",
+  "tracked_diff_sha256": null,
+  "untracked_manifest_sha256": null,
+  "results": [
+    {
+      "case": "qos2_business_validation",
+      "result": "FAIL",
+      "details": "AssertionError: Expected ACK 0x70/7, got (224, b'\\x99\\x00')",
+      "connections": [
+        {
+          "connection_index": 0,
+          "packets": [
+            {
+              "direction": "client_to_server",
+              "hex": "<redacted-connect>",
+              "at": 0.32795425
+            },
+            {
+              "direction": "server_to_client",
+              "first": 32,
+              "body_hex": "000013210020270001000029002a0022000025012801",
+              "at": 0.328314083
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "3426002076312f742f64656d6f2f702f73656e736f722f642f6465766963652d312f75700007007b",
+              "at": 0.328319083
+            },
+            {
+              "direction": "server_to_client",
+              "first": 80,
+              "body_hex": "0007",
+              "at": 0.328448166
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "62020007",
+              "at": 0.328457458
+            },
+            {
+              "direction": "server_to_client",
+              "first": 224,
+              "body_hex": "9900",
+              "at": 0.328819416
+            },
+            {
+              "direction": "client_to_server",
+              "hex": "e000",
+              "at": 0.329065583
+            }
+          ]
+        }
+      ],
+      "traceback": "Traceback (most recent call last):\n  File \"/private/tmp/netbaiot-accept-old-d4f/tests/mqtt_protocol_regressions.py\", line 364, in main\n    test(case)\n  File \"/private/tmp/netbaiot-accept-old-d4f/tests/mqtt_protocol_regressions.py\", line 301, in qos2_business_validation\n    ack(packet, 0x70, 7)  # A successful PUBREC must not lead to a poison reconnect loop.\n  File \"/private/tmp/netbaiot-accept-old-d4f/tests/mqtt_protocol_regressions.py\", line 82, in ack\n    require(first == kind and len(body) >= 2 and\n  File \"/private/tmp/netbaiot-accept-old-d4f/tests/mqtt_protocol_regressions.py\", line 40, in require\n    raise AssertionError(message)\nAssertionError: Expected ACK 0x70/7, got (224, b'\\x99\\x00')\n",
+      "duration_seconds": 0.259
+    }
+  ]
+}

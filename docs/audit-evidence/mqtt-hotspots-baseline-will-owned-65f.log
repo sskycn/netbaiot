@@ -1,0 +1,45 @@
+   Compiling netbaiot-transports v0.1.1 (/private/tmp/netbaiot-perf-baseline/crates/netbaiot-transports)
+    Finished `release` profile [optimized] target(s) in 8.87s
+     Running unittests src/lib.rs (/Users/sam/Dev/work/sskycn/netbaiot/target/release/deps/netbaiot_transports-4651fe9140a278c8)
+
+running 1 test
+test mqtt::broker::hotspot_bench::future_will_reconnect_scaling ... HOTSPOT,will_clean_unrelated,100,1,104832,9458,9666,10625
+HOTSPOT,will_clean_unrelated,100,2,66730,9958,44500,79584
+HOTSPOT,will_clean_unrelated,100,3,72072,10208,38333,97125
+HOTSPOT,will_resume_unrelated,100,1,71944,13875,14166,14333
+HOTSPOT,will_resume_unrelated,100,2,60611,15291,26833,39042
+HOTSPOT,will_resume_unrelated,100,3,49664,16791,45041,60708
+HOTSPOT,will_resume_owned,100,1,57958,16833,17250,17291
+HOTSPOT,will_resume_owned,100,2,56026,15750,24791,58417
+HOTSPOT,will_resume_owned,100,3,52707,14416,19250,142416
+HOTSPOT,will_clean_owned,100,1,95238,10042,10208,10209
+HOTSPOT,will_clean_owned,100,2,88124,9750,21875,28875
+HOTSPOT,will_clean_owned,100,3,87075,9833,13417,40917
+HOTSPOT,will_clean_unrelated,1000,1,8933,109666,144167,144791
+HOTSPOT,will_clean_unrelated,1000,2,8581,113709,131375,230292
+HOTSPOT,will_clean_unrelated,1000,3,8848,110542,134416,147875
+HOTSPOT,will_resume_unrelated,1000,1,7710,126792,146125,158542
+HOTSPOT,will_resume_unrelated,1000,2,7225,127000,195167,376834
+HOTSPOT,will_resume_unrelated,1000,3,6821,131583,274041,385250
+HOTSPOT,will_resume_owned,1000,1,7412,126833,178667,222542
+HOTSPOT,will_resume_owned,1000,2,7484,126166,154416,284833
+HOTSPOT,will_resume_owned,1000,3,7721,125375,156167,174917
+HOTSPOT,will_clean_owned,1000,1,9041,106583,135042,183083
+HOTSPOT,will_clean_owned,1000,2,8797,106042,129625,269292
+HOTSPOT,will_clean_owned,1000,3,8851,110833,139666,145584
+HOTSPOT,will_clean_unrelated,10000,1,728,1343708,1722542,1745834
+HOTSPOT,will_clean_unrelated,10000,2,740,1316458,1706250,1822792
+HOTSPOT,will_clean_unrelated,10000,3,709,1385333,1743125,1887750
+HOTSPOT,will_resume_unrelated,10000,1,499,1915084,2579584,2927541
+HOTSPOT,will_resume_unrelated,10000,2,500,1982625,2587833,2634959
+HOTSPOT,will_resume_unrelated,10000,3,468,2122583,2679708,2775208
+HOTSPOT,will_resume_owned,10000,1,470,2067875,2797250,2910250
+HOTSPOT,will_resume_owned,10000,2,498,1943667,2484375,2619208
+HOTSPOT,will_resume_owned,10000,3,486,2082833,2382458,2478083
+HOTSPOT,will_clean_owned,10000,1,762,1280875,1574459,1774166
+HOTSPOT,will_clean_owned,10000,2,695,1320708,2190583,2357000
+HOTSPOT,will_clean_owned,10000,3,703,1364417,1840875,1955041
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 130 filtered out; finished in 1.03s
+

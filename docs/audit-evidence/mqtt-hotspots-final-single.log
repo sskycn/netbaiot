@@ -1,0 +1,84 @@
+    Finished `release` profile [optimized] target(s) in 0.04s
+     Running unittests src/lib.rs (target/release/deps/netbaiot_transports-4651fe9140a278c8)
+
+running 8 tests
+test mqtt::broker::hotspot_bench::concurrent_route_ack_scaling ... ok
+test mqtt::broker::hotspot_bench::exact_subscribe_scaling ... HOTSPOT,subscribe_exact_no_replay,0,1,888723,1083,1167,2375
+HOTSPOT,subscribe_exact_no_replay,0,2,913764,1083,1125,1167
+HOTSPOT,subscribe_exact_no_replay,0,3,922543,1042,1084,1125
+HOTSPOT,subscribe_exact_no_replay,1000,1,1048267,917,959,1000
+HOTSPOT,subscribe_exact_no_replay,1000,2,1047351,917,959,1125
+HOTSPOT,subscribe_exact_no_replay,1000,3,1015012,958,1042,1125
+HOTSPOT,subscribe_exact_no_replay,4000,1,931680,1042,1084,1125
+HOTSPOT,subscribe_exact_no_replay,4000,2,932401,1042,1084,1167
+HOTSPOT,subscribe_exact_no_replay,4000,3,928790,1042,1084,1166
+ok
+test mqtt::broker::hotspot_bench::fanout_route_scaling ... FANOUT,1,64,0,707264,958,2250,7334
+FANOUT,1,64,1,395168,1375,1750,4834
+FANOUT,1,1024,0,906810,917,1958,2042
+FANOUT,1,1024,1,490469,1417,1584,1833
+FANOUT,1,16384,0,725795,1208,1708,3292
+FANOUT,1,16384,1,401112,1833,2333,3042
+FANOUT,10,64,0,338028,2375,3458,3459
+FANOUT,10,64,1,88626,6375,8917,9667
+FANOUT,10,1024,0,332410,2500,2708,2708
+FANOUT,10,1024,1,85847,6709,6916,7834
+FANOUT,10,16384,0,190627,4458,8042,9542
+FANOUT,10,16384,1,59138,11709,12833,14333
+FANOUT,100,64,0,42581,19167,21459,24125
+FANOUT,100,64,1,8371,65000,72250,95750
+FANOUT,100,1024,0,38710,19666,29917,42208
+FANOUT,100,1024,1,7708,70666,83667,87458
+FANOUT,100,16384,0,20460,40500,49583,144292
+FANOUT,100,16384,1,5997,107791,118667,195625
+FANOUT,1000,64,0,3722,213166,275459,512625
+FANOUT,1000,64,1,751,715417,1110208,1363541
+FANOUT,1000,1024,0,3158,239916,368084,384291
+FANOUT,1000,1024,1,719,750583,1038084,1540417
+FANOUT,1000,16384,0,1641,481500,694541,1324250
+FANOUT,1000,16384,1,505,1287458,1860334,2536750
+ok
+test mqtt::broker::hotspot_bench::future_will_reconnect_scaling ... ok
+test mqtt::broker::hotspot_bench::retained_lookup_scaling ... ok
+test mqtt::broker::hotspot_bench::session_recompute_scaling ... ok
+test mqtt::broker::hotspot_bench::single_session_route_ack_scaling ... HOTSPOT,single_route_puback,0,1,410117,1958,2708,20584
+HOTSPOT,single_route_puback,0,2,527125,1750,2042,4583
+HOTSPOT,single_route_puback,0,3,565039,1709,1917,2000
+HOTSPOT,single_route_pubcomp,0,1,472720,2042,2292,2333
+HOTSPOT,single_route_pubcomp,0,2,455798,2208,2292,2375
+HOTSPOT,single_route_pubcomp,0,3,450070,2208,2292,2792
+HOTSPOT,single_subscribe_unsubscribe,0,1,489297,2041,2125,2167
+HOTSPOT,single_subscribe_unsubscribe,0,2,537756,1833,1916,1959
+HOTSPOT,single_subscribe_unsubscribe,0,3,510746,1875,2541,2625
+HOTSPOT,single_next_offline,0,1,4285684,208,250,250
+HOTSPOT,single_next_offline,0,2,4148603,208,291,292
+HOTSPOT,single_next_offline,0,3,4225382,208,250,292
+HOTSPOT,single_route_puback,100,1,501253,1958,2167,2209
+HOTSPOT,single_route_puback,100,2,472766,2125,2250,2292
+HOTSPOT,single_route_puback,100,3,475860,2125,2208,2375
+HOTSPOT,single_route_pubcomp,100,1,390022,2542,2667,2750
+HOTSPOT,single_route_pubcomp,100,2,395095,2542,2625,2708
+HOTSPOT,single_route_pubcomp,100,3,325667,2542,3500,21375
+HOTSPOT,single_subscribe_unsubscribe,100,1,431693,2292,2459,2958
+HOTSPOT,single_subscribe_unsubscribe,100,2,429223,2292,2792,2917
+HOTSPOT,single_subscribe_unsubscribe,100,3,443377,2250,2375,3458
+HOTSPOT,single_next_offline,100,1,507292,833,1125,1250
+HOTSPOT,single_next_offline,100,2,526836,792,917,1125
+HOTSPOT,single_next_offline,100,3,504626,875,917,1125
+HOTSPOT,single_route_puback,128,1,464936,2167,2666,2750
+HOTSPOT,single_route_puback,128,2,469162,2166,2209,2250
+HOTSPOT,single_route_puback,128,3,477137,2125,2209,2250
+HOTSPOT,single_route_pubcomp,128,1,386255,2584,2708,3250
+HOTSPOT,single_route_pubcomp,128,2,377567,2625,3250,3375
+HOTSPOT,single_route_pubcomp,128,3,389516,2375,2916,3416
+HOTSPOT,single_subscribe_unsubscribe,128,1,460388,2083,2459,2917
+HOTSPOT,single_subscribe_unsubscribe,128,2,441258,2292,2375,2375
+HOTSPOT,single_subscribe_unsubscribe,128,3,447594,2291,2375,2500
+HOTSPOT,single_next_offline,128,1,375235,917,1125,17083
+HOTSPOT,single_next_offline,128,2,474167,917,1000,1208
+HOTSPOT,single_next_offline,128,3,492662,916,958,1000
+ok
+test mqtt::broker::hotspot_bench::tenant_pending_wake_scaling ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 124 filtered out; finished in 0.26s
+

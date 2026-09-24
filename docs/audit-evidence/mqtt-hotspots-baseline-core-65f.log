@@ -1,0 +1,127 @@
+   Compiling syn v3.0.4
+   Compiling syn v2.0.119
+   Compiling tracing-core v0.1.36
+   Compiling tokio-macros v2.7.2
+   Compiling serde_derive v1.0.229
+   Compiling thiserror-impl v2.0.20
+   Compiling futures-macro v0.3.34
+   Compiling async-trait v0.1.92
+   Compiling tracing-attributes v0.1.31
+   Compiling tokio v1.53.1
+   Compiling futures-util v0.3.34
+   Compiling thiserror v2.0.20
+   Compiling tracing v0.1.44
+   Compiling serde v1.0.229
+   Compiling netbaiot-protocol v0.1.1 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-protocol)
+   Compiling netbaiot-core v0.1.1 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-core)
+   Compiling netbaiot-codecs v0.1.1 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-codecs)
+   Compiling hyper v1.11.0
+   Compiling tokio-util v0.7.19
+   Compiling tokio-rustls v0.26.4
+   Compiling netbaiot-runtime v0.1.1 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-runtime)
+   Compiling hyper-util v0.1.20
+   Compiling netbaiot-transports v0.1.1 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-transports)
+    Finished `release` profile [optimized] target(s) in 18.88s
+     Running unittests src/lib.rs (target/release/deps/netbaiot_transports-4651fe9140a278c8)
+
+running 4 tests
+test mqtt::broker::hotspot_bench::future_will_reconnect_scaling ... HOTSPOT,will_clean_unrelated,100,1,44724,18875,29416,68708
+HOTSPOT,will_clean_unrelated,100,2,101026,9541,12458,19250
+HOTSPOT,will_clean_unrelated,100,3,42958,18708,61875,85958
+HOTSPOT,will_resume_unrelated,100,1,39196,25167,27583,27750
+HOTSPOT,will_resume_unrelated,100,2,71910,12750,25666,31375
+HOTSPOT,will_resume_unrelated,100,3,66887,13167,14708,67250
+HOTSPOT,will_clean_unrelated,1000,1,6200,183625,214375,231833
+HOTSPOT,will_clean_unrelated,1000,2,6582,167500,203125,225292
+HOTSPOT,will_clean_unrelated,1000,3,6714,162167,196875,200208
+HOTSPOT,will_resume_unrelated,1000,1,5072,193542,289333,337041
+HOTSPOT,will_resume_unrelated,1000,2,5352,174459,312083,416292
+HOTSPOT,will_resume_unrelated,1000,3,5815,173333,222958,249000
+HOTSPOT,will_clean_unrelated,10000,1,685,1410166,2125042,2356000
+HOTSPOT,will_clean_unrelated,10000,2,768,1269458,1650000,1697750
+HOTSPOT,will_clean_unrelated,10000,3,761,1320833,1831875,1884666
+HOTSPOT,will_resume_unrelated,10000,1,519,1884625,2299625,2428667
+HOTSPOT,will_resume_unrelated,10000,2,525,1900583,2500291,2690375
+HOTSPOT,will_resume_unrelated,10000,3,519,1874500,2393042,2513334
+ok
+test mqtt::broker::hotspot_bench::retained_lookup_scaling ... HOTSPOT,retained_exact,1000,1,4475,216458,289958,339041
+HOTSPOT,retained_exact,1000,2,4515,216250,278792,325792
+HOTSPOT,retained_exact,1000,3,4498,215500,292417,348500
+HOTSPOT,retained_plus,1000,1,4597,211750,280750,308292
+HOTSPOT,retained_plus,1000,2,4639,210458,277833,311292
+HOTSPOT,retained_plus,1000,3,4620,211542,278583,342833
+HOTSPOT,retained_selective_hash,1000,1,4405,221458,287208,349667
+HOTSPOT,retained_selective_hash,1000,2,4457,220375,273666,322958
+HOTSPOT,retained_selective_hash,1000,3,4390,222916,279125,353459
+HOTSPOT,retained_broad_hash,1000,1,8082,121625,155875,203958
+HOTSPOT,retained_broad_hash,1000,2,8090,120917,146792,244083
+HOTSPOT,retained_broad_hash,1000,3,8234,119250,140375,210292
+HOTSPOT,retained_exact,4000,1,1111,879792,1042708,1142834
+HOTSPOT,retained_exact,4000,2,1125,865708,1049083,1100500
+HOTSPOT,retained_exact,4000,3,1113,876208,1045875,1137375
+HOTSPOT,retained_plus,4000,1,1112,870125,1070125,1165708
+HOTSPOT,retained_plus,4000,2,1107,879375,1054666,1150875
+HOTSPOT,retained_plus,4000,3,1100,883042,1083333,1204708
+HOTSPOT,retained_selective_hash,4000,1,1111,879125,1043000,1111875
+HOTSPOT,retained_selective_hash,4000,2,1129,868875,1034333,1082958
+HOTSPOT,retained_selective_hash,4000,3,1053,873334,1218667,2787625
+HOTSPOT,retained_broad_hash,4000,1,1971,487792,631792,705167
+HOTSPOT,retained_broad_hash,4000,2,1973,489917,634917,741958
+HOTSPOT,retained_broad_hash,4000,3,1973,489083,621792,708458
+ok
+test mqtt::broker::hotspot_bench::session_recompute_scaling ... HOTSPOT,session_usage_offline,0,1,24254478,0,42,42
+HOTSPOT,session_usage_offline,0,2,22191401,0,42,42
+HOTSPOT,session_usage_offline,0,3,23289665,0,42,42
+HOTSPOT,message_deadline_offline,0,1,14401440,0,42,42
+HOTSPOT,message_deadline_offline,0,2,24666083,0,42,42
+HOTSPOT,message_deadline_offline,0,3,25303003,0,42,42
+HOTSPOT,session_usage_offline,10,1,25848142,0,42,42
+HOTSPOT,session_usage_offline,10,2,21438065,0,42,42
+HOTSPOT,session_usage_offline,10,3,21173432,0,42,42
+HOTSPOT,message_deadline_offline,10,1,16243655,41,42,42
+HOTSPOT,message_deadline_offline,10,2,20988341,41,42,42
+HOTSPOT,message_deadline_offline,10,3,17837235,41,42,42
+HOTSPOT,session_usage_offline,100,1,22028615,0,42,42
+HOTSPOT,session_usage_offline,100,2,12121212,0,42,42
+HOTSPOT,session_usage_offline,100,3,19504393,41,42,42
+HOTSPOT,message_deadline_offline,100,1,6961583,83,125,167
+HOTSPOT,message_deadline_offline,100,2,7314834,83,125,125
+HOTSPOT,message_deadline_offline,100,3,7848277,83,125,125
+HOTSPOT,session_usage_offline,128,1,16824395,41,42,42
+HOTSPOT,session_usage_offline,128,2,16608951,41,42,42
+HOTSPOT,session_usage_offline,128,3,15904573,41,42,42
+HOTSPOT,message_deadline_offline,128,1,4737462,167,208,250
+HOTSPOT,message_deadline_offline,128,2,4377967,167,208,209
+HOTSPOT,message_deadline_offline,128,3,4935737,167,208,209
+HOTSPOT,session_usage_outbound,1,1,15498830,41,42,42
+HOTSPOT,session_usage_outbound,1,2,5621262,41,42,42
+HOTSPOT,session_usage_outbound,1,3,13590096,41,42,42
+HOTSPOT,message_deadline_outbound,1,1,12776206,42,42,42
+HOTSPOT,message_deadline_outbound,1,2,7969429,42,42,42
+HOTSPOT,message_deadline_outbound,1,3,8336216,42,42,42
+HOTSPOT,session_usage_outbound,10,1,12474038,42,42,42
+HOTSPOT,session_usage_outbound,10,2,10827901,42,42,42
+HOTSPOT,session_usage_outbound,10,3,14388489,41,42,42
+HOTSPOT,message_deadline_outbound,10,1,8953553,42,42,42
+HOTSPOT,message_deadline_outbound,10,2,12182791,42,42,42
+HOTSPOT,message_deadline_outbound,10,3,7606992,42,42,42
+HOTSPOT,session_usage_outbound,32,1,9280742,42,83,125
+HOTSPOT,session_usage_outbound,32,2,11738811,42,42,42
+HOTSPOT,session_usage_outbound,32,3,11931394,42,42,42
+HOTSPOT,message_deadline_outbound,32,1,7428041,42,84,84
+HOTSPOT,message_deadline_outbound,32,2,7426910,83,84,166
+HOTSPOT,message_deadline_outbound,32,3,8950228,83,84,84
+ok
+test mqtt::broker::hotspot_bench::tenant_pending_wake_scaling ... HOTSPOT,pending_wake_full_qos1,100,1,15467,60208,95667,154334
+HOTSPOT,pending_wake_full_qos1,100,2,16653,60416,64625,101084
+HOTSPOT,pending_wake_full_qos1,100,3,18433,51334,77792,108917
+HOTSPOT,pending_wake_full_qos1,1000,1,2502,398791,504541,534542
+HOTSPOT,pending_wake_full_qos1,1000,2,2983,325375,390792,464917
+HOTSPOT,pending_wake_full_qos1,1000,3,3258,297541,364125,531750
+HOTSPOT,pending_wake_full_qos1,4000,1,876,1100459,1320875,1553459
+HOTSPOT,pending_wake_full_qos1,4000,2,859,1108875,1544625,1642750
+HOTSPOT,pending_wake_full_qos1,4000,3,792,1174417,1752958,2382792
+ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 123 filtered out; finished in 7.67s
+
