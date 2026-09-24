@@ -1,19 +1,25 @@
 # Rust device SDK
 
 `netbaiot-device-sdk` is optional. It maps directly onto NetbaIoT's standard MQTT
-3.1.1 topics and does not introduce a tunnel or
+3.1.1/MQTT 5.0 topics and does not introduce a tunnel or
 second authentication scheme.
 
 The builder requires `mqtt_endpoint`; the SDK is a MQTT convenience client. It operates on the caller's Tokio runtime,
 keeps credentials only in memory, redacts them from `Debug`, validates all bounds,
 and enables TLS verification for `mqtts` endpoints. MQTT uses the maintained
-`rumqttc` 0.25 client (Apache-2.0), a bounded request channel, MQTT 3.1.1, and manual
+`rumqttc` 0.25 client (Apache-2.0), a bounded request channel, MQTT 3.1.1 by default or
+MQTT 5.0 via `protocol_version(MqttProtocolVersion::V5)`, and manual
 broker acknowledgement for commands admitted to the bounded application channel.
 At connection time, `connect().await` does not return until the initial
 CONNACK and a successful command-topic SUBACK have been received, or the configured
 connect timeout expires. SUBACK `0x80` is terminal authorization failure and is
 never exposed as Connected. This makes immediate publication after a successful
 connect safe.
+
+MQTT 5 mode also accepts `session_expiry_interval(seconds)` and
+`message_expiry_interval(Some(seconds))`. The latter applies to telemetry and
+command ACK publishes. The default remains MQTT 3.1.1 and offline publishes
+remain rejected.
 
 Supported workflows are QoS0/QoS1 event publish, QoS1 telemetry, command receive,
 command execution ACK, and heartbeat via `publish(DeviceUplink, PublishQos)`. Canonical topics are the existing `v1/t/.../up`, `down`,

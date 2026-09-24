@@ -44,6 +44,7 @@ fuzz_target!(|data: &[u8]| {
             payload: chunk.to_vec(),
             qos,
             retain: operation == 8,
+            properties: Default::default(),
         };
         match operation {
             0 => {

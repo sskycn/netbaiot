@@ -1546,7 +1546,7 @@ async fn exercise_shared_listener(tls: bool) {
     let mut unsupported = device_socket(address, tls).await;
     let mut hello = mqtt_connect("wrong-version", true);
     let level = hello.windows(4).position(|part| part == b"MQTT").unwrap() + 4;
-    hello[level] = 5;
+    hello[level] = 6;
     unsupported.write_all(&hello).await.unwrap();
     assert_eq!(mqtt_read(&mut *unsupported).await, (0x20, vec![0, 1]));
     drop(unsupported);

@@ -4,7 +4,7 @@
 
 `device_ingress` 在同一个地址、相同端口号绑定一个 TCP listener 和一个 UDP socket。
 开发示例为 `127.0.0.1:8080`，生产可配置 `0.0.0.0:443`。TCP 通过同一证书承载
-标准 MQTT 3.1.1 TLS 和通用分帧 TLS TCP。TLS 握手后才识别应用协议，
+标准 MQTT 3.1.1 / MQTT 5.0 TLS 和通用分帧 TLS TCP。TLS 握手后才识别应用协议，
 不要求 ALPN、自定义前导或修改客户端 wire protocol。UDP 同端口继续使用 NBI1/HMAC，
 只认证不加密，不涉及 DTLS/QUIC。
 

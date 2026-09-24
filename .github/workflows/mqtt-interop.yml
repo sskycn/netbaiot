@@ -9,6 +9,7 @@ on:
       - ".github/workflows/mqtt-interop.yml"
       - "apps/netbaiot-server/**"
       - "crates/netbaiot-transports/src/mqtt/**"
+      - "crates/netbaiot-device-sdk/**"
       - "crates/netbaiot-runtime/**"
       - "tests/mqtt_conformance/**"
       - "tests/mosquitto_cli_interop.py"
@@ -38,3 +39,7 @@ jobs:
           python3 scripts/ci_annotate.py
           --title "MQTT release gate failed"
           -- python3 tests/mqtt_conformance/run.py --release-gate
+      - name: Run MQTT 5 raw and Mosquitto client gates
+        run: |
+          python3 tests/mqtt_conformance/v5_smoke.py
+          python3 tests/mqtt_conformance/v5_mosquitto.py

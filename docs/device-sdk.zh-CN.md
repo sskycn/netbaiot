@@ -1,8 +1,8 @@
 # Rust 设备 SDK
 
-`netbaiot-device-sdk` 是可选组件。它直接使用 NetbaIoT 标准 MQTT 3.1.1 topic，不引入隧道或第二套认证机制。
+`netbaiot-device-sdk` 是可选组件。它直接使用 NetbaIoT 标准 MQTT 3.1.1 / MQTT 5.0 topic，不引入隧道或第二套认证机制。
 
-Builder 必须配置 `mqtt_endpoint`；SDK 定位为 MQTT 便捷客户端。SDK 在调用方的 Tokio runtime 上运行，仅在内存中保留凭据，并对 `Debug` 输出进行脱敏；它会校验所有资源上限，并为 `mqtts` endpoint 启用 TLS 验证。MQTT 使用维护中的 `rumqttc` 0.25 客户端（Apache-2.0）、有界请求 channel、MQTT 3.1.1，以及对已进入有界应用 channel 的命令进行 broker 手动确认。连接时，`connect().await` 会等到收到初始 CONNACK 和成功的命令 topic SUBACK，或达到配置的连接超时时间。SUBACK `0x80` 属于终止性授权失败，不会被呈现为 Connected。因此，connect 成功后可以安全地立即发布。
+Builder 必须配置 `mqtt_endpoint`；SDK 定位为 MQTT 便捷客户端。SDK 在调用方的 Tokio runtime 上运行，仅在内存中保留凭据，并对 `Debug` 输出进行脱敏；它会校验所有资源上限，并为 `mqtts` endpoint 启用 TLS 验证。MQTT 使用维护中的 `rumqttc` 0.25 客户端（Apache-2.0）、有界请求 channel、默认 MQTT 3.1.1（可通过 `protocol_version(MqttProtocolVersion::V5)` 选择 MQTT 5.0），以及对已进入有界应用 channel 的命令进行 broker 手动确认。MQTT 5 可设置 `session_expiry_interval` 和 `message_expiry_interval`。连接时，`connect().await` 会等到收到初始 CONNACK 和成功的命令 topic SUBACK，或达到配置的连接超时时间。SUBACK 授权失败不会被呈现为 Connected。因此，connect 成功后可以安全地立即发布。
 
 支持的流程包括 QoS0/QoS1 事件发布、QoS1 遥测、接收命令、命令执行 ACK、通过 `publish(DeviceUplink, PublishQos)` 发布 heartbeat。规范 topic 使用现有的 `v1/t/.../up`、`down` 和 `down_ack` 命名空间。
 

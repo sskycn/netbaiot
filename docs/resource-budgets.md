@@ -33,7 +33,7 @@ spool relationship values.
 | Sink timeout/retry | 5 s / 5 attempts / max age 1 h |
 | Restart spool | 100,000 records / 256 MiB total |
 | Spool segment/record | 64 MiB / 1 MiB |
-| MQTT recovery image | 202,178,660 B; compact NBMQ v3 bound including profiles, pending-Will owners, and integrity trailer |
+| MQTT recovery image | 202,178,660 B default; compact NBMQ v4 bound including profiles, delayed-Will owners, properties, and integrity trailer |
 
 Every sink queue is independently count and byte charged. Global event accounting
 charges the shared event once; each sink charges its delivery responsibility.
