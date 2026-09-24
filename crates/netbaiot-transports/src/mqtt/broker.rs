@@ -601,6 +601,10 @@ fn retained_charge(message: &BrokerMessage, origin: Option<&SessionKey>) -> usiz
 
 struct BrokerState {
     sessions: HashMap<SessionKey, StoredSession>,
+    /// Derived from sessions and rebuilt after recovery; never serialized.
+    session_usage: HashMap<SessionKey, SessionUsage>,
+    tenant_usage: HashMap<TenantId, TenantUsage>,
+    device_subscription_count: HashMap<DeviceKey, usize>,
     active: HashMap<SessionKey, ActiveSession>,
     trie: SubscriptionTrie,
     retained: HashMap<String, RetainedMessage>,
@@ -622,13 +626,141 @@ struct BrokerState {
     pending_sessions: HashSet<SessionKey>,
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+struct SessionUsage {
+    state_bytes: usize,
+    subscriptions: usize,
+    offline_count: usize,
+    offline_bytes: usize,
+    qos1_inflight: usize,
+    qos2_inflight: usize,
+}
+
+impl SessionUsage {
+    fn from_session(session: &StoredSession) -> Self {
+        let mut qos1_inflight = 0;
+        let mut qos2_inflight = session.inbound_qos2.len();
+        for outbound in session.outbound.values() {
+            if matches!(outbound, OutboundState::AwaitPuback(_)) {
+                qos1_inflight += 1;
+            } else {
+                qos2_inflight += 1;
+            }
+        }
+        Self {
+            state_bytes: session.state_bytes,
+            subscriptions: session.subscriptions.len(),
+            offline_count: session.offline.len(),
+            offline_bytes: session.offline_bytes,
+            qos1_inflight,
+            qos2_inflight,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+struct TenantUsage {
+    session_count: usize,
+    session_bytes: usize,
+    subscription_count: usize,
+    offline_count: usize,
+    offline_bytes: usize,
+    qos1_inflight: usize,
+    qos2_inflight: usize,
+}
+
+fn apply_usage_delta(value: &mut usize, before: usize, after: usize) -> Result<()> {
+    *value = if after >= before {
+        value.checked_add(after - before)
+    } else {
+        value.checked_sub(before - after)
+    }
+    .ok_or(Error::Internal)?;
+    Ok(())
+}
+
+/// Reconcile one changed authoritative session while the broker mutex is held.
+/// The cached per-session value makes all callers independent of unrelated sessions.
+fn sync_session_usage(state: &mut BrokerState, key: &SessionKey) -> Result<()> {
+    let before = state.session_usage.get(key).copied();
+    let after = state.sessions.get(key).map(SessionUsage::from_session);
+    if before == after {
+        return Ok(());
+    }
+    let old = before.unwrap_or_default();
+    let new = after.unwrap_or_default();
+    let tenant = &key.device.tenant_id;
+    let mut tenant_usage = state.tenant_usage.get(tenant).copied().unwrap_or_default();
+    apply_usage_delta(
+        &mut tenant_usage.session_count,
+        usize::from(before.is_some()),
+        usize::from(after.is_some()),
+    )?;
+    apply_usage_delta(
+        &mut tenant_usage.session_bytes,
+        old.state_bytes,
+        new.state_bytes,
+    )?;
+    apply_usage_delta(
+        &mut tenant_usage.subscription_count,
+        old.subscriptions,
+        new.subscriptions,
+    )?;
+    apply_usage_delta(
+        &mut tenant_usage.offline_count,
+        old.offline_count,
+        new.offline_count,
+    )?;
+    apply_usage_delta(
+        &mut tenant_usage.offline_bytes,
+        old.offline_bytes,
+        new.offline_bytes,
+    )?;
+    apply_usage_delta(
+        &mut tenant_usage.qos1_inflight,
+        old.qos1_inflight,
+        new.qos1_inflight,
+    )?;
+    apply_usage_delta(
+        &mut tenant_usage.qos2_inflight,
+        old.qos2_inflight,
+        new.qos2_inflight,
+    )?;
+    let mut device_subscriptions = state
+        .device_subscription_count
+        .get(&key.device)
+        .copied()
+        .unwrap_or_default();
+    apply_usage_delta(
+        &mut device_subscriptions,
+        old.subscriptions,
+        new.subscriptions,
+    )?;
+    if let Some(after) = after {
+        state.session_usage.insert(key.clone(), after);
+    } else {
+        state.session_usage.remove(key);
+    }
+    if tenant_usage.session_count == 0 {
+        state.tenant_usage.remove(tenant);
+    } else {
+        state.tenant_usage.insert(tenant.clone(), tenant_usage);
+    }
+    if device_subscriptions == 0 {
+        state.device_subscription_count.remove(&key.device);
+    } else {
+        state
+            .device_subscription_count
+            .insert(key.device.clone(), device_subscriptions);
+    }
+    Ok(())
+}
+
 fn tenant_session_bytes(state: &BrokerState, tenant: &TenantId) -> usize {
     state
-        .sessions
-        .values()
-        .filter(|session| &session.key.device.tenant_id == tenant)
-        .map(|session| session.state_bytes)
-        .sum()
+        .tenant_usage
+        .get(tenant)
+        .map_or(0, |usage| usage.session_bytes)
 }
 
 fn total_session_bytes(state: &BrokerState) -> usize {
@@ -647,27 +779,13 @@ fn tenant_total_session_bytes(state: &BrokerState, tenant: &TenantId) -> usize {
 }
 
 fn tenant_inflight(state: &BrokerState, tenant: &TenantId, qos: u8) -> usize {
-    state
-        .sessions
-        .values()
-        .filter(|session| &session.key.device.tenant_id == tenant)
-        .map(|session| {
-            if qos == 1 {
-                session
-                    .outbound
-                    .values()
-                    .filter(|entry| matches!(entry, OutboundState::AwaitPuback(_)))
-                    .count()
-            } else {
-                session.inbound_qos2.len()
-                    + session
-                        .outbound
-                        .values()
-                        .filter(|entry| !matches!(entry, OutboundState::AwaitPuback(_)))
-                        .count()
-            }
-        })
-        .sum()
+    state.tenant_usage.get(tenant).map_or(0, |usage| {
+        if qos == 1 {
+            usage.qos1_inflight
+        } else {
+            usage.qos2_inflight
+        }
+    })
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -873,6 +991,9 @@ impl MqttBroker {
             subscription_count: AtomicUsize::new(0),
             state: Mutex::new(BrokerState {
                 sessions: HashMap::new(),
+                session_usage: HashMap::new(),
+                tenant_usage: HashMap::new(),
+                device_subscription_count: HashMap::new(),
                 active: HashMap::new(),
                 trie: SubscriptionTrie::default(),
                 retained: HashMap::new(),
@@ -947,8 +1068,8 @@ impl MqttBroker {
             client_id,
         };
         let mut state = lock(&self.state)?;
-        self.prune_expired(&mut state);
-        prune_expired_messages(&mut state, now_ms());
+        self.prune_expired(&mut state)?;
+        prune_expired_messages(&mut state, now_ms())?;
         let authorization = SessionAuthorization::from(auth);
         if clean_session {
             for pending in &mut state.pending_wills {
@@ -964,13 +1085,13 @@ impl MqttBroker {
             retry_pending_wills(&mut state, &self.limits);
         }
         if clean_session {
-            remove_session(&mut state, &key);
+            remove_session(&mut state, &key)?;
         } else if state.sessions.get(&key).is_some_and(|session| {
             session.version != version || session.authorization.as_ref() != Some(&authorization)
         }) {
             // A persistent session is valid only under the authorization profile that created
             // it. Reauthentication with changed provenance starts a fresh MQTT session.
-            remove_session(&mut state, &key);
+            remove_session(&mut state, &key)?;
         }
         let session_present = !clean_session && state.sessions.contains_key(&key);
         if !state.sessions.contains_key(&key) {
@@ -981,6 +1102,7 @@ impl MqttBroker {
             self.check_new_session(&state, &key, session.state_bytes)?;
             state.session_bytes = state.session_bytes.saturating_add(session.state_bytes);
             state.sessions.insert(key.clone(), session);
+            sync_session_usage(&mut state, &key)?;
         }
         retry_pending_wills(&mut state, &self.limits);
         let incarnation = state.sessions.get(&key).ok_or(Error::Internal)?.incarnation;
@@ -1047,15 +1169,17 @@ impl MqttBroker {
             Err(error) => {
                 state.active.remove(&key);
                 if clean_session {
-                    remove_session(&mut state, &key);
+                    remove_session(&mut state, &key)?;
                 } else if let Some(session) = state.sessions.get_mut(&key) {
                     session.active_generation = None;
                 }
+                sync_session_usage(&mut state, &key)?;
                 return Err(error);
             }
         };
         state.offline_count = state.offline_count.saturating_sub(resumed_count);
         state.offline_bytes = state.offline_bytes.saturating_sub(resumed_bytes);
+        sync_session_usage(&mut state, &key)?;
         if state
             .sessions
             .get(&key)
@@ -1103,7 +1227,7 @@ impl MqttBroker {
             }
         });
         if clear_session {
-            remove_session(&mut state, key);
+            remove_session(&mut state, key)?;
         } else if let Some(session) = state.sessions.get_mut(key) {
             session.active_generation = None;
             session.sent.clear();
@@ -1182,7 +1306,7 @@ impl MqttBroker {
             return Err(Error::Invalid);
         }
         let mut state = lock(&self.state)?;
-        prune_expired_messages(&mut state, now_ms());
+        prune_expired_messages(&mut state, now_ms())?;
         check_owner(&state, key, generation)?;
         let replacement = state
             .sessions
@@ -1208,17 +1332,14 @@ impl MqttBroker {
             .collect::<Vec<_>>();
         if !replacement {
             let tenant_count = state
-                .sessions
-                .values()
-                .filter(|session| session.key.device.tenant_id == key.device.tenant_id)
-                .map(|session| session.subscriptions.len())
-                .sum::<usize>();
+                .tenant_usage
+                .get(&key.device.tenant_id)
+                .map_or(0, |usage| usage.subscription_count);
             let device_count = state
-                .sessions
-                .values()
-                .filter(|session| session.key.device == key.device)
-                .map(|session| session.subscriptions.len())
-                .sum::<usize>();
+                .device_subscription_count
+                .get(&key.device)
+                .copied()
+                .unwrap_or_default();
             let session = state.sessions.get(key).ok_or(Error::Internal)?;
             if session.subscriptions.len() >= self.limits.max_subscriptions_per_session
                 || device_count >= self.limits.max_subscriptions_per_device
@@ -1277,6 +1398,7 @@ impl MqttBroker {
             .subscriptions
             .insert(filter.to_owned(), subscription);
         state.trie.insert(filter, key.clone(), subscription);
+        sync_session_usage(&mut state, key)?;
         for message in retained {
             if let Err(error) = enqueue(&mut state, key, message, &self.limits) {
                 // A concurrently closed receiver is the only expected post-preflight failure.
@@ -1291,6 +1413,7 @@ impl MqttBroker {
                 if let Some(previous_qos) = before_session.subscriptions.get(filter) {
                     state.trie.insert(filter, key.clone(), *previous_qos);
                 }
+                sync_session_usage(&mut state, key)?;
                 return Err(error);
             }
         }
@@ -1313,6 +1436,7 @@ impl MqttBroker {
             state.session_bytes = state.session_bytes.saturating_sub(charge);
             state.subscription_count = state.subscription_count.saturating_sub(1);
             state.trie.remove(filter, key);
+            sync_session_usage(&mut state, key)?;
             retry_pending_wills(&mut state, &self.limits);
             self.publish_subscription_count(&state);
         }
@@ -1351,7 +1475,7 @@ impl MqttBroker {
             .filter(|metrics| metrics.lock_timing_enabled())
             .map(|_| Instant::now());
         let mut state = lock(&self.state)?;
-        prune_expired_messages(&mut state, now_ms());
+        prune_expired_messages(&mut state, now_ms())?;
         let lock_wait_us = lock_started.map(|started| started.elapsed().as_micros() as u64);
         let hold_started = lock_started.map(|_| Instant::now());
         let result = route_locked(&mut state, owner, origin, &message, &self.limits);
@@ -1638,6 +1762,7 @@ impl MqttBroker {
             }
         }
         state.session_bytes += charge;
+        sync_session_usage(&mut state, key)?;
         Ok(true)
     }
 
@@ -1816,6 +1941,7 @@ impl MqttBroker {
             session.state_bytes = session.state_bytes.saturating_sub(charge);
             state.session_bytes = state.session_bytes.saturating_sub(charge);
         }
+        sync_session_usage(&mut state, key)?;
         retry_pending_wills(&mut state, &self.limits);
         Ok(())
     }
@@ -1880,6 +2006,7 @@ impl MqttBroker {
             session.state_bytes = session.state_bytes.saturating_sub(charge);
             state.session_bytes = state.session_bytes.saturating_sub(charge);
         }
+        sync_session_usage(&mut state, key)?;
         retry_pending_wills(&mut state, &self.limits);
         Ok(delivered)
     }
@@ -1994,6 +2121,7 @@ impl MqttBroker {
             let charge = outbound.bytes();
             session.state_bytes = session.state_bytes.saturating_sub(charge);
             state.session_bytes = state.session_bytes.saturating_sub(charge);
+            sync_session_usage(&mut state, key)?;
             wake_tenant_pending(
                 &mut state,
                 &key.device.tenant_id,
@@ -2030,6 +2158,7 @@ impl MqttBroker {
         let charge = outbound.bytes();
         session.state_bytes = session.state_bytes.saturating_sub(charge);
         state.session_bytes = state.session_bytes.saturating_sub(charge);
+        sync_session_usage(&mut state, key)?;
         wake_tenant_pending(
             &mut state,
             &key.device.tenant_id,
@@ -2078,6 +2207,7 @@ impl MqttBroker {
         let charge = outbound.bytes();
         session.state_bytes = session.state_bytes.saturating_sub(charge);
         state.session_bytes = state.session_bytes.saturating_sub(charge);
+        sync_session_usage(&mut state, key)?;
         wake_tenant_pending(&mut state, &key.device.tenant_id, 2, &self.limits)?;
         Ok(())
     }
@@ -2111,6 +2241,7 @@ impl MqttBroker {
         let charge = outbound.bytes();
         session.state_bytes = session.state_bytes.saturating_sub(charge);
         state.session_bytes = state.session_bytes.saturating_sub(charge);
+        sync_session_usage(&mut state, key)?;
         wake_tenant_pending(
             &mut state,
             &key.device.tenant_id,
@@ -2184,6 +2315,9 @@ impl MqttBroker {
         }
         let mut replacement = BrokerState {
             sessions: HashMap::new(),
+            session_usage: HashMap::new(),
+            tenant_usage: HashMap::new(),
+            device_subscription_count: HashMap::new(),
             active: HashMap::new(),
             trie: SubscriptionTrie::default(),
             retained: HashMap::new(),
@@ -2475,7 +2609,9 @@ impl MqttBroker {
                         .insert(filter, session.key.clone(), *subscription);
                 }
             }
-            replacement.sessions.insert(session.key.clone(), session);
+            let key = session.key.clone();
+            replacement.sessions.insert(key.clone(), session);
+            sync_session_usage(&mut replacement, &key)?;
         }
         for (topic, retained) in snapshot.retained {
             if topic != retained.message.topic
@@ -2618,8 +2754,8 @@ impl MqttBroker {
     /// One bounded maintenance pass. The server owns a single periodic task for this broker.
     pub fn tick(&self) -> Result<()> {
         let mut state = lock(&self.state)?;
-        self.prune_expired(&mut state);
-        let released_tenants = prune_expired_messages(&mut state, now_ms());
+        self.prune_expired(&mut state)?;
+        let released_tenants = prune_expired_messages(&mut state, now_ms())?;
         for tenant in released_tenants {
             wake_tenant_pending(&mut state, &tenant, 1, &self.limits)?;
             wake_tenant_pending(&mut state, &tenant, 2, &self.limits)?;
@@ -2661,7 +2797,7 @@ impl MqttBroker {
             .map(|session| session.key.clone())
             .collect::<Vec<_>>();
         for key in &keys {
-            remove_session(&mut state, key);
+            remove_session(&mut state, key)?;
         }
         retry_pending_wills(&mut state, &self.limits);
         self.publish_subscription_count(&state);
@@ -2694,10 +2830,9 @@ impl MqttBroker {
         state_bytes: usize,
     ) -> Result<()> {
         let tenant = state
-            .sessions
-            .keys()
-            .filter(|candidate| candidate.device.tenant_id == key.device.tenant_id)
-            .count();
+            .tenant_usage
+            .get(&key.device.tenant_id)
+            .map_or(0, |usage| usage.session_count);
         if state.sessions.len() >= self.limits.max_persistent_sessions
             || tenant >= self.limits.max_persistent_sessions_per_tenant
             || tenant_total_session_bytes(state, &key.device.tenant_id).saturating_add(state_bytes)
@@ -2715,7 +2850,7 @@ impl MqttBroker {
             .store(state.subscription_count, Ordering::Release);
     }
 
-    fn prune_expired(&self, state: &mut BrokerState) {
+    fn prune_expired(&self, state: &mut BrokerState) -> Result<()> {
         let now = now_ms();
         let cutoff = now.saturating_sub(
             i64::try_from(self.limits.mqtt_session_idle_ttl_ms).unwrap_or(i64::MAX),
@@ -2734,8 +2869,9 @@ impl MqttBroker {
             .map(|(key, _)| key.clone())
             .collect::<Vec<_>>();
         for key in expired {
-            remove_session(state, &key)
+            remove_session(state, &key)?;
         }
+        Ok(())
     }
 }
 
@@ -2813,6 +2949,7 @@ fn promote_offline(
     };
     state.offline_count = state.offline_count.saturating_sub(1);
     state.offline_bytes = state.offline_bytes.saturating_sub(bytes);
+    sync_session_usage(state, key)?;
     Ok(Some(frame))
 }
 
@@ -2864,7 +3001,7 @@ fn wake_tenant_pending(
     Ok(())
 }
 
-fn remove_session(state: &mut BrokerState, key: &SessionKey) {
+fn remove_session(state: &mut BrokerState, key: &SessionKey) -> Result<()> {
     unmark_pending(state, key);
     if let Some(active) = state.active.remove(key) {
         active.cancel.cancel()
@@ -2883,10 +3020,12 @@ fn remove_session(state: &mut BrokerState, key: &SessionKey) {
         state.offline_bytes = state.offline_bytes.saturating_sub(session.offline_bytes);
         state.session_bytes = state.session_bytes.saturating_sub(session.state_bytes);
     }
+    sync_session_usage(state, key)
 }
 
-fn prune_expired_messages(state: &mut BrokerState, now: i64) -> HashSet<TenantId> {
+fn prune_expired_messages(state: &mut BrokerState, now: i64) -> Result<HashSet<TenantId>> {
     let mut released_tenants = HashSet::new();
+    let mut changed_sessions = Vec::new();
     let mut removed_count = 0usize;
     let mut removed_offline_bytes = 0usize;
     let mut removed_session_bytes = 0usize;
@@ -2897,6 +3036,9 @@ fn prune_expired_messages(state: &mut BrokerState, now: i64) -> HashSet<TenantId
         removed_count += count;
         removed_offline_bytes = removed_offline_bytes.saturating_add(released_bytes);
         removed_session_bytes = removed_session_bytes.saturating_add(released_state_bytes);
+        if count > 0 || released_state_bytes > 0 {
+            changed_sessions.push(key.clone());
+        }
         if session.offline.is_empty() {
             empty_pending.push(key.clone());
         }
@@ -2910,6 +3052,9 @@ fn prune_expired_messages(state: &mut BrokerState, now: i64) -> HashSet<TenantId
     state.offline_count = state.offline_count.saturating_sub(removed_count);
     state.offline_bytes = state.offline_bytes.saturating_sub(removed_offline_bytes);
     state.session_bytes = state.session_bytes.saturating_sub(removed_session_bytes);
+    for key in changed_sessions {
+        sync_session_usage(state, &key)?;
+    }
     let mut released_retained_bytes = 0usize;
     state.retained.retain(|_, retained| {
         if retained.message.expired(now) {
@@ -2920,7 +3065,7 @@ fn prune_expired_messages(state: &mut BrokerState, now: i64) -> HashSet<TenantId
         }
     });
     state.retained_bytes = state.retained_bytes.saturating_sub(released_retained_bytes);
-    released_tenants
+    Ok(released_tenants)
 }
 
 /// Expiry work for one session. ACK-driven promotion calls this without scanning
@@ -2937,6 +3082,7 @@ fn prune_expired_messages_for_session(
     state.offline_count = state.offline_count.saturating_sub(count);
     state.offline_bytes = state.offline_bytes.saturating_sub(offline_bytes);
     state.session_bytes = state.session_bytes.saturating_sub(session_bytes);
+    sync_session_usage(state, key)?;
     if empty {
         unmark_pending(state, key);
     }
@@ -3135,6 +3281,7 @@ fn enqueue(
             session.send_window.insert(id);
             session.state_bytes += charge;
             state.session_bytes += charge;
+            sync_session_usage(state, key)?;
             (
                 BrokerFrame::Publish(BrokerDelivery {
                     message,
@@ -3162,6 +3309,7 @@ fn enqueue(
         session.remove_outbound(id);
         session.state_bytes = session.state_bytes.saturating_sub(charge);
         state.session_bytes = state.session_bytes.saturating_sub(charge);
+        sync_session_usage(state, key)?;
     }
     match frame {
         BrokerFrame::Publish(delivery) if delivery.message.qos > 0 => {
@@ -3200,17 +3348,13 @@ fn preflight_retained_replay(
     let mut tenant_qos1 = tenant_inflight(state, &key.device.tenant_id, 1);
     let mut tenant_qos2 = tenant_inflight(state, &key.device.tenant_id, 2);
     let mut tenant_offline_count = state
-        .sessions
-        .values()
-        .filter(|candidate| candidate.key.device.tenant_id == key.device.tenant_id)
-        .map(|candidate| candidate.offline.len())
-        .sum::<usize>();
+        .tenant_usage
+        .get(&key.device.tenant_id)
+        .map_or(0, |usage| usage.offline_count);
     let mut tenant_offline_bytes = state
-        .sessions
-        .values()
-        .filter(|candidate| candidate.key.device.tenant_id == key.device.tenant_id)
-        .map(|candidate| candidate.offline_bytes)
-        .sum::<usize>();
+        .tenant_usage
+        .get(&key.device.tenant_id)
+        .map_or(0, |usage| usage.offline_bytes);
     let mut global_offline_count = state.offline_count;
     let mut global_offline_bytes = state.offline_bytes;
     let mut live_frames = 0usize;
@@ -3295,17 +3439,13 @@ fn queue_offline(
     let bytes = message.bytes();
     let tenant_id = key.device.tenant_id.clone();
     let tenant_count = state
-        .sessions
-        .values()
-        .filter(|session| session.key.device.tenant_id == tenant_id)
-        .map(|session| session.offline.len())
-        .sum::<usize>();
+        .tenant_usage
+        .get(&tenant_id)
+        .map_or(0, |usage| usage.offline_count);
     let tenant_bytes = state
-        .sessions
-        .values()
-        .filter(|session| session.key.device.tenant_id == tenant_id)
-        .map(|session| session.offline_bytes)
-        .sum::<usize>();
+        .tenant_usage
+        .get(&tenant_id)
+        .map_or(0, |usage| usage.offline_bytes);
     let tenant_state_bytes = tenant_total_session_bytes(state, &key.device.tenant_id);
     let global_state_bytes = total_session_bytes(state);
     let session = state.sessions.get_mut(key).ok_or(Error::Unavailable)?;
@@ -3327,6 +3467,7 @@ fn queue_offline(
     state.offline_count += 1;
     state.offline_bytes += bytes;
     state.session_bytes += bytes;
+    sync_session_usage(state, key)?;
     mark_pending(state, key);
     Ok(())
 }
@@ -3388,6 +3529,7 @@ fn route_locked(
                 session.send_window.insert(packet_id);
                 session.state_bytes += charge;
                 state.session_bytes += charge;
+                sync_session_usage(state, &target.key)?;
                 let frame = BrokerFrame::Publish(BrokerDelivery {
                     message: routed,
                     packet_id: Some(packet_id),
@@ -3409,6 +3551,7 @@ fn route_locked(
                 state.offline_count += 1;
                 state.offline_bytes += charge;
                 state.session_bytes += charge;
+                sync_session_usage(state, &target.key)?;
                 mark_pending(state, &target.key);
                 delivered += 1;
             }
@@ -3518,35 +3661,20 @@ fn preflight_route(
         .collect::<HashSet<_>>();
     let mut tenant_usage = relevant_tenants
         .into_iter()
-        .map(|tenant| (tenant, TenantRouteUsage::default()))
+        .map(|tenant| {
+            let stored = state.tenant_usage.get(&tenant).copied().unwrap_or_default();
+            (
+                tenant,
+                TenantRouteUsage {
+                    session_bytes: stored.session_bytes,
+                    offline_count: stored.offline_count,
+                    offline_bytes: stored.offline_bytes,
+                    qos1_inflight: stored.qos1_inflight,
+                    qos2_inflight: stored.qos2_inflight,
+                },
+            )
+        })
         .collect::<HashMap<_, _>>();
-    // Compute tenant totals once. Planning memory contains only compact counters and one compact
-    // target entry per match; no StoredSession or payload data is cloned.
-    for session in state.sessions.values() {
-        let Some(usage) = tenant_usage.get_mut(&session.key.device.tenant_id) else {
-            continue;
-        };
-        usage.session_bytes = usage.session_bytes.saturating_add(session.state_bytes);
-        usage.offline_count = usage.offline_count.saturating_add(session.offline.len());
-        usage.offline_bytes = usage.offline_bytes.saturating_add(session.offline_bytes);
-        usage.qos1_inflight = usage.qos1_inflight.saturating_add(
-            session
-                .outbound
-                .values()
-                .filter(|entry| matches!(entry, OutboundState::AwaitPuback(_)))
-                .count(),
-        );
-        usage.qos2_inflight = usage
-            .qos2_inflight
-            .saturating_add(session.inbound_qos2.len())
-            .saturating_add(
-                session
-                    .outbound
-                    .values()
-                    .filter(|entry| !matches!(entry, OutboundState::AwaitPuback(_)))
-                    .count(),
-            );
-    }
     for (tenant, usage) in &state.will_responsibility_tenants {
         if let Some(projected) = tenant_usage.get_mut(tenant) {
             projected.session_bytes = projected.session_bytes.saturating_add(usage.1);
