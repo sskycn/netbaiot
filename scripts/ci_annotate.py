@@ -9,7 +9,7 @@ import subprocess
 import sys
 
 
-MAX_ANNOTATION_CHARS = 12_000
+MAX_ANNOTATION_CHARS = 3_200
 TAIL_LINES = 160
 
 
@@ -29,6 +29,7 @@ def main() -> int:
         parser.error("a command is required after --")
 
     tail: collections.deque[str] = collections.deque(maxlen=TAIL_LINES)
+    failures: collections.deque[str] = collections.deque(maxlen=20)
     try:
         process = subprocess.Popen(
             command,
@@ -48,13 +49,21 @@ def main() -> int:
     for line in process.stdout:
         print(line, end="", flush=True)
         tail.append(line)
+        if ": FAIL" in line:
+            failures.append(line)
     return_code = process.wait()
     if return_code == 0:
         return 0
 
-    details = "".join(tail)
-    if len(details) > MAX_ANNOTATION_CHARS:
-        details = details[-MAX_ANNOTATION_CHARS:]
+    # GitHub truncates long check annotations from the end. Put explicit test
+    # failures first so they remain visible even when command output is large.
+    failure_details = "".join(failures)
+    if len(failure_details) >= MAX_ANNOTATION_CHARS:
+        details = failure_details[:MAX_ANNOTATION_CHARS]
+    else:
+        details = failure_details + "".join(tail)[
+            -(MAX_ANNOTATION_CHARS - len(failure_details)) :
+        ]
     message = f"command exited with {return_code}\n{details}"
     print(f"::error title={arguments.title}::{escape_workflow_data(message)}")
     return return_code
