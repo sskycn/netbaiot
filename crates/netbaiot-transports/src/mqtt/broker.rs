@@ -5691,11 +5691,30 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(stored.0.properties.expires_at_ms, Some(deadline));
+        let accounting = transaction_accounting(&broker, &attachment.key);
         retransmit.payload = b"different".to_vec();
+        assert!(matches!(
+            broker.inbound_qos2(
+                &attachment.key,
+                attachment.generation,
+                7,
+                retransmit.clone()
+            ),
+            Err(Error::Invalid)
+        ));
+        retransmit = message.clone();
+        retransmit.topic.push_str("/changed");
         assert!(matches!(
             broker.inbound_qos2(&attachment.key, attachment.generation, 7, retransmit),
             Err(Error::Invalid)
         ));
+        retransmit = message.clone();
+        retransmit.properties.content_type = Some("other".into());
+        assert!(matches!(
+            broker.inbound_qos2(&attachment.key, attachment.generation, 7, retransmit),
+            Err(Error::Invalid)
+        ));
+        assert_eq!(transaction_accounting(&broker, &attachment.key), accounting);
         attachment.detach().unwrap();
     }
 
