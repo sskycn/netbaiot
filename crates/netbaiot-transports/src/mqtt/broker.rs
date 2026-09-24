@@ -30,7 +30,8 @@ const RECOVERY_VERSION_V1: u32 = 1;
 const RECOVERY_VERSION_V2: u32 = 2;
 const RECOVERY_VERSION_V3: u32 = 3;
 const RECOVERY_VERSION_V4: u32 = 4;
-const RECOVERY_VERSION: u32 = 5;
+const RECOVERY_VERSION_V5: u32 = 5;
+const RECOVERY_VERSION: u32 = 6;
 const LEGACY_V1_RECOVERY_READ_MAX: usize = 1_342_177_280;
 const RECOVERY_FILE: &str = "mqtt-runtime.state";
 const HOT_MAINTENANCE_BUDGET: usize = 64;
@@ -270,7 +271,10 @@ pub enum InboundQos2Action {
 pub(crate) enum InboundQos2PublishState {
     ExistingTransaction,
     NeedsNewMessageAdmission,
+    IdentifierInUse,
 }
+
+type ClientIdPreflight<'a> = dyn Fn(&str) -> Result<()> + 'a;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum OutboundAck {
@@ -468,6 +472,8 @@ struct RetainedReservation {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct PendingWill {
     owner: DeviceKey,
+    #[serde(default)]
+    origin: Option<SessionKey>,
     message: BrokerMessage,
     #[serde(default)]
     due_at_ms: Option<i64>,
@@ -477,6 +483,18 @@ struct PendingWill {
     message_expiry_interval: Option<u32>,
     #[serde(skip)]
     retained_reservation: RetainedReservation,
+}
+
+impl PendingWill {
+    fn bytes(&self) -> usize {
+        will_charge(&self.message, self.origin.as_ref())
+    }
+}
+
+fn will_charge(message: &BrokerMessage, origin: Option<&SessionKey>) -> usize {
+    message
+        .bytes()
+        .saturating_add(origin.map_or(0, |key| key.client_id.len().saturating_add(2)))
 }
 
 #[derive(Clone)]
@@ -928,6 +946,7 @@ pub struct Attachment {
 pub struct WillGuard {
     broker: Arc<MqttBroker>,
     owner: DeviceKey,
+    origin: Option<SessionKey>,
     message: BrokerMessage,
     reservation: RetainedReservation,
     delay: Option<(u32, u32, SessionKey, u64, u64)>,
@@ -980,6 +999,7 @@ impl WillGuard {
             let outcome = self.broker.schedule_reserved_will(
                 PendingWill {
                     owner: self.owner.clone(),
+                    origin: self.origin.clone(),
                     message: self.message.clone(),
                     due_at_ms: Some(due_at_ms),
                     cancel_on_resume: Some((key.clone(), *incarnation)),
@@ -1003,6 +1023,7 @@ impl WillGuard {
         }
         let result = self.broker.publish_reserved_will(
             &self.owner,
+            self.origin.as_ref(),
             &message,
             self.reservation,
             self.message_expiry_interval,
@@ -1026,7 +1047,7 @@ impl WillGuard {
         if !self.finished {
             self.broker.release_will_reservation(
                 &self.owner.tenant_id,
-                self.message.bytes(),
+                will_charge(&self.message, self.origin.as_ref()),
                 self.reservation,
             )?;
             self.finished = true;
@@ -1045,7 +1066,7 @@ impl Drop for WillGuard {
         } else {
             self.broker.release_will_reservation(
                 &self.owner.tenant_id,
-                self.message.bytes(),
+                will_charge(&self.message, self.origin.as_ref()),
                 self.reservation,
             )
         };
@@ -1147,11 +1168,12 @@ impl MqttBroker {
     ) -> Result<Attachment> {
         self.attach_profile(
             auth,
-            client_id,
+            Some(client_id),
             clean_session,
             MqttVersion::V311,
             0,
             u16::MAX,
+            None,
         )
     }
 
@@ -1165,33 +1187,74 @@ impl MqttBroker {
     ) -> Result<Attachment> {
         self.attach_profile(
             auth,
-            client_id,
+            Some(client_id),
             clean_start,
             MqttVersion::V5,
             session_expiry_interval,
             receive_maximum,
+            None,
         )
     }
 
+    pub fn attach_generated(self: &Arc<Self>, auth: &AuthenticatedDevice) -> Result<Attachment> {
+        self.attach_profile(auth, None, true, MqttVersion::V311, 0, u16::MAX, None)
+    }
+
+    pub fn attach_generated_v5(
+        self: &Arc<Self>,
+        auth: &AuthenticatedDevice,
+        session_expiry_interval: u32,
+        receive_maximum: u16,
+        preflight: &dyn Fn(&str) -> Result<()>,
+    ) -> Result<Attachment> {
+        self.attach_profile(
+            auth,
+            None,
+            true,
+            MqttVersion::V5,
+            session_expiry_interval,
+            receive_maximum,
+            Some(preflight),
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
     fn attach_profile(
         self: &Arc<Self>,
         auth: &AuthenticatedDevice,
-        client_id: String,
+        client_id: Option<String>,
         clean_session: bool,
         version: MqttVersion,
         session_expiry_interval: u32,
         receive_maximum: u16,
+        preflight: Option<&ClientIdPreflight<'_>>,
     ) -> Result<Attachment> {
         if receive_maximum == 0 {
             return Err(Error::Invalid);
+        }
+        let mut state = lock(&self.state)?;
+        self.prune_expired(&mut state, HOT_MAINTENANCE_BUDGET)?;
+        prune_expired_messages(&mut state, now_ms(), HOT_MAINTENANCE_BUDGET)?;
+        let client_id = if let Some(client_id) = client_id {
+            client_id
+        } else {
+            (1..=1_024_u64)
+                .filter_map(|offset| {
+                    let candidate = format!("generated-{}", state.generation.wrapping_add(offset));
+                    (candidate.len() <= self.limits.max_client_id_bytes
+                        && !state.sessions.keys().any(|key| key.client_id == candidate))
+                    .then_some(candidate)
+                })
+                .next()
+                .ok_or(Error::Overloaded)?
+        };
+        if let Some(preflight) = preflight {
+            preflight(&client_id)?;
         }
         let key = SessionKey {
             device: auth.device_key.clone(),
             client_id,
         };
-        let mut state = lock(&self.state)?;
-        self.prune_expired(&mut state, HOT_MAINTENANCE_BUDGET)?;
-        prune_expired_messages(&mut state, now_ms(), HOT_MAINTENANCE_BUDGET)?;
         if session_expiry_deadline(&state, &key).is_some_and(|deadline| deadline <= now_ms()) {
             remove_session(&mut state, &key)?;
         }
@@ -1608,18 +1671,45 @@ impl MqttBroker {
         owner: DeviceKey,
         message: BrokerMessage,
     ) -> Result<WillGuard> {
+        self.reserve_will_with_origin(owner, None, message)
+    }
+
+    pub fn reserve_will_for_session(
+        self: &Arc<Self>,
+        origin: SessionKey,
+        message: BrokerMessage,
+    ) -> Result<WillGuard> {
+        self.reserve_will_with_origin(origin.device.clone(), Some(origin), message)
+    }
+
+    fn reserve_will_with_origin(
+        self: &Arc<Self>,
+        owner: DeviceKey,
+        origin: Option<SessionKey>,
+        message: BrokerMessage,
+    ) -> Result<WillGuard> {
         if !valid_broker_message(&message, &self.limits)
             || message.payload.len() > self.limits.max_will_payload_bytes
+            || origin.as_ref().is_some_and(|key| {
+                key.device != owner || key.client_id.len() > self.limits.max_client_id_bytes
+            })
         {
             return Err(Error::Invalid);
         }
+        let charge = will_charge(&message, origin.as_ref());
         let mut state = lock(&self.state)?;
-        reserve_will_capacity(&mut state, &owner.tenant_id, message.bytes(), &self.limits)?;
+        reserve_will_capacity(&mut state, &owner.tenant_id, charge, &self.limits)?;
         let reservation = if message.retain && !message.payload.is_empty() {
-            match reserve_retained(&mut state, &owner.tenant_id, None, &message, &self.limits) {
+            match reserve_retained(
+                &mut state,
+                &owner.tenant_id,
+                origin.as_ref(),
+                &message,
+                &self.limits,
+            ) {
                 Ok(reservation) => reservation,
                 Err(error) => {
-                    release_will_capacity(&mut state, &owner.tenant_id, message.bytes());
+                    release_will_capacity(&mut state, &owner.tenant_id, charge);
                     return Err(error);
                 }
             }
@@ -1630,6 +1720,7 @@ impl MqttBroker {
         Ok(WillGuard {
             broker: self.clone(),
             owner,
+            origin,
             message,
             reservation,
             delay: None,
@@ -1658,6 +1749,7 @@ impl MqttBroker {
     fn publish_reserved_will(
         &self,
         owner: &DeviceKey,
+        origin: Option<&SessionKey>,
         message: &BrokerMessage,
         reservation: RetainedReservation,
         message_expiry_interval: Option<u32>,
@@ -1668,9 +1760,9 @@ impl MqttBroker {
         if reservation != RetainedReservation::default() {
             release_retained_reservation(&mut state, &owner.tenant_id, reservation);
         }
-        match route_locked(&mut state, owner, None, message, &self.limits) {
+        match route_locked(&mut state, owner, origin, message, &self.limits) {
             Ok(delivered) => {
-                release_will_capacity(&mut state, &owner.tenant_id, message.bytes());
+                release_will_capacity(&mut state, &owner.tenant_id, will_charge(message, origin));
                 Ok(Some(delivered))
             }
             Err(error) => {
@@ -1680,6 +1772,7 @@ impl MqttBroker {
                 add_retained_reservation(&mut state, &owner.tenant_id, reservation);
                 state.pending_wills.push_back(PendingWill {
                     owner: owner.clone(),
+                    origin: origin.cloned(),
                     message: message.clone(),
                     due_at_ms: None,
                     cancel_on_resume: None,
@@ -1716,11 +1809,7 @@ impl MqttBroker {
                     &pending.owner.tenant_id,
                     pending.retained_reservation,
                 );
-                release_will_capacity(
-                    &mut state,
-                    &pending.owner.tenant_id,
-                    pending.message.bytes(),
-                );
+                release_will_capacity(&mut state, &pending.owner.tenant_id, pending.bytes());
                 return Ok(WillSchedule::Suppressed);
             }
         }
@@ -1756,6 +1845,37 @@ impl MqttBroker {
         Ok(session.inbound_window.len() < limit)
     }
 
+    /// A retransmitted PUBLISH on a new network connection consumes that
+    /// connection's receive slot once, while retaining the Session transaction.
+    pub fn begin_inbound_qos2_retransmission(
+        &self,
+        key: &SessionKey,
+        generation: u64,
+        packet_id: u16,
+    ) -> Result<bool> {
+        let mut state = lock(&self.state)?;
+        check_owner(&state, key, generation)?;
+        let session = state.sessions.get_mut(key).ok_or(Error::Internal)?;
+        if !matches!(
+            session.inbound_qos2.get(&packet_id),
+            Some(InboundQos2State::AwaitPubrel(_))
+        ) {
+            return Err(Error::Conflict);
+        }
+        if session.inbound_window.contains(&packet_id) {
+            return Ok(true);
+        }
+        let limit = self
+            .limits
+            .max_inflight_qos1_per_session
+            .min(self.limits.max_inflight_qos2_per_session);
+        if session.inbound_window.len() >= limit {
+            return Ok(false);
+        }
+        session.inbound_window.insert(packet_id);
+        Ok(true)
+    }
+
     /// Classify a MQTT 5 QoS 2 PUBLISH before authorizing its topic. Only a
     /// transaction still awaiting PUBREL can bypass the second packet's ACL.
     /// The connection processes packets serially; `inbound_qos2` rechecks
@@ -1772,19 +1892,11 @@ impl MqttBroker {
         let state = lock(&self.state)?;
         check_owner(&state, key, generation)?;
         let session = state.sessions.get(key).ok_or(Error::Internal)?;
-        if session.version != MqttVersion::V5 {
-            return Err(Error::Invalid);
-        }
-        Ok(
-            if matches!(
-                session.inbound_qos2.get(&packet_id),
-                Some(InboundQos2State::AwaitPubrel(_))
-            ) {
-                InboundQos2PublishState::ExistingTransaction
-            } else {
-                InboundQos2PublishState::NeedsNewMessageAdmission
-            },
-        )
+        Ok(match session.inbound_qos2.get(&packet_id) {
+            Some(InboundQos2State::AwaitPubrel(_)) => InboundQos2PublishState::ExistingTransaction,
+            Some(_) => InboundQos2PublishState::IdentifierInUse,
+            None => InboundQos2PublishState::NeedsNewMessageAdmission,
+        })
     }
 
     pub fn inbound_qos2(
@@ -2427,6 +2539,7 @@ impl MqttBroker {
                 | RECOVERY_VERSION_V2
                 | RECOVERY_VERSION_V3
                 | RECOVERY_VERSION_V4
+                | RECOVERY_VERSION_V5
                 | RECOVERY_VERSION
         ) || snapshot.sessions.len() > self.limits.max_persistent_sessions
             || snapshot.retained.len() > self.limits.max_retained_messages
@@ -2786,6 +2899,10 @@ impl MqttBroker {
             if !valid_broker_message(&pending.message, &self.limits)
                 || pending.message.payload.len() > self.limits.max_will_payload_bytes
                 || !device_publish_topic(&pending.owner, &pending.message.topic, None)
+                || pending.origin.as_ref().is_some_and(|key| {
+                    key.device != pending.owner
+                        || key.client_id.len() > self.limits.max_client_id_bytes
+                })
                 || pending.due_at_ms.is_some() != pending.cancel_on_resume.is_some()
                 || pending
                     .cancel_on_resume
@@ -2804,13 +2921,13 @@ impl MqttBroker {
             reserve_will_capacity(
                 &mut replacement,
                 &pending.owner.tenant_id,
-                pending.message.bytes(),
+                pending.bytes(),
                 &self.limits,
             )?;
             pending.retained_reservation = reserve_retained(
                 &mut replacement,
                 &pending.owner.tenant_id,
-                None,
+                pending.origin.as_ref(),
                 &pending.message,
                 &self.limits,
             )?;
@@ -3797,7 +3914,7 @@ fn cancel_resumed_wills(state: &mut BrokerState, key: &SessionKey, incarnation: 
             state.pending_wills.push_back(will);
         } else {
             release_retained_reservation(state, &will.owner.tenant_id, will.retained_reservation);
-            release_will_capacity(state, &will.owner.tenant_id, will.message.bytes());
+            release_will_capacity(state, &will.owner.tenant_id, will.bytes());
         }
     }
 }
@@ -3853,9 +3970,15 @@ fn retry_pending_wills_bounded(state: &mut BrokerState, limits: &Limits, budget:
             &pending.owner.tenant_id,
             pending.retained_reservation,
         );
-        match route_locked(state, &pending.owner, None, &pending.message, limits) {
+        match route_locked(
+            state,
+            &pending.owner,
+            pending.origin.as_ref(),
+            &pending.message,
+            limits,
+        ) {
             Ok(_) => {
-                release_will_capacity(state, &pending.owner.tenant_id, pending.message.bytes());
+                release_will_capacity(state, &pending.owner.tenant_id, pending.bytes());
                 settled += 1;
             }
             Err(error) => {
@@ -4538,6 +4661,12 @@ fn write_recovery(directory: &Path, limits: &Limits, broker: &MqttBroker) -> Res
         } else {
             record.push(0);
         }
+        if let Some(origin) = &pending.origin {
+            record.push(1);
+            put_string(&mut record, &origin.client_id)?;
+        } else {
+            record.push(0);
+        }
         write_record(
             &mut file,
             RECORD_PENDING_WILL,
@@ -4627,7 +4756,11 @@ fn decode_recovery_reader(
     }
     if !matches!(
         version,
-        RECOVERY_VERSION_V2 | RECOVERY_VERSION_V3 | RECOVERY_VERSION_V4 | RECOVERY_VERSION
+        RECOVERY_VERSION_V2
+            | RECOVERY_VERSION_V3
+            | RECOVERY_VERSION_V4
+            | RECOVERY_VERSION_V5
+            | RECOVERY_VERSION
     ) {
         return Err(Error::Invalid);
     }
@@ -5256,7 +5389,7 @@ fn decode_record(
         RECORD_OUTBOUND => {
             let packet_id = reader.u16()?;
             let stage = reader.u8()?;
-            let started = if format_version >= RECOVERY_VERSION {
+            let started = if format_version >= RECOVERY_VERSION_V5 {
                 match reader.u8()? {
                     0 => false,
                     1 => true,
@@ -5352,12 +5485,25 @@ fn decode_record(
                 } else {
                     (None, None, None)
                 };
+            let origin = if format_version >= RECOVERY_VERSION {
+                match reader.u8()? {
+                    0 => None,
+                    1 => Some(SessionKey {
+                        device: owner.clone(),
+                        client_id: reader.string(limits.max_client_id_bytes)?,
+                    }),
+                    _ => return Err(Error::Invalid),
+                }
+            } else {
+                cancel_on_resume.as_ref().map(|(key, _)| key.clone())
+            };
             reader.finish()?;
             if message.payload.len() > limits.max_will_payload_bytes {
                 return Err(Error::Invalid);
             }
             snapshot.pending_wills.push(PendingWill {
                 owner,
+                origin,
                 message,
                 due_at_ms,
                 cancel_on_resume,
@@ -5538,7 +5684,7 @@ mod tests {
         }
         device_subscriptions.retain(|_, count| *count != 0);
         for pending in all_pending_wills(state) {
-            let bytes = pending.message.bytes();
+            let bytes = pending.bytes();
             will_bytes += bytes;
             let tenant = will_tenants
                 .entry(pending.owner.tenant_id.clone())
@@ -6137,6 +6283,7 @@ mod tests {
                     &mut state,
                     PendingWill {
                         owner,
+                        origin: None,
                         message,
                         due_at_ms: Some(now_ms() - 1),
                         cancel_on_resume: Some((
@@ -6183,6 +6330,7 @@ mod tests {
                 &mut state,
                 PendingWill {
                     owner: owner.clone(),
+                    origin: None,
                     message: message.clone(),
                     due_at_ms: Some(now_ms() + 3_600_000),
                     cancel_on_resume: None,
@@ -6268,8 +6416,8 @@ mod tests {
         resumed.detach().unwrap();
 
         let mut will = broker
-            .reserve_will(
-                device.device_key.clone(),
+            .reserve_will_for_session(
+                resumed.key.clone(),
                 BrokerMessage {
                     topic: topic.into(),
                     payload: b"recover".to_vec(),
@@ -6296,6 +6444,13 @@ mod tests {
         let recovered = MqttBroker::new(limits);
         assert!(recovered.recover_from(&root).await.unwrap());
         assert_eq!(recovered.pending_will_count().unwrap(), 1);
+        assert_eq!(
+            all_pending_wills(&recovered.state.lock().unwrap())
+                .next()
+                .unwrap()
+                .origin,
+            Some(resumed.key.clone())
+        );
         assert!(!recovered.has_retained_topic(topic).unwrap());
         {
             let mut state = recovered.state.lock().unwrap();
@@ -6918,6 +7073,175 @@ mod tests {
         assert_eq!(transaction_accounting(&broker, &replacement.key), resumed);
         old.detach().unwrap();
         replacement.detach().unwrap();
+    }
+
+    #[test]
+    fn generated_client_id_never_replaces_explicit_or_recovered_session() {
+        let broker = MqttBroker::new(Arc::new(Limits::default()));
+        let identity = auth("generated-id");
+        let mut explicit = broker
+            .attach_v5(&identity, "generated-2".into(), false, 60, 4)
+            .unwrap();
+        let filter = "v1/t/t/p/p/d/generated-id/up";
+        broker
+            .subscribe(&explicit.key, explicit.generation, filter, 1)
+            .unwrap();
+        explicit.detach().unwrap();
+        let recovered = MqttBroker::new(Arc::new(Limits::default()));
+        recovered.restore(broker.snapshot().unwrap()).unwrap();
+        let mut assigned = recovered
+            .attach_generated_v5(&identity, 60, 4, &|_| Ok(()))
+            .unwrap();
+        assert_ne!(assigned.key.client_id, "generated-2");
+        assigned.detach().unwrap();
+        let mut resumed = recovered
+            .attach_v5(&identity, "generated-2".into(), false, 60, 4)
+            .unwrap();
+        assert!(resumed.session_present);
+        assert_eq!(
+            recovered.subscription_qos(&resumed.key, filter).unwrap(),
+            Some(1)
+        );
+        resumed.detach().unwrap();
+    }
+
+    #[test]
+    fn v5_pending_will_record_remains_readable_without_origin_field() {
+        let limits = Arc::new(Limits::default());
+        let owner = auth("legacy-will").device_key;
+        let message = BrokerMessage {
+            topic: "v1/t/t/p/p/d/legacy-will/up".into(),
+            payload: b"old".to_vec(),
+            qos: 1,
+            retain: false,
+            properties: Default::default(),
+        };
+        let mut payload = Vec::new();
+        put_string(&mut payload, owner.tenant_id.as_str()).unwrap();
+        put_string(&mut payload, owner.product_id.as_str()).unwrap();
+        put_string(&mut payload, owner.device_id.as_str()).unwrap();
+        encode_message(&mut payload, &message).unwrap();
+        payload.extend_from_slice(&[0, 0]); // no delayed cancellation or expiry
+        let mut header = Vec::new();
+        header.extend_from_slice(RECOVERY_MAGIC);
+        header.extend_from_slice(&RECOVERY_VERSION_V5.to_be_bytes());
+        header.extend_from_slice(&1_u64.to_be_bytes());
+        let mut record = Vec::new();
+        record.push(RECORD_PENDING_WILL);
+        record.extend_from_slice(&(payload.len() as u32).to_be_bytes());
+        record.extend_from_slice(&payload);
+        record.extend_from_slice(&Sha256::digest(&payload));
+        let mut stream_hash = Sha256::new();
+        stream_hash.update(&header);
+        stream_hash.update(&record);
+        let mut image = header.clone();
+        image.extend_from_slice(&Sha256::digest(&header));
+        image.extend_from_slice(&record);
+        image.extend_from_slice(RECOVERY_TRAILER_MAGIC);
+        image.extend_from_slice(&1_u64.to_be_bytes());
+        image.extend_from_slice(&(record.len() as u64).to_be_bytes());
+        image.extend_from_slice(&stream_hash.finalize());
+        let snapshot = decode_mqtt_recovery(&image, &limits).unwrap();
+        assert_eq!(snapshot.format_version, RECOVERY_VERSION_V5);
+        assert_eq!(snapshot.pending_wills.len(), 1);
+        assert_eq!(snapshot.pending_wills[0].origin, None);
+        MqttBroker::new(limits).restore(snapshot).unwrap();
+    }
+
+    #[test]
+    fn concurrent_generated_client_ids_are_unique() {
+        let broker = MqttBroker::new(Arc::new(Limits::default()));
+        let identity = auth("generated-concurrent");
+        std::thread::scope(|scope| {
+            let handles = (0..16)
+                .map(|_| {
+                    let broker = broker.clone();
+                    let identity = &identity;
+                    scope.spawn(move || {
+                        broker
+                            .attach_generated_v5(identity, 60, 4, &|_| Ok(()))
+                            .unwrap()
+                    })
+                })
+                .collect::<Vec<_>>();
+            let mut attachments = handles
+                .into_iter()
+                .map(|handle| handle.join().unwrap())
+                .collect::<Vec<_>>();
+            let ids = attachments
+                .iter()
+                .map(|attachment| attachment.key.client_id.clone())
+                .collect::<std::collections::HashSet<_>>();
+            assert_eq!(ids.len(), attachments.len());
+            for attachment in &mut attachments {
+                attachment.detach().unwrap();
+            }
+        });
+    }
+
+    #[test]
+    fn qos2_retransmission_charges_only_the_new_connection_window() {
+        let limits = Limits {
+            max_inflight_qos1_per_session: 2,
+            max_inflight_qos2_per_session: 2,
+            ..Default::default()
+        };
+        let broker = MqttBroker::new(Arc::new(limits));
+        let identity = auth("window-retransmit");
+        let mut old = broker
+            .attach_v5(&identity, "client".into(), false, 60, 4)
+            .unwrap();
+        let message = BrokerMessage {
+            topic: "v1/t/t/p/p/d/window-retransmit/up".into(),
+            payload: b"original".to_vec(),
+            qos: 2,
+            retain: false,
+            properties: Default::default(),
+        };
+        for id in 1..=2 {
+            broker
+                .inbound_qos2(&old.key, old.generation, id, message.clone())
+                .unwrap();
+        }
+        old.detach().unwrap();
+        let mut resumed = broker
+            .attach_v5(&identity, "client".into(), false, 60, 4)
+            .unwrap();
+        assert!(
+            broker
+                .inbound_receive_available(&resumed.key, resumed.generation, 1, 3)
+                .unwrap()
+        );
+        for id in 1..=2 {
+            assert!(
+                broker
+                    .begin_inbound_qos2_retransmission(&resumed.key, resumed.generation, id)
+                    .unwrap()
+            );
+            assert!(
+                broker
+                    .begin_inbound_qos2_retransmission(&resumed.key, resumed.generation, id)
+                    .unwrap()
+            );
+        }
+        assert!(
+            !broker
+                .inbound_receive_available(&resumed.key, resumed.generation, 1, 3)
+                .unwrap()
+        );
+        broker
+            .finish_inbound_pubcomp(&resumed.key, resumed.generation, 1)
+            .unwrap();
+        assert!(
+            broker
+                .inbound_receive_available(&resumed.key, resumed.generation, 1, 3)
+                .unwrap()
+        );
+        assert!(matches!(
+            broker.classify_inbound_qos2_publish(&resumed.key, resumed.generation, 1),
+            Ok(InboundQos2PublishState::ExistingTransaction)
+        ));
+        resumed.detach().unwrap();
     }
 
     #[test]
@@ -7944,6 +8268,81 @@ mod tests {
         a.detach().unwrap();
         b.detach().unwrap();
         c.detach().unwrap();
+    }
+
+    #[test]
+    fn will_origin_filters_no_local_after_takeover_without_suppressing_other_subscribers() {
+        let broker = MqttBroker::new(Arc::new(Limits::default()));
+        let identity = auth("will-origin");
+        let topic = "v1/t/t/p/p/d/will-origin/up";
+        let mut old = broker
+            .attach_v5(&identity, "client".into(), false, 60, 4)
+            .unwrap();
+        let mut observer = broker
+            .attach_v5(&identity, "observer".into(), false, 60, 4)
+            .unwrap();
+        let options = v5::SubscriptionOptions {
+            qos: 1,
+            no_local: true,
+            retain_as_published: false,
+            retain_handling: 0,
+        };
+        broker
+            .subscribe_v5(&old.key, old.generation, topic, options)
+            .unwrap();
+        broker
+            .subscribe_v5(&observer.key, observer.generation, topic, options)
+            .unwrap();
+        let mut will = broker
+            .reserve_will_for_session(
+                old.key.clone(),
+                BrokerMessage {
+                    topic: topic.into(),
+                    payload: b"will".to_vec(),
+                    qos: 1,
+                    retain: true,
+                    properties: Default::default(),
+                },
+            )
+            .unwrap();
+        will.arm_v5(
+            old.key.clone(),
+            old.session_incarnation,
+            old.generation,
+            0,
+            60,
+            None,
+        );
+        let mut resumed = broker
+            .attach_v5(&identity, "client".into(), false, 60, 4)
+            .unwrap();
+        old.detach().unwrap();
+        assert!(will.publish_v5().unwrap().is_some());
+        assert!(resumed.receiver.try_recv().is_err());
+        let BrokerFrame::Publish(delivery) = observer.receiver.try_recv().unwrap() else {
+            panic!("other subscriber must receive the Will")
+        };
+        assert_eq!(delivery.message.payload, b"will");
+        assert_eq!(
+            broker
+                .state
+                .lock()
+                .unwrap()
+                .retained
+                .get(topic)
+                .unwrap()
+                .origin,
+            Some(resumed.key.clone())
+        );
+        broker
+            .puback(
+                &observer.key,
+                observer.generation,
+                delivery.packet_id.unwrap(),
+            )
+            .unwrap();
+        resumed.detach().unwrap();
+        observer.detach().unwrap();
     }
     #[test]
     fn wildcard_trie_and_dollar_rules() {
@@ -9692,6 +10091,7 @@ mod tests {
         let mut invalid = base.clone();
         invalid.pending_wills.push(PendingWill {
             owner: device.device_key.clone(),
+            origin: None,
             message: BrokerMessage {
                 topic: "v1/t/t/p/p/d/other/up".into(),
                 payload: b"foreign-will".to_vec(),
@@ -10109,3 +10509,7 @@ mod tests {
         fs::remove_dir_all(directory).unwrap();
     }
 }
+
+#[cfg(test)]
+#[path = "broker_hotspot_bench.rs"]
+mod hotspot_bench;

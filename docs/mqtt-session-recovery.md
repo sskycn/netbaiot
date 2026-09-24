@@ -20,7 +20,7 @@ tenant count/byte ceilings always providing a hard bound.
 
 ## Snapshot contents
 
-`mqtt-runtime.state` contains one compact NBMQ v5 record stream with:
+`mqtt-runtime.state` contains one compact NBMQ v6 record stream with:
 
 - format version and snapshot/broker generation;
 - persistent SessionKey and last-seen time;
@@ -33,7 +33,7 @@ tenant count/byte ceilings always providing a hard bound.
 - next packet identifier;
 - retained topic/payload/QoS/owner and publisher session origin;
 - bounded pending Will responsibilities, including MQTT 5 delay deadline,
-  cancellation identity, and message expiry interval;
+  cancellation identity, message expiry interval, and original publisher SessionKey;
 - protocol version, MQTT 5 session expiry, and bounded publish properties.
 
 Will begins as a bounded responsibility reserved at successful CONNECT. MQTT 5 DISCONNECT reason 0x00 suppresses it. Every other connection end transfers it to broker-owned
@@ -46,7 +46,7 @@ is no retry task or busy loop. Pending state is included in planned restart reco
 New wire files are:
 
 ```text
-NBMQ | version=4 | generation | header SHA-256
+NBMQ | version=6 | generation | header SHA-256
 record type | checked length | binary payload | record SHA-256
 NEND | record count | total record bytes | whole-stream SHA-256
 ```
@@ -54,9 +54,9 @@ NEND | record count | total record bytes | whole-stream SHA-256
 Shutdown stops listeners, closes owners, waits for detach, then streams one coherent
 lock-held view to a private temporary file, fsyncs it, atomically renames it, and
 fsyncs the directory. The encoder allocates at most one bounded record, hashes
-incrementally, and keeps binary payloads raw. The decoder reads v4/v5 incrementally and
+incrementally, and keeps binary payloads raw. The decoder reads v4/v5/v6 incrementally and
 retains read compatibility with NBMQ v2 records and the legacy NBMQ v1 JSON envelope.
-v1 uses the immediately previous release's 1,342,177,280-byte read ceiling; v2/v3/v4/v5
+v1 uses the immediately previous release's 1,342,177,280-byte read ceiling; v2/v3/v4/v5/v6
 use the compact configured ceiling. File and record limits are checked before
 allocation. Restore recomputes logical counters and rejects impossible QoS/topic/
 packet-ID/order/authorization/codec/ownership state instead of trusting serialized

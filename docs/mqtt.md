@@ -147,15 +147,16 @@ and operation token. Reconnect under changed authorization resets the old sessio
 and returns Session Present=0. Management invalidation removes matching persistent
 state in the same bounded control operation.
 
-Planned restart writes compact NBMQ v5 records incrementally, with a checksummed
+Planned restart writes compact NBMQ v6 records incrementally, with a checksummed
 header, a length/checksum on every bounded record, and an authenticated whole-image
 trailer containing the authoritative record count, byte count, and SHA-256 digest.
-v5 records include protocol version, MQTT 5 session expiry, subscription options,
+v6 records include protocol version, MQTT 5 session expiry, subscription options,
 message properties/expiry, outbound transfer start state, retained origin, and
-delayed Will deadline/cancellation state.
+delayed Will deadline/cancellation state. Pending Wills also retain the original
+publisher SessionKey for No Local filtering, independently of cancellation state.
 Payload bytes remain binary; there is no complete snapshot clone or whole-image
 serialization buffer. NBMQ v1 and v2 images remain readable under version-specific
-ceilings; NBMQ v3 and v4 are also readable, while all new writes use v5. Legacy sessions that lack complete
+ceilings; NBMQ v3, v4, and v5 are also readable, while all new writes use v6. Legacy sessions that lack complete
 authorization/codec provenance are never exposed through the subscription index and
 reset safely on attach. The file uses restrictive permissions, file fsync, atomic
 rename, and directory fsync.

@@ -149,13 +149,10 @@ impl JsonV1 {
             DeviceEventKind::CommandAck(a) => a.execution != ExecutionState::Unknown,
         }
     }
-}
-impl DeviceCodec for JsonV1 {
-    fn decode(
+    fn parse_payload(
         &self,
-        ctx: &DecodeContext<'_>,
         payload: &[u8],
-    ) -> Result<Vec<netbaiot_core::DeviceEvent>, CodecError> {
+    ) -> Result<(SourceMessageId, Option<Timestamp>, DeviceEventKind), CodecError> {
         if payload.len() > self.limits.input_bytes
             || payload.len() > self.limits.decoded_bytes
             || self.limits.output_messages == 0
@@ -187,13 +184,32 @@ impl DeviceCodec for JsonV1 {
         {
             return Err(CodecError);
         }
+        Ok((wire.source_message_id, wire.occurred_at, decoded))
+    }
+}
+impl DeviceCodec for JsonV1 {
+    fn validate_payload(
+        &self,
+        _ctx: &DecodeContext<'_>,
+        payload: &[u8],
+    ) -> Result<Vec<DeviceEventKind>, CodecError> {
+        let (_, _, kind) = self.parse_payload(payload)?;
+        Ok(vec![kind])
+    }
+
+    fn decode(
+        &self,
+        ctx: &DecodeContext<'_>,
+        payload: &[u8],
+    ) -> Result<Vec<netbaiot_core::DeviceEvent>, CodecError> {
+        let (source_message_id, occurred_at, kind) = self.parse_payload(payload)?;
         Ok(vec![netbaiot_core::DeviceEvent {
             event_id: EventId::generate(),
-            source_message_id: wire.source_message_id,
+            source_message_id,
             device: ctx.device.clone(),
             received_at: ctx.received_at,
-            occurred_at: wire.occurred_at,
-            kind: decoded,
+            occurred_at,
+            kind,
         }])
     }
     fn encode(
