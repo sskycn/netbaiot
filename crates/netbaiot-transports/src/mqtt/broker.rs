@@ -223,26 +223,6 @@ impl BrokerMessage {
             .expires_at_ms
             .is_some_and(|expires| expires <= now)
     }
-
-    fn same_inbound_retransmission(&self, other: &Self, version: MqttVersion) -> bool {
-        if self == other {
-            return true;
-        }
-        // MQTT 5 retransmits the original Message Expiry Interval. The absolute
-        // deadline is calculated on receipt, so it naturally differs on a later
-        // duplicate. Keep the first deadline; a duplicate cannot extend it.
-        version == MqttVersion::V5
-            && self.topic == other.topic
-            && self.payload == other.payload
-            && self.qos == other.qos
-            && self.retain == other.retain
-            && self.properties.payload_format == other.properties.payload_format
-            && self.properties.expires_at_ms.is_some() == other.properties.expires_at_ms.is_some()
-            && self.properties.content_type == other.properties.content_type
-            && self.properties.response_topic == other.properties.response_topic
-            && self.properties.correlation_data == other.properties.correlation_data
-            && self.properties.user_properties == other.properties.user_properties
-    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -787,9 +767,6 @@ impl WillGuard {
             &message,
             self.reservation,
             self.message_expiry_interval,
-            self.delay
-                .as_ref()
-                .map(|(_, _, key, incarnation, generation)| (key, *incarnation, *generation)),
         );
         self.finished = true;
         Ok(result?.map(|_| message))
@@ -1440,23 +1417,10 @@ impl MqttBroker {
         message: &BrokerMessage,
         reservation: RetainedReservation,
         message_expiry_interval: Option<u32>,
-        continuation: Option<(&SessionKey, u64, u64)>,
     ) -> Result<Option<usize>> {
         let mut state = lock(&self.state)?;
-        if let Some((key, incarnation, old_generation)) = continuation
-            && state
-                .sessions
-                .get(key)
-                .is_some_and(|session| session.incarnation == incarnation)
-            && state
-                .active
-                .get(key)
-                .is_some_and(|active| active.generation != old_generation)
-        {
-            release_retained_reservation(&mut state, &owner.tenant_id, reservation);
-            release_will_capacity(&mut state, &owner.tenant_id, message.bytes());
-            return Ok(None);
-        }
+        // Only a Will in the delayed cancellation window may be suppressed by a
+        // resumed Session. An immediate Will belongs to the closing connection.
         if reservation != RetainedReservation::default() {
             release_retained_reservation(&mut state, &owner.tenant_id, reservation);
         }
@@ -1554,7 +1518,7 @@ impl MqttBroker {
         packet_id: u16,
         message: BrokerMessage,
     ) -> Result<bool> {
-        if !valid_broker_message(&message, &self.limits) || message.qos != 2 {
+        if message.qos != 2 {
             return Err(Error::Invalid);
         }
         let mut state = lock(&self.state)?;
@@ -1562,18 +1526,26 @@ impl MqttBroker {
         let session_state_bytes = {
             let session = state.sessions.get(key).ok_or(Error::Internal)?;
             if let Some(existing) = session.inbound_qos2.get(&packet_id) {
+                if session.version == MqttVersion::V5 {
+                    // The accepted Packet Identifier owns the original message until
+                    // PUBREL. Repeated PUBLISH contents and DUP do not replace it.
+                    return Ok(false);
+                }
                 return match existing {
                     InboundQos2State::AwaitPubrel(existing)
                     | InboundQos2State::Delivering {
                         message: existing, ..
                     }
                     | InboundQos2State::EventAccepted(existing)
-                        if existing.same_inbound_retransmission(&message, session.version) =>
+                        if existing == &message =>
                     {
                         Ok(false)
                     }
                     _ => Err(Error::Invalid),
                 };
+            }
+            if !valid_broker_message(&message, &self.limits) {
+                return Err(Error::Invalid);
             }
             if session.inbound_qos2.len()
                 + session
@@ -5205,7 +5177,7 @@ mod tests {
     }
 
     #[test]
-    fn v5_takeover_only_cancels_will_when_session_continues() {
+    fn takeover_same_session_positive_delay_suppresses_will() {
         let broker = MqttBroker::new(Arc::new(Limits::default()));
         let device = auth("will-takeover");
         let topic = "v1/t/t/p/p/d/will-takeover/up";
@@ -5240,7 +5212,17 @@ mod tests {
         assert!(will.publish_v5().unwrap().is_none());
         assert_eq!(broker.pending_will_count().unwrap(), 0);
         assert!(!broker.has_retained_topic(topic).unwrap());
+        resumed.detach().unwrap();
+    }
 
+    #[test]
+    fn takeover_clean_start_publishes_old_will() {
+        let broker = MqttBroker::new(Arc::new(Limits::default()));
+        let device = auth("will-clean-takeover");
+        let topic = "v1/t/t/p/p/d/will-clean-takeover/up";
+        let mut resumed = broker
+            .attach_v5(&device, "client".into(), false, 60, 4)
+            .unwrap();
         let mut will = broker
             .reserve_will(
                 device.device_key.clone(),
@@ -5272,7 +5254,7 @@ mod tests {
     }
 
     #[test]
-    fn zero_delay_will_is_suppressed_only_for_continuing_session() {
+    fn takeover_same_session_zero_delay_publishes_will() {
         let broker = MqttBroker::new(Arc::new(Limits::default()));
         let device = auth("immediate-will-takeover");
         let topic = "v1/t/t/p/p/d/immediate-will-takeover/up";
@@ -5303,8 +5285,19 @@ mod tests {
             .attach_v5(&device, "client".into(), false, 60, 4)
             .unwrap();
         old.detach().unwrap();
-        assert!(will.publish_v5().unwrap().is_none());
-        assert!(!broker.has_retained_topic(topic).unwrap());
+        assert!(will.publish_v5().unwrap().is_some());
+        assert!(broker.has_retained_topic(topic).unwrap());
+        resumed.detach().unwrap();
+    }
+
+    #[test]
+    fn takeover_clean_start_zero_delay_publishes_old_will() {
+        let broker = MqttBroker::new(Arc::new(Limits::default()));
+        let device = auth("immediate-will-takeover");
+        let topic = "v1/t/t/p/p/d/immediate-will-takeover/up";
+        let mut resumed = broker
+            .attach_v5(&device, "client".into(), false, 60, 4)
+            .unwrap();
         let mut will = broker
             .reserve_will(
                 device.device_key.clone(),
@@ -5693,28 +5686,179 @@ mod tests {
         assert_eq!(stored.0.properties.expires_at_ms, Some(deadline));
         let accounting = transaction_accounting(&broker, &attachment.key);
         retransmit.payload = b"different".to_vec();
-        assert!(matches!(
-            broker.inbound_qos2(
-                &attachment.key,
-                attachment.generation,
-                7,
-                retransmit.clone()
-            ),
-            Err(Error::Invalid)
-        ));
+        assert!(
+            !broker
+                .inbound_qos2(
+                    &attachment.key,
+                    attachment.generation,
+                    7,
+                    retransmit.clone()
+                )
+                .unwrap()
+        );
         retransmit = message.clone();
-        retransmit.topic.push_str("/changed");
-        assert!(matches!(
-            broker.inbound_qos2(&attachment.key, attachment.generation, 7, retransmit),
-            Err(Error::Invalid)
-        ));
+        retransmit.topic = "v1/t/t/p/p/d/qos2-expiry/down".into();
+        assert!(
+            !broker
+                .inbound_qos2(&attachment.key, attachment.generation, 7, retransmit)
+                .unwrap()
+        );
         retransmit = message.clone();
         retransmit.properties.content_type = Some("other".into());
-        assert!(matches!(
-            broker.inbound_qos2(&attachment.key, attachment.generation, 7, retransmit),
-            Err(Error::Invalid)
-        ));
+        assert!(
+            !broker
+                .inbound_qos2(&attachment.key, attachment.generation, 7, retransmit)
+                .unwrap()
+        );
         assert_eq!(transaction_accounting(&broker, &attachment.key), accounting);
+        attachment.detach().unwrap();
+    }
+
+    fn qos2_duplicate_case() -> (Arc<MqttBroker>, Attachment, BrokerMessage) {
+        let broker = MqttBroker::new(Arc::new(Limits::default()));
+        let device = auth("qos2-duplicate");
+        let attachment = broker
+            .attach_v5(&device, "client".into(), false, 60, 2)
+            .unwrap();
+        let message = BrokerMessage {
+            topic: "v1/t/t/p/p/d/qos2-duplicate/up".into(),
+            payload: b"original".to_vec(),
+            qos: 2,
+            retain: true,
+            properties: Default::default(),
+        };
+        assert!(
+            broker
+                .inbound_qos2(&attachment.key, attachment.generation, 7, message.clone())
+                .unwrap()
+        );
+        (broker, attachment, message)
+    }
+
+    #[test]
+    fn inbound_qos2_repeated_publish_before_pubrel_repeats_pubrec() {
+        let (broker, mut attachment, message) = qos2_duplicate_case();
+        assert!(
+            !broker
+                .inbound_qos2(&attachment.key, attachment.generation, 7, message)
+                .unwrap()
+        );
+        assert!(matches!(
+            broker.begin_inbound_qos2_delivery(&attachment.key, attachment.generation, 7),
+            Ok(InboundQos2Action::Deliver { .. })
+        ));
+        attachment.detach().unwrap();
+    }
+
+    #[test]
+    fn inbound_qos2_repeated_publish_does_not_redeliver() {
+        let (broker, mut attachment, message) = qos2_duplicate_case();
+        let InboundQos2Action::Deliver {
+            session_incarnation,
+            operation_id,
+            ..
+        } = broker
+            .begin_inbound_qos2_delivery(&attachment.key, attachment.generation, 7)
+            .unwrap()
+        else {
+            panic!("original must be delivered")
+        };
+        broker
+            .finish_inbound_qos2_delivery(&attachment.key, session_incarnation, 7, operation_id)
+            .unwrap();
+        assert!(
+            !broker
+                .inbound_qos2(&attachment.key, attachment.generation, 7, message)
+                .unwrap()
+        );
+        assert!(matches!(
+            broker.begin_inbound_qos2_delivery(&attachment.key, attachment.generation, 7),
+            Ok(InboundQos2Action::EventAccepted { .. })
+        ));
+        attachment.detach().unwrap();
+    }
+
+    #[test]
+    fn inbound_qos2_repeated_publish_does_not_change_accounting() {
+        let (broker, mut attachment, mut message) = qos2_duplicate_case();
+        let before = transaction_accounting(&broker, &attachment.key);
+        message.payload = b"different-and-larger".to_vec();
+        message.retain = false;
+        assert!(
+            !broker
+                .inbound_qos2(&attachment.key, attachment.generation, 7, message)
+                .unwrap()
+        );
+        assert_eq!(transaction_accounting(&broker, &attachment.key), before);
+        attachment.detach().unwrap();
+    }
+
+    #[test]
+    fn inbound_qos2_dup_flag_does_not_create_second_transaction() {
+        let (broker, mut attachment, mut message) = qos2_duplicate_case();
+        // The connection supplies identical broker state transitions for both wire DUP values.
+        for _dup in [false, true] {
+            message.payload.push(b'x');
+            assert!(
+                !broker
+                    .inbound_qos2(&attachment.key, attachment.generation, 7, message.clone())
+                    .unwrap()
+            );
+        }
+        assert_eq!(
+            transaction_accounting(&broker, &attachment.key).inbound_qos2_count,
+            1
+        );
+        attachment.detach().unwrap();
+    }
+
+    #[test]
+    fn inbound_qos2_original_message_remains_authoritative_until_pubrel() {
+        let (broker, mut attachment, message) = qos2_duplicate_case();
+        let mut changed = message.clone();
+        changed.payload = b"replacement".to_vec();
+        changed.properties.content_type = Some("changed".into());
+        assert!(
+            !broker
+                .inbound_qos2(&attachment.key, attachment.generation, 7, changed)
+                .unwrap()
+        );
+        let InboundQos2Action::Deliver {
+            message: delivered, ..
+        } = broker
+            .begin_inbound_qos2_delivery(&attachment.key, attachment.generation, 7)
+            .unwrap()
+        else {
+            panic!("original must be delivered")
+        };
+        assert_eq!(delivered, message);
+        attachment.detach().unwrap();
+    }
+
+    #[test]
+    fn inbound_qos2_pubcomp_releases_identifier_for_new_message() {
+        let (broker, mut attachment, message) = qos2_duplicate_case();
+        broker
+            .complete_inbound_qos2(&attachment.key, attachment.generation, 7)
+            .unwrap();
+        broker
+            .finish_inbound_pubcomp(&attachment.key, attachment.generation, 7)
+            .unwrap();
+        let mut next = message;
+        next.payload = b"next".to_vec();
+        assert!(
+            broker
+                .inbound_qos2(&attachment.key, attachment.generation, 7, next.clone())
+                .unwrap()
+        );
+        assert_eq!(
+            broker
+                .inbound_qos2_message(&attachment.key, attachment.generation, 7)
+                .unwrap()
+                .unwrap()
+                .0,
+            next
+        );
         attachment.detach().unwrap();
     }
 
@@ -6235,6 +6379,8 @@ mod tests {
         retained_reserved_count: usize,
         retained_reserved_bytes: usize,
         inbound_qos2_count: usize,
+        inbound_window_count: usize,
+        tenant_qos2_inflight: usize,
         outbound_order: VecDeque<u16>,
         outbound: HashMap<u16, OutboundState>,
     }
@@ -6250,6 +6396,8 @@ mod tests {
             retained_reserved_count: state.retained_reserved_count,
             retained_reserved_bytes: state.retained_reserved_bytes,
             inbound_qos2_count: session.inbound_qos2.len(),
+            inbound_window_count: session.inbound_window.len(),
+            tenant_qos2_inflight: tenant_inflight(&state, &key.device.tenant_id, 2),
             outbound_order: session.outbound_order.clone(),
             outbound: session.outbound.clone(),
         }
