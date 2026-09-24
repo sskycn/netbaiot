@@ -16,11 +16,11 @@ fuzz_target!(|data: &[u8]| {
         let broker = MqttBroker::new(limits);
         let _ = broker.restore(snapshot);
     }
-    // Reach both v3 and v4 record decoders behind valid framing and whole-image integrity.
+    // Reach historical and current record decoders behind valid framing and integrity.
     let kind = data.first().copied().unwrap_or(1);
     let payload = data.get(1..).unwrap_or_default();
     let limits = Limits::default();
-    for version in [3u32, 4] {
+    for version in [3u32, 4, 5, 6] {
         let mut header = Vec::with_capacity(16);
         header.extend_from_slice(b"NBMQ");
         header.extend_from_slice(&version.to_be_bytes());

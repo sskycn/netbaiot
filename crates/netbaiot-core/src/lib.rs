@@ -75,6 +75,24 @@ pub struct EncodeContext<'a> {
 pub struct CodecError;
 
 pub trait DeviceCodec: Send + Sync {
+    /// Deterministic payload check before a transport accepts QoS 2 ownership.
+    /// Implementations can override this to avoid creating an unaccepted event.
+    fn validate_payload(
+        &self,
+        ctx: &DecodeContext<'_>,
+        payload: &[u8],
+    ) -> Result<Vec<DeviceEventKind>, CodecError> {
+        self.decode(ctx, payload)?
+            .into_iter()
+            .map(|event| {
+                if &event.device != ctx.device {
+                    return Err(CodecError);
+                }
+                Ok(event.kind)
+            })
+            .collect()
+    }
+
     fn decode(
         &self,
         ctx: &DecodeContext<'_>,

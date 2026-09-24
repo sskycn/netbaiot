@@ -73,28 +73,42 @@ async fn send(stream: &mut BoxStream, services: &Services, bytes: &[u8]) -> Resu
 async fn send_broker_frame(
     stream: &mut BoxStream,
     services: &Services,
+    key: &broker::SessionKey,
+    generation: u64,
     frame: BrokerFrame,
 ) -> Result<()> {
-    if let BrokerFrame::Publish(delivery) = &frame
-        && delivery.message.expired(now_ms())
-    {
-        return Ok(());
+    let mut pending = Some(frame);
+    while let Some(frame) = pending.take() {
+        let bytes = match frame {
+            BrokerFrame::Publish(delivery) => {
+                if delivery.packet_id.is_none() && delivery.message.expired(now_ms()) {
+                    return Ok(());
+                }
+                let bytes = publish(
+                    &delivery.message.topic,
+                    &delivery.message.payload,
+                    delivery.message.qos,
+                    delivery.packet_id,
+                    delivery.message.retain,
+                    delivery.dup,
+                    &services.ingress.limits,
+                )?;
+                if delivery.packet_id.is_some()
+                    && !services
+                        .mqtt
+                        .begin_outbound_transfer(key, generation, &delivery)?
+                {
+                    pending = services.mqtt.next_offline(key, generation)?;
+                    continue;
+                }
+                bytes
+            }
+            // PUBREL's MQTT 3.1.1 fixed-header flags are always 0010.
+            BrokerFrame::Pubrel { packet_id, dup: _ } => ack(0x62, packet_id),
+        };
+        send(stream, services, &bytes).await?;
     }
-    let bytes = match frame {
-        BrokerFrame::Publish(delivery) => publish(
-            &delivery.message.topic,
-            &delivery.message.payload,
-            delivery.message.qos,
-            delivery.packet_id,
-            delivery.message.retain,
-            delivery.dup,
-            &services.ingress.limits,
-        )?,
-        // PUBREL's MQTT 3.1.1 fixed-header flags are always 0010. Retransmission
-        // is represented in broker state, not by setting a reserved header bit.
-        BrokerFrame::Pubrel { packet_id, dup: _ } => ack(0x62, packet_id),
-    };
-    send(stream, services, &bytes).await
+    Ok(())
 }
 
 async fn accept_iot_publish(
@@ -246,24 +260,27 @@ pub async fn connection(
     let requested_client_id = connect.client_id.clone();
     let clean_session = connect.clean_session;
     let mqtt = services.mqtt.clone();
-    let (live_session, mut commands, (mut attachment, client_id)) = services
-        .ingress
-        .register_session_with(candidate, Transport::Mqtt, move |bound_auth, generation| {
-            let client_id = if requested_client_id.is_empty() {
-                format!("generated-{generation}")
-            } else {
-                requested_client_id
-            };
-            let attachment = mqtt.attach(bound_auth, client_id.clone(), clean_session)?;
-            Ok((attachment, client_id))
-        })?;
+    let (live_session, mut commands, (mut attachment, client_id)) =
+        services.ingress.register_session_with(
+            candidate,
+            Transport::Mqtt,
+            move |bound_auth, _generation| {
+                let attachment = if requested_client_id.is_empty() {
+                    mqtt.attach_generated(bound_auth)?
+                } else {
+                    mqtt.attach(bound_auth, requested_client_id, clean_session)?
+                };
+                let client_id = attachment.key.client_id.clone();
+                Ok((attachment, client_id))
+            },
+        )?;
     connect.client_id = client_id;
     let mut will_guard = connect
         .will
         .take()
         .map(|will| {
-            services.mqtt.reserve_will(
-                auth.device_key.clone(),
+            services.mqtt.reserve_will_for_session(
+                attachment.key.clone(),
                 BrokerMessage {
                     topic: will.topic,
                     payload: will.payload.to_vec(),
@@ -325,7 +342,7 @@ pub async fn connection(
                 }
                 frame = attachment.receiver.recv() => {
                     let Some(frame) = frame else { break };
-                    send_broker_frame(&mut stream, &services, frame).await?;
+                    send_broker_frame(&mut stream, &services, &attachment.key, attachment.generation, frame).await?;
                 }
                 packet = next(&mut reader, &mut stream, limits, idle) => {
                     let (packet, validation_us, validated_at) = packet?;
@@ -363,17 +380,17 @@ pub async fn connection(
                             services.router.transport_state(DeliveryState::Received);
                             services.ingress.metrics.inc(Metric::MqttPubacks);
                             if let Some(frame) = services.mqtt.next_offline(&attachment.key, attachment.generation)? {
-                                send_broker_frame(&mut stream, &services, frame).await?;
+                                send_broker_frame(&mut stream, &services, &attachment.key, attachment.generation, frame).await?;
                             }
                         }
                         Packet::Pubrec(id) => {
                             let frame = services.mqtt.pubrec(&attachment.key, attachment.generation, id)?;
-                            send_broker_frame(&mut stream, &services, frame).await?;
+                            send_broker_frame(&mut stream, &services, &attachment.key, attachment.generation, frame).await?;
                         }
                         Packet::Pubcomp(id) => {
                             services.mqtt.pubcomp(&attachment.key, attachment.generation, id)?;
                             if let Some(frame) = services.mqtt.next_offline(&attachment.key, attachment.generation)? {
-                                send_broker_frame(&mut stream, &services, frame).await?;
+                                send_broker_frame(&mut stream, &services, &attachment.key, attachment.generation, frame).await?;
                             }
                         }
                         Packet::Pubrel(id) => {
@@ -435,14 +452,28 @@ pub async fn connection(
                         }
                         Packet::Publish { topic, payload, qos, packet_id, retain, dup: _ } => {
                             services.ingress.metrics.inc(Metric::MqttPublishes);
+                            if qos == 2 {
+                                let id = packet_id.ok_or(Error::Invalid)?;
+                                match services.mqtt.classify_inbound_qos2_publish(
+                                    &attachment.key, attachment.generation, id)? {
+                                    broker::InboundQos2PublishState::ExistingTransaction => {
+                                        send(&mut stream, &services, &ack(0x50, id)).await?;
+                                        continue;
+                                    }
+                                    broker::InboundQos2PublishState::IdentifierInUse => return Err(Error::Invalid),
+                                    broker::InboundQos2PublishState::NeedsNewMessageAdmission => {}
+                                }
+                            }
                             let message = BrokerMessage { topic, payload: payload.to_vec(), qos, retain,
     properties: Default::default(),
 };
                             // QoS2 acknowledges ownership with PUBREC, so authorization must be
                             // complete before storing the transaction or reserving retained state.
-                            publish_acl(&auth, &message.topic)?;
+                            let kind = publish_acl(&auth, &message.topic)?;
                             if qos == 2 {
                                 let id = packet_id.ok_or(Error::Invalid)?;
+                                services.ingress.validate_mqtt_qos2_payload(
+                                    &auth, &message.payload, kind == TopicKind::DownAck)?;
                                 services.mqtt.inbound_qos2(&attachment.key, attachment.generation, id, message)?;
                                 send(&mut stream, &services, &ack(0x50, id)).await?;
                             } else {

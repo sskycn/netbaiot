@@ -12,6 +12,7 @@ on:
       - "crates/netbaiot-device-sdk/**"
       - "crates/netbaiot-runtime/**"
       - "tests/mqtt_conformance/**"
+      - "tests/mqtt_protocol_regressions.py"
       - "tests/mosquitto_cli_interop.py"
       - "tests/run_mosquitto_cli_interop.py"
       - "tests/run_mosquitto_tls_interop.py"
@@ -35,6 +36,20 @@ jobs:
           mosquitto -h 2>&1 | head -1
           mosquitto_pub --help 2>&1 | head -2
           mosquitto_sub --help 2>&1 | head -2
+      - name: Build server for protocol regressions
+        run: cargo build --locked -p netbaiot-server
+      - name: Run MQTT protocol regressions
+        run: >-
+          python3 tests/mqtt_protocol_regressions.py
+          --repo .
+          --output target/mqtt-audit/ci.json
+      - name: Retain protocol regression evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mqtt-protocol-regressions
+          path: target/mqtt-audit/ci.json
+          if-no-files-found: warn
       - name: Run complete MQTT release gate
         run: >-
           python3 scripts/ci_annotate.py

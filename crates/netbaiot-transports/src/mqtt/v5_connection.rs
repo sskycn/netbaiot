@@ -113,14 +113,6 @@ async fn send_frame(
                 if delivery.packet_id.is_none() && delivery.message.expired(now_ms()) {
                     return Ok(());
                 }
-                if delivery.packet_id.is_some()
-                    && !services
-                        .mqtt
-                        .begin_outbound_transfer(key, generation, &delivery)?
-                {
-                    pending = services.mqtt.next_offline(key, generation)?;
-                    continue;
-                }
                 let properties = &delivery.message.properties;
                 let mut wire = v5::Properties {
                     payload_format: properties.payload_format,
@@ -150,7 +142,17 @@ async fn send_frame(
                     },
                     maximum.min(services.ingress.limits.max_mqtt_packet_size),
                 ) {
-                    Ok(bytes) => bytes,
+                    Ok(bytes) => {
+                        if delivery.packet_id.is_some()
+                            && !services
+                                .mqtt
+                                .begin_outbound_transfer(key, generation, &delivery)?
+                        {
+                            pending = services.mqtt.next_offline(key, generation)?;
+                            continue;
+                        }
+                        bytes
+                    }
                     Err(Error::Overloaded) => {
                         if delivery.packet_id.is_some() {
                             services.mqtt.discard_outbound(key, generation, &delivery)?;
@@ -305,30 +307,47 @@ pub(super) async fn connection(
     let session_expiry = connect.properties.session_expiry.unwrap_or(0);
     let client_receive_maximum = connect.properties.receive_maximum.unwrap_or(u16::MAX);
     let mqtt = services.mqtt.clone();
-    let (live_session, mut commands, (mut attachment, client_id)) = services
-        .ingress
-        .register_session_with(candidate, Transport::Mqtt, move |bound_auth, generation| {
-            let client_id = if requested_client_id.is_empty() {
-                format!("generated-{generation}")
-            } else {
-                requested_client_id
-            };
-            v5::connack(
-                false,
-                v5::ConnackReason::Success,
-                limits,
-                assigned.then_some(client_id.as_str()),
-                client_maximum,
-            )?;
-            let attachment = mqtt.attach_v5(
-                bound_auth,
-                client_id.clone(),
-                clean_start,
-                session_expiry,
-                client_receive_maximum,
-            )?;
-            Ok((attachment, client_id))
-        })?;
+    let (live_session, mut commands, (mut attachment, client_id)) =
+        services.ingress.register_session_with(
+            candidate,
+            Transport::Mqtt,
+            move |bound_auth, _generation| {
+                let attachment = if requested_client_id.is_empty() {
+                    mqtt.attach_generated_v5(
+                        bound_auth,
+                        session_expiry,
+                        client_receive_maximum,
+                        &|client_id| {
+                            v5::connack(
+                                false,
+                                v5::ConnackReason::Success,
+                                limits,
+                                Some(client_id),
+                                client_maximum,
+                            )
+                            .map(|_| ())
+                        },
+                    )?
+                } else {
+                    v5::connack(
+                        false,
+                        v5::ConnackReason::Success,
+                        limits,
+                        None,
+                        client_maximum,
+                    )?;
+                    mqtt.attach_v5(
+                        bound_auth,
+                        requested_client_id,
+                        clean_start,
+                        session_expiry,
+                        client_receive_maximum,
+                    )?
+                };
+                let client_id = attachment.key.client_id.clone();
+                Ok((attachment, client_id))
+            },
+        )?;
     connect.client_id = client_id.clone();
     let mut will_guard = connect
         .will
@@ -340,8 +359,8 @@ pub(super) async fn connection(
             // Keep the expiry metadata charged from CONNECT. The absolute deadline starts
             // only when the Will is published after its delay.
             properties.expires_at_ms = message_expiry.map(|_| i64::MAX);
-            let mut guard = services.mqtt.reserve_will(
-                auth.device_key.clone(),
+            let mut guard = services.mqtt.reserve_will_for_session(
+                attachment.key.clone(),
                 BrokerMessage {
                     topic: will.topic,
                     payload: will.payload.to_vec(),
@@ -523,11 +542,25 @@ pub(super) async fn connection(
                             services.ingress.metrics.inc(Metric::MqttPublishes);
                             if qos == 2 {
                                 let id = packet_id.ok_or(Error::Invalid)?;
-                                if authorize_inbound_qos2_publish(&services.mqtt, &auth, &attachment.key, attachment.generation, id, &topic)?
-                                    == broker::InboundQos2PublishState::ExistingTransaction {
-                                    let bytes = v5::ack(v5::AckReason::Pubrec(v5::PubrecReason::Success), id, limits.max_mqtt_packet_size)?;
-                                    send_v5(&mut stream, &services, &bytes, client_maximum, Some(&mut error_disconnect_sent)).await?;
-                                    continue;
+                                match authorize_inbound_qos2_publish(&services.mqtt, &auth, &attachment.key, attachment.generation, id, &topic)? {
+                                    broker::InboundQos2PublishState::ExistingTransaction => {
+                                        if !services.mqtt.begin_inbound_qos2_retransmission(
+                                            &attachment.key, attachment.generation, id)? {
+                                            fail_with_reason(&mut stream, &services, client_maximum,
+                                                &mut error_disconnect_sent,
+                                                v5::DisconnectReason::ReceiveMaximumExceeded,
+                                                Error::Overloaded).await?;
+                                        }
+                                        let bytes = v5::ack(v5::AckReason::Pubrec(v5::PubrecReason::Success), id, limits.max_mqtt_packet_size)?;
+                                        send_v5(&mut stream, &services, &bytes, client_maximum, Some(&mut error_disconnect_sent)).await?;
+                                        continue;
+                                    }
+                                    broker::InboundQos2PublishState::IdentifierInUse => {
+                                        let bytes = v5::ack(v5::AckReason::Pubrec(v5::PubrecReason::PacketIdentifierInUse), id, limits.max_mqtt_packet_size)?;
+                                        send_v5(&mut stream, &services, &bytes, client_maximum, Some(&mut error_disconnect_sent)).await?;
+                                        continue;
+                                    }
+                                    broker::InboundQos2PublishState::NeedsNewMessageAdmission => {}
                                 }
                             } else {
                                 publish_acl(&auth, &topic)?;
@@ -539,12 +572,25 @@ pub(super) async fn connection(
                             }
                             if qos == 2 {
                                 let id = packet_id.ok_or(Error::Invalid)?;
+                                if properties.payload_format == Some(1) && std::str::from_utf8(&payload).is_err() {
+                                    let bytes = v5::ack(v5::AckReason::Pubrec(v5::PubrecReason::PayloadFormatInvalid), id, limits.max_mqtt_packet_size)?;
+                                    send_v5(&mut stream, &services, &bytes, client_maximum, Some(&mut error_disconnect_sent)).await?;
+                                    continue;
+                                }
+                                let kind = publish_acl(&auth, &message.topic)?;
+                                if let Err(error) = services.ingress.validate_mqtt_qos2_payload(
+                                    &auth, &message.payload, kind == TopicKind::DownAck) {
+                                    if matches!(error, Error::Codec | Error::Invalid) {
+                                        let bytes = v5::ack(v5::AckReason::Pubrec(v5::PubrecReason::ImplementationSpecific), id, limits.max_mqtt_packet_size)?;
+                                        send_v5(&mut stream, &services, &bytes, client_maximum, Some(&mut error_disconnect_sent)).await?;
+                                        continue;
+                                    }
+                                    return Err(error);
+                                }
                                 match services.mqtt.inbound_qos2(&attachment.key, attachment.generation, id, message) {
                                     Ok(_) => {}
                                     Err(Error::Invalid) => {
-                                        let bytes = v5::ack(v5::AckReason::Pubrec(v5::PubrecReason::PacketIdentifierInUse), id, limits.max_mqtt_packet_size)?;
-                                        send_v5(&mut stream, &services, &bytes, client_maximum, Some(&mut error_disconnect_sent)).await?;
-                                        continue;
+                                        return Err(Error::Invalid);
                                     }
                                     Err(error) => return Err(error),
                                 }
@@ -675,7 +721,7 @@ mod tests {
                 7,
                 forbidden
             ),
-            Err(Error::Forbidden)
+            Ok(broker::InboundQos2PublishState::IdentifierInUse)
         ));
         mqtt.finish_inbound_qos2_delivery(&attachment.key, session_incarnation, 7, operation_id)
             .unwrap();

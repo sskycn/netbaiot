@@ -58,6 +58,41 @@ pub struct Ingress {
 }
 
 impl Ingress {
+    /// Check deterministic codec and authorization failures before MQTT QoS 2
+    /// transfers ownership. This does not reserve a sink or accept an event.
+    pub fn validate_mqtt_qos2_payload(
+        &self,
+        auth: &AuthenticatedDevice,
+        payload: &[u8],
+        require_command_ack: bool,
+    ) -> Result<()> {
+        if !auth.permissions.publish {
+            return Err(Error::Forbidden);
+        }
+        let kinds = self
+            .codecs
+            .get(auth)?
+            .validate_payload(
+                &DecodeContext {
+                    device: &auth.device_key,
+                    received_at: now_ms(),
+                },
+                payload,
+            )
+            .map_err(|_| Error::Codec)?;
+        if kinds.len() != 1 {
+            return Err(Error::Codec);
+        }
+        let kind = kinds.into_iter().next().ok_or(Error::Codec)?;
+        if require_command_ack && !matches!(kind, DeviceEventKind::CommandAck(_)) {
+            return Err(Error::Invalid);
+        }
+        if matches!(kind, DeviceEventKind::CommandAck(_)) && !auth.permissions.commands {
+            return Err(Error::Forbidden);
+        }
+        Ok(())
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         limits: Arc<Limits>,

@@ -74,7 +74,9 @@ pub enum PubackReason {
 #[repr(u8)]
 pub enum PubrecReason {
     Success = 0,
+    ImplementationSpecific = 0x83,
     PacketIdentifierInUse = 0x91,
+    PayloadFormatInvalid = 0x99,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u8)]
