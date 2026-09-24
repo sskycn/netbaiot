@@ -42,6 +42,20 @@ doc = false
 bench = false
 
 [[bin]]
+name = "mqtt_v5_packet"
+path = "fuzz_targets/mqtt_v5_packet.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "mqtt_v5_properties"
+path = "fuzz_targets/mqtt_v5_properties.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
 name = "mqtt_state"
 path = "fuzz_targets/mqtt_state.rs"
 test = false
