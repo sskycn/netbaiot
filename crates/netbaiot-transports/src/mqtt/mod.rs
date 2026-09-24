@@ -2,6 +2,7 @@ pub mod broker;
 pub mod codec;
 pub mod packet;
 pub mod topics;
+mod v5_connection;
 
 use crate::common::*;
 use broker::{BrokerFrame, BrokerMessage, InboundQos2Action, subscribe_acl};
@@ -74,6 +75,11 @@ async fn send_broker_frame(
     services: &Services,
     frame: BrokerFrame,
 ) -> Result<()> {
+    if let BrokerFrame::Publish(delivery) = &frame
+        && delivery.message.expired(now_ms())
+    {
+        return Ok(());
+    }
     let bytes = match frame {
         BrokerFrame::Publish(delivery) => publish(
             &delivery.message.topic,
@@ -122,6 +128,7 @@ async fn accept_iot_publish(
 async fn process_publish(
     services: &Services,
     auth: &AuthenticatedDevice,
+    origin: &broker::SessionKey,
     message: &BrokerMessage,
     validated_at: Instant,
     validation_us: u64,
@@ -132,7 +139,7 @@ async fn process_publish(
     // Broker-side retained/routing admission is the last fallible MQTT responsibility before the
     // unified event crosses EventAccepted. A later broker error must never turn an accepted QoS1
     // DeviceEvent into a producer-visible failure and retransmission.
-    services.mqtt.route(&auth.device_key, message.clone())?;
+    services.mqtt.route_from_session(origin, message.clone())?;
     let acceptance =
         accept_iot_publish(services, auth, message, validated_at, validation_us).await?;
     Ok(acceptance)
@@ -156,6 +163,25 @@ pub async fn connection(
     };
     machine.transition(ConnectionState::AwaitConnect)?;
     let mut reader = Reader::new(limits.max_mqtt_packet_size, limits.packet_read_timeout_ms);
+    loop {
+        if let Some((first, header, total)) =
+            codec::common::fixed_header(&reader.buffer, limits.max_mqtt_packet_size)?
+            && reader.buffer.len() >= total
+        {
+            if first != 0x10 || total < header + 7 {
+                return Err(Error::Invalid);
+            }
+            if &reader.buffer[header..header + 6] == b"\0\x04MQTT" && reader.buffer[header + 6] == 5
+            {
+                return v5_connection::connection(stream, services, connection, stop, reader).await;
+            }
+            break;
+        }
+        tokio::select! {
+            _ = stop.cancelled() => return Ok(()),
+            result = reader.read_more(&mut stream, connection.connect_deadline()) => result?,
+        }
+    }
     let (first, _, _) = tokio::select! {
         _ = stop.cancelled() => return Ok(()),
         packet = next(&mut reader, &mut stream, limits, connection.connect_deadline()) => packet?,
@@ -243,6 +269,7 @@ pub async fn connection(
                     payload: will.payload.to_vec(),
                     qos: will.qos,
                     retain: will.retain,
+                    properties: Default::default(),
                 },
             )
         })
@@ -292,6 +319,7 @@ pub async fn connection(
                         .unwrap_or(1);
                     services.mqtt.send_live(&attachment.key, BrokerMessage {
                         topic: down, payload: command.bytes.to_vec(), qos, retain: false,
+                        properties: Default::default(),
                     })?;
                     services.router.transport_state(DeliveryState::Sent);
                 }
@@ -407,7 +435,9 @@ pub async fn connection(
                         }
                         Packet::Publish { topic, payload, qos, packet_id, retain, dup: _ } => {
                             services.ingress.metrics.inc(Metric::MqttPublishes);
-                            let message = BrokerMessage { topic, payload: payload.to_vec(), qos, retain };
+                            let message = BrokerMessage { topic, payload: payload.to_vec(), qos, retain,
+    properties: Default::default(),
+};
                             // QoS2 acknowledges ownership with PUBREC, so authorization must be
                             // complete before storing the transaction or reserving retained state.
                             publish_acl(&auth, &message.topic)?;
@@ -416,7 +446,7 @@ pub async fn connection(
                                 services.mqtt.inbound_qos2(&attachment.key, attachment.generation, id, message)?;
                                 send(&mut stream, &services, &ack(0x50, id)).await?;
                             } else {
-                                let _acceptance = process_publish(&services, &auth, &message, validated_at, validation_us).await?;
+                                let _acceptance = process_publish(&services, &auth, &attachment.key, &message, validated_at, validation_us).await?;
                                 if let Some(id) = packet_id {
                                     let started = Instant::now();
                                     send(&mut stream, &services, &ack(0x40, id)).await?;

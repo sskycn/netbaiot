@@ -224,6 +224,7 @@ fn main() {
         payload: vec![7; 128],
         qos: 1,
         retain: false,
+        properties: Default::default(),
     };
     measure("mqtt_qos1_route_ack", 10_000, || {
         qos1.route(&auth.device_key, qos1_message.clone()).unwrap();
@@ -244,6 +245,7 @@ fn main() {
         payload: vec![9; 128],
         qos: 2,
         retain: false,
+        properties: Default::default(),
     };
     let mut qos2_packet_id = 0u16;
     measure("mqtt_qos2_inbound_accept_route", 10_000, || {
@@ -462,6 +464,7 @@ fn main() {
                         payload: vec![b'x'; 64],
                         qos: 1,
                         retain: true,
+                        properties: Default::default(),
                     },
                 )
                 .unwrap();
@@ -502,6 +505,7 @@ fn main() {
                     payload: payload.clone(),
                     qos: 1,
                     retain: false,
+                    properties: Default::default(),
                 },
             )
             .unwrap();
@@ -523,6 +527,7 @@ fn main() {
                     payload: payload.clone(),
                     qos: 1,
                     retain: false,
+                    properties: Default::default(),
                 },
             )
             .unwrap();
@@ -545,6 +550,7 @@ fn main() {
                     payload: payload.clone(),
                     qos: 2,
                     retain: false,
+                    properties: Default::default(),
                 },
             )
             .unwrap();
@@ -566,6 +572,7 @@ fn main() {
                     payload,
                     qos: 2,
                     retain: false,
+                    properties: Default::default(),
                 },
             )
             .unwrap();

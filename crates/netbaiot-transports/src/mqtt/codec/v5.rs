@@ -7,6 +7,11 @@ pub const MALFORMED_PACKET: u8 = 0x81;
 pub const PROTOCOL_ERROR: u8 = 0x82;
 pub const PACKET_TOO_LARGE: u8 = 0x95;
 pub const TOPIC_ALIAS_INVALID: u8 = 0x94;
+pub const TOPIC_NAME_INVALID: u8 = 0x90;
+pub const TOPIC_FILTER_INVALID: u8 = 0x8f;
+pub const PACKET_IDENTIFIER_NOT_FOUND: u8 = 0x92;
+pub const PACKET_IDENTIFIER_IN_USE: u8 = 0x91;
+pub const RECEIVE_MAXIMUM_EXCEEDED: u8 = 0x93;
 pub const SUBSCRIPTION_IDENTIFIERS_NOT_SUPPORTED: u8 = 0xa1;
 pub const SHARED_SUBSCRIPTIONS_NOT_SUPPORTED: u8 = 0x9e;
 
@@ -38,6 +43,16 @@ pub fn disconnect_reason(error: &Error) -> u8 {
         Error::Draining => 0x8b,
         Error::Codec => 0x99,
         Error::Configuration | Error::Storage | Error::IncompatibleSpool | Error::Internal => 0x83,
+    }
+}
+
+pub fn subscription_reason(error: &Error) -> u8 {
+    match error {
+        Error::Forbidden | Error::Authentication => 0x87,
+        Error::Invalid => 0x8f,
+        Error::Overloaded => 0x97,
+        Error::Draining | Error::Unavailable | Error::Timeout => 0x88,
+        _ => 0x83,
     }
 }
 
@@ -414,7 +429,9 @@ fn decode_connect(cursor: &mut Cursor, limits: &Limits) -> Result<Packet> {
         let properties = cursor.properties(PropertyContext::Will, limits)?;
         let topic = cursor.string(limits.max_topic_bytes)?;
         if !valid_topic(&topic, limits, false) {
-            return Err(protocol());
+            return Err(DecodeError {
+                reason: TOPIC_NAME_INVALID,
+            });
         }
         Some(Will {
             topic,
@@ -493,7 +510,9 @@ pub fn decode(input: &mut BytesMut, limits: &Limits) -> Result<Option<Packet>> {
             let qos = (first >> 1) & 3;
             let topic = cursor.string(limits.max_topic_bytes)?;
             if !valid_topic(&topic, limits, false) {
-                return Err(protocol());
+                return Err(DecodeError {
+                    reason: TOPIC_NAME_INVALID,
+                });
             }
             let packet_id = if qos == 0 { None } else { Some(cursor.id()?) };
             let properties = cursor.properties(PropertyContext::Publish, limits)?;
@@ -546,7 +565,9 @@ pub fn decode(input: &mut BytesMut, limits: &Limits) -> Result<Option<Packet>> {
                     });
                 }
                 if !valid_topic(&filter, limits, true) {
-                    return Err(protocol());
+                    return Err(DecodeError {
+                        reason: TOPIC_FILTER_INVALID,
+                    });
                 }
                 let options = cursor.byte()?;
                 if options & 0xc0 != 0 || options & 3 > 2 || (options >> 4) & 3 > 2 {
@@ -581,7 +602,9 @@ pub fn decode(input: &mut BytesMut, limits: &Limits) -> Result<Option<Packet>> {
                 }
                 let filter = cursor.string(limits.max_topic_bytes)?;
                 if !valid_topic(&filter, limits, true) {
-                    return Err(protocol());
+                    return Err(DecodeError {
+                        reason: TOPIC_FILTER_INVALID,
+                    });
                 }
                 filters.push(filter);
             }
@@ -676,7 +699,8 @@ pub fn connack(
             .map_err(|_| Error::Configuration)?
             .to_be_bytes(),
     );
-    properties.extend_from_slice(&[0x22, 0, 0, 0x24, 2, 0x25, 1, 0x28, 1, 0x29, 0, 0x2a, 0]);
+    // Maximum QoS 2 is represented by omitting 0x24; MQTT 5 permits only 0 or 1 there.
+    properties.extend_from_slice(&[0x22, 0, 0, 0x25, 1, 0x28, 1, 0x29, 0, 0x2a, 0]);
     if let Some(client_id) = assigned_client_id {
         properties.push(0x12);
         let length = u16::try_from(client_id.len()).map_err(|_| Error::Overloaded)?;
@@ -701,6 +725,138 @@ fn variable(mut value: usize, output: &mut Vec<u8>) {
             break;
         }
     }
+}
+
+fn put_string(output: &mut Vec<u8>, value: &str) -> std::result::Result<(), Error> {
+    let length = u16::try_from(value.len()).map_err(|_| Error::Overloaded)?;
+    output.extend_from_slice(&length.to_be_bytes());
+    output.extend_from_slice(value.as_bytes());
+    Ok(())
+}
+
+fn put_binary(output: &mut Vec<u8>, value: &[u8]) -> std::result::Result<(), Error> {
+    let length = u16::try_from(value.len()).map_err(|_| Error::Overloaded)?;
+    output.extend_from_slice(&length.to_be_bytes());
+    output.extend_from_slice(value);
+    Ok(())
+}
+
+pub struct OutboundPublish<'a> {
+    pub topic: &'a str,
+    pub payload: &'a [u8],
+    pub qos: u8,
+    pub packet_id: Option<u16>,
+    pub retain: bool,
+    pub dup: bool,
+    pub properties: &'a Properties,
+}
+
+pub fn publish(packet: OutboundPublish<'_>, maximum: usize) -> std::result::Result<Vec<u8>, Error> {
+    let OutboundPublish {
+        topic,
+        payload,
+        qos,
+        packet_id,
+        retain,
+        dup,
+        properties,
+    } = packet;
+    if qos > 2 || (qos > 0 && packet_id.is_none()) {
+        return Err(Error::Invalid);
+    }
+    let mut body = Vec::with_capacity(
+        topic
+            .len()
+            .saturating_add(payload.len())
+            .saturating_add(128),
+    );
+    put_string(&mut body, topic)?;
+    if let Some(id) = packet_id {
+        body.extend_from_slice(&id.to_be_bytes());
+    }
+    let mut encoded = Vec::new();
+    if let Some(value) = properties.payload_format {
+        encoded.extend_from_slice(&[0x01, value]);
+    }
+    if let Some(value) = properties.message_expiry {
+        encoded.push(0x02);
+        encoded.extend_from_slice(&value.to_be_bytes());
+    }
+    if let Some(value) = &properties.content_type {
+        encoded.push(0x03);
+        put_string(&mut encoded, value)?;
+    }
+    if let Some(value) = &properties.response_topic {
+        encoded.push(0x08);
+        put_string(&mut encoded, value)?;
+    }
+    if let Some(value) = &properties.correlation_data {
+        encoded.push(0x09);
+        put_binary(&mut encoded, value)?;
+    }
+    for (key, value) in &properties.user_properties {
+        encoded.push(0x26);
+        put_string(&mut encoded, key)?;
+        put_string(&mut encoded, value)?;
+    }
+    variable(encoded.len(), &mut body);
+    body.extend_from_slice(&encoded);
+    body.extend_from_slice(payload);
+    encode(
+        0x30 | (u8::from(dup) << 3) | (qos << 1) | u8::from(retain),
+        &body,
+        maximum,
+    )
+}
+
+pub fn ack(
+    first: u8,
+    packet_id: u16,
+    reason: u8,
+    maximum: usize,
+) -> std::result::Result<Vec<u8>, Error> {
+    if reason == 0 {
+        encode(first, &packet_id.to_be_bytes(), maximum)
+    } else {
+        encode(
+            first,
+            &[
+                packet_id.to_be_bytes()[0],
+                packet_id.to_be_bytes()[1],
+                reason,
+                0,
+            ],
+            maximum,
+        )
+    }
+}
+
+pub fn disconnect(reason: u8, maximum: usize) -> std::result::Result<Vec<u8>, Error> {
+    encode(0xe0, &[reason, 0], maximum)
+}
+
+pub fn suback(
+    packet_id: u16,
+    reasons: &[u8],
+    maximum: usize,
+) -> std::result::Result<Vec<u8>, Error> {
+    let mut body = Vec::with_capacity(3 + reasons.len());
+    body.extend_from_slice(&packet_id.to_be_bytes());
+    body.push(0); // Property Length
+    body.extend_from_slice(reasons);
+    encode(0x90, &body, maximum)
+}
+
+pub fn unsuback(
+    packet_id: u16,
+    reasons: &[u8],
+    maximum: usize,
+) -> std::result::Result<Vec<u8>, Error> {
+    let mut body = Vec::with_capacity(3 + reasons.len());
+    body.extend_from_slice(&packet_id.to_be_bytes());
+    body.push(0);
+    body.extend_from_slice(reasons);
+    encode(0xb0, &body, maximum)
 }
 
 #[cfg(test)]
