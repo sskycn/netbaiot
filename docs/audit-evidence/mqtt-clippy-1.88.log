@@ -1,0 +1,4 @@
+    Checking netbaiot-transports v0.1.1 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-transports)
+    Checking netbaiot-server v0.1.1 (/Users/sam/Dev/work/sskycn/netbaiot/apps/netbaiot-server)
+    Checking netbaiot-cli v0.1.1 (/Users/sam/Dev/work/sskycn/netbaiot/apps/netbaiot-cli)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 9.79s

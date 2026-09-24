@@ -256,7 +256,7 @@ impl Default for Limits {
             spool_record_max_bytes: 1_048_576,
             // NBMQ v6 stores raw payload bytes, bounded record envelopes, profile metadata, and a
             // fixed integrity trailer. The checked upper-bound formula below covers admitted state.
-            mqtt_recovery_max_bytes: 202_178_660,
+            mqtt_recovery_max_bytes: 202_195_044,
         }
     }
 }
@@ -270,7 +270,14 @@ impl Limits {
             .checked_add(self.max_retained_bytes)
             .and_then(|bytes| bytes.checked_add(self.max_retained_messages.checked_mul(64)?))
             .and_then(|bytes| bytes.checked_add(self.max_persistent_sessions.checked_mul(128)?))
-            .and_then(|bytes| bytes.checked_add(self.max_connections.checked_mul(256)?))
+            // A delayed Will record writes its cancellation ClientId as well as its origin.
+            // Logical Will bytes charge the origin once; allow the second bounded copy here.
+            .and_then(|bytes| {
+                bytes.checked_add(
+                    self.max_connections
+                        .checked_mul(256usize.checked_add(self.max_client_id_bytes)?)?,
+                )
+            })
             .and_then(|bytes| bytes.checked_add(100))
             .ok_or(Error::Configuration)
     }

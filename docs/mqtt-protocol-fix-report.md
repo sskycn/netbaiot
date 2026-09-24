@@ -36,4 +36,95 @@ The wire protocol, MQTT 3.1.1 packet encoding, and MQTT 5 packet encoding do not
 
 The extra Will origin is bounded by the configured ClientId limit and charged to Will count/byte capacity. The additional connection receive slots are bounded by existing per-session inflight limits. No external broker, database, task per packet, or unbounded queue was added. MQTT QoS2 is not a business exactly-once or crash-durability guarantee.
 
-Final command results and the exact not-run list are recorded in the task response; machine-readable before/after packet evidence is in `target/mqtt-audit/` and is intentionally not committed.
+The original machine-readable before/after packet evidence is preserved in
+`docs/audit-evidence/mqtt-m01-m07-before.json` and `mqtt-m01-m07-after.json`.
+Those older files name the baseline checkout but do **not** contain a binary
+hash or a working-tree digest, so they are historical observations rather than
+complete provenance for a release candidate. The release-acceptance evidence
+below supplies those identifiers for fresh runs.
+
+## Release acceptance, 2026-09-24
+
+The M01–M07 implementation patch is commit `65f6ba6a8dbc0796a1d14d8f67d33815372c9a8f`
+against `d4f7612a350d8c66e670ec897f3e7263ed2f00ff`. The subsequent broker
+hotspot patch is `a75faded1c770fac8d67c0e9c226dfcc22ff384c` and is a
+separate performance change. `main` and `origin/main` advanced to that commit
+while this acceptance task was running; this task did not request or perform a
+commit or push. The remaining acceptance edits are identified by the final
+working-tree manifest in `docs/audit-evidence/mqtt-release-candidate-manifest.json`.
+HEAD alone is **not** the tested version while those edits remain uncommitted.
+
+The M01–M07 table above identifies source corrections. The ACK and DISCONNECT
+parsers, EventAccepted counts, M04 receiver-policy wording, identifier-in-use
+expectation, collision fixture, and expiry wait described under “Test
+corrections and evidence” are test oracle or fixture changes; they do not
+constitute separate broker fixes. The corrected M03, M04, M06 and M07 raw cases
+were rerun against the isolated `d4f7612` server binary (SHA-256
+`a879b781823bc4f56d71373df7a98bdd4e7a5bba5ba86e7f17380acb7ae22bea`).
+All four still failed. Their fresh JSON files are
+`docs/audit-evidence/mqtt-old-baseline-*.json`; the archived source checkout is
+not a Git worktree, so its test JSON says `checkout_head: unknown`, while the
+source SHA and rebuilt binary hash here identify the old implementation.
+
+Fixed NBMQ v1–v5 samples under
+`tests/mqtt_conformance/fixtures/mqtt_recovery/` were emitted by binaries from
+five pinned historical commits. Their README records each source commit, binary
+hash and fixture hash. v1–v4 empty samples prove structural read compatibility.
+Additional nonempty v1–v4 samples contain a persistent subscription, a retained
+QoS1 publication, and inbound QoS2 Packet Identifier 7 awaiting PUBREL. The v5
+sample contains that QoS2 state, a No Local subscription, and a delayed Will.
+The Rust tests read the fixed bytes, rewrite each state as v6, read it again,
+verify QoS and retained state, and verify that the v5 Will
+reaches another subscriber without forwarding to its original No Local client.
+For old immediate Wills without a cancellation key, the origin remains unknown;
+No Local cannot be reconstructed from a ClientId that was never recorded.
+
+The default-limit near-capacity test admitted 128 persistent sessions with
+14,080 offline QoS1 messages, 256 pending delayed Wills carrying maximum-length
+ClientIds, and 1,024 retained messages. Its v6 file was 199,727,012 bytes,
+below the final 202,195,044-byte bound (98.8%), and recovered with consistent
+accounting. Acceptance review also found a new configurable-bound defect:
+the v6 delayed-Will record stores both cancellation and origin ClientIds, but
+only one was charged in the file bound and neither was included in the per-record
+ceiling. The patch adds the second ClientId to the checked whole-file formula
+and both ClientIds to the record ceiling. The default whole-file ceiling is now
+202,195,044 bytes. A legal 40,000-byte ClientId with a 20,000-byte Will payload
+now commits and recovers; its record exceeds the previous ceiling.
+
+The nonempty historical v2 sample exposed a second upgrade defect. Its session
+has credential/permission provenance but no codec ID/version, which v2 never
+recorded. The new reader restored it, but `encode_session_meta` rejected it when
+writing v6, blocking planned shutdown. The v6 writer now records such incomplete
+legacy provenance as unknown. It carries the QoS and retained state into the v6
+image without fabricating a codec; authenticated reconnect still resets the
+session under the existing conservative profile rule. The regression verifies
+both the v2→v6→v6 read path and that reset behavior. These two recovery-boundary
+fixes are the only new implementation changes made during acceptance.
+
+For rollback, a v6 file from the rebuilt candidate was copied to an isolated
+temporary directory and opened by the genuine `d4f7612` server binary. The old
+process exited with `Error: Invalid`, and the copied file's SHA-256 stayed
+`b4bbdd15bd1f2a2b58ba734426f183a6e2f38a8347087da2bf0e1559f39727af`
+before and after. That file was an empty but valid v6 planned-shutdown image.
+The source recovery directory was untouched. The operational upgrade and
+rollback conditions, including the distinction between no new state change and
+newly processed business, are in `docs/mqtt-session-recovery.md`.
+
+The existing Rust checks workflow runs all workspace tests for Rust source and
+fixture edits. `mqtt-interop.yml` explicitly watches
+`tests/mqtt_protocol_regressions.py` and `tests/mqtt_conformance/**`, so the
+updated raw runner, common binary selector and fixed samples trigger the
+external MQTT gate on a push. The final local gate used the witnessed isolated
+binary `/private/tmp/netbaiot-accept-final-target/debug/netbaiot-server`
+(SHA-256 `93a1dcee678a4aa60eb9ec011049378cd2f14e6ba634e322837a2fb869137e32`);
+its hash was unchanged before and after each Python suite. The final local
+results are Rust fmt/Clippy/workspace tests on 1.88.0 and stable **PASS**,
+MQTT release gate **76/76 PASS** with normative coverage **125/125**, MQTT 5
+raw and Mosquitto clients **PASS**, seven M01–M07 cases **PASS**, recovery fuzz
+5,000 runs **PASS**, and the 98.8%-of-bound v6 commit/recover test **PASS**.
+The 60-second soak and a production-state upgrade rehearsal were **NOT RUN**
+in this acceptance pass.
+No GitHub workflow can validate the still-uncommitted acceptance diff; remote
+CI for that exact candidate is **NOT RUN**. Exact local command results and
+artifact hashes are recorded in the candidate manifest, with unrun checks
+marked **NOT RUN**.

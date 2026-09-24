@@ -104,6 +104,13 @@ reader does not invent a ClientId. A legacy immediate Will can therefore be
 forwarded to a matching No Local subscription after recovery. v6 records retain
 the origin explicitly, including when a recovered state is written again.
 
+NBMQ v2 also lacks codec authorization provenance. A v2 session can be read and
+its QoS state carried into a v6 image, but the v6 writer marks that profile as
+unknown rather than inventing a codec ID/version. On the next authenticated
+reconnect, the existing conservative profile check resets that session; do not
+promise seamless resume of such legacy QoS exchanges. v3 and later carry codec
+provenance and retain their normal matching-profile resume behavior.
+
 An older binary rejects v6 rather than silently interpreting it. Direct
 downgrade with a v6 snapshot is unsupported; there is no v6-to-v5 converter that
 preserves the new Will-origin semantics. If the upgraded process has made **no**
