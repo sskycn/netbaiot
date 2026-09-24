@@ -66,14 +66,15 @@ async fn business_client(config: &Config, admin: &str, stream_token: &str) -> Ne
         .token(admin)
         .event_token(stream_token)
         .event_address(config.business_tcp.unwrap())
-        .stream_handshake_timeout(Duration::from_millis(200))
+        .stream_handshake_timeout(Duration::from_secs(2))
         .connect()
         .await
         .unwrap()
 }
 
 async fn wait_ready(client: &NetbaIoTClient) {
-    let result = tokio::time::timeout(Duration::from_secs(5), async {
+    // CI runs three real server processes in this test binary concurrently.
+    let result = tokio::time::timeout(Duration::from_secs(15), async {
         loop {
             if client.runtime().status().await.is_ok() {
                 break;
