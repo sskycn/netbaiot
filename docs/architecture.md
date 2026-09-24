@@ -4,7 +4,7 @@
 
 `device_ingress` binds one TCP listener and one UDP socket at the same address and
 numeric port (development: `127.0.0.1:8080`; production example: `0.0.0.0:443`).
-TCP serves standard MQTT 3.1.1 over TLS, and generic framed TCP over TLS using
+TCP serves standard MQTT 3.1.1 or MQTT 5.0 over TLS, and generic framed TCP over TLS using
 one certificate. TLS finishes before application classification; no ALPN, custom
 preface, or client wire change is required. UDP on the same port remains NBI1/HMAC,
 authenticated but unencrypted; this does not add DTLS or QUIC.
@@ -54,8 +54,8 @@ the original global/IP pool remains shared, so this is not starvation-proof QoS.
 
 Detection uses a fixed 12-byte buffer: one packet byte, up to four Remaining Length
 bytes, two protocol-name length bytes, four name bytes and one level byte. MQTT reuses the bounded fixed-header/Remaining-Length decoder and requires the
-`00 04 MQTT` name plus a protocol level byte. Level 4 is supported; other levels go
-to the existing parser only to return standard CONNACK=1 and close. Generic TCP
+`00 04 MQTT` name plus a protocol level byte. Levels 4 and 5 bind separate packet
+codecs; unsupported levels receive a version rejection and close. Generic TCP
 requires a valid 1..max_tcp_frame_size length and JSON object/whitespace start.
 Validated frames never exceed 1 MiB, so their first length byte is zero, disjoint
 from MQTT's 0x10. No failed parser falls back to another protocol.

@@ -1,10 +1,10 @@
-# 内嵌 MQTT 3.1.1 broker
+# 内嵌 MQTT 3.1.1 / MQTT 5.0 broker
 
 ## Single Device Ingress（单设备入口）
 
 `device_ingress` 在同一个地址、相同端口号绑定一个 TCP listener 和一个 UDP socket。
 开发示例为 `127.0.0.1:8080`，生产可配置 `0.0.0.0:443`。TCP 通过同一证书承载
-标准 MQTT 3.1.1 TLS 和通用分帧 TLS TCP。TLS 握手后才识别应用协议，
+标准 MQTT 3.1.1 / MQTT 5.0 TLS 和通用分帧 TLS TCP。TLS 握手后才识别应用协议，
 不要求 ALPN、自定义前导或修改客户端 wire protocol。UDP 同端口继续使用 NBI1/HMAC，
 只认证不加密，不涉及 DTLS/QUIC。
 
@@ -15,13 +15,13 @@ Management HTTP（`management_http`，通常为 `127.0.0.1:9090`）和可选的
 `device_ingress` 是唯一设备地址，旧分离监听字段会触发配置错误。443 只是部署选择，不代表 HTTPS。
 设备入口收到 HTTP 字节后直接关闭，不返回 HTTP 响应。详见[迁移说明](remove-device-http.md)。
 
-NetbaIoT 直接实现 MQTT 3.1.1，不依赖外部 broker 或数据库。子系统分层包括增量 packet codec、连接状态机、认证后的会话挂接、有界会话存储、topic trie、retain 存储、QoS 引擎，最后才是 IoT 绑定/EventBus。
+NetbaIoT 直接实现 MQTT 3.1.1 和 MQTT 5.0，不依赖外部 broker 或数据库。子系统分层包括按版本隔离的增量 packet codec、连接状态机、认证后的会话挂接、有界会话存储、topic trie、retain 存储、QoS 引擎，最后才是 IoT 绑定/EventBus。
 
-支持的控制报文包括 CONNECT/CONNACK、PUBLISH、PUBACK/PUBREC/PUBREL/PUBCOMP、SUBSCRIBE/SUBACK、UNSUBSCRIBE/UNSUBACK、PINGREQ/PINGRESP 和 DISCONNECT。已实现 QoS0、QoS1 以及明确的入站/出站 QoS2 状态机。MQTT 5、MQTT-SN、WebSocket、共享订阅、bridge 模式和 `$SYS` 服务不在当前范围内。仍会遵守 MQTT 对 `$` 开头 topic 的通配符规则。
+支持的控制报文包括 CONNECT/CONNACK、PUBLISH、PUBACK/PUBREC/PUBREL/PUBCOMP、SUBSCRIBE/SUBACK、UNSUBSCRIBE/UNSUBACK、PINGREQ/PINGRESP 和 DISCONNECT。已实现 QoS0、QoS1 以及明确的入站/出站 QoS2 状态机。MQTT 5 支持会话过期、消息过期、Will Delay、接收上限、报文大小上限、订阅选项和有界 PUBLISH 属性。MQTT-SN、WebSocket、共享订阅、Topic Alias、Subscription Identifier、Enhanced Authentication、bridge 模式和 `$SYS` 服务不在当前范围内。详细能力矩阵见[英文 MQTT 文档](mqtt.md#compatibility-and-mqtt-5-profile)。
 
 CONNECT 阶段通过有界 AuthCache 认证一次。得到的 `Arc<AuthenticatedDevice>` 会绑定到连接；后续普通 MQTT 报文不会再调用远程认证。MQTT ClientId 不作为可信身份。持久会话以 `(Authenticated DeviceKey, ClientId)` 为键，因此其他设备或租户不能仅凭复制 ClientId 继承或删除会话。空 ClientId 仅在 CleanSession=1 时接受，并会生成仅对当前连接有效的值。
 
-CleanSession=1 会删除该认证身份的旧会话，并始终返回 Session Present=0。CleanSession=0 会在 socket 销毁后保留订阅、离线 QoS1/2 投递、入站 QoS2、出站 QoS1/2 和 packet ID 分配状态。默认断开会话保留策略为 24 小时；这是 broker 资源策略，不是 MQTT 5 的 Session Expiry。会话有效期在新连接挂接时检查；与此同时所有集合仍受硬性容量限制。
+CleanSession=1 会删除该认证身份的旧会话，并始终返回 Session Present=0。CleanSession=0 会在 socket 销毁后保留订阅、离线 QoS1/2 投递、入站 QoS2、出站 QoS1/2 和 packet ID 分配状态。MQTT 3.1.1 默认断开会话保留策略为 24 小时；MQTT 5 使用 Session Expiry Interval。会话有效期在新连接挂接和定期维护时检查；与此同时所有集合仍受硬性容量限制。
 
 订阅使用 topic trie 支持精确 topic filter、`+` 和末尾的整层 `#`。根级通配符不会匹配以 `$` 开头的 topic。重复订阅会更新已有条目。订阅请求 QoS 和 publish QoS 通过 `min(publish_qos, subscription_qos)` 合并。授权只允许绑定设备命名空间内的有效 filter。发布仅限以下规范 topic：
 
@@ -46,6 +46,6 @@ SUBSCRIBE 会先针对会话、租户、全局、离线队列和活动 channel �
 
 持久会话会保存授权来源信息（credential version、auth generation、permissions、codec 标识和版本，不含密钥），以及单调递增的 session incarnation。CleanSession=0 接管会保留 incarnation；CleanSession=1 会创建新的 incarnation。入站 QoS2 完成和路由必须匹配相同的 incarnation、packet identifier 和 operation token。授权变更后重连会重置旧会话并返回 Session Present=0。管理失效操作会在同一个有界控制操作中删除匹配的持久状态。
 
-计划重启时会增量写入紧凑的 NBMQ v3 记录：带校验和的头部、每条有界记录的长度/校验和，以及包含权威记录数量、字节数和 SHA-256 摘要的全镜像校验尾部。载荷字节保持二进制，不会复制完整快照或创建整个镜像的序列化缓冲区。仍可按各版本独立上限读取 NBMQ v1/v2 镜像；所有新写入均使用 v3。缺少完整授权/codec 来源信息的旧会话不会暴露在订阅索引中，并会在连接挂接时安全重置。文件使用受限权限，并执行文件 fsync、原子重命名和目录 fsync。镜像不包含密码或 socket/TLS/task 状态。恢复 `(DeviceKey, ClientId)` 会话前必须重新认证。突发崩溃可能丢失上一次计划快照之后的修改；broker 不承诺崩溃持久性。
+计划重启时会增量写入紧凑的 NBMQ v4 记录：带校验和的头部、每条有界记录的长度/校验和，以及包含权威记录数量、字节数和 SHA-256 摘要的全镜像校验尾部。v4 保存协议版本、会话/消息过期、订阅选项、发布属性及延迟 Will 状态。载荷字节保持二进制，不会复制完整快照或创建整个镜像的序列化缓冲区。仍可按各版本独立上限读取 NBMQ v1/v2/v3 镜像；所有新写入均使用 v4。缺少完整授权/codec 来源信息的旧会话不会暴露在订阅索引中，并会在连接挂接时安全重置。文件使用受限权限，并执行文件 fsync、原子重命名和目录 fsync。镜像不包含密码或 socket/TLS/task 状态。恢复 `(DeviceKey, ClientId)` 会话前必须重新认证。突发崩溃可能丢失上一次计划快照之后的修改；broker 不承诺崩溃持久性。
 
 实现证据和恢复细节见英文版 [MQTT 3.1.1 一致性清单](mqtt-3.1.1-conformance.md)和 [MQTT 会话恢复说明](mqtt-session-recovery.md)。

@@ -166,7 +166,7 @@ Quiesce 先让 readiness false、关闭 admission gate、等待活动 guard，�
 
 如果 spool fsync/rename/directory fsync 失败且仍有 accepted work，进程保持存活、unready、有界频率重试，不宣称成功退出。结构性 MQTT recovery failure 不会跳过 EventBus 安全流程，但最终仍会阻止 voluntary exit。
 
-EventBus 当前 writer 为 v2，并可读 legacy v1。MQTT 当前 writer 是 streaming NBMQ v3，读取 v1/v2/v3；snapshot 包含权威 record-count/byte-count/digest trailer。目录默认应为 0700、文件 0600；监控容量、权限、inode 和本地磁盘错误，不要把它当 hot-path queue 或一般 event store。
+EventBus 当前 writer 为 v2，并可读 legacy v1。MQTT 当前 writer 是 streaming NBMQ v4，读取 v1/v2/v3/v4；snapshot 包含权威 record-count/byte-count/digest trailer。目录默认应为 0700、文件 0600；监控容量、权限、inode 和本地磁盘错误，不要把它当 hot-path queue 或一般 event store。
 
 SIGKILL、process/OS crash、断电可能丢失仍仅在内存中的 bounded recent traffic 和最近 MQTT state。NetbaIoT 不是 crash-durable database；恢复能力只承诺正确完成的 planned shutdown。
 

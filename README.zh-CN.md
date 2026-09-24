@@ -1,13 +1,13 @@
 # NetbaIoT
 
-NetbaIoT 是一个无数据库、以内存为主的 IoT 协议网关和实时事件路由器。它通过内嵌 MQTT 3.1.1、通用分帧 TCP 和经过认证的 UDP 接收设备流量，将其规范化为 `DeviceEvent`，并发送到需确认或尽力而为的业务接收端。
+NetbaIoT 是一个无数据库、以内存为主的 IoT 协议网关和实时事件路由器。它通过内嵌 MQTT 3.1.1 / MQTT 5.0、通用分帧 TCP 和经过认证的 UDP 接收设备流量，将其规范化为 `DeviceEvent`，并发送到需确认或尽力而为的业务接收端。
 
 运行时不需要 PostgreSQL 或其他数据库。业务系统负责持久化业务数据和离线命令。NetbaIoT 唯一的持久化机制是有界本地重启 spool，仅用于计划内优雅关机无法完成所有已接受的必需投递时。
 
 ## 5 分钟 Quick Start
 
 要求 Rust 1.88+、Python 3、`curl` 和 Mosquitto clients。
-Mosquitto 在此仅作为客户端，NetbaIoT 自带 MQTT 3.1.1 broker。
+Mosquitto 在此仅作为客户端，NetbaIoT 自带 MQTT 3.1.1 / MQTT 5.0 broker。
 
 ```bash
 cargo +1.88.0 build --locked

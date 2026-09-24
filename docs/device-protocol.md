@@ -4,7 +4,7 @@
 
 `device_ingress` binds one TCP listener and one UDP socket at the same address and
 numeric port (development: `127.0.0.1:8080`; production example: `0.0.0.0:443`).
-TCP serves standard MQTT 3.1.1 over TLS, and generic framed TCP over TLS using
+TCP serves standard MQTT 3.1.1 or MQTT 5.0 over TLS, and generic framed TCP over TLS using
 one certificate. TLS finishes before application classification; no ALPN, custom
 preface, or client wire change is required. UDP on the same port remains NBI1/HMAC,
 authenticated but unencrypted; this does not add DTLS or QUIC.

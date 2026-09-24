@@ -1,10 +1,10 @@
-# Embedded MQTT 3.1.1 broker
+# Embedded MQTT 3.1.1 and MQTT 5.0 broker
 
 ## Single Device Ingress
 
 `device_ingress` binds one TCP listener and one UDP socket at the same address and
 numeric port (development: `127.0.0.1:8080`; production example: `0.0.0.0:443`).
-TCP serves standard MQTT 3.1.1 over TLS, and generic framed TCP over TLS using
+TCP serves standard MQTT 3.1.1 or MQTT 5.0 over TLS, and generic framed TCP over TLS using
 one certificate. TLS finishes before application classification; no ALPN, custom
 preface, or client wire change is required. UDP on the same port remains NBI1/HMAC,
 authenticated but unencrypted; this does not add DTLS or QUIC.
@@ -18,16 +18,48 @@ requires loopback and permits plaintext for local testing.
 rejected. Port 443 is only a deployment choice, not an HTTPS endpoint. HTTP bytes
 on device ingress close without an HTTP response; see [migration](remove-device-http.md).
 
-NetbaIoT implements MQTT 3.1.1 directly. It does not require an external broker or
+NetbaIoT implements MQTT 3.1.1 and MQTT 5.0 directly. It does not require an external broker or
 database. The subsystem is layered as incremental packet codec, connection state
 machine, authenticated session attachment, bounded session store, topic trie,
 retained store, QoS engine, and finally the IoT binding/EventBus.
 
 Supported control packets are CONNECT/CONNACK, PUBLISH, PUBACK/PUBREC/PUBREL/PUBCOMP,
 SUBSCRIBE/SUBACK, UNSUBSCRIBE/UNSUBACK, PINGREQ/PINGRESP, and DISCONNECT. QoS0, QoS1,
-and explicit inbound/outbound QoS2 state machines are implemented. MQTT 5, MQTT-SN,
+and explicit inbound/outbound QoS2 state machines are implemented. MQTT-SN,
 WebSockets, shared subscriptions, bridge mode, and `$SYS` services are outside this
 phase. MQTT wildcard rules around `$` topics are still enforced.
+
+## Compatibility and MQTT 5 profile
+
+| Capability | MQTT 3.1.1 | MQTT 5.0 |
+| --- | --- | --- |
+| QoS0/1/2, retained messages, Will, persistent sessions | Supported | Supported |
+| Session expiry, message expiry, Will Delay | No wire property | Supported |
+| Receive Maximum and Maximum Packet Size | Broker bounds | CONNECT and CONNACK bounds |
+| No Local, Retain As Published, Retain Handling | No wire option | Supported |
+| Publish payload format, content type, response topic, correlation data, user properties | No wire property | Bounded transport metadata |
+| Topic Alias, Subscription Identifier, shared subscriptions, Enhanced Authentication, WebSocket | Not in profile | Not supported |
+
+MQTT 5 CONNECT binds the connection to protocol level 5. Sessions from protocol
+levels 4 and 5 never resume across a version switch: the old session is removed and
+Session Present is false. Session Expiry Interval determines when disconnected MQTT 5
+state is removed; MQTT 3.1.1 keeps its configured idle policy. Message expiry is
+stored as an absolute deadline and forwarded with the remaining seconds. Expired
+offline, retained and outbound PUBLISH payload state is released by the broker's
+bounded maintenance pass. QoS2 packet state continues until its ACK handshake ends.
+
+MQTT 5 CONNECT advertises the server Receive Maximum, Maximum Packet Size, zero
+Topic Alias Maximum, and availability of wildcards and retained messages. Unsupported
+shared subscriptions and subscription identifiers are declared unavailable. Property
+bytes and counts have explicit `Limits` bounds; rejected features receive MQTT 5
+reason codes. MQTT metadata remains inside the MQTT transport and broker, outside
+the public `DeviceEvent` model. QoS1 PUBACK retains the existing `EventAccepted`
+meaning: the required EventBus responsibility has been accepted, while business
+processing can still be pending.
+
+The optional device SDK defaults to MQTT 3.1.1. Select
+`MqttProtocolVersion::V5` in its builder for MQTT 5 and configure session/message
+expiry if needed. Standard MQTT clients need no SDK.
 
 CONNECT authenticates once through the bounded AuthCache. The resulting
 `Arc<AuthenticatedDevice>` is bound to the connection; normal MQTT packets never
@@ -39,8 +71,8 @@ accepted only with CleanSession=1 and receives a connection-local generated valu
 CleanSession=1 deletes that authenticated identity's old session and always returns
 Session Present=0. CleanSession=0 preserves subscriptions, offline QoS1/2 delivery,
 inbound QoS2, outbound QoS1/2, and packet-ID allocation after socket destruction.
-The default disconnected-session retention policy is 24 hours and is a broker
-resource policy, not MQTT 5 Session Expiry. Expiry is evaluated during new attach;
+The default MQTT 3.1.1 disconnected-session retention policy is 24 hours and is a broker
+resource policy. Expiry is evaluated during new attach and periodic maintenance;
 all collections remain hard bounded meanwhile.
 
 Subscriptions support exact topic filters, `+`, and final whole-level `#` using a
@@ -115,12 +147,14 @@ and operation token. Reconnect under changed authorization resets the old sessio
 and returns Session Present=0. Management invalidation removes matching persistent
 state in the same bounded control operation.
 
-Planned restart writes compact NBMQ v3 records incrementally, with a checksummed
+Planned restart writes compact NBMQ v4 records incrementally, with a checksummed
 header, a length/checksum on every bounded record, and an authenticated whole-image
 trailer containing the authoritative record count, byte count, and SHA-256 digest.
+v4 records include protocol version, MQTT 5 session expiry, subscription options,
+message properties/expiry, retained origin, and delayed Will deadline/cancellation state.
 Payload bytes remain binary; there is no complete snapshot clone or whole-image
 serialization buffer. NBMQ v1 and v2 images remain readable under version-specific
-ceilings, while all new writes use v3. Legacy sessions that lack complete
+ceilings; NBMQ v3 is also readable, while all new writes use v4. Legacy sessions that lack complete
 authorization/codec provenance are never exposed through the subscription index and
 reset safely on attach. The file uses restrictive permissions, file fsync, atomic
 rename, and directory fsync.

@@ -14,7 +14,7 @@ MQTT connection owners publish their Will unless the client sent MQTT DISCONNECT
 the MQTT 3.1.1 Will contract applies when the server closes the Network Connection.
 After all owners detach, one consistent broker snapshot records
 persistent sessions, subscriptions, offline messages, inbound/outbound QoS state,
-packet allocator position, retained messages, and bounded Wills awaiting subscriber
+packet allocator position, retained messages, and bounded Wills awaiting delay or subscriber
 capacity. The snapshot must commit before a
 successful exit.
 Required sink workers continue during the drain window. If pending required count
@@ -36,7 +36,7 @@ only then readiness is enabled. Recovered EventBus segment files are removed onl
 after required work drains. MQTT reconnect still authenticates before session
 resume; restored state never contains credentials.
 
-MQTT recovery writes NBMQ v3 incrementally as bounded typed records plus a final
+MQTT recovery writes NBMQ v4 incrementally as bounded typed records plus a final
 record-count, byte-count, and whole-stream-digest trailer. It reads v1, v2, and v3;
 the larger legacy v1 ceiling is selected only after the prefix identifies v1.
 Recovery validates topic/filter syntax, packet identifiers, legal QoS per

@@ -4,7 +4,7 @@ NetbaIoT exposes one public wire-model crate and two purpose-specific clients:
 
 - `netbaiot-protocol`: portable public IDs, messages, versioning, paths, and errors;
 - `netbaiot-client`: business event consumption and management APIs;
-- `netbaiot-device-sdk`: optional standard MQTT 3.1.1 convenience;
+- `netbaiot-device-sdk`: optional standard MQTT 3.1.1/MQTT 5.0 convenience;
 - `netbaiot-cli`: operator/debug client built exclusively on `netbaiot-client`.
 
 Neither client depends on `netbaiot-runtime`, `netbaiot-transports`, or

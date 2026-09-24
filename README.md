@@ -3,7 +3,7 @@
 [简体中文](README.zh-CN.md)
 
 NetbaIoT is a database-free, memory-first IoT protocol gateway and real-time event
-router. It accepts device traffic over embedded MQTT 3.1.1, generic framed
+router. It accepts device traffic over embedded MQTT 3.1.1 and MQTT 5.0, generic framed
 TCP, and authenticated UDP; normalizes it into `DeviceEvent`; and sends it to
 confirmed or best-effort business sinks.
 
@@ -15,7 +15,7 @@ all already accepted required deliveries.
 ## Quick start
 
 Requirements: Rust 1.88 or newer, Python 3, `curl`, and Mosquitto client
-tools. Mosquitto is only a client here; NetbaIoT includes its own MQTT 3.1.1
+tools. Mosquitto is only a client here; NetbaIoT includes its own MQTT 3.1.1/MQTT 5.0
 broker.
 
 Build the locked workspace, start the tutorial business consumer, then start the
@@ -53,6 +53,11 @@ mosquitto_pub -h 127.0.0.1 -p 8080 -V mqttv311 \
   -i quickstart -t v1/t/demo/p/sensor/d/device-1/up -q 1 \
   -m '{"schema_version":1,"source_message_id":"demo:1","kind":"heartbeat","data":{"sequence":1}}'
 ```
+
+MQTT 5.0 clients use the same listener and canonical topics; change the example to
+`-V mqttv5`. MQTT 3.1.1 remains the default SDK mode. See the
+[MQTT compatibility profile](docs/mqtt.md) for supported MQTT 5 properties and
+features that are outside this release.
 
 MQTT QoS1 PUBACK means the event crossed the bounded
 `EventAccepted` boundary. It does not mean that a business database stored it.

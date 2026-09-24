@@ -171,6 +171,7 @@ The original global/IP connection pool is shared; downstream bounds isolate work
 but there is no strict per-protocol reserved connection capacity. Management still
 shares existing process connection budgets while retaining independent listener
 lifecycle. Configuration migration is deliberate and breaking for old deployment
-JSON. HTTP/2/custom methods, MQTT 5, DTLS and QUIC remain unsupported. Abrupt failure
+JSON. HTTP/2/custom methods, DTLS and QUIC remain unsupported. MQTT 5 uses the
+same ingress listener and is described in [the MQTT profile](mqtt.md). Abrupt failure
 can still lose bounded memory traffic. No multi-host saturation campaign, 30-minute
 mixed soak, new full parser-fuzz campaign or production TLS deployment was run.
