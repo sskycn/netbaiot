@@ -181,7 +181,12 @@ async fn official_clients_cover_mqtt_tcp_command_ack_status_and_offline_contract
 
     let rejected = business_client(&config, &admin, "incorrect-stream-token").await;
     let rejected = rejected.events().subscribe(EventFilter::default()).await;
-    assert!(matches!(rejected, Err(ClientError::Unauthenticated { .. })));
+    if !matches!(&rejected, Err(ClientError::Unauthenticated { .. })) {
+        match rejected {
+            Ok(_) => panic!("invalid business stream token was accepted"),
+            Err(error) => panic!("unexpected invalid-token result: {error:?}"),
+        }
+    }
 
     let rejected_device = DeviceClient::builder()
         .device(device_key())
