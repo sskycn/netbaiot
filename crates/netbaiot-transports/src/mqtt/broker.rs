@@ -680,7 +680,9 @@ struct BrokerState {
     retained_reserved_count: usize,
     retained_reserved_bytes: usize,
     retained_reserved_tenants: HashMap<TenantId, (usize, usize)>,
+    /// Ready Wills only. Future delayed Wills live in `future_wills` until due.
     pending_wills: VecDeque<PendingWill>,
+    future_wills: BTreeMap<i64, VecDeque<PendingWill>>,
     will_responsibility_count: usize,
     will_responsibility_bytes: usize,
     will_responsibility_tenants: HashMap<TenantId, (usize, usize)>,
@@ -1127,6 +1129,7 @@ impl MqttBroker {
                 retained_reserved_bytes: 0,
                 retained_reserved_tenants: HashMap::new(),
                 pending_wills: VecDeque::new(),
+                future_wills: BTreeMap::new(),
                 will_responsibility_count: 0,
                 will_responsibility_bytes: 0,
                 will_responsibility_tenants: HashMap::new(),
@@ -1197,6 +1200,7 @@ impl MqttBroker {
         }
         let authorization = SessionAuthorization::from(auth);
         if clean_session {
+            release_clean_start_delays(&mut state, &key);
             for pending in &mut state.pending_wills {
                 if pending
                     .cancel_on_resume
@@ -1231,28 +1235,7 @@ impl MqttBroker {
         }
         retry_pending_wills(&mut state, &self.limits);
         let incarnation = state.sessions.get(&key).ok_or(Error::Internal)?.incarnation;
-        let mut keep_wills = VecDeque::with_capacity(state.pending_wills.len());
-        while let Some(pending) = state.pending_wills.pop_front() {
-            if pending
-                .cancel_on_resume
-                .as_ref()
-                .is_some_and(|(owner, prior)| owner == &key && *prior == incarnation)
-            {
-                release_retained_reservation(
-                    &mut state,
-                    &pending.owner.tenant_id,
-                    pending.retained_reservation,
-                );
-                release_will_capacity(
-                    &mut state,
-                    &pending.owner.tenant_id,
-                    pending.message.bytes(),
-                );
-            } else {
-                keep_wills.push_back(pending);
-            }
-        }
-        state.pending_wills = keep_wills;
+        cancel_resumed_wills(&mut state, &key, incarnation);
         if let Some(old) = state.active.remove(&key) {
             old.cancel.cancel();
         }
@@ -1742,12 +1725,13 @@ impl MqttBroker {
             }
         }
         // The CONNECT reservation already owns the global and tenant capacity for this entry.
-        state.pending_wills.push_back(pending);
+        insert_pending_will(&mut state, pending);
         Ok(WillSchedule::Delayed)
     }
 
     pub fn pending_will_count(&self) -> Result<usize> {
-        Ok(lock(&self.state)?.pending_wills.len())
+        let state = lock(&self.state)?;
+        Ok(pending_will_count(&state))
     }
 
     /// MQTT 5 Receive Maximum is scoped to this connection. QoS 1 is processed
@@ -2409,7 +2393,7 @@ impl MqttBroker {
                 .iter()
                 .map(|(topic, retained)| (topic.clone(), retained.clone()))
                 .collect(),
-            pending_wills: state.pending_wills.iter().cloned().collect(),
+            pending_wills: all_pending_wills(&state).cloned().collect(),
         })
     }
 
@@ -2473,6 +2457,7 @@ impl MqttBroker {
             retained_reserved_bytes: 0,
             retained_reserved_tenants: HashMap::new(),
             pending_wills: VecDeque::new(),
+            future_wills: BTreeMap::new(),
             will_responsibility_count: 0,
             will_responsibility_bytes: 0,
             will_responsibility_tenants: HashMap::new(),
@@ -2829,7 +2814,7 @@ impl MqttBroker {
                 &pending.message,
                 &self.limits,
             )?;
-            replacement.pending_wills.push_back(pending);
+            insert_pending_will(&mut replacement, pending);
         }
         let reservations = replacement
             .sessions
@@ -2904,7 +2889,7 @@ impl MqttBroker {
             wake_tenant_pending(&mut state, &tenant, 1, &self.limits)?;
             wake_tenant_pending(&mut state, &tenant, 2, &self.limits)?;
         }
-        retry_pending_wills(&mut state, &self.limits);
+        retry_pending_wills_bounded(&mut state, &self.limits, TICK_MAINTENANCE_BUDGET);
         self.publish_subscription_count(&state);
         Ok(())
     }
@@ -3745,15 +3730,116 @@ struct TenantRouteUsage {
     qos2_inflight: usize,
 }
 
+fn all_pending_wills(state: &BrokerState) -> impl Iterator<Item = &PendingWill> {
+    state
+        .pending_wills
+        .iter()
+        .chain(state.future_wills.values().flat_map(|queue| queue.iter()))
+}
+
+fn pending_will_count(state: &BrokerState) -> usize {
+    state.pending_wills.len()
+        + state
+            .future_wills
+            .values()
+            .map(VecDeque::len)
+            .sum::<usize>()
+}
+
+fn insert_pending_will(state: &mut BrokerState, pending: PendingWill) {
+    if let Some(deadline) = pending.due_at_ms {
+        state
+            .future_wills
+            .entry(deadline)
+            .or_default()
+            .push_back(pending);
+    } else {
+        state.pending_wills.push_back(pending);
+    }
+}
+
+fn release_clean_start_delays(state: &mut BrokerState, key: &SessionKey) {
+    let future = std::mem::take(&mut state.future_wills);
+    for (_, bucket) in future {
+        for mut pending in bucket {
+            if pending
+                .cancel_on_resume
+                .as_ref()
+                .is_some_and(|(owner, _)| owner == key)
+            {
+                pending.due_at_ms = None;
+                pending.cancel_on_resume = None;
+            }
+            insert_pending_will(state, pending);
+        }
+    }
+}
+
+fn cancel_resumed_wills(state: &mut BrokerState, key: &SessionKey, incarnation: u64) {
+    let mut pending = std::mem::take(&mut state.pending_wills);
+    let future = std::mem::take(&mut state.future_wills);
+    for (_, bucket) in future {
+        pending.extend(bucket);
+    }
+    let now = now_ms();
+    while let Some(mut will) = pending.pop_front() {
+        let matches = will
+            .cancel_on_resume
+            .as_ref()
+            .is_some_and(|(owner, prior)| owner == key && *prior == incarnation);
+        if !matches {
+            insert_pending_will(state, will);
+        } else if will.due_at_ms.is_some_and(|deadline| deadline <= now) {
+            // A due Will was already eligible before the resume. Keep its broker-owned
+            // responsibility even when a bounded maintenance pass has not reached it yet.
+            will.due_at_ms = None;
+            will.cancel_on_resume = None;
+            state.pending_wills.push_back(will);
+        } else {
+            release_retained_reservation(state, &will.owner.tenant_id, will.retained_reservation);
+            release_will_capacity(state, &will.owner.tenant_id, will.message.bytes());
+        }
+    }
+}
+
+fn promote_due_wills(state: &mut BrokerState, now: i64, mut budget: usize) {
+    while budget > 0 {
+        let Some((&deadline, _)) = state.future_wills.first_key_value() else {
+            break;
+        };
+        if deadline > now {
+            break;
+        }
+        let Some(mut bucket) = state.future_wills.remove(&deadline) else {
+            break;
+        };
+        while budget > 0 {
+            let Some(pending) = bucket.pop_front() else {
+                break;
+            };
+            state.pending_wills.push_back(pending);
+            budget -= 1;
+        }
+        if !bucket.is_empty() {
+            state.future_wills.insert(deadline, bucket);
+        }
+    }
+}
+
 fn retry_pending_wills(state: &mut BrokerState, limits: &Limits) -> usize {
-    let attempts = state.pending_wills.len();
+    retry_pending_wills_bounded(state, limits, HOT_MAINTENANCE_BUDGET)
+}
+
+fn retry_pending_wills_bounded(state: &mut BrokerState, limits: &Limits, budget: usize) -> usize {
+    promote_due_wills(state, now_ms(), budget);
+    let attempts = state.pending_wills.len().min(budget);
     let mut settled = 0usize;
     for _ in 0..attempts {
         let Some(mut pending) = state.pending_wills.pop_front() else {
             break;
         };
         if pending.due_at_ms.is_some_and(|due| due > now_ms()) {
-            state.pending_wills.push_back(pending);
+            insert_pending_will(state, pending);
             continue;
         }
         pending.due_at_ms = None;
@@ -4344,7 +4430,7 @@ fn write_recovery(directory: &Path, limits: &Limits, broker: &MqttBroker) -> Res
     file.write_all(&header)
         .and_then(|_| file.write_all(&Sha256::digest(header)))
         .map_err(|_| Error::Storage)?;
-    if state.will_responsibility_count != state.pending_wills.len() {
+    if state.will_responsibility_count != pending_will_count(&state) {
         // Planned shutdown must detach every connection first, transferring every armed Will to
         // either settled or broker-owned pending state before a coherent image is committed.
         return Err(Error::Conflict);
@@ -4432,7 +4518,7 @@ fn write_recovery(directory: &Path, limits: &Limits, broker: &MqttBroker) -> Res
             write_record(&mut file, RECORD_OUTBOUND, &record, limits, &mut recovery)?;
         }
     }
-    for pending in &state.pending_wills {
+    for pending in all_pending_wills(&state) {
         let mut record = Vec::with_capacity(pending.message.payload.len().saturating_add(384));
         put_string(&mut record, pending.owner.tenant_id.as_str())?;
         put_string(&mut record, pending.owner.product_id.as_str())?;
@@ -5402,6 +5488,8 @@ mod tests {
         let mut reserved_count = 0;
         let mut reserved_bytes = 0;
         let mut reserved_tenants = HashMap::<TenantId, (usize, usize)>::new();
+        let mut will_bytes = 0;
+        let mut will_tenants = HashMap::<TenantId, (usize, usize)>::new();
         let mut session_expiry = HashMap::new();
         let mut message_expiry = HashMap::new();
         for (key, session) in &state.sessions {
@@ -5449,7 +5537,14 @@ mod tests {
             }
         }
         device_subscriptions.retain(|_, count| *count != 0);
-        for pending in &state.pending_wills {
+        for pending in all_pending_wills(state) {
+            let bytes = pending.message.bytes();
+            will_bytes += bytes;
+            let tenant = will_tenants
+                .entry(pending.owner.tenant_id.clone())
+                .or_default();
+            tenant.0 += 1;
+            tenant.1 += bytes;
             let reservation = pending.retained_reservation;
             reserved_count += reservation.global_count;
             reserved_bytes += reservation.global_bytes;
@@ -5478,6 +5573,9 @@ mod tests {
         assert_eq!(state.retained_reserved_count, reserved_count);
         assert_eq!(state.retained_reserved_bytes, reserved_bytes);
         assert_eq!(state.retained_reserved_tenants, reserved_tenants);
+        assert_eq!(state.will_responsibility_count, pending_will_count(state));
+        assert_eq!(state.will_responsibility_bytes, will_bytes);
+        assert_eq!(state.will_responsibility_tenants, will_tenants);
         let retained_expiry = state
             .retained
             .iter()
@@ -6019,6 +6117,55 @@ mod tests {
     }
 
     #[test]
+    fn delayed_will_deadlines_have_bounded_due_work() {
+        let limits = Arc::new(Limits::default());
+        let broker = MqttBroker::new(limits.clone());
+        {
+            let mut state = lock(&broker.state).unwrap();
+            for index in 0..5 {
+                let owner = auth(&format!("will-index-{index}")).device_key;
+                let message = BrokerMessage {
+                    topic: format!("v1/t/t/p/p/d/will-index-{index}/up"),
+                    payload: vec![index as u8],
+                    qos: 1,
+                    retain: false,
+                    properties: Default::default(),
+                };
+                reserve_will_capacity(&mut state, &owner.tenant_id, message.bytes(), &limits)
+                    .unwrap();
+                insert_pending_will(
+                    &mut state,
+                    PendingWill {
+                        owner,
+                        message,
+                        due_at_ms: Some(now_ms() - 1),
+                        cancel_on_resume: Some((
+                            SessionKey {
+                                device: auth(&format!("will-index-{index}")).device_key,
+                                client_id: format!("client-{index}"),
+                            },
+                            1,
+                        )),
+                        message_expiry_interval: None,
+                        retained_reservation: RetainedReservation::default(),
+                    },
+                );
+            }
+            assert_accounting_consistent(&state);
+            promote_due_wills(&mut state, now_ms(), 3);
+            assert_eq!(state.pending_wills.len(), 3);
+            assert_eq!(pending_will_count(&state), 5);
+            assert_accounting_consistent(&state);
+            assert_eq!(retry_pending_wills_bounded(&mut state, &limits, 3), 3);
+            assert_eq!(pending_will_count(&state), 2);
+            assert_accounting_consistent(&state);
+        }
+        broker.tick().unwrap();
+        assert_eq!(broker.pending_will_count().unwrap(), 0);
+        assert_broker_accounting(&broker);
+    }
+
+    #[test]
     #[ignore = "manual baseline for future delayed-Will retry cost"]
     fn benchmark_future_pending_will_retry() {
         let broker = MqttBroker::new(Arc::new(Limits::default()));
@@ -6032,14 +6179,17 @@ mod tests {
         };
         let mut state = lock(&broker.state).unwrap();
         for _ in 0..10_000 {
-            state.pending_wills.push_back(PendingWill {
-                owner: owner.clone(),
-                message: message.clone(),
-                due_at_ms: Some(now_ms() + 3_600_000),
-                cancel_on_resume: None,
-                message_expiry_interval: None,
-                retained_reservation: RetainedReservation::default(),
-            });
+            insert_pending_will(
+                &mut state,
+                PendingWill {
+                    owner: owner.clone(),
+                    message: message.clone(),
+                    due_at_ms: Some(now_ms() + 3_600_000),
+                    cancel_on_resume: None,
+                    message_expiry_interval: None,
+                    retained_reservation: RetainedReservation::default(),
+                },
+            );
         }
         for run in 1..=5 {
             let mut samples = Vec::with_capacity(100);
@@ -6149,7 +6299,10 @@ mod tests {
         assert!(!recovered.has_retained_topic(topic).unwrap());
         {
             let mut state = recovered.state.lock().unwrap();
-            state.pending_wills.front_mut().unwrap().due_at_ms = Some(now_ms() - 1);
+            let (_, mut bucket) = state.future_wills.pop_first().unwrap();
+            let mut pending = bucket.pop_front().unwrap();
+            pending.due_at_ms = Some(now_ms() - 1);
+            insert_pending_will(&mut state, pending);
         }
         recovered.tick().unwrap();
         assert_eq!(recovered.pending_will_count().unwrap(), 0);
