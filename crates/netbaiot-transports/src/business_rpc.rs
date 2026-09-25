@@ -608,12 +608,32 @@ async fn connection_inner(
                 {
                     break Err(Error::Invalid);
                 }
+                let ack_receiver = ack_rx.take().ok_or(Error::Internal)?;
                 let (send, recv) = mpsc::channel(1);
                 let generation = services.sink.claim(send, filter)?;
+                let (written, subscribed_written) = oneshot::channel();
+                if let Err(error) = queue(
+                    &control_tx,
+                    &control_budget,
+                    &metrics,
+                    BusinessRpcQueueClass::Control,
+                    BusinessRpcFrame::Subscribed { subscription_id },
+                    Some(written),
+                ) {
+                    let _ = services.sink.release(generation);
+                    break Err(error);
+                }
+                match subscribed_written.await {
+                    Ok(Ok(())) => {}
+                    _ => {
+                        let _ = services.sink.release(generation);
+                        break Err(Error::Unavailable);
+                    }
+                }
                 let worker_stop = connection_stop.clone();
                 let handle = tokio::spawn(event_loop(
                     recv,
-                    ack_rx.take().ok_or(Error::Internal)?,
+                    ack_receiver,
                     event_tx.clone(),
                     (event_budget.clone(), metrics.clone()),
                     subscription_id,
@@ -621,14 +641,6 @@ async fn connection_inner(
                     worker_stop,
                 ));
                 subscription = Some((subscription_id, generation, handle));
-                queue(
-                    &control_tx,
-                    &control_budget,
-                    &metrics,
-                    BusinessRpcQueueClass::Control,
-                    BusinessRpcFrame::Subscribed { subscription_id },
-                    None,
-                )?;
             }
             BusinessRpcFrame::EventAck { ack } if role.events() => {
                 if subscription
