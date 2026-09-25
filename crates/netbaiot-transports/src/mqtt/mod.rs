@@ -79,7 +79,7 @@ async fn send_broker_frame(
 ) -> Result<()> {
     let mut pending = Some(frame);
     while let Some(frame) = pending.take() {
-        let bytes = match frame {
+        let (bytes, budget, command) = match frame {
             BrokerFrame::Publish(delivery) => {
                 if delivery.packet_id.is_none() && delivery.message.expired(now_ms()) {
                     return Ok(());
@@ -101,12 +101,21 @@ async fn send_broker_frame(
                     pending = services.mqtt.next_offline(key, generation)?;
                     continue;
                 }
-                bytes
+                (bytes, delivery._budget, delivery.command)
             }
             // PUBREL's MQTT 3.1.1 fixed-header flags are always 0010.
-            BrokerFrame::Pubrel { packet_id, dup: _ } => ack(0x62, packet_id),
+            BrokerFrame::Pubrel { packet_id, dup: _ } => (ack(0x62, packet_id), Vec::new(), false),
         };
-        send(stream, services, &bytes).await?;
+        let sent = send(stream, services, &bytes).await;
+        let charged = !budget.is_empty();
+        drop(budget);
+        if charged {
+            services.mqtt.outbound_bytes_released()?;
+        }
+        sent?;
+        if command {
+            services.router.transport_state(DeliveryState::Sent);
+        }
     }
     Ok(())
 }
@@ -304,6 +313,13 @@ pub async fn connection(
     .await?;
     services.ingress.metrics.inc(Metric::MqttConnectSuccess);
     machine.transition(ConnectionState::Connected)?;
+    let down_topic = topic(&auth.device_key, TopicKind::Down);
+    live_session.set_command_ready(
+        services
+            .mqtt
+            .subscription_qos(&attachment.key, &down_topic)?
+            .is_some(),
+    )?;
     let keepalive = if connect.keep_alive == 0 {
         None
     } else {
@@ -327,18 +343,16 @@ pub async fn connection(
                     let Some(command) = command else { break };
                     if command.expires_at <= now_ms() { continue }
                     let down = topic(&auth.device_key, TopicKind::Down);
-                    // Management commands target this authenticated live connection directly.
-                    // A missing broker subscription must not turn an accepted command into a
-                    // silent drop; QoS1 supplies transport receipt independently of execution ACK.
-                    let qos = services
-                        .mqtt
-                        .subscription_qos(&attachment.key, &down)?
-                        .unwrap_or(1);
-                    services.mqtt.send_live(&attachment.key, BrokerMessage {
+                    let Some(qos) = services.mqtt.subscription_qos(&attachment.key, &down)? else {
+                        services.router.transport_state(DeliveryState::Failed);
+                        continue;
+                    };
+                    if services.mqtt.send_live(&attachment.key, attachment.generation, BrokerMessage {
                         topic: down, payload: command.bytes.to_vec(), qos, retain: false,
                         properties: Default::default(),
-                    })?;
-                    services.router.transport_state(DeliveryState::Sent);
+                    }).is_err() {
+                        services.router.transport_state(DeliveryState::Failed);
+                    }
                 }
                 frame = attachment.receiver.recv() => {
                     let Some(frame) = frame else { break };
@@ -346,11 +360,18 @@ pub async fn connection(
                 }
                 packet = next(&mut reader, &mut stream, limits, idle) => {
                     let (packet, validation_us, validated_at) = packet?;
-                    if !matches!(&packet, Packet::Publish { .. }) {
-                        let (wait, hold) = services.protocol_admission.check_rate(&auth.device_key)?;
-                        services.ingress.metrics.observe(Histogram::AdmissionLockWait, wait);
-                        services.ingress.metrics.observe(Histogram::AdmissionLockHold, hold);
-                    }
+                    let control = matches!(&packet, Packet::Puback(_) | Packet::Pubrec(_)
+                        | Packet::Pubrel(_) | Packet::Pubcomp(_) | Packet::Pingreq | Packet::Disconnect);
+                    let units = match &packet {
+                        Packet::Publish { topic, payload, .. } =>
+                            1usize.saturating_add(topic.len().saturating_add(payload.len()) / 4096),
+                        _ => 1,
+                    };
+                    let admission = if control { &services.protocol_control_admission }
+                        else { &services.protocol_admission };
+                    let (wait, hold) = admission.check_rate_weighted(&auth.device_key, units)?;
+                    services.ingress.metrics.observe(Histogram::AdmissionLockWait, wait);
+                    services.ingress.metrics.observe(Histogram::AdmissionLockHold, hold);
                     last = Instant::now();
                     services.ingress.metrics.inc(Metric::MqttPacketsReceived);
                     match packet {
@@ -369,15 +390,23 @@ pub async fn connection(
                                 } else { 0x80 };
                                 body.push(granted);
                             }
+                            live_session.set_command_ready(
+                                services.mqtt.subscription_qos(&attachment.key, &down_topic)?.is_some()
+                            )?;
                             send(&mut stream, &services, &encode(0x90, &body, limits.max_mqtt_packet_size)?).await?;
                         }
                         Packet::Unsubscribe { packet_id, filters } => {
+                            live_session.set_command_ready(false)?;
                             for filter in filters { services.mqtt.unsubscribe(&attachment.key, attachment.generation, &filter)?; }
+                            live_session.set_command_ready(
+                                services.mqtt.subscription_qos(&attachment.key, &down_topic)?.is_some()
+                            )?;
                             send(&mut stream, &services, &ack(0xb0, packet_id)).await?;
                         }
                         Packet::Puback(id) => {
-                            services.mqtt.puback(&attachment.key, attachment.generation, id)?;
-                            services.router.transport_state(DeliveryState::Received);
+                            if services.mqtt.puback(&attachment.key, attachment.generation, id)? {
+                                services.router.transport_state(DeliveryState::Received);
+                            }
                             services.ingress.metrics.inc(Metric::MqttPubacks);
                             if let Some(frame) = services.mqtt.next_offline(&attachment.key, attachment.generation)? {
                                 send_broker_frame(&mut stream, &services, &attachment.key, attachment.generation, frame).await?;
@@ -388,7 +417,9 @@ pub async fn connection(
                             send_broker_frame(&mut stream, &services, &attachment.key, attachment.generation, frame).await?;
                         }
                         Packet::Pubcomp(id) => {
-                            services.mqtt.pubcomp(&attachment.key, attachment.generation, id)?;
+                            if services.mqtt.pubcomp(&attachment.key, attachment.generation, id)? {
+                                services.router.transport_state(DeliveryState::Received);
+                            }
                             if let Some(frame) = services.mqtt.next_offline(&attachment.key, attachment.generation)? {
                                 send_broker_frame(&mut stream, &services, &attachment.key, attachment.generation, frame).await?;
                             }
@@ -472,8 +503,10 @@ pub async fn connection(
                             let kind = publish_acl(&auth, &message.topic)?;
                             if qos == 2 {
                                 let id = packet_id.ok_or(Error::Invalid)?;
-                                services.ingress.validate_mqtt_qos2_payload(
-                                    &auth, &message.payload, kind == TopicKind::DownAck)?;
+                                if !(message.retain && message.payload.is_empty()) {
+                                    services.ingress.validate_mqtt_qos2_payload(
+                                        &auth, &message.payload, kind == TopicKind::DownAck)?;
+                                }
                                 services.mqtt.inbound_qos2(&attachment.key, attachment.generation, id, message)?;
                                 send(&mut stream, &services, &ack(0x50, id)).await?;
                             } else {

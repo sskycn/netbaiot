@@ -5,7 +5,7 @@ use std::{
     collections::HashMap,
     sync::{
         Arc, Weak,
-        atomic::{AtomicUsize, Ordering},
+        atomic::{AtomicBool, AtomicUsize, Ordering},
     },
 };
 use tokio::sync::{OwnedSemaphorePermit, Semaphore, mpsc};
@@ -40,9 +40,14 @@ pub struct SessionEndpoint {
     tenant_bytes: ByteBudget,
     global_bytes: ByteBudget,
     queued: Arc<AtomicUsize>,
+    command_ready: Arc<AtomicBool>,
 }
 
 impl SessionEndpoint {
+    pub fn command_ready(&self) -> bool {
+        self.command_ready.load(Ordering::Acquire)
+    }
+
     pub fn enqueue(&self, command: &DeviceCommand, bytes: Vec<u8>) -> Result<()> {
         if self.cancel.is_cancelled() || command.device != self.auth.device_key {
             return Err(Error::Unavailable);
@@ -216,6 +221,7 @@ impl Sessions {
             tenant_bytes,
             global_bytes: self.global_bytes.clone(),
             queued: self.queued.clone(),
+            command_ready: Arc::new(AtomicBool::new(transport == Transport::Tcp)),
         };
         if let Some(old) = state.sessions.insert(device.clone(), endpoint) {
             old.cancel.cancel();
@@ -416,6 +422,20 @@ impl Sessions {
     }
 }
 
+impl SessionLease {
+    /// Update only the current transport generation. A replaced connection cannot
+    /// mark the replacement's command channel ready.
+    pub fn set_command_ready(&self, ready: bool) -> Result<()> {
+        let state = lock(&self.owner.state)?;
+        let endpoint = state.sessions.get(&self.device).ok_or(Error::Unavailable)?;
+        if endpoint.generation != self.generation {
+            return Err(Error::Unavailable);
+        }
+        endpoint.command_ready.store(ready, Ordering::Release);
+        Ok(())
+    }
+}
+
 impl Drop for SessionLease {
     fn drop(&mut self) {
         if let Ok(mut state) = self.owner.state.lock()
@@ -560,6 +580,55 @@ mod tests {
         assert_eq!(
             sessions.lookup(&new.device).unwrap().unwrap().generation,
             new.generation
+        );
+    }
+
+    #[test]
+    fn mqtt_command_readiness_is_generation_fenced() {
+        let sessions = Sessions::new(Arc::new(Limits::default()));
+        let auth = auth("ready");
+        let (old, _) = sessions.register(auth.clone(), Transport::Mqtt).unwrap();
+        assert!(
+            !sessions
+                .lookup(&old.device)
+                .unwrap()
+                .unwrap()
+                .command_ready()
+        );
+        old.set_command_ready(true).unwrap();
+        assert!(
+            sessions
+                .lookup(&old.device)
+                .unwrap()
+                .unwrap()
+                .command_ready()
+        );
+        let (new, _) = sessions.register(auth, Transport::Mqtt).unwrap();
+        assert!(
+            !sessions
+                .lookup(&new.device)
+                .unwrap()
+                .unwrap()
+                .command_ready()
+        );
+        assert!(matches!(
+            old.set_command_ready(true),
+            Err(Error::Unavailable)
+        ));
+        assert!(
+            !sessions
+                .lookup(&new.device)
+                .unwrap()
+                .unwrap()
+                .command_ready()
+        );
+        new.set_command_ready(true).unwrap();
+        assert!(
+            sessions
+                .lookup(&new.device)
+                .unwrap()
+                .unwrap()
+                .command_ready()
         );
     }
 

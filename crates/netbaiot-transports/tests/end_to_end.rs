@@ -476,6 +476,432 @@ fn qos2_publish(body: &[u8], packet_id: u16, dup: bool) -> Vec<u8> {
     wire
 }
 
+fn retained_delete(qos: u8, packet_id: u16, v5: bool) -> Vec<u8> {
+    let topic = "v1/t/t/p/p/d/a/up";
+    let mut body = Vec::new();
+    mqtt_string(topic.as_bytes(), &mut body);
+    if qos > 0 {
+        body.extend_from_slice(&packet_id.to_be_bytes());
+    }
+    if v5 {
+        body.push(0); // zero publish properties
+    }
+    let mut frame = vec![0x31 | (qos << 1), body.len() as u8];
+    frame.extend_from_slice(&body);
+    frame
+}
+
+fn connect_packet_v5() -> Vec<u8> {
+    let mut body = Vec::new();
+    mqtt_string(b"MQTT", &mut body);
+    body.extend_from_slice(&[5, 0xc2, 0, 30, 0]); // version, flags, keepalive, properties
+    mqtt_string(b"client-v5", &mut body);
+    mqtt_string(b"a", &mut body);
+    mqtt_string(b"secret", &mut body);
+    let mut frame = vec![0x10, body.len() as u8];
+    frame.extend_from_slice(&body);
+    frame
+}
+
+async fn read_mqtt_packet(stream: &mut tokio::io::DuplexStream) -> Vec<u8> {
+    let mut header = [0u8; 2];
+    stream.read_exact(&mut header).await.unwrap();
+    assert_eq!(header[1] & 0x80, 0, "test expects a short reply");
+    let mut packet = header.to_vec();
+    let mut body = vec![0; usize::from(header[1])];
+    stream.read_exact(&mut body).await.unwrap();
+    packet.extend_from_slice(&body);
+    packet
+}
+
+async fn read_mqtt_frame(stream: &mut tokio::io::DuplexStream) -> (u8, Vec<u8>) {
+    let mut first = [0u8; 1];
+    stream.read_exact(&mut first).await.unwrap();
+    let mut remaining = 0usize;
+    let mut multiplier = 1usize;
+    loop {
+        let mut byte = [0u8; 1];
+        stream.read_exact(&mut byte).await.unwrap();
+        remaining += usize::from(byte[0] & 0x7f) * multiplier;
+        if byte[0] & 0x80 == 0 {
+            break;
+        }
+        multiplier *= 128;
+        assert!(multiplier <= 128 * 128 * 128);
+    }
+    assert!(remaining <= 4096);
+    let mut body = vec![0; remaining];
+    stream.read_exact(&mut body).await.unwrap();
+    (first[0], body)
+}
+
+fn packet_id_from_publish(body: &[u8]) -> u16 {
+    let topic_len = usize::from(u16::from_be_bytes([body[0], body[1]]));
+    u16::from_be_bytes([body[topic_len + 2], body[topic_len + 3]])
+}
+
+#[tokio::test]
+async fn retained_delete_qos_matrix_skips_business_json_decode() {
+    use netbaiot_transports::mqtt::broker::BrokerMessage;
+
+    for v5 in [false, true] {
+        for qos in 0..=2 {
+            let provider = Arc::new(CountingProvider {
+                calls: AtomicUsize::new(0),
+                auth: auth(),
+                delay: false,
+            });
+            let sink = Arc::new(CountSink(AtomicUsize::new(0)));
+            let (ingress, services, stop) =
+                runtime_with_sink(Limits::default(), provider, sink.clone());
+            let topic = "v1/t/t/p/p/d/a/up";
+            services
+                .mqtt
+                .route(
+                    &auth().device_key,
+                    BrokerMessage {
+                        topic: topic.into(),
+                        payload: b"old".to_vec(),
+                        qos: 0,
+                        retain: true,
+                        properties: Default::default(),
+                    },
+                )
+                .unwrap();
+            assert!(services.mqtt.has_retained_topic(topic).unwrap());
+            let (mut client, server) = tokio::io::duplex(4096);
+            let lease = services
+                .connections
+                .acquire("127.0.0.1".parse().unwrap(), Transport::Mqtt)
+                .unwrap();
+            let task = tokio::spawn(netbaiot_transports::mqtt::connection(
+                Box::new(server),
+                services.clone(),
+                lease,
+                stop.child_token(),
+            ));
+            let connect = if v5 {
+                connect_packet_v5()
+            } else {
+                connect_packet()
+            };
+            client.write_all(&connect).await.unwrap();
+            let connack = read_mqtt_packet(&mut client).await;
+            assert_eq!(connack[0], 0x20);
+            assert_eq!(connack[3], 0);
+            let id = 7;
+            client
+                .write_all(&retained_delete(qos, id, v5))
+                .await
+                .unwrap();
+            if qos > 0 {
+                let response = read_mqtt_packet(&mut client).await;
+                assert_eq!(response[0], if qos == 1 { 0x40 } else { 0x50 });
+                assert_eq!(&response[2..4], &id.to_be_bytes());
+            }
+            if qos == 2 {
+                client.write_all(&[0x62, 2, 0, id as u8]).await.unwrap();
+                let response = read_mqtt_packet(&mut client).await;
+                assert_eq!(response[0], 0x70);
+            }
+            tokio::time::timeout(std::time::Duration::from_secs(1), async {
+                while services.mqtt.has_retained_topic(topic).unwrap() {
+                    tokio::task::yield_now().await;
+                }
+            })
+            .await
+            .unwrap();
+            assert_eq!(sink.0.load(Ordering::Relaxed), 0);
+            drop(client);
+            stop.cancel();
+            task.await.unwrap().unwrap();
+            ingress.events.stop_workers().await.unwrap();
+        }
+    }
+}
+
+#[tokio::test]
+async fn mqtt_publish_fast_paths_consume_protocol_budget() {
+    for case in 0..3 {
+        let provider = Arc::new(CountingProvider {
+            calls: AtomicUsize::new(0),
+            auth: auth(),
+            delay: false,
+        });
+        let limits = Limits {
+            requests_per_second: 100,
+            messages_per_device_second: 2,
+            messages_per_tenant_second: 100,
+            ..Limits::default()
+        };
+        let (ingress, services, stop) = runtime(limits, provider);
+        let (mut client, server) = tokio::io::duplex(4096);
+        let lease = services
+            .connections
+            .acquire("127.0.0.1".parse().unwrap(), Transport::Mqtt)
+            .unwrap();
+        let task = tokio::spawn(netbaiot_transports::mqtt::connection(
+            Box::new(server),
+            services,
+            lease,
+            stop.child_token(),
+        ));
+        let connect = if case == 2 {
+            connect_packet_v5()
+        } else {
+            connect_packet()
+        };
+        client.write_all(&connect).await.unwrap();
+        assert_eq!(read_mqtt_packet(&mut client).await[0], 0x20);
+        for iteration in 0..3 {
+            let frame = match case {
+                0 => retained_delete(0, 0, false),
+                1 => qos2_publish(&payload(1), 7, iteration > 0),
+                _ => {
+                    let topic = "v1/t/t/p/p/d/a/up";
+                    let mut body = Vec::new();
+                    mqtt_string(topic.as_bytes(), &mut body);
+                    body.extend_from_slice(&(iteration + 1u16).to_be_bytes());
+                    body.push(0); // zero MQTT 5 PUBLISH properties
+                    body.extend_from_slice(b"invalid-json");
+                    let mut frame = vec![0x34, body.len() as u8];
+                    frame.extend_from_slice(&body);
+                    frame
+                }
+            };
+            client.write_all(&frame).await.unwrap();
+            if iteration < 2 && case != 0 {
+                let response = read_mqtt_packet(&mut client).await;
+                assert_eq!(response[0], 0x50);
+                if case == 2 {
+                    assert!(response[4] >= 0x80);
+                }
+            }
+        }
+        assert!(matches!(
+            tokio::time::timeout(std::time::Duration::from_secs(1), task)
+                .await
+                .unwrap()
+                .unwrap(),
+            Err(Error::Overloaded)
+        ));
+        assert_eq!(ingress.metrics.get(Metric::MqttPublishes), 2);
+        assert_eq!(ingress.metrics.get(Metric::EventsAccepted), 0);
+        drop(client);
+        stop.cancel();
+        ingress.events.stop_workers().await.unwrap();
+    }
+}
+
+#[tokio::test]
+async fn mqtt_v5_command_metrics_distinguish_ordinary_and_negative_puback() {
+    use netbaiot_transports::mqtt::broker::BrokerMessage;
+
+    let provider = Arc::new(CountingProvider {
+        calls: AtomicUsize::new(0),
+        auth: auth(),
+        delay: false,
+    });
+    let (ingress, services, stop) = runtime(Limits::default(), provider);
+    let (mut client, server) = tokio::io::duplex(4096);
+    let lease = services
+        .connections
+        .acquire("127.0.0.1".parse().unwrap(), Transport::Mqtt)
+        .unwrap();
+    let task = tokio::spawn(netbaiot_transports::mqtt::connection(
+        Box::new(server),
+        services.clone(),
+        lease,
+        stop.child_token(),
+    ));
+    client.write_all(&connect_packet_v5()).await.unwrap();
+    assert_eq!(read_mqtt_frame(&mut client).await.0, 0x20);
+    let down = "v1/t/t/p/p/d/a/down";
+    let up = "v1/t/t/p/p/d/a/up";
+    let mut subscribe = vec![0, 1, 0]; // packet ID and zero properties
+    for filter in [down, up] {
+        mqtt_string(filter.as_bytes(), &mut subscribe);
+        subscribe.push(1);
+    }
+    let mut wire = vec![0x82, subscribe.len() as u8];
+    wire.extend_from_slice(&subscribe);
+    client.write_all(&wire).await.unwrap();
+    assert_eq!(read_mqtt_frame(&mut client).await.0, 0x90);
+    services
+        .mqtt
+        .route(
+            &auth().device_key,
+            BrokerMessage {
+                topic: up.into(),
+                payload: b"ordinary".to_vec(),
+                qos: 1,
+                retain: false,
+                properties: Default::default(),
+            },
+        )
+        .unwrap();
+    let (first, body) = read_mqtt_frame(&mut client).await;
+    assert_eq!(first & 0xf0, 0x30);
+    let ordinary_id = packet_id_from_publish(&body);
+    client
+        .write_all(&[0x40, 2, (ordinary_id >> 8) as u8, ordinary_id as u8])
+        .await
+        .unwrap();
+    tokio::time::timeout(std::time::Duration::from_secs(1), async {
+        while ingress.metrics.get(Metric::MqttPubacks) != 1 {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .unwrap();
+    assert_eq!(ingress.metrics.get(Metric::CommandReceived), 0);
+
+    for (reason, expected_received, expected_failed) in [(0x80, 0, 1), (0, 1, 1)] {
+        services
+            .router
+            .send(DeviceCommand {
+                command_id: CommandId::generate(),
+                device: auth().device_key,
+                expires_at: None,
+                payload: DeviceCommandPayload {
+                    name: "test".into(),
+                    arguments: Default::default(),
+                },
+            })
+            .unwrap();
+        let (first, body) = read_mqtt_frame(&mut client).await;
+        assert_eq!(first & 0xf0, 0x30);
+        let command_id = packet_id_from_publish(&body);
+        let ack = if reason == 0 {
+            vec![0x40, 2, (command_id >> 8) as u8, command_id as u8]
+        } else {
+            vec![0x40, 3, (command_id >> 8) as u8, command_id as u8, reason]
+        };
+        client.write_all(&ack).await.unwrap();
+        tokio::time::timeout(std::time::Duration::from_secs(1), async {
+            while ingress.metrics.get(Metric::CommandReceived) != expected_received
+                || ingress.metrics.get(Metric::CommandFailed) != expected_failed
+            {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+    }
+    assert_eq!(ingress.metrics.get(Metric::CommandSent), 2);
+    let mut subscribe = vec![0, 2, 0];
+    mqtt_string(down.as_bytes(), &mut subscribe);
+    subscribe.push(2);
+    let mut wire = vec![0x82, subscribe.len() as u8];
+    wire.extend_from_slice(&subscribe);
+    client.write_all(&wire).await.unwrap();
+    assert_eq!(read_mqtt_frame(&mut client).await.0, 0x90);
+    services
+        .router
+        .send(DeviceCommand {
+            command_id: CommandId::generate(),
+            device: auth().device_key,
+            expires_at: None,
+            payload: DeviceCommandPayload {
+                name: "test".into(),
+                arguments: Default::default(),
+            },
+        })
+        .unwrap();
+    let (first, body) = read_mqtt_frame(&mut client).await;
+    assert_eq!(first & 0x06, 0x04);
+    let packet_id = packet_id_from_publish(&body);
+    client
+        .write_all(&[0x50, 3, (packet_id >> 8) as u8, packet_id as u8, 0x80])
+        .await
+        .unwrap();
+    tokio::time::timeout(std::time::Duration::from_secs(1), async {
+        while ingress.metrics.get(Metric::CommandFailed) != 2 {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .unwrap();
+    assert_eq!(ingress.metrics.get(Metric::CommandReceived), 1);
+    drop(client);
+    stop.cancel();
+    task.await.unwrap().unwrap();
+    ingress.events.stop_workers().await.unwrap();
+}
+
+#[tokio::test]
+async fn mqtt_command_requires_live_subscription_and_unsubscribe_preserves_inflight_ack() {
+    let provider = Arc::new(CountingProvider {
+        calls: AtomicUsize::new(0),
+        auth: auth(),
+        delay: false,
+    });
+    let (ingress, services, stop) = runtime(Limits::default(), provider);
+    let (mut client, server) = tokio::io::duplex(4096);
+    let lease = services
+        .connections
+        .acquire("127.0.0.1".parse().unwrap(), Transport::Mqtt)
+        .unwrap();
+    let task = tokio::spawn(netbaiot_transports::mqtt::connection(
+        Box::new(server),
+        services.clone(),
+        lease,
+        stop.child_token(),
+    ));
+    client.write_all(&connect_packet()).await.unwrap();
+    assert_eq!(read_mqtt_frame(&mut client).await.0, 0x20);
+    let command = || DeviceCommand {
+        command_id: CommandId::generate(),
+        device: auth().device_key,
+        expires_at: None,
+        payload: DeviceCommandPayload {
+            name: "test".into(),
+            arguments: Default::default(),
+        },
+    };
+    assert!(matches!(
+        services.router.send(command()),
+        Err(Error::Unavailable)
+    ));
+    let down = "v1/t/t/p/p/d/a/down";
+    let mut subscribe = vec![0, 1];
+    mqtt_string(down.as_bytes(), &mut subscribe);
+    subscribe.push(1);
+    let mut wire = vec![0x82, subscribe.len() as u8];
+    wire.extend_from_slice(&subscribe);
+    client.write_all(&wire).await.unwrap();
+    assert_eq!(read_mqtt_frame(&mut client).await.0, 0x90);
+    services.router.send(command()).unwrap();
+    let (first, body) = read_mqtt_frame(&mut client).await;
+    assert_eq!(first & 0xf0, 0x30);
+    let packet_id = packet_id_from_publish(&body);
+    let mut unsubscribe = vec![0, 2];
+    mqtt_string(down.as_bytes(), &mut unsubscribe);
+    let mut wire = vec![0xa2, unsubscribe.len() as u8];
+    wire.extend_from_slice(&unsubscribe);
+    client.write_all(&wire).await.unwrap();
+    assert_eq!(read_mqtt_frame(&mut client).await.0, 0xb0);
+    assert!(matches!(
+        services.router.send(command()),
+        Err(Error::Unavailable)
+    ));
+    client
+        .write_all(&[0x40, 2, (packet_id >> 8) as u8, packet_id as u8])
+        .await
+        .unwrap();
+    tokio::time::timeout(std::time::Duration::from_secs(1), async {
+        while ingress.metrics.get(Metric::CommandReceived) != 1 {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .unwrap();
+    drop(client);
+    stop.cancel();
+    task.await.unwrap().unwrap();
+    ingress.events.stop_workers().await.unwrap();
+}
+
 #[tokio::test]
 async fn inbound_qos2_duplicate_sequence_emits_one_device_event() {
     let provider = Arc::new(CountingProvider {

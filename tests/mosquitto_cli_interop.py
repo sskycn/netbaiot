@@ -2,6 +2,7 @@
 """Real MQTT 3.1.1 matrix using only mosquitto_pub/sub against NetbaIoT."""
 
 import argparse
+from collections import deque
 import json
 import os
 import shutil
@@ -77,17 +78,39 @@ class Matrix:
         self.sequence = 0
         self.clients = 0
         self.last_command = []
+        self.packet_times = deque()
+
+    def pace_protocol_packets(self):
+        # The development broker admits 16 data packets per device per second.
+        # This matrix checks interoperability, while dedicated tests check the
+        # limit itself. Keep CLI SUBSCRIBE/PUBLISH bursts below that budget.
+        while True:
+            now = time.monotonic()
+            while self.packet_times and now - self.packet_times[0] >= 1.0:
+                self.packet_times.popleft()
+            if len(self.packet_times) < 10:
+                self.packet_times.append(now)
+                return
+            time.sleep(max(0.001, 1.01 - (now - self.packet_times[0])))
 
     def publish(self, topic=TOPIC, qos=1, payload=None, retain=False, check=True, extra=()):
+        self.pace_protocol_packets()
         self.sequence += 1
         payload = payload if payload is not None else event(f"mosq-{self.sequence}", self.sequence)
         command = [MOSQUITTO_PUB, *self.base, "-i", f"mosq-pub-{self.sequence}", "-t", topic, "-q", str(qos), "-m", payload, *extra]
         if retain:
             command.append("-r")
         self.last_command = command
-        return subprocess.run(command, check=check, capture_output=True, text=True, timeout=8)
+        completed = subprocess.run(command, capture_output=True, text=True, timeout=8)
+        if check and completed.returncode != 0:
+            raise AssertionError(
+                f"Mosquitto publish failed: {redacted_command(command)}; "
+                f"exit={completed.returncode}; stderr={completed.stderr}"
+            )
+        return completed
 
     def subscriber(self, topic, qos=2, count=1, client_id=None, persistent=False, extra=()):
+        self.pace_protocol_packets()
         self.clients += 1
         client_id = client_id or f"mosq-sub-{self.clients}"
         command = [MOSQUITTO_SUB, *self.base, "-t", topic, "-q", str(qos), "-C", str(count), "-W", "5", "-N", *extra]
