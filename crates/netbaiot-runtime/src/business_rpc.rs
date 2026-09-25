@@ -20,18 +20,37 @@ use std::{
     },
     time::{Duration, Instant},
 };
-use tokio::sync::{OwnedSemaphorePermit, Semaphore, mpsc, oneshot};
+use tokio::sync::{OwnedSemaphorePermit, Semaphore, mpsc, oneshot, watch};
 use uuid::Uuid;
 
 /// One authority is active at a time. A lease generation fences late responses and old disconnects.
 pub struct BusinessRpcRegistry {
     state: Mutex<State>,
+    status: watch::Sender<ProviderStatus>,
     next_epoch: AtomicU64,
     pending_slots: Arc<Semaphore>,
     pending_bytes: Arc<Semaphore>,
     timeout: Duration,
     metrics: Arc<Metrics>,
     max_bytes: usize,
+}
+/// Provider generation and readiness are observed together by the offline grace watcher.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ProviderStatus {
+    pub epoch: u64,
+    pub serving: bool,
+    /// Changes on every Serving state transition, even within one clock tick.
+    pub transition: u64,
+    /// The last transition into or out of Serving, on Tokio's monotonic clock.
+    pub changed_at: tokio::time::Instant,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct BusinessRpcUsage {
+    pub pending_items: usize,
+    pub pending_bytes: usize,
+    pub pending_slots_available: usize,
+    pub auth_queue_items: usize,
+    pub provider: ProviderStatus,
 }
 struct State {
     provider: Option<Provider>,
@@ -52,7 +71,14 @@ struct Provider {
     epoch: u64,
     serving: bool,
     revision: u64,
+    expires_at_ms: Option<i64>,
     sender: mpsc::Sender<BusinessRpcOutbound>,
+}
+impl Provider {
+    fn authorized_now(&self) -> bool {
+        self.expires_at_ms
+            .is_none_or(|expiry| expiry > crate::now_ms())
+    }
 }
 struct Pending {
     method: &'static str,
@@ -169,6 +195,13 @@ impl BusinessRpcRegistry {
                 provider: None,
                 pending: HashMap::new(),
             }),
+            status: watch::channel(ProviderStatus {
+                epoch: 0,
+                serving: false,
+                transition: 0,
+                changed_at: tokio::time::Instant::now(),
+            })
+            .0,
             next_epoch: AtomicU64::new(1),
             pending_slots: Arc::new(Semaphore::new(max_pending)),
             pending_bytes: Arc::new(Semaphore::new(max_bytes)),
@@ -181,6 +214,14 @@ impl BusinessRpcRegistry {
         self: &Arc<Self>,
         sender: mpsc::Sender<BusinessRpcOutbound>,
         scope: BusinessProviderScope,
+    ) -> Result<ProviderLease> {
+        self.register_with_expiry(sender, scope, None)
+    }
+    pub fn register_with_expiry(
+        self: &Arc<Self>,
+        sender: mpsc::Sender<BusinessRpcOutbound>,
+        scope: BusinessProviderScope,
+        expires_at_ms: Option<i64>,
     ) -> Result<ProviderLease> {
         let mut state = self.state.lock().map_err(|_| Error::Internal)?;
         if state.provider.is_some() {
@@ -195,8 +236,10 @@ impl BusinessRpcRegistry {
             epoch,
             serving: false,
             revision: 0,
+            expires_at_ms,
             sender,
         });
+        self.update_status(epoch, false);
         Ok(ProviderLease {
             registry: self.clone(),
             epoch,
@@ -208,11 +251,18 @@ impl BusinessRpcRegistry {
         if provider.epoch != epoch {
             return Err(Error::Unavailable);
         }
+        if !provider.authorized_now() {
+            return Err(Error::Forbidden);
+        }
         if revision == 0 {
             return Err(Error::Invalid);
         }
+        if revision < provider.revision {
+            return Err(Error::Conflict);
+        }
         provider.revision = revision;
         provider.serving = true;
+        self.update_status(epoch, true);
         Ok(())
     }
     fn mark_syncing(&self, epoch: u64) -> Result<()> {
@@ -223,6 +273,9 @@ impl BusinessRpcRegistry {
             .filter(|p| p.epoch == epoch)
             .ok_or(Error::Unavailable)?;
         provider.serving = false;
+        provider.revision = 0;
+        state.pending.retain(|(owner, _), _| *owner != epoch);
+        self.update_status(epoch, false);
         Ok(())
     }
     fn advance_revision(&self, epoch: u64, revision: u64) -> Result<()> {
@@ -236,6 +289,7 @@ impl BusinessRpcRegistry {
             return Err(Error::Conflict);
         }
         provider.revision = revision;
+        state.pending.retain(|(owner, _), _| *owner != epoch);
         Ok(())
     }
     pub fn auth_revision(&self) -> Result<u64> {
@@ -243,7 +297,7 @@ impl BusinessRpcRegistry {
         state
             .provider
             .as_ref()
-            .filter(|p| p.serving)
+            .filter(|p| p.serving && p.authorized_now())
             .map(|p| p.revision)
             .ok_or(Error::Unavailable)
     }
@@ -253,15 +307,68 @@ impl BusinessRpcRegistry {
         {
             state.provider = None;
             state.pending.retain(|(owner, _), _| *owner != epoch);
+            self.update_status(epoch, false);
         }
     }
+    // Call only while holding state. Consecutive Syncing/Disconnected updates
+    // must not restart the grace clock or extend old authorization.
+    fn update_status(&self, epoch: u64, serving: bool) {
+        let previous = *self.status.borrow();
+        self.status.send_replace(ProviderStatus {
+            epoch,
+            serving,
+            transition: if previous.serving == serving {
+                previous.transition
+            } else {
+                previous.transition.wrapping_add(1)
+            },
+            changed_at: if previous.serving == serving {
+                previous.changed_at
+            } else {
+                tokio::time::Instant::now()
+            },
+        });
+    }
+    pub fn subscribe_status(&self) -> watch::Receiver<ProviderStatus> {
+        self.status.subscribe()
+    }
+    /// Hold the provider state boundary while revoking offline authorization.
+    /// A newly synchronized generation cannot become Serving between the check
+    /// and the shared ingress/cache/session invalidation callback.
+    pub fn invalidate_if_offline<T>(
+        &self,
+        observed: ProviderStatus,
+        invalidate: impl FnOnce() -> Result<T>,
+    ) -> Result<Option<T>> {
+        let _state = self.state.lock().map_err(|_| Error::Internal)?;
+        let current = *self.status.borrow();
+        if current.serving || current != observed {
+            return Ok(None);
+        }
+        invalidate().map(Some)
+    }
     pub fn is_serving(&self) -> bool {
-        self.state
-            .lock()
-            .is_ok_and(|s| s.provider.as_ref().is_some_and(|p| p.serving))
+        self.state.lock().is_ok_and(|s| {
+            s.provider
+                .as_ref()
+                .is_some_and(|p| p.serving && p.authorized_now())
+        })
     }
     pub fn pending_usage(&self) -> usize {
         self.state.lock().map_or(0, |s| s.pending.len())
+    }
+    pub fn usage(&self) -> Result<BusinessRpcUsage> {
+        let state = self.state.lock().map_err(|_| Error::Internal)?;
+        Ok(BusinessRpcUsage {
+            pending_items: state.pending.len(),
+            pending_bytes: self.max_bytes - self.pending_bytes.available_permits(),
+            pending_slots_available: self.pending_slots.available_permits(),
+            auth_queue_items: state
+                .provider
+                .as_ref()
+                .map_or(0, |p| p.sender.max_capacity() - p.sender.capacity()),
+            provider: *self.status.borrow(),
+        })
     }
     pub fn render_metrics(&self) -> String {
         let (serving, pending, queue) = self.state.lock().map_or((false, 0, 0), |state| {
@@ -291,13 +398,28 @@ impl BusinessRpcRegistry {
             self.metrics.inc(Metric::BusinessRpcLateResponses);
             return false;
         };
-        if pending.method != method || pending.deadline <= Instant::now() {
+        if pending.method != method {
             self.metrics.inc(Metric::BusinessRpcLateResponses);
             return false;
         }
-        let scope = match state.provider.as_ref().filter(|p| p.epoch == epoch) {
+        if pending.deadline <= Instant::now() {
+            self.metrics.inc(Metric::BusinessRpcLateResponses);
+            if let Some(pending) = state.pending.remove(&(epoch, id)) {
+                let _ = pending.result.send(Err(Error::Timeout));
+            }
+            return false;
+        }
+        let scope = match state.provider.as_ref().filter(|p| {
+            p.epoch == epoch
+                && p.serving
+                && p.authorized_now()
+                && p.revision == pending.min_revision
+        }) {
             Some(provider) => provider.scope.clone(),
-            None => return false,
+            None => {
+                self.metrics.inc(Metric::BusinessRpcLateResponses);
+                return false;
+            }
         };
         let Some(pending) = state.pending.remove(&(epoch, id)) else {
             return false;
@@ -385,7 +507,7 @@ impl BusinessRpcRegistry {
             let provider = state
                 .provider
                 .as_ref()
-                .filter(|p| p.serving)
+                .filter(|p| p.serving && p.authorized_now())
                 .ok_or(Error::Unavailable)?;
             let epoch = provider.epoch;
             let sender = provider.sender.clone();
@@ -898,5 +1020,477 @@ mod tests {
             Ok(json!({"identity": identity, "verifier_key_hex": "07".repeat(32)}))
         ));
         recovered.await.unwrap().unwrap();
+    }
+
+    #[tokio::test]
+    async fn local_epoch_rejects_high_revision_response_after_device_and_all_invalidation() {
+        for invalidation in [
+            netbaiot_core::AuthInvalidation::Device {
+                device: serde_json::from_value(test_identity("one")["device_key"].clone()).unwrap(),
+            },
+            netbaiot_core::AuthInvalidation::All,
+        ] {
+            let registry = BusinessRpcRegistry::new(2, 65_536, Duration::from_secs(1)).unwrap();
+            let (send, mut receive) = mpsc::channel(2);
+            let lease = registry
+                .register(
+                    send,
+                    BusinessProviderScope {
+                        global: true,
+                        tenants: vec![],
+                    },
+                )
+                .unwrap();
+            lease.mark_serving(1).unwrap();
+            let cache = AuthCache::new(
+                BusinessRpcAuthProvider::new(registry.clone()),
+                Arc::new(Limits::default()),
+                Arc::new(Metrics::default()),
+            );
+            let old = tokio::spawn({
+                let cache = cache.clone();
+                async move {
+                    cache
+                        .authenticate_candidate(AuthenticationRequest::Secret {
+                            credential_id: "cred-one",
+                            secret: b"secret",
+                        })
+                        .await
+                }
+            });
+            let outbound = receive.recv().await.unwrap();
+            let BusinessRpcFrame::Request {
+                request_id, method, ..
+            } = outbound.frame
+            else {
+                panic!("request expected")
+            };
+            drop(outbound._bytes);
+            cache.invalidate(&invalidation).unwrap();
+            let mut identity = test_identity("one");
+            identity["auth_revision"] = json!(2);
+            assert!(registry.complete(lease.epoch(), request_id, &method, Ok(identity.clone())));
+            assert!(matches!(old.await.unwrap(), Err(Error::Authentication)));
+            assert_eq!(cache.usage().unwrap().0, 0);
+            assert_eq!(registry.usage().unwrap().pending_items, 0);
+            lease.advance_revision(2).unwrap();
+            let fresh = tokio::spawn({
+                let cache = cache.clone();
+                async move {
+                    cache
+                        .authenticate_candidate(AuthenticationRequest::Secret {
+                            credential_id: "cred-one",
+                            secret: b"secret",
+                        })
+                        .await
+                }
+            });
+            let outbound = receive.recv().await.unwrap();
+            let BusinessRpcFrame::Request {
+                request_id,
+                method,
+                body,
+                ..
+            } = outbound.frame
+            else {
+                panic!("fresh request expected")
+            };
+            assert_eq!(body["min_auth_revision"], json!(2));
+            assert!(registry.complete(lease.epoch(), request_id, &method, Ok(identity)));
+            assert!(fresh.await.unwrap().is_ok());
+        }
+    }
+
+    #[tokio::test]
+    async fn syncing_and_revision_advance_reclaim_pending_and_fence_late_responses() {
+        let metrics = Arc::new(Metrics::default());
+        let registry = BusinessRpcRegistry::new_with_metrics(
+            2,
+            65_536,
+            Duration::from_secs(1),
+            metrics.clone(),
+        )
+        .unwrap();
+        let (send, mut receive) = mpsc::channel(2);
+        let lease = registry
+            .register(
+                send,
+                BusinessProviderScope {
+                    global: true,
+                    tenants: vec![],
+                },
+            )
+            .unwrap();
+        lease.mark_serving(10).unwrap();
+        let task = tokio::spawn({
+            let registry = registry.clone();
+            async move {
+                registry
+                    .call::<_, Value>("device.authenticate", &json!({"credential_id":"x"}))
+                    .await
+            }
+        });
+        let outbound = receive.recv().await.unwrap();
+        let BusinessRpcFrame::Request { request_id, .. } = outbound.frame else {
+            panic!("request expected")
+        };
+        drop(outbound._bytes);
+        lease.mark_syncing().unwrap();
+        assert!(matches!(task.await.unwrap(), Err(Error::Unavailable)));
+        assert!(!registry.complete(
+            lease.epoch(),
+            request_id,
+            "device.authenticate",
+            Ok(test_identity("one"))
+        ));
+        let usage = registry.usage().unwrap();
+        assert_eq!(usage.pending_items, 0);
+        assert_eq!(usage.pending_bytes, 0);
+        assert_eq!(usage.pending_slots_available, 2);
+        assert!(!usage.provider.serving);
+        lease.mark_serving(12).unwrap();
+        assert_eq!(registry.auth_revision().unwrap(), 12);
+        assert_eq!(metrics.get(Metric::BusinessRpcLateResponses), 1);
+    }
+
+    #[tokio::test]
+    async fn queue_and_byte_overload_release_all_admission_permits() {
+        let registry = BusinessRpcRegistry::new(3, 256, Duration::from_secs(1)).unwrap();
+        let (send, mut receive) = mpsc::channel(1);
+        let lease = registry
+            .register(
+                send,
+                BusinessProviderScope {
+                    global: true,
+                    tenants: vec![],
+                },
+            )
+            .unwrap();
+        lease.mark_serving(1).unwrap();
+        let first = tokio::spawn({
+            let registry = registry.clone();
+            async move {
+                registry
+                    .call::<_, Value>("device.authenticate", &json!({"credential_id":"first"}))
+                    .await
+            }
+        });
+        let outbound = receive.recv().await.unwrap();
+        let BusinessRpcFrame::Request {
+            request_id, method, ..
+        } = outbound.frame
+        else {
+            panic!("request expected")
+        };
+        assert!(registry.usage().unwrap().pending_bytes > 0);
+        let overloaded = registry
+            .call::<_, Value>("device.authenticate", &json!({"credential_id":"second"}))
+            .await;
+        assert!(matches!(overloaded, Err(Error::Overloaded)));
+        assert_eq!(registry.usage().unwrap().pending_items, 1);
+        drop(outbound._bytes);
+        assert!(registry.complete(lease.epoch(), request_id, &method, Ok(test_identity("one"))));
+        first.await.unwrap().unwrap();
+        // A cancelled call may enqueue a bounded Cancel frame. Drain it before
+        // asserting byte permits return to their baseline.
+        while let Ok(frame) = receive.try_recv() {
+            drop(frame);
+        }
+        let usage = registry.usage().unwrap();
+        assert_eq!(usage.pending_items, 0);
+        assert_eq!(usage.pending_bytes, 0);
+        assert_eq!(usage.pending_slots_available, 3);
+    }
+
+    #[tokio::test]
+    async fn stale_verifier_cannot_validate_datagram_or_poison_cache() {
+        let registry = BusinessRpcRegistry::new(2, 65_536, Duration::from_secs(1)).unwrap();
+        let (send, mut receive) = mpsc::channel(2);
+        let lease = registry
+            .register(
+                send,
+                BusinessProviderScope {
+                    global: true,
+                    tenants: vec![],
+                },
+            )
+            .unwrap();
+        lease.mark_serving(1).unwrap();
+        let cache = AuthCache::new(
+            BusinessRpcAuthProvider::new(registry.clone()),
+            Arc::new(Limits::default()),
+            Arc::new(Metrics::default()),
+        );
+        let message = b"udp-signed";
+        let mut mac = Hmac::<Sha256>::new_from_slice(&[7; 32]).unwrap();
+        mac.update(message);
+        let tag = mac.finalize().into_bytes().to_vec();
+        let old = tokio::spawn({
+            let cache = cache.clone();
+            let tag = tag.clone();
+            async move { cache.verify_signed("cred-udp", message, &tag).await }
+        });
+        let outbound = receive.recv().await.unwrap();
+        let BusinessRpcFrame::Request {
+            request_id, method, ..
+        } = outbound.frame
+        else {
+            panic!("verifier request expected")
+        };
+        cache
+            .invalidate(&netbaiot_core::AuthInvalidation::All)
+            .unwrap();
+        let mut identity = test_identity("udp");
+        identity["auth_revision"] = json!(2);
+        let reply = json!({"identity": identity, "verifier_key_hex": "07".repeat(32)});
+        assert!(registry.complete(lease.epoch(), request_id, &method, Ok(reply.clone())));
+        assert!(matches!(old.await.unwrap(), Err(Error::Authentication)));
+        assert_eq!(cache.usage().unwrap().0, 0);
+        lease.advance_revision(2).unwrap();
+        let fresh = tokio::spawn({
+            let cache = cache.clone();
+            let tag = tag.clone();
+            async move { cache.verify_signed("cred-udp", message, &tag).await }
+        });
+        let outbound = receive.recv().await.unwrap();
+        let BusinessRpcFrame::Request {
+            request_id,
+            method,
+            body,
+            ..
+        } = outbound.frame
+        else {
+            panic!("fresh verifier request expected")
+        };
+        assert_eq!(body["min_auth_revision"], json!(2));
+        assert!(registry.complete(lease.epoch(), request_id, &method, Ok(reply)));
+        assert!(fresh.await.unwrap().is_ok());
+    }
+
+    #[tokio::test]
+    async fn stale_lease_cleanup_and_response_cannot_touch_reconnected_provider() {
+        let metrics = Arc::new(Metrics::default());
+        let registry = BusinessRpcRegistry::new_with_metrics(
+            2,
+            65_536,
+            Duration::from_secs(1),
+            metrics.clone(),
+        )
+        .unwrap();
+        let (first_sender, mut first_rx) = mpsc::channel(2);
+        let first = registry
+            .register(
+                first_sender,
+                BusinessProviderScope {
+                    global: true,
+                    tenants: vec![],
+                },
+            )
+            .unwrap();
+        first.mark_serving(20).unwrap();
+        let old_epoch = first.epoch();
+        let old = tokio::spawn({
+            let registry = registry.clone();
+            async move {
+                registry
+                    .call::<_, Value>("device.authenticate", &json!({"credential_id":"old"}))
+                    .await
+            }
+        });
+        let outbound = first_rx.recv().await.unwrap();
+        let BusinessRpcFrame::Request { request_id, .. } = outbound.frame else {
+            panic!("request expected")
+        };
+        drop(outbound._bytes);
+        drop(first);
+        assert!(matches!(old.await.unwrap(), Err(Error::Unavailable)));
+        drop(first_rx);
+        let (second_sender, _second_rx) = mpsc::channel(2);
+        let second = registry
+            .register(
+                second_sender,
+                BusinessProviderScope {
+                    global: true,
+                    tenants: vec![],
+                },
+            )
+            .unwrap();
+        second.mark_serving(21).unwrap();
+        registry.release(old_epoch);
+        assert!(!registry.complete(
+            old_epoch,
+            request_id,
+            "device.authenticate",
+            Ok(test_identity("old"))
+        ));
+        assert_eq!(registry.auth_revision().unwrap(), 21);
+        assert_eq!(registry.usage().unwrap().provider.epoch, second.epoch());
+        assert_eq!(registry.usage().unwrap().pending_items, 0);
+        assert_eq!(registry.usage().unwrap().pending_bytes, 0);
+        assert_eq!(metrics.get(Metric::BusinessRpcLateResponses), 1);
+    }
+
+    #[tokio::test]
+    async fn response_below_minimum_authority_revision_is_rejected_and_reclaimed() {
+        let registry = BusinessRpcRegistry::new(1, 65_536, Duration::from_secs(1)).unwrap();
+        let (send, mut receive) = mpsc::channel(1);
+        let lease = registry
+            .register(
+                send,
+                BusinessProviderScope {
+                    global: true,
+                    tenants: vec![],
+                },
+            )
+            .unwrap();
+        lease.mark_serving(2).unwrap();
+        let call = tokio::spawn({
+            let registry = registry.clone();
+            async move {
+                registry
+                    .call::<_, Value>("device.authenticate", &json!({"credential_id":"old"}))
+                    .await
+            }
+        });
+        let outbound = receive.recv().await.unwrap();
+        let BusinessRpcFrame::Request {
+            request_id, method, ..
+        } = outbound.frame
+        else {
+            panic!("request expected")
+        };
+        drop(outbound._bytes);
+        assert!(registry.complete(lease.epoch(), request_id, &method, Ok(test_identity("old"))));
+        assert!(matches!(call.await.unwrap(), Err(Error::Invalid)));
+        assert_eq!(registry.usage().unwrap().pending_items, 0);
+        assert_eq!(registry.usage().unwrap().pending_bytes, 0);
+    }
+
+    #[tokio::test]
+    async fn expired_business_principal_cannot_remain_an_auth_authority() {
+        let registry = BusinessRpcRegistry::new(1, 65_536, Duration::from_secs(1)).unwrap();
+        let (send, _receive) = mpsc::channel(1);
+        let lease = registry
+            .register_with_expiry(
+                send,
+                BusinessProviderScope {
+                    global: true,
+                    tenants: vec![],
+                },
+                Some(crate::now_ms().saturating_add(60_000)),
+            )
+            .unwrap();
+        lease.mark_serving(1).unwrap();
+        registry
+            .state
+            .lock()
+            .unwrap()
+            .provider
+            .as_mut()
+            .unwrap()
+            .expires_at_ms = Some(crate::now_ms().saturating_sub(1));
+        assert!(!registry.is_serving());
+        assert!(matches!(registry.auth_revision(), Err(Error::Unavailable)));
+        assert!(matches!(
+            registry
+                .call::<_, Value>("device.authenticate", &json!({"credential_id":"x"}))
+                .await,
+            Err(Error::Unavailable)
+        ));
+    }
+
+    #[test]
+    fn offline_invalidation_and_new_serving_share_one_generation_boundary() {
+        let registry = BusinessRpcRegistry::new(1, 65_536, Duration::from_secs(1)).unwrap();
+        let (send, _receive) = mpsc::channel(1);
+        let lease = Arc::new(
+            registry
+                .register(
+                    send,
+                    BusinessProviderScope {
+                        global: true,
+                        tenants: vec![],
+                    },
+                )
+                .unwrap(),
+        );
+        let observed = *registry.subscribe_status().borrow();
+        let (entered_tx, entered_rx) = std::sync::mpsc::channel();
+        let (release_tx, release_rx) = std::sync::mpsc::channel();
+        let revoker = std::thread::spawn({
+            let registry = registry.clone();
+            move || {
+                registry.invalidate_if_offline(observed, || {
+                    entered_tx.send(()).unwrap();
+                    release_rx.recv().unwrap();
+                    Ok(())
+                })
+            }
+        });
+        entered_rx.recv().unwrap();
+        let serving = std::thread::spawn({
+            let lease = lease.clone();
+            move || lease.mark_serving(1)
+        });
+        release_tx.send(()).unwrap();
+        assert!(revoker.join().unwrap().unwrap().is_some());
+        serving.join().unwrap().unwrap();
+        assert!(registry.is_serving());
+        assert!(
+            registry
+                .invalidate_if_offline(observed, || Err::<(), _>(Error::Internal))
+                .unwrap()
+                .is_none()
+        );
+        drop(lease);
+        let disconnected = *registry.subscribe_status().borrow();
+        assert!(
+            registry
+                .invalidate_if_offline(disconnected, || Ok(()))
+                .unwrap()
+                .is_some()
+        );
+        assert!(
+            registry
+                .invalidate_if_offline(observed, || Ok(()))
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn old_offline_timer_cannot_revoke_a_new_sync_on_same_provider_epoch() {
+        let registry = BusinessRpcRegistry::new(1, 65_536, Duration::from_secs(1)).unwrap();
+        let (send, _receive) = mpsc::channel(1);
+        let lease = registry
+            .register(
+                send,
+                BusinessProviderScope {
+                    global: true,
+                    tenants: vec![],
+                },
+            )
+            .unwrap();
+        let old_offline = *registry.subscribe_status().borrow();
+        lease.mark_serving(1).unwrap();
+        tokio::time::advance(Duration::from_millis(1)).await;
+        lease.mark_syncing().unwrap();
+        let new_offline = *registry.subscribe_status().borrow();
+        assert_eq!(new_offline.epoch, old_offline.epoch);
+        assert_ne!(new_offline.changed_at, old_offline.changed_at);
+        lease.mark_syncing().unwrap();
+        assert_eq!(*registry.subscribe_status().borrow(), new_offline);
+        assert!(
+            registry
+                .invalidate_if_offline(old_offline, || Err::<(), _>(Error::Internal))
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            registry
+                .invalidate_if_offline(new_offline, || Ok(()))
+                .unwrap()
+                .is_some()
+        );
     }
 }

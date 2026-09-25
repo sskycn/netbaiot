@@ -212,11 +212,13 @@ async fn one_socket_authentication_progresses_while_event_ack_waits() {
         revision: AtomicU64::new(1),
         allowed: AtomicBool::new(true),
     });
-    let client_config = BusinessRpcClientConfig::development(
+    let mut client_config = BusinessRpcClientConfig::development(
         addresses[2],
         "rpc-test-token".into(),
         BusinessRole::Multiplexed,
     );
+    client_config.reconnect_initial = Duration::from_millis(1);
+    client_config.reconnect_max = Duration::from_millis(1);
     let (business, mut events) =
         BusinessRpcClient::connect(client_config, Some(handler.clone())).unwrap();
     tokio::time::timeout(Duration::from_secs(10), business.wait_ready())
@@ -289,7 +291,33 @@ async fn one_socket_authentication_progresses_while_event_ack_waits() {
     handler.allowed.store(true, Ordering::SeqCst);
     handler.revision.store(3, Ordering::SeqCst);
     business.invalidate(3, AuthInvalidation::All).await.unwrap();
+    let duplicate = business.invalidate(3, AuthInvalidation::All).await.unwrap();
+    assert_eq!(duplicate.applied_revision, 3);
+    assert_eq!(duplicate.disconnected_connections, 0);
     let _recovered = device(addresses[0], "one").await;
+    handler.revision.store(5, Ordering::SeqCst);
+    assert!(matches!(
+        business.invalidate(5, AuthInvalidation::All).await,
+        Err(
+            netbaiot_client::business_rpc::BusinessRpcClientError::Remote(
+                RpcErrorCode::StaleRevision
+            )
+        )
+    ));
+    // A gap invalidates live authorization before the SDK's reset sync can
+    // return the replacement provider to Serving.
+    let _recovered_after_gap = tokio::time::timeout(Duration::from_secs(10), async {
+        loop {
+            if business.ready()
+                && let Ok(recovered) = device_result(addresses[0], "one").await
+            {
+                break recovered;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+    })
+    .await
+    .unwrap();
     drop(three);
     business.shutdown().await;
     assert!(
@@ -370,6 +398,133 @@ async fn one_socket_authentication_progresses_while_event_ack_waits() {
     legacy_delivery.ack().await.unwrap();
     server.start_kill().unwrap();
     let _ = server.wait().await;
+    let _ = std::fs::remove_dir_all(root);
+}
+
+#[tokio::test]
+async fn zero_offline_grace_revokes_live_session_and_requires_reset_sync() {
+    let root = std::env::temp_dir().join(format!(
+        "netbaiot-business-rpc-zero-{}",
+        uuid::Uuid::new_v4()
+    ));
+    let mut config: Config =
+        serde_json::from_str(include_str!("../../../configs/development.json")).unwrap();
+    let mut reservations = Vec::new();
+    for _ in 0..3 {
+        reservations.push(TcpListener::bind("127.0.0.1:0").await.unwrap());
+    }
+    let addresses = reservations
+        .iter()
+        .map(|listener| listener.local_addr().unwrap())
+        .collect::<Vec<_>>();
+    config.device_ingress = addresses[0];
+    config.management_http = addresses[1];
+    config.business_tcp = Some(addresses[2]);
+    config.device_auth = Some(DeviceAuthSource::BusinessRpc);
+    config.event_delivery = Some(EventDeliverySource::DevelopmentAudit);
+    config.business_rpc = Some(BusinessRpcConfig {
+        version: 2,
+        tls: None,
+        identities: Vec::new(),
+        development_token_env: Some("NETBAIOT_BUSINESS_RPC_TOKEN".into()),
+        allow_v1: false,
+        max_connections: 8,
+        auth_max_inflight: 16,
+        max_auth_control_offline_ms: 0,
+    });
+    config.spool_directory = root.join("spool");
+    drop(reservations);
+    let path = write_config(&root, &config);
+    let mut server = Command::new(env!("CARGO_BIN_EXE_netbaiot-server"))
+        .arg(&path)
+        .env("NETBAIOT_ADMIN_SECRET", "a".repeat(64))
+        .env("NETBAIOT_BUSINESS_RPC_TOKEN", "rpc-test-token")
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .kill_on_drop(true)
+        .spawn()
+        .unwrap();
+    let handler = Arc::new(Handler {
+        calls: AtomicUsize::new(0),
+        verifier_calls: AtomicUsize::new(0),
+        revision: AtomicU64::new(1),
+        allowed: AtomicBool::new(true),
+    });
+    let settings = BusinessRpcClientConfig::development(
+        addresses[2],
+        "rpc-test-token".into(),
+        BusinessRole::AuthControl,
+    );
+    let (business, _) =
+        BusinessRpcClient::connect(settings.clone(), Some(handler.clone())).unwrap();
+    tokio::time::timeout(Duration::from_secs(10), business.wait_ready())
+        .await
+        .unwrap()
+        .unwrap();
+    let old = device(addresses[0], "one").await;
+    let admin = NetbaIoTClient::builder()
+        .endpoint(format!("http://{}", addresses[1]))
+        .token("a".repeat(64))
+        .connect()
+        .await
+        .unwrap();
+    assert!(
+        admin
+            .devices()
+            .connection(&identity("one").device_key)
+            .await
+            .unwrap()
+            .connected
+    );
+    business.shutdown().await;
+    tokio::time::timeout(Duration::from_secs(2), async {
+        loop {
+            if admin
+                .devices()
+                .connection(&identity("one").device_key)
+                .await
+                .is_ok_and(|state| !state.connected)
+            {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .unwrap();
+    assert!(
+        device_result(addresses[0], "one").await.is_err(),
+        "old positive cache must be invalidated"
+    );
+    assert!(
+        device_result(addresses[0], "two").await.is_err(),
+        "new miss must fail closed"
+    );
+    handler.revision.store(2, Ordering::SeqCst);
+    let (replacement, _) = BusinessRpcClient::connect(settings, Some(handler)).unwrap();
+    tokio::time::timeout(Duration::from_secs(10), replacement.wait_ready())
+        .await
+        .unwrap()
+        .unwrap();
+    let _fresh = device(addresses[0], "one").await;
+    assert!(
+        admin
+            .devices()
+            .connection(&identity("one").device_key)
+            .await
+            .unwrap()
+            .connected
+    );
+    replacement.shutdown().await;
+    drop(old);
+    admin.runtime().drain().await.unwrap();
+    assert!(
+        tokio::time::timeout(Duration::from_secs(8), server.wait())
+            .await
+            .unwrap()
+            .unwrap()
+            .success()
+    );
     let _ = std::fs::remove_dir_all(root);
 }
 

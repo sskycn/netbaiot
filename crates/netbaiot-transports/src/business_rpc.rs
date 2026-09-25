@@ -478,12 +478,13 @@ async fn connection_inner(
     let (event_tx, event_rx) = mpsc::channel::<Queued>(1);
     let (ack_tx, ack_rx) = mpsc::channel::<EventSignal>(2);
     let mut provider = if role.auth_control() {
-        Some(Arc::new(services.registry.register(
+        Some(Arc::new(services.registry.register_with_expiry(
             auth_tx,
             BusinessProviderScope {
                 global: principal.global,
                 tenants: principal.tenants.clone(),
             },
+            principal.expires_at_ms,
         )?))
     } else {
         None
@@ -537,6 +538,10 @@ async fn connection_inner(
             connection_stop.clone(),
         ))
     });
+    let expiry_deadline = principal.expires_at_ms.and_then(|expires_at| {
+        let remaining_ms = expires_at.saturating_sub(netbaiot_runtime::now_ms()).max(0) as u64;
+        tokio::time::Instant::now().checked_add(Duration::from_millis(remaining_ms))
+    });
     let result = loop {
         if principal
             .expires_at_ms
@@ -546,6 +551,7 @@ async fn connection_inner(
         }
         let bytes = tokio::select! {
             _ = connection_stop.cancelled() => break Ok(()),
+            _ = tokio::time::sleep_until(expiry_deadline.unwrap_or_else(tokio::time::Instant::now)), if expiry_deadline.is_some() => break Err(Error::Forbidden),
             result = read_frame(&mut reader, effective_max, config.read_timeout) => match result { Ok(value) => value, Err(error) => break Err(error) },
         };
         let frame: BusinessRpcFrame = match serde_json::from_slice(&bytes) {
@@ -814,6 +820,14 @@ async fn control_loop(
                 ),
             },
             "auth.invalidate" => match serde_json::from_value::<AuthInvalidateRequest>(body) {
+                Ok(request) if request.auth_revision == 0 || request.auth_revision == u64::MAX => {
+                    error(
+                        request_id,
+                        &method,
+                        RpcErrorCode::InvalidRequest,
+                        "invalid revision",
+                    )
+                }
                 Ok(request) if !principal.permits_invalidation(&request.invalidation) => error(
                     request_id,
                     &method,
@@ -832,6 +846,18 @@ async fn control_loop(
                             disconnected_connections: 0,
                             invalidated_mqtt_sessions: 0,
                         }),
+                    )
+                }
+                Ok(request)
+                    if revision.is_some_and(|(inc, rev)| {
+                        inc == request.authority_incarnation && request.auth_revision < rev
+                    }) =>
+                {
+                    error(
+                        request_id,
+                        &method,
+                        RpcErrorCode::StaleRevision,
+                        "stale invalidation revision",
                     )
                 }
                 Ok(request)
@@ -872,9 +898,28 @@ async fn control_loop(
                     }
                 }
                 Ok(_) => {
+                    services
+                        .ingress
+                        .metrics
+                        .inc(Metric::BusinessRpcRevisionGaps);
                     confirmation.store(0, Ordering::Release);
-                    let _ = lease.mark_syncing();
+                    if lease.mark_syncing().is_err() {
+                        stop.cancel();
+                        break;
+                    }
                     revision = None;
+                    // A missing revision can hide a device revocation. Revoke all
+                    // local authorization before accepting the reset handshake.
+                    let invalidate = AuthInvalidation::All;
+                    let mqtt = services.mqtt.clone();
+                    if services
+                        .ingress
+                        .invalidate_auth_with(&invalidate, || mqtt.invalidate_sessions(&invalidate))
+                        .is_err()
+                    {
+                        stop.cancel();
+                        break;
+                    }
                     error(
                         request_id,
                         &method,
@@ -1036,6 +1081,37 @@ mod tests {
         SourceMessageId,
     };
     use netbaiot_runtime::DeliveryEnvelope;
+
+    #[tokio::test]
+    async fn control_queue_pressure_rejects_without_leaking_byte_permits() {
+        let (send, mut receive) = mpsc::channel(1);
+        let budget = Arc::new(Semaphore::new(256));
+        let metrics = Arc::new(Metrics::default());
+        queue(
+            &send,
+            &budget,
+            &metrics,
+            BusinessRpcQueueClass::Control,
+            BusinessRpcFrame::Ping { nonce: 1 },
+            None,
+        )
+        .unwrap();
+        assert!(matches!(
+            queue(
+                &send,
+                &budget,
+                &metrics,
+                BusinessRpcQueueClass::Control,
+                BusinessRpcFrame::Pong { nonce: 2 },
+                None
+            ),
+            Err(Error::Overloaded)
+        ));
+        assert!(budget.available_permits() < 256);
+        drop(receive.recv().await.unwrap());
+        assert_eq!(budget.available_permits(), 256);
+        assert_eq!(metrics.get(Metric::BusinessRpcOverloads), 1);
+    }
 
     #[test]
     fn scoped_business_principal_cannot_invalidate_other_tenants_or_all() {

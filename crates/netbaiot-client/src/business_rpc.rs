@@ -744,9 +744,12 @@ async fn connected(
             .send(Err(BusinessRpcClientError::Unavailable));
     }
     handlers.abort_all();
+    while handlers.join_next().await.is_some() {}
     drop(out_tx);
     reader_task.abort();
     writer_task.abort();
+    let _ = reader_task.await;
+    let _ = writer_task.await;
     result
 }
 fn rpc_error(id: Uuid, method: &str, code: RpcErrorCode) -> BusinessRpcFrame {
@@ -755,5 +758,293 @@ fn rpc_error(id: Uuid, method: &str, code: RpcErrorCode) -> BusinessRpcFrame {
         method: method.into(),
         body: None,
         error: Some(RpcError::new(code, "request rejected")),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use netbaiot_protocol::{
+        DeliveryId, DeviceEvent, DeviceEventKind, DeviceId, DeviceKey, EventId, Heartbeat,
+        ProductId, SourceMessageId, TenantId,
+    };
+    use tokio::{net::TcpListener, sync::Notify};
+
+    struct HeldHandler {
+        entered: Mutex<Option<oneshot::Sender<()>>>,
+        dropped: Mutex<Option<oneshot::Sender<()>>>,
+        release: Notify,
+    }
+    struct HandlerDrop(Option<oneshot::Sender<()>>);
+    impl Drop for HandlerDrop {
+        fn drop(&mut self) {
+            if let Some(signal) = self.0.take() {
+                let _ = signal.send(());
+            }
+        }
+    }
+    #[async_trait]
+    impl BusinessAuthHandler for HeldHandler {
+        async fn authenticate(
+            &self,
+            _request: DeviceAuthenticateRequest,
+        ) -> std::result::Result<AuthenticatedDeviceWire, RpcError> {
+            let _drop = HandlerDrop(self.dropped.lock().unwrap().take());
+            if let Some(signal) = self.entered.lock().unwrap().take() {
+                let _ = signal.send(());
+            }
+            self.release.notified().await;
+            Err(RpcError::new(RpcErrorCode::Unavailable, "released"))
+        }
+        async fn resolve_verifier(
+            &self,
+            _request: ResolveVerifierRequest,
+        ) -> std::result::Result<ResolveVerifierResponse, RpcError> {
+            Err(RpcError::new(RpcErrorCode::Unavailable, "unused"))
+        }
+    }
+
+    async fn auth_server_handshake(socket: &mut TcpStream, generation: u64) {
+        let BusinessRpcFrame::Hello { role, limits, .. } =
+            read_frame(socket, BUSINESS_RPC_HELLO_MAX_BYTES, Duration::from_secs(2))
+                .await
+                .unwrap()
+        else {
+            panic!("hello expected")
+        };
+        write_frame(
+            socket,
+            &BusinessRpcFrame::Ready {
+                version: BUSINESS_RPC_VERSION,
+                role,
+                connection_epoch: generation,
+                limits,
+            },
+            BUSINESS_RPC_HELLO_MAX_BYTES,
+            Duration::from_secs(2),
+        )
+        .await
+        .unwrap();
+        let BusinessRpcFrame::Request {
+            request_id, method, ..
+        } = read_frame(socket, 16 * 1024, Duration::from_secs(2))
+            .await
+            .unwrap()
+        else {
+            panic!("sync request expected")
+        };
+        assert_eq!(method, "auth.sync");
+        write_frame(
+            socket,
+            &BusinessRpcFrame::Response {
+                request_id,
+                method,
+                body: Some(serde_json::json!({})),
+                error: None,
+            },
+            16 * 1024,
+            Duration::from_secs(2),
+        )
+        .await
+        .unwrap();
+        let BusinessRpcFrame::Ping { nonce } =
+            read_frame(socket, 16 * 1024, Duration::from_secs(2))
+                .await
+                .unwrap()
+        else {
+            panic!("sync confirmation expected")
+        };
+        write_frame(
+            socket,
+            &BusinessRpcFrame::Pong { nonce },
+            16 * 1024,
+            Duration::from_secs(2),
+        )
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn old_auth_handler_is_cancelled_before_replacement_writer_is_ready() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let (entered_tx, entered_rx) = oneshot::channel();
+        let (dropped_tx, dropped_rx) = oneshot::channel();
+        let (second_tx, second_rx) = oneshot::channel();
+        let handler = Arc::new(HeldHandler {
+            entered: Mutex::new(Some(entered_tx)),
+            dropped: Mutex::new(Some(dropped_tx)),
+            release: Notify::new(),
+        });
+        let server = tokio::spawn(async move {
+            let (mut first, _) = listener.accept().await.unwrap();
+            auth_server_handshake(&mut first, 1).await;
+            write_frame(
+                &mut first,
+                &BusinessRpcFrame::Request {
+                    request_id: Uuid::new_v4(),
+                    method: "device.authenticate".into(),
+                    deadline_ms: 5_000,
+                    body: serde_json::json!({
+                        "credential_id": "cred-device",
+                        "secret_hex": "00",
+                        "min_auth_revision": 1
+                    }),
+                },
+                16 * 1024,
+                Duration::from_secs(2),
+            )
+            .await
+            .unwrap();
+            entered_rx.await.unwrap();
+            drop(first);
+            let (mut second, _) = listener.accept().await.unwrap();
+            auth_server_handshake(&mut second, 2).await;
+            let _ = second_tx.send(());
+            let until = tokio::time::Instant::now() + Duration::from_millis(300);
+            while let Ok(Ok(frame)) = tokio::time::timeout_at(
+                until,
+                read_frame(&mut second, 16 * 1024, Duration::from_secs(2)),
+            )
+            .await
+            {
+                match frame {
+                    BusinessRpcFrame::Ping { nonce } => {
+                        write_frame(
+                            &mut second,
+                            &BusinessRpcFrame::Pong { nonce },
+                            16 * 1024,
+                            Duration::from_secs(2),
+                        )
+                        .await
+                        .unwrap();
+                    }
+                    BusinessRpcFrame::Response { .. } => panic!("old response crossed generation"),
+                    _ => panic!("unexpected replacement frame"),
+                }
+            }
+        });
+        let mut config = BusinessRpcClientConfig::development(
+            address,
+            "test-token".into(),
+            BusinessRole::AuthControl,
+        );
+        config.reconnect_initial = Duration::from_millis(1);
+        config.reconnect_max = Duration::from_millis(1);
+        let (client, _events) = BusinessRpcClient::connect(config, Some(handler.clone())).unwrap();
+        tokio::time::timeout(Duration::from_secs(3), dropped_rx)
+            .await
+            .unwrap()
+            .unwrap();
+        tokio::time::timeout(Duration::from_secs(3), second_rx)
+            .await
+            .unwrap()
+            .unwrap();
+        handler.release.notify_waiters();
+        server.await.unwrap();
+        client.shutdown().await;
+    }
+
+    #[tokio::test]
+    async fn one_hundred_reconnect_generations_and_shutdown_release_driver() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move {
+            for generation in 1..=100u64 {
+                let (mut socket, _) = listener.accept().await.unwrap();
+                let BusinessRpcFrame::Hello { role, limits, .. } = read_frame(
+                    &mut socket,
+                    BUSINESS_RPC_HELLO_MAX_BYTES,
+                    Duration::from_secs(2),
+                )
+                .await
+                .unwrap() else {
+                    panic!("hello expected")
+                };
+                write_frame(
+                    &mut socket,
+                    &BusinessRpcFrame::Ready {
+                        version: BUSINESS_RPC_VERSION,
+                        role,
+                        connection_epoch: generation,
+                        limits,
+                    },
+                    BUSINESS_RPC_HELLO_MAX_BYTES,
+                    Duration::from_secs(2),
+                )
+                .await
+                .unwrap();
+                let BusinessRpcFrame::Subscribe {
+                    subscription_id, ..
+                } = read_frame(&mut socket, 16 * 1024, Duration::from_secs(2))
+                    .await
+                    .unwrap()
+                else {
+                    panic!("subscribe expected")
+                };
+                write_frame(
+                    &mut socket,
+                    &BusinessRpcFrame::Subscribed { subscription_id },
+                    16 * 1024,
+                    Duration::from_secs(2),
+                )
+                .await
+                .unwrap();
+                // Closing the socket forces the SDK to discard its reader, writer,
+                // pending requests and delivery generation before retrying.
+            }
+        });
+        let mut config = BusinessRpcClientConfig::development(
+            address,
+            "test-token".into(),
+            BusinessRole::Events,
+        );
+        config.reconnect_initial = Duration::from_millis(1);
+        config.reconnect_max = Duration::from_millis(1);
+        let (client, _events) = BusinessRpcClient::connect(config, None).unwrap();
+        tokio::time::timeout(Duration::from_secs(20), server)
+            .await
+            .unwrap()
+            .unwrap();
+        client.shutdown().await;
+        assert!(!client.ready());
+        let weak = Arc::downgrade(&client.inner);
+        drop(client);
+        assert!(
+            weak.upgrade().is_none(),
+            "last handle must release ownership"
+        );
+    }
+
+    #[tokio::test]
+    async fn old_delivery_ack_cannot_use_replacement_writer() {
+        let (old_writer, old_receiver) = mpsc::channel(1);
+        drop(old_receiver);
+        let (new_writer, mut new_receiver) = mpsc::channel::<Outbound>(1);
+        let delivery = BusinessDelivery {
+            delivery: EventDelivery {
+                delivery_id: DeliveryId::generate(),
+                subscription_id: SubscriptionId::generate(),
+                event: DeviceEvent {
+                    event_id: EventId::generate(),
+                    source_message_id: SourceMessageId::new("old-delivery").unwrap(),
+                    device: DeviceKey {
+                        tenant_id: TenantId::new("tenant").unwrap(),
+                        product_id: ProductId::new("product").unwrap(),
+                        device_id: DeviceId::new("device").unwrap(),
+                    },
+                    received_at: 1,
+                    occurred_at: None,
+                    kind: DeviceEventKind::Heartbeat(Heartbeat { sequence: 1 }),
+                },
+                attempt: 1,
+            },
+            epoch: 1,
+            writer: old_writer,
+            budget: Arc::new(Semaphore::new(1024)),
+        };
+        assert!(delivery.ack().await.is_err());
+        assert!(new_receiver.try_recv().is_err());
+        drop(new_writer);
     }
 }

@@ -684,9 +684,12 @@ dependencies = [
 name = "netbaiot-loadgen"
 version = "0.2.0"
 dependencies = [
+ "async-trait",
  "bytes",
  "hmac",
+ "netbaiot-client",
  "netbaiot-core",
+ "netbaiot-device-sdk",
  "netbaiot-runtime",
  "reqwest",
  "rustls-pemfile",

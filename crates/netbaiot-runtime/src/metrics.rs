@@ -64,6 +64,8 @@ pub enum Metric {
     BusinessRpcOverloads,
     BusinessRpcEventAcks,
     BusinessRpcReconnects,
+    BusinessRpcRevisionGaps,
+    BusinessRpcOfflineGraceExpirations,
 }
 #[derive(Clone, Copy)]
 #[repr(usize)]
@@ -82,7 +84,7 @@ pub enum BusinessRpcCallResult {
     Invalid,
 }
 
-const NAMES: [&str; 60] = [
+const NAMES: [&str; 62] = [
     "connections_accepted",
     "connections_rejected",
     "mqtt_connect_success",
@@ -143,6 +145,8 @@ const NAMES: [&str; 60] = [
     "business_rpc_overloads",
     "business_rpc_event_acks",
     "business_rpc_reconnects",
+    "business_rpc_revision_gaps",
+    "business_rpc_offline_grace_expirations",
 ];
 
 /// Opt-in experiment counters, inactive unless lock timing is enabled.
