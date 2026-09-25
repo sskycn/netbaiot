@@ -1,4 +1,6 @@
 pub mod auth;
+pub mod business_event;
+pub mod business_rpc;
 pub mod commands;
 pub mod control;
 pub mod event;
@@ -11,6 +13,8 @@ pub mod quota;
 pub mod sessions;
 pub mod spool;
 pub use auth::*;
+pub use business_event::*;
+pub use business_rpc::*;
 pub use commands::*;
 pub use control::*;
 pub use event::*;

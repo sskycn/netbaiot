@@ -7,6 +7,10 @@ rust-version.workspace = true
 
 [dependencies]
 netbaiot-protocol.workspace = true
+async-trait.workspace = true
+tokio-rustls.workspace = true
+rustls-pemfile.workspace = true
+uuid.workspace = true
 futures-core.workspace = true
 reqwest.workspace = true
 serde.workspace = true

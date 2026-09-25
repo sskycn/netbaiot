@@ -9,6 +9,9 @@ use std::{collections::BTreeMap, fmt, sync::Arc};
 use thiserror::Error;
 use uuid::Uuid;
 
+pub mod business_rpc;
+pub use business_rpc::*;
+
 pub const PROTOCOL_VERSION: u16 = 1;
 pub const MAX_IDENTIFIER_BYTES: usize = 64;
 pub const MAX_FILTER_EVENT_TYPES: usize = 16;
@@ -715,6 +718,38 @@ mod tests {
                 "revision":1, "products":[], "routes":[], "devices":[]
             }))
             .is_err()
+        );
+    }
+    #[test]
+    fn v1_stream_golden_json_stays_compatible() {
+        let hello = StreamClientFrame::Hello {
+            version: PROTOCOL_VERSION,
+            token: "legacy".into(),
+        };
+        assert_eq!(
+            serde_json::to_string(&hello).unwrap(),
+            r#"{"type":"hello","version":1,"token":"legacy"}"#
+        );
+        let subscription_id = SubscriptionId(Uuid::nil());
+        let ready = StreamServerFrame::Ready {
+            version: PROTOCOL_VERSION,
+            subscription_id,
+        };
+        assert_eq!(
+            serde_json::to_string(&ready).unwrap(),
+            r#"{"type":"ready","version":1,"subscription_id":"00000000-0000-0000-0000-000000000000"}"#
+        );
+        let ack = StreamClientFrame::Ack {
+            version: PROTOCOL_VERSION,
+            ack: EventAck {
+                delivery_id: DeliveryId(Uuid::nil()),
+                subscription_id,
+                event_id: EventId(Uuid::nil()),
+            },
+        };
+        assert_eq!(
+            serde_json::to_string(&ack).unwrap(),
+            r#"{"type":"ack","version":1,"ack":{"delivery_id":"00000000-0000-0000-0000-000000000000","subscription_id":"00000000-0000-0000-0000-000000000000","event_id":"00000000-0000-0000-0000-000000000000"}}"#
         );
     }
 }

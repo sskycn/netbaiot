@@ -17,6 +17,7 @@ pub type BoxStream = Box<dyn Stream>;
 pub struct Services {
     pub admin: Option<Arc<AdminAccess>>,
     pub management_auth: Option<Arc<ManagementAuthService>>,
+    pub business_auth: Option<Arc<BusinessRpcRegistry>>,
     pub shutdown: CancellationToken,
     pub control_lock: Arc<tokio::sync::Mutex<()>>,
     pub http_slots: Arc<tokio::sync::Semaphore>,
@@ -44,6 +45,7 @@ impl Services {
         Arc::new(Self {
             admin: None,
             management_auth: None,
+            business_auth: None,
             shutdown,
             control_lock: Arc::new(tokio::sync::Mutex::new(())),
             http_slots: Arc::new(tokio::sync::Semaphore::new(limits.max_ingress)),
