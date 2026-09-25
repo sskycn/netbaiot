@@ -1,5 +1,7 @@
 # Business RPC V2 implementation checklist
 
+Production-readiness follow-up: [mTLS, topology, network and soak gate](business-rpc-v2-production-readiness.zh-CN.md). The short measured gate is distinct from the one-hour and six-hour soaks, which remain NOT RUN.
+
 This checklist maps the initial V2 scope to implementation and evidence. The validation section is updated only with commands actually run.
 
 ## Reliability and load gate (task starting at `583bb0d`)

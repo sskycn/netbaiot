@@ -3,24 +3,24 @@
 use async_trait::async_trait;
 use hmac::{Hmac, Mac};
 use netbaiot_client::business_rpc::{
-    BusinessAuthHandler, BusinessRpcClient, BusinessRpcClientConfig,
+    BusinessAuthHandler, BusinessRpcClient, BusinessRpcClientConfig, BusinessRpcTls,
 };
 use netbaiot_core::{
     AuthInvalidation, CodecId, DeviceId, DeviceKey, DeviceUplink, DeviceUplinkKind, Heartbeat,
-    ProductId, SourceMessageId, TenantId,
+    ProductId, Scalar, SourceMessageId, TenantId,
     business_rpc::{
         AuthenticatedDeviceWire, BusinessRole, DeviceAuthenticateRequest, ResolveVerifierRequest,
         ResolveVerifierResponse, RpcError, RpcErrorCode,
     },
 };
-use netbaiot_device_sdk::{DeviceClient, DeviceCredentials, PublishQos};
+use netbaiot_device_sdk::{DeviceClient, DeviceCredentials, DeviceSdkError, PublishQos};
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 use std::{
-    collections::HashSet,
+    collections::{BTreeMap, HashSet},
     error::Error,
     net::SocketAddr,
-    path::Path,
+    path::{Path, PathBuf},
     sync::{
         Arc, Mutex,
         atomic::{AtomicBool, AtomicU64, Ordering},
@@ -37,6 +37,12 @@ const SECRET: &str = "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c
 struct Config {
     scenario: String,
     business_address: SocketAddr,
+    #[serde(default, skip_serializing)]
+    business_transport: BusinessTransport,
+    #[serde(default)]
+    topology: Topology,
+    #[serde(default)]
+    network_profile: Option<String>,
     device_address: SocketAddr,
     udp_address: Option<SocketAddr>,
     management_url: Option<String>,
@@ -46,17 +52,57 @@ struct Config {
     #[serde(default)]
     auth_handler_delay_ms: u64,
     event_rate: u64,
+    #[serde(default)]
+    event_payload_bytes: usize,
     event_ack_delay_ms: u64,
     #[serde(default)]
     event_reconnect_every_secs: u64,
+    #[serde(default)]
+    auth_reconnect_every_secs: u64,
+    #[serde(default)]
+    invalidate_every_secs: u64,
+    #[serde(default)]
+    verifier_rate: u64,
     reconnect_cycles: usize,
     #[serde(default)]
     reconnect_pause_ms: u64,
     sample_period_ms: u64,
+    #[serde(default = "default_snapshot_every_secs")]
+    snapshot_every_secs: u64,
     #[serde(default)]
     warmup_secs: u64,
     #[serde(default)]
     recovery_secs: u64,
+}
+fn default_snapshot_every_secs() -> u64 {
+    900
+}
+#[derive(Clone, Default, Deserialize)]
+#[serde(tag = "mode", rename_all = "snake_case", deny_unknown_fields)]
+enum BusinessTransport {
+    #[default]
+    DevelopmentToken,
+    Mtls {
+        server_name: String,
+        ca_pem: PathBuf,
+        certificate_pem: PathBuf,
+        private_key_pem: PathBuf,
+    },
+}
+impl BusinessTransport {
+    fn name(&self) -> &'static str {
+        match self {
+            Self::DevelopmentToken => "development_token",
+            Self::Mtls { .. } => "mtls",
+        }
+    }
+}
+#[derive(Clone, Copy, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+enum Topology {
+    #[default]
+    Multiplexed,
+    Dual,
 }
 impl Config {
     fn validate(&self) -> Result<()> {
@@ -66,22 +112,36 @@ impl Config {
             "reconnect",
             "verifier",
             "consumer_outage",
+            "handshake",
+            "steady_auth",
+            "topology_compare",
+            "soak",
         ]
         .contains(&self.scenario.as_str())
             || self.duration_secs == 0
-            || self.duration_secs > 3600
+            || self.duration_secs > 21_600
             || self.warmup_secs > self.duration_secs
             || self.recovery_secs > 600
             || self.auth_concurrency == 0
             || self.auth_concurrency > 256
             || self.auth_handler_delay_ms > 5_000
             || self.event_rate > 10_000
+            || self.event_payload_bytes > 16_384
+            || self
+                .network_profile
+                .as_ref()
+                .is_some_and(|name| name.len() > 64)
             || self.event_ack_delay_ms > 60_000
             || self.event_reconnect_every_secs > 3600
+            || self.auth_reconnect_every_secs > 3600
+            || self.invalidate_every_secs > 3600
+            || self.verifier_rate > 1000
             || self.reconnect_cycles > 10_000
             || self.reconnect_pause_ms > 60_000
             || !(100..=10_000).contains(&self.sample_period_ms)
-            || !self.business_address.ip().is_loopback()
+            || !(1..=3600).contains(&self.snapshot_every_secs)
+            || (matches!(self.business_transport, BusinessTransport::DevelopmentToken)
+                && !self.business_address.ip().is_loopback())
             || !self.device_address.ip().is_loopback()
             || self
                 .udp_address
@@ -103,8 +163,24 @@ impl Config {
         if self.scenario == "verifier" && self.udp_address.is_none() {
             return Err("verifier scenario requires udp_address".into());
         }
+        if self.verifier_rate > 0 && self.udp_address.is_none() {
+            return Err("verifier probe requires udp_address".into());
+        }
         if self.scenario == "verifier" && self.duration_secs < 2 {
             return Err("verifier scenario requires at least 2 seconds for invalidation".into());
+        }
+        if let BusinessTransport::Mtls {
+            server_name,
+            ca_pem,
+            certificate_pem,
+            private_key_pem,
+        } = &self.business_transport
+            && (server_name.is_empty()
+                || ca_pem.as_os_str().is_empty()
+                || certificate_pem.as_os_str().is_empty()
+                || private_key_pem.as_os_str().is_empty())
+        {
+            return Err("mTLS requires server_name, CA, certificate and private key paths".into());
         }
         Ok(())
     }
@@ -114,6 +190,7 @@ struct Handler {
     auth: AtomicU64,
     verifier: AtomicU64,
     auth_delay: Duration,
+    latency: Mutex<Histogram>,
 }
 impl Handler {
     fn new(config: &Config) -> Self {
@@ -121,6 +198,7 @@ impl Handler {
             auth: AtomicU64::new(0),
             verifier: AtomicU64::new(0),
             auth_delay: Duration::from_millis(config.auth_handler_delay_ms),
+            latency: Mutex::new(Histogram::default()),
         }
     }
 }
@@ -151,9 +229,13 @@ impl BusinessAuthHandler for Handler {
         &self,
         request: DeviceAuthenticateRequest,
     ) -> std::result::Result<AuthenticatedDeviceWire, RpcError> {
+        let started = Instant::now();
         self.auth.fetch_add(1, Ordering::Relaxed);
         if !self.auth_delay.is_zero() {
             tokio::time::sleep(self.auth_delay).await;
+        }
+        if let Ok(mut latency) = self.latency.lock() {
+            latency.add(started.elapsed());
         }
         let encoded_secret = SECRET
             .as_bytes()
@@ -202,10 +284,13 @@ struct Counts {
     publish_errors: u64,
     reconnects: u64,
     sync_failures: u64,
+    invalidations: u64,
+    verifier_requests: u64,
+    verifier_acks: u64,
     latency_ms: Percentiles,
     event_ack_ms: Percentiles,
 }
-#[derive(Default, Serialize)]
+#[derive(Clone, Copy, Default, Serialize)]
 struct Percentiles {
     p50: f64,
     p95: f64,
@@ -263,6 +348,9 @@ struct Stats {
     counts: Counts,
     auth_latency: Histogram,
     ack_latency: Histogram,
+    tls_handshake: Histogram,
+    sync_ready: Histogram,
+    full_ready: Histogram,
 }
 type SharedStats = Arc<Mutex<Stats>>;
 
@@ -270,14 +358,48 @@ async fn connect_business(
     config: &Config,
     handler: Arc<Handler>,
     role: BusinessRole,
+    stats: Option<&SharedStats>,
 ) -> Result<(
     BusinessRpcClient,
     tokio::sync::mpsc::Receiver<netbaiot_client::business_rpc::BusinessDelivery>,
 )> {
-    let token = std::env::var("NETBAIOT_BUSINESS_RPC_TOKEN")?;
-    let settings = BusinessRpcClientConfig::development(config.business_address, token, role);
+    let mut settings = match &config.business_transport {
+        BusinessTransport::DevelopmentToken => BusinessRpcClientConfig::development(
+            config.business_address,
+            std::env::var("NETBAIOT_BUSINESS_RPC_TOKEN")?,
+            role,
+        ),
+        BusinessTransport::Mtls {
+            server_name,
+            ca_pem,
+            certificate_pem,
+            private_key_pem,
+        } => {
+            let mut settings =
+                BusinessRpcClientConfig::development(config.business_address, String::new(), role);
+            settings.token = None;
+            settings.tls = Some(BusinessRpcTls {
+                server_name: server_name.clone(),
+                ca_pem: ca_pem.clone(),
+                certificate_pem: certificate_pem.clone(),
+                private_key_pem: private_key_pem.clone(),
+            });
+            settings
+        }
+    };
+    settings.reconnect_initial = Duration::from_millis(100);
     let (client, deliveries) = BusinessRpcClient::connect(settings, Some(handler))?;
     tokio::time::timeout(Duration::from_secs(10), client.wait_ready()).await??;
+    if let Some(stats) = stats
+        && let Some(timing) = client.connection_timing()
+    {
+        let mut state = stats.lock().unwrap();
+        state.full_ready.add(timing.full_ready);
+        state.sync_ready.add(timing.sync_to_ready);
+        if let Some(tls) = timing.tls_handshake {
+            state.tls_handshake.add(tls);
+        }
+    }
     Ok((client, deliveries))
 }
 async fn device(config: &Config, id: &str) -> Result<DeviceClient> {
@@ -323,31 +445,54 @@ async fn auth_load(config: Config, stats: SharedStats, until: Instant) {
             state.auth_latency.add(elapsed);
             match answer {
                 Ok(_) => state.counts.success += 1,
-                Err(error) => {
-                    let text = error.to_string();
-                    if text.contains("overload") {
-                        state.counts.overloaded += 1;
-                    } else if text.contains("timeout") {
-                        state.counts.timeout += 1;
-                    } else if text.contains("auth") || text.contains("reject") {
-                        state.counts.rejected += 1;
-                    } else {
-                        state.counts.transport_failures += 1;
+                Err(error) => match error.downcast_ref::<DeviceSdkError>() {
+                    Some(DeviceSdkError::Overloaded) => state.counts.overloaded += 1,
+                    Some(DeviceSdkError::Timeout) => state.counts.timeout += 1,
+                    Some(DeviceSdkError::Unauthenticated | DeviceSdkError::Forbidden) => {
+                        state.counts.rejected += 1
                     }
-                }
+                    _ => state.counts.transport_failures += 1,
+                },
             }
         }
     }
 }
 
-async fn event_load(config: &Config, stats: SharedStats, outage: bool) -> Result<u64> {
+async fn event_load(
+    config: &Config,
+    stats: SharedStats,
+    outage: bool,
+) -> Result<(u64, Option<Percentiles>)> {
     let handler = Arc::new(Handler::new(config));
-    let (mut business, mut deliveries) =
-        connect_business(config, handler.clone(), BusinessRole::Multiplexed).await?;
+    let auth_role = if config.topology == Topology::Dual {
+        BusinessRole::AuthControl
+    } else {
+        BusinessRole::Multiplexed
+    };
+    let (mut business, auth_deliveries) =
+        connect_business(config, handler.clone(), auth_role, Some(&stats)).await?;
+    let (mut event_business, mut deliveries) = if config.topology == Topology::Dual {
+        let (events, deliveries) =
+            connect_business(config, handler.clone(), BusinessRole::Events, Some(&stats)).await?;
+        (Some(events), deliveries)
+    } else {
+        (None, auth_deliveries)
+    };
     let publisher = device(config, "publisher").await?;
     let until = Instant::now() + Duration::from_secs(config.duration_secs);
     let outage_until = Instant::now() + Duration::from_secs(config.duration_secs / 2);
-    let auth_task = tokio::spawn(auth_load(config.clone(), stats.clone(), until));
+    let mut workers = JoinSet::new();
+    let auth_config = config.clone();
+    let auth_stats = stats.clone();
+    workers.spawn(async move {
+        auth_load(auth_config, auth_stats, until).await;
+        Ok::<(), Box<dyn Error + Send + Sync>>(())
+    });
+    if config.verifier_rate > 0 {
+        let verifier_config = config.clone();
+        let verifier_stats = stats.clone();
+        workers.spawn(async move { verifier_probe(verifier_config, verifier_stats, until).await });
+    }
     let mut tick = tokio::time::interval(Duration::from_secs_f64(
         1.0 / config.event_rate.max(1) as f64,
     ));
@@ -357,16 +502,53 @@ async fn event_load(config: &Config, stats: SharedStats, outage: bool) -> Result
         tokio::time::Instant::now() + reconnect_period,
         reconnect_period,
     );
+    let auth_reconnect_period = Duration::from_secs(config.auth_reconnect_every_secs.max(1));
+    let mut auth_reconnect_tick = tokio::time::interval_at(
+        tokio::time::Instant::now() + auth_reconnect_period,
+        auth_reconnect_period,
+    );
+    let invalidate_period = Duration::from_secs(config.invalidate_every_secs.max(1));
+    let mut invalidate_tick = tokio::time::interval_at(
+        tokio::time::Instant::now() + invalidate_period,
+        invalidate_period,
+    );
+    let mut revision = 1u64;
     let mut sequence = 0u64;
     let mut seen = HashSet::new();
     let source_prefix = format!("load-{}-", uuid::Uuid::new_v4().simple());
     while Instant::now() < until {
         tokio::select! {
-            _ = reconnect_tick.tick(), if config.event_reconnect_every_secs > 0 => {
+            _ = invalidate_tick.tick(), if config.invalidate_every_secs > 0 => {
+                revision = revision.saturating_add(1);
+                let device = identity("udp", revision).map_err(|_| "invalid verifier identity")?.device_key;
+                if business.invalidate(revision, AuthInvalidation::Device { device }).await.is_ok() {
+                    stats.lock().unwrap().counts.invalidations += 1;
+                } else {
+                    stats.lock().unwrap().counts.sync_failures += 1;
+                }
+            }
+            _ = auth_reconnect_tick.tick(), if config.auth_reconnect_every_secs > 0 && config.topology == Topology::Dual => {
                 business.shutdown().await;
-                match connect_business(config, handler.clone(), BusinessRole::Multiplexed).await {
-                    Ok((next, next_deliveries)) => {
+                match connect_business(config, handler.clone(), BusinessRole::AuthControl, Some(&stats)).await {
+                    Ok((next, _)) => {
                         business = next;
+                        revision = 1;
+                        stats.lock().unwrap().counts.reconnects += 1;
+                    }
+                    Err(error) => {
+                        stats.lock().unwrap().counts.sync_failures += 1;
+                        return Err(error);
+                    }
+                }
+            }
+            _ = reconnect_tick.tick(), if config.event_reconnect_every_secs > 0 => {
+                if let Some(events) = event_business.take() { events.shutdown().await; }
+                else { business.shutdown().await; }
+                let role = if config.topology == Topology::Dual { BusinessRole::Events } else { BusinessRole::Multiplexed };
+                match connect_business(config, handler.clone(), role, Some(&stats)).await {
+                    Ok((next, next_deliveries)) => {
+                        if config.topology == Topology::Dual { event_business = Some(next); }
+                        else { business = next; revision = 1; }
                         deliveries = next_deliveries;
                         stats.lock().unwrap().counts.reconnects += 1;
                     }
@@ -378,7 +560,20 @@ async fn event_load(config: &Config, stats: SharedStats, outage: bool) -> Result
             }
             _ = tick.tick(), if config.event_rate > 0 => {
                 sequence += 1;
-                let payload = DeviceUplink::new(SourceMessageId::new(format!("{source_prefix}{sequence}"))?, DeviceUplinkKind::Heartbeat(Heartbeat { sequence }));
+                let kind = if config.event_payload_bytes == 0 {
+                    DeviceUplinkKind::Heartbeat(Heartbeat { sequence })
+                } else {
+                    let mut fields = BTreeMap::new();
+                    let mut remaining = config.event_payload_bytes;
+                    for index in 0..64 {
+                        if remaining == 0 { break; }
+                        let length = remaining.min(256);
+                        fields.insert(format!("f{index:02}"), Scalar::Text("x".repeat(length)));
+                        remaining -= length;
+                    }
+                    DeviceUplinkKind::Telemetry(fields)
+                };
+                let payload = DeviceUplink::new(SourceMessageId::new(format!("{source_prefix}{sequence}"))?, kind);
                 let published = publisher.publish(payload, PublishQos::AtLeastOnce).await;
                 let mut state = stats.lock().unwrap();
                 state.counts.publish_attempts += 1;
@@ -408,18 +603,76 @@ async fn event_load(config: &Config, stats: SharedStats, outage: bool) -> Result
             }
         }
     }
-    auth_task.await?;
+    while let Some(result) = workers.join_next().await {
+        result??;
+    }
     let _ = publisher
         .shutdown_with_timeout(Duration::from_secs(1))
         .await;
     business.shutdown().await;
-    Ok(handler.auth.load(Ordering::Relaxed))
+    if let Some(events) = event_business {
+        events.shutdown().await;
+    }
+    let handler_latency = handler
+        .latency
+        .lock()
+        .ok()
+        .and_then(|h| (h.count > 0).then(|| h.summary()));
+    Ok((handler.auth.load(Ordering::Relaxed), handler_latency))
+}
+
+async fn verifier_probe(config: Config, stats: SharedStats, until: Instant) -> Result<()> {
+    let socket = UdpSocket::bind("127.0.0.1:0").await?;
+    let address = config
+        .udp_address
+        .ok_or("verifier probe requires udp_address")?;
+    let boot_id = uuid::Uuid::new_v4().into_bytes();
+    let mut tick =
+        tokio::time::interval(Duration::from_secs_f64(1.0 / config.verifier_rate as f64));
+    tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+    let mut sequence = 0u64;
+    while Instant::now() < until {
+        tick.tick().await;
+        sequence += 1;
+        let payload = serde_json::to_vec(&DeviceUplink::new(
+            SourceMessageId::new(format!("soak-udp-{sequence}"))?,
+            DeviceUplinkKind::Heartbeat(Heartbeat { sequence }),
+        ))?;
+        let credential = b"cred-udp";
+        let mut datagram = b"NBI1".to_vec();
+        datagram.push(credential.len() as u8);
+        datagram.extend_from_slice(credential);
+        datagram.extend_from_slice(&1u32.to_be_bytes());
+        datagram.extend_from_slice(&boot_id);
+        datagram.extend_from_slice(&sequence.to_be_bytes());
+        datagram.extend_from_slice(&netbaiot_runtime::now_ms().to_be_bytes());
+        datagram.extend_from_slice(&(payload.len() as u16).to_be_bytes());
+        datagram.extend_from_slice(&payload);
+        let key = (0..32u8).collect::<Vec<_>>();
+        let mut mac = Hmac::<Sha256>::new_from_slice(&key)?;
+        mac.update(&datagram);
+        datagram.extend_from_slice(&mac.finalize().into_bytes());
+        socket.send_to(&datagram, address).await?;
+        let mut ack = [0u8; 64];
+        let result = tokio::time::timeout(Duration::from_secs(2), socket.recv_from(&mut ack)).await;
+        let mut state = stats.lock().unwrap();
+        state.counts.verifier_requests += 1;
+        if matches!(result, Ok(Ok((64, _)))) && &ack[..4] == b"NBA1" {
+            state.counts.verifier_acks += 1;
+        }
+    }
+    Ok(())
 }
 
 async fn verifier_load(config: &Config, stats: SharedStats) -> Result<(u64, u64)> {
     let handler = Arc::new(Handler::new(config));
-    let (business, mut deliveries) =
-        connect_business(config, handler.clone(), BusinessRole::Multiplexed).await?;
+    let (business, mut deliveries) = connect_business(
+        config,
+        handler.clone(),
+        BusinessRole::Multiplexed,
+        Some(&stats),
+    )
+    .await?;
     let acknowledger = tokio::spawn(async move {
         while let Some(delivery) = deliveries.recv().await {
             let _ = delivery.ack().await;
@@ -510,14 +763,65 @@ fn rss_kb(pid: u32) -> Option<u64> {
         .ok()?;
     String::from_utf8(output.stdout).ok()?.trim().parse().ok()
 }
+fn cpu_percent(pid: u32) -> Option<f64> {
+    let output = std::process::Command::new("ps")
+        .args(["-o", "%cpu=", "-p", &pid.to_string()])
+        .output()
+        .ok()?;
+    String::from_utf8(output.stdout).ok()?.trim().parse().ok()
+}
+
+#[derive(Default, Serialize)]
+struct CpuSamples {
+    baseline_percent: Option<f64>,
+    warm_percent: Option<f64>,
+    average_workload_percent: Option<f64>,
+    peak_sampled_percent: Option<f64>,
+    recovery_percent: Option<f64>,
+    last_percent: Option<f64>,
+    #[serde(skip)]
+    total: f64,
+    #[serde(skip)]
+    count: u64,
+}
+impl CpuSamples {
+    fn add(&mut self, value: f64, elapsed: Duration, config: &Config) {
+        self.last_percent = Some(value);
+        self.baseline_percent.get_or_insert(value);
+        if elapsed >= Duration::from_secs(config.warmup_secs) {
+            self.warm_percent.get_or_insert(value);
+            let workload_secs =
+                config
+                    .duration_secs
+                    .saturating_mul(if config.scenario == "topology_compare" {
+                        2
+                    } else {
+                        1
+                    });
+            if elapsed <= Duration::from_secs(workload_secs) {
+                self.total += value;
+                self.count += 1;
+                self.average_workload_percent = Some(self.total / self.count as f64);
+                self.peak_sampled_percent =
+                    Some(self.peak_sampled_percent.unwrap_or(value).max(value));
+            } else {
+                self.recovery_percent = Some(value);
+            }
+        }
+    }
+}
 
 #[derive(Default, Serialize)]
 struct Peaks {
+    metrics_observed: bool,
     rss_baseline_kb: Option<u64>,
     rss_warm_kb: Option<u64>,
     rss_peak_kb: Option<u64>,
+    rss_last_kb: Option<u64>,
     rss_post_soak_kb: Option<u64>,
     rss_post_recovery_kb: Option<u64>,
+    gateway_cpu: CpuSamples,
+    loadgen_cpu: CpuSamples,
     pending_items: u64,
     pending_bytes: u64,
     pending_items_last: u64,
@@ -537,6 +841,23 @@ struct Peaks {
     event_acks_total: u64,
     revision_gaps_total: u64,
     offline_grace_expirations_total: u64,
+    timeline: Vec<Milestone>,
+}
+#[derive(Serialize)]
+struct Milestone {
+    elapsed_seconds: u64,
+    rss_kib: Option<u64>,
+    cpu_percent: Option<f64>,
+    pending_items: Option<u64>,
+    pending_bytes: Option<u64>,
+    connections: Option<u64>,
+    reconnects: u64,
+    sync_failures: u64,
+    late_responses_total: Option<u64>,
+    overloads_total: Option<u64>,
+    event_retries: u64,
+    auth_success: u64,
+    auth_failures: u64,
 }
 fn metric(body: &str, name: &str) -> u64 {
     body.lines()
@@ -544,16 +865,97 @@ fn metric(body: &str, name: &str) -> u64 {
         .and_then(|value| value.trim().parse().ok())
         .unwrap_or(0)
 }
-async fn sample_gateway(config: Config, peaks: Arc<Mutex<Peaks>>, stop: Arc<AtomicBool>) {
+async fn read_gateway_metrics(config: &Config) -> Option<String> {
+    let url = config.management_url.as_ref()?;
+    let admin = std::env::var("NETBAIOT_ADMIN_SECRET").ok()?;
+    reqwest::Client::builder()
+        .no_proxy()
+        .timeout(Duration::from_secs(2))
+        .build()
+        .ok()?
+        .get(format!("{url}/api/v1/metrics"))
+        .bearer_auth(admin)
+        .send()
+        .await
+        .ok()?
+        .text()
+        .await
+        .ok()
+}
+#[derive(Serialize)]
+struct GatewayPercentiles {
+    p50: Option<f64>,
+    p95: Option<f64>,
+    p99: Option<f64>,
+    max: Option<f64>,
+}
+fn gateway_histogram(before: &str, after: &str, name: &str) -> Option<GatewayPercentiles> {
+    let prefix = format!("netbaiot_{name}_bucket{{le=\"");
+    let parse = |body: &str| -> Vec<(String, u64)> {
+        body.lines()
+            .filter_map(|line| {
+                let rest = line.strip_prefix(&prefix)?;
+                let (bound, value) = rest.split_once("\"} ")?;
+                Some((bound.to_owned(), value.parse().ok()?))
+            })
+            .collect()
+    };
+    let old = parse(before);
+    let new = parse(after);
+    if old.len() != new.len() || old.is_empty() {
+        return None;
+    }
+    let total = new.last()?.1.checked_sub(old.last()?.1)?;
+    if total == 0 {
+        return None;
+    }
+    let percentile = |percent: u64| -> Option<f64> {
+        let target = total.saturating_mul(percent).div_ceil(100);
+        new.iter()
+            .zip(&old)
+            .find_map(|((bound, count), (old_bound, prior))| {
+                if bound != old_bound || count.checked_sub(*prior)? < target {
+                    return None;
+                }
+                bound.parse::<f64>().ok().map(|us| us / 1000.0)
+            })
+    };
+    Some(GatewayPercentiles {
+        p50: percentile(50),
+        p95: percentile(95),
+        p99: percentile(99),
+        max: None,
+    })
+}
+fn gateway_delta(before: &str, after: &str, name: &str) -> Option<u64> {
+    let key = format!("netbaiot_{name} ");
+    let parse = |body: &str| {
+        body.lines()
+            .find_map(|line| line.strip_prefix(&key)?.parse::<u64>().ok())
+    };
+    parse(after)?.checked_sub(parse(before)?)
+}
+async fn sample_gateway(
+    config: Config,
+    peaks: Arc<Mutex<Peaks>>,
+    stats: SharedStats,
+    stop: Arc<AtomicBool>,
+) {
     let client = match reqwest::Client::builder().no_proxy().build() {
         Ok(client) => client,
         Err(_) => return,
     };
     let admin = std::env::var("NETBAIOT_ADMIN_SECRET").ok();
     let started = Instant::now();
+    let mut next_snapshot = 0u64;
     let mut interval = tokio::time::interval(Duration::from_millis(config.sample_period_ms));
     while !stop.load(Ordering::Relaxed) {
         interval.tick().await;
+        let elapsed = started.elapsed();
+        let own_pid = std::process::id();
+        if let Ok(Some(cpu)) = tokio::task::spawn_blocking(move || cpu_percent(own_pid)).await {
+            peaks.lock().unwrap().loadgen_cpu.add(cpu, elapsed, &config);
+        }
         if let Some(pid) = config.gateway_pid {
             let rss = tokio::task::spawn_blocking(move || rss_kb(pid))
                 .await
@@ -566,6 +968,10 @@ async fn sample_gateway(config: Config, peaks: Arc<Mutex<Peaks>>, stop: Arc<Atom
                     guard.rss_warm_kb.get_or_insert(rss);
                 }
                 guard.rss_peak_kb = Some(guard.rss_peak_kb.unwrap_or(0).max(rss));
+                guard.rss_last_kb = Some(rss);
+            }
+            if let Ok(Some(cpu)) = tokio::task::spawn_blocking(move || cpu_percent(pid)).await {
+                peaks.lock().unwrap().gateway_cpu.add(cpu, elapsed, &config);
             }
         }
         if let (Some(url), Some(secret)) = (&config.management_url, &admin)
@@ -577,6 +983,7 @@ async fn sample_gateway(config: Config, peaks: Arc<Mutex<Peaks>>, stop: Arc<Atom
             && let Ok(body) = reply.text().await
         {
             let mut guard = peaks.lock().unwrap();
+            guard.metrics_observed = true;
             guard.pending_items = guard
                 .pending_items
                 .max(metric(&body, "netbaiot_business_rpc_pending "));
@@ -625,6 +1032,29 @@ async fn sample_gateway(config: Config, peaks: Arc<Mutex<Peaks>>, stop: Arc<Atom
                 "netbaiot_business_rpc_offline_grace_expirations_total ",
             );
         }
+        if elapsed.as_secs() >= next_snapshot {
+            let counts = &stats.lock().unwrap().counts;
+            let mut guard = peaks.lock().unwrap();
+            let snapshot = Milestone {
+                elapsed_seconds: elapsed.as_secs(),
+                rss_kib: guard.rss_last_kb,
+                cpu_percent: guard.gateway_cpu.last_percent,
+                pending_items: guard.metrics_observed.then_some(guard.pending_items_last),
+                pending_bytes: guard.metrics_observed.then_some(guard.pending_bytes_last),
+                connections: guard
+                    .metrics_observed
+                    .then_some(guard.active_business_connections_last),
+                reconnects: counts.reconnects,
+                sync_failures: counts.sync_failures,
+                late_responses_total: guard.metrics_observed.then_some(guard.late_responses_total),
+                overloads_total: guard.metrics_observed.then_some(guard.overloads_total),
+                event_retries: counts.event_retries,
+                auth_success: counts.success,
+                auth_failures: counts.requests.saturating_sub(counts.success),
+            };
+            guard.timeline.push(snapshot);
+            next_snapshot = next_snapshot.saturating_add(config.snapshot_every_secs);
+        }
     }
 }
 
@@ -638,16 +1068,29 @@ async fn main() -> Result<()> {
     let stats = Arc::new(Mutex::new(Stats::default()));
     let peaks = Arc::new(Mutex::new(Peaks::default()));
     let stop = Arc::new(AtomicBool::new(false));
-    let sampler = tokio::spawn(sample_gateway(config.clone(), peaks.clone(), stop.clone()));
+    let sampler = tokio::spawn(sample_gateway(
+        config.clone(),
+        peaks.clone(),
+        stats.clone(),
+        stop.clone(),
+    ));
+    let gateway_before = read_gateway_metrics(&config).await;
     let started = Instant::now();
     let mut verifier_calls = None;
     let mut verifier_calls_before_invalidation = None;
     let mut provider_auth_calls = None;
+    let mut handler_latency = None;
+    let mut topology_results = None;
     match config.scenario.as_str() {
-        "auth" => {
+        "auth" | "steady_auth" => {
             let handler = Arc::new(Handler::new(&config));
-            let (business, _) =
-                connect_business(&config, handler.clone(), BusinessRole::AuthControl).await?;
+            let (business, _) = connect_business(
+                &config,
+                handler.clone(),
+                BusinessRole::AuthControl,
+                Some(&stats),
+            )
+            .await?;
             auth_load(
                 config.clone(),
                 stats.clone(),
@@ -656,12 +1099,77 @@ async fn main() -> Result<()> {
             .await;
             business.shutdown().await;
             provider_auth_calls = Some(handler.auth.load(Ordering::Relaxed));
+            handler_latency = handler
+                .latency
+                .lock()
+                .ok()
+                .and_then(|h| (h.count > 0).then(|| h.summary()));
         }
-        "multiplexed" => {
-            provider_auth_calls = Some(event_load(&config, stats.clone(), false).await?)
+        "multiplexed" | "soak" => {
+            let (calls, latency) = event_load(&config, stats.clone(), false).await?;
+            provider_auth_calls = Some(calls);
+            handler_latency = latency;
         }
         "consumer_outage" => {
-            provider_auth_calls = Some(event_load(&config, stats.clone(), true).await?)
+            let (calls, latency) = event_load(&config, stats.clone(), true).await?;
+            provider_auth_calls = Some(calls);
+            handler_latency = latency;
+        }
+        "topology_compare" => {
+            let mut results = Vec::new();
+            for topology in [Topology::Multiplexed, Topology::Dual] {
+                let mut run_config = config.clone();
+                run_config.topology = topology;
+                let run_stats = Arc::new(Mutex::new(Stats::default()));
+                let before = read_gateway_metrics(&run_config).await;
+                let started = Instant::now();
+                let (calls, handler) = event_load(&run_config, run_stats.clone(), false).await?;
+                let elapsed = started.elapsed();
+                let after = read_gateway_metrics(&run_config).await;
+                let mut run = run_stats.lock().unwrap();
+                run.counts.latency_ms = run.auth_latency.summary();
+                run.counts.event_ack_ms = run.ack_latency.summary();
+                results.push(serde_json::json!({
+                    "topology": topology,
+                    "duration_seconds": elapsed.as_secs_f64(),
+                    "counts": run.counts,
+                    "auth_provider_calls": calls,
+                    "latency": {
+                        "end_to_end_ms": (run.auth_latency.count > 0).then(|| run.auth_latency.summary()),
+                        "event_ack_ms": (run.ack_latency.count > 0).then(|| run.ack_latency.summary()),
+                        "handler_ms": handler,
+                        "rpc_ms_gateway": before.as_ref().zip(after.as_ref()).and_then(|(a,b)| gateway_histogram(a,b,"business_rpc_auth_latency_us")),
+                        "rpc_remote_wait_ms_gateway": before.as_ref().zip(after.as_ref()).and_then(|(a,b)| gateway_histogram(a,b,"business_rpc_remote_wait_us")),
+                        "rpc_queue_wait_ms_gateway": before.as_ref().zip(after.as_ref()).and_then(|(a,b)| gateway_histogram(a,b,"business_rpc_queue_wait_us")),
+                        "event_ack_ms_gateway": before.as_ref().zip(after.as_ref()).and_then(|(a,b)| gateway_histogram(a,b,"business_rpc_event_ack_latency_us")),
+                        "sync_ms": (run.sync_ready.count > 0).then(|| run.sync_ready.summary()),
+                        "tls_handshake_ms": (run.tls_handshake.count > 0).then(|| run.tls_handshake.summary()),
+                    },
+                    "gateway_overloads": before.as_ref().zip(after.as_ref()).and_then(|(a,b)| gateway_delta(a,b,"business_rpc_overloads_total")),
+                }));
+            }
+            topology_results = Some(results);
+        }
+        "handshake" => {
+            let handler = Arc::new(Handler::new(&config));
+            let until = started + Duration::from_secs(config.duration_secs);
+            while Instant::now() < until {
+                let attempt = connect_business(
+                    &config,
+                    handler.clone(),
+                    BusinessRole::AuthControl,
+                    Some(&stats),
+                )
+                .await;
+                stats.lock().unwrap().counts.requests += 1;
+                match attempt {
+                    Ok((business, _)) => {
+                        stats.lock().unwrap().counts.success += 1;
+                        business.shutdown().await;
+                    }
+                    Err(_) => stats.lock().unwrap().counts.transport_failures += 1,
+                }
+            }
         }
         "verifier" => {
             let (before, total) = verifier_load(&config, stats.clone()).await?;
@@ -675,7 +1183,14 @@ async fn main() -> Result<()> {
                 || Instant::now() < started + Duration::from_secs(config.duration_secs)
             {
                 cycles += 1;
-                match connect_business(&config, handler.clone(), BusinessRole::AuthControl).await {
+                match connect_business(
+                    &config,
+                    handler.clone(),
+                    BusinessRole::AuthControl,
+                    Some(&stats),
+                )
+                .await
+                {
                     Ok((business, _)) => {
                         stats.lock().unwrap().counts.reconnects += 1;
                         let started = Instant::now();
@@ -721,15 +1236,66 @@ async fn main() -> Result<()> {
     }
     stop.store(true, Ordering::Relaxed);
     sampler.await?;
+    let gateway_after = read_gateway_metrics(&config).await;
     let elapsed = started.elapsed();
     let mut state = stats.lock().unwrap();
     state.counts.latency_ms = state.auth_latency.summary();
     state.counts.event_ack_ms = state.ack_latency.summary();
+    let git_commit = std::process::Command::new("git")
+        .args(["rev-parse", "HEAD"])
+        .output()
+        .ok()
+        .and_then(|output| String::from_utf8(output.stdout).ok())
+        .map(|value| value.trim().to_owned());
+    let git_dirty = std::process::Command::new("git")
+        .args(["status", "--porcelain"])
+        .output()
+        .ok()
+        .map(|output| !output.stdout.is_empty());
+    let rust_version = std::process::Command::new("rustc")
+        .arg("--version")
+        .output()
+        .ok()
+        .and_then(|output| String::from_utf8(output.stdout).ok())
+        .map(|value| value.trim().to_owned());
+    let observed = peaks.lock().unwrap().metrics_observed;
     println!(
         "{}",
         serde_json::to_string_pretty(&serde_json::json!({
             "scenario": config.scenario,
             "config": config,
+            "environment": {
+                "os": std::env::consts::OS,
+                "arch": std::env::consts::ARCH,
+                "rust": rust_version,
+                "build_profile": if cfg!(debug_assertions) { "dev" } else { "release" },
+                "git_commit": git_commit,
+                "git_dirty": git_dirty,
+                "transport": config.business_transport.name(),
+                "topology": config.topology,
+                "network_profile": config.network_profile,
+                "network_injection": "external_unverified",
+                "sample_period_ms": config.sample_period_ms,
+            },
+            "latency": {
+                "end_to_end_ms": (state.auth_latency.count > 0).then(|| state.auth_latency.summary()),
+                "rpc_ms_gateway": gateway_before.as_ref().zip(gateway_after.as_ref()).and_then(|(a,b)| gateway_histogram(a,b,"business_rpc_auth_latency_us")),
+                "rpc_remote_wait_ms_gateway": gateway_before.as_ref().zip(gateway_after.as_ref()).and_then(|(a,b)| gateway_histogram(a,b,"business_rpc_remote_wait_us")),
+                "rpc_queue_wait_ms_gateway": gateway_before.as_ref().zip(gateway_after.as_ref()).and_then(|(a,b)| gateway_histogram(a,b,"business_rpc_queue_wait_us")),
+                "event_ack_ms_gateway": gateway_before.as_ref().zip(gateway_after.as_ref()).and_then(|(a,b)| gateway_histogram(a,b,"business_rpc_event_ack_latency_us")),
+                "handler_ms": handler_latency,
+                "event_ack_ms": (state.ack_latency.count > 0).then(|| state.ack_latency.summary()),
+                "tls_handshake_ms": (state.tls_handshake.count > 0).then(|| state.tls_handshake.summary()),
+                "sync_ms": (state.sync_ready.count > 0).then(|| state.sync_ready.summary()),
+                "full_ready_ms": (state.full_ready.count > 0).then(|| state.full_ready.summary()),
+            },
+            "topology_results": topology_results,
+            "gateway_deltas": {
+                "overloads": gateway_before.as_ref().zip(gateway_after.as_ref()).and_then(|(a,b)| gateway_delta(a,b,"business_rpc_overloads_total")),
+                "late_responses": gateway_before.as_ref().zip(gateway_after.as_ref()).and_then(|(a,b)| gateway_delta(a,b,"business_rpc_late_responses_total")),
+                "sync_success": gateway_before.as_ref().zip(gateway_after.as_ref()).and_then(|(a,b)| gateway_delta(a,b,"business_rpc_provider_sync_success_total")),
+                "sync_failure": gateway_before.as_ref().zip(gateway_after.as_ref()).and_then(|(a,b)| gateway_delta(a,b,"business_rpc_provider_sync_failure_total")),
+            },
             "duration_seconds": elapsed.as_secs_f64(),
             "requests_per_second": state.counts.requests as f64 / elapsed.as_secs_f64().max(0.001),
             "events_per_second": state.counts.events as f64 / elapsed.as_secs_f64().max(0.001),
@@ -738,7 +1304,7 @@ async fn main() -> Result<()> {
         "verifier_provider_calls": verifier_calls,
         "verifier_calls_before_invalidation": verifier_calls_before_invalidation,
             "auth_provider_calls": provider_auth_calls,
-            "peaks": &*peaks.lock().unwrap(),
+            "peaks": if observed { Some(serde_json::to_value(&*peaks.lock().unwrap())?) } else { None },
         }))?
     );
     Ok(())

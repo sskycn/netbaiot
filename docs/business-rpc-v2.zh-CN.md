@@ -1,5 +1,7 @@
 # Business RPC Stream V2
 
+生产环境的 mTLS、同端口双角色连接、网络延迟与长时门禁证据见 [Business RPC V2 生产就绪门禁](business-rpc-v2-production-readiness.zh-CN.md)。
+
 V2 在现有 `business_tcp` 监听地址上承载设备认证、UDP verifier 获取、认证失效控制和需确认事件。每帧是四字节大端长度加 JSON；长度不含前缀。零长度、超限、畸形 JSON 和未知字段会被拒绝。`hello.version = 2` 与 V1 公共协议版本独立。准确帧结构和 DTO 见 `netbaiot-protocol::business_rpc`。
 
 ## 角色、身份和连接

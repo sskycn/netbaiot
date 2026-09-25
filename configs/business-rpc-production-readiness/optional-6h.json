@@ -1,0 +1,32 @@
+{
+  "scenario": "soak",
+  "business_address": "127.0.0.1:19002",
+  "device_address": "127.0.0.1:19000",
+  "udp_address": "127.0.0.1:19000",
+  "management_url": "http://127.0.0.1:19001",
+  "gateway_pid": null,
+  "duration_secs": 21600,
+  "auth_concurrency": 4,
+  "event_rate": 2,
+  "event_ack_delay_ms": 100,
+  "event_reconnect_every_secs": 45,
+  "reconnect_cycles": 100,
+  "reconnect_pause_ms": 0,
+  "sample_period_ms": 250,
+  "warmup_secs": 10,
+  "recovery_secs": 30,
+  "business_transport": {
+    "mode": "mtls",
+    "server_name": "localhost",
+    "ca_pem": "/path/to/ca.pem",
+    "certificate_pem": "/path/to/client.pem",
+    "private_key_pem": "/path/to/client-key.pem"
+  },
+  "topology": "dual",
+  "network_profile": "local",
+  "event_payload_bytes": 1024,
+  "auth_reconnect_every_secs": 60,
+  "invalidate_every_secs": 120,
+  "verifier_rate": 1,
+  "snapshot_every_secs": 900
+}

@@ -563,6 +563,7 @@ async fn mtls_verifies_server_and_maps_exact_client_certificate() {
         .iter()
         .map(|byte| format!("{byte:02x}"))
         .collect::<String>();
+    let principal_expiry = netbaiot_runtime::now_ms().saturating_add(12_000);
     config.business_rpc = Some(BusinessRpcConfig {
         version: 2,
         tls: Some(ManagementTlsFiles {
@@ -584,7 +585,7 @@ async fn mtls_verifies_server_and_maps_exact_client_certificate() {
             call_methods: vec!["auth.sync".into(), "auth.invalidate".into()],
             global: false,
             tenants: vec![TenantId::new("demo").unwrap()],
-            expires_at_ms: None,
+            expires_at_ms: Some(principal_expiry),
         }],
         development_token_env: None,
         allow_v1: false,
@@ -643,9 +644,9 @@ async fn mtls_verifies_server_and_maps_exact_client_certificate() {
         "an auth-only mTLS principal cannot subscribe to events"
     );
     event_only.shutdown().await;
-    let mut wrong_name = client_config;
+    let mut wrong_name = client_config.clone();
     wrong_name.tls.as_mut().unwrap().server_name = "not-localhost.example".into();
-    let (untrusted, _) = BusinessRpcClient::connect(wrong_name, Some(handler)).unwrap();
+    let (untrusted, _) = BusinessRpcClient::connect(wrong_name, Some(handler.clone())).unwrap();
     assert!(
         tokio::time::timeout(Duration::from_secs(5), untrusted.wait_ready())
             .await
@@ -653,9 +654,121 @@ async fn mtls_verifies_server_and_maps_exact_client_certificate() {
             .is_err()
     );
     untrusted.shutdown().await;
+    for (case, ca, cert, key) in [
+        (
+            "untrusted CA",
+            "management-ca.pem",
+            "management-client.pem",
+            "management-client-key.pem",
+        ),
+        (
+            "wrong client certificate",
+            "localhost-cert.pem",
+            "localhost-cert.pem",
+            "localhost-key.pem",
+        ),
+        (
+            "expired client certificate",
+            "localhost-cert.pem",
+            "management-expired.pem",
+            "management-client-key.pem",
+        ),
+        (
+            "missing client certificate",
+            "localhost-cert.pem",
+            "missing-client.pem",
+            "management-client-key.pem",
+        ),
+        (
+            "known CA but unmapped principal",
+            "localhost-cert.pem",
+            "management-unmapped.pem",
+            "management-client-key.pem",
+        ),
+    ] {
+        let mut invalid = client_config.clone();
+        let tls = invalid.tls.as_mut().unwrap();
+        tls.ca_pem = fixtures.join(ca);
+        tls.certificate_pem = fixtures.join(cert);
+        tls.private_key_pem = fixtures.join(key);
+        let (client, _) = BusinessRpcClient::connect(invalid, Some(handler.clone())).unwrap();
+        assert!(
+            !matches!(
+                tokio::time::timeout(Duration::from_secs(1), client.wait_ready()).await,
+                Ok(Ok(()))
+            ),
+            "{case} must not reach Ready"
+        );
+        client.shutdown().await;
+    }
+    assert_eq!(
+        handler.calls.load(Ordering::Relaxed),
+        1,
+        "TLS failures cannot reach device auth"
+    );
+    tokio::time::timeout(Duration::from_secs(13), async {
+        while business.ready() {
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+    })
+    .await
+    .expect("principal expiry must close an idle Serving connection");
+    assert!(netbaiot_runtime::now_ms() >= principal_expiry);
+    assert!(
+        !matches!(
+            tokio::time::timeout(
+                Duration::from_secs(3),
+                device_result(addresses[0], "after-expiry")
+            )
+            .await,
+            Ok(Ok(_))
+        ),
+        "an expired principal cannot authorize a new device"
+    );
+    assert_eq!(handler.calls.load(Ordering::Relaxed), 1);
     business.shutdown().await;
     server.start_kill().unwrap();
     let _ = server.wait().await;
+    let replacement_cert = std::fs::read(fixtures.join("management-unmapped.pem")).unwrap();
+    let replacement_der = rustls_pemfile::certs(&mut replacement_cert.as_slice())
+        .next()
+        .unwrap()
+        .unwrap();
+    config.business_rpc.as_mut().unwrap().identities[0].certificate_sha256 =
+        Sha256::digest(replacement_der.as_ref())
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect();
+    config.business_rpc.as_mut().unwrap().identities[0].expires_at_ms = None;
+    let replacement_path = write_config(&root, &config);
+    let mut replacement_server = Command::new(env!("CARGO_BIN_EXE_netbaiot-server"))
+        .arg(&replacement_path)
+        .env("NETBAIOT_ADMIN_SECRET", "a".repeat(64))
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .kill_on_drop(true)
+        .spawn()
+        .unwrap();
+    let mut replacement_config = client_config.clone();
+    replacement_config.tls.as_mut().unwrap().certificate_pem =
+        fixtures.join("management-unmapped.pem");
+    let (replacement, _) =
+        BusinessRpcClient::connect(replacement_config, Some(handler.clone())).unwrap();
+    tokio::time::timeout(Duration::from_secs(10), replacement.wait_ready())
+        .await
+        .unwrap()
+        .unwrap();
+    device_result(addresses[0], "rotated").await.unwrap();
+    let (old_certificate, _) =
+        BusinessRpcClient::connect(client_config, Some(handler.clone())).unwrap();
+    assert!(!matches!(
+        tokio::time::timeout(Duration::from_secs(1), old_certificate.wait_ready()).await,
+        Ok(Ok(()))
+    ));
+    old_certificate.shutdown().await;
+    replacement.shutdown().await;
+    replacement_server.start_kill().unwrap();
+    let _ = replacement_server.wait().await;
     let _ = std::fs::remove_dir_all(root);
 }
 

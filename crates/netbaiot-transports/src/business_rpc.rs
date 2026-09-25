@@ -509,6 +509,7 @@ async fn connection_inner(
     .await?;
     let connection_stop = stop.child_token();
     let writer_stop = connection_stop.child_token();
+    let writer_metrics = metrics.clone();
     let writer_handle = tokio::spawn(async move {
         let result = writer_loop(
             writer,
@@ -517,7 +518,10 @@ async fn connection_inner(
             event_rx,
             effective_max,
             config.write_timeout,
-            writer_stop.clone(),
+            WriterSignals {
+                metrics: writer_metrics,
+                stop: writer_stop.clone(),
+            },
         )
         .await;
         writer_stop.cancel();
@@ -576,14 +580,19 @@ async fn connection_inner(
                 {
                     break Err(Error::Forbidden);
                 }
+                let remote_code = error.as_ref().map(|error| error.code);
                 let result = match (body, error) {
                     (Some(body), None) => Ok(body),
                     (None, Some(error)) => Err(netbaiot_runtime::rpc_error_to_runtime(error.code)),
                     _ => Err(Error::Invalid),
                 };
-                let _ = services
+                if services
                     .registry
-                    .complete(epoch, request_id, &method, result);
+                    .complete(epoch, request_id, &method, result)
+                    && let Some(code) = remote_code
+                {
+                    metrics.business_rpc_remote_error(&method, code);
+                }
             }
             BusinessRpcFrame::Subscribe {
                 subscription_id,
@@ -1048,6 +1057,10 @@ async fn event_loop(
         }
     }
 }
+struct WriterSignals {
+    metrics: Arc<Metrics>,
+    stop: CancellationToken,
+}
 async fn writer_loop<W: AsyncWrite + Unpin>(
     mut writer: W,
     mut control: mpsc::Receiver<Queued>,
@@ -1055,13 +1068,18 @@ async fn writer_loop<W: AsyncWrite + Unpin>(
     mut events: mpsc::Receiver<Queued>,
     maximum: usize,
     timeout: Duration,
-    stop: CancellationToken,
+    signals: WriterSignals,
 ) -> Result<()> {
     loop {
         let item = tokio::select! {
-            _ = stop.cancelled() => return Ok(()),
+            _ = signals.stop.cancelled() => return Ok(()),
             item = control.recv(), if !control.is_closed() => item,
-            item = auth.recv(), if !auth.is_closed() => item.map(|out| Queued { frame: out.frame, written: None, _bytes: out._bytes, _tracking: None }),
+            item = auth.recv(), if !auth.is_closed() => item.map(|out| {
+                if matches!(out.frame, BusinessRpcFrame::Request { .. }) {
+                    signals.metrics.observe(Histogram::BusinessRpcQueueWait, out.queued_at.elapsed().as_micros().min(u64::MAX as u128) as u64);
+                }
+                Queued { frame: out.frame, written: None, _bytes: out._bytes, _tracking: None }
+            }),
             item = events.recv(), if !events.is_closed() => item,
         };
         let Some(item) = item else { return Ok(()) };

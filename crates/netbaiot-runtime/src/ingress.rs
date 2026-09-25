@@ -171,7 +171,8 @@ impl Ingress {
         let _gate = lock(&self.auth_registration)?;
         if !self.auth_cache.candidate_is_current(&candidate)? {
             self.metrics.inc(Metric::AuthFailures);
-            return Err(Error::Authentication);
+            self.metrics.inc(Metric::AuthStaleResponses);
+            return Err(Error::Unavailable);
         }
         let auth = Arc::new(candidate.auth);
         self.sessions.register_with(auth, transport, finalize)
@@ -507,7 +508,7 @@ mod tests {
             assert!(
                 matches!(
                     ingress.register_session(candidate, Transport::Mqtt),
-                    Err(Error::Authentication)
+                    Err(Error::Unavailable)
                 ),
                 "a pre-invalidation candidate must never become a live session"
             );
@@ -601,7 +602,7 @@ mod tests {
             "commands": true, "auth_revision": 2
         });
         assert!(registry.complete(lease.epoch(), request_id, &method, Ok(reply.clone())));
-        assert!(matches!(stale.await.unwrap(), Err(Error::Authentication)));
+        assert!(matches!(stale.await.unwrap(), Err(Error::Unavailable)));
         assert_eq!(ingress.auth_cache.usage().unwrap().0, 0);
         assert!(sessions.list(0, 10).unwrap().is_empty());
         lease.advance_revision(2).unwrap();
