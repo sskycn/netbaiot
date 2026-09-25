@@ -713,6 +713,11 @@ async fn reader_loop<R: AsyncRead + Unpin + Send + 'static>(
     let result: Result<()> = async {
         loop {
         gauges.sync(&streams);
+        // Once the last even ID is consumed, a new connection gets a fresh namespace.
+        // The normal exit path sends GOAWAY NO_ERROR before the writer stops.
+        if streams.local_ids_exhausted() {
+            break Ok(());
+        }
         if draining.is_some()
             && outbound_auth.is_empty()
             && pending_event.is_none()

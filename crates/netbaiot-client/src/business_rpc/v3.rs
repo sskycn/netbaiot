@@ -812,6 +812,22 @@ async fn connected(
     }
     let result: Result<(), Error> = async {
         loop {
+        if streams.local_ids_exhausted() {
+            ready.send_replace(false);
+            let away = V3GoAway {
+                last_stream_id: streams.last_peer_id(),
+                code: V3GoAwayCode::NoError,
+                message: String::new(),
+            };
+            let (done, written) = oneshot::channel();
+            let frame = metadata(0, V3FrameType::GoAway, &away, &limits)?;
+            if tokio::time::timeout(config.request_timeout,
+                writer_tx.send(WriterMessage::GoAway(frame, done))).await.is_ok_and(|sent| sent.is_ok())
+            {
+                let _ = tokio::time::timeout(config.request_timeout, written).await;
+            }
+            break Ok(());
+        }
         if draining.is_some()
             && invalidations.is_empty()
             && handlers.is_empty()

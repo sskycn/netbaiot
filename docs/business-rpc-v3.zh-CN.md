@@ -6,7 +6,7 @@ V3 在现有 `business_tcp` listener 上显式启用：保留 `business_rpc.vers
 
 Hello/Ready 是有长度上限的 JSON 握手；Ready 返回新的 `connection_epoch` 和协商限额。后续固定帧头为 12 字节：`payload_length: u32 BE`、`stream_id: u32 BE`（高位为零）、`frame_type: u8`、`flags: u8`、`reserved: u16 BE`（必须为零），随后是 payload。稳定编号：OPEN 1、ACCEPT 2、RESPONSE 3、DATA 4、WINDOW_UPDATE 5、RESET_STREAM 6、CLOSE_STREAM 7、PING 8、PONG 9、GOAWAY 10。`END_STREAM = 1` 仅用于 DATA/RESPONSE；其他 flag 位均非法。读取 payload 前先验证帧类型、标志、ID 和长度。metadata 仍是最多 4 KiB 的 JSON，DATA 是原始业务 body 字节（当前业务 DTO 仍为 JSON）；收齐后严格核对声明的 `content_length`。
 
-Stream 0 仅用于 PING、PONG、连接 WINDOW_UPDATE 和 GOAWAY。客户端 stream ID 为奇数，网关为偶数，同一连接上严格递增且不复用。传输流身份是 `(connection_epoch, stream_id)`，不能替代业务 `request_id`、稳定 `event_id`、`delivery_id` 和 `subscription_id`。GOAWAY 的 `last_stream_id` 表示已考虑的最高对端 stream；重连生成新 epoch。
+Stream 0 仅用于 PING、PONG、连接 WINDOW_UPDATE 和 GOAWAY。客户端 stream ID 为奇数，网关为偶数，同一连接上严格递增且不复用。用尽最后一个合法本地 ID 后，端点发送 GOAWAY NO_ERROR 并重连，不回绕。传输流身份是 `(connection_epoch, stream_id)`，不能替代业务 `request_id`、稳定 `event_id`、`delivery_id` 和 `subscription_id`。GOAWAY 的 `last_stream_id` 表示已考虑的最高对端 stream；重连生成新 epoch。
 
 Provider 和 EventSubscription 是长寿命父流。Provider 下有网关发起的 `device.authenticate`、`device.resolve_verifier` 子 RPC，以及客户端发起的 `auth.sync`、`auth.invalidate` 子 RPC。初始 reset sync 完成且客户端通过 PING/PONG 确认响应后，Provider 才进入 Serving。EventSubscription 下有网关发起的 EventDelivery 子流，每个订阅仍只允许一个 delivery 在途。应用提交后才调用 `BusinessRpcV3Delivery::ack()`，失败时调用 `nack()`。socket 写入、WINDOW_UPDATE、SDK 收到事件都不等于业务 ACK。重试时 `delivery_id` 可变，`event_id` 保持稳定。V3 不增加 Command RPC。
 
