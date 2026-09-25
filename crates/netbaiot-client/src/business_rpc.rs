@@ -17,7 +17,7 @@ use std::{
         Arc, Mutex,
         atomic::{AtomicU64, Ordering},
     },
-    time::Duration,
+    time::{Duration, Instant},
 };
 use thiserror::Error;
 use tokio::{
@@ -218,6 +218,20 @@ struct ClientInner {
     shutdown: CancellationToken,
     task: Mutex<Option<JoinHandle<()>>>,
     ready: watch::Receiver<bool>,
+    connection_timing: Arc<Mutex<Option<BusinessRpcConnectionTiming>>>,
+}
+/// Client-observed timing for the most recent successful connection. TLS is
+/// measured inside the existing verified rustls path, before the V2 handshake.
+#[derive(Clone, Copy, Debug)]
+pub struct BusinessRpcConnectionTiming {
+    pub tcp_connect: Duration,
+    pub tls_handshake: Option<Duration>,
+    pub sync_to_ready: Duration,
+    pub full_ready: Duration,
+}
+struct DriverSignals {
+    ready: watch::Sender<bool>,
+    timing: Arc<Mutex<Option<BusinessRpcConnectionTiming>>>,
 }
 impl Drop for ClientInner {
     fn drop(&mut self) {
@@ -234,6 +248,13 @@ pub struct BusinessRpcClient {
     inner: Arc<ClientInner>,
 }
 impl BusinessRpcClient {
+    pub fn connection_timing(&self) -> Option<BusinessRpcConnectionTiming> {
+        self.inner
+            .connection_timing
+            .lock()
+            .ok()
+            .and_then(|timing| *timing)
+    }
     pub fn ready(&self) -> bool {
         *self.inner.ready.borrow()
     }
@@ -299,13 +320,17 @@ impl BusinessRpcClient {
         let (ready_tx, ready_rx) = watch::channel(false);
         let shutdown = CancellationToken::new();
         let revision = Arc::new(AtomicU64::new(config.auth_revision));
+        let connection_timing = Arc::new(Mutex::new(None));
         let task = tokio::spawn(driver(
             config.clone(),
             handler,
             command_rx,
             deliveries,
-            ready_tx,
             revision.clone(),
+            DriverSignals {
+                ready: ready_tx,
+                timing: connection_timing.clone(),
+            },
             shutdown.clone(),
         ));
         let client = Self {
@@ -317,6 +342,7 @@ impl BusinessRpcClient {
                 shutdown,
                 task: Mutex::new(Some(task)),
                 ready: ready_rx,
+                connection_timing,
             }),
         };
         Ok((client, delivery_rx))
@@ -325,11 +351,13 @@ impl BusinessRpcClient {
 
 async fn connect_io(
     config: &BusinessRpcClientConfig,
-) -> Result<Box<dyn Io>, BusinessRpcClientError> {
+) -> Result<(Box<dyn Io>, Duration, Option<Duration>), BusinessRpcClientError> {
+    let tcp_started = Instant::now();
     let socket = tokio::time::timeout(config.connect_timeout, TcpStream::connect(config.address))
         .await
         .map_err(|_| BusinessRpcClientError::Timeout)?
         .map_err(|_| BusinessRpcClientError::Unavailable)?;
+    let tcp_connect = tcp_started.elapsed();
     if let Some(tls) = &config.tls {
         let ca = std::fs::read(&tls.ca_pem).map_err(|_| BusinessRpcClientError::InvalidConfig)?;
         let cert = std::fs::read(&tls.certificate_pem)
@@ -364,6 +392,7 @@ async fn connect_io(
         .map_err(|_| BusinessRpcClientError::InvalidConfig)?;
         let name = rustls::pki_types::ServerName::try_from(tls.server_name.clone())
             .map_err(|_| BusinessRpcClientError::InvalidConfig)?;
+        let tls_started = Instant::now();
         let stream = tokio::time::timeout(
             config.connect_timeout,
             TlsConnector::from(Arc::new(rustls_config)).connect(name, socket),
@@ -371,9 +400,9 @@ async fn connect_io(
         .await
         .map_err(|_| BusinessRpcClientError::Timeout)?
         .map_err(|_| BusinessRpcClientError::Unauthorized)?;
-        Ok(Box::new(stream))
+        Ok((Box::new(stream), tcp_connect, Some(tls_started.elapsed())))
     } else {
-        Ok(Box::new(socket))
+        Ok((Box::new(socket), tcp_connect, None))
     }
 }
 async fn write_frame<W: AsyncWrite + Unpin>(
@@ -543,8 +572,8 @@ async fn driver(
     handler: Option<Arc<dyn BusinessAuthHandler>>,
     mut commands: mpsc::Receiver<Command>,
     deliveries: mpsc::Sender<BusinessDelivery>,
-    ready: watch::Sender<bool>,
     revision: Arc<AtomicU64>,
+    signals: DriverSignals,
     stop: CancellationToken,
 ) {
     let mut attempt = 0u32;
@@ -557,12 +586,12 @@ async fn driver(
             handler.clone(),
             &mut commands,
             &deliveries,
-            &ready,
             &revision,
+            &signals,
             &stop,
         )
         .await;
-        let _ = ready.send(false);
+        let _ = signals.ready.send(false);
         if stop.is_cancelled() {
             break;
         }
@@ -599,11 +628,13 @@ async fn connected(
     handler: Option<Arc<dyn BusinessAuthHandler>>,
     commands: &mut mpsc::Receiver<Command>,
     deliveries: &mpsc::Sender<BusinessDelivery>,
-    ready: &watch::Sender<bool>,
     revision: &AtomicU64,
+    signals: &DriverSignals,
     stop: &CancellationToken,
 ) -> Result<(), BusinessRpcClientError> {
-    let mut io = connect_io(config).await?;
+    let started = Instant::now();
+    let (mut io, tcp_connect, tls_handshake) = connect_io(config).await?;
+    let sync_started = Instant::now();
     let (epoch, subscription) = handshake(&mut io, config, revision.load(Ordering::SeqCst)).await?;
     let (mut reader, mut writer) = tokio::io::split(io);
     let (read_tx, mut read_rx) = mpsc::channel::<(BusinessRpcFrame, OwnedSemaphorePermit)>(64);
@@ -642,7 +673,15 @@ async fn connected(
             }
         }
     });
-    let _ = ready.send(true);
+    if let Ok(mut timing) = signals.timing.lock() {
+        *timing = Some(BusinessRpcConnectionTiming {
+            tcp_connect,
+            tls_handshake,
+            sync_to_ready: sync_started.elapsed(),
+            full_ready: started.elapsed(),
+        });
+    }
+    let _ = signals.ready.send(true);
     let mut pending = HashMap::<Uuid, Pending>::new();
     let slots = Arc::new(Semaphore::new(config.auth_max_inflight));
     let mut handlers = JoinSet::new();

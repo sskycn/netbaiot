@@ -1,5 +1,7 @@
 # Business RPC V2 可靠性与负载门禁
 
+后续 mTLS、双角色拓扑、WAN-like 流延迟、CPU/RSS、证书生命周期与生产门禁记录见 [Business RPC V2 生产就绪门禁](business-rpc-v2-production-readiness.zh-CN.md)。本页以下数字仍是上一阶段的明文 loopback/dev profile 历史测量，不能与新一轮 release/mTLS 数据混写或作为当前生产容量。
+
 本轮基于 `583bb0d` 开始；附件所列的 `ef8ee53` 是前一个 Business RPC 提交，二者之间已有独立的 MQTT Device Profile 提交。本门禁不把开发机的瞬时吞吐当成生产容量。正确性测试判定 PASS/FAIL，性能数据只记录观测值。
 
 ## 授权边界

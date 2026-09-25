@@ -1,3 +1,4 @@
+use netbaiot_core::business_rpc::RpcErrorCode;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 /// Closed metric vocabulary: identifiers and URLs are never labels.
@@ -24,6 +25,7 @@ pub enum Metric {
     AuthNegativeHits,
     AuthEvictions,
     AuthInvalidations,
+    AuthStaleResponses,
     CodecFailures,
     IngressAccepted,
     IngressRejected,
@@ -84,7 +86,7 @@ pub enum BusinessRpcCallResult {
     Invalid,
 }
 
-const NAMES: [&str; 62] = [
+const NAMES: [&str; 63] = [
     "connections_accepted",
     "connections_rejected",
     "mqtt_connect_success",
@@ -105,6 +107,7 @@ const NAMES: [&str; 62] = [
     "auth_negative_hits",
     "auth_evictions",
     "auth_invalidations",
+    "auth_stale_responses",
     "codec_failures",
     "ingress_accepted",
     "ingress_rejected",
@@ -201,9 +204,12 @@ pub enum Histogram {
     BusinessRpcAuthLatency,
     BusinessRpcVerifierLatency,
     BusinessRpcEventAckLatency,
+    BusinessRpcAdmission,
+    BusinessRpcRemoteWait,
+    BusinessRpcQueueWait,
 }
 
-const HISTOGRAM_NAMES: [&str; 18] = [
+const HISTOGRAM_NAMES: [&str; 21] = [
     "mqtt_protocol_validation_us",
     "validation_to_admission_us",
     "admission_wait_us",
@@ -222,6 +228,9 @@ const HISTOGRAM_NAMES: [&str; 18] = [
     "business_rpc_auth_latency_us",
     "business_rpc_verifier_latency_us",
     "business_rpc_event_ack_latency_us",
+    "business_rpc_admission_us",
+    "business_rpc_remote_wait_us",
+    "business_rpc_queue_wait_us",
 ];
 const BOUNDS: [u64; 16] = [
     10, 25, 50, 100, 250, 500, 1_000, 2_500, 5_000, 10_000, 25_000, 50_000, 100_000, 500_000,
@@ -324,6 +333,7 @@ pub struct Metrics {
     values: [AtomicU64; NAMES.len()],
     business_rpc_active: AtomicU64,
     business_rpc_method_results: [[AtomicU64; 6]; 2],
+    business_rpc_remote_errors: [[AtomicU64; 11]; 2],
     management_auth_attempts: [AtomicU64; 15],
     management_authz_denied: [AtomicU64; 12],
     management_jwks_cache: [AtomicU64; 2],
@@ -341,6 +351,9 @@ impl Default for Metrics {
             values: std::array::from_fn(|_| AtomicU64::new(0)),
             business_rpc_active: AtomicU64::new(0),
             business_rpc_method_results: std::array::from_fn(|_| {
+                std::array::from_fn(|_| AtomicU64::new(0))
+            }),
+            business_rpc_remote_errors: std::array::from_fn(|_| {
                 std::array::from_fn(|_| AtomicU64::new(0))
             }),
             management_auth_attempts: std::array::from_fn(|_| AtomicU64::new(0)),
@@ -364,6 +377,14 @@ impl Metrics {
             _ => return,
         };
         self.business_rpc_method_results[index][result as usize].fetch_add(1, Ordering::Relaxed);
+    }
+    pub fn business_rpc_remote_error(&self, method: &str, code: RpcErrorCode) {
+        let index = match method {
+            "device.authenticate" => 0,
+            "device.resolve_verifier" => 1,
+            _ => return,
+        };
+        self.business_rpc_remote_errors[index][code as usize].fetch_add(1, Ordering::Relaxed);
     }
     pub fn business_rpc_connection_started(&self) {
         self.business_rpc_active.fetch_add(1, Ordering::Relaxed);
@@ -492,6 +513,24 @@ impl Metrics {
             {
                 output.push_str(&format!("netbaiot_business_rpc_method_results_total{{method=\"{method}\",result=\"{result}\"}} {}\n", self.business_rpc_method_results[method_index][result_index].load(Ordering::Relaxed)));
             }
+            for (code_index, code) in [
+                "invalid_request",
+                "unknown_method",
+                "unauthenticated",
+                "forbidden",
+                "device_rejected",
+                "unavailable",
+                "overloaded",
+                "timeout",
+                "conflict",
+                "stale_revision",
+                "internal",
+            ]
+            .iter()
+            .enumerate()
+            {
+                output.push_str(&format!("netbaiot_business_rpc_remote_errors_total{{method=\"{method}\",code=\"{code}\"}} {}\n", self.business_rpc_remote_errors[method_index][code_index].load(Ordering::Relaxed)));
+            }
         }
         for (index, class) in ["control", "event"].iter().enumerate() {
             output.push_str(&format!("netbaiot_business_rpc_queue_count{{class=\"{class}\"}} {}\nnetbaiot_business_rpc_queue_bytes{{class=\"{class}\"}} {}\n", self.business_rpc_queue_count[index].load(Ordering::Relaxed), self.business_rpc_queue_bytes[index].load(Ordering::Relaxed)));
@@ -596,6 +635,38 @@ impl Metrics {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn business_rpc_remote_error_labels_match_every_wire_code() {
+        let metrics = Metrics::default();
+        let cases = [
+            (RpcErrorCode::InvalidRequest, "invalid_request"),
+            (RpcErrorCode::UnknownMethod, "unknown_method"),
+            (RpcErrorCode::Unauthenticated, "unauthenticated"),
+            (RpcErrorCode::Forbidden, "forbidden"),
+            (RpcErrorCode::DeviceRejected, "device_rejected"),
+            (RpcErrorCode::Unavailable, "unavailable"),
+            (RpcErrorCode::Overloaded, "overloaded"),
+            (RpcErrorCode::Timeout, "timeout"),
+            (RpcErrorCode::Conflict, "conflict"),
+            (RpcErrorCode::StaleRevision, "stale_revision"),
+            (RpcErrorCode::Internal, "internal"),
+        ];
+        for (code, _) in cases {
+            metrics.business_rpc_remote_error("device.authenticate", code);
+        }
+        metrics.business_rpc_remote_error("unexpected.method", RpcErrorCode::Overloaded);
+        let rendered = metrics.render();
+        for (_, label) in cases {
+            assert!(rendered.contains(&format!(
+                "netbaiot_business_rpc_remote_errors_total{{method=\"device.authenticate\",code=\"{label}\"}} 1\n"
+            )));
+            assert!(rendered.contains(&format!(
+                "netbaiot_business_rpc_remote_errors_total{{method=\"device.resolve_verifier\",code=\"{label}\"}} 0\n"
+            )));
+        }
+        assert!(!rendered.contains("unexpected.method"));
+    }
 
     #[test]
     fn eventbus_probes_require_explicit_opt_in() {

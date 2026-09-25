@@ -283,7 +283,8 @@ impl AuthCache {
             leader.key = None;
             if state.epoch != leader_epoch {
                 let _ = completed.completed.send(true);
-                return Err(Error::Authentication);
+                self.metrics.inc(Metric::AuthStaleResponses);
+                return Err(Error::Unavailable);
             }
             let value = match &result {
                 Ok(auth) => CachedAuth::Positive(auth.clone()),
@@ -378,7 +379,8 @@ impl AuthCache {
     ) -> Result<T> {
         let state = lock(&self.state)?;
         if state.epoch != verified.epoch {
-            return Err(Error::Authentication);
+            self.metrics.inc(Metric::AuthStaleResponses);
+            return Err(Error::Unavailable);
         }
         finish(&verified.verifier)
     }
@@ -468,7 +470,8 @@ impl AuthCache {
             leader.key = None;
             if state.epoch != leader_epoch {
                 let _ = completed.completed.send(true);
-                return Err(Error::Authentication);
+                self.metrics.inc(Metric::AuthStaleResponses);
+                return Err(Error::Unavailable);
             }
             let (value, verifier) = match result {
                 Ok(verifier) => (CachedAuth::Verifier(verifier.clone()), Some(verifier)),
@@ -996,7 +999,7 @@ mod cache_tests {
         cache.invalidate(&AuthInvalidation::All).unwrap();
         provider.block.store(false, Ordering::SeqCst);
         provider.release.notify_waiters();
-        assert!(matches!(first.await.unwrap(), Err(Error::Authentication)));
+        assert!(matches!(first.await.unwrap(), Err(Error::Unavailable)));
         cache.authenticate(request("same")).await.unwrap();
         assert_eq!(provider.calls.load(Ordering::SeqCst), 2);
         assert_eq!(

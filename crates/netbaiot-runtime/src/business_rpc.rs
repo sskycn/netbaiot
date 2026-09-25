@@ -91,6 +91,7 @@ struct Pending {
 /// The writer owns the outbound frame; its byte permit remains held until the frame is written.
 pub struct BusinessRpcOutbound {
     pub frame: BusinessRpcFrame,
+    pub queued_at: Instant,
     pub _bytes: OwnedSemaphorePermit,
 }
 pub struct ProviderLease {
@@ -165,6 +166,7 @@ impl Drop for PendingGuard<'_> {
             {
                 let _ = sender.try_send(BusinessRpcOutbound {
                     frame,
+                    queued_at: Instant::now(),
                     _bytes: bytes,
                 });
             }
@@ -477,6 +479,7 @@ impl BusinessRpcRegistry {
             histogram,
             started: Instant::now(),
         };
+        let admission_started = Instant::now();
         let value = serde_json::to_value(body).map_err(|_| Error::Invalid)?;
         let size = serde_json::to_vec(&value)
             .map_err(|_| Error::Invalid)?
@@ -551,17 +554,30 @@ impl BusinessRpcRegistry {
                 self.metrics.inc(Metric::BusinessRpcOverloads);
                 Error::Overloaded
             })?;
+        self.metrics.observe(
+            Histogram::BusinessRpcAdmission,
+            admission_started
+                .elapsed()
+                .as_micros()
+                .min(u64::MAX as u128) as u64,
+        );
         sender
             .try_send(BusinessRpcOutbound {
                 frame,
+                queued_at: Instant::now(),
                 _bytes: wire_bytes,
             })
             .map_err(|_| {
                 self.metrics.inc(Metric::BusinessRpcOverloads);
                 Error::Overloaded
             })?;
-        let value = tokio::time::timeout_at(deadline.into(), receive)
-            .await
+        let remote_started = Instant::now();
+        let waited = tokio::time::timeout_at(deadline.into(), receive).await;
+        self.metrics.observe(
+            Histogram::BusinessRpcRemoteWait,
+            remote_started.elapsed().as_micros().min(u64::MAX as u128) as u64,
+        );
+        let value = waited
             .map_err(|_| {
                 self.metrics.inc(Metric::BusinessRpcTimeouts);
                 Error::Timeout
@@ -693,15 +709,130 @@ mod tests {
     use sha2::Sha256;
 
     #[test]
-    fn provider_permission_failure_cannot_negative_cache_device() {
-        assert!(matches!(
-            rpc_error_to_runtime(RpcErrorCode::Forbidden),
-            Error::Invalid
-        ));
-        assert!(matches!(
-            rpc_error_to_runtime(RpcErrorCode::DeviceRejected),
-            Error::Authentication
-        ));
+    fn rpc_error_mapping_and_negative_cache_eligibility() {
+        let cases = [
+            (RpcErrorCode::DeviceRejected, Error::Authentication, true),
+            (RpcErrorCode::Unavailable, Error::Unavailable, false),
+            (RpcErrorCode::Overloaded, Error::Overloaded, false),
+            (RpcErrorCode::Timeout, Error::Timeout, false),
+            (RpcErrorCode::Forbidden, Error::Invalid, false),
+            (RpcErrorCode::Unauthenticated, Error::Unavailable, false),
+            (RpcErrorCode::Internal, Error::Internal, false),
+            (RpcErrorCode::StaleRevision, Error::Conflict, false),
+            (RpcErrorCode::Conflict, Error::Conflict, false),
+            (RpcErrorCode::InvalidRequest, Error::Invalid, false),
+            (RpcErrorCode::UnknownMethod, Error::Invalid, false),
+        ];
+        for (code, expected, cacheable) in cases {
+            let actual = rpc_error_to_runtime(code);
+            assert_eq!(
+                std::mem::discriminant(&actual),
+                std::mem::discriminant(&expected),
+                "{code:?}"
+            );
+            assert_eq!(
+                matches!(actual, Error::Authentication | Error::Forbidden),
+                cacheable,
+                "{code:?}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn only_device_rejection_is_cached_after_a_business_rpc_error() {
+        for code in [
+            RpcErrorCode::DeviceRejected,
+            RpcErrorCode::Unavailable,
+            RpcErrorCode::Overloaded,
+            RpcErrorCode::Timeout,
+            RpcErrorCode::Forbidden,
+            RpcErrorCode::Unauthenticated,
+            RpcErrorCode::Internal,
+            RpcErrorCode::StaleRevision,
+        ] {
+            let metrics = Arc::new(Metrics::default());
+            let registry = BusinessRpcRegistry::new_with_metrics(
+                2,
+                65_536,
+                Duration::from_secs(1),
+                metrics.clone(),
+            )
+            .unwrap();
+            let (sender, mut outbound) = mpsc::channel(2);
+            let lease = registry
+                .register(
+                    sender,
+                    BusinessProviderScope {
+                        global: true,
+                        tenants: Vec::new(),
+                    },
+                )
+                .unwrap();
+            lease.mark_serving(1).unwrap();
+            let cache = AuthCache::new(
+                BusinessRpcAuthProvider::new(registry.clone()),
+                Arc::new(Limits::default()),
+                metrics.clone(),
+            );
+            let first = tokio::spawn({
+                let cache = cache.clone();
+                async move {
+                    cache
+                        .authenticate_candidate(AuthenticationRequest::Secret {
+                            credential_id: "cred-one",
+                            secret: b"secret",
+                        })
+                        .await
+                }
+            });
+            let item = outbound.recv().await.unwrap();
+            let BusinessRpcFrame::Request {
+                request_id, method, ..
+            } = item.frame
+            else {
+                panic!("auth request expected")
+            };
+            assert!(registry.complete(
+                lease.epoch(),
+                request_id,
+                &method,
+                Err(rpc_error_to_runtime(code))
+            ));
+            assert!(first.await.unwrap().is_err(), "{code:?}");
+            let second = tokio::spawn({
+                let cache = cache.clone();
+                async move {
+                    cache
+                        .authenticate_candidate(AuthenticationRequest::Secret {
+                            credential_id: "cred-one",
+                            secret: b"secret",
+                        })
+                        .await
+                }
+            });
+            if code == RpcErrorCode::DeviceRejected {
+                assert!(matches!(second.await.unwrap(), Err(Error::Authentication)));
+                assert!(outbound.try_recv().is_err());
+                assert_eq!(metrics.get(Metric::AuthNegativeHits), 1);
+            } else {
+                let item = outbound.recv().await.unwrap();
+                let BusinessRpcFrame::Request {
+                    request_id, method, ..
+                } = item.frame
+                else {
+                    panic!("retry request expected")
+                };
+                assert!(registry.complete(
+                    lease.epoch(),
+                    request_id,
+                    &method,
+                    Ok(test_identity("one"))
+                ));
+                second.await.unwrap().unwrap();
+                assert_eq!(metrics.get(Metric::AuthNegativeHits), 0, "{code:?}");
+            }
+            assert_eq!(registry.pending_usage(), 0, "{code:?}");
+        }
     }
 
     fn test_identity(device: &str) -> Value {
@@ -1070,7 +1201,7 @@ mod tests {
             let mut identity = test_identity("one");
             identity["auth_revision"] = json!(2);
             assert!(registry.complete(lease.epoch(), request_id, &method, Ok(identity.clone())));
-            assert!(matches!(old.await.unwrap(), Err(Error::Authentication)));
+            assert!(matches!(old.await.unwrap(), Err(Error::Unavailable)));
             assert_eq!(cache.usage().unwrap().0, 0);
             assert_eq!(registry.usage().unwrap().pending_items, 0);
             lease.advance_revision(2).unwrap();
@@ -1244,7 +1375,7 @@ mod tests {
         identity["auth_revision"] = json!(2);
         let reply = json!({"identity": identity, "verifier_key_hex": "07".repeat(32)});
         assert!(registry.complete(lease.epoch(), request_id, &method, Ok(reply.clone())));
-        assert!(matches!(old.await.unwrap(), Err(Error::Authentication)));
+        assert!(matches!(old.await.unwrap(), Err(Error::Unavailable)));
         assert_eq!(cache.usage().unwrap().0, 0);
         lease.advance_revision(2).unwrap();
         let fresh = tokio::spawn({

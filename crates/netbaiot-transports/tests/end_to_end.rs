@@ -278,7 +278,7 @@ async fn auth_mqtt_attach_revoke_race_001() {
             ingress.register_session_with(stale_candidate, Transport::Mqtt, |bound, _| {
                 services.mqtt.attach(bound, format!("stale-{index}"), false)
             }),
-            Err(Error::Authentication)
+            Err(Error::Unavailable)
         ));
 
         let fresh = ingress

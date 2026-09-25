@@ -1,0 +1,200 @@
+{
+  "auth_provider_calls": 365,
+  "config": {
+    "auth_concurrency": 4,
+    "auth_handler_delay_ms": 0,
+    "auth_reconnect_every_secs": 0,
+    "business_address": "127.0.0.1:19102",
+    "device_address": "127.0.0.1:19100",
+    "duration_secs": 10,
+    "event_ack_delay_ms": 100,
+    "event_payload_bytes": 0,
+    "event_rate": 0,
+    "event_reconnect_every_secs": 0,
+    "gateway_pid": 97796,
+    "invalidate_every_secs": 0,
+    "management_url": "http://127.0.0.1:19101",
+    "network_profile": "local",
+    "reconnect_cycles": 10,
+    "reconnect_pause_ms": 0,
+    "recovery_secs": 2,
+    "sample_period_ms": 250,
+    "scenario": "steady_auth",
+    "snapshot_every_secs": 900,
+    "topology": "multiplexed",
+    "udp_address": "127.0.0.1:19100",
+    "verifier_rate": 0,
+    "warmup_secs": 1
+  },
+  "counts": {
+    "event_ack_ms": {
+      "max": 0.0,
+      "p50": 0.0,
+      "p95": 0.0,
+      "p99": 0.0
+    },
+    "event_acks": 0,
+    "event_retries": 0,
+    "events": 0,
+    "invalidations": 0,
+    "latency_ms": {
+      "max": 4887.0,
+      "p50": 46.64,
+      "p95": 685.0,
+      "p99": 1753.0
+    },
+    "overloaded": 0,
+    "publish_attempts": 0,
+    "publish_enqueued": 0,
+    "publish_errors": 0,
+    "reconnects": 0,
+    "rejected": 0,
+    "requests": 308,
+    "success": 308,
+    "sync_failures": 0,
+    "timeout": 0,
+    "transport_failures": 0,
+    "verifier_acks": 0,
+    "verifier_requests": 0
+  },
+  "duration_seconds": 12.757805792,
+  "environment": {
+    "arch": "aarch64",
+    "build_profile": "release",
+    "git_commit": "76c0d658d410e82eecdbfb8c1d31f09d73af42bc",
+    "git_dirty": true,
+    "network_injection": "external_unverified",
+    "network_profile": "local",
+    "os": "macos",
+    "rust": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
+    "sample_period_ms": 250,
+    "topology": "multiplexed",
+    "transport": "mtls"
+  },
+  "event_acks_per_second": 0.0,
+  "events_per_second": 0.0,
+  "gateway_deltas": {
+    "late_responses": 0,
+    "overloads": 0,
+    "sync_failure": 0,
+    "sync_success": 1
+  },
+  "latency": {
+    "end_to_end_ms": {
+      "max": 4887.0,
+      "p50": 46.64,
+      "p95": 685.0,
+      "p99": 1753.0
+    },
+    "event_ack_ms": null,
+    "event_ack_ms_gateway": null,
+    "full_ready_ms": {
+      "max": 1.75,
+      "p50": 1.75,
+      "p95": 1.75,
+      "p99": 1.75
+    },
+    "handler_ms": {
+      "max": 0.04,
+      "p50": 0.01,
+      "p95": 0.01,
+      "p99": 0.01
+    },
+    "rpc_ms_gateway": {
+      "max": null,
+      "p50": 0.25,
+      "p95": 0.25,
+      "p99": 0.5
+    },
+    "rpc_queue_wait_ms_gateway": {
+      "max": null,
+      "p50": 0.01,
+      "p95": 0.01,
+      "p99": 0.01
+    },
+    "rpc_remote_wait_ms_gateway": {
+      "max": null,
+      "p50": 0.25,
+      "p95": 0.25,
+      "p99": 0.25
+    },
+    "sync_ms": {
+      "max": 0.43,
+      "p50": 0.43,
+      "p95": 0.43,
+      "p99": 0.43
+    },
+    "tls_handshake_ms": {
+      "max": 1.13,
+      "p50": 1.13,
+      "p95": 1.13,
+      "p99": 1.13
+    }
+  },
+  "peaks": {
+    "active_business_connections_last": 0,
+    "active_business_connections_peak": 1,
+    "auth_queue_items": 0,
+    "business_reconnects_total": 0,
+    "control_queue_bytes": 0,
+    "control_queue_items": 0,
+    "event_acks_total": 0,
+    "event_queue_bytes": 0,
+    "event_queue_items": 0,
+    "gateway_cpu": {
+      "average_workload_percent": 0.7166666666666663,
+      "baseline_percent": 0.0,
+      "last_percent": 0.0,
+      "peak_sampled_percent": 1.4,
+      "recovery_percent": 0.0,
+      "warm_percent": 0.1
+    },
+    "late_responses_total": 0,
+    "loadgen_cpu": {
+      "average_workload_percent": 1.2777777777777777,
+      "baseline_percent": 0.0,
+      "last_percent": 0.3,
+      "peak_sampled_percent": 2.2,
+      "recovery_percent": 0.3,
+      "warm_percent": 0.5
+    },
+    "metrics_observed": true,
+    "offline_grace_expirations_total": 2,
+    "overloads_total": 0,
+    "pending_bytes": 0,
+    "pending_bytes_last": 0,
+    "pending_items": 0,
+    "pending_items_last": 0,
+    "provider_sync_failure_total": 0,
+    "provider_sync_success_total": 1,
+    "revision_gaps_total": 0,
+    "rss_baseline_kb": 7536,
+    "rss_last_kb": 8064,
+    "rss_peak_kb": 8064,
+    "rss_post_recovery_kb": 8064,
+    "rss_post_soak_kb": 8064,
+    "rss_warm_kb": 7952,
+    "timeline": [
+      {
+        "auth_failures": 0,
+        "auth_success": 32,
+        "connections": 1,
+        "cpu_percent": 0.0,
+        "elapsed_seconds": 0,
+        "event_retries": 0,
+        "late_responses_total": 0,
+        "overloads_total": 0,
+        "pending_bytes": 0,
+        "pending_items": 0,
+        "reconnects": 0,
+        "rss_kib": 7536,
+        "sync_failures": 0
+      }
+    ]
+  },
+  "requests_per_second": 24.14208250396292,
+  "scenario": "steady_auth",
+  "topology_results": null,
+  "verifier_calls_before_invalidation": null,
+  "verifier_provider_calls": null
+}
