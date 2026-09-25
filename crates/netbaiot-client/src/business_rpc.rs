@@ -491,6 +491,7 @@ async fn handshake(
     io: &mut Box<dyn Io>,
     config: &BusinessRpcClientConfig,
     revision: u64,
+    handler: Option<&dyn BusinessAuthHandler>,
     signals: &DriverSignals,
 ) -> Result<(u64, SubscriptionId), BusinessRpcClientError> {
     let limits = BusinessLimits {
@@ -594,29 +595,128 @@ async fn handshake(
             config.request_timeout,
         )
         .await?;
-        let acknowledgement = read_frame(io, config.max_frame_bytes, config.request_timeout)
-            .await
-            .map_err(|error| protocol_context(error, signals, "event_subscription_ack"))?;
-        match acknowledgement {
-            BusinessRpcFrame::Subscribed {
-                subscription_id: received,
-            } if received == subscription => {}
-            BusinessRpcFrame::Subscribed { .. } => {
-                return Err(protocol_at(signals, "event_subscription_wrong_id"));
+        let mut handled_requests = 0usize;
+        loop {
+            let acknowledgement = read_frame(io, config.max_frame_bytes, config.request_timeout)
+                .await
+                .map_err(|error| protocol_context(error, signals, "event_subscription_ack"))?;
+            match acknowledgement {
+                BusinessRpcFrame::Subscribed {
+                    subscription_id: received,
+                } if received == subscription => break,
+                BusinessRpcFrame::Request {
+                    request_id,
+                    method,
+                    body,
+                    deadline_ms,
+                } if config.role.auth_control() => {
+                    handled_requests += 1;
+                    if handled_requests > config.auth_max_inflight {
+                        return Err(BusinessRpcClientError::Overloaded);
+                    }
+                    let Some(handler) = handler else {
+                        return Err(BusinessRpcClientError::InvalidConfig);
+                    };
+                    let response = handshake_auth_response(
+                        handler,
+                        request_id,
+                        method,
+                        body,
+                        deadline_ms,
+                        config.request_timeout,
+                    )
+                    .await;
+                    write_frame(
+                        io,
+                        &response,
+                        config.max_frame_bytes,
+                        config.request_timeout,
+                    )
+                    .await?;
+                }
+                BusinessRpcFrame::Subscribed { .. } => {
+                    return Err(protocol_at(signals, "event_subscription_wrong_id"));
+                }
+                BusinessRpcFrame::Event { .. } => {
+                    return Err(protocol_at(signals, "event_before_subscription_ack"));
+                }
+                BusinessRpcFrame::Response { .. } => {
+                    return Err(protocol_at(signals, "response_before_subscription_ack"));
+                }
+                BusinessRpcFrame::Pong { .. } => {
+                    return Err(protocol_at(signals, "pong_before_subscription_ack"));
+                }
+                _ => return Err(protocol_at(signals, "unexpected_subscription_frame")),
             }
-            BusinessRpcFrame::Event { .. } => {
-                return Err(protocol_at(signals, "event_before_subscription_ack"));
-            }
-            BusinessRpcFrame::Response { .. } => {
-                return Err(protocol_at(signals, "response_before_subscription_ack"));
-            }
-            BusinessRpcFrame::Pong { .. } => {
-                return Err(protocol_at(signals, "pong_before_subscription_ack"));
-            }
-            _ => return Err(protocol_at(signals, "unexpected_subscription_frame")),
         }
     }
     Ok((connection_epoch, subscription))
+}
+async fn handshake_auth_response(
+    handler: &dyn BusinessAuthHandler,
+    request_id: Uuid,
+    method: String,
+    body: serde_json::Value,
+    deadline_ms: u32,
+    request_timeout: Duration,
+) -> BusinessRpcFrame {
+    let handler_timeout = Duration::from_millis(u64::from(deadline_ms)).min(request_timeout);
+    let answer = tokio::time::timeout(handler_timeout, async {
+        match method.as_str() {
+            "device.authenticate" => {
+                match serde_json::from_value::<DeviceAuthenticateRequest>(body) {
+                    Ok(request)
+                        if request.credential_id.len() <= 64 && request.secret_hex.len() <= 512 =>
+                    {
+                        handler.authenticate(request).await.and_then(|reply| {
+                            serde_json::to_value(reply)
+                                .map_err(|_| RpcError::new(RpcErrorCode::Internal, "encode failed"))
+                        })
+                    }
+                    _ => Err(RpcError::new(
+                        RpcErrorCode::InvalidRequest,
+                        "invalid authentication request",
+                    )),
+                }
+            }
+            "device.resolve_verifier" => {
+                match serde_json::from_value::<ResolveVerifierRequest>(body) {
+                    Ok(request) if request.credential_id.len() <= 64 => {
+                        handler.resolve_verifier(request).await.and_then(|reply| {
+                            serde_json::to_value(reply)
+                                .map_err(|_| RpcError::new(RpcErrorCode::Internal, "encode failed"))
+                        })
+                    }
+                    _ => Err(RpcError::new(
+                        RpcErrorCode::InvalidRequest,
+                        "invalid verifier request",
+                    )),
+                }
+            }
+            _ => Err(RpcError::new(RpcErrorCode::UnknownMethod, "unknown method")),
+        }
+    })
+    .await
+    .unwrap_or_else(|_| {
+        Err(RpcError::new(
+            RpcErrorCode::Timeout,
+            "handler deadline exceeded",
+        ))
+    });
+    match answer {
+        Ok(body) => BusinessRpcFrame::Response {
+            request_id,
+            method,
+            body: Some(body),
+            error: None,
+        },
+        Err(error) => BusinessRpcFrame::Response {
+            request_id,
+            method,
+            body: None,
+            error: Some(error),
+        },
+    }
 }
 fn protocol_at(signals: &DriverSignals, context: &'static str) -> BusinessRpcClientError {
     if let Ok(mut last_context) = signals.last_protocol_context.lock() {
@@ -709,8 +809,14 @@ async fn connected(
     let started = Instant::now();
     let (mut io, tcp_connect, tls_handshake) = connect_io(config).await?;
     let sync_started = Instant::now();
-    let (epoch, subscription) =
-        handshake(&mut io, config, revision.load(Ordering::SeqCst), signals).await?;
+    let (epoch, subscription) = handshake(
+        &mut io,
+        config,
+        revision.load(Ordering::SeqCst),
+        handler.as_deref(),
+        signals,
+    )
+    .await?;
     let (mut reader, mut writer) = tokio::io::split(io);
     let (read_tx, mut read_rx) = mpsc::channel::<(BusinessRpcFrame, OwnedSemaphorePermit)>(64);
     let read_budget = Arc::new(Semaphore::new(config.max_frame_bytes + 64 * 16 * 1024));
