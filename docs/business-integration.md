@@ -49,3 +49,7 @@ ACK immediately before a planned restart, causing the same ID to replay.
 ## Business RPC V2
 
 The bidirectional V2 protocol, independent authentication provider, mTLS mapping, configuration, and Rust SDK are documented in [Business RPC Stream V2](business-rpc-v2.md). V1 remains the default when `business_rpc` is absent.
+
+## Sending online device commands over Business RPC V2
+
+Use an mTLS `commands` principal for command-only services, or `application` to receive confirmed events and send commands on one connection. Both must have `call_methods: ["device.command.send"]`; `application` also requires `sink_id: "tcp-rpc"`. `BusinessRpcClient::send_command(&command)` returns a `Queued` dispatch when the gateway accepts the command for the current live session. It does not wait for device execution. Match later `CommandAck` events by `command_id`, commit application work, then ACK the event. Preserve the same `command_id` when explicitly retrying an unknown RPC outcome; each attempt gets its own `request_id`. The in-memory dedup window is `command_ttl_ms` and is lost on process restart. Offline commands are rejected and remain the business system's responsibility. Management HTTP `/api/v1/devices/commands` remains available for operations and older clients, sharing the same command dedup behavior. See [Business RPC Stream V2](business-rpc-v2.md) for limits and failure semantics.

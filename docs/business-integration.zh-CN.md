@@ -21,3 +21,7 @@ Hello、subscribe、事件 ACK 读取和写入都有硬性截止时间和帧大�
 ## Business RPC V2
 
 双向 V2 协议、独立认证 provider、mTLS 映射、配置和 Rust SDK 见 [Business RPC Stream V2](business-rpc-v2.zh-CN.md)。没有 `business_rpc` 配置时默认保留 V1 行为。
+
+## 通过 Business RPC V2 发送在线设备命令
+
+仅发送命令的业务服务使用 mTLS `commands` 身份；同时收需确认事件与发命令则用 `application`。两者均需 `call_methods: ["device.command.send"]`；`application` 还需 `sink_id: "tcp-rpc"`。`BusinessRpcClient::send_command(&command)` 返回 `Queued` 只代表网关已接受当前在线会话的命令，不等待设备执行。后续按 `command_id` 匹配 `CommandAck` 事件，完成业务事务后再 ACK 事件。结果未知时由业务方决定重试，并保留相同 `command_id`；每次 RPC 的 `request_id` 独立。进程内幂等窗口为 `command_ttl_ms`，重启后不保留。离线命令由业务系统负责，网关直接拒绝。管理 HTTP `/api/v1/devices/commands` 继续服务运维及旧客户端，并共用命令幂等语义。限制和错误详见 [Business RPC Stream V2](business-rpc-v2.zh-CN.md)。

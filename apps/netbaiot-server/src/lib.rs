@@ -97,6 +97,8 @@ pub struct BusinessRpcConfig {
     pub identities: Vec<BusinessRpcIdentityConfig>,
     pub development_token_env: Option<String>,
     #[serde(default)]
+    pub development_role: Option<BusinessRole>,
+    #[serde(default)]
     pub allow_v1: bool,
     #[serde(default = "default_business_connections")]
     pub max_connections: usize,
@@ -214,6 +216,9 @@ impl Config {
                 return Err(Error::Configuration);
             }
             if rpc.tls.is_some() {
+                if rpc.development_role.is_some() {
+                    return Err(Error::Configuration);
+                }
                 if rpc.development_token_env.is_some()
                     || rpc.allow_v1
                     || rpc.identities.is_empty()
@@ -228,6 +233,11 @@ impl Config {
                 .is_none_or(|addr| !addr.ip().is_loopback())
                 || rpc.development_token_env.is_none()
                 || !rpc.identities.is_empty()
+                || (self.device_auth == Some(DeviceAuthSource::BusinessRpc)
+                    && !rpc
+                        .development_role
+                        .unwrap_or(BusinessRole::Multiplexed)
+                        .auth_control())
             {
                 return Err(Error::Configuration);
             }
@@ -259,7 +269,10 @@ impl Config {
                             )
                         })
                         || identity.call_methods.iter().any(|method| {
-                            !matches!(method.as_str(), "auth.sync" | "auth.invalidate")
+                            !matches!(
+                                method.as_str(),
+                                "auth.sync" | "auth.invalidate" | "device.command.send"
+                            )
                         })
                         || (identity.role.auth_control()
                             && (identity.provider_id.as_deref() != Some("primary")
@@ -282,7 +295,25 @@ impl Config {
                         || (!identity.role.auth_control()
                             && (identity.provider_id.is_some()
                                 || !identity.provide_methods.is_empty()
-                                || !identity.call_methods.is_empty()))
+                                || identity
+                                    .call_methods
+                                    .iter()
+                                    .any(|method| method != "device.command.send")))
+                        || (identity.role.commands()
+                            && !identity
+                                .call_methods
+                                .iter()
+                                .any(|method| method == "device.command.send"))
+                        || (!identity.role.commands()
+                            && identity
+                                .call_methods
+                                .iter()
+                                .any(|method| method == "device.command.send"))
+                        || (identity.role.auth_control()
+                            && identity
+                                .call_methods
+                                .iter()
+                                .any(|method| method == "device.command.send"))
                         || (identity.role.events()
                             && identity.sink_id.as_deref() != Some("tcp-rpc"))
                         || (!identity.role.events() && identity.sink_id.is_some())
@@ -1010,7 +1041,11 @@ pub async fn run_with_credentials(
         management_tls,
         management_listener.child_token(),
     ));
-    work_tasks.spawn(udp::serve(udp, base_services, work_listeners.child_token()));
+    work_tasks.spawn(udp::serve(
+        udp,
+        base_services.clone(),
+        work_listeners.child_token(),
+    ));
     let business_accept_stop = CancellationToken::new();
     let business_connection_stop = CancellationToken::new();
     let mut business_task = None;
@@ -1048,18 +1083,29 @@ pub async fn run_with_credentials(
                 if token.is_empty() || token.len() > BUSINESS_RPC_MAX_TOKEN_BYTES {
                     return Err(Error::Configuration);
                 }
+                let role = rpc.development_role.unwrap_or(BusinessRole::Multiplexed);
                 BusinessIdentity::Development {
                     token_hash: Sha256::digest(token.as_bytes()).into(),
                     principal: BusinessPrincipal {
                         id: "development".into(),
-                        role: BusinessRole::Multiplexed,
-                        provider_id: Some("primary".into()),
-                        sink_id: Some("tcp-rpc".into()),
-                        provide_methods: vec![
-                            "device.authenticate".into(),
-                            "device.resolve_verifier".into(),
-                        ],
-                        call_methods: vec!["auth.sync".into(), "auth.invalidate".into()],
+                        role,
+                        provider_id: role.auth_control().then(|| "primary".into()),
+                        sink_id: role.events().then(|| "tcp-rpc".into()),
+                        provide_methods: if role.auth_control() {
+                            vec![
+                                "device.authenticate".into(),
+                                "device.resolve_verifier".into(),
+                            ]
+                        } else {
+                            Vec::new()
+                        },
+                        call_methods: if role.auth_control() {
+                            vec!["auth.sync".into(), "auth.invalidate".into()]
+                        } else if role.commands() {
+                            vec!["device.command.send".into()]
+                        } else {
+                            Vec::new()
+                        },
                         global: true,
                         tenants: Vec::new(),
                         expires_at_ms: None,
@@ -1088,6 +1134,7 @@ pub async fn run_with_credentials(
                 sink: sink.clone(),
                 ingress: ingress.clone(),
                 mqtt: mqtt_broker.clone(),
+                commands: base_services.router.clone(),
             });
             if rpc.allow_v1 {
                 let secret = business_stream_token
@@ -1360,6 +1407,96 @@ fn shutdown_can_finish(mqtt_recovery_safe: bool, eventbus_required_work_safe: bo
 mod reliability_tests {
     use super::*;
     use std::sync::atomic::{AtomicUsize, Ordering};
+
+    #[test]
+    fn business_rpc_command_roles_validate_without_changing_existing_roles() {
+        let config_for = |role,
+                          provider: Option<&str>,
+                          sink: Option<&str>,
+                          provide: Vec<&str>,
+                          call: Vec<&str>| {
+            let mut config: Config =
+                serde_json::from_str(include_str!("../../../configs/development.json")).unwrap();
+            config.business_tcp = Some("127.0.0.1:19002".parse().unwrap());
+            config.business_rpc = Some(BusinessRpcConfig {
+                version: 2,
+                tls: Some(ManagementTlsFiles {
+                    certificate: "cert".into(),
+                    private_key: "key".into(),
+                    client_ca: Some("ca".into()),
+                    require_client_certificate: true,
+                }),
+                identities: vec![BusinessRpcIdentityConfig {
+                    certificate_sha256: "00".repeat(32),
+                    principal_id: "test".into(),
+                    role,
+                    provider_id: provider.map(str::to_owned),
+                    sink_id: sink.map(str::to_owned),
+                    provide_methods: provide.into_iter().map(str::to_owned).collect(),
+                    call_methods: call.into_iter().map(str::to_owned).collect(),
+                    global: true,
+                    tenants: Vec::new(),
+                    expires_at_ms: None,
+                }],
+                development_token_env: None,
+                development_role: None,
+                allow_v1: false,
+                max_connections: 8,
+                auth_max_inflight: 16,
+                max_auth_control_offline_ms: 30_000,
+            });
+            config.validate().is_ok()
+        };
+        assert!(config_for(
+            BusinessRole::Commands,
+            None,
+            None,
+            vec![],
+            vec!["device.command.send"]
+        ));
+        assert!(!config_for(
+            BusinessRole::Commands,
+            None,
+            None,
+            vec!["device.authenticate"],
+            vec!["device.command.send"]
+        ));
+        assert!(config_for(
+            BusinessRole::Application,
+            None,
+            Some("tcp-rpc"),
+            vec![],
+            vec!["device.command.send"]
+        ));
+        assert!(!config_for(
+            BusinessRole::Application,
+            Some("primary"),
+            Some("tcp-rpc"),
+            vec![],
+            vec!["device.command.send"]
+        ));
+        assert!(!config_for(
+            BusinessRole::Events,
+            None,
+            Some("tcp-rpc"),
+            vec![],
+            vec!["device.command.send"]
+        ));
+        assert!(!config_for(
+            BusinessRole::AuthControl,
+            Some("primary"),
+            None,
+            vec!["device.authenticate", "device.resolve_verifier"],
+            vec!["device.command.send"]
+        ));
+        assert!(config_for(
+            BusinessRole::Multiplexed,
+            Some("primary"),
+            Some("tcp-rpc"),
+            vec!["device.authenticate", "device.resolve_verifier"],
+            vec!["auth.sync", "auth.invalidate"]
+        ));
+    }
 
     #[tokio::test(start_paused = true)]
     async fn business_auth_zero_grace_invalidates_without_clock_advance() {
