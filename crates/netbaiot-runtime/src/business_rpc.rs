@@ -632,7 +632,7 @@ fn decode_hex_32(text: &str) -> Result<[u8; 32]> {
         return Err(Error::Invalid);
     }
     let mut key = [0u8; 32];
-    for (index, pair) in text.as_bytes().chunks_exact(2).enumerate() {
+    for (index, pair) in text.as_bytes().as_chunks::<2>().0.iter().enumerate() {
         let hi = (pair[0] as char).to_digit(16).ok_or(Error::Invalid)? as u8;
         let lo = (pair[1] as char).to_digit(16).ok_or(Error::Invalid)? as u8;
         key[index] = (hi << 4) | lo;

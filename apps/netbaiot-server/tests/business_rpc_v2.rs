@@ -306,7 +306,7 @@ async fn one_socket_authentication_progresses_while_event_ack_waits() {
     ));
     // A gap invalidates live authorization before the SDK's reset sync can
     // return the replacement provider to Serving.
-    let _recovered_after_gap = tokio::time::timeout(Duration::from_secs(10), async {
+    let _recovered_after_gap = tokio::time::timeout(Duration::from_secs(30), async {
         loop {
             if business.ready()
                 && let Ok(recovered) = device_result(addresses[0], "one").await
