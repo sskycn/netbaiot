@@ -594,13 +594,26 @@ async fn handshake(
             config.request_timeout,
         )
         .await?;
-        match read_frame(io, config.max_frame_bytes, config.request_timeout)
+        let acknowledgement = read_frame(io, config.max_frame_bytes, config.request_timeout)
             .await
-            .map_err(|error| protocol_context(error, signals, "event_subscription_ack"))?
-        {
-            BusinessRpcFrame::Subscribed { subscription_id } if subscription_id == subscription => {
+            .map_err(|error| protocol_context(error, signals, "event_subscription_ack"))?;
+        match acknowledgement {
+            BusinessRpcFrame::Subscribed {
+                subscription_id: received,
+            } if received == subscription => {}
+            BusinessRpcFrame::Subscribed { .. } => {
+                return Err(protocol_at(signals, "event_subscription_wrong_id"));
             }
-            _ => return Err(protocol_at(signals, "event_subscription_ack")),
+            BusinessRpcFrame::Event { .. } => {
+                return Err(protocol_at(signals, "event_before_subscription_ack"));
+            }
+            BusinessRpcFrame::Response { .. } => {
+                return Err(protocol_at(signals, "response_before_subscription_ack"));
+            }
+            BusinessRpcFrame::Pong { .. } => {
+                return Err(protocol_at(signals, "pong_before_subscription_ack"));
+            }
+            _ => return Err(protocol_at(signals, "unexpected_subscription_frame")),
         }
     }
     Ok((connection_epoch, subscription))
