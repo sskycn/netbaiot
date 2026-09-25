@@ -236,8 +236,7 @@ async fn command_pressure_preserves_auth_invalidation_and_event_ack() {
                 command.device.device_id = DeviceId::new("pressure").unwrap();
                 if matches!(
                     client.send_command(&command).await,
-                    Err(BusinessRpcClientError::Overloaded
-                        | BusinessRpcClientError::Remote(RpcErrorCode::Overloaded))
+                    Err(BusinessRpcClientError::Remote(RpcErrorCode::Overloaded))
                 ) {
                     rejects.fetch_add(1, Ordering::Relaxed);
                 }

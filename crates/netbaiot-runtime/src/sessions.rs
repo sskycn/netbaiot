@@ -659,4 +659,73 @@ mod tests {
         endpoint.enqueue(&command, vec![0]).unwrap();
         drop(lease);
     }
+
+    #[test]
+    fn command_tenant_and_process_slots_reject_and_release_independently() {
+        let sessions = Sessions::new(Arc::new(Limits {
+            max_pending_commands_per_device: 2,
+            max_pending_commands_per_tenant: 1,
+            max_pending_commands: 2,
+            max_outbound_messages_per_connection: 2,
+            ..Limits::default()
+        }));
+        let first = auth("first");
+        let second = auth("second");
+        let mut other = (*auth("other")).clone();
+        other.device_key.tenant_id = TenantId::new("other").unwrap();
+        let other = Arc::new(other);
+        let mut third = (*auth("third")).clone();
+        third.device_key.tenant_id = TenantId::new("third").unwrap();
+        let third = Arc::new(third);
+        let (_first_lease, mut first_rx) =
+            sessions.register(first.clone(), Transport::Tcp).unwrap();
+        let (_second_lease, _second_rx) =
+            sessions.register(second.clone(), Transport::Tcp).unwrap();
+        let (_other_lease, _other_rx) = sessions.register(other.clone(), Transport::Tcp).unwrap();
+        let (_third_lease, _third_rx) = sessions.register(third.clone(), Transport::Tcp).unwrap();
+        let command = |device: &DeviceKey| DeviceCommand {
+            command_id: CommandId::generate(),
+            device: device.clone(),
+            expires_at: Some(now_ms() + 1_000),
+            payload: DeviceCommandPayload {
+                name: "x".into(),
+                arguments: Default::default(),
+            },
+        };
+        sessions
+            .lookup(&first.device_key)
+            .unwrap()
+            .unwrap()
+            .enqueue(&command(&first.device_key), vec![1])
+            .unwrap();
+        assert!(matches!(
+            sessions
+                .lookup(&second.device_key)
+                .unwrap()
+                .unwrap()
+                .enqueue(&command(&second.device_key), vec![2]),
+            Err(Error::Overloaded)
+        ));
+        sessions
+            .lookup(&other.device_key)
+            .unwrap()
+            .unwrap()
+            .enqueue(&command(&other.device_key), vec![3])
+            .unwrap();
+        assert!(matches!(
+            sessions
+                .lookup(&third.device_key)
+                .unwrap()
+                .unwrap()
+                .enqueue(&command(&third.device_key), vec![4]),
+            Err(Error::Overloaded)
+        ));
+        drop(first_rx.try_recv().unwrap());
+        sessions
+            .lookup(&second.device_key)
+            .unwrap()
+            .unwrap()
+            .enqueue(&command(&second.device_key), vec![5])
+            .unwrap();
+    }
 }
