@@ -289,6 +289,10 @@ impl StreamTable {
     pub fn last_peer_id(&self) -> u32 {
         self.highest_peer
     }
+    /// The final legal local ID is consumed before GOAWAY; IDs never wrap or restart in place.
+    pub fn local_ids_exhausted(&self) -> bool {
+        self.next_local > V3_MAX_STREAM_ID
+    }
     /// GOAWAY's last ID is the highest accepted peer stream, not an arbitrary future ID.
     pub fn goaway(&mut self) -> u32 {
         self.accepting = false;
@@ -781,6 +785,38 @@ mod tests {
         let debug = format!("{frame:?}");
         assert!(debug.contains("payload_bytes"));
         assert!(!debug.contains("private-device-credential"));
+    }
+    #[test]
+    fn local_id_exhaustion_is_detected_before_reuse() {
+        let request = V3Open::Rpc {
+            parent_stream_id: None,
+            request_id: Uuid::new_v4(),
+            method: "auth.invalidate".into(),
+            deadline_ms: 1_000,
+            content_length: 1,
+        };
+        let mut client = StreamTable::new(
+            Initiator::Client,
+            limits(),
+            100_000,
+            ReassemblyBudget::new(100_000),
+        )
+        .unwrap();
+        client.next_local = V3_MAX_STREAM_ID;
+        assert_eq!(client.open_local(&request), Ok(V3_MAX_STREAM_ID));
+        assert!(client.local_ids_exhausted());
+        assert!(client.open_local(&request).is_err());
+
+        let mut server = StreamTable::new(
+            Initiator::Server,
+            limits(),
+            100_000,
+            ReassemblyBudget::new(100_000),
+        )
+        .unwrap();
+        server.next_local = V3_MAX_STREAM_ID - 1;
+        assert_eq!(server.open_local(&request), Ok(V3_MAX_STREAM_ID - 1));
+        assert!(server.local_ids_exhausted());
     }
     #[test]
     fn event_fragments_and_rpc_interleaves() {
