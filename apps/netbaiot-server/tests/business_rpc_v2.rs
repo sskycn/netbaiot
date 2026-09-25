@@ -323,9 +323,10 @@ async fn one_socket_authentication_progresses_while_event_ack_waits() {
     .await;
     let _recovered_after_gap = recovered_after_gap.unwrap_or_else(|_| {
         panic!(
-            "auth provider did not recover: ready={}, attempts={recovery_attempts}, last_device_error={last_recovery_error:?}, last_connection_error={:?}, timing={:?}",
+            "auth provider did not recover: ready={}, attempts={recovery_attempts}, last_device_error={last_recovery_error:?}, last_connection_error={:?}, protocol_context={:?}, timing={:?}",
             business.ready(),
             business.last_connection_error(),
+            business.last_protocol_context(),
             business.connection_timing()
         )
     });
