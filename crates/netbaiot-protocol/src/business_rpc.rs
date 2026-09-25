@@ -1,7 +1,7 @@
 //! Business RPC Stream V2 wire contract. V1 stream frames remain in `lib.rs`.
 use crate::{
-    AuthInvalidation, CodecId, DeviceKey, EventAck, EventDelivery, EventFilter, ProtocolError,
-    SubscriptionId,
+    AuthInvalidation, CodecId, CommandDispatch, DeviceCommand, DeviceKey, EventAck, EventDelivery,
+    EventFilter, ProtocolError, SubscriptionId,
 };
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -19,15 +19,32 @@ pub enum BusinessRole {
     Events,
     AuthControl,
     Multiplexed,
+    Commands,
+    Application,
 }
 
 impl BusinessRole {
     pub fn events(self) -> bool {
-        matches!(self, Self::Events | Self::Multiplexed)
+        matches!(self, Self::Events | Self::Multiplexed | Self::Application)
     }
     pub fn auth_control(self) -> bool {
         matches!(self, Self::AuthControl | Self::Multiplexed)
     }
+    pub fn commands(self) -> bool {
+        matches!(self, Self::Commands | Self::Application)
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct DeviceCommandSendRequest {
+    pub command: DeviceCommand,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct DeviceCommandSendResponse {
+    pub dispatch: CommandDispatch,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -344,6 +361,7 @@ pub struct AuthInvalidateResponse {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{CommandId, DeviceCommandPayload, DeviceId, ProductId, TenantId};
     #[test]
     fn v2_contract_and_v1_version_are_independent() {
         assert_eq!(crate::PROTOCOL_VERSION, 1);
@@ -363,5 +381,65 @@ mod tests {
         assert_eq!(wire["role"], "multiplexed");
         assert_eq!(wire["version"], 2);
         assert!(serde_json::from_value::<BusinessRpcFrame>(wire).is_ok());
+    }
+
+    #[test]
+    fn roles_preserve_v2_names_and_capabilities() {
+        for (role, wire, events, auth, commands) in [
+            (BusinessRole::Events, "events", true, false, false),
+            (
+                BusinessRole::AuthControl,
+                "auth_control",
+                false,
+                true,
+                false,
+            ),
+            (BusinessRole::Multiplexed, "multiplexed", true, true, false),
+            (BusinessRole::Commands, "commands", false, false, true),
+            (BusinessRole::Application, "application", true, false, true),
+        ] {
+            assert_eq!(serde_json::to_value(role).unwrap(), wire);
+            assert!(
+                matches!(serde_json::from_str::<BusinessRole>(&format!("\"{wire}\"")), Ok(value) if value == role)
+            );
+            assert_eq!(
+                (role.events(), role.auth_control(), role.commands()),
+                (events, auth, commands)
+            );
+        }
+    }
+
+    #[test]
+    fn command_dto_rejects_unknown_and_malformed_fields() {
+        let request = DeviceCommandSendRequest {
+            command: DeviceCommand {
+                command_id: CommandId::generate(),
+                device: DeviceKey {
+                    tenant_id: TenantId::new("demo").unwrap(),
+                    product_id: ProductId::new("sensor").unwrap(),
+                    device_id: DeviceId::new("one").unwrap(),
+                },
+                expires_at: None,
+                payload: DeviceCommandPayload {
+                    name: "reboot".into(),
+                    arguments: Default::default(),
+                },
+            },
+        };
+        let wire = serde_json::to_value(&request).unwrap();
+        assert!(serde_json::from_value::<DeviceCommandSendRequest>(wire.clone()).is_ok());
+        let mut unknown = wire.clone();
+        unknown["unexpected"] = serde_json::json!(true);
+        assert!(serde_json::from_value::<DeviceCommandSendRequest>(unknown).is_err());
+        let mut malformed = wire;
+        malformed["command"]["payload"]["arguments"] = serde_json::json!({"bad": [1, 2]});
+        assert!(serde_json::from_value::<DeviceCommandSendRequest>(malformed).is_err());
+        let oversized = BusinessRpcFrame::Request {
+            request_id: Uuid::new_v4(),
+            method: "device.command.send".into(),
+            deadline_ms: 1_000,
+            body: serde_json::json!({ "command": { "payload": "x".repeat(BUSINESS_RPC_AUTH_MAX_BYTES) } }),
+        };
+        assert!(oversized.validate().is_err());
     }
 }

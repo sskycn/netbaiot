@@ -1,16 +1,20 @@
 //! Business RPC V2 client. The connection driver runs independently of event consumption.
 use async_trait::async_trait;
 use netbaiot_protocol::{
-    AuthInvalidation, EventAck, EventDelivery, EventFilter, SubscriptionId,
+    AuthInvalidation, CommandDispatch, DeviceCommand, EventAck, EventDelivery, EventFilter,
+    SubscriptionId,
     business_rpc::{
         AuthInvalidateRequest, AuthInvalidateResponse, AuthSyncRequest, AuthenticatedDeviceWire,
-        BUSINESS_RPC_EVENT_WINDOW, BUSINESS_RPC_HELLO_MAX_BYTES, BUSINESS_RPC_VERSION,
-        BusinessLimits, BusinessRole, BusinessRpcFrame, DeviceAuthenticateRequest,
-        ResolveVerifierRequest, ResolveVerifierResponse, RpcError, RpcErrorCode,
+        BUSINESS_RPC_AUTH_MAX_BYTES, BUSINESS_RPC_EVENT_WINDOW, BUSINESS_RPC_HELLO_MAX_BYTES,
+        BUSINESS_RPC_VERSION, BusinessLimits, BusinessRole, BusinessRpcFrame,
+        DeviceAuthenticateRequest, DeviceCommandSendResponse, ResolveVerifierRequest,
+        ResolveVerifierResponse, RpcError, RpcErrorCode,
     },
 };
+use serde::Serialize;
 use std::{
     collections::HashMap,
+    io::{self, Write},
     net::SocketAddr,
     path::PathBuf,
     sync::{
@@ -32,6 +36,24 @@ use uuid::Uuid;
 
 trait Io: AsyncRead + AsyncWrite + Unpin + Send {}
 impl<T: AsyncRead + AsyncWrite + Unpin + Send> Io for T {}
+
+struct BoundedCommandBody(Vec<u8>);
+#[derive(Serialize)]
+struct BorrowedCommandRequest<'a> {
+    command: &'a DeviceCommand,
+}
+impl Write for BoundedCommandBody {
+    fn write(&mut self, chunk: &[u8]) -> io::Result<usize> {
+        if chunk.len() > BUSINESS_RPC_AUTH_MAX_BYTES.saturating_sub(self.0.len()) {
+            return Err(io::Error::other("command body exceeds RPC limit"));
+        }
+        self.0.extend_from_slice(chunk);
+        Ok(chunk.len())
+    }
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
 
 #[derive(Clone)]
 pub struct BusinessRpcTls {
@@ -120,6 +142,8 @@ pub enum BusinessRpcClientError {
     Unauthorized,
     #[error("business RPC overloaded")]
     Overloaded,
+    #[error("command RPC outcome is unknown; retry only with the same command_id")]
+    OutcomeUnknown,
     #[error("business RPC request rejected: {0:?}")]
     Remote(RpcErrorCode),
 }
@@ -209,12 +233,18 @@ enum Command {
         tokio::time::Instant,
         oneshot::Sender<Result<AuthInvalidateResponse, BusinessRpcClientError>>,
     ),
+    SendCommand(
+        serde_json::Value,
+        tokio::time::Instant,
+        oneshot::Sender<Result<CommandDispatch, BusinessRpcClientError>>,
+    ),
 }
 struct ClientInner {
     commands: mpsc::Sender<Command>,
     revision: Arc<AtomicU64>,
     incarnation: Uuid,
     request_timeout: Duration,
+    role: BusinessRole,
     shutdown: CancellationToken,
     task: Mutex<Option<JoinHandle<()>>>,
     ready: watch::Receiver<bool>,
@@ -252,6 +282,37 @@ pub struct BusinessRpcClient {
     inner: Arc<ClientInner>,
 }
 impl BusinessRpcClient {
+    /// A successful response means only that the current Gateway session accepted
+    /// dispatch. Device execution is reported separately as a CommandAck event.
+    pub async fn send_command(
+        &self,
+        command: &DeviceCommand,
+    ) -> Result<CommandDispatch, BusinessRpcClientError> {
+        if !self.inner.role.commands() {
+            return Err(BusinessRpcClientError::Unauthorized);
+        }
+        if !self.ready() {
+            return Err(BusinessRpcClientError::Unavailable);
+        }
+        let mut encoded = BoundedCommandBody(Vec::new());
+        serde_json::to_writer(&mut encoded, &BorrowedCommandRequest { command })
+            .map_err(|_| BusinessRpcClientError::Protocol)?;
+        let body =
+            serde_json::from_slice(&encoded.0).map_err(|_| BusinessRpcClientError::Protocol)?;
+        let (send, receive) = oneshot::channel();
+        self.inner
+            .commands
+            .try_send(Command::SendCommand(
+                body,
+                tokio::time::Instant::now() + self.inner.request_timeout,
+                send,
+            ))
+            .map_err(|_| BusinessRpcClientError::Overloaded)?;
+        tokio::time::timeout(self.inner.request_timeout, receive)
+            .await
+            .map_err(|_| BusinessRpcClientError::OutcomeUnknown)?
+            .map_err(|_| BusinessRpcClientError::OutcomeUnknown)?
+    }
     /// Returns the most recent connection failure observed by the reconnect driver.
     pub fn last_connection_error(&self) -> Option<BusinessRpcClientError> {
         self.inner
@@ -363,6 +424,7 @@ impl BusinessRpcClient {
                 revision,
                 incarnation: config.authority_incarnation,
                 request_timeout: config.request_timeout,
+                role: config.role,
                 shutdown,
                 task: Mutex::new(Some(task)),
                 ready: ready_rx,
@@ -795,7 +857,29 @@ async fn driver(
 struct Pending {
     method: &'static str,
     deadline: tokio::time::Instant,
-    result: oneshot::Sender<Result<AuthInvalidateResponse, BusinessRpcClientError>>,
+    result: PendingResult,
+}
+enum PendingResult {
+    Invalidate(oneshot::Sender<Result<AuthInvalidateResponse, BusinessRpcClientError>>),
+    Command(oneshot::Sender<Result<CommandDispatch, BusinessRpcClientError>>),
+}
+impl PendingResult {
+    fn is_closed(&self) -> bool {
+        match self {
+            Self::Invalidate(result) => result.is_closed(),
+            Self::Command(result) => result.is_closed(),
+        }
+    }
+    fn fail(self, error: BusinessRpcClientError) {
+        match self {
+            Self::Invalidate(result) => {
+                let _ = result.send(Err(error));
+            }
+            Self::Command(result) => {
+                let _ = result.send(Err(error));
+            }
+        }
+    }
 }
 async fn connected(
     config: &BusinessRpcClientConfig,
@@ -911,10 +995,25 @@ async fn connected(
                     BusinessRpcFrame::Response { request_id, method, body, error } => {
                         let stale = error.as_ref().is_some_and(|failure| failure.code == RpcErrorCode::StaleRevision);
                         if let Some(pending) = pending.remove(&request_id) {
-                            let result = if pending.method != method { Err(protocol_at(signals, "rpc_response_method")) }
-                                else if let Some(error) = error { Err(BusinessRpcClientError::Remote(error.code)) }
-                                else { body.and_then(|body| serde_json::from_value(body).ok()).ok_or_else(|| protocol_at(signals, "rpc_response_body")) };
-                            let _ = pending.result.send(result);
+                            if pending.method != method {
+                                pending.result.fail(protocol_at(signals, "rpc_response_method"));
+                            } else if let Some(error) = error {
+                                pending.result.fail(BusinessRpcClientError::Remote(error.code));
+                            } else {
+                                match pending.result {
+                                    PendingResult::Invalidate(result) => {
+                                        let value = body.and_then(|body| serde_json::from_value(body).ok())
+                                            .ok_or_else(|| protocol_at(signals, "rpc_response_body"));
+                                        let _ = result.send(value);
+                                    }
+                                    PendingResult::Command(result) => {
+                                        let value = body.and_then(|body| serde_json::from_value::<DeviceCommandSendResponse>(body).ok())
+                                            .map(|reply| reply.dispatch)
+                                            .ok_or_else(|| protocol_at(signals, "rpc_response_body"));
+                                        let _ = result.send(value);
+                                    }
+                                }
+                            }
                         }
                         if stale { break Err(BusinessRpcClientError::Remote(RpcErrorCode::StaleRevision)); }
                     }
@@ -930,16 +1029,28 @@ async fn connected(
             }
             command = commands.recv() => {
                 let Some(command) = command else { break Ok(()) };
-                let Command::Invalidate(request, deadline, result) = command;
+                let (method, body, deadline, result) = match command {
+                    Command::Invalidate(request, deadline, result) => {
+                        let body = match serde_json::to_value(request) {
+                            Ok(value) => value,
+                            Err(_) => { let _ = result.send(Err(BusinessRpcClientError::Protocol)); continue; }
+                        };
+                        ("auth.invalidate", body, deadline, PendingResult::Invalidate(result))
+                    }
+                    Command::SendCommand(body, deadline, result) =>
+                        ("device.command.send", body, deadline, PendingResult::Command(result)),
+                };
                 if result.is_closed() { continue; }
-                if deadline <= tokio::time::Instant::now() { let _ = result.send(Err(BusinessRpcClientError::Timeout)); continue; }
-                if !config.role.auth_control() { let _ = result.send(Err(BusinessRpcClientError::Unauthorized)); continue; }
-                if pending.len() >= config.auth_max_inflight { let _ = result.send(Err(BusinessRpcClientError::Overloaded)); continue; }
+                if deadline <= tokio::time::Instant::now() { result.fail(BusinessRpcClientError::Timeout); continue; }
+                if (method == "auth.invalidate" && !config.role.auth_control())
+                    || (method == "device.command.send" && !config.role.commands()) {
+                    result.fail(BusinessRpcClientError::Unauthorized); continue;
+                }
+                if pending.len() >= config.auth_max_inflight { result.fail(BusinessRpcClientError::Overloaded); continue; }
                 let id = Uuid::new_v4();
-                let body = match serde_json::to_value(request) { Ok(value) => value, Err(_) => { let _ = result.send(Err(BusinessRpcClientError::Protocol)); continue; } };
-                let frame = BusinessRpcFrame::Request { request_id: id, method: "auth.invalidate".into(), deadline_ms: deadline.saturating_duration_since(tokio::time::Instant::now()).as_millis().min(u32::MAX as u128).max(1) as u32, body };
-                if enqueue(&out_tx, &out_budget, frame, None).is_err() { let _ = result.send(Err(BusinessRpcClientError::Overloaded)); continue; }
-                pending.insert(id, Pending { method: "auth.invalidate", deadline, result });
+                let frame = BusinessRpcFrame::Request { request_id: id, method: method.into(), deadline_ms: deadline.saturating_duration_since(tokio::time::Instant::now()).as_millis().min(u32::MAX as u128).max(1) as u32, body };
+                if enqueue(&out_tx, &out_budget, frame, None).is_err() { result.fail(BusinessRpcClientError::Overloaded); continue; }
+                pending.insert(id, Pending { method, deadline, result });
             }
             _ = heartbeat.tick() => {
                 if enqueue(&out_tx, &out_budget, BusinessRpcFrame::Ping { nonce: Uuid::new_v4().as_u128() as u64 }, None).is_err() { break Err(BusinessRpcClientError::Overloaded); }
@@ -948,7 +1059,7 @@ async fn connected(
             _ = expiry.tick() => {
                 let now = tokio::time::Instant::now();
                 let expired = pending.iter().filter_map(|(id, entry)| (entry.deadline <= now || entry.result.is_closed()).then_some(*id)).collect::<Vec<_>>();
-                for id in expired { if let Some(entry) = pending.remove(&id) { let _ = entry.result.send(Err(BusinessRpcClientError::Timeout)); } }
+                for id in expired { if let Some(entry) = pending.remove(&id) { entry.result.fail(BusinessRpcClientError::Timeout); } }
             }
             result = handlers.join_next(), if !handlers.is_empty() => {
                 match result {
@@ -959,9 +1070,13 @@ async fn connected(
         }
     };
     for (_, pending) in pending {
-        let _ = pending
+        pending
             .result
-            .send(Err(BusinessRpcClientError::Unavailable));
+            .fail(if pending.method == "device.command.send" {
+                BusinessRpcClientError::OutcomeUnknown
+            } else {
+                BusinessRpcClientError::Unavailable
+            });
     }
     handlers.abort_all();
     while handlers.join_next().await.is_some() {}

@@ -50,9 +50,7 @@ impl Services {
             shutdown,
             control_lock: Arc::new(tokio::sync::Mutex::new(())),
             http_slots: Arc::new(tokio::sync::Semaphore::new(limits.max_ingress)),
-            router: Arc::new(CommandRouter {
-                ingress: ingress.clone(),
-            }),
+            router: Arc::new(CommandRouter::new(ingress.clone())),
             connections: Connections::new(limits.clone(), ingress.metrics.clone()),
             rates: Arc::new(RateLimiter::new(limits.clone())),
             management_request_rates: Arc::new(RateLimiter::new(limits.clone())),

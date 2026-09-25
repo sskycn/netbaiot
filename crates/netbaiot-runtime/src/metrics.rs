@@ -74,6 +74,7 @@ pub enum Metric {
 pub enum BusinessRpcQueueClass {
     Control,
     Event,
+    Command,
 }
 #[derive(Clone, Copy)]
 #[repr(usize)]
@@ -338,8 +339,8 @@ pub struct Metrics {
     management_authz_denied: [AtomicU64; 12],
     management_jwks_cache: [AtomicU64; 2],
     histograms: [HistogramState; HISTOGRAM_NAMES.len()],
-    business_rpc_queue_count: [AtomicU64; 2],
-    business_rpc_queue_bytes: [AtomicU64; 2],
+    business_rpc_queue_count: [AtomicU64; 3],
+    business_rpc_queue_bytes: [AtomicU64; 3],
     lock_timing_enabled: bool,
     event_bus_probes: [AtomicU64; EVENT_BUS_PROBES.len()],
     event_bus_timing: Option<Box<EventBusTiming>>,
@@ -532,7 +533,7 @@ impl Metrics {
                 output.push_str(&format!("netbaiot_business_rpc_remote_errors_total{{method=\"{method}\",code=\"{code}\"}} {}\n", self.business_rpc_remote_errors[method_index][code_index].load(Ordering::Relaxed)));
             }
         }
-        for (index, class) in ["control", "event"].iter().enumerate() {
+        for (index, class) in ["control", "event", "command"].iter().enumerate() {
             output.push_str(&format!("netbaiot_business_rpc_queue_count{{class=\"{class}\"}} {}\nnetbaiot_business_rpc_queue_bytes{{class=\"{class}\"}} {}\n", self.business_rpc_queue_count[index].load(Ordering::Relaxed), self.business_rpc_queue_bytes[index].load(Ordering::Relaxed)));
         }
         for (index, method) in ["static_token", "api_key", "jwt", "mtls", "unknown"]

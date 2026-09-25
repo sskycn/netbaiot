@@ -384,8 +384,10 @@ async fn official_clients_cover_mqtt_tcp_command_ack_status_and_offline_contract
         })
         .await
         .unwrap();
+        let mut offline_command = command.clone();
+        offline_command.command_id = CommandId::generate();
         assert!(matches!(
-            business.commands().send(&command).await,
+            business.commands().send(&offline_command).await,
             Err(ClientError::DeviceOffline { .. })
         ));
     }

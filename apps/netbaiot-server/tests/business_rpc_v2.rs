@@ -5,8 +5,9 @@ use netbaiot_client::business_rpc::{
     BusinessAuthHandler, BusinessRpcClient, BusinessRpcClientConfig,
 };
 use netbaiot_core::{
-    AuthInvalidation, CodecId, DeviceId, DeviceKey, DeviceUplink, DeviceUplinkKind, Heartbeat,
-    ProductId, SourceMessageId, TenantId,
+    AuthInvalidation, CodecId, CommandId, DeliveryState, DeviceCommand, DeviceCommandPayload,
+    DeviceEventKind, DeviceId, DeviceKey, DeviceUplink, DeviceUplinkKind, ExecutionState,
+    Heartbeat, ProductId, SourceMessageId, TenantId,
 };
 use netbaiot_device_sdk::{DeviceClient, DeviceCredentials, PublishQos};
 use netbaiot_protocol::business_rpc::{
@@ -24,9 +25,538 @@ use std::{
     time::Duration,
 };
 use tokio::{
-    net::{TcpListener, UdpSocket},
+    io::{AsyncReadExt, AsyncWriteExt},
+    net::{TcpListener, TcpStream, UdpSocket},
     process::Command,
 };
+
+async fn write_rpc(
+    socket: &mut TcpStream,
+    frame: &netbaiot_protocol::business_rpc::BusinessRpcFrame,
+) {
+    let data = serde_json::to_vec(frame).unwrap();
+    socket
+        .write_all(&(data.len() as u32).to_be_bytes())
+        .await
+        .unwrap();
+    socket.write_all(&data).await.unwrap();
+}
+
+async fn read_rpc(socket: &mut TcpStream) -> netbaiot_protocol::business_rpc::BusinessRpcFrame {
+    let mut header = [0u8; 4];
+    socket.read_exact(&mut header).await.unwrap();
+    let mut body = vec![0; u32::from_be_bytes(header) as usize];
+    socket.read_exact(&mut body).await.unwrap();
+    serde_json::from_slice(&body).unwrap()
+}
+
+async fn read_tcp_device(socket: &mut TcpStream) -> Vec<u8> {
+    let mut header = [0u8; 4];
+    socket.read_exact(&mut header).await.unwrap();
+    let mut body = vec![0; u32::from_be_bytes(header) as usize];
+    socket.read_exact(&mut body).await.unwrap();
+    body
+}
+
+async fn read_mqtt_packet(socket: &mut TcpStream) -> (u8, Vec<u8>) {
+    let mut first = [0u8; 1];
+    socket.read_exact(&mut first).await.unwrap();
+    let mut remaining = 0usize;
+    let mut multiplier = 1usize;
+    loop {
+        let mut digit = [0u8; 1];
+        socket.read_exact(&mut digit).await.unwrap();
+        remaining += usize::from(digit[0] & 0x7f) * multiplier;
+        assert!(remaining <= 16_384);
+        if digit[0] & 0x80 == 0 {
+            break;
+        }
+        multiplier *= 128;
+        assert!(multiplier <= 128 * 128 * 128);
+    }
+    let mut body = vec![0; remaining];
+    socket.read_exact(&mut body).await.unwrap();
+    (first[0], body)
+}
+
+#[tokio::test]
+async fn commands_role_dispatches_to_real_tcp_and_shares_http_dedup() {
+    use netbaiot_client::business_rpc::{BusinessRpcClientError, BusinessRpcTls};
+    use netbaiot_server::{BusinessRpcIdentityConfig, ManagementTlsFiles};
+    use sha2::{Digest, Sha256};
+    let root =
+        std::env::temp_dir().join(format!("netbaiot-rpc-tcp-command-{}", uuid::Uuid::new_v4()));
+    let mut config: Config =
+        serde_json::from_str(include_str!("../../../configs/development.json")).unwrap();
+    let mut reservations = Vec::new();
+    for _ in 0..3 {
+        reservations.push(TcpListener::bind("127.0.0.1:0").await.unwrap());
+    }
+    let addresses = reservations
+        .iter()
+        .map(|listener| listener.local_addr().unwrap())
+        .collect::<Vec<_>>();
+    config.device_ingress = addresses[0];
+    config.management_http = addresses[1];
+    config.business_tcp = Some(addresses[2]);
+    config.device_auth = Some(DeviceAuthSource::Static);
+    config.event_delivery = Some(EventDeliverySource::DevelopmentAudit);
+    config.limits.max_pending_commands_per_device = 1;
+    config.limits.max_pending_commands_per_tenant = 1;
+    config.limits.max_pending_commands = 1;
+    let fixtures = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures");
+    let cert_pem = std::fs::read(fixtures.join("management-client.pem")).unwrap();
+    let cert = rustls_pemfile::certs(&mut cert_pem.as_slice())
+        .next()
+        .unwrap()
+        .unwrap();
+    let fingerprint = Sha256::digest(cert.as_ref())
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<String>();
+    config.business_rpc = Some(BusinessRpcConfig {
+        version: 2,
+        tls: Some(ManagementTlsFiles {
+            certificate: fixtures.join("localhost-cert.pem").to_string_lossy().into(),
+            private_key: fixtures.join("localhost-key.pem").to_string_lossy().into(),
+            client_ca: Some(fixtures.join("management-ca.pem").to_string_lossy().into()),
+            require_client_certificate: true,
+        }),
+        identities: vec![BusinessRpcIdentityConfig {
+            certificate_sha256: fingerprint,
+            principal_id: "command-service".into(),
+            role: BusinessRole::Commands,
+            provider_id: None,
+            sink_id: None,
+            provide_methods: Vec::new(),
+            call_methods: vec!["device.command.send".into()],
+            global: false,
+            tenants: vec![TenantId::new("demo").unwrap()],
+            expires_at_ms: None,
+        }],
+        development_token_env: None,
+        development_role: None,
+        allow_v1: false,
+        max_connections: 8,
+        auth_max_inflight: 16,
+        max_auth_control_offline_ms: 0,
+    });
+    config.spool_directory = root.join("spool");
+    drop(reservations);
+    let path = write_config(&root, &config);
+    let mut server = Command::new(env!("CARGO_BIN_EXE_netbaiot-server"))
+        .arg(&path)
+        .env("NETBAIOT_ADMIN_SECRET", "a".repeat(64))
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .kill_on_drop(true)
+        .spawn()
+        .unwrap();
+    let mut client_config =
+        BusinessRpcClientConfig::development(addresses[2], "unused".into(), BusinessRole::Commands);
+    client_config.token = None;
+    client_config.tls = Some(BusinessRpcTls {
+        server_name: "localhost".into(),
+        ca_pem: fixtures.join("localhost-cert.pem"),
+        certificate_pem: fixtures.join("management-client.pem"),
+        private_key_pem: fixtures.join("management-client-key.pem"),
+    });
+    let (business, mut events) = BusinessRpcClient::connect(client_config, None).unwrap();
+    tokio::time::timeout(Duration::from_secs(10), business.wait_ready())
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(matches!(
+        business.invalidate(2, AuthInvalidation::All).await,
+        Err(BusinessRpcClientError::Unauthorized)
+    ));
+    assert!(
+        tokio::time::timeout(Duration::from_millis(100), events.recv())
+            .await
+            .is_err()
+    );
+    let mut socket = TcpStream::connect(addresses[0]).await.unwrap();
+    let handshake = serde_json::to_vec(&serde_json::json!({
+        "credential_id": "demo-device", "secret": SECRET,
+    }))
+    .unwrap();
+    socket
+        .write_all(&(handshake.len() as u32).to_be_bytes())
+        .await
+        .unwrap();
+    socket.write_all(&handshake).await.unwrap();
+    assert_eq!(
+        read_tcp_device(&mut socket).await,
+        br#"{"authenticated":true}"#
+    );
+    let command = demo_command("tcp-rpc");
+    let mut forbidden = command.clone();
+    forbidden.device.tenant_id = TenantId::new("other").unwrap();
+    assert!(matches!(
+        business.send_command(&forbidden).await,
+        Err(BusinessRpcClientError::Remote(RpcErrorCode::Forbidden))
+    ));
+    let accepted = business.send_command(&command).await.unwrap();
+    assert_eq!(accepted.state, DeliveryState::Queued);
+    let received: DeviceCommand =
+        serde_json::from_slice(&read_tcp_device(&mut socket).await).unwrap();
+    assert_eq!(received.command_id, command.command_id);
+    assert_eq!(received.payload, command.payload);
+    let admin = NetbaIoTClient::builder()
+        .endpoint(format!("http://{}", addresses[1]))
+        .token("a".repeat(64))
+        .connect()
+        .await
+        .unwrap();
+    let duplicate = admin.commands().send(&command).await.unwrap();
+    assert_eq!(duplicate, accepted);
+    assert!(matches!(
+        business.send_command(&demo_command("capacity")).await,
+        Err(BusinessRpcClientError::Remote(RpcErrorCode::Overloaded))
+    ));
+    assert!(
+        tokio::time::timeout(Duration::from_millis(300), read_tcp_device(&mut socket))
+            .await
+            .is_err()
+    );
+    business.shutdown().await;
+    server.start_kill().unwrap();
+    let _ = server.wait().await;
+    let _ = std::fs::remove_dir_all(root);
+}
+
+#[tokio::test]
+async fn business_rpc_command_mqtt_dedup_and_ack_use_real_sockets() {
+    use netbaiot_client::business_rpc::BusinessRpcClientError;
+    use netbaiot_protocol::business_rpc::{
+        BusinessLimits, BusinessRpcFrame, DeviceCommandSendRequest,
+    };
+
+    let root = std::env::temp_dir().join(format!("netbaiot-rpc-command-{}", uuid::Uuid::new_v4()));
+    let mut config: Config =
+        serde_json::from_str(include_str!("../../../configs/development.json")).unwrap();
+    let mut reservations = Vec::new();
+    for _ in 0..3 {
+        reservations.push(TcpListener::bind("127.0.0.1:0").await.unwrap());
+    }
+    let addresses = reservations
+        .iter()
+        .map(|listener| listener.local_addr().unwrap())
+        .collect::<Vec<_>>();
+    config.device_ingress = addresses[0];
+    config.management_http = addresses[1];
+    config.business_tcp = Some(addresses[2]);
+    config.device_auth = Some(DeviceAuthSource::Static);
+    config.event_delivery = Some(EventDeliverySource::BusinessRpc);
+    config.business_rpc = Some(BusinessRpcConfig {
+        version: 2,
+        tls: None,
+        identities: Vec::new(),
+        development_token_env: Some("NETBAIOT_BUSINESS_RPC_TOKEN".into()),
+        development_role: Some(BusinessRole::Application),
+        allow_v1: false,
+        max_connections: 8,
+        auth_max_inflight: 32,
+        max_auth_control_offline_ms: 0,
+    });
+    config.spool_directory = root.join("spool");
+    drop(reservations);
+    let path = write_config(&root, &config);
+    let mut server = Command::new(env!("CARGO_BIN_EXE_netbaiot-server"))
+        .arg(&path)
+        .env("NETBAIOT_ADMIN_SECRET", "a".repeat(64))
+        .env("NETBAIOT_BUSINESS_RPC_TOKEN", "rpc-command-token")
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .kill_on_drop(true)
+        .spawn()
+        .unwrap();
+    let (business, mut events) = BusinessRpcClient::connect(
+        BusinessRpcClientConfig::development(
+            addresses[2],
+            "rpc-command-token".into(),
+            BusinessRole::Application,
+        ),
+        None,
+    )
+    .unwrap();
+    tokio::time::timeout(Duration::from_secs(10), business.wait_ready())
+        .await
+        .unwrap()
+        .unwrap();
+
+    let retry = demo_command("offline-retry");
+    assert!(matches!(
+        business.send_command(&retry).await,
+        Err(BusinessRpcClientError::Remote(RpcErrorCode::Unavailable))
+    ));
+    let mut invalid_id = retry.clone();
+    invalid_id.command_id = CommandId(uuid::Uuid::nil());
+    assert!(matches!(
+        business.send_command(&invalid_id).await,
+        Err(BusinessRpcClientError::Remote(RpcErrorCode::InvalidRequest))
+    ));
+    // A real MQTT connection without a /down subscription is online but not command ready.
+    let mut old_mqtt = TcpStream::connect(addresses[0]).await.unwrap();
+    let mut connect_body = Vec::new();
+    for text in [
+        b"MQTT".as_slice(),
+        b"rpc-unready",
+        b"demo-device",
+        SECRET.as_bytes(),
+    ] {
+        connect_body.extend_from_slice(&(text.len() as u16).to_be_bytes());
+        connect_body.extend_from_slice(text);
+        if text == b"MQTT" {
+            connect_body.extend_from_slice(&[4, 0xc2, 0, 30]);
+        }
+    }
+    let mut packet = vec![0x10, connect_body.len() as u8];
+    packet.extend_from_slice(&connect_body);
+    old_mqtt.write_all(&packet).await.unwrap();
+    let mut connack = [0u8; 4];
+    old_mqtt.read_exact(&mut connack).await.unwrap();
+    assert_eq!(connack, [0x20, 2, 0, 0]);
+    assert!(matches!(
+        business.send_command(&retry).await,
+        Err(BusinessRpcClientError::Remote(RpcErrorCode::Unavailable))
+    ));
+    let down = b"v1/t/demo/p/sensor/d/device-1/down";
+    let mut subscription = vec![0, 1];
+    subscription.extend_from_slice(&(down.len() as u16).to_be_bytes());
+    subscription.extend_from_slice(down);
+    subscription.push(1);
+    let mut subscribe = vec![0x82, subscription.len() as u8];
+    subscribe.extend_from_slice(&subscription);
+    old_mqtt.write_all(&subscribe).await.unwrap();
+    assert_eq!(read_mqtt_packet(&mut old_mqtt).await.0, 0x90);
+    let old_command = demo_command("old-generation");
+    business.send_command(&old_command).await.unwrap();
+    let (publish_header, publish_body) = read_mqtt_packet(&mut old_mqtt).await;
+    assert_eq!(publish_header & 0xf0, 0x30);
+    let topic_bytes = u16::from_be_bytes([publish_body[0], publish_body[1]]) as usize;
+    let packet_id_at = topic_bytes + 2;
+    let packet_id =
+        u16::from_be_bytes([publish_body[packet_id_at], publish_body[packet_id_at + 1]]);
+    let delivered: DeviceCommand =
+        serde_json::from_slice(&publish_body[packet_id_at + 2..]).unwrap();
+    assert_eq!(delivered.command_id, old_command.command_id);
+    old_mqtt
+        .write_all(&[0x40, 2, (packet_id >> 8) as u8, packet_id as u8])
+        .await
+        .unwrap();
+    let device = DeviceClient::builder()
+        .device(retry.device.clone())
+        .credentials(DeviceCredentials::new("demo-device", SECRET).unwrap())
+        .mqtt_endpoint(format!("mqtt://{}", addresses[0]))
+        .client_id("rpc-command-mqtt")
+        .connect()
+        .await
+        .unwrap();
+    let mut commands = device.commands().unwrap();
+    device
+        .wait_until_connected(Duration::from_secs(5))
+        .await
+        .unwrap();
+    let mut stale_byte = [0u8; 1];
+    assert!(matches!(
+        tokio::time::timeout(Duration::from_secs(1), old_mqtt.read(&mut stale_byte)).await,
+        Ok(Ok(0)) | Ok(Err(_))
+    ));
+    assert!(
+        tokio::time::timeout(Duration::from_millis(200), commands.recv())
+            .await
+            .is_err()
+    );
+    let accepted = business.send_command(&retry).await.unwrap();
+    assert_eq!(accepted.state, DeliveryState::Queued);
+    assert_eq!(
+        tokio::time::timeout(Duration::from_secs(5), commands.recv())
+            .await
+            .unwrap()
+            .unwrap()
+            .command_id,
+        retry.command_id
+    );
+
+    let same = business.send_command(&retry).await.unwrap();
+    assert_eq!(same, accepted);
+    // All attempts for this new ID race before any caller receives a dispatch.
+    let simultaneous = demo_command("concurrent-first");
+    let mut concurrent = tokio::task::JoinSet::new();
+    for _ in 0..16 {
+        let business = business.clone();
+        let simultaneous = simultaneous.clone();
+        concurrent.spawn(async move { business.send_command(&simultaneous).await });
+    }
+    let mut concurrent_dispatch = None;
+    while let Some(result) = concurrent.join_next().await {
+        let dispatch = result.unwrap().unwrap();
+        assert_eq!(dispatch.command_id, simultaneous.command_id);
+        if let Some(previous) = concurrent_dispatch {
+            assert_eq!(dispatch, previous);
+        }
+        concurrent_dispatch = Some(dispatch);
+    }
+    assert_eq!(
+        tokio::time::timeout(Duration::from_secs(5), commands.recv())
+            .await
+            .unwrap()
+            .unwrap()
+            .command_id,
+        simultaneous.command_id
+    );
+    let mut changed = retry.clone();
+    changed.payload.name = "different".into();
+    assert!(matches!(
+        business.send_command(&changed).await,
+        Err(BusinessRpcClientError::Remote(RpcErrorCode::Conflict))
+    ));
+    assert!(
+        tokio::time::timeout(Duration::from_millis(300), commands.recv())
+            .await
+            .is_err()
+    );
+
+    // The transport ACK generated by the SDK precedes the application CommandAck.
+    assert!(
+        tokio::time::timeout(Duration::from_millis(200), events.recv())
+            .await
+            .is_err()
+    );
+    device
+        .ack_command(retry.command_id, ExecutionState::Succeeded)
+        .await
+        .unwrap();
+    let delivery = tokio::time::timeout(Duration::from_secs(5), events.recv())
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(
+        matches!(&delivery.delivery.event.kind, DeviceEventKind::CommandAck(ack)
+        if ack.command_id == retry.command_id && ack.execution == ExecutionState::Succeeded)
+    );
+    delivery.ack().await.unwrap();
+
+    // A downgraded events-only Hello is denied before its malformed command DTO is decoded.
+    let mut events_only = TcpStream::connect(addresses[2]).await.unwrap();
+    write_rpc(
+        &mut events_only,
+        &BusinessRpcFrame::Hello {
+            version: 2,
+            role: BusinessRole::Events,
+            token: Some("rpc-command-token".into()),
+            limits: BusinessLimits {
+                max_frame_bytes: 65_536,
+                auth_max_inflight: 16,
+                event_max_inflight: 1,
+                heartbeat_ms: 5_000,
+            },
+        },
+    )
+    .await;
+    assert!(matches!(
+        read_rpc(&mut events_only).await,
+        BusinessRpcFrame::Ready { .. }
+    ));
+    write_rpc(
+        &mut events_only,
+        &BusinessRpcFrame::Request {
+            request_id: uuid::Uuid::new_v4(),
+            method: "device.command.send".into(),
+            deadline_ms: 5_000,
+            body: serde_json::json!({ "command": "malformed" }),
+        },
+    )
+    .await;
+    assert!(matches!(
+        read_rpc(&mut events_only).await,
+        BusinessRpcFrame::Response {
+            error: Some(RpcError {
+                code: RpcErrorCode::Forbidden,
+                ..
+            }),
+            ..
+        }
+    ));
+    drop(events_only);
+
+    // A raw RPC connection can disappear after admission and before reading Response.
+    let lost = demo_command("lost-response");
+    let mut socket = TcpStream::connect(addresses[2]).await.unwrap();
+    write_rpc(
+        &mut socket,
+        &BusinessRpcFrame::Hello {
+            version: 2,
+            role: BusinessRole::Application,
+            token: Some("rpc-command-token".into()),
+            limits: BusinessLimits {
+                max_frame_bytes: 65_536,
+                auth_max_inflight: 16,
+                event_max_inflight: 1,
+                heartbeat_ms: 5_000,
+            },
+        },
+    )
+    .await;
+    assert!(matches!(
+        read_rpc(&mut socket).await,
+        BusinessRpcFrame::Ready { .. }
+    ));
+    write_rpc(
+        &mut socket,
+        &BusinessRpcFrame::Request {
+            request_id: uuid::Uuid::new_v4(),
+            method: "device.command.send".into(),
+            deadline_ms: 5_000,
+            body: serde_json::to_value(DeviceCommandSendRequest {
+                command: lost.clone(),
+            })
+            .unwrap(),
+        },
+    )
+    .await;
+    assert_eq!(
+        tokio::time::timeout(Duration::from_secs(5), commands.recv())
+            .await
+            .unwrap()
+            .unwrap()
+            .command_id,
+        lost.command_id
+    );
+    drop(socket);
+    assert_eq!(
+        business.send_command(&lost).await.unwrap().command_id,
+        lost.command_id
+    );
+    assert!(
+        tokio::time::timeout(Duration::from_millis(300), commands.recv())
+            .await
+            .is_err()
+    );
+
+    business.shutdown().await;
+    device.shutdown();
+    server.start_kill().unwrap();
+    let _ = server.wait().await;
+    let _ = std::fs::remove_dir_all(root);
+}
+
+fn demo_command(name: &str) -> DeviceCommand {
+    DeviceCommand {
+        command_id: CommandId::generate(),
+        device: DeviceKey {
+            tenant_id: TenantId::new("demo").unwrap(),
+            product_id: ProductId::new("sensor").unwrap(),
+            device_id: DeviceId::new("device-1").unwrap(),
+        },
+        expires_at: None,
+        payload: DeviceCommandPayload {
+            name: name.into(),
+            arguments: Default::default(),
+        },
+    }
+}
 
 const SECRET: &str = "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f";
 struct Handler {
@@ -187,6 +717,7 @@ async fn one_socket_authentication_progresses_while_event_ack_waits() {
         tls: None,
         identities: Vec::new(),
         development_token_env: Some("NETBAIOT_BUSINESS_RPC_TOKEN".into()),
+        development_role: None,
         allow_v1: true,
         max_connections: 8,
         auth_max_inflight: 16,
@@ -439,6 +970,7 @@ async fn zero_offline_grace_revokes_live_session_and_requires_reset_sync() {
         tls: None,
         identities: Vec::new(),
         development_token_env: Some("NETBAIOT_BUSINESS_RPC_TOKEN".into()),
+        development_role: None,
         allow_v1: false,
         max_connections: 8,
         auth_max_inflight: 16,
@@ -600,6 +1132,7 @@ async fn mtls_verifies_server_and_maps_exact_client_certificate() {
             expires_at_ms: Some(principal_expiry),
         }],
         development_token_env: None,
+        development_role: None,
         allow_v1: false,
         max_connections: 8,
         auth_max_inflight: 16,
@@ -870,6 +1403,7 @@ async fn v1_spooled_required_event_replays_to_v2_with_stable_event_id() {
         tls: None,
         identities: Vec::new(),
         development_token_env: Some("NETBAIOT_BUSINESS_RPC_TOKEN".into()),
+        development_role: None,
         allow_v1: false,
         max_connections: 8,
         auth_max_inflight: 16,

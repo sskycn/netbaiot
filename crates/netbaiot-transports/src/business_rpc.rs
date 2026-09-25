@@ -6,21 +6,23 @@ use netbaiot_core::{
         AuthInvalidateRequest, AuthInvalidateResponse, AuthSyncRequest, AuthSyncResponse,
         BUSINESS_RPC_AUTH_MAX_BYTES, BUSINESS_RPC_EVENT_WINDOW, BUSINESS_RPC_HELLO_MAX_BYTES,
         BUSINESS_RPC_MAX_TOKEN_BYTES, BUSINESS_RPC_VERSION, BusinessLimits, BusinessRole,
-        BusinessRpcFrame, RpcError, RpcErrorCode,
+        BusinessRpcFrame, DeviceCommandSendRequest, DeviceCommandSendResponse, RpcError,
+        RpcErrorCode,
     },
 };
 use netbaiot_runtime::{
     BusinessEventRequest, BusinessProviderScope, BusinessRpcEventSink, BusinessRpcOutbound,
-    BusinessRpcRegistry, Error, Ingress, ProviderLease, Result, SinkAck, SinkError,
+    BusinessRpcRegistry, CommandRouter, Error, Ingress, ProviderLease, Result, SinkAck, SinkError,
     metrics::{BusinessRpcQueueClass, Histogram, Metric, Metrics},
 };
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::{
+    collections::HashMap,
     net::SocketAddr,
     sync::{
-        Arc,
-        atomic::{AtomicU64, Ordering},
+        Arc, Mutex,
+        atomic::{AtomicBool, AtomicU64, Ordering},
     },
     time::Duration,
 };
@@ -87,6 +89,9 @@ impl BusinessPrincipal {
                 && self.call_methods.iter().any(|m| m == "auth.invalidate")))
             && (!role.events()
                 || (self.role.events() && self.sink_id.as_deref() == Some("tcp-rpc")))
+            && (!role.commands()
+                || (self.role.commands()
+                    && self.call_methods.iter().any(|m| m == "device.command.send")))
     }
 }
 
@@ -158,6 +163,7 @@ pub struct BusinessRpcServices {
     pub sink: Arc<BusinessRpcEventSink>,
     pub ingress: Arc<Ingress>,
     pub mqtt: Arc<MqttBroker>,
+    pub commands: Arc<CommandRouter>,
 }
 
 pub async fn serve(
@@ -472,6 +478,11 @@ async fn connection_inner(
     let (mut reader, mut writer) = tokio::io::split(io);
     let (control_tx, control_rx) = mpsc::channel::<Queued>(16);
     let control_budget = Arc::new(Semaphore::new(16 * BUSINESS_RPC_AUTH_MAX_BYTES));
+    let (command_tx, command_rx) = mpsc::channel::<Queued>(16);
+    let command_budget = Arc::new(Semaphore::new(16 * BUSINESS_RPC_AUTH_MAX_BYTES));
+    let (command_work_tx, command_work_rx) = mpsc::channel::<CommandRequest>(16);
+    let command_work_budget = Arc::new(Semaphore::new(16 * BUSINESS_RPC_AUTH_MAX_BYTES));
+    let command_cancellations = Arc::new(Mutex::new(HashMap::<Uuid, Arc<AtomicBool>>::new()));
     let event_budget = Arc::new(Semaphore::new(effective_max));
     let (auth_tx, auth_rx) =
         mpsc::channel::<BusinessRpcOutbound>(negotiated.auth_max_inflight as usize);
@@ -513,7 +524,7 @@ async fn connection_inner(
     let writer_handle = tokio::spawn(async move {
         let result = writer_loop(
             writer,
-            control_rx,
+            (control_rx, command_rx),
             auth_rx,
             event_rx,
             effective_max,
@@ -542,6 +553,15 @@ async fn connection_inner(
             connection_stop.clone(),
         ))
     });
+    let command_worker = tokio::spawn(command_loop(
+        command_work_rx,
+        command_tx.clone(),
+        command_budget.clone(),
+        services.clone(),
+        principal.clone(),
+        command_cancellations.clone(),
+        connection_stop.clone(),
+    ));
     let expiry_deadline = principal.expires_at_ms.and_then(|expires_at| {
         let remaining_ms = expires_at.saturating_sub(netbaiot_runtime::now_ms()).max(0) as u64;
         tokio::time::Instant::now().checked_add(Duration::from_millis(remaining_ms))
@@ -684,8 +704,141 @@ async fn connection_inner(
                 )?;
             }
             BusinessRpcFrame::Pong { .. } => {}
-            BusinessRpcFrame::Cancel { .. } => {}
+            BusinessRpcFrame::Cancel { request_id } => {
+                if let Ok(cancellations) = command_cancellations.lock()
+                    && let Some(cancelled) = cancellations.get(&request_id)
+                {
+                    cancelled.store(true, Ordering::Release);
+                }
+            }
             BusinessRpcFrame::GoAway { .. } => break Ok(()),
+            BusinessRpcFrame::Request {
+                request_id,
+                method,
+                deadline_ms,
+                body,
+            } if method == "device.command.send" => {
+                if !role.commands()
+                    || !principal
+                        .call_methods
+                        .iter()
+                        .any(|allowed| allowed == &method)
+                {
+                    queue(
+                        &command_tx,
+                        &command_budget,
+                        &metrics,
+                        BusinessRpcQueueClass::Command,
+                        error(
+                            request_id,
+                            &method,
+                            RpcErrorCode::Forbidden,
+                            "method not permitted",
+                        ),
+                        None,
+                    )?;
+                    continue;
+                }
+                let body_bytes = serde_json::to_vec(&body).map_err(|_| Error::Invalid)?.len();
+                let permits = u32::try_from(body_bytes).map_err(|_| Error::Overloaded)?;
+                let admitted = command_work_budget.clone().try_acquire_many_owned(permits);
+                let Ok(bytes) = admitted else {
+                    queue(
+                        &command_tx,
+                        &command_budget,
+                        &metrics,
+                        BusinessRpcQueueClass::Command,
+                        error(
+                            request_id,
+                            &method,
+                            RpcErrorCode::Overloaded,
+                            "command bytes exhausted",
+                        ),
+                        None,
+                    )?;
+                    continue;
+                };
+                let cancelled = Arc::new(AtomicBool::new(false));
+                let duplicate = match command_cancellations.lock() {
+                    Ok(mut cancellations) => {
+                        if let std::collections::hash_map::Entry::Vacant(entry) =
+                            cancellations.entry(request_id)
+                        {
+                            entry.insert(cancelled.clone());
+                            false
+                        } else {
+                            true
+                        }
+                    }
+                    Err(_) => break Err(Error::Internal),
+                };
+                if duplicate {
+                    queue(
+                        &command_tx,
+                        &command_budget,
+                        &metrics,
+                        BusinessRpcQueueClass::Command,
+                        error(
+                            request_id,
+                            &method,
+                            RpcErrorCode::Conflict,
+                            "request ID already pending",
+                        ),
+                        None,
+                    )?;
+                    continue;
+                }
+                let deadline = tokio::time::Instant::now()
+                    .checked_add(Duration::from_millis(u64::from(deadline_ms)))
+                    .ok_or(Error::Invalid)?;
+                if command_work_tx
+                    .try_send(CommandRequest {
+                        request_id,
+                        body,
+                        deadline,
+                        cancelled,
+                        _bytes: bytes,
+                    })
+                    .is_err()
+                {
+                    if let Ok(mut cancellations) = command_cancellations.lock() {
+                        cancellations.remove(&request_id);
+                    }
+                    queue(
+                        &command_tx,
+                        &command_budget,
+                        &metrics,
+                        BusinessRpcQueueClass::Command,
+                        error(
+                            request_id,
+                            &method,
+                            RpcErrorCode::Overloaded,
+                            "command queue full",
+                        ),
+                        None,
+                    )?;
+                }
+            }
+            BusinessRpcFrame::Request {
+                request_id,
+                method,
+                deadline_ms: _,
+                body: _,
+            } if !role.auth_control() => {
+                queue(
+                    &control_tx,
+                    &control_budget,
+                    &metrics,
+                    BusinessRpcQueueClass::Control,
+                    error(
+                        request_id,
+                        &method,
+                        RpcErrorCode::Forbidden,
+                        "method not permitted",
+                    ),
+                    None,
+                )?;
+            }
             BusinessRpcFrame::Request {
                 request_id,
                 method,
@@ -779,6 +932,8 @@ async fn connection_inner(
         worker.abort();
         let _ = worker.await;
     }
+    command_worker.abort();
+    let _ = command_worker.await;
     provider.take();
     let _ = writer_handle.await;
     result
@@ -789,6 +944,125 @@ struct ControlRequest {
     method: String,
     body: serde_json::Value,
 }
+
+struct CommandRequest {
+    request_id: Uuid,
+    body: serde_json::Value,
+    deadline: tokio::time::Instant,
+    cancelled: Arc<AtomicBool>,
+    _bytes: OwnedSemaphorePermit,
+}
+
+fn command_error(error: Error) -> RpcErrorCode {
+    match error {
+        Error::Invalid | Error::Codec | Error::Configuration => RpcErrorCode::InvalidRequest,
+        Error::Forbidden => RpcErrorCode::Forbidden,
+        Error::Conflict => RpcErrorCode::Conflict,
+        Error::Overloaded => RpcErrorCode::Overloaded,
+        Error::Timeout => RpcErrorCode::Timeout,
+        Error::Unavailable
+        | Error::Draining
+        | Error::Storage
+        | Error::IncompatibleSpool
+        | Error::Authentication => RpcErrorCode::Unavailable,
+        Error::Internal => RpcErrorCode::Internal,
+    }
+}
+
+fn process_command_request(
+    request: CommandRequest,
+    principal: &BusinessPrincipal,
+    dispatch: impl FnOnce(netbaiot_core::DeviceCommand) -> Result<netbaiot_core::CommandDispatch>,
+) -> BusinessRpcFrame {
+    let method = "device.command.send";
+    if request.cancelled.load(Ordering::Acquire) || tokio::time::Instant::now() >= request.deadline
+    {
+        return error(
+            request.request_id,
+            method,
+            RpcErrorCode::Timeout,
+            "command request expired",
+        );
+    }
+    match serde_json::from_value::<DeviceCommandSendRequest>(request.body) {
+        Err(_) => error(
+            request.request_id,
+            method,
+            RpcErrorCode::InvalidRequest,
+            "invalid command request",
+        ),
+        Ok(input) if !principal.allows_tenant(&input.command.device.tenant_id) => error(
+            request.request_id,
+            method,
+            RpcErrorCode::Forbidden,
+            "tenant not permitted",
+        ),
+        Ok(_)
+            if tokio::time::Instant::now() >= request.deadline
+                || request.cancelled.load(Ordering::Acquire) =>
+        {
+            error(
+                request.request_id,
+                method,
+                RpcErrorCode::Timeout,
+                "command request expired",
+            )
+        }
+        Ok(input) => match dispatch(input.command) {
+            Ok(dispatch) => response(
+                request.request_id,
+                method,
+                Ok(DeviceCommandSendResponse { dispatch }),
+            ),
+            Err(failure) => error(
+                request.request_id,
+                method,
+                command_error(failure),
+                "command dispatch rejected",
+            ),
+        },
+    }
+}
+
+async fn command_loop(
+    mut requests: mpsc::Receiver<CommandRequest>,
+    writer: mpsc::Sender<Queued>,
+    budget: Arc<Semaphore>,
+    services: Arc<BusinessRpcServices>,
+    principal: BusinessPrincipal,
+    cancellations: Arc<Mutex<HashMap<Uuid, Arc<AtomicBool>>>>,
+    stop: CancellationToken,
+) {
+    while let Some(request) = tokio::select! {
+        _ = stop.cancelled() => None,
+        request = requests.recv() => request,
+    } {
+        let request_id = request.request_id;
+        let reply = process_command_request(request, &principal, |command| {
+            services.commands.send(command)
+        });
+        if let Ok(mut pending) = cancellations.lock() {
+            pending.remove(&request_id);
+        } else {
+            stop.cancel();
+            break;
+        }
+        if queue(
+            &writer,
+            &budget,
+            &services.ingress.metrics,
+            BusinessRpcQueueClass::Command,
+            reply,
+            None,
+        )
+        .is_err()
+        {
+            stop.cancel();
+            break;
+        }
+    }
+}
+
 async fn control_loop(
     mut requests: mpsc::Receiver<ControlRequest>,
     writer: mpsc::Sender<Queued>,
@@ -1075,7 +1349,7 @@ struct WriterSignals {
 }
 async fn writer_loop<W: AsyncWrite + Unpin>(
     mut writer: W,
-    mut control: mpsc::Receiver<Queued>,
+    mut queues: (mpsc::Receiver<Queued>, mpsc::Receiver<Queued>),
     mut auth: mpsc::Receiver<BusinessRpcOutbound>,
     mut events: mpsc::Receiver<Queued>,
     maximum: usize,
@@ -1084,8 +1358,9 @@ async fn writer_loop<W: AsyncWrite + Unpin>(
 ) -> Result<()> {
     loop {
         let item = tokio::select! {
+            biased;
             _ = signals.stop.cancelled() => return Ok(()),
-            item = control.recv(), if !control.is_closed() => item,
+            item = queues.0.recv(), if !queues.0.is_closed() => item,
             item = auth.recv(), if !auth.is_closed() => item.map(|out| {
                 if matches!(out.frame, BusinessRpcFrame::Request { .. }) {
                     signals.metrics.observe(Histogram::BusinessRpcQueueWait, out.queued_at.elapsed().as_micros().min(u64::MAX as u128) as u64);
@@ -1093,6 +1368,7 @@ async fn writer_loop<W: AsyncWrite + Unpin>(
                 Queued { frame: out.frame, written: None, _bytes: out._bytes, _tracking: None }
             }),
             item = events.recv(), if !events.is_closed() => item,
+            item = queues.1.recv(), if !queues.1.is_closed() => item,
         };
         let Some(item) = item else { return Ok(()) };
         let result = write_frame(&mut writer, &item.frame, maximum, timeout).await;
@@ -1107,10 +1383,208 @@ async fn writer_loop<W: AsyncWrite + Unpin>(
 mod tests {
     use super::*;
     use netbaiot_core::{
-        DeviceEvent, DeviceEventKind, DeviceId, DeviceKey, EventId, Heartbeat, ProductId, SinkId,
+        CommandId, DeliveryState, DeviceCommand, DeviceCommandPayload, DeviceEvent,
+        DeviceEventKind, DeviceId, DeviceKey, EventId, Heartbeat, ProductId, SinkId,
         SourceMessageId,
     };
     use netbaiot_runtime::DeliveryEnvelope;
+
+    #[test]
+    fn command_scope_deadline_and_cancel_precede_dispatch() {
+        let principal = BusinessPrincipal {
+            id: "commands".into(),
+            role: BusinessRole::Commands,
+            provider_id: None,
+            sink_id: None,
+            provide_methods: Vec::new(),
+            call_methods: vec!["device.command.send".into()],
+            global: false,
+            tenants: vec![TenantId::new("demo").unwrap()],
+            expires_at_ms: None,
+        };
+        let mut command = DeviceCommand {
+            command_id: CommandId::generate(),
+            device: DeviceKey {
+                tenant_id: TenantId::new("other").unwrap(),
+                product_id: ProductId::new("sensor").unwrap(),
+                device_id: DeviceId::new("one").unwrap(),
+            },
+            expires_at: None,
+            payload: DeviceCommandPayload {
+                name: "run".into(),
+                arguments: Default::default(),
+            },
+        };
+        let make_request =
+            |command: &DeviceCommand, deadline, cancelled: Arc<AtomicBool>| CommandRequest {
+                request_id: Uuid::new_v4(),
+                body: serde_json::to_value(DeviceCommandSendRequest {
+                    command: command.clone(),
+                })
+                .unwrap(),
+                deadline,
+                cancelled,
+                _bytes: Arc::new(Semaphore::new(1)).try_acquire_owned().unwrap(),
+            };
+        let future = tokio::time::Instant::now() + Duration::from_secs(5);
+        let forbidden = process_command_request(
+            make_request(&command, future, Arc::new(AtomicBool::new(false))),
+            &principal,
+            |_| panic!("scope denial must precede session lookup"),
+        );
+        assert!(matches!(
+            forbidden,
+            BusinessRpcFrame::Response {
+                error: Some(RpcError {
+                    code: RpcErrorCode::Forbidden,
+                    ..
+                }),
+                ..
+            }
+        ));
+        command.device.tenant_id = TenantId::new("demo").unwrap();
+        let expired = process_command_request(
+            make_request(
+                &command,
+                tokio::time::Instant::now(),
+                Arc::new(AtomicBool::new(false)),
+            ),
+            &principal,
+            |_| panic!("deadline must precede dispatch"),
+        );
+        assert!(matches!(
+            expired,
+            BusinessRpcFrame::Response {
+                error: Some(RpcError {
+                    code: RpcErrorCode::Timeout,
+                    ..
+                }),
+                ..
+            }
+        ));
+        let cancelled = Arc::new(AtomicBool::new(true));
+        let skipped = process_command_request(
+            make_request(&command, future, cancelled),
+            &principal,
+            |_| panic!("cancelled work must not dispatch"),
+        );
+        assert!(matches!(
+            skipped,
+            BusinessRpcFrame::Response {
+                error: Some(RpcError {
+                    code: RpcErrorCode::Timeout,
+                    ..
+                }),
+                ..
+            }
+        ));
+        let cancelled_after_admission = Arc::new(AtomicBool::new(false));
+        let flag = cancelled_after_admission.clone();
+        let accepted = process_command_request(
+            make_request(&command, future, cancelled_after_admission),
+            &principal,
+            move |command| {
+                flag.store(true, Ordering::Release);
+                Ok(netbaiot_core::CommandDispatch {
+                    command_id: command.command_id,
+                    state: DeliveryState::Queued,
+                })
+            },
+        );
+        assert!(matches!(
+            accepted,
+            BusinessRpcFrame::Response {
+                error: None,
+                body: Some(_),
+                ..
+            }
+        ));
+    }
+
+    #[tokio::test]
+    async fn command_response_pressure_preserves_control_queue_capacity() {
+        let (command_tx, _command_rx) = mpsc::channel(1);
+        let (control_tx, mut control_rx) = mpsc::channel(1);
+        let command_bytes = Arc::new(Semaphore::new(256));
+        let control_bytes = Arc::new(Semaphore::new(256));
+        let metrics = Arc::new(Metrics::default());
+        queue(
+            &command_tx,
+            &command_bytes,
+            &metrics,
+            BusinessRpcQueueClass::Command,
+            BusinessRpcFrame::Ping { nonce: 1 },
+            None,
+        )
+        .unwrap();
+        assert!(matches!(
+            queue(
+                &command_tx,
+                &command_bytes,
+                &metrics,
+                BusinessRpcQueueClass::Command,
+                BusinessRpcFrame::Ping { nonce: 2 },
+                None
+            ),
+            Err(Error::Overloaded)
+        ));
+        let id = Uuid::new_v4();
+        queue(
+            &control_tx,
+            &control_bytes,
+            &metrics,
+            BusinessRpcQueueClass::Control,
+            error(
+                id,
+                "auth.invalidate",
+                RpcErrorCode::Forbidden,
+                "revision denied",
+            ),
+            None,
+        )
+        .unwrap();
+        assert!(matches!(control_rx.recv().await.map(|item| item.frame),
+            Some(BusinessRpcFrame::Response { request_id, .. }) if request_id == id));
+    }
+
+    #[tokio::test]
+    async fn command_response_byte_limit_rejects_and_releases_permits() {
+        let (tx, mut rx) = mpsc::channel(2);
+        let budget = Arc::new(Semaphore::new(40));
+        let metrics = Arc::new(Metrics::default());
+        queue(
+            &tx,
+            &budget,
+            &metrics,
+            BusinessRpcQueueClass::Command,
+            BusinessRpcFrame::Ping { nonce: 1 },
+            None,
+        )
+        .unwrap();
+        assert!(matches!(
+            queue(
+                &tx,
+                &budget,
+                &metrics,
+                BusinessRpcQueueClass::Command,
+                BusinessRpcFrame::Ping { nonce: 2 },
+                None
+            ),
+            Err(Error::Overloaded)
+        ));
+        drop(rx.recv().await);
+        assert!(
+            queue(
+                &tx,
+                &budget,
+                &metrics,
+                BusinessRpcQueueClass::Command,
+                BusinessRpcFrame::Ping { nonce: 3 },
+                None
+            )
+            .is_ok()
+        );
+    }
 
     #[tokio::test]
     async fn control_queue_pressure_rejects_without_leaking_byte_permits() {
