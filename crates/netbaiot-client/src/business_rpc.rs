@@ -219,6 +219,7 @@ struct ClientInner {
     task: Mutex<Option<JoinHandle<()>>>,
     ready: watch::Receiver<bool>,
     connection_timing: Arc<Mutex<Option<BusinessRpcConnectionTiming>>>,
+    last_connection_error: Arc<Mutex<Option<BusinessRpcClientError>>>,
 }
 /// Client-observed timing for the most recent successful connection. TLS is
 /// measured inside the existing verified rustls path, before the V2 handshake.
@@ -232,6 +233,7 @@ pub struct BusinessRpcConnectionTiming {
 struct DriverSignals {
     ready: watch::Sender<bool>,
     timing: Arc<Mutex<Option<BusinessRpcConnectionTiming>>>,
+    last_connection_error: Arc<Mutex<Option<BusinessRpcClientError>>>,
 }
 impl Drop for ClientInner {
     fn drop(&mut self) {
@@ -248,6 +250,14 @@ pub struct BusinessRpcClient {
     inner: Arc<ClientInner>,
 }
 impl BusinessRpcClient {
+    /// Returns the most recent connection failure observed by the reconnect driver.
+    pub fn last_connection_error(&self) -> Option<BusinessRpcClientError> {
+        self.inner
+            .last_connection_error
+            .lock()
+            .ok()
+            .and_then(|error| error.clone())
+    }
     pub fn connection_timing(&self) -> Option<BusinessRpcConnectionTiming> {
         self.inner
             .connection_timing
@@ -321,6 +331,7 @@ impl BusinessRpcClient {
         let shutdown = CancellationToken::new();
         let revision = Arc::new(AtomicU64::new(config.auth_revision));
         let connection_timing = Arc::new(Mutex::new(None));
+        let last_connection_error = Arc::new(Mutex::new(None));
         let task = tokio::spawn(driver(
             config.clone(),
             handler,
@@ -330,6 +341,7 @@ impl BusinessRpcClient {
             DriverSignals {
                 ready: ready_tx,
                 timing: connection_timing.clone(),
+                last_connection_error: last_connection_error.clone(),
             },
             shutdown.clone(),
         ));
@@ -343,6 +355,7 @@ impl BusinessRpcClient {
                 task: Mutex::new(Some(task)),
                 ready: ready_rx,
                 connection_timing,
+                last_connection_error,
             }),
         };
         Ok((client, delivery_rx))
@@ -591,6 +604,9 @@ async fn driver(
             &stop,
         )
         .await;
+        if let Ok(mut last_error) = signals.last_connection_error.lock() {
+            *last_error = result.as_ref().err().cloned();
+        }
         let _ = signals.ready.send(false);
         if stop.is_cancelled() {
             break;
