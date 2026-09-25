@@ -10,12 +10,15 @@ on:
       - "apps/netbaiot-server/**"
       - "crates/netbaiot-transports/src/mqtt/**"
       - "crates/netbaiot-device-sdk/**"
+      - "crates/netbaiot-mqtt-wire/**"
       - "crates/netbaiot-runtime/**"
       - "tests/mqtt_conformance/**"
       - "tests/mqtt_protocol_regressions.py"
       - "tests/mosquitto_cli_interop.py"
       - "tests/run_mosquitto_cli_interop.py"
       - "tests/run_mosquitto_tls_interop.py"
+      - "tests/run_device_profile_mosquitto.py"
+      - "tests/measure_device_profile.py"
       - "scripts/ci_annotate.py"
       - "Cargo.toml"
       - "Cargo.lock"
@@ -59,3 +62,8 @@ jobs:
         run: |
           python3 tests/mqtt_conformance/v5_smoke.py
           python3 tests/mqtt_conformance/v5_mosquitto.py
+      - name: Run Device Profile SDK against Mosquitto
+        run: |
+          cargo build --locked -p netbaiot-device-sdk --example device_mqtt
+          python3 tests/run_device_profile_mosquitto.py
+          python3 tests/measure_device_profile.py

@@ -2,7 +2,7 @@
 
 管理接口支持兼容的 `NETBAIOT_ADMIN_SECRET` 引导令牌、API Key、RS256 JWT 与独立配置的管理 mTLS。旧令牌拥有全部 Scope 和 Global 资源权限，迁移后应设置 `"legacy_static_token_enabled": false`。每个请求只使用一种管理凭据，JWKS 故障返回 503。权限按 Scope 和 Tenant/Product/完整 DeviceKey 限定。参阅[管理认证与迁移](docs/management-auth.zh-CN.md)。
 
-CI 会检查依赖漏洞。[审计例外](.cargo/audit.toml)记录了可选设备 SDK 所用 `rumqttc` 锁定的 `rustls-webpki 0.102.x` 四条安全公告；网关服务运行时不依赖该版本。上游发布兼容修复后应移除这些例外。
+CI 会检查依赖漏洞。可选设备 SDK 已改用仓库内 MQTT wire codec 和 rustls；`rumqttc`、旧 `rustls-webpki 0.102.x` 链与相应审计例外均已移除。
 
 NetbaIoT 是一个无数据库、以内存为主的 IoT 协议网关和实时事件路由器。它通过内嵌 MQTT 3.1.1 / MQTT 5.0、通用分帧 TCP 和经过认证的 UDP 接收设备流量，将其规范化为 `DeviceEvent`，并发送到需确认或尽力而为的业务接收端。
 

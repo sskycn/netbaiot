@@ -1,0 +1,28 @@
+name: MQTT Device Profile decoder fuzz smoke
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - ".github/workflows/mqtt-device-fuzz.yml"
+      - "crates/netbaiot-mqtt-wire/**"
+      - "fuzz/**"
+      - "Cargo.lock"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/mqtt-device-fuzz.yml"
+      - "crates/netbaiot-mqtt-wire/**"
+      - "fuzz/**"
+      - "Cargo.lock"
+
+jobs:
+  decoder:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - run: cargo install cargo-fuzz --locked
+      - run: cargo +nightly fuzz run mqtt_device_profile -- -runs=10000 -max_len=131072
+        working-directory: fuzz

@@ -7,14 +7,17 @@ rust-version.workspace = true
 
 [dependencies]
 netbaiot-protocol.workspace = true
+netbaiot-mqtt-wire.workspace = true
+bytes.workspace = true
 futures-core.workspace = true
 url.workspace = true
-rumqttc.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 tokio-util.workspace = true
-tracing.workspace = true
+tokio-rustls.workspace = true
+rustls-pemfile.workspace = true
+webpki-roots.workspace = true
 
 [lints]
 workspace = true

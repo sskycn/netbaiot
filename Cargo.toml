@@ -15,6 +15,7 @@ netbaiot-protocol = { path = "crates/netbaiot-protocol" }
 netbaiot-core = { path = "crates/netbaiot-core" }
 netbaiot-client = { path = "crates/netbaiot-client" }
 netbaiot-device-sdk = { path = "crates/netbaiot-device-sdk" }
+netbaiot-mqtt-wire = { path = "crates/netbaiot-mqtt-wire" }
 netbaiot-runtime = { path = "crates/netbaiot-runtime" }
 netbaiot-codecs = { path = "crates/netbaiot-codecs" }
 netbaiot-transports = { path = "crates/netbaiot-transports" }
@@ -39,7 +40,7 @@ rustls-pemfile = "2"
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
 futures-core = "0.3"
 futures-util = "0.3"
-rumqttc = { version = "0.25.1", default-features = false, features = ["use-rustls"] }
+webpki-roots = "1"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

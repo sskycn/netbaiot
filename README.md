@@ -70,10 +70,9 @@ configurations must specify a confirmed webhook or framed TCP/RPC business sink.
 The business sink must deduplicate by stable `event_id` because retry and restart
 replay can duplicate delivery.
 
-Dependency audits run in CI. [The audit exceptions](.cargo/audit.toml) track four
-`rustls-webpki 0.102.x` advisories pinned by `rumqttc` in the optional device SDK;
-they are not part of the gateway server runtime. The exceptions need removal when
-an upstream compatible release is available.
+Dependency audits run in CI. The optional Device Profile SDK now uses the repository's
+MQTT wire crate and rustls; the former `rumqttc` dependency and its
+`rustls-webpki 0.102.x` audit exceptions have been removed.
 
 See the [complete user guide](docs/user-guide.md), [architecture](docs/architecture.md), [delivery semantics](docs/delivery-semantics.md),
 [HTTP API](docs/http-api.md), [MQTT profile](docs/mqtt.md), and the

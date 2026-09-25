@@ -621,10 +621,18 @@ dependencies = [
  "libfuzzer-sys",
  "netbaiot-codecs",
  "netbaiot-core",
+ "netbaiot-mqtt-wire",
  "netbaiot-runtime",
  "netbaiot-transports",
  "serde_json",
  "sha2",
+]
+
+[[package]]
+name = "netbaiot-mqtt-wire"
+version = "0.2.0"
+dependencies = [
+ "bytes",
 ]
 
 [[package]]
@@ -671,6 +679,7 @@ dependencies = [
  "hyper",
  "hyper-util",
  "netbaiot-core",
+ "netbaiot-mqtt-wire",
  "netbaiot-runtime",
  "serde",
  "serde_json",
