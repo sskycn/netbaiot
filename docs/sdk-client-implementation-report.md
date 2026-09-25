@@ -1,5 +1,9 @@
 # SDK and client implementation report
 
+> Historical dependency note: this report's `rumqttc` description records its
+> original baseline. The current device SDK uses the repository's
+> `netbaiot-mqtt-wire` and Device Profile driver; see [device SDK](device-sdk.md).
+
 > Historical audit: device-configuration ownership described here was removed later.
 > Current behavior and migration: [Remove device configuration](remove-device-config.md).
 

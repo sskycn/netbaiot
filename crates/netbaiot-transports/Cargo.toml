@@ -8,6 +8,7 @@ rust-version.workspace = true
 [dependencies]
 netbaiot-core.workspace = true
 netbaiot-runtime.workspace = true
+netbaiot-mqtt-wire.workspace = true
 async-trait.workspace = true
 bytes.workspace = true
 serde.workspace = true
