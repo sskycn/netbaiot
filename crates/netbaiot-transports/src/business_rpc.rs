@@ -1390,6 +1390,15 @@ mod tests {
     use netbaiot_runtime::DeliveryEnvelope;
 
     #[test]
+    fn command_runtime_capacity_and_offline_errors_keep_rpc_semantics() {
+        assert_eq!(command_error(Error::Overloaded), RpcErrorCode::Overloaded);
+        assert_eq!(command_error(Error::Unavailable), RpcErrorCode::Unavailable);
+        assert_eq!(command_error(Error::Draining), RpcErrorCode::Unavailable);
+        assert_eq!(command_error(Error::Conflict), RpcErrorCode::Conflict);
+        assert_eq!(command_error(Error::Codec), RpcErrorCode::InvalidRequest);
+    }
+
+    #[test]
     fn command_scope_deadline_and_cancel_precede_dispatch() {
         let principal = BusinessPrincipal {
             id: "commands".into(),
