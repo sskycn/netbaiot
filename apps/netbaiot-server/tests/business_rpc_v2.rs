@@ -80,6 +80,214 @@ async fn read_mqtt_packet(socket: &mut TcpStream) -> (u8, Vec<u8>) {
 }
 
 #[tokio::test]
+async fn command_pressure_preserves_auth_invalidation_and_event_ack() {
+    use netbaiot_client::business_rpc::{BusinessRpcClientError, BusinessRpcTls};
+    use netbaiot_server::{BusinessRpcIdentityConfig, ManagementTlsFiles};
+    use sha2::{Digest, Sha256};
+
+    let root = std::env::temp_dir().join(format!("netbaiot-rpc-pressure-{}", uuid::Uuid::new_v4()));
+    let mut config: Config =
+        serde_json::from_str(include_str!("../../../configs/development.json")).unwrap();
+    let mut reservations = Vec::new();
+    for _ in 0..3 {
+        reservations.push(TcpListener::bind("127.0.0.1:0").await.unwrap());
+    }
+    let addresses = reservations
+        .iter()
+        .map(|listener| listener.local_addr().unwrap())
+        .collect::<Vec<_>>();
+    config.device_ingress = addresses[0];
+    config.management_http = addresses[1];
+    config.business_tcp = Some(addresses[2]);
+    config.device_auth = Some(DeviceAuthSource::BusinessRpc);
+    config.event_delivery = Some(EventDeliverySource::BusinessRpc);
+    config.limits.max_pending_commands_per_device = 8;
+    config.limits.max_pending_commands_per_tenant = 8;
+    config.limits.max_pending_commands = 8;
+    config.spool_directory = root.join("spool");
+    let fixtures = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures");
+    let fingerprint = |file: &str| {
+        let pem = std::fs::read(fixtures.join(file)).unwrap();
+        let cert = rustls_pemfile::certs(&mut pem.as_slice())
+            .next()
+            .unwrap()
+            .unwrap();
+        Sha256::digest(cert.as_ref())
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect::<String>()
+    };
+    config.business_rpc = Some(BusinessRpcConfig {
+        version: 2,
+        tls: Some(ManagementTlsFiles {
+            certificate: fixtures.join("localhost-cert.pem").to_string_lossy().into(),
+            private_key: fixtures.join("localhost-key.pem").to_string_lossy().into(),
+            client_ca: Some(
+                fixtures
+                    .join("business-rpc-test-client-cas.pem")
+                    .to_string_lossy()
+                    .into(),
+            ),
+            require_client_certificate: true,
+        }),
+        identities: vec![
+            BusinessRpcIdentityConfig {
+                certificate_sha256: fingerprint("management-client.pem"),
+                principal_id: "provider".into(),
+                role: BusinessRole::AuthControl,
+                provider_id: Some("primary".into()),
+                sink_id: None,
+                provide_methods: vec![
+                    "device.authenticate".into(),
+                    "device.resolve_verifier".into(),
+                ],
+                call_methods: vec!["auth.sync".into(), "auth.invalidate".into()],
+                global: true,
+                tenants: Vec::new(),
+                expires_at_ms: None,
+            },
+            BusinessRpcIdentityConfig {
+                certificate_sha256: fingerprint("business-command-client.pem"),
+                principal_id: "application".into(),
+                role: BusinessRole::Application,
+                provider_id: None,
+                sink_id: Some("tcp-rpc".into()),
+                provide_methods: Vec::new(),
+                call_methods: vec!["device.command.send".into()],
+                global: true,
+                tenants: Vec::new(),
+                expires_at_ms: None,
+            },
+        ],
+        development_token_env: None,
+        development_role: None,
+        allow_v1: false,
+        max_connections: 8,
+        auth_max_inflight: 16,
+        max_auth_control_offline_ms: 30_000,
+    });
+    drop(reservations);
+    let path = write_config(&root, &config);
+    let mut server = Command::new(env!("CARGO_BIN_EXE_netbaiot-server"))
+        .arg(&path)
+        .env("NETBAIOT_ADMIN_SECRET", "a".repeat(64))
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .kill_on_drop(true)
+        .spawn()
+        .unwrap();
+    let tls = |cert: &str, key: &str| BusinessRpcTls {
+        server_name: "localhost".into(),
+        ca_pem: fixtures.join("localhost-cert.pem"),
+        certificate_pem: fixtures.join(cert),
+        private_key_pem: fixtures.join(key),
+    };
+    let handler = Arc::new(Handler {
+        calls: AtomicUsize::new(0),
+        verifier_calls: AtomicUsize::new(0),
+        revision: AtomicU64::new(1),
+        allowed: AtomicBool::new(true),
+    });
+    let mut auth_config = BusinessRpcClientConfig::development(
+        addresses[2],
+        "unused".into(),
+        BusinessRole::AuthControl,
+    );
+    auth_config.token = None;
+    auth_config.tls = Some(tls("management-client.pem", "management-client-key.pem"));
+    let (auth, _) = BusinessRpcClient::connect(auth_config, Some(handler.clone())).unwrap();
+    tokio::time::timeout(Duration::from_secs(10), auth.wait_ready())
+        .await
+        .unwrap()
+        .unwrap();
+    let mut app_config = BusinessRpcClientConfig::development(
+        addresses[2],
+        "unused".into(),
+        BusinessRole::Application,
+    );
+    app_config.token = None;
+    app_config.tls = Some(tls(
+        "business-command-client.pem",
+        "business-command-client-key.pem",
+    ));
+    app_config.heartbeat = Duration::from_millis(100);
+    let (application, mut events) = BusinessRpcClient::connect(app_config, None).unwrap();
+    tokio::time::timeout(Duration::from_secs(10), application.wait_ready())
+        .await
+        .unwrap()
+        .unwrap();
+    let device = device(addresses[0], "pressure").await;
+    let mut command_stream = device.commands().unwrap();
+    device
+        .wait_until_connected(Duration::from_secs(5))
+        .await
+        .unwrap();
+    let command_drain = tokio::spawn(async move { while command_stream.recv().await.is_some() {} });
+    let stop = Arc::new(AtomicBool::new(false));
+    let rejects = Arc::new(AtomicUsize::new(0));
+    let mut floods = tokio::task::JoinSet::new();
+    for _ in 0..8 {
+        let client = application.clone();
+        let stop = stop.clone();
+        let rejects = rejects.clone();
+        floods.spawn(async move {
+            while !stop.load(Ordering::Acquire) {
+                let mut command = demo_command("pressure");
+                command.device.device_id = DeviceId::new("pressure").unwrap();
+                if matches!(
+                    client.send_command(&command).await,
+                    Err(BusinessRpcClientError::Overloaded
+                        | BusinessRpcClientError::Remote(RpcErrorCode::Overloaded))
+                ) {
+                    rejects.fetch_add(1, Ordering::Relaxed);
+                }
+            }
+        });
+    }
+    tokio::time::timeout(Duration::from_secs(3), async {
+        while rejects.load(Ordering::Relaxed) == 0 {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .unwrap();
+    publish(&device, 301).await;
+    let delivery = tokio::time::timeout(Duration::from_secs(5), events.recv())
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(matches!(
+        delivery.delivery.event.kind,
+        DeviceEventKind::Heartbeat(_)
+    ));
+    delivery.ack().await.unwrap();
+    handler.revision.store(2, Ordering::SeqCst);
+    tokio::time::timeout(
+        Duration::from_secs(5),
+        auth.invalidate(
+            2,
+            AuthInvalidation::Device {
+                device: identity("pressure").device_key,
+            },
+        ),
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    stop.store(true, Ordering::Release);
+    floods.abort_all();
+    while floods.join_next().await.is_some() {}
+    assert!(rejects.load(Ordering::Relaxed) > 0);
+    application.shutdown().await;
+    auth.shutdown().await;
+    device.shutdown();
+    command_drain.abort();
+    server.start_kill().unwrap();
+    let _ = server.wait().await;
+    let _ = std::fs::remove_dir_all(root);
+}
+
+#[tokio::test]
 async fn commands_role_dispatches_to_real_tcp_and_shares_http_dedup() {
     use netbaiot_client::business_rpc::{BusinessRpcClientError, BusinessRpcTls};
     use netbaiot_server::{BusinessRpcIdentityConfig, ManagementTlsFiles};
