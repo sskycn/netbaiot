@@ -136,7 +136,7 @@ fn parse_hex_32(text: &str) -> Result<[u8; 32]> {
         return Err(Error::Configuration);
     }
     let mut bytes = [0u8; 32];
-    for (index, pair) in text.as_bytes().chunks_exact(2).enumerate() {
+    for (index, pair) in text.as_bytes().as_chunks::<2>().0.iter().enumerate() {
         let high = (pair[0] as char).to_digit(16).ok_or(Error::Configuration)? as u8;
         let low = (pair[1] as char).to_digit(16).ok_or(Error::Configuration)? as u8;
         bytes[index] = (high << 4) | low;
