@@ -65,10 +65,15 @@ The Python terminal prints the normalized event and acknowledges it with HTTP
 204. Continue with the Chinese [10-minute end-to-end tutorial](docs/getting-started.md)
 for MQTT publish and subscribe, a live command, CLI usage, and graceful shutdown.
 
-Set a 64-character `NETBAIOT_ADMIN_SECRET` to enable legacy bootstrap management calls. API Keys, RS256 JWT, and management mTLS are also supported; see [management authentication](docs/management-auth.md). Production
+Set a 64-character `NETBAIOT_ADMIN_SECRET` to enable legacy bootstrap management calls. This token has full scope and Global resource access; disable it with `"legacy_static_token_enabled": false` after moving to scoped API Keys, RS256 JWT, or management mTLS. A request uses one management credential, and JWKS outages return 503. See [management authentication](docs/management-auth.md). Production
 configurations must specify a confirmed webhook or framed TCP/RPC business sink.
 The business sink must deduplicate by stable `event_id` because retry and restart
 replay can duplicate delivery.
+
+Dependency audits run in CI. [The audit exceptions](.cargo/audit.toml) track four
+`rustls-webpki 0.102.x` advisories pinned by `rumqttc` in the optional device SDK;
+they are not part of the gateway server runtime. The exceptions need removal when
+an upstream compatible release is available.
 
 See the [complete user guide](docs/user-guide.md), [architecture](docs/architecture.md), [delivery semantics](docs/delivery-semantics.md),
 [HTTP API](docs/http-api.md), [MQTT profile](docs/mqtt.md), and the

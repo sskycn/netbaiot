@@ -22,4 +22,4 @@
 
 连接查询有界。命令请求体必须包含权威的完整 `DeviceKey`；设备不可用时返回 503，且不会将命令放入离线队列。连接响应会返回活动传输类型、`connected_at`、`last_seen` 和会话 generation，但不会暴露 socket 状态。仅当当前 MQTT/TCP 会话仍处于连接状态时才会提供 `connected_at`。
 
-错误使用稳定的 `ApiError` JSON 结构，字段包括 `code`、安全的 `message`、可选 `request_id` 和可选 `required_scope`。例如，离线命令使用 `device_offline`。缺少 Scope 返回 403 并填写 `required_scope`；资源越权返回通用 403，不透露设备是否存在。设备和管理接口的授权相互独立。
+错误使用稳定的 `ApiError` JSON 结构，字段包括 `code`、安全的 `message`、可选 `request_id` 和可选 `required_scope`。例如，离线命令使用 `device_offline`。缺少 Scope 返回 403 并填写 `required_scope`；资源越权返回通用 403，不透露设备是否存在。无效管理凭据返回 401；JWKS 验证服务暂时不可用时返回 503。设备和管理接口的授权相互独立。

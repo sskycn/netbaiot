@@ -112,6 +112,14 @@ impl Config {
         {
             return Err(Error::Configuration);
         }
+        if self
+            .management_tls
+            .as_ref()
+            .is_some_and(|tls| tls.require_client_certificate)
+            && self.management_auth.mtls_identities.is_empty()
+        {
+            return Err(Error::Configuration);
+        }
         if !self.management_auth.mtls_identities.is_empty()
             && !self
                 .management_tls
@@ -1041,8 +1049,23 @@ pub async fn run_with_credentials(
         limits.clone(),
     )?
     .with_metrics(metrics.clone());
-    if !config.management_http.ip().is_loopback() && !management_auth.has_provider() {
+    if !config.management_http.ip().is_loopback()
+        && !(if config
+            .management_tls
+            .as_ref()
+            .is_some_and(|tls| tls.require_client_certificate)
+        {
+            management_auth.has_mtls_provider()
+        } else {
+            management_auth.has_provider()
+        })
+    {
         return Err(Error::Configuration);
+    }
+    if management_auth.has_legacy_provider() && management_auth.has_usable_scoped_provider() {
+        tracing::warn!(
+            "legacy bootstrap management token remains enabled together with scoped management authentication providers"
+        );
     }
     Arc::get_mut(&mut base_services)
         .ok_or(Error::Internal)?

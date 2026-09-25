@@ -11,7 +11,7 @@
 | JWT Access Token | `Authorization: Bearer <三段 JWT>` | `management_auth.jwt` 与 HTTPS JWKS URL |
 | 管理 mTLS | 经 CA 验证的客户端证书，不带 Authorization | `management_tls` 与证书 SHA-256 显式映射 |
 
-每个请求只能提供一种凭据；认证失败不回退到其他 Provider。旧令牌映射成 `bootstrap-admin`、`admin.*`、Global。迁移后可设置 `management_auth.legacy_static_token_enabled=false`。没有任何 Provider 时管理接口关闭。
+每个请求只能提供一种凭据；客户端证书与 Authorization 头同时出现时拒绝请求，认证失败也不回退到其他 Provider。旧引导令牌映射成 `bootstrap-admin`、`admin.*`、Global，可执行所有管理操作。若它与可用的受限 Provider 同时启用，服务会输出警告。迁移完成后在 `management_auth` 下设置 `"legacy_static_token_enabled": false`。非本机管理监听器必须有可用的 Provider；禁用或过期的 API Key 不算可用。
 
 API Key 配置示例。密钥由环境变量提供，不能明文放进 JSON：
 
@@ -33,7 +33,7 @@ API Key 配置示例。密钥由环境变量提供，不能明文放进 JSON：
 }
 ```
 
-环境变量必须在启动时存在，值为高熵 64 位十六进制字符串。`expires_at` 使用 Unix 毫秒。`global: true` 必须显式配置；空资源列表不授权任何资源。Key ID、subject、Scope 和资源数量/字节在启动时验证。
+环境变量必须在启动时存在，值为高熵 64 位十六进制字符串。`expires_at` 使用 Unix 毫秒；禁用或过期的 API Key 认证失败，也不能满足公网监听器的 Provider 检查。`global: true` 必须显式配置；空资源列表不授权任何资源。Key ID、subject、Scope 和资源数量/字节在启动时验证。保留的 `auth_generation` 字段仅为元数据，修改它不会在运行时吊销管理 API Key；吊销时应禁用或移除密钥并重启。
 
 JWT 配置示例：
 
@@ -55,7 +55,7 @@ JWT 配置示例：
 }
 ```
 
-本阶段只支持 RS256。签名、配置的 `iss`/`aud`、`exp`、`nbf` 都必须有效；拒绝 JWT 自带的 JWK/密钥 URL。JWKS 只从配置的 HTTPS URL 获取，连接超时 2 秒、总超时 5 秒，不跟随重定向，并限制响应字节数、key 数量、TTL 和最短刷新间隔。刷新只有一个执行者，不排无限等待队列。缓存未过期的 key 可在短暂网络故障时使用；过期后关闭。随机未知 `kid` 不能持续触发远程请求。Scope claim 支持空格分隔字符串或数组；角色映射由配置决定，只有配置在 `global_roles` 中的角色授予 Global，其他主体按 Tenant claim 限权。
+本阶段只支持 RS256。签名、配置的 `iss`/`aud`、`exp`、`nbf` 都必须有效；拒绝 JWT 自带的 JWK/密钥 URL。JWKS 只从配置的 HTTPS URL 获取，连接超时 2 秒、总超时 5 秒，不跟随重定向，并限制响应字节数、key 数量、TTL 和最短刷新间隔。刷新只有一个执行者，不排无限等待队列。缓存未过期的 key 可在短暂网络故障时使用；过期后关闭。无效 JWT 凭据返回 401；JWKS 故障、超时、不可用的 keyset，或无可验证 key 时的刷新竞争返回 503，且不会放行 token。有效且已刷新 keyset 中的未知 `kid` 返回 401，随机 `kid` 不能持续触发远程请求。Scope claim 支持空格分隔字符串或数组；角色映射由配置决定，只有配置在 `global_roles` 中的角色授予 Global，其他主体按 Tenant claim 限权。
 
 管理 mTLS 使用独立 TLS 配置：
 
@@ -78,11 +78,13 @@ JWT 配置示例：
 }
 ```
 
-TLS 握手先验证客户端 CA、证书有效期和证书链，再匹配叶证书 DER 的 SHA-256 指纹。未映射证书拒绝。Subject CN 不是权威身份。旧 `tls` 配置仍适用于设备监听器；未配置 `management_tls` 时，管理监听器单独加载同一服务端证书以保持旧配置兼容。配置 `management_tls` 的客户端证书要求不影响 MQTT/TCP 设备。若请求同时带客户端证书和 Authorization 则拒绝。本阶段尚不支持 URI/DNS SAN 映射。
+TLS 握手先验证客户端 CA、证书有效期和证书链，再匹配叶证书 DER 的 SHA-256 指纹。未映射证书拒绝。Subject CN 不是权威身份。旧 `tls` 配置仍适用于设备监听器；未配置 `management_tls` 时，管理监听器单独加载同一服务端证书以保持旧配置兼容。`require_client_certificate: true` 要求至少有一条 `mtls_identities` 映射，并使管理监听器只接受 mTLS：每条连接都要提供证书，且不能叠加 Authorization 凭据。此设置不影响 MQTT/TCP 设备。本阶段尚不支持 URI/DNS SAN 映射。
 
 ## 授权
 
 Scope：`runtime.read`、`metrics.read`、`connection.read`、`device.command`、`auth.invalidate`、`auth.invalidate.all`、`control.read`、`control.write`、`routes.read`、`routes.write`、`runtime.drain`、`admin.*`（所有 Scope）。资源范围为 Global，或 Tenant、`(tenant_id, product_id)`、完整 `DeviceKey` 的有界并集。`admin.*` 不绕过资源范围。
+
+`control.read` 与 `routes.read` 是保留名称，目前没有对应的读取 API，授予它们不会产生实际权限。
 
 | 接口 | Scope | 资源 |
 |---|---|---|
@@ -114,3 +116,5 @@ HMAC 请求签名、OAuth2 Token Introspection、管理审计持久化、URI/DNS
 ## 资源上限
 
 `limits` 中新增的默认值：`management_auth_max_subject_bytes=128`、`management_auth_max_scopes=32`、`management_auth_max_scope_bytes=512`、`management_auth_max_resource_entries=128`、`management_auth_max_resource_bytes=8192`、`management_api_key_max_entries=128`、`management_api_key_max_bytes=32768`、`management_jwks_max_keys=32`、`management_jwks_max_bytes=65536`、`management_jwks_ttl_ms=300000`、`management_jwks_refresh_min_interval_ms=30000`、`management_jwt_max_bytes=16384`。HTTP 请求仍受现有头、体和并发上限约束。
+
+连接接入与管理 HTTP 请求分别使用有界的限流窗口，沿用 `requests_per_second` 和 `requests_per_ip_second` 配置。每个已接入 HTTP 请求只消耗一次请求额度。

@@ -32,3 +32,5 @@ netbaiot-client.workspace = true
 netbaiot-device-sdk.workspace = true
 netbaiot-protocol.workspace = true
 futures-util.workspace = true
+jsonwebtoken = "9.3.1"
+reqwest = { workspace = true, features = ["rustls-tls-native-roots"] }

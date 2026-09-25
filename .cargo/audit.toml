@@ -1,0 +1,10 @@
+[advisories]
+# rumqttc 0.25.1 (used only by the optional device SDK) pins rustls-webpki
+# 0.102.x. Its upstream issue is https://github.com/bytebeamio/rumqtt/issues/1067.
+# Remove these exceptions as soon as rumqttc publishes a compatible fix.
+ignore = [
+    "RUSTSEC-2026-0049",
+    "RUSTSEC-2026-0098",
+    "RUSTSEC-2026-0099",
+    "RUSTSEC-2026-0104",
+]

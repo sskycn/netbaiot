@@ -6,7 +6,7 @@ use serde::de::{MapAccess, Visitor};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -360,6 +360,7 @@ struct JwksState {
     keys: HashMap<String, DecodingKey>,
     expires: Option<Instant>,
     last_refresh: Option<Instant>,
+    last_refresh_failed: bool,
 }
 struct JwtProvider {
     config: JwtConfig,
@@ -535,10 +536,23 @@ impl ManagementAuthService {
         })
     }
     pub fn has_provider(&self) -> bool {
-        self.legacy.is_some()
-            || !self.api_keys.is_empty()
-            || self.jwt.is_some()
+        self.legacy.is_some() || self.has_usable_scoped_provider()
+    }
+    pub fn has_usable_scoped_provider(&self) -> bool {
+        self.api_keys.values().any(|key| {
+            key.enabled
+                && key
+                    .principal
+                    .expires_at
+                    .is_none_or(|expiry| expiry > crate::now_ms())
+        }) || self.jwt.is_some()
             || !self.mtls.is_empty()
+    }
+    pub fn has_mtls_provider(&self) -> bool {
+        !self.mtls.is_empty()
+    }
+    pub fn has_legacy_provider(&self) -> bool {
+        self.legacy.is_some()
     }
     pub async fn authenticate(
         &self,
@@ -601,7 +615,11 @@ fn decode_hex_32(value: &str) -> Option<[u8; 32]> {
         return None;
     }
     let mut out = [0u8; 32];
-    for (i, chunk) in value.as_bytes().chunks_exact(2).enumerate() {
+    let (chunks, remainder) = value.as_bytes().as_chunks::<2>();
+    if !remainder.is_empty() {
+        return None;
+    }
+    for (i, chunk) in chunks.iter().enumerate() {
         out[i] = (chunk[0] as char)
             .to_digit(16)?
             .checked_mul(16)?
@@ -681,6 +699,7 @@ impl JwtProvider {
                 keys: HashMap::new(),
                 expires: None,
                 last_refresh: None,
+                last_refresh_failed: false,
             }),
             refresh: Mutex::new(()),
             limits,
@@ -730,14 +749,22 @@ impl JwtProvider {
                 last.elapsed()
                     < Duration::from_millis(self.limits.management_jwks_refresh_min_interval_ms)
             }) {
-                return Err(Error::Authentication);
+                return Err(
+                    if state.expires.is_some_and(|expiry| Instant::now() < expiry)
+                        && !state.last_refresh_failed
+                    {
+                        Error::Authentication
+                    } else {
+                        Error::Unavailable
+                    },
+                );
             }
         }
         if let Some(metrics) = &self.metrics {
             metrics.management_jwks_cache(false);
         }
         // No unbounded waiter queue. Concurrent misses fail closed while one refresh proceeds.
-        let _refresh = self.refresh.try_lock().map_err(|_| Error::Authentication)?;
+        let _refresh = self.refresh.try_lock().map_err(|_| Error::Unavailable)?;
         {
             let state = self.cache.lock().await;
             if state.expires.is_some_and(|expiry| Instant::now() < expiry)
@@ -749,11 +776,33 @@ impl JwtProvider {
                 last.elapsed()
                     < Duration::from_millis(self.limits.management_jwks_refresh_min_interval_ms)
             }) {
-                return Err(Error::Authentication);
+                return Err(
+                    if state.expires.is_some_and(|expiry| Instant::now() < expiry)
+                        && !state.last_refresh_failed
+                    {
+                        Error::Authentication
+                    } else {
+                        Error::Unavailable
+                    },
+                );
             }
         }
         // Charge the attempt before network I/O so an outage cannot cause rapid retries.
-        self.cache.lock().await.last_refresh = Some(Instant::now());
+        {
+            let mut state = self.cache.lock().await;
+            state.last_refresh = Some(Instant::now());
+            state.last_refresh_failed = true;
+        }
+        let keys = self.fetch_jwks().await?;
+        let mut state = self.cache.lock().await;
+        state.keys = keys;
+        state.expires =
+            Some(Instant::now() + Duration::from_millis(self.limits.management_jwks_ttl_ms));
+        state.last_refresh_failed = false;
+        state.keys.get(kid).cloned().ok_or(Error::Authentication)
+    }
+
+    async fn fetch_jwks(&self) -> Result<HashMap<String, DecodingKey>> {
         let response = self
             .client
             .get(&self.config.jwks_url)
@@ -775,12 +824,7 @@ impl JwtProvider {
             }
             bytes.extend_from_slice(&chunk);
         }
-        let keys = parse_jwks(&bytes, &self.limits)?;
-        let mut state = self.cache.lock().await;
-        state.keys = keys;
-        state.expires =
-            Some(Instant::now() + Duration::from_millis(self.limits.management_jwks_ttl_ms));
-        state.keys.get(kid).cloned().ok_or(Error::Authentication)
+        parse_jwks(&bytes, &self.limits)
     }
 
     fn map_claims(&self, claims: &serde_json::Value) -> Result<AdminPrincipal> {
@@ -889,14 +933,17 @@ fn parse_jwks(bytes: &[u8], limits: &Limits) -> Result<HashMap<String, DecodingK
         return Err(Error::Unavailable);
     }
     let mut keys = HashMap::new();
+    let mut seen_ids = HashSet::new();
     for jwk in set.keys {
+        if let Some(id) = jwk.common.key_id.as_deref()
+            && !seen_ids.insert(id.to_owned())
+        {
+            return Err(Error::Unavailable);
+        }
         if !matches!(
             jwk.algorithm,
             jsonwebtoken::jwk::AlgorithmParameters::RSA(_)
         ) {
-            continue;
-        }
-        if jwk.common.public_key_use.is_some() && jwk.common.key_operations.is_some() {
             continue;
         }
         if jwk
@@ -934,6 +981,9 @@ fn parse_jwks(bytes: &[u8], limits: &Limits) -> Result<HashMap<String, DecodingK
         if keys.insert(id.to_owned(), decoded).is_some() {
             return Err(Error::Unavailable);
         }
+    }
+    if keys.is_empty() {
+        return Err(Error::Unavailable);
     }
     Ok(keys)
 }
@@ -1003,6 +1053,17 @@ mod tests {
                 .is_err()
         );
         assert!(principal.require_global().is_err());
+        let all_scopes = AdminPrincipal {
+            scopes: ScopeSet(vec![AdminScope::AdminAll]),
+            ..principal
+        };
+        assert!(all_scopes.require_scope(AdminScope::RoutesWrite).is_ok());
+        assert!(
+            all_scopes
+                .require_device(&device("other", "p", "d"))
+                .is_err()
+        );
+        assert!(all_scopes.require_global().is_err());
         assert!(
             AdminPrincipal::bootstrap()
                 .require_scope(AdminScope::RuntimeDrain)
@@ -1016,6 +1077,7 @@ mod tests {
         let service =
             ManagementAuthService::new(ManagementAuthConfig::default(), Some(admin), limits())
                 .unwrap();
+        assert!(service.has_provider());
         let principal = service
             .authenticate(Some(&format!("Bearer {secret}")), None)
             .await
@@ -1037,6 +1099,22 @@ mod tests {
                 .await
                 .is_err()
         );
+        let disabled = ManagementAuthService::new(
+            ManagementAuthConfig {
+                legacy_static_token_enabled: Some(false),
+                ..Default::default()
+            },
+            service.legacy.clone(),
+            limits(),
+        )
+        .unwrap();
+        assert!(!disabled.has_provider());
+        assert!(matches!(
+            disabled
+                .authenticate(Some(&format!("Bearer {secret}")), None)
+                .await,
+            Err(Error::Authentication)
+        ));
     }
 
     fn api_config() -> ManagementAuthConfig {
@@ -1067,6 +1145,7 @@ mod tests {
             })
             .unwrap();
         let header = format!("ApiKey backend.{secret}");
+        assert!(service.has_provider());
         let principal = service.authenticate(Some(&header), None).await.unwrap();
         assert_eq!(principal.auth_method, AdminAuthMethod::ApiKey);
         assert!(principal.require_device(&device("a", "p", "d")).is_ok());
@@ -1093,6 +1172,7 @@ mod tests {
             Some(secret.clone())
         })
         .unwrap();
+        assert!(!service.has_provider());
         assert!(service.authenticate(Some(&header), None).await.is_err());
         let mut expired = api_config();
         expired.api_keys[0].expires_at = Some(1);
@@ -1100,6 +1180,7 @@ mod tests {
             Some(secret.clone())
         })
         .unwrap();
+        assert!(!service.has_provider());
         assert!(service.authenticate(Some(&header), None).await.is_err());
     }
 
@@ -1121,6 +1202,7 @@ mod tests {
             ..Default::default()
         };
         let service = ManagementAuthService::new(config, None, limits()).unwrap();
+        assert!(service.has_mtls_provider());
         assert_eq!(
             service
                 .authenticate(None, Some(certificate))
@@ -1141,7 +1223,10 @@ mod tests {
     #[test]
     fn jwks_parser_has_byte_and_key_count_ceilings() {
         let mut limits = Limits::default();
-        assert!(parse_jwks(br#"{"keys":[]}"#, &limits).unwrap().is_empty());
+        assert!(matches!(
+            parse_jwks(br#"{"keys":[]}"#, &limits),
+            Err(Error::Unavailable)
+        ));
         limits.management_jwks_max_bytes = 4;
         assert!(parse_jwks(br#"{"keys":[]}"#, &limits).is_err());
         limits.management_jwks_max_bytes = 65_536;
@@ -1160,6 +1245,39 @@ mod tests {
         let service =
             ManagementAuthService::new(ManagementAuthConfig::default(), None, limits()).unwrap();
         assert!(!service.has_provider());
+        let service = ManagementAuthService::new(
+            ManagementAuthConfig {
+                jwt: Some(jwt_config()),
+                ..Default::default()
+            },
+            None,
+            limits(),
+        )
+        .unwrap();
+        assert!(service.has_provider());
+    }
+
+    #[test]
+    fn jwk_use_and_key_ops_can_both_allow_verification() {
+        let mut jwks: serde_json::Value = serde_json::from_slice(include_bytes!(
+            "../../../tests/fixtures/localhost-jwks.json"
+        ))
+        .unwrap();
+        jwks["keys"][0]["key_ops"] = serde_json::json!(["verify"]);
+        let bytes = serde_json::to_vec(&jwks).unwrap();
+        assert!(parse_jwks(&bytes, &limits()).unwrap().contains_key("test"));
+        jwks["keys"][0]["key_ops"] = serde_json::json!(["sign"]);
+        assert!(parse_jwks(&serde_json::to_vec(&jwks).unwrap(), &limits()).is_err());
+        jwks["keys"][0]["key_ops"] = serde_json::json!(["verify"]);
+        jwks["keys"][0]["alg"] = serde_json::json!("RS512");
+        assert!(parse_jwks(&serde_json::to_vec(&jwks).unwrap(), &limits()).is_err());
+        jwks["keys"][0]["alg"] = serde_json::json!("RS256");
+        let duplicate = jwks["keys"][0].clone();
+        jwks["keys"].as_array_mut().unwrap().push(duplicate);
+        assert!(matches!(
+            parse_jwks(&serde_json::to_vec(&jwks).unwrap(), &limits()),
+            Err(Error::Unavailable)
+        ));
     }
 
     fn jwt_config() -> JwtConfig {
@@ -1279,14 +1397,23 @@ mod tests {
             cache.expires = Some(Instant::now() - Duration::from_millis(1));
             cache.last_refresh = Some(Instant::now() - Duration::from_secs(31));
         }
-        assert!(provider.authenticate(&token).await.is_err());
+        assert!(matches!(
+            provider.authenticate(&token).await,
+            Err(Error::Unavailable)
+        ));
         assert_eq!(requests.load(Ordering::SeqCst), 2);
         *body.lock().await = None;
         provider.cache.lock().await.last_refresh = Some(Instant::now() - Duration::from_secs(31));
-        assert!(provider.authenticate(&token).await.is_err());
+        assert!(matches!(
+            provider.authenticate(&token).await,
+            Err(Error::Unavailable)
+        ));
         assert_eq!(requests.load(Ordering::SeqCst), 3);
         for index in 0..100 {
-            assert!(provider.key(&format!("unknown-{index}")).await.is_err());
+            assert!(matches!(
+                provider.key(&format!("unknown-{index}")).await,
+                Err(Error::Unavailable)
+            ));
         }
         assert_eq!(requests.load(Ordering::SeqCst), 3);
         server.abort();
@@ -1331,6 +1458,10 @@ mod tests {
         })
         .await
         .unwrap();
+        assert!(matches!(
+            provider.authenticate(&token).await,
+            Err(Error::Unavailable)
+        ));
         leader.abort();
         let _ = leader.await;
         assert!(provider.refresh.try_lock().is_ok());
@@ -1404,22 +1535,22 @@ mod tests {
         ] {
             let mut claims = base.clone();
             claims[field] = value;
-            assert!(
+            assert!(matches!(
                 provider
                     .authenticate(&encode(&header, &claims, &private).unwrap())
-                    .await
-                    .is_err()
-            );
+                    .await,
+                Err(Error::Authentication)
+            ));
         }
         let mut unknown = header.clone();
         unknown.kid = Some("unknown".into());
         provider.cache.lock().await.last_refresh = Some(Instant::now());
-        assert!(
+        assert!(matches!(
             provider
                 .authenticate(&encode(&unknown, &base, &private).unwrap())
-                .await
-                .is_err()
-        );
+                .await,
+            Err(Error::Authentication)
+        ));
         for index in 0..1_000 {
             assert!(provider.key(&format!("random-{index}")).await.is_err());
         }
@@ -1439,14 +1570,17 @@ mod tests {
                 .is_err()
         );
         let mut tampered = token.into_bytes();
-        if let Some(last) = tampered.last_mut() {
-            *last = if *last == b'A' { b'B' } else { b'A' };
-        }
-        assert!(
+        let signature_start = tampered.iter().rposition(|byte| *byte == b'.').unwrap() + 1;
+        tampered[signature_start] = if tampered[signature_start] == b'A' {
+            b'B'
+        } else {
+            b'A'
+        };
+        assert!(matches!(
             provider
                 .authenticate(&String::from_utf8(tampered).unwrap())
-                .await
-                .is_err()
-        );
+                .await,
+            Err(Error::Authentication)
+        ));
     }
 }

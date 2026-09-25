@@ -154,7 +154,8 @@ async fn handle(
         .try_acquire_owned()
         .map_err(|_| Error::Overloaded)?;
     services.ingress.metrics.inc(Metric::ManagementHttpRequests);
-    services.rates.take(peer.ip())?;
+    // Connection admission and HTTP request quota use separate bounded windows.
+    services.management_request_rates.take(peer.ip())?;
     let limits = &services.ingress.limits;
     let header_bytes = req
         .headers()
