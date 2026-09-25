@@ -18,3 +18,10 @@ openssl req -x509 -newkey rsa:2048 -nodes \
   -addext 'subjectAltName=DNS:localhost,IP:127.0.0.1' \
   -addext 'basicConstraints=critical,CA:FALSE'
 ```
+
+The Business RPC pressure test also uses the test-only
+`business-command-client.pem` and `business-command-client-key.pem`. The
+`business-rpc-test-client-cas.pem` bundle trusts that client and the existing
+management client so the test can exercise independent `application` and
+`auth_control` mTLS principals at once. These private keys are public test
+fixtures and must never be used in a deployment.
