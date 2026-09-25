@@ -3,7 +3,9 @@
 use async_trait::async_trait;
 use hmac::{Hmac, Mac};
 use netbaiot_client::business_rpc::{
-    BusinessAuthHandler, BusinessRpcClient, BusinessRpcClientConfig, BusinessRpcTls,
+    BusinessAuthHandler, BusinessDelivery, BusinessRpcClient, BusinessRpcClientConfig,
+    BusinessRpcClientError, BusinessRpcTls, BusinessRpcV3Client, BusinessRpcV3ClientConfig,
+    BusinessRpcV3Delivery,
 };
 use netbaiot_core::{
     AuthInvalidation, CodecId, DeviceId, DeviceKey, DeviceUplink, DeviceUplinkKind, Heartbeat,
@@ -54,6 +56,10 @@ struct Config {
     event_rate: u64,
     #[serde(default)]
     event_payload_bytes: usize,
+    #[serde(default)]
+    frame_payload_bytes: Option<u32>,
+    #[serde(default)]
+    stream_window_bytes: Option<u32>,
     event_ack_delay_ms: u64,
     #[serde(default)]
     event_reconnect_every_secs: u64,
@@ -103,6 +109,7 @@ enum Topology {
     #[default]
     Multiplexed,
     Dual,
+    V3,
 }
 impl Config {
     fn validate(&self) -> Result<()> {
@@ -127,6 +134,12 @@ impl Config {
             || self.auth_handler_delay_ms > 5_000
             || self.event_rate > 10_000
             || self.event_payload_bytes > 16_384
+            || self
+                .frame_payload_bytes
+                .is_some_and(|size| ![4096, 8192, 16384].contains(&size))
+            || self.stream_window_bytes.is_some_and(|size| {
+                size < self.frame_payload_bytes.unwrap_or(8192) || size > 4 * 1024 * 1024
+            })
             || self
                 .network_profile
                 .as_ref()
@@ -402,6 +415,105 @@ async fn connect_business(
     }
     Ok((client, deliveries))
 }
+
+enum AnyBusiness {
+    V2(BusinessRpcClient),
+    V3(BusinessRpcV3Client),
+}
+impl AnyBusiness {
+    async fn shutdown(&self) {
+        match self {
+            Self::V2(client) => client.shutdown().await,
+            Self::V3(client) => client.shutdown().await,
+        }
+    }
+    async fn invalidate(
+        &self,
+        revision: u64,
+        scope: AuthInvalidation,
+    ) -> std::result::Result<(), BusinessRpcClientError> {
+        match self {
+            Self::V2(client) => client.invalidate(revision, scope).await.map(|_| ()),
+            Self::V3(client) => client.invalidate(revision, scope).await.map(|_| ()),
+        }
+    }
+}
+enum AnyDelivery {
+    V2(BusinessDelivery),
+    V3(BusinessRpcV3Delivery),
+}
+impl AnyDelivery {
+    fn event_id(&self) -> netbaiot_core::EventId {
+        match self {
+            Self::V2(delivery) => delivery.delivery.event.event_id,
+            Self::V3(delivery) => delivery.delivery.event.event_id,
+        }
+    }
+    fn source_message_id(&self) -> &SourceMessageId {
+        match self {
+            Self::V2(delivery) => &delivery.delivery.event.source_message_id,
+            Self::V3(delivery) => &delivery.delivery.event.source_message_id,
+        }
+    }
+    async fn ack(self) -> std::result::Result<(), BusinessRpcClientError> {
+        match self {
+            Self::V2(delivery) => delivery.ack().await,
+            Self::V3(delivery) => delivery.ack().await,
+        }
+    }
+}
+enum AnyDeliveries {
+    V2(tokio::sync::mpsc::Receiver<BusinessDelivery>),
+    V3(tokio::sync::mpsc::Receiver<BusinessRpcV3Delivery>),
+}
+impl AnyDeliveries {
+    async fn recv(&mut self) -> Option<AnyDelivery> {
+        match self {
+            Self::V2(deliveries) => deliveries.recv().await.map(AnyDelivery::V2),
+            Self::V3(deliveries) => deliveries.recv().await.map(AnyDelivery::V3),
+        }
+    }
+}
+async fn connect_event_business(
+    config: &Config,
+    handler: Arc<Handler>,
+    role: BusinessRole,
+    stats: &SharedStats,
+) -> Result<(AnyBusiness, AnyDeliveries)> {
+    if config.topology != Topology::V3 {
+        let (client, deliveries) = connect_business(config, handler, role, Some(stats)).await?;
+        return Ok((AnyBusiness::V2(client), AnyDeliveries::V2(deliveries)));
+    }
+    let mut settings = BusinessRpcV3ClientConfig::development(
+        config.business_address,
+        std::env::var("NETBAIOT_BUSINESS_RPC_TOKEN").unwrap_or_default(),
+    );
+    if let BusinessTransport::Mtls {
+        server_name,
+        ca_pem,
+        certificate_pem,
+        private_key_pem,
+    } = &config.business_transport
+    {
+        settings.token = None;
+        settings.tls = Some(BusinessRpcTls {
+            server_name: server_name.clone(),
+            ca_pem: ca_pem.clone(),
+            certificate_pem: certificate_pem.clone(),
+            private_key_pem: private_key_pem.clone(),
+        });
+    }
+    if let Some(frame_bytes) = config.frame_payload_bytes {
+        settings.limits.max_frame_payload_bytes = frame_bytes;
+    }
+    if let Some(window_bytes) = config.stream_window_bytes {
+        settings.limits.initial_stream_window_bytes = window_bytes;
+    }
+    settings.reconnect_initial = Duration::from_millis(100);
+    let (client, deliveries) = BusinessRpcV3Client::connect(settings, Some(handler))?;
+    tokio::time::timeout(Duration::from_secs(10), client.wait_ready()).await??;
+    Ok((AnyBusiness::V3(client), AnyDeliveries::V3(deliveries)))
+}
 async fn device(config: &Config, id: &str) -> Result<DeviceClient> {
     let client = DeviceClient::builder()
         .device(
@@ -470,10 +582,10 @@ async fn event_load(
         BusinessRole::Multiplexed
     };
     let (mut business, auth_deliveries) =
-        connect_business(config, handler.clone(), auth_role, Some(&stats)).await?;
+        connect_event_business(config, handler.clone(), auth_role, &stats).await?;
     let (mut event_business, mut deliveries) = if config.topology == Topology::Dual {
         let (events, deliveries) =
-            connect_business(config, handler.clone(), BusinessRole::Events, Some(&stats)).await?;
+            connect_event_business(config, handler.clone(), BusinessRole::Events, &stats).await?;
         (Some(events), deliveries)
     } else {
         (None, auth_deliveries)
@@ -529,7 +641,7 @@ async fn event_load(
             }
             _ = auth_reconnect_tick.tick(), if config.auth_reconnect_every_secs > 0 && config.topology == Topology::Dual => {
                 business.shutdown().await;
-                match connect_business(config, handler.clone(), BusinessRole::AuthControl, Some(&stats)).await {
+                match connect_event_business(config, handler.clone(), BusinessRole::AuthControl, &stats).await {
                     Ok((next, _)) => {
                         business = next;
                         revision = 1;
@@ -545,7 +657,7 @@ async fn event_load(
                 if let Some(events) = event_business.take() { events.shutdown().await; }
                 else { business.shutdown().await; }
                 let role = if config.topology == Topology::Dual { BusinessRole::Events } else { BusinessRole::Multiplexed };
-                match connect_business(config, handler.clone(), role, Some(&stats)).await {
+                match connect_event_business(config, handler.clone(), role, &stats).await {
                     Ok((next, next_deliveries)) => {
                         if config.topology == Topology::Dual { event_business = Some(next); }
                         else { business = next; revision = 1; }
@@ -582,7 +694,7 @@ async fn event_load(
             }
             received = deliveries.recv() => {
                 let Some(delivery) = received else { break };
-                if !delivery.delivery.event.source_message_id.as_str().starts_with(&source_prefix) {
+                if !delivery.source_message_id().as_str().starts_with(&source_prefix) {
                     let _ = delivery.ack().await;
                     continue;
                 }
@@ -590,7 +702,7 @@ async fn event_load(
                 {
                     let mut state = stats.lock().unwrap();
                     state.counts.events += 1;
-                    if !seen.insert(delivery.delivery.event.event_id) { state.counts.event_retries += 1; }
+                    if !seen.insert(delivery.event_id()) { state.counts.event_retries += 1; }
                 }
                 if seen.len() > 100_000 { seen.clear(); }
                 if outage && Instant::now() < outage_until { continue; }

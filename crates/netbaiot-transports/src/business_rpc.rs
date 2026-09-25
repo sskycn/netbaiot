@@ -1,4 +1,5 @@
 //! Business RPC V2 transport: one reader, one writer, one event window per connection.
+mod v3;
 use crate::mqtt::broker::MqttBroker;
 use netbaiot_core::{
     AuthInvalidation, EventAck, EventDelivery, SubscriptionId, TenantId,
@@ -11,8 +12,9 @@ use netbaiot_core::{
     },
 };
 use netbaiot_runtime::{
-    BusinessEventRequest, BusinessProviderScope, BusinessRpcEventSink, BusinessRpcOutbound,
-    BusinessRpcRegistry, CommandRouter, Error, Ingress, ProviderLease, Result, SinkAck, SinkError,
+    BusinessEventRequest, BusinessProviderScope, BusinessRpcCall, BusinessRpcEventSink,
+    BusinessRpcOutbound, BusinessRpcRegistry, CommandRouter, Error, Ingress, ProviderLease, Result,
+    SinkAck, SinkError,
     metrics::{BusinessRpcQueueClass, Histogram, Metric, Metrics},
 };
 use serde::Serialize;
@@ -111,6 +113,7 @@ pub enum BusinessIdentity {
 pub struct BusinessRpcTransportConfig {
     pub identity: BusinessIdentity,
     pub tls: Option<TlsAcceptor>,
+    pub v3: Option<netbaiot_core::business_rpc_v3::V3Limits>,
     pub max_connections: usize,
     pub max_frame_bytes: usize,
     pub auth_max_inflight: usize,
@@ -123,6 +126,7 @@ pub struct BusinessRpcTransportConfig {
 impl BusinessRpcTransportConfig {
     pub fn validate(&self, address: SocketAddr) -> Result<()> {
         if self.max_connections == 0
+            || self.v3.as_ref().is_some_and(|v3| v3.validate().is_err())
             || self.max_connections > 1024
             || self.max_frame_bytes < BUSINESS_RPC_AUTH_MAX_BYTES
             || self.max_frame_bytes > 8 * 1024 * 1024
@@ -395,6 +399,13 @@ async fn connection_inner(
             .await?
         }
     };
+    if serde_json::from_slice::<serde_json::Value>(&hello)
+        .ok()
+        .and_then(|value| value.get("version").and_then(serde_json::Value::as_u64))
+        == Some(3)
+    {
+        return v3::connection(io, certificate, hello, config, services, stop).await;
+    }
     let hello_frame: BusinessRpcFrame =
         serde_json::from_slice(&hello).map_err(|_| Error::Invalid)?;
     hello_frame.validate().map_err(|_| Error::Invalid)?;
@@ -1362,10 +1373,16 @@ async fn writer_loop<W: AsyncWrite + Unpin>(
             _ = signals.stop.cancelled() => return Ok(()),
             item = queues.0.recv(), if !queues.0.is_closed() => item,
             item = auth.recv(), if !auth.is_closed() => item.map(|out| {
-                if matches!(out.frame, BusinessRpcFrame::Request { .. }) {
+                if matches!(out.call, BusinessRpcCall::Request { .. }) {
                     signals.metrics.observe(Histogram::BusinessRpcQueueWait, out.queued_at.elapsed().as_micros().min(u64::MAX as u128) as u64);
                 }
-                Queued { frame: out.frame, written: None, _bytes: out._bytes, _tracking: None }
+                let frame = match out.call {
+                    BusinessRpcCall::Request { request_id, method, deadline_ms, body } => BusinessRpcFrame::Request {
+                        request_id, method: method.into(), deadline_ms, body,
+                    },
+                    BusinessRpcCall::Cancel { request_id } => BusinessRpcFrame::Cancel { request_id },
+                };
+                Queued { frame, written: None, _bytes: out._bytes, _tracking: None }
             }),
             item = events.recv(), if !events.is_closed() => item,
             item = queues.1.recv(), if !queues.1.is_closed() => item,

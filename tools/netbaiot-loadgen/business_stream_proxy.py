@@ -2,6 +2,7 @@
 """Bounded test-only TCP stream proxy. It does not simulate packet loss."""
 import argparse
 import asyncio
+import json
 import random
 import time
 
@@ -19,6 +20,7 @@ async def main():
     parser.add_argument("--reset-after-secs", type=float)
     parser.add_argument("--half-open-after-secs", type=float)
     parser.add_argument("--max-connections", type=int, default=8)
+    parser.add_argument("--capture-prefix", help="test-only prefix for bounded V3 frame-header traces")
     args = parser.parse_args()
     if (args.delay_ms < 0 or args.jitter_ms < 0 or args.bytes_per_second < 0
             or args.max_connections < 1 or args.max_connections > 64
@@ -33,14 +35,18 @@ async def main():
 
     target_host, target_port = address(args.target)
     active = set()
+    connection_number = 0
 
     async def serve(reader, writer):
+        nonlocal connection_number
         if len(active) >= args.max_connections:
             writer.close()
             await writer.wait_closed()
             return
         current = asyncio.current_task()
         active.add(current)
+        connection_number += 1
+        capture_number = connection_number
         remote = None
         started = time.monotonic()
         try:
@@ -48,6 +54,11 @@ async def main():
                 asyncio.open_connection(target_host, target_port), timeout=5)
 
             async def pump(source, sink, upstream):
+                # A V3 trace stores only frame headers, never Hello tokens or Event bodies.
+                capture = args.capture_prefix is not None and not upstream
+                capture_buffer = bytearray()
+                capture_seen = 0
+                bootstrap_done = False
                 while True:
                     elapsed = time.monotonic() - started
                     if args.disconnect_after_secs is not None and elapsed >= args.disconnect_after_secs:
@@ -70,6 +81,37 @@ async def main():
                             sink.write_eof()
                             await sink.drain()
                         return
+                    if capture:
+                        remaining = max(0, 2 * 1024 * 1024 - capture_seen)
+                        capture_buffer.extend(chunk[:remaining])
+                        capture_seen += min(len(chunk), remaining)
+                        if not bootstrap_done and len(capture_buffer) >= 4:
+                            length = int.from_bytes(capture_buffer[:4], "big")
+                            if length > 4096:
+                                capture = False
+                            elif len(capture_buffer) >= 4 + length:
+                                del capture_buffer[:4 + length]
+                                bootstrap_done = True
+                        if capture and bootstrap_done:
+                            trace = f"{args.capture_prefix}-{capture_number}-down.jsonl"
+                            with open(trace, "a", encoding="utf-8") as output:
+                                while len(capture_buffer) >= 12:
+                                    length = int.from_bytes(capture_buffer[:4], "big")
+                                    if length > 16 * 1024:
+                                        capture = False
+                                        break
+                                    if len(capture_buffer) < 12 + length:
+                                        break
+                                    output.write(json.dumps({
+                                        "stream_id": int.from_bytes(capture_buffer[4:8], "big"),
+                                        "frame_type": capture_buffer[8],
+                                        "flags": capture_buffer[9],
+                                        "payload_bytes": length,
+                                    }) + "\n")
+                                    del capture_buffer[:12 + length]
+                        if not capture or capture_seen >= 2 * 1024 * 1024:
+                            capture_buffer.clear()
+                            capture = False
                     if args.blackhole_after_secs is not None:
                         until = started + args.blackhole_after_secs + args.blackhole_for_secs
                         if time.monotonic() >= started + args.blackhole_after_secs:

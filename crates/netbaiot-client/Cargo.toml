@@ -6,6 +6,8 @@ license.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+netbaiot-v3-mux.workspace = true
+bytes.workspace = true
 netbaiot-protocol.workspace = true
 async-trait.workspace = true
 tokio-rustls.workspace = true

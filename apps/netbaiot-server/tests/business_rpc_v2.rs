@@ -119,6 +119,7 @@ async fn command_pressure_preserves_auth_invalidation_and_event_ack() {
     };
     config.business_rpc = Some(BusinessRpcConfig {
         version: 2,
+        v3: None,
         tls: Some(ManagementTlsFiles {
             certificate: fixtures.join("localhost-cert.pem").to_string_lossy().into(),
             private_key: fixtures.join("localhost-key.pem").to_string_lossy().into(),
@@ -323,6 +324,7 @@ async fn commands_role_dispatches_to_real_tcp_and_shares_http_dedup() {
         .collect::<String>();
     config.business_rpc = Some(BusinessRpcConfig {
         version: 2,
+        v3: None,
         tls: Some(ManagementTlsFiles {
             certificate: fixtures.join("localhost-cert.pem").to_string_lossy().into(),
             private_key: fixtures.join("localhost-key.pem").to_string_lossy().into(),
@@ -457,6 +459,7 @@ async fn business_rpc_command_mqtt_dedup_and_ack_use_real_sockets() {
     config.event_delivery = Some(EventDeliverySource::BusinessRpc);
     config.business_rpc = Some(BusinessRpcConfig {
         version: 2,
+        v3: None,
         tls: None,
         identities: Vec::new(),
         development_token_env: Some("NETBAIOT_BUSINESS_RPC_TOKEN".into()),
@@ -921,6 +924,7 @@ async fn one_socket_authentication_progresses_while_event_ack_waits() {
     config.event_delivery = Some(EventDeliverySource::BusinessRpc);
     config.business_rpc = Some(BusinessRpcConfig {
         version: 2,
+        v3: None,
         tls: None,
         identities: Vec::new(),
         development_token_env: Some("NETBAIOT_BUSINESS_RPC_TOKEN".into()),
@@ -1174,6 +1178,7 @@ async fn zero_offline_grace_revokes_live_session_and_requires_reset_sync() {
     config.event_delivery = Some(EventDeliverySource::DevelopmentAudit);
     config.business_rpc = Some(BusinessRpcConfig {
         version: 2,
+        v3: None,
         tls: None,
         identities: Vec::new(),
         development_token_env: Some("NETBAIOT_BUSINESS_RPC_TOKEN".into()),
@@ -1317,6 +1322,7 @@ async fn mtls_verifies_server_and_maps_exact_client_certificate() {
     let principal_expiry = netbaiot_runtime::now_ms().saturating_add(12_000);
     config.business_rpc = Some(BusinessRpcConfig {
         version: 2,
+        v3: None,
         tls: Some(ManagementTlsFiles {
             certificate: fixtures.join("localhost-cert.pem").to_string_lossy().into(),
             private_key: fixtures.join("localhost-key.pem").to_string_lossy().into(),
@@ -1607,6 +1613,7 @@ async fn v1_spooled_required_event_replays_to_v2_with_stable_event_id() {
 
     config.business_rpc = Some(BusinessRpcConfig {
         version: 2,
+        v3: None,
         tls: None,
         identities: Vec::new(),
         development_token_env: Some("NETBAIOT_BUSINESS_RPC_TOKEN".into()),

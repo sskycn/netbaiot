@@ -596,7 +596,7 @@ dependencies = [
 
 [[package]]
 name = "netbaiot-codecs"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "netbaiot-core",
  "serde",
@@ -605,7 +605,7 @@ dependencies = [
 
 [[package]]
 name = "netbaiot-core"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "netbaiot-protocol",
  "serde",
@@ -624,20 +624,21 @@ dependencies = [
  "netbaiot-mqtt-wire",
  "netbaiot-runtime",
  "netbaiot-transports",
+ "netbaiot-v3-mux",
  "serde_json",
  "sha2",
 ]
 
 [[package]]
 name = "netbaiot-mqtt-wire"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "bytes",
 ]
 
 [[package]]
 name = "netbaiot-protocol"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "serde",
  "serde_json",
@@ -647,7 +648,7 @@ dependencies = [
 
 [[package]]
 name = "netbaiot-runtime"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "async-trait",
  "bytes",
@@ -670,7 +671,7 @@ dependencies = [
 
 [[package]]
 name = "netbaiot-transports"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "async-trait",
  "bytes",
@@ -681,6 +682,7 @@ dependencies = [
  "netbaiot-core",
  "netbaiot-mqtt-wire",
  "netbaiot-runtime",
+ "netbaiot-v3-mux",
  "serde",
  "serde_json",
  "sha2",
@@ -691,6 +693,17 @@ dependencies = [
  "tokio-util",
  "tracing",
  "uuid",
+]
+
+[[package]]
+name = "netbaiot-v3-mux"
+version = "0.2.1"
+dependencies = [
+ "bytes",
+ "netbaiot-protocol",
+ "serde",
+ "serde_json",
+ "tokio",
 ]
 
 [[package]]

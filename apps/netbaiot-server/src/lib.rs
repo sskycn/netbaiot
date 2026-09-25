@@ -92,6 +92,9 @@ pub enum EventDeliverySource {
 #[serde(deny_unknown_fields)]
 pub struct BusinessRpcConfig {
     pub version: u16,
+    /// V3 is available on the same listener only when explicitly configured.
+    #[serde(default)]
+    pub v3: Option<business_rpc_v3::V3Limits>,
     pub tls: Option<ManagementTlsFiles>,
     #[serde(default)]
     pub identities: Vec<BusinessRpcIdentityConfig>,
@@ -206,6 +209,7 @@ impl Config {
         }
         if let Some(rpc) = &self.business_rpc {
             if rpc.version != BUSINESS_RPC_VERSION
+                || rpc.v3.as_ref().is_some_and(|v3| v3.validate().is_err())
                 || self.business_tcp.is_none()
                 || rpc.max_connections == 0
                 || rpc.auth_max_inflight == 0
@@ -1120,6 +1124,7 @@ pub async fn run_with_credentials(
             let transport = BusinessRpcTransportConfig {
                 identity,
                 tls,
+                v3: rpc.v3.clone(),
                 max_connections: rpc.max_connections,
                 max_frame_bytes: 8 * 1024 * 1024,
                 auth_max_inflight: rpc.auth_max_inflight,
@@ -1388,7 +1393,7 @@ async fn serve_business_mixed(
                     )
                     .await
                 }
-                Some(2) if first.len() <= BUSINESS_RPC_HELLO_MAX_BYTES => {
+                Some(2 | 3) if first.len() <= BUSINESS_RPC_HELLO_MAX_BYTES => {
                     business_rpc::serve_accepted(stream, transport, services, stop, first).await
                 }
                 _ => Err(Error::Invalid),
@@ -1409,6 +1414,38 @@ mod reliability_tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     #[test]
+    fn business_rpc_v3_config_is_explicit_and_limits_are_checked() {
+        let mut config: Config =
+            serde_json::from_str(include_str!("../../../configs/development.json")).unwrap();
+        config.business_tcp = Some("127.0.0.1:19002".parse().unwrap());
+        let legacy: BusinessRpcConfig = serde_json::from_value(serde_json::json!({
+            "version": 2,
+            "tls": null,
+            "development_token_env": "NETBAIOT_BUSINESS_RPC_TOKEN"
+        }))
+        .unwrap();
+        assert!(legacy.v3.is_none());
+        config.business_rpc = Some(legacy);
+        assert!(config.validate().is_ok());
+
+        let mut limits = business_rpc_v3::V3Limits::default();
+        config.business_rpc.as_mut().unwrap().v3 = Some(limits.clone());
+        assert!(config.validate().is_ok());
+
+        limits.max_frame_payload_bytes = 1024;
+        config.business_rpc.as_mut().unwrap().v3 = Some(limits.clone());
+        assert!(config.validate().is_err());
+        limits.max_frame_payload_bytes = 8192;
+        limits.max_concurrent_streams = 0;
+        config.business_rpc.as_mut().unwrap().v3 = Some(limits.clone());
+        assert!(config.validate().is_err());
+        limits.max_concurrent_streams = 256;
+        limits.initial_connection_window_bytes = limits.initial_stream_window_bytes - 1;
+        config.business_rpc.as_mut().unwrap().v3 = Some(limits);
+        assert!(config.validate().is_err());
+    }
+
+    #[test]
     fn business_rpc_command_roles_validate_without_changing_existing_roles() {
         let config_for = |role,
                           provider: Option<&str>,
@@ -1420,6 +1457,7 @@ mod reliability_tests {
             config.business_tcp = Some("127.0.0.1:19002".parse().unwrap());
             config.business_rpc = Some(BusinessRpcConfig {
                 version: 2,
+                v3: None,
                 tls: Some(ManagementTlsFiles {
                     certificate: "cert".into(),
                     private_key: "key".into(),
