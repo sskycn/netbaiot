@@ -5,11 +5,14 @@ use netbaiot_core::{
 };
 use netbaiot_protocol::RouteDefinition;
 use netbaiot_runtime::{
-    AuthCache, CodecRegistry, DeliveryEnvelope, Error, EventAcceptance, EventBus, EventSink,
-    GatewayControl, Ingress, Lifecycle, Limits, Metrics, RestartSpool, Sessions, SinkAck,
-    SinkDefinition, SinkDeliveryMode, SinkError, StaticAuthenticator,
+    AdminResourceConfig, ApiKeyConfig, AuthCache, CodecRegistry, DeliveryEnvelope, Error,
+    EventAcceptance, EventBus, EventSink, GatewayControl, Ingress, Lifecycle, Limits, Metrics,
+    MtlsIdentityConfig, RestartSpool, Sessions, SinkAck, SinkDefinition, SinkDeliveryMode,
+    SinkError, StaticAuthenticator,
 };
-use netbaiot_server::{Config, TlsFiles, read_config, run, tls_acceptor};
+use netbaiot_server::{
+    Config, ManagementTlsFiles, TlsFiles, management_tls_acceptor, read_config, run, tls_acceptor,
+};
 use netbaiot_transports::{
     BoxStream, Services, serve_device_ingress, serve_management_http, serve_stream,
 };
@@ -380,6 +383,333 @@ async fn start_child(path: &std::path::Path, admin: &str) -> Child {
         .stderr(Stdio::null())
         .spawn()
         .unwrap()
+}
+
+#[tokio::test]
+async fn api_key_scope_and_tenant_denials_precede_management_mutations() {
+    let _port_guard = EPHEMERAL_PORT_TEST_LOCK.lock().await;
+    let mut config = config();
+    config.device_ingress = free_address().await;
+    config.management_http = free_address().await;
+    let root =
+        std::env::temp_dir().join(format!("netbaiot-management-auth-{}", uuid::Uuid::new_v4()));
+    std::fs::create_dir_all(&root).unwrap();
+    config.spool_directory = root.join("spool");
+    config.management_auth.api_keys.push(ApiKeyConfig {
+        key_id: "tenant-reader".into(),
+        secret_env: "NETBAIOT_TEST_MANAGEMENT_KEY".into(),
+        subject: "service:reader".into(),
+        scopes: vec!["connection.read".into()],
+        resources: AdminResourceConfig {
+            tenants: vec![TenantId::new("demo").unwrap()],
+            ..Default::default()
+        },
+        global: false,
+        expires_at: None,
+        auth_generation: 1,
+        enabled: true,
+    });
+    config.management_auth.api_keys.push(ApiKeyConfig {
+        key_id: "tenant-invalidator".into(),
+        secret_env: "NETBAIOT_TEST_MANAGEMENT_KEY".into(),
+        subject: "service:invalidator".into(),
+        scopes: vec!["auth.invalidate.all".into()],
+        resources: AdminResourceConfig {
+            tenants: vec![TenantId::new("demo").unwrap()],
+            ..Default::default()
+        },
+        global: false,
+        expires_at: None,
+        auth_generation: 1,
+        enabled: true,
+    });
+    let path = root.join("config.json");
+    std::fs::write(&path, serde_json::to_vec(&config).unwrap()).unwrap();
+    let admin = "a".repeat(64);
+    let secret = "b".repeat(64);
+    let key = format!("tenant-reader.{secret}");
+    let mut child = Command::new(env!("CARGO_BIN_EXE_netbaiot-server"))
+        .arg(&path)
+        .env("NETBAIOT_ADMIN_SECRET", &admin)
+        .env("NETBAIOT_TEST_MANAGEMENT_KEY", &secret)
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .kill_on_drop(true)
+        .spawn()
+        .unwrap();
+    let client = reqwest::Client::builder().no_proxy().build().unwrap();
+    wait_ready(&client, config.management_http, &admin).await;
+    let official = netbaiot_client::NetbaIoTClient::builder()
+        .endpoint(format!("http://{}", config.management_http))
+        .api_key(&key)
+        .connect()
+        .await
+        .unwrap();
+    assert!(matches!(
+        official.runtime().status().await,
+        Err(netbaiot_client::ClientError::Forbidden { .. })
+    ));
+    let url = |path: &str| format!("http://{}{path}", config.management_http);
+    let response = client
+        .get(url("/api/v1/status"))
+        .header("Authorization", format!("ApiKey {key}"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), reqwest::StatusCode::FORBIDDEN);
+    let denied: netbaiot_protocol::ApiError = response.json().await.unwrap();
+    assert_eq!(denied.required_scope.as_deref(), Some("runtime.read"));
+    let response = client
+        .get(url("/api/v1/connections"))
+        .header("Authorization", format!("ApiKey {key}"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), reqwest::StatusCode::OK);
+    let response = client
+        .post(url("/api/v1/devices/connection"))
+        .header("Authorization", format!("ApiKey {key}"))
+        .json(
+            &serde_json::json!({"tenant_id":"other","product_id":"sensor","device_id":"device-1"}),
+        )
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), reqwest::StatusCode::FORBIDDEN);
+    let response = client
+        .post(url("/api/v1/devices/commands"))
+        .header("Authorization", format!("ApiKey {key}"))
+        .body("not even JSON")
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), reqwest::StatusCode::FORBIDDEN);
+    let response = client
+        .post(url("/api/v1/drain"))
+        .header("Authorization", format!("ApiKey {key}"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), reqwest::StatusCode::FORBIDDEN);
+    for path in ["/api/v1/routes", "/api/v1/control/snapshot"] {
+        let response = client
+            .put(url(path))
+            .header("Authorization", format!("ApiKey {key}"))
+            .body("not even JSON")
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(response.status(), reqwest::StatusCode::FORBIDDEN);
+    }
+    let response = client
+        .post(url("/api/v1/auth/invalidate"))
+        .header(
+            "Authorization",
+            format!("ApiKey tenant-invalidator.{secret}"),
+        )
+        .json(&serde_json::json!({"scope":"all"}))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), reqwest::StatusCode::FORBIDDEN);
+    let response = client
+        .get(url("/api/v1/ready"))
+        .bearer_auth(&admin)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), reqwest::StatusCode::OK);
+    let response = client
+        .get(url("/api/v1/connections"))
+        .header(
+            "Authorization",
+            format!("ApiKey tenant-reader.{}", "c".repeat(64)),
+        )
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), reqwest::StatusCode::UNAUTHORIZED);
+    request_drain(&client, config.management_http, &admin).await;
+    assert!(
+        tokio::time::timeout(Duration::from_secs(5), child.wait())
+            .await
+            .unwrap()
+            .unwrap()
+            .success()
+    );
+    std::fs::remove_dir_all(root).unwrap();
+}
+
+#[tokio::test]
+async fn management_client_certificate_requirement_does_not_change_device_tls() {
+    let files = test_tls_files();
+    let device_tls = tls_acceptor(&files).await.unwrap();
+    let management_tls = management_tls_acceptor(&ManagementTlsFiles {
+        certificate: files.certificate.clone(),
+        private_key: files.private_key.clone(),
+        client_ca: Some(files.certificate.clone()),
+        require_client_certificate: true,
+    })
+    .await
+    .unwrap();
+    let device = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let management = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let device_addr = device.local_addr().unwrap();
+    let management_addr = management.local_addr().unwrap();
+    let device_task =
+        tokio::spawn(async move { device_tls.accept(device.accept().await.unwrap().0).await });
+    let management_task = tokio::spawn(async move {
+        management_tls
+            .accept(management.accept().await.unwrap().0)
+            .await
+    });
+    let connector = test_tls_connector();
+    let device_socket = TcpStream::connect(device_addr).await.unwrap();
+    assert!(
+        connector
+            .connect("localhost".try_into().unwrap(), device_socket)
+            .await
+            .is_ok()
+    );
+    assert!(device_task.await.unwrap().is_ok());
+    let management_socket = TcpStream::connect(management_addr).await.unwrap();
+    let management_client = connector
+        .connect("localhost".try_into().unwrap(), management_socket)
+        .await;
+    let management_server = management_task.await.unwrap();
+    assert!(management_server.is_err() || management_client.is_err());
+}
+
+#[tokio::test]
+async fn management_mtls_trust_and_explicit_identity_mapping() {
+    use sha2::{Digest, Sha256};
+    let _port_guard = EPHEMERAL_PORT_TEST_LOCK.lock().await;
+    let fixtures = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures");
+    let files = test_tls_files();
+    let client_cert = std::fs::read(fixtures.join("management-client.pem")).unwrap();
+    let client_key = std::fs::read(fixtures.join("management-client-key.pem")).unwrap();
+    let leaf = rustls_pemfile::certs(&mut client_cert.as_slice())
+        .next()
+        .unwrap()
+        .unwrap();
+    let fingerprint = Sha256::digest(leaf.as_ref())
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<String>();
+    let mut config = config();
+    config.device_ingress = free_address().await;
+    config.management_http = free_address().await;
+    config.management_tls = Some(ManagementTlsFiles {
+        certificate: files.certificate.clone(),
+        private_key: files.private_key.clone(),
+        client_ca: Some(fixtures.join("management-ca.pem").to_str().unwrap().into()),
+        require_client_certificate: true,
+    });
+    config
+        .management_auth
+        .mtls_identities
+        .push(MtlsIdentityConfig {
+            certificate_sha256: fingerprint,
+            subject: "service:iot-platform".into(),
+            scopes: vec!["runtime.read".into(), "runtime.drain".into()],
+            resources: AdminResourceConfig::default(),
+            global: true,
+        });
+    let root =
+        std::env::temp_dir().join(format!("netbaiot-management-mtls-{}", uuid::Uuid::new_v4()));
+    std::fs::create_dir_all(&root).unwrap();
+    config.spool_directory = root.join("spool");
+    let path = root.join("config.json");
+    std::fs::write(&path, serde_json::to_vec(&config).unwrap()).unwrap();
+    let mut child = Command::new(env!("CARGO_BIN_EXE_netbaiot-server"))
+        .arg(&path)
+        .env_remove("NETBAIOT_ADMIN_SECRET")
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .kill_on_drop(true)
+        .spawn()
+        .unwrap();
+    let root_cert =
+        reqwest::Certificate::from_pem(&std::fs::read(&files.certificate).unwrap()).unwrap();
+    let mut identity_pem = client_cert.clone();
+    identity_pem.extend_from_slice(&client_key);
+    let trusted = reqwest::Client::builder()
+        .no_proxy()
+        .add_root_certificate(root_cert.clone())
+        .identity(reqwest::Identity::from_pem(&identity_pem).unwrap())
+        .build()
+        .unwrap();
+    let url = format!(
+        "https://localhost:{}/api/v1/ready",
+        config.management_http.port()
+    );
+    tokio::time::timeout(Duration::from_secs(5), async {
+        loop {
+            if trusted
+                .get(&url)
+                .send()
+                .await
+                .is_ok_and(|response| response.status().is_success())
+            {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+    })
+    .await
+    .unwrap();
+    let no_cert = reqwest::Client::builder()
+        .no_proxy()
+        .add_root_certificate(root_cert.clone())
+        .build()
+        .unwrap();
+    assert!(no_cert.get(&url).send().await.is_err());
+    let mut expired_pem = std::fs::read(fixtures.join("management-expired.pem")).unwrap();
+    expired_pem.extend_from_slice(&client_key);
+    let expired = reqwest::Client::builder()
+        .no_proxy()
+        .add_root_certificate(root_cert.clone())
+        .identity(reqwest::Identity::from_pem(&expired_pem).unwrap())
+        .build()
+        .unwrap();
+    assert!(expired.get(&url).send().await.is_err());
+    let mut untrusted_pem = std::fs::read(&files.certificate).unwrap();
+    untrusted_pem.extend_from_slice(&std::fs::read(&files.private_key).unwrap());
+    let untrusted = reqwest::Client::builder()
+        .no_proxy()
+        .add_root_certificate(root_cert.clone())
+        .identity(reqwest::Identity::from_pem(&untrusted_pem).unwrap())
+        .build()
+        .unwrap();
+    assert!(untrusted.get(&url).send().await.is_err());
+    let mut unmapped_pem = std::fs::read(fixtures.join("management-unmapped.pem")).unwrap();
+    unmapped_pem.extend_from_slice(&client_key);
+    let unmapped = reqwest::Client::builder()
+        .no_proxy()
+        .add_root_certificate(root_cert)
+        .identity(reqwest::Identity::from_pem(&unmapped_pem).unwrap())
+        .build()
+        .unwrap();
+    assert_eq!(
+        unmapped.get(&url).send().await.unwrap().status(),
+        reqwest::StatusCode::UNAUTHORIZED
+    );
+    let drain_url = format!(
+        "https://localhost:{}/api/v1/drain",
+        config.management_http.port()
+    );
+    assert_eq!(
+        trusted.post(drain_url).send().await.unwrap().status(),
+        reqwest::StatusCode::ACCEPTED
+    );
+    assert!(
+        tokio::time::timeout(Duration::from_secs(5), child.wait())
+            .await
+            .unwrap()
+            .unwrap()
+            .success()
+    );
+    std::fs::remove_dir_all(root).unwrap();
 }
 
 fn mqtt_text(value: &[u8], output: &mut Vec<u8>) {

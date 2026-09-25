@@ -44,6 +44,10 @@ pub struct Config {
     #[serde(default)]
     pub credentials: Vec<Credential>,
     pub tls: Option<TlsFiles>,
+    #[serde(default)]
+    pub management_tls: Option<ManagementTlsFiles>,
+    #[serde(default)]
+    pub management_auth: ManagementAuthConfig,
     pub delivery_url: Option<String>,
     pub auth_provider_url: Option<String>,
     pub spool_directory: PathBuf,
@@ -54,6 +58,16 @@ pub struct Config {
 pub struct TlsFiles {
     pub certificate: String,
     pub private_key: String,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ManagementTlsFiles {
+    pub certificate: String,
+    pub private_key: String,
+    pub client_ca: Option<String>,
+    #[serde(default)]
+    pub require_client_certificate: bool,
 }
 
 async fn read_bounded(path: &str, maximum: u64) -> Result<Vec<u8>> {
@@ -85,7 +99,25 @@ impl Config {
         if !self.device_ingress.ip().is_loopback() && self.tls.is_none() {
             return Err(Error::Configuration);
         }
-        if !self.management_http.ip().is_loopback() && self.tls.is_none() {
+        if !self.management_http.ip().is_loopback()
+            && self.tls.is_none()
+            && self.management_tls.is_none()
+        {
+            return Err(Error::Configuration);
+        }
+        if self
+            .management_tls
+            .as_ref()
+            .is_some_and(|tls| tls.require_client_certificate && tls.client_ca.is_none())
+        {
+            return Err(Error::Configuration);
+        }
+        if !self.management_auth.mtls_identities.is_empty()
+            && !self
+                .management_tls
+                .as_ref()
+                .is_some_and(|tls| tls.require_client_certificate)
+        {
             return Err(Error::Configuration);
         }
         // The framed business stream currently authenticates with a bearer secret. Keep it
@@ -126,6 +158,51 @@ pub async fn tls_acceptor(files: &TlsFiles) -> Result<TlsAcceptor> {
     .with_no_client_auth()
     .with_single_cert(certificates, private)
     .map_err(|_| Error::Configuration)?;
+    Ok(TlsAcceptor::from(Arc::new(config)))
+}
+
+pub async fn management_tls_acceptor(files: &ManagementTlsFiles) -> Result<TlsAcceptor> {
+    let cert = read_bounded(&files.certificate, 1_048_576).await?;
+    let key = read_bounded(&files.private_key, 65_536).await?;
+    let certificates = rustls_pemfile::certs(&mut cert.as_slice())
+        .collect::<std::result::Result<Vec<_>, _>>()
+        .map_err(|_| Error::Configuration)?;
+    let private = rustls_pemfile::private_key(&mut key.as_slice())
+        .map_err(|_| Error::Configuration)?
+        .ok_or(Error::Configuration)?;
+    let builder = rustls::ServerConfig::builder_with_provider(Arc::new(
+        rustls::crypto::ring::default_provider(),
+    ))
+    .with_safe_default_protocol_versions()
+    .map_err(|_| Error::Configuration)?;
+    let builder = if files.require_client_certificate {
+        let ca = read_bounded(
+            files.client_ca.as_deref().ok_or(Error::Configuration)?,
+            1_048_576,
+        )
+        .await?;
+        let mut roots = rustls::RootCertStore::empty();
+        for cert in rustls_pemfile::certs(&mut ca.as_slice()) {
+            roots
+                .add(cert.map_err(|_| Error::Configuration)?)
+                .map_err(|_| Error::Configuration)?;
+        }
+        if roots.is_empty() {
+            return Err(Error::Configuration);
+        }
+        let verifier = rustls::server::WebPkiClientVerifier::builder_with_provider(
+            Arc::new(roots),
+            Arc::new(rustls::crypto::ring::default_provider()),
+        )
+        .build()
+        .map_err(|_| Error::Configuration)?;
+        builder.with_client_cert_verifier(verifier)
+    } else {
+        builder.with_no_client_auth()
+    };
+    let config = builder
+        .with_single_cert(certificates, private)
+        .map_err(|_| Error::Configuration)?;
     Ok(TlsAcceptor::from(Arc::new(config)))
 }
 
@@ -835,9 +912,6 @@ pub async fn run_with_credentials(
     business_stream_token: Option<String>,
 ) -> Result<()> {
     config.validate()?;
-    if !config.management_http.ip().is_loopback() && admin_secret.is_none() {
-        return Err(Error::Configuration);
-    }
     let limits = Arc::new(config.limits.clone());
     let metrics = Arc::new(
         if matches!(
@@ -961,7 +1035,27 @@ pub async fn run_with_credentials(
             .ok_or(Error::Internal)?
             .admin = Some(admin);
     }
+    let management_auth = ManagementAuthService::new(
+        config.management_auth.clone(),
+        base_services.admin.clone(),
+        limits.clone(),
+    )?
+    .with_metrics(metrics.clone());
+    if !config.management_http.ip().is_loopback() && !management_auth.has_provider() {
+        return Err(Error::Configuration);
+    }
+    Arc::get_mut(&mut base_services)
+        .ok_or(Error::Internal)?
+        .management_auth = Some(Arc::new(management_auth));
     let tls = if let Some(files) = &config.tls {
+        Some(tls_acceptor(files).await?)
+    } else {
+        None
+    };
+    let management_tls = if let Some(files) = &config.management_tls {
+        Some(management_tls_acceptor(files).await?)
+    } else if let Some(files) = &config.tls {
+        // Legacy certificate configuration is loaded separately for the management listener.
         Some(tls_acceptor(files).await?)
     } else {
         None
@@ -1016,7 +1110,7 @@ pub async fn run_with_credentials(
     let mut management_task = tokio::spawn(serve_management_http(
         management_http,
         base_services.clone(),
-        tls.clone(),
+        management_tls,
         management_listener.child_token(),
     ));
     work_tasks.spawn(udp::serve(udp, base_services, work_listeners.child_token()));

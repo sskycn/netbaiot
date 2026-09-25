@@ -95,6 +95,18 @@ pub struct Limits {
     pub auth_cache_max_waiters: usize,
     pub auth_positive_ttl_ms: u64,
     pub auth_negative_ttl_ms: u64,
+    pub management_auth_max_subject_bytes: usize,
+    pub management_auth_max_scopes: usize,
+    pub management_auth_max_scope_bytes: usize,
+    pub management_auth_max_resource_entries: usize,
+    pub management_auth_max_resource_bytes: usize,
+    pub management_api_key_max_entries: usize,
+    pub management_api_key_max_bytes: usize,
+    pub management_jwks_max_keys: usize,
+    pub management_jwks_max_bytes: usize,
+    pub management_jwks_ttl_ms: u64,
+    pub management_jwks_refresh_min_interval_ms: u64,
+    pub management_jwt_max_bytes: usize,
     /// Gateway product/codec profiles only; no per-device business state.
     pub control_max_products: usize,
     /// Serialized gateway product profiles and routes (not preallocated).
@@ -223,6 +235,18 @@ impl Default for Limits {
             auth_cache_max_waiters: 256,
             auth_positive_ttl_ms: 300_000,
             auth_negative_ttl_ms: 5_000,
+            management_auth_max_subject_bytes: 128,
+            management_auth_max_scopes: 32,
+            management_auth_max_scope_bytes: 512,
+            management_auth_max_resource_entries: 128,
+            management_auth_max_resource_bytes: 8_192,
+            management_api_key_max_entries: 128,
+            management_api_key_max_bytes: 32_768,
+            management_jwks_max_keys: 32,
+            management_jwks_max_bytes: 65_536,
+            management_jwks_ttl_ms: 300_000,
+            management_jwks_refresh_min_interval_ms: 30_000,
+            management_jwt_max_bytes: 16_384,
             control_max_products: 4_096,
             control_max_bytes: 16_777_216,
             max_sinks: 32,
@@ -283,6 +307,21 @@ impl Limits {
     }
 
     pub fn validate(&self) -> Result<()> {
+        if self.management_auth_max_subject_bytes > 256
+            || self.management_auth_max_scopes > 64
+            || self.management_auth_max_scope_bytes > 1_024
+            || self.management_auth_max_resource_entries > 1_024
+            || self.management_auth_max_resource_bytes > 65_536
+            || self.management_api_key_max_entries > 1_024
+            || self.management_api_key_max_bytes > 262_144
+            || self.management_jwks_max_keys > 128
+            || self.management_jwks_max_bytes > 262_144
+            || self.management_jwks_ttl_ms > 3_600_000
+            || self.management_jwks_refresh_min_interval_ms > self.management_jwks_ttl_ms
+            || self.management_jwt_max_bytes > 65_536
+        {
+            return Err(Error::Configuration);
+        }
         let value = serde_json::to_value(self).map_err(|_| Error::Configuration)?;
         if value
             .as_object()

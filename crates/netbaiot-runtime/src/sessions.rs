@@ -293,6 +293,16 @@ impl Sessions {
     }
 
     pub fn list(&self, offset: usize, limit: usize) -> Result<Vec<ConnectionSummary>> {
+        self.list_filtered(offset, limit, |_| true)
+    }
+
+    /// Filters the bounded live registry before applying offset/limit.
+    pub fn list_filtered(
+        &self,
+        offset: usize,
+        limit: usize,
+        allowed: impl Fn(&DeviceKey) -> bool,
+    ) -> Result<Vec<ConnectionSummary>> {
         if limit == 0 || limit > 256 {
             return Err(Error::Invalid);
         }
@@ -300,13 +310,25 @@ impl Sessions {
         let mut values = state
             .sessions
             .iter()
+            .filter(|(device, _)| allowed(device))
             .map(|(device, endpoint)| ConnectionSummary {
                 device: device.clone(),
                 generation: endpoint.generation,
                 transport: endpoint.transport,
             })
             .collect::<Vec<_>>();
-        values.sort_by(|a, b| a.device.device_id.cmp(&b.device.device_id));
+        values.sort_by(|a, b| {
+            (
+                &a.device.tenant_id,
+                &a.device.product_id,
+                &a.device.device_id,
+            )
+                .cmp(&(
+                    &b.device.tenant_id,
+                    &b.device.product_id,
+                    &b.device.device_id,
+                ))
+        });
         Ok(values.into_iter().skip(offset).take(limit).collect())
     }
 
@@ -466,6 +488,33 @@ mod tests {
             1
         );
         assert!(third_lease.cancel.is_cancelled());
+    }
+
+    #[test]
+    fn authorized_connection_pagination_filters_before_offset() {
+        let sessions = Sessions::new(Arc::new(Limits::default()));
+        let mut other = (*auth("other")).clone();
+        other.device_key.tenant_id = TenantId::new("a-other").unwrap();
+        let (other_lease, _) = sessions.register(Arc::new(other), Transport::Mqtt).unwrap();
+        let (one, _) = sessions.register(auth("one"), Transport::Mqtt).unwrap();
+        let (two, _) = sessions.register(auth("two"), Transport::Tcp).unwrap();
+        let first = sessions
+            .list_filtered(0, 1, |device| device.tenant_id.as_str() == "t")
+            .unwrap();
+        let second = sessions
+            .list_filtered(1, 1, |device| device.tenant_id.as_str() == "t")
+            .unwrap();
+        assert_eq!(first.len(), 1);
+        assert_eq!(second.len(), 1);
+        assert_eq!(first[0].device.device_id.as_str(), "one");
+        assert_eq!(second[0].device.device_id.as_str(), "two");
+        assert!(
+            sessions
+                .list_filtered(2, 1, |device| device.tenant_id.as_str() == "t")
+                .unwrap()
+                .is_empty()
+        );
+        drop((other_lease, one, two));
     }
 
     #[test]

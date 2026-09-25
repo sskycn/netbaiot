@@ -186,6 +186,7 @@ pub struct ClientMetrics {
 struct ClientInner {
     endpoint: Url,
     token: Secret,
+    api_key: bool,
     event_token: Secret,
     http: reqwest::Client,
     event_address: Option<SocketAddr>,
@@ -225,6 +226,7 @@ impl fmt::Debug for NetbaIoTClient {
 pub struct ClientBuilder {
     endpoint: Option<String>,
     token: Option<String>,
+    api_key: bool,
     event_token: Option<String>,
     event_address: Option<SocketAddr>,
     connect_timeout: Duration,
@@ -258,6 +260,7 @@ impl Default for ClientBuilder {
         Self {
             endpoint: None,
             token: None,
+            api_key: false,
             event_token: None,
             event_address: None,
             connect_timeout: Duration::from_secs(5),
@@ -281,6 +284,14 @@ impl ClientBuilder {
 
     pub fn token(mut self, token: impl Into<String>) -> Self {
         self.token = Some(token.into());
+        self.api_key = false;
+        self
+    }
+
+    /// Uses `Authorization: ApiKey <key_id>.<secret>` for management HTTP.
+    pub fn api_key(mut self, key: impl Into<String>) -> Self {
+        self.token = Some(key.into());
+        self.api_key = true;
         self
     }
 
@@ -361,6 +372,23 @@ impl ClientBuilder {
             message: "management token is required".into(),
             request_id: None,
         })?;
+        if self.api_key {
+            let valid = token.split_once('.').is_some_and(|(id, secret)| {
+                !id.is_empty()
+                    && id.len() <= 64
+                    && id
+                        .bytes()
+                        .all(|b| b.is_ascii_alphanumeric() || b"_-.:/@".contains(&b))
+                    && secret.len() == 64
+                    && secret.bytes().all(|b| b.is_ascii_hexdigit())
+            });
+            if !valid || (self.event_address.is_some() && self.event_token.is_none()) {
+                return Err(ClientError::InvalidRequest {
+                    message: "invalid API key or missing separate event token".into(),
+                    request_id: None,
+                });
+            }
+        }
         let event_token = self.event_token.unwrap_or_else(|| token.clone());
         if token.is_empty()
             || event_token.is_empty()
@@ -393,6 +421,7 @@ impl ClientBuilder {
             inner: Arc::new(ClientInner {
                 endpoint,
                 token: Secret(Arc::from(token)),
+                api_key: self.api_key,
                 event_token: Secret(Arc::from(event_token)),
                 http,
                 event_address: self.event_address,
@@ -463,11 +492,15 @@ impl NetbaIoTClient {
             .endpoint
             .join(path.trim_start_matches('/'))
             .map_err(|error| ClientError::Protocol(error.to_string()))?;
-        let mut request = self
-            .inner
-            .http
-            .request(method, url)
-            .bearer_auth(self.inner.token.expose());
+        let mut request = self.inner.http.request(method, url);
+        request = if self.inner.api_key {
+            request.header(
+                reqwest::header::AUTHORIZATION,
+                format!("ApiKey {}", self.inner.token.expose()),
+            )
+        } else {
+            request.bearer_auth(self.inner.token.expose())
+        };
         if let Some(body) = body {
             request = request.json(body);
         }
@@ -491,11 +524,15 @@ impl NetbaIoTClient {
             .endpoint
             .join(path.trim_start_matches('/'))
             .map_err(|error| ClientError::Protocol(error.to_string()))?;
-        let mut request = self
-            .inner
-            .http
-            .request(method, url)
-            .bearer_auth(self.inner.token.expose());
+        let mut request = self.inner.http.request(method, url);
+        request = if self.inner.api_key {
+            request.header(
+                reqwest::header::AUTHORIZATION,
+                format!("ApiKey {}", self.inner.token.expose()),
+            )
+        } else {
+            request.bearer_auth(self.inner.token.expose())
+        };
         if let Some(body) = body {
             request = request.json(body);
         }
@@ -1247,6 +1284,25 @@ mod tests {
             .await
             .unwrap();
         assert!(!format!("{client:?}").contains("top-secret"));
+    }
+
+    #[tokio::test]
+    async fn api_key_builder_validates_credential_and_keeps_it_redacted() {
+        let key = format!("backend.{}", "a".repeat(64));
+        let builder = NetbaIoTClient::builder()
+            .endpoint("http://127.0.0.1:1")
+            .api_key(&key);
+        assert!(!format!("{builder:?}").contains(&key));
+        let client = builder.connect().await.unwrap();
+        assert!(!format!("{client:?}").contains(&key));
+        assert!(
+            NetbaIoTClient::builder()
+                .endpoint("http://127.0.0.1:1")
+                .api_key("bad")
+                .connect()
+                .await
+                .is_err()
+        );
     }
 
     #[tokio::test]

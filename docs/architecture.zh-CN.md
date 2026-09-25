@@ -60,7 +60,7 @@ Quiesce 关闭接纳，停止共享 TCP/UDP 并等待连接结束，然后进行
 
 命令沿相反方向流动：从管理 HTTP 到 `CommandRouter`，然后直接进入本地活动 MQTT/TCP 会话的有界命令队列（按数量和字节数限制）。设备离线时返回不可用；不会保留离线命令。
 
-管理 HTTP 使用独立监听器和管理授权。运行时配置是带 revision 的不可变控制快照。认证缓存与网关控制状态分别设限，并在重启后重建；二者均不拥有设备期望配置。
+管理 HTTP 使用独立监听器。管理凭据由 Static Token、API Key、JWT/JWKS 或受信的客户端证书映射成统一 `AdminPrincipal`，再经过 Scope 与 Tenant/Product/完整 DeviceKey 资源授权。管理 JWKS 缓存与设备 `AuthCache` 完全分开；管理 mTLS 可使用自己的服务端证书和客户端 CA，设备 TLS 不要求客户端证书。参阅[管理认证](management-auth.zh-CN.md)。运行时配置是带 revision 的不可变控制快照。认证缓存与网关控制状态分别设限，并在重启后重建；二者均不拥有设备期望配置。
 
 计划关机过程为 `RUNNING -> QUIESCING -> DRAINING -> SPOOLING -> DRAINED`。在关闭监听器前先关闭接纳闸门。已接受的必需投递要么收到 ACK，要么通过文件 fsync、原子重命名和目录 fsync 写入有界本地重启 spool。同一恢复目录还保存单独的原子 MQTT 协议快照，用于 retain 和持久会话状态。突发崩溃可能丢失有界的、尚未写入 spool 的内存流量以及最近的 MQTT 修改。
 

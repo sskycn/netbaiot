@@ -274,6 +274,9 @@ impl Default for HistogramState {
 
 pub struct Metrics {
     values: [AtomicU64; NAMES.len()],
+    management_auth_attempts: [AtomicU64; 15],
+    management_authz_denied: [AtomicU64; 12],
+    management_jwks_cache: [AtomicU64; 2],
     histograms: [HistogramState; HISTOGRAM_NAMES.len()],
     lock_timing_enabled: bool,
     event_bus_probes: [AtomicU64; EVENT_BUS_PROBES.len()],
@@ -284,6 +287,9 @@ impl Default for Metrics {
     fn default() -> Self {
         Self {
             values: std::array::from_fn(|_| AtomicU64::new(0)),
+            management_auth_attempts: std::array::from_fn(|_| AtomicU64::new(0)),
+            management_authz_denied: std::array::from_fn(|_| AtomicU64::new(0)),
+            management_jwks_cache: std::array::from_fn(|_| AtomicU64::new(0)),
             histograms: std::array::from_fn(|_| HistogramState::default()),
             lock_timing_enabled: false,
             event_bus_probes: std::array::from_fn(|_| AtomicU64::new(0)),
@@ -293,6 +299,27 @@ impl Default for Metrics {
 }
 
 impl Metrics {
+    pub fn management_auth_attempt(&self, method: &str, result: &str) {
+        let method = match method {
+            "static_token" => 0,
+            "api_key" => 1,
+            "jwt" => 2,
+            "mtls" => 3,
+            _ => 4,
+        };
+        let result = match result {
+            "success" => 0,
+            "unavailable" => 1,
+            _ => 2,
+        };
+        self.management_auth_attempts[method * 3 + result].fetch_add(1, Ordering::Relaxed);
+    }
+    pub fn management_authz_denied(&self, action: crate::AdminScope) {
+        self.management_authz_denied[action as usize].fetch_add(1, Ordering::Relaxed);
+    }
+    pub fn management_jwks_cache(&self, hit: bool) {
+        self.management_jwks_cache[usize::from(!hit)].fetch_add(1, Ordering::Relaxed);
+    }
     pub fn with_lock_timing() -> Self {
         Self {
             lock_timing_enabled: true,
@@ -364,6 +391,47 @@ impl Metrics {
                 format!("netbaiot_{name}_total {}\n", value.load(Ordering::Relaxed))
             })
             .collect();
+        for (index, method) in ["static_token", "api_key", "jwt", "mtls", "unknown"]
+            .iter()
+            .enumerate()
+        {
+            for (result, label) in ["success", "unavailable", "unauthenticated"]
+                .iter()
+                .enumerate()
+            {
+                output.push_str(&format!("netbaiot_management_auth_attempts_total{{method=\"{method}\",result=\"{label}\"}} {}\n", self.management_auth_attempts[index * 3 + result].load(Ordering::Relaxed)));
+            }
+        }
+        for (index, action) in [
+            "runtime.read",
+            "metrics.read",
+            "connection.read",
+            "device.command",
+            "auth.invalidate",
+            "auth.invalidate.all",
+            "control.read",
+            "control.write",
+            "routes.read",
+            "routes.write",
+            "runtime.drain",
+            "admin.*",
+        ]
+        .iter()
+        .enumerate()
+        {
+            output.push_str(&format!(
+                "netbaiot_management_authz_denied_total{{action=\"{action}\"}} {}\n",
+                self.management_authz_denied[index].load(Ordering::Relaxed)
+            ));
+        }
+        output.push_str(&format!(
+            "netbaiot_management_auth_cache_hits_total{{provider=\"jwks\"}} {}\n",
+            self.management_jwks_cache[0].load(Ordering::Relaxed)
+        ));
+        output.push_str(&format!(
+            "netbaiot_management_auth_cache_misses_total{{provider=\"jwks\"}} {}\n",
+            self.management_jwks_cache[1].load(Ordering::Relaxed)
+        ));
         if self.lock_timing_enabled {
             for (name, value) in EVENT_BUS_PROBES.iter().zip(&self.event_bus_probes) {
                 output.push_str(&format!(

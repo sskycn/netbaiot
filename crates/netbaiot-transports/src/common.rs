@@ -16,6 +16,7 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Send> Stream for T {}
 pub type BoxStream = Box<dyn Stream>;
 pub struct Services {
     pub admin: Option<Arc<AdminAccess>>,
+    pub management_auth: Option<Arc<ManagementAuthService>>,
     pub shutdown: CancellationToken,
     pub control_lock: Arc<tokio::sync::Mutex<()>>,
     pub http_slots: Arc<tokio::sync::Semaphore>,
@@ -41,6 +42,7 @@ impl Services {
         let limits = ingress.limits.clone();
         Arc::new(Self {
             admin: None,
+            management_auth: None,
             shutdown,
             control_lock: Arc::new(tokio::sync::Mutex::new(())),
             http_slots: Arc::new(tokio::sync::Semaphore::new(limits.max_ingress)),
@@ -249,22 +251,30 @@ async fn serve_accepted(
     let _ = socket.set_nodelay(true);
     let result = async {
         let deadline = lease.connect_deadline();
-        let stream: BoxStream = if let Some(tls) = tls {
+        let (stream, certificate): (BoxStream, Option<Vec<u8>>) = if let Some(tls) = tls {
             tokio::select! {
                 biased;
                 _ = stop.cancelled() => return Err(Error::Draining),
                 result = tokio::time::timeout_at(deadline, tls.accept(socket)) => {
-                    Box::new(result.map_err(|_| Error::Timeout)?.map_err(|error| {
+                    let accepted = result.map_err(|_| Error::Timeout)?.map_err(|error| {
                         tracing::debug!(%error, "TLS handshake rejected");
                         Error::Invalid
-                    })?)
+                    })?;
+                    let certificate = if matches!(kind, ListenerKind::Management) {
+                        match accepted.get_ref().1.peer_certificates().and_then(|certs| certs.first()) {
+                            Some(cert) if cert.as_ref().len() <= 65_536 => Some(cert.as_ref().to_vec()),
+                            Some(_) => return Err(Error::Invalid),
+                            None => None,
+                        }
+                    } else { None };
+                    (Box::new(accepted), certificate)
                 }
             }
         } else {
-            Box::new(socket)
+            (Box::new(socket), None)
         };
         if matches!(kind, ListenerKind::Management) {
-            return crate::management_http::connection(stream, peer, services.clone(), lease.into_management()?, stop).await;
+            return crate::management_http::connection(stream, peer, services.clone(), lease.into_management()?, stop, certificate).await;
         }
         let (classified, stream) = if let ListenerKind::Device(transport) = kind {
             (transport, stream)

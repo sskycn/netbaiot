@@ -74,22 +74,55 @@ fn error(error: Error, request_id: &str) -> Response<Full<Bytes>> {
     api_error(status, error_code(&error), &error.to_string(), request_id)
 }
 
-fn authorization(req: &Request<Incoming>) -> Result<String> {
+fn authorization(req: &Request<Incoming>) -> Result<Option<&str>> {
     if req
         .headers()
         .get_all(hyper::header::AUTHORIZATION)
         .iter()
         .count()
-        != 1
+        > 1
     {
         return Err(Error::Authentication);
     }
     req.headers()
         .get(hyper::header::AUTHORIZATION)
-        .and_then(|header| header.to_str().ok())
-        .and_then(|header| header.strip_prefix("Bearer "))
-        .map(str::to_owned)
-        .ok_or(Error::Authentication)
+        .map(|header| header.to_str().map_err(|_| Error::Authentication))
+        .transpose()
+}
+
+fn scope_for_route(method: &hyper::Method, path: &str) -> Option<AdminScope> {
+    match (method, path) {
+        (&hyper::Method::GET, "/api/v1/health" | "/api/v1/ready" | "/api/v1/status") => {
+            Some(AdminScope::RuntimeRead)
+        }
+        (&hyper::Method::GET, "/api/v1/metrics") => Some(AdminScope::MetricsRead),
+        (&hyper::Method::GET, "/api/v1/connections")
+        | (&hyper::Method::POST, "/api/v1/devices/connection") => Some(AdminScope::ConnectionRead),
+        (&hyper::Method::POST, "/api/v1/devices/commands") => Some(AdminScope::DeviceCommand),
+        (&hyper::Method::POST, "/api/v1/auth/invalidate") => None,
+        (&hyper::Method::PUT, "/api/v1/control/snapshot") => Some(AdminScope::ControlWrite),
+        (&hyper::Method::PUT, "/api/v1/routes") => Some(AdminScope::RoutesWrite),
+        (&hyper::Method::POST, "/api/v1/drain") => Some(AdminScope::RuntimeDrain),
+        _ => None,
+    }
+}
+
+fn missing_scope(scope: AdminScope) -> Response<Full<Bytes>> {
+    let request_id = Uuid::new_v4().to_string();
+    let payload = ApiError {
+        code: ErrorCode::Forbidden,
+        message: "missing required scope".into(),
+        request_id: Some(request_id.clone()),
+        required_scope: Some(scope.as_str().into()),
+    };
+    let mut result = response(
+        StatusCode::FORBIDDEN,
+        serde_json::to_vec(&payload).unwrap_or_else(|_| b"{}".to_vec()),
+    );
+    if let Ok(value) = hyper::header::HeaderValue::from_str(&request_id) {
+        result.headers_mut().insert("x-request-id", value);
+    }
+    result
 }
 
 async fn body(req: Request<Incoming>, maximum: usize) -> Result<Bytes> {
@@ -113,6 +146,7 @@ async fn handle(
     req: Request<Incoming>,
     peer: SocketAddr,
     services: Arc<Services>,
+    certificate: Option<Arc<Vec<u8>>>,
 ) -> Result<Response<Full<Bytes>>> {
     let _slot = services
         .http_slots
@@ -128,7 +162,7 @@ async fn handle(
         .try_fold(0usize, |total, (name, value)| {
             total
                 .checked_add(name.as_str().len())?
-                .checked_add(value.len() + 4)
+                .checked_add(value.len().checked_add(4)?)
         })
         .ok_or(Error::Invalid)?;
     if header_bytes > limits.max_http_header_bytes || req.headers().len() > limits.max_http_headers
@@ -138,21 +172,64 @@ async fn handle(
     if req.headers().contains_key(hyper::header::CONTENT_ENCODING) {
         return Ok(response(StatusCode::UNSUPPORTED_MEDIA_TYPE, b"{}".to_vec()));
     }
-    handle_management(req, services).await
+    handle_management(req, services, certificate.as_deref().map(Vec::as_slice)).await
 }
 
 async fn handle_management(
     req: Request<Incoming>,
     services: Arc<Services>,
+    certificate: Option<&[u8]>,
 ) -> Result<Response<Full<Bytes>>> {
     let authorization = authorization(&req)?;
-    services
-        .admin
-        .as_ref()
-        .ok_or(Error::Forbidden)?
-        .verify(authorization.as_bytes())?;
+    let auth_method = if certificate.is_some() {
+        "mtls"
+    } else if authorization.is_some_and(|h| h.starts_with("ApiKey ")) {
+        "api_key"
+    } else if authorization.is_some_and(|h| h.starts_with("Bearer ") && h.len() == 71) {
+        "static_token"
+    } else if authorization.is_some_and(|h| h.starts_with("Bearer ")) {
+        "jwt"
+    } else {
+        "unknown"
+    };
+    let authentication: Result<AdminPrincipal> = if let Some(service) = &services.management_auth {
+        service.authenticate(authorization, certificate).await
+    } else {
+        services
+            .admin
+            .as_ref()
+            .zip(authorization.and_then(|h| h.strip_prefix("Bearer ")))
+            .ok_or(Error::Authentication)
+            .and_then(|(admin, secret)| admin.authenticate(secret.as_bytes()))
+    };
+    let principal = match authentication {
+        Ok(principal) => {
+            services
+                .ingress
+                .metrics
+                .management_auth_attempt(auth_method, "success");
+            principal
+        }
+        Err(error) => {
+            services.ingress.metrics.management_auth_attempt(
+                auth_method,
+                if matches!(error, Error::Unavailable | Error::Timeout) {
+                    "unavailable"
+                } else {
+                    "unauthenticated"
+                },
+            );
+            return Err(error);
+        }
+    };
     let path = req.uri().path().to_owned();
     let method = req.method().clone();
+    if let Some(scope) = scope_for_route(&method, &path)
+        && principal.require_scope(scope).is_err()
+    {
+        services.ingress.metrics.management_authz_denied(scope);
+        return Ok(missing_scope(scope));
+    }
     match (method, path.as_str()) {
         (hyper::Method::GET, "/api/v1/health") => {
             Ok(response(StatusCode::OK, b"{\"live\":true}".to_vec()))
@@ -218,14 +295,24 @@ async fn handle_management(
             }
             Ok(response(
                 StatusCode::OK,
-                serde_json::to_vec(&services.ingress.sessions.list(offset, limit)?)
-                    .map_err(|_| Error::Internal)?,
+                serde_json::to_vec(&services.ingress.sessions.list_filtered(
+                    offset,
+                    limit,
+                    |device| principal.resource_scope.allows_device(device),
+                )?)
+                .map_err(|_| Error::Internal)?,
             ))
         }
         (hyper::Method::POST, "/api/v1/devices/commands") => {
             let maximum = services.ingress.limits.max_command_bytes;
             let command: DeviceCommand =
                 serde_json::from_slice(&body(req, maximum).await?).map_err(|_| Error::Invalid)?;
+            principal.require_device(&command.device).inspect_err(|_| {
+                services
+                    .ingress
+                    .metrics
+                    .management_authz_denied(AdminScope::DeviceCommand)
+            })?;
             let result = match services.router.send(command) {
                 Ok(result) => result,
                 Err(Error::Unavailable) => {
@@ -249,6 +336,12 @@ async fn handle_management(
                 &body(req, services.ingress.limits.max_http_body_size).await?,
             )
             .map_err(|_| Error::Invalid)?;
+            principal.require_device(&device).inspect_err(|_| {
+                services
+                    .ingress
+                    .metrics
+                    .management_authz_denied(AdminScope::ConnectionRead)
+            })?;
             Ok(response(
                 StatusCode::OK,
                 serde_json::to_vec(&services.ingress.sessions.connection(&device)?)
@@ -256,10 +349,86 @@ async fn handle_management(
             ))
         }
         (hyper::Method::POST, "/api/v1/auth/invalidate") => {
+            if principal.require_scope(AdminScope::AuthInvalidate).is_err()
+                && principal
+                    .require_scope(AdminScope::AuthInvalidateAll)
+                    .is_err()
+            {
+                services
+                    .ingress
+                    .metrics
+                    .management_authz_denied(AdminScope::AuthInvalidate);
+                return Ok(missing_scope(AdminScope::AuthInvalidate));
+            }
             let invalidation: AuthInvalidation = serde_json::from_slice(
                 &body(req, services.ingress.limits.max_http_body_size).await?,
             )
             .map_err(|_| Error::Invalid)?;
+            if !matches!(invalidation, AuthInvalidation::All)
+                && principal.require_scope(AdminScope::AuthInvalidate).is_err()
+            {
+                services
+                    .ingress
+                    .metrics
+                    .management_authz_denied(AdminScope::AuthInvalidate);
+                return Ok(missing_scope(AdminScope::AuthInvalidate));
+            }
+            match &invalidation {
+                AuthInvalidation::Device { device } => {
+                    principal.require_device(device).inspect_err(|_| {
+                        services
+                            .ingress
+                            .metrics
+                            .management_authz_denied(AdminScope::AuthInvalidate)
+                    })?
+                }
+                AuthInvalidation::Product {
+                    tenant_id,
+                    product_id,
+                } => principal
+                    .require_product(tenant_id, product_id)
+                    .inspect_err(|_| {
+                        services
+                            .ingress
+                            .metrics
+                            .management_authz_denied(AdminScope::AuthInvalidate)
+                    })?,
+                AuthInvalidation::Tenant { tenant_id } => {
+                    principal.require_tenant(tenant_id).inspect_err(|_| {
+                        services
+                            .ingress
+                            .metrics
+                            .management_authz_denied(AdminScope::AuthInvalidate)
+                    })?
+                }
+                AuthInvalidation::CredentialVersion { .. }
+                | AuthInvalidation::AuthGeneration { .. } => {
+                    principal.require_global().inspect_err(|_| {
+                        services
+                            .ingress
+                            .metrics
+                            .management_authz_denied(AdminScope::AuthInvalidate)
+                    })?
+                }
+                AuthInvalidation::All => {
+                    if principal
+                        .require_scope(AdminScope::AuthInvalidateAll)
+                        .is_err()
+                    {
+                        services
+                            .ingress
+                            .metrics
+                            .management_authz_denied(AdminScope::AuthInvalidateAll);
+                        return Ok(missing_scope(AdminScope::AuthInvalidateAll));
+                    }
+                    principal.require_global().inspect_err(|_| {
+                        services
+                            .ingress
+                            .metrics
+                            .management_authz_denied(AdminScope::AuthInvalidateAll)
+                    })?;
+                }
+            }
             let mqtt = services.mqtt.clone();
             let (devices, disconnected, mqtt_invalidated) = services
                 .ingress
@@ -278,6 +447,12 @@ async fn handle_management(
             ))
         }
         (hyper::Method::PUT, "/api/v1/control/snapshot") => {
+            principal.require_global().inspect_err(|_| {
+                services
+                    .ingress
+                    .metrics
+                    .management_authz_denied(AdminScope::ControlWrite)
+            })?;
             let snapshot: ControlSnapshot = serde_json::from_slice(
                 &body(req, services.ingress.limits.max_http_body_size).await?,
             )
@@ -294,6 +469,12 @@ async fn handle_management(
             Ok(response(StatusCode::NO_CONTENT, Vec::new()))
         }
         (hyper::Method::PUT, "/api/v1/routes") => {
+            principal.require_global().inspect_err(|_| {
+                services
+                    .ingress
+                    .metrics
+                    .management_authz_denied(AdminScope::RoutesWrite)
+            })?;
             let update: RoutesUpdate = serde_json::from_slice(
                 &body(req, services.ingress.limits.max_http_body_size).await?,
             )
@@ -314,6 +495,12 @@ async fn handle_management(
             Ok(response(StatusCode::NO_CONTENT, Vec::new()))
         }
         (hyper::Method::POST, "/api/v1/drain") => {
+            principal.require_global().inspect_err(|_| {
+                services
+                    .ingress
+                    .metrics
+                    .management_authz_denied(AdminScope::RuntimeDrain)
+            })?;
             services.shutdown.cancel();
             Ok(response(
                 StatusCode::ACCEPTED,
@@ -330,6 +517,7 @@ pub async fn connection(
     services: Arc<Services>,
     lease: ConnectionLease,
     stop: CancellationToken,
+    certificate: Option<Vec<u8>>,
 ) -> Result<()> {
     let connect_remaining = lease
         .connect_deadline()
@@ -337,13 +525,15 @@ pub async fn connection(
         .ok_or(Error::Timeout)?;
     let _lease = lease; // Retain the global/IP/byte permits through connection shutdown.
     let handler = services.clone();
+    let certificate = certificate.map(Arc::new);
     let service = service_fn(move |request| {
         let services = handler.clone();
+        let certificate = certificate.clone();
         async move {
             let request_id = Uuid::new_v4().to_string();
             let result = deadline(
                 services.ingress.limits.request_timeout_ms,
-                handle(request, peer, services),
+                handle(request, peer, services, certificate),
             )
             .await;
             Ok::<_, Infallible>(match result {
