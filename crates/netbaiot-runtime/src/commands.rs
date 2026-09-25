@@ -23,6 +23,9 @@ impl CommandRouter {
             .sessions
             .lookup(&command.device)?
             .ok_or(Error::Unavailable)?;
+        if !endpoint.command_ready() {
+            return Err(Error::Unavailable);
+        }
         if !endpoint.auth.permissions.commands {
             return Err(Error::Forbidden);
         }

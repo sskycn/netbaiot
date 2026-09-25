@@ -27,6 +27,7 @@ pub struct Services {
     pub rates: Arc<RateLimiter>,
     pub management_request_rates: Arc<RateLimiter>,
     pub protocol_admission: Arc<Admission>,
+    pub protocol_control_admission: Arc<Admission>,
     pub mqtt: Arc<MqttBroker>,
 }
 impl Services {
@@ -56,6 +57,7 @@ impl Services {
             rates: Arc::new(RateLimiter::new(limits.clone())),
             management_request_rates: Arc::new(RateLimiter::new(limits.clone())),
             protocol_admission: Admission::new(limits.clone()),
+            protocol_control_admission: Admission::new(limits.clone()),
             mqtt,
             ingress,
         })

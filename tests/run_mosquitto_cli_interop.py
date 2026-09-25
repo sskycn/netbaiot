@@ -53,11 +53,15 @@ def main():
             listener.close()
         environment = os.environ.copy()
         environment["NETBAIOT_ADMIN_SECRET"] = ADMIN
+        environment["RUST_LOG"] = "netbaiot_transports=debug,info"
+        output_path = pathlib.Path(temporary) / "server.log"
+        output = output_path.open("w")
+        success = False
         server = subprocess.Popen(
             [str(ROOT / "target/debug/netbaiot-server"), str(config_path)],
             cwd=ROOT,
             env=environment,
-            stdout=subprocess.DEVNULL,
+            stdout=output,
             stderr=subprocess.PIPE,
             text=True,
         )
@@ -78,6 +82,7 @@ def main():
             )
             server.terminate()
             assert server.wait(timeout=8) == 0
+            success = True
         finally:
             if server.poll() is None:
                 server.kill()
@@ -85,6 +90,9 @@ def main():
             diagnostics = server.stderr.read()
             if diagnostics:
                 print(diagnostics, flush=True)
+            output.close()
+            if not success:
+                print(output_path.read_text()[-8192:], flush=True)
 
 
 if __name__ == "__main__":

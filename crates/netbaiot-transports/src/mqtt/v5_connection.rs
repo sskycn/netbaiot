@@ -108,7 +108,7 @@ async fn send_frame(
 ) -> Result<()> {
     let mut pending = Some(frame);
     while let Some(frame) = pending.take() {
-        let bytes = match frame {
+        let (bytes, budget, command) = match frame {
             BrokerFrame::Publish(delivery) => {
                 if delivery.packet_id.is_none() && delivery.message.expired(now_ms()) {
                     return Ok(());
@@ -151,7 +151,7 @@ async fn send_frame(
                             pending = services.mqtt.next_offline(key, generation)?;
                             continue;
                         }
-                        bytes
+                        (bytes, delivery._budget, delivery.command)
                     }
                     Err(Error::Overloaded) => {
                         if delivery.packet_id.is_some() {
@@ -163,13 +163,26 @@ async fn send_frame(
                     Err(error) => return Err(error),
                 }
             }
-            BrokerFrame::Pubrel { packet_id, .. } => v5::ack(
-                v5::AckReason::Pubrel(v5::PubrelReason::Success),
-                packet_id,
-                maximum,
-            )?,
+            BrokerFrame::Pubrel { packet_id, .. } => (
+                v5::ack(
+                    v5::AckReason::Pubrel(v5::PubrelReason::Success),
+                    packet_id,
+                    maximum,
+                )?,
+                Vec::new(),
+                false,
+            ),
         };
-        send_v5(stream, services, &bytes, maximum, Some(disconnected)).await?;
+        let sent = send_v5(stream, services, &bytes, maximum, Some(disconnected)).await;
+        let charged = !budget.is_empty();
+        drop(budget);
+        if charged {
+            services.mqtt.outbound_bytes_released()?;
+        }
+        sent?;
+        if command {
+            services.router.transport_state(DeliveryState::Sent);
+        }
     }
     Ok(())
 }
@@ -389,6 +402,13 @@ pub(super) async fn connection(
     )?;
     send_v5(&mut stream, &services, &response, client_maximum, None).await?;
     services.ingress.metrics.inc(Metric::MqttConnectSuccess);
+    let down_topic = topic(&auth.device_key, TopicKind::Down);
+    live_session.set_command_ready(
+        services
+            .mqtt
+            .subscription_qos(&attachment.key, &down_topic)?
+            .is_some(),
+    )?;
     let keepalive = if connect.keep_alive == 0 {
         None
     } else {
@@ -414,15 +434,19 @@ pub(super) async fn connection(
                     let Some(command) = command else { break };
                     if command.expires_at <= now_ms() { continue; }
                     let down = topic(&auth.device_key, TopicKind::Down);
-                    let qos = services.mqtt.subscription_qos(&attachment.key, &down)?.unwrap_or(1);
-                    services.mqtt.send_live(&attachment.key, BrokerMessage {
+                    let Some(qos) = services.mqtt.subscription_qos(&attachment.key, &down)? else {
+                        services.router.transport_state(DeliveryState::Failed);
+                        continue;
+                    };
+                    if services.mqtt.send_live(&attachment.key, attachment.generation, BrokerMessage {
                         topic: down, payload: command.bytes.to_vec(), qos, retain: false,
                         properties: PublishProperties {
                             expires_at_ms: Some(command.expires_at),
                             ..Default::default()
                         },
-                    })?;
-                    services.router.transport_state(DeliveryState::Sent);
+                    }).is_err() {
+                        services.router.transport_state(DeliveryState::Failed);
+                    }
                 }
                 frame = attachment.receiver.recv() => {
                     let Some(frame) = frame else { break };
@@ -439,11 +463,19 @@ pub(super) async fn connection(
                             return Err(error);
                         }
                     };
-                    if !matches!(&packet, Packet::Publish { .. }) {
-                        let (wait, hold) = services.protocol_admission.check_rate(&auth.device_key)?;
-                        services.ingress.metrics.observe(Histogram::AdmissionLockWait, wait);
-                        services.ingress.metrics.observe(Histogram::AdmissionLockHold, hold);
-                    }
+                    let control = matches!(&packet, Packet::Puback { .. } | Packet::Pubrec { .. }
+                        | Packet::Pubrel { .. } | Packet::Pubcomp { .. } | Packet::Pingreq
+                        | Packet::Disconnect { .. });
+                    let units = match &packet {
+                        Packet::Publish { topic, payload, .. } =>
+                            1usize.saturating_add(topic.len().saturating_add(payload.len()) / 4096),
+                        _ => 1,
+                    };
+                    let admission = if control { &services.protocol_control_admission }
+                        else { &services.protocol_admission };
+                    let (wait, hold) = admission.check_rate_weighted(&auth.device_key, units)?;
+                    services.ingress.metrics.observe(Histogram::AdmissionLockWait, wait);
+                    services.ingress.metrics.observe(Histogram::AdmissionLockHold, hold);
                     last = Instant::now();
                     services.ingress.metrics.inc(Metric::MqttPacketsReceived);
                     match packet {
@@ -468,20 +500,31 @@ pub(super) async fn connection(
                                 } else { v5::SubackReason::NotAuthorized };
                                 reasons.push(reason);
                             }
+                            live_session.set_command_ready(
+                                services.mqtt.subscription_qos(&attachment.key, &down_topic)?.is_some()
+                            )?;
                             let bytes = v5::suback(packet_id, &reasons, limits.max_mqtt_packet_size)?;
                             send_v5(&mut stream, &services, &bytes, client_maximum, Some(&mut error_disconnect_sent)).await?;
                         }
                         Packet::Unsubscribe { packet_id, filters, .. } => {
+                            live_session.set_command_ready(false)?;
                             let mut reasons = Vec::with_capacity(filters.len());
                             for filter in filters {
                                 reasons.push(if services.mqtt.unsubscribe(&attachment.key, attachment.generation, &filter)? { v5::UnsubackReason::Success } else { v5::UnsubackReason::NoSubscriptionExisted });
                             }
+                            live_session.set_command_ready(
+                                services.mqtt.subscription_qos(&attachment.key, &down_topic)?.is_some()
+                            )?;
                             let bytes = v5::unsuback(packet_id, &reasons, limits.max_mqtt_packet_size)?;
                             send_v5(&mut stream, &services, &bytes, client_maximum, Some(&mut error_disconnect_sent)).await?;
                         }
-                        Packet::Puback { packet_id, reason: _ } => {
-                            outbound_ack_result(services.mqtt.puback(&attachment.key, attachment.generation, packet_id), &mut stream, &services, client_maximum, &mut error_disconnect_sent).await?;
-                            services.router.transport_state(DeliveryState::Received);
+                        Packet::Puback { packet_id, reason } => {
+                            let command = outbound_ack_result(services.mqtt.puback(&attachment.key, attachment.generation, packet_id), &mut stream, &services, client_maximum, &mut error_disconnect_sent).await?;
+                            if command && reason < 0x80 {
+                                services.router.transport_state(DeliveryState::Received);
+                            } else if command {
+                                services.router.transport_state(DeliveryState::Failed);
+                            }
                             services.ingress.metrics.inc(Metric::MqttPubacks);
                             if let Some(frame) = services.mqtt.next_offline(&attachment.key, attachment.generation)? {
                                 send_frame(&mut stream, &services, &attachment.key, attachment.generation, frame, client_maximum, &mut error_disconnect_sent).await?;
@@ -495,7 +538,9 @@ pub(super) async fn connection(
                                     send_v5(&mut stream, &services, &bytes, client_maximum, Some(&mut error_disconnect_sent)).await?;
                                     continue;
                                 }
-                                result?;
+                                if result? {
+                                    services.router.transport_state(DeliveryState::Failed);
+                                }
                             } else {
                                 let result = services.mqtt.pubrec(&attachment.key, attachment.generation, packet_id);
                                 if matches!(result, Err(Error::Invalid)) {
@@ -510,8 +555,13 @@ pub(super) async fn connection(
                                 send_frame(&mut stream, &services, &attachment.key, attachment.generation, frame, client_maximum, &mut error_disconnect_sent).await?;
                             }
                         }
-                        Packet::Pubcomp { packet_id, reason: _ } => {
-                            outbound_ack_result(services.mqtt.pubcomp(&attachment.key, attachment.generation, packet_id), &mut stream, &services, client_maximum, &mut error_disconnect_sent).await?;
+                        Packet::Pubcomp { packet_id, reason } => {
+                            let command = outbound_ack_result(services.mqtt.pubcomp(&attachment.key, attachment.generation, packet_id), &mut stream, &services, client_maximum, &mut error_disconnect_sent).await?;
+                            if command && reason < 0x80 {
+                                services.router.transport_state(DeliveryState::Received);
+                            } else if command {
+                                services.router.transport_state(DeliveryState::Failed);
+                            }
                             if let Some(frame) = services.mqtt.next_offline(&attachment.key, attachment.generation)? {
                                 send_frame(&mut stream, &services, &attachment.key, attachment.generation, frame, client_maximum, &mut error_disconnect_sent).await?;
                             }
@@ -578,8 +628,12 @@ pub(super) async fn connection(
                                     continue;
                                 }
                                 let kind = publish_acl(&auth, &message.topic)?;
-                                if let Err(error) = services.ingress.validate_mqtt_qos2_payload(
-                                    &auth, &message.payload, kind == TopicKind::DownAck) {
+                                if let Err(error) = if message.retain && message.payload.is_empty() {
+                                    Ok(())
+                                } else {
+                                    services.ingress.validate_mqtt_qos2_payload(
+                                        &auth, &message.payload, kind == TopicKind::DownAck)
+                                } {
                                     if matches!(error, Error::Codec | Error::Invalid) {
                                         let bytes = v5::ack(v5::AckReason::Pubrec(v5::PubrecReason::ImplementationSpecific), id, limits.max_mqtt_packet_size)?;
                                         send_v5(&mut stream, &services, &bytes, client_maximum, Some(&mut error_disconnect_sent)).await?;

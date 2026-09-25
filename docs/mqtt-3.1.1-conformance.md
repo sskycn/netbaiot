@@ -15,7 +15,7 @@ The normative source is MQTT 3.1.1 with Errata 01.
 | CleanSession=0 | PASS | `SESSION-001`, `SESSION-OFFLINE-001`, restart subprocess tests |
 | Duplicate ClientId | PASS | `DIFF-DUPLICATE-CLIENT-001`, `WILL-TAKEOVER-001`, generation-fencing unit tests |
 | QoS0 | PASS | `QOS0-001`, `DIFF-QOS-001`, Mosquitto CLI matrix |
-| QoS1 / PUBACK / DUP / reconnect | PASS | `QOS1-001`, `QOS1-DUP-001`, original-order reconnect unit test, subprocess restart test |
+| QoS1 / PUBACK / DUP / reconnect | PASS | `QOS1-001`, `QOS1-DUP-001`, `persistent_reconnect_retransmits_outbound_in_original_order`, barrier test `reconnect_replay_is_ordered_before_new_live_route`, subprocess restart test |
 | Inbound QoS2 | PASS | `QOS2-IN-001`, `QOS2-IN-SESSION-TAKEOVER-001`, end-to-end one-DeviceEvent test, state/failure/recovery unit tests |
 | Outbound QoS2 | PASS | `QOS2-OUT-WRONG-PUBACK-001`, `QOS2-OUT-WRONG-PUBCOMP-001`, reconnect-stage and four-generation restart tests, Mosquitto CLI matrix |
 | Packet Identifier lifecycle | PASS | zero-ID raw vectors, allocator collision/limit/unit and restart tests |
@@ -25,7 +25,10 @@ The normative source is MQTT 3.1.1 with Errata 01.
 | Re-subscribe retained replay | PASS | `SUB-RESUB-001`, `DIFF-SUB-001` |
 | UNSUBSCRIBE / UNSUBACK | PASS | `UNSUB-001`, `PERSISTENT-UNSUB-RECONNECT-001`, `DIFF-SUB-001`, `MOSQUITTO-PERSISTENT-UNSUB-001` |
 | Persistent offline QoS1/QoS2 | PASS | `SESSION-OFFLINE-001`, `MQTT-TENANT-INFLIGHT-WAKE-QOS1-001`, `MQTT-TENANT-INFLIGHT-WAKE-QOS2-001`, CLI matrix, bounded queue and restart tests |
-| Retained create/replace/delete/replay | PASS | `RETAIN-001`, `DIFF-RETAIN-001`, CLI and recovery tests |
+| QoS2 capacity release | PASS | `inbound_qos2_completion_wakes_waiting_outbound_qos2` checks that finishing an inbound exchange advances a pending subscriber copy |
+| Retained create/replace/delete/replay | PASS | `RETAIN-001`, `DIFF-RETAIN-001`, CLI and recovery tests, six-case `retained_delete_qos_matrix_skips_business_json_decode` across MQTT 3.1.1 and MQTT 5 |
+| Retained replacement ownership | PASS | `retained_replacement_reservation_survives_old_value_deletion` and `retained_qos2_reserved_state_round_trips_recovery` |
+| Protocol rate admission | PROFILE (PASS) | `mqtt_publish_fast_paths_consume_protocol_budget` covers retained deletes, duplicate QoS2 PUBLISH, and MQTT 5 invalid-payload replies |
 | Will QoS0/1/2 and RETAIN | PASS | `WILL-001`, `DIFF-WILL-001`, `WILL-RESOURCE-FAILURE-001`, `WILL-SUBSCRIBER-PRESSURE-001`, pending-Will restart test, Mosquitto CLI matrix |
 | DISCONNECT suppresses Will | PASS | `WILL-001`, Mosquitto CLI matrix |
 | EOF/timeout/protocol/takeover/shutdown Will | PASS | `WILL-001`, `WILL-TAKEOVER-001`, `WILL-SHUTDOWN-001`, keepalive and malformed cases |
@@ -36,7 +39,7 @@ The normative source is MQTT 3.1.1 with Errata 01.
 | Planned restart recovery | PASS | session/QoS1/QoS2/retained/pending-Will subprocess and unit coverage, NBMQ v1/v2 compatibility, NBMQ v3 whole-image integrity, ownership validation, and `MQTT-RECOVERY-BINARY-WORSTCASE-001` |
 | TLS interoperability | PASS | `tests/run_mosquitto_tls_interop.py`; test CA/hostname verification succeeds and untrusted CA fails |
 | Abrupt crash durability | PROFILE | recent memory state may be lost; no crash durability claim |
-| MQTT 5, WebSocket, shared subscriptions, bridges | NOT_APPLICABLE | explicitly outside this embedded MQTT 3.1.1 profile |
+| MQTT 5, WebSocket, shared subscriptions, bridges | NOT_APPLICABLE | MQTT 5 has its own implemented profile; the other entries are outside this MQTT 3.1.1 checklist |
 
 The dependency-free raw suite is `tests/mqtt_conformance/run.py`; its stable expected
 IDs and the exact 125-requirement evidence map are in

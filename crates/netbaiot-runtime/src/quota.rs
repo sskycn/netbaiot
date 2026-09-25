@@ -11,7 +11,7 @@ use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 #[derive(Clone)]
 pub struct ByteBudget(Arc<Semaphore>);
 #[derive(Default)]
-pub(crate) struct WeakByteBudget(std::sync::Weak<Semaphore>);
+pub struct WeakByteBudget(std::sync::Weak<Semaphore>);
 impl WeakByteBudget {
     pub fn upgrade(&self) -> Option<ByteBudget> {
         self.0.upgrade().map(ByteBudget)
@@ -27,11 +27,12 @@ impl WeakByteBudget {
         budget
     }
 }
+#[derive(Debug)]
 pub struct BytesPermit {
     _permit: OwnedSemaphorePermit,
 }
 impl ByteBudget {
-    pub(crate) fn downgrade(&self) -> WeakByteBudget {
+    pub fn downgrade(&self) -> WeakByteBudget {
         WeakByteBudget(Arc::downgrade(&self.0))
     }
     pub fn new(bytes: usize) -> Self {
@@ -238,14 +239,20 @@ struct Window {
 }
 impl Window {
     fn take(&mut self, limit: usize) -> Result<()> {
+        self.take_n(limit, 1)
+    }
+    fn take_n(&mut self, limit: usize, units: usize) -> Result<()> {
         if self.start.elapsed() >= Duration::from_secs(1) {
             self.start = Instant::now();
             self.count = 0;
         }
-        if self.count >= limit {
+        let Some(next) = self.count.checked_add(units) else {
+            return Err(Error::Overloaded);
+        };
+        if next > limit {
             return Err(Error::Overloaded);
         }
-        self.count += 1;
+        self.count = next;
         Ok(())
     }
 }
@@ -358,10 +365,21 @@ impl Admission {
     /// Applies only the bounded rate tables. Callers remain owned by their
     /// connection task, so this does not create a second concurrency lifetime.
     pub fn check_rate(&self, device: &DeviceKey) -> Result<(u64, u64)> {
+        self.check_rate_weighted(device, 1)
+    }
+
+    /// Charges every protocol packet, including paths that never create a business event.
+    /// A caller may charge additional units for a large packet.
+    pub fn check_rate_weighted(&self, device: &DeviceKey, units: usize) -> Result<(u64, u64)> {
+        if units == 0 {
+            return Err(Error::Invalid);
+        }
         let lock_started = Instant::now();
         let mut state = lock(&self.state)?;
         let lock_wait_us = lock_started.elapsed().as_micros() as u64;
-        state.global.take(self.limits.requests_per_second)?;
+        state
+            .global
+            .take_n(self.limits.requests_per_second, units)?;
         if !state.devices.contains_key(device) && state.devices.len() >= self.limits.max_devices {
             let capacity = self.limits.max_ingress_per_device;
             state.devices.retain(|_, entry| {
@@ -395,7 +413,7 @@ impl Admission {
                 },
             })
             .rate
-            .take(self.limits.messages_per_device_second)?;
+            .take_n(self.limits.messages_per_device_second, units)?;
         state
             .tenants
             .entry(device.tenant_id.clone())
@@ -407,7 +425,7 @@ impl Admission {
                 },
             })
             .rate
-            .take(self.limits.messages_per_tenant_second)?;
+            .take_n(self.limits.messages_per_tenant_second, units)?;
         let lock_hold_us = lock_started
             .elapsed()
             .as_micros()
@@ -744,6 +762,31 @@ mod tests {
             product_id: ProductId::new("p").unwrap(),
             device_id: DeviceId::new(device).unwrap(),
         }
+    }
+    #[test]
+    fn protocol_packet_budget_charges_count_and_payload_units() {
+        let limits = Arc::new(Limits {
+            requests_per_second: 4,
+            messages_per_device_second: 4,
+            messages_per_tenant_second: 4,
+            ..Limits::default()
+        });
+        let data = Admission::new(limits.clone());
+        let control = Admission::new(limits);
+        let device = key("t", "d");
+        data.check_rate_weighted(&device, 3).unwrap();
+        data.check_rate(&device).unwrap();
+        assert!(matches!(
+            data.check_rate_weighted(&device, 1),
+            Err(Error::Overloaded)
+        ));
+        // ACK/PING/DISCONNECT have a separate bounded budget, so data floods
+        // cannot prevent a transaction from completing or a peer disconnecting.
+        control.check_rate(&device).unwrap();
+        assert!(matches!(
+            control.check_rate_weighted(&device, 5),
+            Err(Error::Overloaded)
+        ));
     }
     #[tokio::test]
     async fn ingress_wait_is_count_byte_and_deadline_bounded() {

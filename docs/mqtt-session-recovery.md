@@ -61,6 +61,13 @@ use the compact configured ceiling. File and record limits are checked before
 allocation. Restore recomputes logical counters and rejects impossible QoS/topic/
 packet-ID/order/authorization/codec/ownership state instead of trusting serialized
 counters.
+Retained tenant count and byte indexes are rebuilt from validated retained records;
+they are derived runtime accounting, not trusted snapshot fields.
+QoS2 retained reservations are reconstructed from pending inbound transactions,
+charging the complete prospective retained entry rather than a delta against the
+current topic. The NBMQ format remains v6: no new field is required. An older
+snapshot whose simultaneous pending replacements exceed the configured retained
+capacity can now fail restore instead of recreating an overcommitted responsibility.
 
 The EventBus spool and MQTT snapshot are independent replay-safe responsibilities,
 not a general transaction/database. If either required commit fails, planned
@@ -77,6 +84,8 @@ shutdown fails.
   packet state before PUBCOMP. A restart from `EventAccepted` skips IoT ingestion and
   resumes broker routing, preventing a duplicate `DeviceEvent`.
 - Offline QoS1/2: promote messages into bounded inflight slots as ACKs complete.
+- Reconnect retransmission frames enter the new channel while the broker state lock
+  is held, before the active generation becomes visible to concurrent publishers.
 - Subscriptions and retained state are restored before readiness.
 
 The reconnecting socket itself is new. Server-generated ClientId is used only for a

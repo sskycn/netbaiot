@@ -93,6 +93,14 @@ Retained publish, replacement, wildcard replay, and zero-payload deletion are
 implemented with count/byte/message/per-tenant bounds. The retained store is bounded
 but wildcard retained replay currently scans that bounded store; this deliberate
 simplicity is measured and listed as a scaling limitation.
+An empty retained PUBLISH is a broker deletion at QoS0, QoS1, or QoS2, including
+MQTT 5: it still needs topic authorization and the QoS handshake but does not
+decode a JSON device event. A pending QoS2 retained replacement reserves one
+complete retained entry and its bytes until routing commits or the transaction is
+released. This conservative reservation remains owned even if another operation
+deletes the old value first.
+Per-tenant retained count and byte totals are maintained as bounded derived
+accounting, so admission does not scan the retained store for each update.
 
 Will Topic, binary payload, QoS, retain flag, size, syntax, and authorization are
 validated during CONNECT. EOF, network/protocol error, keepalive timeout, and
@@ -118,6 +126,19 @@ reserved count/bytes and was enqueued; it is not a database commit. MQTT QoS2
 prevents duplicate IoT binding for one stored MQTT flow, but it does not promise
 business exactly-once: EventBus recovery is at-least-once and consumers remain
 idempotent.
+When inbound QoS2 completion frees tenant inflight capacity, indexed pending
+subscriber deliveries are retried at a bounded cadence. Active outbound frames
+hold connection, tenant, and process byte permits until the socket write finishes;
+retained replay and reconnect frames follow the same budget.
+If reconnect replay waits for global byte capacity, the session remains indexed;
+later socket writes or bounded maintenance retry its unsent QoS frame.
+
+Every decoded MQTT packet crosses protocol processing admission before its
+state-machine branch. PUBLISH is charged even for retained deletion, duplicate
+QoS2 transactions, and MQTT 5 negative validation paths. Large PUBLISH payloads
+consume additional rate units per 4096 bytes. ACK, PINGREQ, and DISCONNECT use a
+separate bounded control budget. Business event admission is independent and is
+only charged when a new device event is created.
 
 SUBSCRIBE validates and preflights the complete retained replay against session,
 tenant, global, offline, and active-channel bounds before inserting either the
@@ -125,8 +146,16 @@ subscription map entry or trie node. A failed SUBACK therefore cannot leave a hi
 subscription that receives future live publications.
 
 Persistent MQTT offline subscription delivery is separate from the command API.
-Explicit management commands still require a live device and return
-`DEVICE_OFFLINE`; they are never silently converted into stored MQTT commands.
+Explicit MQTT management commands require a live current-generation connection
+with a matching `/down` subscription. A missing command subscription reports
+unavailable at dispatch; an old connection generation cannot publish into its
+replacement. Commands are rejected when live send quota or the active channel is
+full, rather than converted into an offline MQTT queue. MQTT packet write,
+positive transport ACK, and application CommandAck remain distinct milestones.
+Command send metrics advance only after the MQTT packet write succeeds. Ordinary
+subscription PUBACKs never advance command receipt; a negative MQTT 5 PUBACK or
+PUBCOMP marks a command failed rather than received. A subscription removal blocks
+new commands but leaves already-started QoS exchanges intact.
 
 Slow active consumers have a bounded sender. QoS0 may be shed when that bound is
 full. For QoS1/2, the broker preflights every matching session, tenant/global
