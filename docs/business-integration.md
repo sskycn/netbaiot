@@ -45,3 +45,7 @@ application-level `ACK event_id`.
 
 Consumers must be idempotent by `event_id`: a sink can process an event and lose its
 ACK immediately before a planned restart, causing the same ID to replay.
+
+## Business RPC V2
+
+The bidirectional V2 protocol, independent authentication provider, mTLS mapping, configuration, and Rust SDK are documented in [Business RPC Stream V2](business-rpc-v2.md). V1 remains the default when `business_rpc` is absent.

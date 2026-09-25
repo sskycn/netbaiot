@@ -3,6 +3,8 @@
 //! Event delivery is manual-ACK by default. A delivery is never acknowledged
 //! merely because it was decoded or placed in the application's bounded stream.
 
+pub mod business_rpc;
+
 use futures_core::Stream;
 use netbaiot_protocol::*;
 use reqwest::{Method, StatusCode, Url};

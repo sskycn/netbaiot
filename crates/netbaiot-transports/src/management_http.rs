@@ -236,7 +236,11 @@ async fn handle_management(
             Ok(response(StatusCode::OK, b"{\"live\":true}".to_vec()))
         }
         (hyper::Method::GET, "/api/v1/ready") => {
-            let ready = services.ingress.lifecycle.ready();
+            let ready = services.ingress.lifecycle.ready()
+                && services
+                    .business_auth
+                    .as_ref()
+                    .is_none_or(|registry| registry.is_serving());
             Ok(response(
                 if ready {
                     StatusCode::OK
@@ -264,6 +268,8 @@ async fn handle_management(
                     "pending_required": usage.pending_required,
                     "auth_cache_entries": auth_entries,
                     "auth_cache_bytes": auth_bytes,
+                    "business_auth_serving": services.business_auth.as_ref().is_some_and(|registry| registry.is_serving()),
+                    "business_rpc_pending": services.business_auth.as_ref().map_or(0, |registry| registry.pending_usage()),
                     "runtime_tasks": tokio::runtime::Handle::current().metrics().num_alive_tasks(),
                     "active_connections": active_connections,
                 }))
@@ -271,10 +277,11 @@ async fn handle_management(
             ))
         }
         (hyper::Method::GET, "/api/v1/metrics") => {
-            let mut result = response(
-                StatusCode::OK,
-                services.ingress.metrics.render().into_bytes(),
-            );
+            let mut body = services.ingress.metrics.render();
+            if let Some(registry) = &services.business_auth {
+                body.push_str(&registry.render_metrics());
+            }
+            let mut result = response(StatusCode::OK, body.into_bytes());
             result.headers_mut().insert(
                 hyper::header::CONTENT_TYPE,
                 hyper::header::HeaderValue::from_static("text/plain; version=0.0.4"),

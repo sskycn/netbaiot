@@ -17,3 +17,7 @@ Hello、subscribe、事件 ACK 读取和写入都有硬性截止时间和帧大�
 此分帧 RPC 是当前提供的高吞吐流式通道。本版本尚未实现原生 gRPC 和 WebSocket 适配器。未来可将 WebSocket 用于 dashboard，但除非它增加应用级 `ACK event_id`，否则必须作为尽力而为的通道。
 
 消费者必须按 `event_id` 实现幂等：sink 可能已处理事件，但在计划重启前丢失 ACK，导致相同 ID 被重放。
+
+## Business RPC V2
+
+双向 V2 协议、独立认证 provider、mTLS 映射、配置和 Rust SDK 见 [Business RPC Stream V2](business-rpc-v2.zh-CN.md)。没有 `business_rpc` 配置时默认保留 V1 行为。

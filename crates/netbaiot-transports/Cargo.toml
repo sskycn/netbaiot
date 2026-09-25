@@ -22,6 +22,7 @@ http-body-util.workspace = true
 tokio-rustls.workspace = true
 hmac.workspace = true
 sha2.workspace = true
+subtle.workspace = true
 uuid.workspace = true
 
 [lints]

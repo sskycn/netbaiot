@@ -30,3 +30,7 @@ while let Some(delivery) = events.next().await {
 连接丢失后使用可取消的指数全抖动退避，间隔从 100 ms 到 5 s。重连时会重新认证、使用相同的 `SubscriptionId` 订阅并继续处理。客户端不会自行虚构 offset。重放可能使用新的 `delivery_id` 返回相同的 `event_id`；需要持久幂等的应用必须自行保存 event ID。丢弃流会终止其所属任务并关闭 socket。
 
 命令不会自动重试。`DeviceOffline` 与一般服务端故障分别报告，调用方提供的 `command_id` 保持不变。设备 desired/reported 配置和历史由业务系统持久化。配置操作可使用普通命令；`CommandAck` 表示设备执行结果，业务系统自行决定收敛、重试与回滚。`runtime().drain()` 是显式管理操作。
+
+## Business RPC V2 客户端
+
+`netbaiot-client::business_rpc` 提供 V2 业务认证 handler、reset 同步、失效通知和手动事件 ACK 驱动。用法见 [Business RPC Stream V2](business-rpc-v2.zh-CN.md) 与可编译的 `crates/netbaiot-client/examples/business_rpc_v2.rs` 示例。

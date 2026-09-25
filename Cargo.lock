@@ -701,16 +701,20 @@ dependencies = [
 name = "netbaiot-client"
 version = "0.2.0"
 dependencies = [
+ "async-trait",
  "futures-core",
  "futures-util",
  "netbaiot-protocol",
  "reqwest",
+ "rustls-pemfile",
  "serde",
  "serde_json",
  "thiserror",
  "tokio",
+ "tokio-rustls",
  "tokio-util",
  "tracing",
+ "uuid",
 ]
 
 [[package]]
@@ -845,6 +849,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
+ "subtle",
  "thiserror",
  "tokio",
  "tokio-rustls",

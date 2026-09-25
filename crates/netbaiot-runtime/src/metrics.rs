@@ -53,9 +53,36 @@ pub enum Metric {
     UdpAckSendFailures,
     UdpAcceptedDuplicates,
     UdpAccepted,
+    BusinessRpcConnections,
+    BusinessRpcAbnormalClosures,
+    BusinessRpcProviderSyncSuccess,
+    BusinessRpcProviderSyncFailure,
+    BusinessRpcInvalidationSuccess,
+    BusinessRpcInvalidationFailure,
+    BusinessRpcLateResponses,
+    BusinessRpcTimeouts,
+    BusinessRpcOverloads,
+    BusinessRpcEventAcks,
+    BusinessRpcReconnects,
+}
+#[derive(Clone, Copy)]
+#[repr(usize)]
+pub enum BusinessRpcQueueClass {
+    Control,
+    Event,
+}
+#[derive(Clone, Copy)]
+#[repr(usize)]
+pub enum BusinessRpcCallResult {
+    Success,
+    DeviceRejected,
+    Timeout,
+    Overloaded,
+    Unavailable,
+    Invalid,
 }
 
-const NAMES: [&str; 49] = [
+const NAMES: [&str; 60] = [
     "connections_accepted",
     "connections_rejected",
     "mqtt_connect_success",
@@ -105,6 +132,17 @@ const NAMES: [&str; 49] = [
     "udp_ack_send_failures",
     "udp_accepted_duplicates",
     "udp_accepted",
+    "business_rpc_connections",
+    "business_rpc_abnormal_closures",
+    "business_rpc_provider_sync_success",
+    "business_rpc_provider_sync_failure",
+    "business_rpc_invalidation_success",
+    "business_rpc_invalidation_failure",
+    "business_rpc_late_responses",
+    "business_rpc_timeouts",
+    "business_rpc_overloads",
+    "business_rpc_event_acks",
+    "business_rpc_reconnects",
 ];
 
 /// Opt-in experiment counters, inactive unless lock timing is enabled.
@@ -156,9 +194,12 @@ pub enum Histogram {
     CodecToEventAccepted,
     EventAcceptedToSinkAck,
     PubackWrite,
+    BusinessRpcAuthLatency,
+    BusinessRpcVerifierLatency,
+    BusinessRpcEventAckLatency,
 }
 
-const HISTOGRAM_NAMES: [&str; 15] = [
+const HISTOGRAM_NAMES: [&str; 18] = [
     "mqtt_protocol_validation_us",
     "validation_to_admission_us",
     "admission_wait_us",
@@ -174,6 +215,9 @@ const HISTOGRAM_NAMES: [&str; 15] = [
     "codec_to_event_accepted_us",
     "event_accepted_to_sink_ack_us",
     "puback_write_us",
+    "business_rpc_auth_latency_us",
+    "business_rpc_verifier_latency_us",
+    "business_rpc_event_ack_latency_us",
 ];
 const BOUNDS: [u64; 16] = [
     10, 25, 50, 100, 250, 500, 1_000, 2_500, 5_000, 10_000, 25_000, 50_000, 100_000, 500_000,
@@ -274,10 +318,14 @@ impl Default for HistogramState {
 
 pub struct Metrics {
     values: [AtomicU64; NAMES.len()],
+    business_rpc_active: AtomicU64,
+    business_rpc_method_results: [[AtomicU64; 6]; 2],
     management_auth_attempts: [AtomicU64; 15],
     management_authz_denied: [AtomicU64; 12],
     management_jwks_cache: [AtomicU64; 2],
     histograms: [HistogramState; HISTOGRAM_NAMES.len()],
+    business_rpc_queue_count: [AtomicU64; 2],
+    business_rpc_queue_bytes: [AtomicU64; 2],
     lock_timing_enabled: bool,
     event_bus_probes: [AtomicU64; EVENT_BUS_PROBES.len()],
     event_bus_timing: Option<Box<EventBusTiming>>,
@@ -287,10 +335,16 @@ impl Default for Metrics {
     fn default() -> Self {
         Self {
             values: std::array::from_fn(|_| AtomicU64::new(0)),
+            business_rpc_active: AtomicU64::new(0),
+            business_rpc_method_results: std::array::from_fn(|_| {
+                std::array::from_fn(|_| AtomicU64::new(0))
+            }),
             management_auth_attempts: std::array::from_fn(|_| AtomicU64::new(0)),
             management_authz_denied: std::array::from_fn(|_| AtomicU64::new(0)),
             management_jwks_cache: std::array::from_fn(|_| AtomicU64::new(0)),
             histograms: std::array::from_fn(|_| HistogramState::default()),
+            business_rpc_queue_count: std::array::from_fn(|_| AtomicU64::new(0)),
+            business_rpc_queue_bytes: std::array::from_fn(|_| AtomicU64::new(0)),
             lock_timing_enabled: false,
             event_bus_probes: std::array::from_fn(|_| AtomicU64::new(0)),
             event_bus_timing: None,
@@ -299,6 +353,28 @@ impl Default for Metrics {
 }
 
 impl Metrics {
+    pub fn business_rpc_method_result(&self, method: &str, result: BusinessRpcCallResult) {
+        let index = match method {
+            "device.authenticate" => 0,
+            "device.resolve_verifier" => 1,
+            _ => return,
+        };
+        self.business_rpc_method_results[index][result as usize].fetch_add(1, Ordering::Relaxed);
+    }
+    pub fn business_rpc_connection_started(&self) {
+        self.business_rpc_active.fetch_add(1, Ordering::Relaxed);
+    }
+    pub fn business_rpc_connection_finished(&self) {
+        self.business_rpc_active.fetch_sub(1, Ordering::Relaxed);
+    }
+    pub fn business_rpc_queue_add(&self, class: BusinessRpcQueueClass, bytes: u64) {
+        self.business_rpc_queue_count[class as usize].fetch_add(1, Ordering::Relaxed);
+        self.business_rpc_queue_bytes[class as usize].fetch_add(bytes, Ordering::Relaxed);
+    }
+    pub fn business_rpc_queue_sub(&self, class: BusinessRpcQueueClass, bytes: u64) {
+        self.business_rpc_queue_count[class as usize].fetch_sub(1, Ordering::Relaxed);
+        self.business_rpc_queue_bytes[class as usize].fetch_sub(bytes, Ordering::Relaxed);
+    }
     pub fn management_auth_attempt(&self, method: &str, result: &str) {
         let method = match method {
             "static_token" => 0,
@@ -391,6 +467,31 @@ impl Metrics {
                 format!("netbaiot_{name}_total {}\n", value.load(Ordering::Relaxed))
             })
             .collect();
+        output.push_str(&format!(
+            "netbaiot_business_rpc_active_connections {}\n",
+            self.business_rpc_active.load(Ordering::Relaxed)
+        ));
+        for (method_index, method) in ["device.authenticate", "device.resolve_verifier"]
+            .iter()
+            .enumerate()
+        {
+            for (result_index, result) in [
+                "success",
+                "device_rejected",
+                "timeout",
+                "overloaded",
+                "unavailable",
+                "invalid",
+            ]
+            .iter()
+            .enumerate()
+            {
+                output.push_str(&format!("netbaiot_business_rpc_method_results_total{{method=\"{method}\",result=\"{result}\"}} {}\n", self.business_rpc_method_results[method_index][result_index].load(Ordering::Relaxed)));
+            }
+        }
+        for (index, class) in ["control", "event"].iter().enumerate() {
+            output.push_str(&format!("netbaiot_business_rpc_queue_count{{class=\"{class}\"}} {}\nnetbaiot_business_rpc_queue_bytes{{class=\"{class}\"}} {}\n", self.business_rpc_queue_count[index].load(Ordering::Relaxed), self.business_rpc_queue_bytes[index].load(Ordering::Relaxed)));
+        }
         for (index, method) in ["static_token", "api_key", "jwt", "mtls", "unknown"]
             .iter()
             .enumerate()

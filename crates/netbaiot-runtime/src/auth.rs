@@ -525,7 +525,9 @@ impl AuthCache {
             let auth = match &entry.value {
                 CachedAuth::Positive(auth) => auth,
                 CachedAuth::Verifier(verifier) => verifier.identity(),
-                CachedAuth::Negative => return !matches!(invalidation, AuthInvalidation::All),
+                // Negative entries have no trusted device/product/tenant association.
+                // Remove them on any invalidation so a newly enabled credential can recover.
+                CachedAuth::Negative => return false,
             };
             let remove = match invalidation {
                 AuthInvalidation::Device { device } => &auth.device_key == device,

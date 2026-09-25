@@ -45,3 +45,7 @@ server failure, and caller-supplied `command_id` remains unchanged. Applications
 persist desired/reported configuration and history externally. Ordinary commands
 can carry application-defined configuration operations; `CommandAck` reports device
 execution, while application code decides convergence, retries and rollback. `runtime().drain()` is explicitly administrative.
+
+## Business RPC V2 client
+
+`netbaiot-client::business_rpc` exposes the V2 business authorization handler, reset sync, invalidation, and manual event ACK driver. See [Business RPC Stream V2](business-rpc-v2.md) and the compilable `crates/netbaiot-client/examples/business_rpc_v2.rs` example.

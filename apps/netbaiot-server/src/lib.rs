@@ -1,9 +1,16 @@
+mod business_stream_v1;
 use async_trait::async_trait;
+#[cfg(test)]
+use business_stream_v1::TcpStreamSink;
+use business_stream_v1::{serve_business_connection, serve_business_stream};
 use netbaiot_codecs::JsonV1;
 use netbaiot_core::*;
 use netbaiot_runtime::*;
 use netbaiot_transports::{
     Services,
+    business_rpc::{
+        self, BusinessIdentity, BusinessPrincipal, BusinessRpcServices, BusinessRpcTransportConfig,
+    },
     mqtt::broker::MqttBroker,
     serve_device_ingress, serve_management_http,
     tcp::{LengthPrefixFramer, TcpFramer},
@@ -11,21 +18,12 @@ use netbaiot_transports::{
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::{
-    collections::HashMap,
-    net::SocketAddr,
-    path::PathBuf,
-    sync::{
-        Arc, Mutex,
-        atomic::{AtomicU64, Ordering},
-    },
-    time::Duration,
-};
+use std::{collections::HashMap, net::SocketAddr, path::PathBuf, sync::Arc, time::Duration};
 use subtle::ConstantTimeEq;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::{TcpListener, TcpStream, UdpSocket},
-    sync::{Notify, mpsc, oneshot},
+    sync::mpsc,
     task::JoinSet,
 };
 use tokio_rustls::{TlsAcceptor, rustls};
@@ -37,6 +35,12 @@ pub struct Config {
     pub device_ingress: SocketAddr,
     pub management_http: SocketAddr,
     pub business_tcp: Option<SocketAddr>,
+    #[serde(default)]
+    pub business_rpc: Option<BusinessRpcConfig>,
+    #[serde(default)]
+    pub device_auth: Option<DeviceAuthSource>,
+    #[serde(default)]
+    pub event_delivery: Option<EventDeliverySource>,
     #[serde(default)]
     pub development: bool,
     #[serde(default)]
@@ -68,6 +72,76 @@ pub struct ManagementTlsFiles {
     pub client_ca: Option<String>,
     #[serde(default)]
     pub require_client_certificate: bool,
+}
+
+#[derive(Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum DeviceAuthSource {
+    Static,
+    Http,
+    BusinessRpc,
+}
+#[derive(Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum EventDeliverySource {
+    Http,
+    BusinessRpc,
+    DevelopmentAudit,
+}
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct BusinessRpcConfig {
+    pub version: u16,
+    pub tls: Option<ManagementTlsFiles>,
+    #[serde(default)]
+    pub identities: Vec<BusinessRpcIdentityConfig>,
+    pub development_token_env: Option<String>,
+    #[serde(default)]
+    pub allow_v1: bool,
+    #[serde(default = "default_business_connections")]
+    pub max_connections: usize,
+    #[serde(default = "default_business_auth_inflight")]
+    pub auth_max_inflight: usize,
+    #[serde(default = "default_business_offline_ms")]
+    pub max_auth_control_offline_ms: u64,
+}
+fn default_business_connections() -> usize {
+    8
+}
+fn default_business_auth_inflight() -> usize {
+    128
+}
+fn default_business_offline_ms() -> u64 {
+    30_000
+}
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct BusinessRpcIdentityConfig {
+    pub certificate_sha256: String,
+    pub principal_id: String,
+    pub role: BusinessRole,
+    pub provider_id: Option<String>,
+    pub sink_id: Option<String>,
+    pub provide_methods: Vec<String>,
+    pub call_methods: Vec<String>,
+    #[serde(default)]
+    pub global: bool,
+    #[serde(default)]
+    pub tenants: Vec<TenantId>,
+    pub expires_at_ms: Option<i64>,
+}
+
+fn parse_hex_32(text: &str) -> Result<[u8; 32]> {
+    if text.len() != 64 {
+        return Err(Error::Configuration);
+    }
+    let mut bytes = [0u8; 32];
+    for (index, pair) in text.as_bytes().chunks_exact(2).enumerate() {
+        let high = (pair[0] as char).to_digit(16).ok_or(Error::Configuration)? as u8;
+        let low = (pair[1] as char).to_digit(16).ok_or(Error::Configuration)? as u8;
+        bytes[index] = (high << 4) | low;
+    }
+    Ok(bytes)
 }
 
 async fn read_bounded(path: &str, maximum: u64) -> Result<Vec<u8>> {
@@ -128,18 +202,162 @@ impl Config {
         {
             return Err(Error::Configuration);
         }
-        // The framed business stream currently authenticates with a bearer secret. Keep it
-        // node-local until transport TLS is implemented for this optional integration.
-        if self
-            .business_tcp
-            .is_some_and(|address| !address.ip().is_loopback())
-        {
+        if let Some(rpc) = &self.business_rpc {
+            if rpc.version != BUSINESS_RPC_VERSION
+                || self.business_tcp.is_none()
+                || rpc.max_connections == 0
+                || rpc.auth_max_inflight == 0
+                || rpc.auth_max_inflight > 1024
+                || rpc.max_connections > 1024
+                || rpc.max_auth_control_offline_ms > 86_400_000
+            {
+                return Err(Error::Configuration);
+            }
+            if rpc.tls.is_some() {
+                if rpc.development_token_env.is_some()
+                    || rpc.allow_v1
+                    || rpc.identities.is_empty()
+                    || rpc.tls.as_ref().is_none_or(|tls| {
+                        !tls.require_client_certificate || tls.client_ca.is_none()
+                    })
+                {
+                    return Err(Error::Configuration);
+                }
+            } else if self
+                .business_tcp
+                .is_none_or(|addr| !addr.ip().is_loopback())
+                || rpc.development_token_env.is_none()
+                || !rpc.identities.is_empty()
+            {
+                return Err(Error::Configuration);
+            }
+            if self.development
+                && self
+                    .business_tcp
+                    .is_some_and(|addr| !addr.ip().is_loopback())
+            {
+                return Err(Error::Configuration);
+            }
+            if rpc.tls.is_some() {
+                let mut fingerprints = std::collections::HashSet::new();
+                for identity in &rpc.identities {
+                    let fingerprint = parse_hex_32(&identity.certificate_sha256)?;
+                    if !fingerprints.insert(fingerprint)
+                        || identity.principal_id.is_empty()
+                        || identity.principal_id.len() > 64
+                        || identity
+                            .expires_at_ms
+                            .is_some_and(|expiry| expiry <= now_ms())
+                        || identity.global != identity.tenants.is_empty()
+                        || identity.tenants.len() > 64
+                        || identity.provide_methods.len() > 2
+                        || identity.call_methods.len() > 2
+                        || identity.provide_methods.iter().any(|method| {
+                            !matches!(
+                                method.as_str(),
+                                "device.authenticate" | "device.resolve_verifier"
+                            )
+                        })
+                        || identity.call_methods.iter().any(|method| {
+                            !matches!(method.as_str(), "auth.sync" | "auth.invalidate")
+                        })
+                        || (identity.role.auth_control()
+                            && (identity.provider_id.as_deref() != Some("primary")
+                                || !identity
+                                    .provide_methods
+                                    .iter()
+                                    .any(|method| method == "device.authenticate")
+                                || !identity
+                                    .provide_methods
+                                    .iter()
+                                    .any(|method| method == "device.resolve_verifier")
+                                || !identity
+                                    .call_methods
+                                    .iter()
+                                    .any(|method| method == "auth.sync")
+                                || !identity
+                                    .call_methods
+                                    .iter()
+                                    .any(|method| method == "auth.invalidate")))
+                        || (!identity.role.auth_control()
+                            && (identity.provider_id.is_some()
+                                || !identity.provide_methods.is_empty()
+                                || !identity.call_methods.is_empty()))
+                        || (identity.role.events()
+                            && identity.sink_id.as_deref() != Some("tcp-rpc"))
+                        || (!identity.role.events() && identity.sink_id.is_some())
+                    {
+                        return Err(Error::Configuration);
+                    }
+                }
+            } else if rpc.development_token_env.as_deref().is_none_or(|name| {
+                name.is_empty()
+                    || name.len() > 64
+                    || name == "NETBAIOT_ADMIN_SECRET"
+                    || name == "NETBAIOT_BUSINESS_STREAM_TOKEN"
+                    || !name.bytes().all(|byte| {
+                        byte.is_ascii_uppercase() || byte.is_ascii_digit() || byte == b'_'
+                    })
+            }) {
+                return Err(Error::Configuration);
+            }
+            if self.auth_provider_url.is_some() && self.device_auth != Some(DeviceAuthSource::Http)
+            {
+                return Err(Error::Configuration);
+            }
+            if self.delivery_url.is_some() && self.event_delivery != Some(EventDeliverySource::Http)
+            {
+                return Err(Error::Configuration);
+            }
+            if self.device_auth.is_none() && self.auth_provider_url.is_some() {
+                return Err(Error::Configuration);
+            }
+            if self.event_delivery.is_none() && self.delivery_url.is_some() {
+                return Err(Error::Configuration);
+            }
+        } else {
+            if self
+                .business_tcp
+                .is_some_and(|addr| !addr.ip().is_loopback())
+            {
+                return Err(Error::Configuration);
+            }
+            if self.device_auth.is_some() || self.event_delivery.is_some() {
+                return Err(Error::Configuration);
+            }
+        }
+        let auth = self
+            .device_auth
+            .unwrap_or(if self.auth_provider_url.is_some() {
+                DeviceAuthSource::Http
+            } else {
+                DeviceAuthSource::Static
+            });
+        if auth == DeviceAuthSource::Static && self.credentials.is_empty() {
             return Err(Error::Configuration);
         }
-        if self.credentials.is_empty() && self.auth_provider_url.is_none() {
+        if auth == DeviceAuthSource::Http && self.auth_provider_url.is_none() {
             return Err(Error::Configuration);
         }
-        if !self.development && self.delivery_url.is_none() && self.business_tcp.is_none() {
+        if auth == DeviceAuthSource::BusinessRpc && self.business_rpc.is_none() {
+            return Err(Error::Configuration);
+        }
+        let delivery = self
+            .event_delivery
+            .unwrap_or(if self.business_tcp.is_some() {
+                EventDeliverySource::BusinessRpc
+            } else if self.delivery_url.is_some() {
+                EventDeliverySource::Http
+            } else {
+                EventDeliverySource::DevelopmentAudit
+            });
+        if delivery == EventDeliverySource::BusinessRpc && self.business_tcp.is_none() {
+            return Err(Error::Configuration);
+        }
+        if delivery == EventDeliverySource::Http && self.delivery_url.is_none() {
+            return Err(Error::Configuration);
+        }
+        if !self.development && delivery == EventDeliverySource::DevelopmentAudit {
             return Err(Error::Configuration);
         }
         if self.spool_directory.as_os_str().is_empty() {
@@ -308,432 +526,6 @@ impl EventSink for HttpSink {
             Err(SinkError::Permanent)
         }
     }
-}
-
-struct StreamRequest {
-    delivery: DeliveryEnvelope,
-    result: oneshot::Sender<std::result::Result<SinkAck, SinkError>>,
-}
-
-struct TcpStreamSink {
-    active: Mutex<Option<ActiveStream>>,
-    availability: Notify,
-    generation: AtomicU64,
-}
-
-#[derive(Clone)]
-struct ActiveStream {
-    generation: u64,
-    sender: mpsc::Sender<StreamRequest>,
-    filter: EventFilter,
-}
-
-struct ActiveStreamLease {
-    sink: Arc<TcpStreamSink>,
-    generation: u64,
-}
-
-impl Drop for ActiveStreamLease {
-    fn drop(&mut self) {
-        let _ = self.sink.release(self.generation);
-    }
-}
-
-impl TcpStreamSink {
-    fn new() -> Arc<Self> {
-        Arc::new(Self {
-            active: Mutex::new(None),
-            availability: Notify::new(),
-            generation: AtomicU64::new(0),
-        })
-    }
-
-    fn claim(&self, sender: mpsc::Sender<StreamRequest>, filter: EventFilter) -> Result<u64> {
-        let mut active = self.active.lock().map_err(|_| Error::Internal)?;
-        if active.is_some() {
-            return Err(Error::Conflict);
-        }
-        let generation = self
-            .generation
-            .fetch_add(1, Ordering::Relaxed)
-            .wrapping_add(1)
-            .max(1);
-        *active = Some(ActiveStream {
-            generation,
-            sender,
-            filter,
-        });
-        drop(active);
-        self.availability.notify_waiters();
-        Ok(generation)
-    }
-
-    fn release(&self, generation: u64) -> Result<()> {
-        let mut active = self.active.lock().map_err(|_| Error::Internal)?;
-        if active
-            .as_ref()
-            .is_some_and(|owner| owner.generation == generation)
-        {
-            *active = None;
-            drop(active);
-            self.availability.notify_waiters();
-        }
-        Ok(())
-    }
-}
-
-#[async_trait]
-impl EventSink for TcpStreamSink {
-    async fn deliver(&self, delivery: DeliveryEnvelope) -> std::result::Result<SinkAck, SinkError> {
-        let active = loop {
-            // Construct the waiter before checking state so a concurrent claim or release cannot
-            // be lost between the state check and awaiting the notification. EventBus owns the
-            // outer bounded delivery timeout, so this wait consumes exactly one configured sink
-            // concurrency slot and cannot create unbounded hidden work.
-            let available = self.availability.notified();
-            let active = self
-                .active
-                .lock()
-                .map_err(|_| SinkError::Permanent)?
-                .clone();
-            if let Some(active) = active
-                && active.filter.matches(&delivery.event)
-            {
-                break active;
-            }
-            // No subscriber, or only a non-matching subscriber, is normal during reconnect and
-            // filter replacement. Do not consume a delivery attempt before an eligible owner can
-            // possibly acknowledge the already-accepted required work.
-            available.await;
-        };
-        let (result, receive) = oneshot::channel();
-        active
-            .sender
-            .try_send(StreamRequest { delivery, result })
-            .map_err(|_| SinkError::Retryable)?;
-        receive.await.map_err(|_| SinkError::Retryable)?
-    }
-}
-
-async fn read_frame(
-    stream: &mut TcpStream,
-    framer: &LengthPrefixFramer,
-    timeout_ms: u64,
-) -> Result<Vec<u8>> {
-    tokio::time::timeout(Duration::from_millis(timeout_ms), async {
-        let mut length = [0u8; 4];
-        stream
-            .read_exact(&mut length)
-            .await
-            .map_err(|_| Error::Unavailable)?;
-        let length = usize::try_from(u32::from_be_bytes(length)).map_err(|_| Error::Invalid)?;
-        if length == 0 || length > framer.maximum {
-            return Err(Error::Invalid);
-        }
-        let mut payload = vec![0; length];
-        stream
-            .read_exact(&mut payload)
-            .await
-            .map_err(|_| Error::Unavailable)?;
-        Ok(payload)
-    })
-    .await
-    .map_err(|_| Error::Timeout)?
-}
-
-async fn write_frame(
-    stream: &mut TcpStream,
-    framer: &LengthPrefixFramer,
-    frame: &StreamServerFrame,
-    timeout_ms: u64,
-) -> Result<()> {
-    let payload = serde_json::to_vec(frame).map_err(|_| Error::Internal)?;
-    let wire = framer.encode(&payload)?;
-    tokio::time::timeout(Duration::from_millis(timeout_ms), stream.write_all(&wire))
-        .await
-        .map_err(|_| Error::Timeout)?
-        .map_err(|_| Error::Unavailable)
-}
-
-async fn write_stream_error(
-    stream: &mut TcpStream,
-    framer: &LengthPrefixFramer,
-    limits: &Limits,
-    code: ErrorCode,
-    message: &str,
-) {
-    let _ = write_frame(
-        stream,
-        framer,
-        &StreamServerFrame::Error {
-            version: PROTOCOL_VERSION,
-            error: ApiError {
-                code,
-                message: message.to_owned(),
-                request_id: Some(EventId::generate().to_string()),
-                required_scope: None,
-            },
-        },
-        limits.write_timeout_ms,
-    )
-    .await;
-}
-
-async fn business_handshake(
-    stream: &mut TcpStream,
-    framer: &LengthPrefixFramer,
-    token_hash: &[u8; 32],
-    limits: &Limits,
-) -> Result<(SubscriptionId, EventFilter)> {
-    let payload = read_frame(stream, framer, limits.connect_timeout_ms).await?;
-    let hello = match serde_json::from_slice::<StreamClientFrame>(&payload) {
-        Ok(frame) => frame,
-        Err(_) => {
-            write_stream_error(
-                stream,
-                framer,
-                limits,
-                ErrorCode::InvalidRequest,
-                "invalid business stream hello",
-            )
-            .await;
-            return Err(Error::Invalid);
-        }
-    };
-    let StreamClientFrame::Hello { version, token } = hello else {
-        write_stream_error(
-            stream,
-            framer,
-            limits,
-            ErrorCode::InvalidRequest,
-            "hello must be the first business stream frame",
-        )
-        .await;
-        return Err(Error::Invalid);
-    };
-    if version != PROTOCOL_VERSION {
-        write_stream_error(
-            stream,
-            framer,
-            limits,
-            ErrorCode::InvalidProtocolVersion,
-            "unsupported business stream protocol version",
-        )
-        .await;
-        return Err(Error::Invalid);
-    }
-    if !bool::from(
-        Sha256::digest(token.as_bytes())
-            .as_slice()
-            .ct_eq(token_hash),
-    ) {
-        write_stream_error(
-            stream,
-            framer,
-            limits,
-            ErrorCode::Unauthenticated,
-            "business stream authentication failed",
-        )
-        .await;
-        return Err(Error::Authentication);
-    }
-
-    let payload = read_frame(stream, framer, limits.connect_timeout_ms).await?;
-    let subscribe = match serde_json::from_slice::<StreamClientFrame>(&payload) {
-        Ok(frame) => frame,
-        Err(_) => {
-            write_stream_error(
-                stream,
-                framer,
-                limits,
-                ErrorCode::InvalidRequest,
-                "invalid business stream subscription",
-            )
-            .await;
-            return Err(Error::Invalid);
-        }
-    };
-    let StreamClientFrame::Subscribe {
-        version,
-        subscription_id,
-        filter,
-    } = subscribe
-    else {
-        write_stream_error(
-            stream,
-            framer,
-            limits,
-            ErrorCode::InvalidRequest,
-            "subscribe must follow the business stream hello",
-        )
-        .await;
-        return Err(Error::Invalid);
-    };
-    if version != PROTOCOL_VERSION {
-        write_stream_error(
-            stream,
-            framer,
-            limits,
-            ErrorCode::InvalidProtocolVersion,
-            "unsupported business stream protocol version",
-        )
-        .await;
-        return Err(Error::Invalid);
-    }
-    if filter.validate().is_err() {
-        write_stream_error(
-            stream,
-            framer,
-            limits,
-            ErrorCode::InvalidRequest,
-            "business stream filter exceeds protocol bounds",
-        )
-        .await;
-        return Err(Error::Invalid);
-    }
-    Ok((subscription_id, filter))
-}
-
-async fn serve_business_stream(
-    listener: TcpListener,
-    sink: Arc<TcpStreamSink>,
-    token_hash: [u8; 32],
-    limits: Arc<Limits>,
-    stop: CancellationToken,
-) -> Result<()> {
-    let mut tasks = JoinSet::new();
-    loop {
-        let accepted = tokio::select! {
-            _ = stop.cancelled() => break,
-            completed = tasks.join_next(), if !tasks.is_empty() => {
-                if let Some(Err(error)) = completed {
-                    tracing::warn!(error=%error, "business stream task failed");
-                }
-                continue;
-            }
-            accepted = listener.accept() => accepted.map_err(|_| Error::Unavailable)?,
-        };
-        if tasks.len() >= limits.max_ingress {
-            drop(accepted.0);
-            continue;
-        }
-        let (mut stream, _) = accepted;
-        let sink = sink.clone();
-        let limits = limits.clone();
-        let stop = stop.child_token();
-        tasks.spawn(async move {
-        let framer = LengthPrefixFramer {
-            maximum: limits.max_tcp_frame_size,
-        };
-        let Ok((subscription_id, filter)) =
-            business_handshake(&mut stream, &framer, &token_hash, &limits).await
-        else {
-            return Ok::<(), Error>(());
-        };
-        let (sender, mut receiver) = mpsc::channel(limits.sink_delivery_concurrency);
-        let generation = match sink.claim(sender, filter) {
-            Ok(generation) => generation,
-            Err(Error::Conflict) => {
-                write_stream_error(
-                    &mut stream,
-                    &framer,
-                    &limits,
-                    ErrorCode::Conflict,
-                    "an active business subscriber already owns the required sink",
-                )
-                .await;
-                return Ok(());
-            }
-            Err(error) => return Err(error),
-        };
-        let _lease = ActiveStreamLease {
-            sink: sink.clone(),
-            generation,
-        };
-        if write_frame(
-            &mut stream,
-            &framer,
-            &StreamServerFrame::Ready {
-                version: PROTOCOL_VERSION,
-                subscription_id,
-            },
-            limits.write_timeout_ms,
-        )
-        .await
-        .is_err()
-        {
-            sink.release(generation)?;
-            return Ok(());
-        }
-        loop {
-            let request = tokio::select! {
-                _ = stop.cancelled() => None,
-                request = receiver.recv() => request,
-                ready = stream.readable() => {
-                    ready.map_err(|_| Error::Unavailable)?;
-                    let mut unexpected = [0u8; 1];
-                    match stream.try_read(&mut unexpected) {
-                        Ok(0) => None,
-                        Ok(_) => return Err(Error::Invalid),
-                        Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => continue,
-                        Err(_) => return Err(Error::Unavailable),
-                    }
-                }
-            };
-            let Some(request) = request else { break };
-            let delivery_id = DeliveryId::generate();
-            let event_id = request.delivery.event.event_id;
-            let frame = StreamServerFrame::Event {
-                version: PROTOCOL_VERSION,
-                delivery: EventDelivery {
-                    delivery_id,
-                    subscription_id,
-                    event: (*request.delivery.event).clone(),
-                    attempt: request.delivery.attempt,
-                },
-            };
-            let delivered = tokio::select! {
-                _ = stop.cancelled() => Err(Error::Draining),
-                result = async {
-                    write_frame(&mut stream, &framer, &frame, limits.write_timeout_ms).await?;
-                    let ack: StreamClientFrame =
-                        serde_json::from_slice(&read_frame(
-                            &mut stream,
-                            &framer,
-                            limits.sink_timeout_ms,
-                        ).await?)
-                            .map_err(|_| Error::Invalid)?;
-                    match ack {
-                        StreamClientFrame::Ack { version, ack }
-                            if version == PROTOCOL_VERSION
-                                && ack.delivery_id == delivery_id
-                                && ack.subscription_id == subscription_id
-                                && ack.event_id == event_id =>
-                        {
-                            Ok(SinkAck)
-                        }
-                        _ => Err(Error::Invalid),
-                    }
-                } => result,
-            };
-            let failed = delivered.is_err();
-            let _ = request.result.send(delivered.map_err(|error| {
-                if matches!(error, Error::Invalid) {
-                    SinkError::Permanent
-                } else {
-                    SinkError::Retryable
-                }
-            }));
-            if failed {
-                break;
-            }
-        }
-        sink.release(generation)?;
-        Ok(())
-        });
-    }
-    while tasks.join_next().await.is_some() {}
-    Ok(())
 }
 
 struct HttpAuthProvider {
@@ -942,10 +734,37 @@ pub async fn run_with_credentials(
             )
         })
         .collect();
-    let provider: Arc<dyn DeviceAuthenticator> = if let Some(url) = &config.auth_provider_url {
-        HttpAuthProvider::new(url, &limits)?
+    let rpc_registry = if let Some(rpc) = &config.business_rpc {
+        Some(BusinessRpcRegistry::new_with_metrics(
+            rpc.auth_max_inflight,
+            rpc.auth_max_inflight
+                .checked_mul(32 * 1024)
+                .ok_or(Error::Configuration)?,
+            Duration::from_millis(limits.authentication_timeout_ms),
+            metrics.clone(),
+        )?)
     } else {
-        StaticAuthenticator::new(config.credentials.clone(), &limits)?
+        None
+    };
+    let auth_source = config
+        .device_auth
+        .unwrap_or(if config.auth_provider_url.is_some() {
+            DeviceAuthSource::Http
+        } else {
+            DeviceAuthSource::Static
+        });
+    let provider: Arc<dyn DeviceAuthenticator> = match auth_source {
+        DeviceAuthSource::Static => StaticAuthenticator::new(config.credentials.clone(), &limits)?,
+        DeviceAuthSource::Http => HttpAuthProvider::new(
+            config
+                .auth_provider_url
+                .as_deref()
+                .ok_or(Error::Configuration)?,
+            &limits,
+        )?,
+        DeviceAuthSource::BusinessRpc => {
+            BusinessRpcAuthProvider::new(rpc_registry.as_ref().ok_or(Error::Configuration)?.clone())
+        }
     };
     let auth_cache = AuthCache::new(provider, limits.clone(), metrics.clone());
     let codec_limits = CodecLimits {
@@ -968,39 +787,54 @@ pub async fn run_with_credentials(
         registry.get(auth)?;
     }
 
-    let (sink_id, mut sink_definition, tcp_sink) = if let Some(address) = config.business_tcp {
-        let sink = TcpStreamSink::new();
-        let id = SinkId::new("tcp-rpc").map_err(|_| Error::Configuration)?;
-        let mut definition = SinkDefinition::bounded(
-            id.clone(),
-            SinkDeliveryMode::ConfirmedRequired,
-            sink.clone(),
-            &limits,
-        );
-        definition.concurrency = 1;
-        (id, definition, Some((address, sink)))
-    } else if let Some(url) = &config.delivery_url {
-        let id = SinkId::new("webhook").map_err(|_| Error::Configuration)?;
-        let sink = Arc::new(HttpSink::new(url, &limits)?);
-        (
-            id.clone(),
-            SinkDefinition::bounded(id, SinkDeliveryMode::ConfirmedRequired, sink, &limits),
-            None,
-        )
-    } else {
-        let id = SinkId::new("development-audit").map_err(|_| Error::Configuration)?;
-        (
-            id.clone(),
-            SinkDefinition::bounded(
-                id,
+    let delivery_source = config
+        .event_delivery
+        .unwrap_or(if config.business_tcp.is_some() {
+            EventDeliverySource::BusinessRpc
+        } else if config.delivery_url.is_some() {
+            EventDeliverySource::Http
+        } else {
+            EventDeliverySource::DevelopmentAudit
+        });
+    let business_sink = config.business_tcp.map(|_| BusinessRpcEventSink::new());
+    let (sink_id, mut sink_definition) = match delivery_source {
+        EventDeliverySource::BusinessRpc => {
+            let id = SinkId::new("tcp-rpc").map_err(|_| Error::Configuration)?;
+            let sink = business_sink.as_ref().ok_or(Error::Configuration)?.clone();
+            let mut definition = SinkDefinition::bounded(
+                id.clone(),
                 SinkDeliveryMode::ConfirmedRequired,
-                Arc::new(AuditSink),
+                sink,
                 &limits,
-            ),
-            None,
-        )
+            );
+            definition.concurrency = 1;
+            (id, definition)
+        }
+        EventDeliverySource::Http => {
+            let id = SinkId::new("webhook").map_err(|_| Error::Configuration)?;
+            let sink = Arc::new(HttpSink::new(
+                config.delivery_url.as_deref().ok_or(Error::Configuration)?,
+                &limits,
+            )?);
+            (
+                id.clone(),
+                SinkDefinition::bounded(id, SinkDeliveryMode::ConfirmedRequired, sink, &limits),
+            )
+        }
+        EventDeliverySource::DevelopmentAudit => {
+            let id = SinkId::new("development-audit").map_err(|_| Error::Configuration)?;
+            (
+                id.clone(),
+                SinkDefinition::bounded(
+                    id,
+                    SinkDeliveryMode::ConfirmedRequired,
+                    Arc::new(AuditSink),
+                    &limits,
+                ),
+            )
+        }
     };
-    if tcp_sink.is_some() {
+    if delivery_source == EventDeliverySource::BusinessRpc {
         sink_definition.timeout = Duration::from_millis(limits.sink_timeout_ms);
     }
     let snapshot = bootstrap_snapshot(&config, sink_id)?;
@@ -1037,6 +871,11 @@ pub async fn run_with_credentials(
     let shutdown = stop.child_token();
     let mut base_services =
         Services::new_with_mqtt(ingress.clone(), shutdown.clone(), mqtt_broker.clone());
+    if auth_source == DeviceAuthSource::BusinessRpc {
+        Arc::get_mut(&mut base_services)
+            .ok_or(Error::Internal)?
+            .business_auth = rpc_registry.clone();
+    }
     if let Some(secret) = admin_secret {
         let admin = Arc::new(AdminAccess::new(&secret, identities, &limits)?);
         Arc::get_mut(&mut base_services)
@@ -1097,12 +936,12 @@ pub async fn run_with_credentials(
     let udp = UdpSocket::bind(device_address)
         .await
         .map_err(|_| Error::Unavailable)?;
-    let business = if let Some((address, sink)) = tcp_sink {
+    let business = if let Some(address) = config.business_tcp {
         Some((
             TcpListener::bind(address)
                 .await
                 .map_err(|_| Error::Unavailable)?,
-            sink,
+            business_sink.ok_or(Error::Internal)?,
         ))
     } else {
         None
@@ -1124,6 +963,41 @@ pub async fn run_with_credentials(
             }
         }
     });
+    if auth_source == DeviceAuthSource::BusinessRpc {
+        let authority = rpc_registry.as_ref().ok_or(Error::Internal)?.clone();
+        let ingress_for_offline = ingress.clone();
+        let mqtt_for_offline = mqtt_broker.clone();
+        let grace = Duration::from_millis(
+            config
+                .business_rpc
+                .as_ref()
+                .ok_or(Error::Internal)?
+                .max_auth_control_offline_ms,
+        );
+        let offline_stop = work_listeners.child_token();
+        work_tasks.spawn(async move {
+            let mut since = Some(tokio::time::Instant::now());
+            let mut invalidated = false;
+            let mut interval = tokio::time::interval(Duration::from_millis(250));
+            interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+            loop {
+                tokio::select! {
+                    _ = offline_stop.cancelled() => return Ok(()),
+                    _ = interval.tick() => {
+                        if authority.is_serving() { since = None; invalidated = false; }
+                        else {
+                            let started = *since.get_or_insert_with(tokio::time::Instant::now);
+                            if !invalidated && started.elapsed() >= grace {
+                                let invalidate = AuthInvalidation::All;
+                                ingress_for_offline.invalidate_auth_with(&invalidate, || mqtt_for_offline.invalidate_sessions(&invalidate))?;
+                                invalidated = true;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
     work_tasks.spawn(serve_device_ingress(
         device_ingress,
         base_services.clone(),
@@ -1137,16 +1011,124 @@ pub async fn run_with_credentials(
         management_listener.child_token(),
     ));
     work_tasks.spawn(udp::serve(udp, base_services, work_listeners.child_token()));
+    let business_accept_stop = CancellationToken::new();
+    let business_connection_stop = CancellationToken::new();
+    let mut business_task = None;
     if let Some((listener, sink)) = business {
-        let secret = business_stream_token.ok_or(Error::Configuration)?;
-        let hash: [u8; 32] = Sha256::digest(secret.as_bytes()).into();
-        work_tasks.spawn(serve_business_stream(
-            listener,
-            sink,
-            hash,
-            limits.clone(),
-            work_listeners.child_token(),
-        ));
+        if let Some(rpc) = &config.business_rpc {
+            let identity = if let Some(tls) = &rpc.tls {
+                let identities = rpc
+                    .identities
+                    .iter()
+                    .map(|configured| {
+                        Ok((
+                            parse_hex_32(&configured.certificate_sha256)?,
+                            BusinessPrincipal {
+                                id: configured.principal_id.clone(),
+                                role: configured.role,
+                                provider_id: configured.provider_id.clone(),
+                                sink_id: configured.sink_id.clone(),
+                                provide_methods: configured.provide_methods.clone(),
+                                call_methods: configured.call_methods.clone(),
+                                global: configured.global,
+                                tenants: configured.tenants.clone(),
+                                expires_at_ms: configured.expires_at_ms,
+                            },
+                        ))
+                    })
+                    .collect::<Result<Vec<_>>>()?;
+                let _ = tls;
+                BusinessIdentity::Mtls { identities }
+            } else {
+                let name = rpc
+                    .development_token_env
+                    .as_deref()
+                    .ok_or(Error::Configuration)?;
+                let token = std::env::var(name).map_err(|_| Error::Configuration)?;
+                if token.is_empty() || token.len() > BUSINESS_RPC_MAX_TOKEN_BYTES {
+                    return Err(Error::Configuration);
+                }
+                BusinessIdentity::Development {
+                    token_hash: Sha256::digest(token.as_bytes()).into(),
+                    principal: BusinessPrincipal {
+                        id: "development".into(),
+                        role: BusinessRole::Multiplexed,
+                        provider_id: Some("primary".into()),
+                        sink_id: Some("tcp-rpc".into()),
+                        provide_methods: vec![
+                            "device.authenticate".into(),
+                            "device.resolve_verifier".into(),
+                        ],
+                        call_methods: vec!["auth.sync".into(), "auth.invalidate".into()],
+                        global: true,
+                        tenants: Vec::new(),
+                        expires_at_ms: None,
+                    },
+                }
+            };
+            let tls = if let Some(files) = &rpc.tls {
+                Some(management_tls_acceptor(files).await?)
+            } else {
+                None
+            };
+            let transport = BusinessRpcTransportConfig {
+                identity,
+                tls,
+                max_connections: rpc.max_connections,
+                max_frame_bytes: 8 * 1024 * 1024,
+                auth_max_inflight: rpc.auth_max_inflight,
+                heartbeat_ms: 5_000,
+                handshake_timeout: Duration::from_millis(limits.connect_timeout_ms),
+                read_timeout: Duration::from_millis(limits.packet_read_timeout_ms.max(15_000)),
+                write_timeout: Duration::from_millis(limits.write_timeout_ms),
+                event_ack_timeout: Duration::from_millis(limits.sink_timeout_ms),
+            };
+            let services = Arc::new(BusinessRpcServices {
+                registry: rpc_registry.as_ref().ok_or(Error::Internal)?.clone(),
+                sink: sink.clone(),
+                ingress: ingress.clone(),
+                mqtt: mqtt_broker.clone(),
+            });
+            if rpc.allow_v1 {
+                let secret = business_stream_token
+                    .as_deref()
+                    .ok_or(Error::Configuration)?;
+                if secret.is_empty() || secret.len() > 256 {
+                    return Err(Error::Configuration);
+                }
+                let legacy_hash: [u8; 32] = Sha256::digest(secret.as_bytes()).into();
+                business_task = Some(tokio::spawn(serve_business_mixed(
+                    listener,
+                    sink.clone(),
+                    legacy_hash,
+                    transport,
+                    services,
+                    limits.clone(),
+                    (
+                        business_accept_stop.child_token(),
+                        business_connection_stop.child_token(),
+                    ),
+                )));
+            } else {
+                business_task = Some(tokio::spawn(business_rpc::serve(
+                    listener,
+                    transport,
+                    services,
+                    business_accept_stop.child_token(),
+                    business_connection_stop.child_token(),
+                )));
+            }
+        } else {
+            let secret = business_stream_token.ok_or(Error::Configuration)?;
+            let hash: [u8; 32] = Sha256::digest(secret.as_bytes()).into();
+            work_tasks.spawn(serve_business_stream(
+                listener,
+                sink,
+                hash,
+                limits.clone(),
+                work_listeners.child_token(),
+            ));
+        }
     }
     tracing::info!(device_ingress=%device_address,management_http=%config.management_http,business_tcp=?config.business_tcp,"runtime ready");
     let mut management_running = true;
@@ -1161,6 +1143,7 @@ pub async fn run_with_credentials(
     lifecycle.begin_quiesce().await?;
     events.close_admission()?;
     work_listeners.cancel();
+    business_accept_stop.cancel();
     while work_tasks.join_next().await.is_some() {}
 
     // All network owners have detached. Snapshot MQTT protocol state as one versioned,
@@ -1241,6 +1224,10 @@ pub async fn run_with_credentials(
         std::future::pending::<()>().await;
         return Err(error);
     }
+    business_connection_stop.cancel();
+    if let Some(task) = business_task.take() {
+        let _ = task.await;
+    }
     lifecycle.mark_drained()?;
     management_listener.cancel();
     if management_running {
@@ -1250,6 +1237,81 @@ pub async fn run_with_credentials(
     failure.map_or(Ok(()), Err)
 }
 
+async fn serve_business_mixed(
+    listener: TcpListener,
+    sink: Arc<BusinessRpcEventSink>,
+    legacy_token_hash: [u8; 32],
+    transport: BusinessRpcTransportConfig,
+    services: Arc<BusinessRpcServices>,
+    limits: Arc<Limits>,
+    stops: (CancellationToken, CancellationToken),
+) -> Result<()> {
+    let (stop_accepting, stop_connections) = stops;
+    transport.validate(listener.local_addr().map_err(|_| Error::Unavailable)?)?;
+    let mut tasks = JoinSet::new();
+    loop {
+        let accepted = tokio::select! {
+            _ = stop_accepting.cancelled() => break,
+            completed = tasks.join_next(), if !tasks.is_empty() => { if let Some(Err(error)) = completed { tracing::warn!(%error, "business mixed connection failed"); } continue; },
+            accepted = listener.accept() => accepted.map_err(|_| Error::Unavailable)?,
+        };
+        if tasks.len() >= transport.max_connections {
+            drop(accepted.0);
+            continue;
+        }
+        let (mut stream, _) = accepted;
+        let sink = sink.clone();
+        let services = services.clone();
+        let transport = transport.clone();
+        let limits = limits.clone();
+        let stop = stop_connections.child_token();
+        tasks.spawn(async move {
+            let first =
+                tokio::time::timeout(Duration::from_millis(limits.connect_timeout_ms), async {
+                    let mut header = [0u8; 4];
+                    stream
+                        .read_exact(&mut header)
+                        .await
+                        .map_err(|_| Error::Unavailable)?;
+                    let length =
+                        usize::try_from(u32::from_be_bytes(header)).map_err(|_| Error::Invalid)?;
+                    if length == 0 || length > limits.max_tcp_frame_size {
+                        return Err(Error::Invalid);
+                    }
+                    let mut payload = vec![0u8; length];
+                    stream
+                        .read_exact(&mut payload)
+                        .await
+                        .map_err(|_| Error::Unavailable)?;
+                    Ok::<_, Error>(payload)
+                })
+                .await
+                .map_err(|_| Error::Timeout)??;
+            let header: serde_json::Value =
+                serde_json::from_slice(&first).map_err(|_| Error::Invalid)?;
+            match header.get("version").and_then(|value| value.as_u64()) {
+                Some(1) => {
+                    serve_business_connection(
+                        stream,
+                        sink,
+                        legacy_token_hash,
+                        limits,
+                        stop,
+                        Some(first),
+                    )
+                    .await
+                }
+                Some(2) if first.len() <= BUSINESS_RPC_HELLO_MAX_BYTES => {
+                    business_rpc::serve_accepted(stream, transport, services, stop, first).await
+                }
+                _ => Err(Error::Invalid),
+            }
+        });
+    }
+    while tasks.join_next().await.is_some() {}
+    Ok(())
+}
+
 fn shutdown_can_finish(mqtt_recovery_safe: bool, eventbus_required_work_safe: bool) -> bool {
     mqtt_recovery_safe && eventbus_required_work_safe
 }
@@ -1257,6 +1319,48 @@ fn shutdown_can_finish(mqtt_recovery_safe: bool, eventbus_required_work_safe: bo
 #[cfg(test)]
 mod reliability_tests {
     use super::*;
+
+    #[test]
+    fn business_rpc_auth_and_event_delivery_are_independent() {
+        let base: Config =
+            serde_json::from_str(include_str!("../../../configs/development.json")).unwrap();
+        for (auth, delivery) in [
+            (
+                DeviceAuthSource::BusinessRpc,
+                EventDeliverySource::BusinessRpc,
+            ),
+            (DeviceAuthSource::BusinessRpc, EventDeliverySource::Http),
+            (DeviceAuthSource::Http, EventDeliverySource::BusinessRpc),
+            (DeviceAuthSource::Static, EventDeliverySource::BusinessRpc),
+        ] {
+            let mut value = serde_json::to_value(&base).unwrap();
+            value["business_tcp"] = serde_json::json!("127.0.0.1:19002");
+            value["business_rpc"] = serde_json::json!({
+                "version": 2,
+                "tls": null,
+                "development_token_env": "NETBAIOT_BUSINESS_RPC_TOKEN"
+            });
+            value["device_auth"] = serde_json::to_value(auth).unwrap();
+            value["event_delivery"] = serde_json::to_value(delivery).unwrap();
+            value["auth_provider_url"] = if auth == DeviceAuthSource::Http {
+                serde_json::json!("http://127.0.0.1:19003")
+            } else {
+                serde_json::Value::Null
+            };
+            value["delivery_url"] = if delivery == EventDeliverySource::Http {
+                serde_json::json!("http://127.0.0.1:19004")
+            } else {
+                serde_json::Value::Null
+            };
+            let config: Config = serde_json::from_value(value).unwrap();
+            assert!(
+                config.validate().is_ok(),
+                "combination {:?} {:?}",
+                auth as u8,
+                delivery as u8
+            );
+        }
+    }
 
     #[test]
     fn mqtt_recovery_structural_eventbus_safety_001() {
@@ -1401,9 +1505,9 @@ mod reliability_tests {
             "a non-matching subscriber must not acknowledge required work"
         );
         sink.release(generation.wrapping_add(1)).unwrap();
-        assert!(sink.active.lock().unwrap().is_some());
+        assert!(sink.has_owner().unwrap());
         sink.release(generation).unwrap();
-        assert!(sink.active.lock().unwrap().is_none());
+        assert!(!sink.has_owner().unwrap());
 
         // The same already-accepted responsibility survives the filter revision and is ACKed
         // only after a later eligible subscriber explicitly confirms it.

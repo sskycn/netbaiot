@@ -118,3 +118,5 @@ HMAC 请求签名、OAuth2 Token Introspection、管理审计持久化、URI/DNS
 `limits` 中新增的默认值：`management_auth_max_subject_bytes=128`、`management_auth_max_scopes=32`、`management_auth_max_scope_bytes=512`、`management_auth_max_resource_entries=128`、`management_auth_max_resource_bytes=8192`、`management_api_key_max_entries=128`、`management_api_key_max_bytes=32768`、`management_jwks_max_keys=32`、`management_jwks_max_bytes=65536`、`management_jwks_ttl_ms=300000`、`management_jwks_refresh_min_interval_ms=30000`、`management_jwt_max_bytes=16384`。HTTP 请求仍受现有头、体和并发上限约束。
 
 连接接入与管理 HTTP 请求分别使用有界的限流窗口，沿用 `requests_per_second` 和 `requests_per_ip_second` 配置。每个已接入 HTTP 请求只消耗一次请求额度。
+
+Business RPC V2 使用独立的 mTLS principal 或回环开发 token，管理凭据不能授权它。管理 HTTP 与 V2 的 `auth.invalidate` 共用完整的入口/MQTT 失效边界，详见 [Business RPC Stream V2](business-rpc-v2.zh-CN.md)。
