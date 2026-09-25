@@ -33,4 +33,5 @@ Errors use the stable `ApiError` JSON shape with `code`, safe `message`, optiona
 `request_id`, and optional `required_scope`. In particular, an offline command uses
 `device_offline`, not an opaque internal 500. Device and management authorization
 remain separate. Missing scopes return 403 with `required_scope`; resource denials
-return 403 without exposing whether a device exists.
+return 403 without exposing whether a device exists. Invalid management credentials
+return 401; a temporarily unavailable JWKS verifier returns 503.

@@ -529,26 +529,33 @@ impl EventBus {
     }
 
     async fn run_sink(self: Arc<Self>, id: SinkId) {
-        let (definition, notify) =
-            match self
-                .lock_state(EventBusProbe::Other)
-                .ok()
-                .and_then(|state| {
-                    state
-                        .sinks
-                        .get(&id)
-                        .map(|sink| (sink.definition.clone(), sink.notify.clone()))
-                }) {
-                Some(value) => value,
-                None => return,
-            };
+        let (definition, notify) = match self.lock_state(EventBusProbe::Other) {
+            Ok(state) => match state.sinks.get(&id) {
+                Some(sink) => (sink.definition.clone(), sink.notify.clone()),
+                None => {
+                    tracing::error!(sink_id=%id, "EventBus sink worker lost its definition");
+                    return;
+                }
+            },
+            Err(error) => {
+                tracing::error!(%error, sink_id=%id, "EventBus sink worker could not read state");
+                return;
+            }
+        };
         let mut inflight = JoinSet::new();
         let mut woke = false;
         loop {
             let mut took_work = false;
             while inflight.len() < definition.concurrency {
                 let next = self.take_ready(&id);
-                let Ok(Some(record)) = next else { break };
+                let record = match next {
+                    Ok(Some(record)) => record,
+                    Ok(None) => break,
+                    Err(error) => {
+                        tracing::error!(%error, sink_id=%id, "EventBus failed to take ready delivery");
+                        break;
+                    }
+                };
                 took_work = true;
                 let sink = definition.sink.clone();
                 let sink_id = id.clone();
@@ -590,19 +597,28 @@ impl EventBus {
                     _ = self.stop.cancelled() => continue,
                     completed = inflight.join_next() => {
                         self.metrics.event_bus_probe(EventBusProbe::WakeJoin);
-                        if let Some(Ok((record, result))) = completed {
-                            let _ = self.complete(&id, record, result, &definition);
+                        match completed {
+                            Some(Ok((record, result))) => {
+                                if let Err(error) = self.complete(&id, record, result, &definition) {
+                                    tracing::error!(%error, sink_id=%id, "EventBus failed to complete delivery");
+                                }
+                            }
+                            Some(Err(error)) => tracing::error!(%error, sink_id=%id, "EventBus delivery task failed"),
+                            None => {}
                         }
                     }
                 }
                 continue;
             }
             if inflight.is_empty() {
-                let delay = self
-                    .next_ready_delay(&id)
-                    .ok()
-                    .flatten()
-                    .unwrap_or(Duration::from_secs(3_600));
+                let delay = match self.next_ready_delay(&id) {
+                    Ok(Some(delay)) => delay,
+                    Ok(None) => Duration::from_secs(3_600),
+                    Err(error) => {
+                        tracing::error!(%error, sink_id=%id, "EventBus failed to schedule next delivery");
+                        Duration::from_secs(3_600)
+                    }
+                };
                 tokio::select! {
                     biased;
                     _ = self.stop.cancelled() => continue,
@@ -610,18 +626,27 @@ impl EventBus {
                     _ = tokio::time::sleep(delay) => { self.metrics.event_bus_probe(EventBusProbe::WakeTimer); },
                 }
             } else {
-                let delay = self
-                    .next_ready_delay(&id)
-                    .ok()
-                    .flatten()
-                    .unwrap_or(Duration::from_secs(3_600));
+                let delay = match self.next_ready_delay(&id) {
+                    Ok(Some(delay)) => delay,
+                    Ok(None) => Duration::from_secs(3_600),
+                    Err(error) => {
+                        tracing::error!(%error, sink_id=%id, "EventBus failed to schedule next delivery");
+                        Duration::from_secs(3_600)
+                    }
+                };
                 tokio::select! {
                     biased;
                     _ = self.stop.cancelled() => continue,
                     completed = inflight.join_next() => {
                         self.metrics.event_bus_probe(EventBusProbe::WakeJoin);
-                        if let Some(Ok((record, result))) = completed {
-                            let _ = self.complete(&id, record, result, &definition);
+                        match completed {
+                            Some(Ok((record, result))) => {
+                                if let Err(error) = self.complete(&id, record, result, &definition) {
+                                    tracing::error!(%error, sink_id=%id, "EventBus failed to complete delivery");
+                                }
+                            }
+                            Some(Err(error)) => tracing::error!(%error, sink_id=%id, "EventBus delivery task failed"),
+                            None => {}
                         }
                     }
                     _ = notify.notified() => { self.metrics.event_bus_probe(EventBusProbe::WakeNotify); },

@@ -26,3 +26,10 @@ jobs:
           -- cargo test --locked --workspace --all-features
       - if: matrix.toolchain == 'stable'
         run: python3 tests/mqtt_conformance/run.py --netbaiot-only
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo install --locked cargo-audit
+      - run: cargo audit

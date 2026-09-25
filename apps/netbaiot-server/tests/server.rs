@@ -179,6 +179,109 @@ fn non_loopback_management_requires_tls_while_loopback_development_allows_http()
     });
     assert!(public.validate().is_ok());
 }
+
+#[test]
+fn required_management_mtls_needs_a_mapped_identity() {
+    let mut c = config();
+    c.management_tls = Some(ManagementTlsFiles {
+        certificate: "cert".into(),
+        private_key: "key".into(),
+        client_ca: Some("ca".into()),
+        require_client_certificate: true,
+    });
+    assert!(matches!(c.validate(), Err(Error::Configuration)));
+    c.management_auth.mtls_identities.push(MtlsIdentityConfig {
+        certificate_sha256: "a".repeat(64),
+        subject: "service:test".into(),
+        scopes: vec!["runtime.read".into()],
+        resources: AdminResourceConfig::default(),
+        global: true,
+    });
+    assert!(c.validate().is_ok());
+}
+
+#[tokio::test]
+async fn public_management_rejects_only_disabled_or_expired_api_keys() {
+    for (enabled, expires_at) in [(false, None), (true, Some(1))] {
+        let root =
+            std::env::temp_dir().join(format!("netbaiot-unusable-key-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&root).unwrap();
+        let mut c = config();
+        c.development = false;
+        c.delivery_url = Some("https://example.invalid/ingress".into());
+        c.management_http = "0.0.0.0:9090".parse().unwrap();
+        c.tls = Some(test_tls_files());
+        c.spool_directory = root.join("spool");
+        c.management_auth.legacy_static_token_enabled = Some(false);
+        c.management_auth.api_keys.push(ApiKeyConfig {
+            key_id: "backend".into(),
+            secret_env: "NETBAIOT_TEST_MANAGEMENT_KEY".into(),
+            subject: "service:backend".into(),
+            scopes: vec!["runtime.read".into()],
+            resources: AdminResourceConfig::default(),
+            global: true,
+            expires_at,
+            auth_generation: 0,
+            enabled,
+        });
+        let path = root.join("config.json");
+        std::fs::write(&path, serde_json::to_vec(&c).unwrap()).unwrap();
+        let output = tokio::time::timeout(
+            Duration::from_secs(5),
+            Command::new(env!("CARGO_BIN_EXE_netbaiot-server"))
+                .arg(&path)
+                .env_remove("NETBAIOT_ADMIN_SECRET")
+                .env("NETBAIOT_TEST_MANAGEMENT_KEY", "a".repeat(64))
+                .kill_on_drop(true)
+                .output(),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+        assert!(!output.status.success());
+        assert!(String::from_utf8_lossy(&output.stderr).contains("Configuration"));
+        std::fs::remove_dir_all(root).unwrap();
+    }
+}
+
+#[tokio::test]
+async fn one_management_request_consumes_one_request_quota() {
+    use netbaiot_runtime::AdminAccess;
+    let stop = CancellationToken::new();
+    let (ingress, mut services) = tls_test_services(
+        Limits {
+            requests_per_second: 1,
+            requests_per_ip_second: 1,
+            ..Limits::default()
+        },
+        stop.clone(),
+    );
+    let admin = "d".repeat(64);
+    Arc::get_mut(&mut services).unwrap().admin = Some(Arc::new(
+        AdminAccess::new(&admin, Default::default(), &ingress.limits).unwrap(),
+    ));
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let task = tokio::spawn(serve_management_http(
+        listener,
+        services,
+        None,
+        stop.child_token(),
+    ));
+    let response = reqwest::Client::builder()
+        .no_proxy()
+        .build()
+        .unwrap()
+        .get(format!("http://{address}/api/v1/status"))
+        .bearer_auth(admin)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), reqwest::StatusCode::OK);
+    stop.cancel();
+    task.await.unwrap().unwrap();
+    ingress.events.stop_workers().await.unwrap();
+}
 async fn tcp_accept(address: std::net::SocketAddr, payload: &[u8]) -> EventAcceptance {
     use netbaiot_transports::tcp::{LengthPrefixFramer, TcpFramer};
     let mut socket: BoxStream = Box::new(TcpStream::connect(address).await.unwrap());
@@ -432,7 +535,7 @@ async fn api_key_scope_and_tenant_denials_precede_management_mutations() {
         .arg(&path)
         .env("NETBAIOT_ADMIN_SECRET", &admin)
         .env("NETBAIOT_TEST_MANAGEMENT_KEY", &secret)
-        .stdout(Stdio::null())
+        .stdout(Stdio::piped())
         .stderr(Stdio::null())
         .kill_on_drop(true)
         .spawn()
@@ -459,6 +562,13 @@ async fn api_key_scope_and_tenant_denials_precede_management_mutations() {
     assert_eq!(response.status(), reqwest::StatusCode::FORBIDDEN);
     let denied: netbaiot_protocol::ApiError = response.json().await.unwrap();
     assert_eq!(denied.required_scope.as_deref(), Some("runtime.read"));
+    let response = client
+        .get(url("/api/v1/metrics"))
+        .header("Authorization", format!("ApiKey {key}"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), reqwest::StatusCode::FORBIDDEN);
     let response = client
         .get(url("/api/v1/connections"))
         .header("Authorization", format!("ApiKey {key}"))
@@ -537,6 +647,187 @@ async fn api_key_scope_and_tenant_denials_precede_management_mutations() {
             .unwrap()
             .success()
     );
+    let mut log = Vec::new();
+    child
+        .stdout
+        .take()
+        .unwrap()
+        .read_to_end(&mut log)
+        .await
+        .unwrap();
+    let log = String::from_utf8_lossy(&log);
+    assert!(log.contains("legacy bootstrap management token remains enabled"));
+    assert!(!log.contains(&secret));
+    assert!(!log.contains(&admin));
+    std::fs::remove_dir_all(root).unwrap();
+}
+
+#[tokio::test]
+async fn jwt_http_uses_https_jwks_and_reports_outage_as_503() {
+    use jsonwebtoken::{Algorithm, EncodingKey, Header, encode};
+    use tokio_rustls::TlsAcceptor;
+
+    let _port_guard = EPHEMERAL_PORT_TEST_LOCK.lock().await;
+    let cert = include_bytes!("../../../tests/fixtures/localhost-cert.pem");
+    let key = include_bytes!("../../../tests/fixtures/localhost-key.pem");
+    let certificates = rustls_pemfile::certs(&mut cert.as_slice())
+        .collect::<std::result::Result<Vec<_>, _>>()
+        .unwrap();
+    let private_key = rustls_pemfile::private_key(&mut key.as_slice())
+        .unwrap()
+        .unwrap();
+    let tls = TlsAcceptor::from(Arc::new(
+        rustls::ServerConfig::builder_with_provider(Arc::new(
+            rustls::crypto::ring::default_provider(),
+        ))
+        .with_safe_default_protocol_versions()
+        .unwrap()
+        .with_no_client_auth()
+        .with_single_cert(certificates, private_key)
+        .unwrap(),
+    ));
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let jwks_address = listener.local_addr().unwrap();
+    let outage = Arc::new(AtomicBool::new(false));
+    let outage_task = outage.clone();
+    let jwks_task = tokio::spawn(async move {
+        while let Ok((socket, _)) = listener.accept().await {
+            let Ok(mut stream) = tls.accept(socket).await else {
+                continue;
+            };
+            let mut request = [0u8; 4_096];
+            let mut length = 0usize;
+            while length < request.len() {
+                let Ok(read) = stream.read(&mut request[length..]).await else {
+                    break;
+                };
+                if read == 0 {
+                    break;
+                }
+                length += read;
+                if request[..length].windows(4).any(|part| part == b"\r\n\r\n") {
+                    break;
+                }
+            }
+            let body = include_bytes!("../../../tests/fixtures/localhost-jwks.json");
+            let response = if outage_task.load(Ordering::SeqCst) {
+                b"HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                    .to_vec()
+            } else {
+                format!(
+                    "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                    body.len()
+                )
+                .into_bytes()
+            };
+            if stream.write_all(&response).await.is_ok() && !outage_task.load(Ordering::SeqCst) {
+                let _ = stream.write_all(body).await;
+            }
+        }
+    });
+
+    let root = std::env::temp_dir().join(format!("netbaiot-jwt-http-{}", uuid::Uuid::new_v4()));
+    std::fs::create_dir_all(&root).unwrap();
+    let ca_path = root.join("jwks-ca.pem");
+    std::fs::write(&ca_path, cert).unwrap();
+    let mut c = config();
+    c.device_ingress = free_address().await;
+    c.management_http = free_address().await;
+    c.spool_directory = root.join("spool");
+    c.limits.management_jwks_ttl_ms = 50;
+    c.limits.management_jwks_refresh_min_interval_ms = 1;
+    c.management_auth.legacy_static_token_enabled = Some(false);
+    c.management_auth.jwt = Some(
+        serde_json::from_value(serde_json::json!({
+            "issuer": "https://issuer.example",
+            "audience": "netbaiot",
+            "jwks_url": format!("https://localhost:{}/jwks", jwks_address.port())
+        }))
+        .unwrap(),
+    );
+    let config_path = root.join("config.json");
+    std::fs::write(&config_path, serde_json::to_vec(&c).unwrap()).unwrap();
+    let mut child = Command::new(env!("CARGO_BIN_EXE_netbaiot-server"))
+        .arg(&config_path)
+        .env_remove("NETBAIOT_ADMIN_SECRET")
+        .env("SSL_CERT_FILE", &ca_path)
+        .env("NO_PROXY", "localhost,127.0.0.1")
+        .env("no_proxy", "localhost,127.0.0.1")
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .kill_on_drop(true)
+        .spawn()
+        .unwrap();
+    let now = netbaiot_runtime::now_ms() / 1_000;
+    let claims = serde_json::json!({
+        "iss": "https://issuer.example", "aud": "netbaiot", "sub": "user-1",
+        "exp": now + 60, "nbf": now - 1,
+        "scope": "runtime.read connection.read", "tenants": ["demo"]
+    });
+    let mut header = Header::new(Algorithm::RS256);
+    header.kid = Some("test".into());
+    let private = EncodingKey::from_rsa_pem(key).unwrap();
+    let token = encode(&header, &claims, &private).unwrap();
+    let client = reqwest::Client::builder().no_proxy().build().unwrap();
+    let url = |path: &str| format!("http://{}{path}", c.management_http);
+    tokio::time::timeout(Duration::from_secs(8), async {
+        loop {
+            if client
+                .get(url("/api/v1/status"))
+                .bearer_auth(&token)
+                .send()
+                .await
+                .is_ok_and(|response| response.status() == reqwest::StatusCode::OK)
+            {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+    })
+    .await
+    .unwrap();
+    let denied = client
+        .post(url("/api/v1/devices/connection"))
+        .bearer_auth(&token)
+        .json(
+            &serde_json::json!({"tenant_id":"other","product_id":"sensor","device_id":"device-1"}),
+        )
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(denied.status(), reqwest::StatusCode::FORBIDDEN);
+    let denied = client
+        .get(url("/api/v1/metrics"))
+        .bearer_auth(&token)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(denied.status(), reqwest::StatusCode::FORBIDDEN);
+    outage.store(true, Ordering::SeqCst);
+    tokio::time::sleep(Duration::from_millis(70)).await;
+    let unavailable = client
+        .get(url("/api/v1/status"))
+        .bearer_auth(&token)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(
+        unavailable.status(),
+        reqwest::StatusCode::SERVICE_UNAVAILABLE
+    );
+    let unavailable = client
+        .get(url("/api/v1/status"))
+        .bearer_auth(&token)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(
+        unavailable.status(),
+        reqwest::StatusCode::SERVICE_UNAVAILABLE
+    );
+    child.kill().await.unwrap();
+    let _ = child.wait().await;
+    jwks_task.abort();
     std::fs::remove_dir_all(root).unwrap();
 }
 
@@ -692,6 +983,16 @@ async fn management_mtls_trust_and_explicit_identity_mapping() {
         .unwrap();
     assert_eq!(
         unmapped.get(&url).send().await.unwrap().status(),
+        reqwest::StatusCode::UNAUTHORIZED
+    );
+    assert_eq!(
+        trusted
+            .get(&url)
+            .header("Authorization", format!("Bearer {}", "a".repeat(64)))
+            .send()
+            .await
+            .unwrap()
+            .status(),
         reqwest::StatusCode::UNAUTHORIZED
     );
     let drain_url = format!(
