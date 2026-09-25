@@ -964,14 +964,25 @@ def differential_vectors(netbaiot_port: int, mosquitto_port: int, results: Resul
     def keepalive(port: int, credentials: bool):
         client, _ = open_client(port, "diff-keepalive", clean=True, credentials=credentials, keepalive=1)
         started = time.monotonic()
-        client.expect_closed(timeout=2.6)
+        # The raw NetbaIoT case above enforces the tighter 1.5x deadline.
+        # Mosquitto's periodic keepalive sweep can run later on loaded CI hosts.
+        # Keep a finite reference-broker bound without changing the gateway check.
+        timeout = 2.6 if credentials else 4.5
+        try:
+            client.expect_closed(timeout=timeout)
+        except TimeoutError as error:
+            broker = "NetbaIoT" if credentials else "Mosquitto"
+            raise AssertionError(f"{broker} did not close within {timeout}s") from error
+        finally:
+            client.close()
         elapsed = time.monotonic() - started
         # The broker's keepalive clock starts while CONNECT is being processed,
         # before this post-CONNACK measurement begins.  Keep a lower bound that
         # still rejects an immediate close without assuming the handshake and
         # scheduler consumed less than 300 ms on a loaded CI host.
-        assert 1.0 <= elapsed <= 2.5, elapsed
-        return "closed-at-1.5x"
+        upper_bound = 2.5 if credentials else 4.0
+        assert 1.0 <= elapsed <= upper_bound, elapsed
+        return "closed-within-keepalive-bound"
 
     compare("DIFF-KEEPALIVE-001", "keepalive", keepalive)
 
