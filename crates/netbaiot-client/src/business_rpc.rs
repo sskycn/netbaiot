@@ -220,6 +220,7 @@ struct ClientInner {
     ready: watch::Receiver<bool>,
     connection_timing: Arc<Mutex<Option<BusinessRpcConnectionTiming>>>,
     last_connection_error: Arc<Mutex<Option<BusinessRpcClientError>>>,
+    last_protocol_context: Arc<Mutex<Option<&'static str>>>,
 }
 /// Client-observed timing for the most recent successful connection. TLS is
 /// measured inside the existing verified rustls path, before the V2 handshake.
@@ -234,6 +235,7 @@ struct DriverSignals {
     ready: watch::Sender<bool>,
     timing: Arc<Mutex<Option<BusinessRpcConnectionTiming>>>,
     last_connection_error: Arc<Mutex<Option<BusinessRpcClientError>>>,
+    last_protocol_context: Arc<Mutex<Option<&'static str>>>,
 }
 impl Drop for ClientInner {
     fn drop(&mut self) {
@@ -257,6 +259,14 @@ impl BusinessRpcClient {
             .lock()
             .ok()
             .and_then(|error| error.clone())
+    }
+    /// Returns the handshake or frame-processing stage for the latest protocol error.
+    pub fn last_protocol_context(&self) -> Option<&'static str> {
+        self.inner
+            .last_protocol_context
+            .lock()
+            .ok()
+            .and_then(|context| *context)
     }
     pub fn connection_timing(&self) -> Option<BusinessRpcConnectionTiming> {
         self.inner
@@ -332,6 +342,7 @@ impl BusinessRpcClient {
         let revision = Arc::new(AtomicU64::new(config.auth_revision));
         let connection_timing = Arc::new(Mutex::new(None));
         let last_connection_error = Arc::new(Mutex::new(None));
+        let last_protocol_context = Arc::new(Mutex::new(None));
         let task = tokio::spawn(driver(
             config.clone(),
             handler,
@@ -342,6 +353,7 @@ impl BusinessRpcClient {
                 ready: ready_tx,
                 timing: connection_timing.clone(),
                 last_connection_error: last_connection_error.clone(),
+                last_protocol_context: last_protocol_context.clone(),
             },
             shutdown.clone(),
         ));
@@ -356,6 +368,7 @@ impl BusinessRpcClient {
                 ready: ready_rx,
                 connection_timing,
                 last_connection_error,
+                last_protocol_context,
             }),
         };
         Ok((client, delivery_rx))
@@ -478,6 +491,7 @@ async fn handshake(
     io: &mut Box<dyn Io>,
     config: &BusinessRpcClientConfig,
     revision: u64,
+    signals: &DriverSignals,
 ) -> Result<(u64, SubscriptionId), BusinessRpcClientError> {
     let limits = BusinessLimits {
         max_frame_bytes: config.max_frame_bytes as u32,
@@ -498,7 +512,9 @@ async fn handshake(
         config.connect_timeout,
     )
     .await?;
-    let ready = read_frame(io, BUSINESS_RPC_HELLO_MAX_BYTES, config.connect_timeout).await?;
+    let ready = read_frame(io, BUSINESS_RPC_HELLO_MAX_BYTES, config.connect_timeout)
+        .await
+        .map_err(|error| protocol_context(error, signals, "ready_frame"))?;
     let BusinessRpcFrame::Ready {
         version,
         role,
@@ -513,7 +529,7 @@ async fn handshake(
         || limits.event_max_inflight != 1
         || limits.max_frame_bytes == 0
     {
-        return Err(BusinessRpcClientError::Protocol);
+        return Err(protocol_at(signals, "ready_contract"));
     }
     if config.role.auth_control() {
         let id = Uuid::new_v4();
@@ -535,7 +551,10 @@ async fn handshake(
             config.request_timeout,
         )
         .await?;
-        match read_frame(io, config.max_frame_bytes, config.request_timeout).await? {
+        match read_frame(io, config.max_frame_bytes, config.request_timeout)
+            .await
+            .map_err(|error| protocol_context(error, signals, "auth_sync_response"))?
+        {
             BusinessRpcFrame::Response {
                 request_id,
                 method,
@@ -545,7 +564,7 @@ async fn handshake(
             BusinessRpcFrame::Response {
                 error: Some(error), ..
             } => return Err(BusinessRpcClientError::Remote(error.code)),
-            _ => return Err(BusinessRpcClientError::Protocol),
+            _ => return Err(protocol_at(signals, "auth_sync_response")),
         }
         let nonce = Uuid::new_v4().as_u128() as u64;
         write_frame(
@@ -555,9 +574,12 @@ async fn handshake(
             config.request_timeout,
         )
         .await?;
-        match read_frame(io, config.max_frame_bytes, config.request_timeout).await? {
+        match read_frame(io, config.max_frame_bytes, config.request_timeout)
+            .await
+            .map_err(|error| protocol_context(error, signals, "auth_sync_pong"))?
+        {
             BusinessRpcFrame::Pong { nonce: received } if received == nonce => {}
-            _ => return Err(BusinessRpcClientError::Protocol),
+            _ => return Err(protocol_at(signals, "auth_sync_pong")),
         }
     }
     let subscription = SubscriptionId::generate();
@@ -572,13 +594,33 @@ async fn handshake(
             config.request_timeout,
         )
         .await?;
-        match read_frame(io, config.max_frame_bytes, config.request_timeout).await? {
+        match read_frame(io, config.max_frame_bytes, config.request_timeout)
+            .await
+            .map_err(|error| protocol_context(error, signals, "event_subscription_ack"))?
+        {
             BusinessRpcFrame::Subscribed { subscription_id } if subscription_id == subscription => {
             }
-            _ => return Err(BusinessRpcClientError::Protocol),
+            _ => return Err(protocol_at(signals, "event_subscription_ack")),
         }
     }
     Ok((connection_epoch, subscription))
+}
+fn protocol_at(signals: &DriverSignals, context: &'static str) -> BusinessRpcClientError {
+    if let Ok(mut last_context) = signals.last_protocol_context.lock() {
+        *last_context = Some(context);
+    }
+    BusinessRpcClientError::Protocol
+}
+fn protocol_context(
+    error: BusinessRpcClientError,
+    signals: &DriverSignals,
+    context: &'static str,
+) -> BusinessRpcClientError {
+    if matches!(error, BusinessRpcClientError::Protocol) {
+        protocol_at(signals, context)
+    } else {
+        error
+    }
 }
 async fn driver(
     config: BusinessRpcClientConfig,
@@ -593,6 +635,9 @@ async fn driver(
     loop {
         if stop.is_cancelled() {
             break;
+        }
+        if let Ok(mut context) = signals.last_protocol_context.lock() {
+            *context = None;
         }
         let result = connected(
             &config,
@@ -651,7 +696,8 @@ async fn connected(
     let started = Instant::now();
     let (mut io, tcp_connect, tls_handshake) = connect_io(config).await?;
     let sync_started = Instant::now();
-    let (epoch, subscription) = handshake(&mut io, config, revision.load(Ordering::SeqCst)).await?;
+    let (epoch, subscription) =
+        handshake(&mut io, config, revision.load(Ordering::SeqCst), signals).await?;
     let (mut reader, mut writer) = tokio::io::split(io);
     let (read_tx, mut read_rx) = mpsc::channel::<(BusinessRpcFrame, OwnedSemaphorePermit)>(64);
     let read_budget = Arc::new(Semaphore::new(config.max_frame_bytes + 64 * 16 * 1024));
@@ -746,9 +792,9 @@ async fn connected(
                     BusinessRpcFrame::Response { request_id, method, body, error } => {
                         let stale = error.as_ref().is_some_and(|failure| failure.code == RpcErrorCode::StaleRevision);
                         if let Some(pending) = pending.remove(&request_id) {
-                            let result = if pending.method != method { Err(BusinessRpcClientError::Protocol) }
+                            let result = if pending.method != method { Err(protocol_at(signals, "rpc_response_method")) }
                                 else if let Some(error) = error { Err(BusinessRpcClientError::Remote(error.code)) }
-                                else { body.and_then(|body| serde_json::from_value(body).ok()).ok_or(BusinessRpcClientError::Protocol) };
+                                else { body.and_then(|body| serde_json::from_value(body).ok()).ok_or_else(|| protocol_at(signals, "rpc_response_body")) };
                             let _ = pending.result.send(result);
                         }
                         if stale { break Err(BusinessRpcClientError::Remote(RpcErrorCode::StaleRevision)); }
@@ -760,7 +806,7 @@ async fn connected(
                     BusinessRpcFrame::Pong { .. } => {},
                     BusinessRpcFrame::Cancel { request_id } => { if let Some(cancel) = handler_cancellations.get(&request_id) { cancel.cancel(); } },
                     BusinessRpcFrame::GoAway { error } => break Err(BusinessRpcClientError::Remote(error.code)),
-                    _ => break Err(BusinessRpcClientError::Protocol),
+                    _ => break Err(protocol_at(signals, "connected_frame")),
                 }
             }
             command = commands.recv() => {
