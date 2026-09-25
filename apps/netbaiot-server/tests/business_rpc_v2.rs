@@ -311,8 +311,7 @@ async fn one_socket_authentication_progresses_while_event_ack_waits() {
     let recovered_after_gap = tokio::time::timeout(Duration::from_secs(30), async {
         loop {
             recovery_attempts += 1;
-            if business.ready()
-            {
+            if business.ready() {
                 match device_result(addresses[0], "one").await {
                     Ok(recovered) => break recovered,
                     Err(error) => last_recovery_error = Some(format!("{error:?}")),
