@@ -50,6 +50,8 @@ cargo run --locked --release -p netbaiot-loadgen --bin business_rpc -- configs/b
 
 原始 JSON 位于 [`docs/performance/business-rpc-v2/`](performance/business-rpc-v2/)。环境为 macOS Darwin 25.6.0、arm64、Rust stable 1.97.1；网关和工具均为 **dev profile**，同机回环明文，单个网关进程，管理指标每 250 ms 采样。普通场景的网关 `auth_max_inflight=16`、正缓存 TTL 30 秒、sink ACK 超时 8 秒；认证饱和场景单独重启网关，`auth_max_inflight=2`、正缓存 TTL 2 ms、负缓存 TTL 1 ms。业务 handler 延迟和场景并发在 JSON 的 `config` 中记录。五分钟 soak 开始时的工具版本尚未在 JSON 中内嵌配置；其实际参数为 `duration_secs=300`、`reconnect_cycles=300`、`reconnect_pause_ms=1000`、`auth_concurrency=4`、`warmup_secs=10`、`recovery_secs=5`、`sample_period_ms=250`。
 
+负载二进制构建于最后一项极端 principal 到期时间 `checked_add` 防溢出修复之前；该修复不改变本节正常到期配置的执行路径。修复后的代码通过了稳定版与 Rust 1.88 全量测试、MQTT conformance、V2 fuzz 和重启 soak。负载场景没有因这一行修复再重跑，结果据实作为该构建的回归测量保存。
+
 下表 `requests_per_second` 是包括恢复等待及未完成 SDK 连接收尾时间的进程平均值。认证延迟是 **设备 SDK 发起 MQTT CONNECT 至连接结果** 的端到端时间，可能包含 SDK 重试；verifier 延迟是 UDP 发送至 NBA1 ACK。它们不是纯 Business RPC 帧往返延迟，也不是生产容量。
 
 | 场景及原始结果 | 配置时长 / 实际时长 | 并发 | 请求成功 / 总数 | 请求/秒 | p50 / p95 / p99 / max (ms) |
