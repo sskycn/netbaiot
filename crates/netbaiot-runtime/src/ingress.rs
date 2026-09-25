@@ -298,6 +298,9 @@ impl Ingress {
 mod tests {
     use super::*;
     use async_trait::async_trait;
+    use netbaiot_core::business_rpc::BusinessRpcFrame;
+    use serde_json::json;
+    use std::time::Duration;
 
     struct TestCodec;
     impl DeviceCodec for TestCodec {
@@ -509,6 +512,123 @@ mod tests {
                 "a pre-invalidation candidate must never become a live session"
             );
         }
+        events.stop_workers().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn delayed_business_rpc_auth_cannot_register_after_device_invalidation() {
+        let limits = Arc::new(Limits::default());
+        let metrics = Arc::new(Metrics::default());
+        let registry = BusinessRpcRegistry::new(2, 65_536, Duration::from_secs(2)).unwrap();
+        let (send, mut requests) = tokio::sync::mpsc::channel(2);
+        let lease = registry
+            .register(
+                send,
+                BusinessProviderScope {
+                    global: true,
+                    tenants: vec![],
+                },
+            )
+            .unwrap();
+        lease.mark_serving(1).unwrap();
+        let sink_id = SinkId::new("rpc-auth-race").unwrap();
+        let events = EventBus::new(
+            limits.clone(),
+            metrics.clone(),
+            vec![SinkDefinition::bounded(
+                sink_id.clone(),
+                SinkDeliveryMode::ConfirmedRequired,
+                Arc::new(TestSink),
+                &limits,
+            )],
+            vec![RouteDefinition {
+                tenant: None,
+                sinks: vec![sink_id],
+            }],
+            1,
+        )
+        .unwrap();
+        let lifecycle = Arc::new(Lifecycle::starting());
+        lifecycle.mark_running().unwrap();
+        let sessions = Sessions::new(limits.clone());
+        let ingress = Ingress::new(
+            limits.clone(),
+            AuthCache::new(
+                BusinessRpcAuthProvider::new(registry.clone()),
+                limits.clone(),
+                metrics.clone(),
+            ),
+            CodecRegistry::new(vec![(
+                CodecId::new("test").unwrap(),
+                1,
+                Arc::new(TestCodec),
+            )])
+            .unwrap(),
+            events.clone(),
+            GatewayControl::empty(limits),
+            metrics,
+            sessions.clone(),
+            lifecycle,
+        );
+        let ingress = Arc::new(ingress);
+        let stale = tokio::spawn({
+            let ingress = ingress.clone();
+            async move {
+                ingress
+                    .authenticate_session(AuthenticationRequest::Secret {
+                        credential_id: "rpc-race",
+                        secret: b"secret",
+                    })
+                    .await
+            }
+        });
+        let outbound = requests.recv().await.unwrap();
+        let BusinessRpcFrame::Request {
+            request_id, method, ..
+        } = outbound.frame
+        else {
+            panic!("auth request expected")
+        };
+        let device = identity("rpc-race").device_key;
+        ingress
+            .invalidate_auth(&AuthInvalidation::Device {
+                device: device.clone(),
+            })
+            .unwrap();
+        let reply = json!({
+            "device_key": device, "credential_version": 1, "auth_generation": 1,
+            "codec_id": "test", "codec_version": 1, "publish": true,
+            "commands": true, "auth_revision": 2
+        });
+        assert!(registry.complete(lease.epoch(), request_id, &method, Ok(reply.clone())));
+        assert!(matches!(stale.await.unwrap(), Err(Error::Authentication)));
+        assert_eq!(ingress.auth_cache.usage().unwrap().0, 0);
+        assert!(sessions.list(0, 10).unwrap().is_empty());
+        lease.advance_revision(2).unwrap();
+        let fresh = tokio::spawn({
+            let ingress = ingress.clone();
+            async move {
+                ingress
+                    .authenticate_session(AuthenticationRequest::Secret {
+                        credential_id: "rpc-race",
+                        secret: b"secret",
+                    })
+                    .await
+            }
+        });
+        let outbound = requests.recv().await.unwrap();
+        let BusinessRpcFrame::Request {
+            request_id, method, ..
+        } = outbound.frame
+        else {
+            panic!("fresh auth request expected")
+        };
+        assert!(registry.complete(lease.epoch(), request_id, &method, Ok(reply)));
+        let candidate = fresh.await.unwrap().unwrap();
+        let (_session, _commands) = ingress
+            .register_session(candidate, Transport::Mqtt)
+            .unwrap();
+        assert_eq!(sessions.list(0, 10).unwrap().len(), 1);
         events.stop_workers().await.unwrap();
     }
 }

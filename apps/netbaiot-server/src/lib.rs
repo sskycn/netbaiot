@@ -975,28 +975,28 @@ pub async fn run_with_credentials(
                 .max_auth_control_offline_ms,
         );
         let offline_stop = work_listeners.child_token();
-        work_tasks.spawn(async move {
-            let mut since = Some(tokio::time::Instant::now());
-            let mut invalidated = false;
-            let mut interval = tokio::time::interval(Duration::from_millis(250));
-            interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
-            loop {
-                tokio::select! {
-                    _ = offline_stop.cancelled() => return Ok(()),
-                    _ = interval.tick() => {
-                        if authority.is_serving() { since = None; invalidated = false; }
-                        else {
-                            let started = *since.get_or_insert_with(tokio::time::Instant::now);
-                            if !invalidated && started.elapsed() >= grace {
-                                let invalidate = AuthInvalidation::All;
-                                ingress_for_offline.invalidate_auth_with(&invalidate, || mqtt_for_offline.invalidate_sessions(&invalidate))?;
-                                invalidated = true;
-                            }
-                        }
-                    }
+        work_tasks.spawn(watch_business_auth_offline(
+            authority.subscribe_status(),
+            grace,
+            offline_stop,
+            move |observed| {
+                if authority
+                    .invalidate_if_offline(observed, || {
+                        let invalidate = AuthInvalidation::All;
+                        ingress_for_offline.invalidate_auth_with(&invalidate, || {
+                            mqtt_for_offline.invalidate_sessions(&invalidate)
+                        })?;
+                        Ok(())
+                    })?
+                    .is_some()
+                {
+                    ingress_for_offline
+                        .metrics
+                        .inc(Metric::BusinessRpcOfflineGraceExpirations);
                 }
-            }
-        });
+                Ok(())
+            },
+        ));
     }
     work_tasks.spawn(serve_device_ingress(
         device_ingress,
@@ -1237,6 +1237,46 @@ pub async fn run_with_credentials(
     failure.map_or(Ok(()), Err)
 }
 
+async fn watch_business_auth_offline(
+    mut status: tokio::sync::watch::Receiver<ProviderStatus>,
+    grace: Duration,
+    stop: CancellationToken,
+    mut invalidate: impl FnMut(ProviderStatus) -> Result<()>,
+) -> Result<()> {
+    let mut offline_state = None;
+    let mut invalidated = false;
+    loop {
+        let current = *status.borrow();
+        if current.serving {
+            offline_state = None;
+            invalidated = false;
+        } else if offline_state != Some((current.transition, current.changed_at)) {
+            offline_state = Some((current.transition, current.changed_at));
+            invalidated = false;
+        }
+        let deadline = offline_state.map(|(_, since)| since + grace);
+        if let Some(expires) = deadline.filter(|_| !invalidated)
+            && tokio::time::Instant::now() >= expires
+        {
+            // A newly synchronized generation wins an exact-deadline race.
+            let observed = *status.borrow();
+            if !observed.serving && observed.transition == current.transition {
+                invalidate(observed)?;
+            }
+            invalidated = true;
+            continue;
+        }
+        tokio::select! {
+            biased;
+            _ = stop.cancelled() => return Ok(()),
+            changed = status.changed() => {
+                if changed.is_err() { return Ok(()); }
+            }
+            _ = tokio::time::sleep_until(deadline.unwrap_or_else(tokio::time::Instant::now)), if deadline.is_some() && !invalidated => {}
+        }
+    }
+}
+
 async fn serve_business_mixed(
     listener: TcpListener,
     sink: Arc<BusinessRpcEventSink>,
@@ -1319,6 +1359,161 @@ fn shutdown_can_finish(mqtt_recovery_safe: bool, eventbus_required_work_safe: bo
 #[cfg(test)]
 mod reliability_tests {
     use super::*;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    #[tokio::test(start_paused = true)]
+    async fn business_auth_zero_grace_invalidates_without_clock_advance() {
+        let (status, receiver) = tokio::sync::watch::channel(ProviderStatus {
+            epoch: 1,
+            serving: true,
+            transition: 1,
+            changed_at: tokio::time::Instant::now(),
+        });
+        let count = Arc::new(AtomicUsize::new(0));
+        let observed = count.clone();
+        let stop = CancellationToken::new();
+        let task = tokio::spawn(watch_business_auth_offline(
+            receiver,
+            Duration::ZERO,
+            stop.clone(),
+            move |_| {
+                observed.fetch_add(1, Ordering::SeqCst);
+                Ok(())
+            },
+        ));
+        tokio::task::yield_now().await;
+        status.send_replace(ProviderStatus {
+            epoch: 1,
+            serving: false,
+            transition: 2,
+            changed_at: tokio::time::Instant::now(),
+        });
+        tokio::task::yield_now().await;
+        assert_eq!(count.load(Ordering::SeqCst), 1);
+        stop.cancel();
+        task.await.unwrap().unwrap();
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn business_auth_grace_deadline_and_reconnect_are_generation_fenced() {
+        let (status, receiver) = tokio::sync::watch::channel(ProviderStatus {
+            epoch: 1,
+            serving: true,
+            transition: 1,
+            changed_at: tokio::time::Instant::now(),
+        });
+        let count = Arc::new(AtomicUsize::new(0));
+        let observed = count.clone();
+        let stop = CancellationToken::new();
+        let task = tokio::spawn(watch_business_auth_offline(
+            receiver,
+            Duration::from_secs(30),
+            stop.clone(),
+            move |_| {
+                observed.fetch_add(1, Ordering::SeqCst);
+                Ok(())
+            },
+        ));
+        tokio::task::yield_now().await;
+        status.send_replace(ProviderStatus {
+            epoch: 1,
+            serving: false,
+            transition: 2,
+            changed_at: tokio::time::Instant::now(),
+        });
+        tokio::task::yield_now().await;
+        tokio::time::advance(Duration::from_millis(29_999)).await;
+        assert_eq!(count.load(Ordering::SeqCst), 0);
+        tokio::time::advance(Duration::from_millis(1)).await;
+        tokio::task::yield_now().await;
+        assert_eq!(count.load(Ordering::SeqCst), 1);
+        status.send_replace(ProviderStatus {
+            epoch: 2,
+            serving: true,
+            transition: 3,
+            changed_at: tokio::time::Instant::now(),
+        });
+        tokio::task::yield_now().await;
+        status.send_replace(ProviderStatus {
+            epoch: 2,
+            serving: false,
+            transition: 4,
+            changed_at: tokio::time::Instant::now(),
+        });
+        tokio::task::yield_now().await;
+        tokio::time::advance(Duration::from_secs(10)).await;
+        status.send_replace(ProviderStatus {
+            epoch: 3,
+            serving: true,
+            transition: 5,
+            changed_at: tokio::time::Instant::now(),
+        });
+        tokio::task::yield_now().await;
+        tokio::time::advance(Duration::from_secs(21)).await;
+        assert_eq!(count.load(Ordering::SeqCst), 1);
+        status.send_replace(ProviderStatus {
+            epoch: 3,
+            serving: false,
+            transition: 6,
+            changed_at: tokio::time::Instant::now(),
+        });
+        tokio::task::yield_now().await;
+        tokio::time::advance(Duration::from_secs(30)).await;
+        status.send_replace(ProviderStatus {
+            epoch: 4,
+            serving: true,
+            transition: 7,
+            changed_at: tokio::time::Instant::now(),
+        });
+        tokio::task::yield_now().await;
+        assert_eq!(count.load(Ordering::SeqCst), 1);
+        stop.cancel();
+        task.await.unwrap().unwrap();
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn collapsed_serving_disconnect_starts_grace_at_actual_disconnect() {
+        let (status, receiver) = tokio::sync::watch::channel(ProviderStatus {
+            epoch: 0,
+            serving: false,
+            transition: 0,
+            changed_at: tokio::time::Instant::now(),
+        });
+        let count = Arc::new(AtomicUsize::new(0));
+        let observed = count.clone();
+        let stop = CancellationToken::new();
+        let task = tokio::spawn(watch_business_auth_offline(
+            receiver,
+            Duration::from_secs(30),
+            stop.clone(),
+            move |_| {
+                observed.fetch_add(1, Ordering::SeqCst);
+                Ok(())
+            },
+        ));
+        tokio::task::yield_now().await;
+        tokio::time::advance(Duration::from_secs(10)).await;
+        status.send_replace(ProviderStatus {
+            epoch: 1,
+            serving: true,
+            transition: 1,
+            changed_at: tokio::time::Instant::now(),
+        });
+        status.send_replace(ProviderStatus {
+            epoch: 1,
+            serving: false,
+            transition: 2,
+            changed_at: tokio::time::Instant::now(),
+        });
+        tokio::task::yield_now().await;
+        tokio::time::advance(Duration::from_secs(20)).await;
+        assert_eq!(count.load(Ordering::SeqCst), 0);
+        tokio::time::advance(Duration::from_secs(10)).await;
+        tokio::task::yield_now().await;
+        assert_eq!(count.load(Ordering::SeqCst), 1);
+        stop.cancel();
+        task.await.unwrap().unwrap();
+    }
 
     #[test]
     fn business_rpc_auth_and_event_delivery_are_independent() {

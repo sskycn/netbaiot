@@ -18,6 +18,9 @@ reqwest.workspace = true
 uuid.workspace = true
 netbaiot-core.workspace = true
 netbaiot-runtime.workspace = true
+netbaiot-client.workspace = true
+netbaiot-device-sdk.workspace = true
+async-trait.workspace = true
 
 [lints]
 workspace = true
