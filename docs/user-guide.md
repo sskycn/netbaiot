@@ -1,5 +1,7 @@
 # NetbaIoT 完整用户指南
 
+管理接口的 API Key、JWT、mTLS、Scope、资源授权和旧令牌迁移参阅[管理认证](management-auth.zh-CN.md)。
+
 > 当前职责边界与验证见[设备配置职责移除报告](remove-device-config.md)。<br>
 > Workspace 版本：`0.1.0`；Rust MSRV：`1.88`。
 

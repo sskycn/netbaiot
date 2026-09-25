@@ -773,9 +773,9 @@ impl AdminAccess {
             identities,
         })
     }
-    pub fn verify(&self, secret: &[u8]) -> Result<()> {
+    pub fn authenticate(&self, secret: &[u8]) -> Result<crate::AdminPrincipal> {
         if secret.len() == 64 && bool::from(self.hash.ct_eq(&Sha256::digest(secret))) {
-            Ok(())
+            Ok(crate::AdminPrincipal::bootstrap())
         } else {
             Err(Error::Authentication)
         }

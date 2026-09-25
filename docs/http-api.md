@@ -1,7 +1,9 @@
 # Management HTTP API
 
-Management HTTP has its own listener and 64-character admin secret configured
-through `NETBAIOT_ADMIN_SECRET`. Headers, bodies, handler concurrency, responses
+Management HTTP has its own listener and supports the legacy bootstrap token,
+API Keys, RS256 JWT, and explicitly mapped management mTLS identities. See
+[management authentication](management-auth.md) for configuration and permission rules.
+Headers, bodies, handler concurrency, responses
 and deadlines are bounded; content encoding is rejected. Device credentials cannot
 authorize these operations. The device ingress does not dispatch HTTP.
 
@@ -30,5 +32,5 @@ only while the current MQTT/TCP session remains connected.
 Errors use the stable `ApiError` JSON shape with `code`, safe `message`, optional
 `request_id`, and optional `required_scope`. In particular, an offline command uses
 `device_offline`, not an opaque internal 500. Device and management authorization
-remain separate; the current static management token is all-or-nothing, while the
-public error model reserves scope detail for a future scoped provider.
+remain separate. Missing scopes return 403 with `required_scope`; resource denials
+return 403 without exposing whether a device exists.

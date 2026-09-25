@@ -20,6 +20,7 @@ enum Output {
 struct Global {
     endpoint: String,
     token: String,
+    api_key: bool,
     event_token: Option<String>,
     event_address: Option<SocketAddr>,
     output: Output,
@@ -65,9 +66,12 @@ impl From<ClientError> for CliError {
 
 async fn run(mut arguments: Vec<String>) -> Result<(), CliError> {
     let global = parse_global(&mut arguments)?;
-    let mut builder = NetbaIoTClient::builder()
-        .endpoint(global.endpoint)
-        .token(global.token);
+    let mut builder = NetbaIoTClient::builder().endpoint(global.endpoint);
+    builder = if global.api_key {
+        builder.api_key(global.token)
+    } else {
+        builder.token(global.token)
+    };
     if let Some(token) = global.event_token {
         builder = builder.event_token(token);
     }
@@ -91,6 +95,13 @@ async fn run(mut arguments: Vec<String>) -> Result<(), CliError> {
 fn parse_global(arguments: &mut Vec<String>) -> Result<Global, CliError> {
     let mut endpoint = env::var("NETBAIOT_ENDPOINT").ok();
     let mut token = env::var("NETBAIOT_TOKEN").ok();
+    let mut api_key = false;
+    if token.is_none()
+        && let Ok(value) = env::var("NETBAIOT_API_KEY")
+    {
+        token = Some(value);
+        api_key = true;
+    }
     let mut event_address = env::var("NETBAIOT_EVENT_ADDRESS")
         .ok()
         .map(|value| value.parse())
@@ -102,7 +113,8 @@ fn parse_global(arguments: &mut Vec<String>) -> Result<Global, CliError> {
     let mut at = 0usize;
     while at < arguments.len() {
         match arguments[at].as_str() {
-            "--endpoint" | "--token" | "--event-token" | "--event-address" | "--output" => {
+            "--endpoint" | "--token" | "--api-key" | "--event-token" | "--event-address"
+            | "--output" => {
                 let flag = arguments[at].clone();
                 let value = arguments
                     .get(at + 1)
@@ -110,7 +122,14 @@ fn parse_global(arguments: &mut Vec<String>) -> Result<Global, CliError> {
                     .clone();
                 match flag.as_str() {
                     "--endpoint" => endpoint = Some(value),
-                    "--token" => token = Some(value),
+                    "--token" => {
+                        token = Some(value);
+                        api_key = false;
+                    }
+                    "--api-key" => {
+                        token = Some(value);
+                        api_key = true;
+                    }
                     "--event-token" => event_token = Some(value),
                     "--event-address" => {
                         event_address = Some(value.parse().map_err(|_| {
@@ -143,6 +162,7 @@ fn parse_global(arguments: &mut Vec<String>) -> Result<Global, CliError> {
         endpoint: endpoint
             .ok_or_else(|| CliError::Usage("set --endpoint or NETBAIOT_ENDPOINT".into()))?,
         token: token.ok_or_else(|| CliError::Usage("set --token or NETBAIOT_TOKEN".into()))?,
+        api_key,
         event_token,
         event_address,
         output,
@@ -415,7 +435,7 @@ async fn print_json_line<T: serde::Serialize>(
 }
 
 fn usage() -> &'static str {
-    "netbaiot [--endpoint URL] [--token TOKEN] [--output human|json] COMMAND\n\
+    "netbaiot [--endpoint URL] [--token TOKEN|--api-key KEY] [--output human|json] COMMAND\n\
      commands: server status | server drain --yes | device status DEVICE |\n\
      command send DEVICE --json JSON | auth invalidate | events subscribe\n\
      device-scoped commands require --tenant and --product (or matching environment variables)"
@@ -424,6 +444,32 @@ fn usage() -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn api_key_flag_selects_client_credential_without_changing_token_flag() {
+        let key = format!("backend.{}", "a".repeat(64));
+        let mut arguments = vec![
+            "--endpoint".into(),
+            "http://localhost:9001".into(),
+            "--api-key".into(),
+            key.clone(),
+            "server".into(),
+            "status".into(),
+        ];
+        let global = parse_global(&mut arguments).unwrap();
+        assert!(global.api_key);
+        assert_eq!(global.token, key);
+        assert_eq!(arguments, ["server", "status"]);
+        let mut arguments = vec![
+            "--endpoint".into(),
+            "http://localhost:9001".into(),
+            "--token".into(),
+            "legacy".into(),
+            "server".into(),
+            "status".into(),
+        ];
+        assert!(!parse_global(&mut arguments).unwrap().api_key);
+    }
 
     #[test]
     fn global_parser_removes_secrets_and_preserves_command() {

@@ -1,6 +1,6 @@
 # 管理 HTTP API
 
-管理 HTTP 使用独立监听器和通过 `NETBAIOT_ADMIN_SECRET` 配置的 64 字符管理密钥。
+管理 HTTP 使用独立监听器，支持旧版引导令牌、API Key、RS256 JWT 和显式映射的管理 mTLS 身份。配置与权限规则见[管理认证](management-auth.zh-CN.md)。
 请求头、请求体、处理器并发、响应和超时均有界，不接受内容编码。设备凭据不能授权管理操作；
 设备入口不分派 HTTP。
 
@@ -22,4 +22,4 @@
 
 连接查询有界。命令请求体必须包含权威的完整 `DeviceKey`；设备不可用时返回 503，且不会将命令放入离线队列。连接响应会返回活动传输类型、`connected_at`、`last_seen` 和会话 generation，但不会暴露 socket 状态。仅当当前 MQTT/TCP 会话仍处于连接状态时才会提供 `connected_at`。
 
-错误使用稳定的 `ApiError` JSON 结构，字段包括 `code`、安全的 `message`、可选 `request_id` 和可选 `required_scope`。例如，离线命令使用 `device_offline`，而不是含糊的内部 500。设备和管理接口的授权相互独立；当前静态管理令牌只支持全有或全无授权，公共错误模型中的 scope 字段为未来的细粒度授权 provider 预留。
+错误使用稳定的 `ApiError` JSON 结构，字段包括 `code`、安全的 `message`、可选 `request_id` 和可选 `required_scope`。例如，离线命令使用 `device_offline`。缺少 Scope 返回 403 并填写 `required_scope`；资源越权返回通用 403，不透露设备是否存在。设备和管理接口的授权相互独立。

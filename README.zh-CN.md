@@ -1,5 +1,7 @@
 # NetbaIoT
 
+管理接口支持兼容的 `NETBAIOT_ADMIN_SECRET` 引导令牌、API Key、RS256 JWT 与独立配置的管理 mTLS。权限按 Scope 和 Tenant/Product/完整 DeviceKey 限定。参阅[管理认证与迁移](docs/management-auth.zh-CN.md)。
+
 NetbaIoT 是一个无数据库、以内存为主的 IoT 协议网关和实时事件路由器。它通过内嵌 MQTT 3.1.1 / MQTT 5.0、通用分帧 TCP 和经过认证的 UDP 接收设备流量，将其规范化为 `DeviceEvent`，并发送到需确认或尽力而为的业务接收端。
 
 运行时不需要 PostgreSQL 或其他数据库。业务系统负责持久化业务数据和离线命令。NetbaIoT 唯一的持久化机制是有界本地重启 spool，仅用于计划内优雅关机无法完成所有已接受的必需投递时。
