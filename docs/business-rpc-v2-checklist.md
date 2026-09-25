@@ -42,7 +42,7 @@ Detailed semantics, commands, environment, limits and measured results: `docs/bu
 
 The first V2 implementation started at `afade44563b8f0f075faec356838af543451f3be` on `codex/business-rpc-v2`. This reliability task started from clean `583bb0dcf486faae9d95192fa37ffc5dce5cb7fc` on `codex/business-rpc-v2-reliability`; final current-task validation is reported in `docs/business-rpc-v2-reliability.zh-CN.md` and the delivery report.
 
-For this reliability task, final stable and Rust 1.88.0 format/clippy/workspace tests passed. MQTT conformance passed 31/31, the V2 fuzz target ran 10,000 inputs without a crash, and the ignored 60-second subprocess restart soak passed in 63.86 seconds. The final gateway also completed a 307.27-second / 300-generation reconnect soak, a 66.76-second multiplexed slow-ACK/reconnect run, a consumer outage/retry run, and near-limit/above-limit auth saturation runs. Exact commands, measurements and limits are in `docs/business-rpc-v2-reliability.zh-CN.md`.
+For this reliability task, final stable and Rust 1.88.0 format/clippy/workspace tests passed. MQTT conformance passed 31/31, the V2 fuzz target ran 10,000 inputs without a crash, and the ignored 60-second subprocess restart soak passed in 64.41 seconds on the pushed code. The final gateway also completed a 307.27-second / 300-generation reconnect soak, a 66.76-second multiplexed slow-ACK/reconnect run, a consumer outage/retry run, and near-limit/above-limit auth saturation runs. Exact commands, measurements and limits are in `docs/business-rpc-v2-reliability.zh-CN.md`.
 
 The following checks passed for the earlier V2 implementation:
 

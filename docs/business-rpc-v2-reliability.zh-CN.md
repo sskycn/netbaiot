@@ -97,4 +97,4 @@ cargo +nightly fuzz run business_rpc_v2 -- -runs=10000
 cargo test --locked -p netbaiot-server --test server subprocess_graceful_restart_sixty_second_soak -- --ignored --nocapture
 ```
 
-MQTT conformance 为 31/31；Business RPC fuzz 处理 10,000 次输入无崩溃；重启 soak 用时 63.86 秒通过。普通全量测试保留原有按用途 `ignored` 的测量用例，已单独执行上述 60 秒用例。负载测量使用本节列出的真实 loopback 进程，未运行 mTLS、跨机器负载或更长的多小时 soak；没有以这些未运行项推断生产容量。
+MQTT conformance 为 31/31；Business RPC fuzz 处理 10,000 次输入无崩溃；推送版本上的重启 soak 用时 64.41 秒通过。普通全量测试保留原有按用途 `ignored` 的测量用例，已单独执行上述 60 秒用例。负载测量使用本节列出的真实 loopback 进程，未运行 mTLS、跨机器负载或更长的多小时 soak；没有以这些未运行项推断生产容量。
