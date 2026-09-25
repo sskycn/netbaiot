@@ -298,8 +298,8 @@ impl Ingress {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::BusinessRpcCall;
     use async_trait::async_trait;
-    use netbaiot_core::business_rpc::BusinessRpcFrame;
     use serde_json::json;
     use std::time::Duration;
 
@@ -584,9 +584,9 @@ mod tests {
             }
         });
         let outbound = requests.recv().await.unwrap();
-        let BusinessRpcFrame::Request {
+        let BusinessRpcCall::Request {
             request_id, method, ..
-        } = outbound.frame
+        } = outbound.call
         else {
             panic!("auth request expected")
         };
@@ -601,7 +601,7 @@ mod tests {
             "codec_id": "test", "codec_version": 1, "publish": true,
             "commands": true, "auth_revision": 2
         });
-        assert!(registry.complete(lease.epoch(), request_id, &method, Ok(reply.clone())));
+        assert!(registry.complete(lease.epoch(), request_id, method, Ok(reply.clone())));
         assert!(matches!(stale.await.unwrap(), Err(Error::Unavailable)));
         assert_eq!(ingress.auth_cache.usage().unwrap().0, 0);
         assert!(sessions.list(0, 10).unwrap().is_empty());
@@ -618,13 +618,13 @@ mod tests {
             }
         });
         let outbound = requests.recv().await.unwrap();
-        let BusinessRpcFrame::Request {
+        let BusinessRpcCall::Request {
             request_id, method, ..
-        } = outbound.frame
+        } = outbound.call
         else {
             panic!("fresh auth request expected")
         };
-        assert!(registry.complete(lease.epoch(), request_id, &method, Ok(reply)));
+        assert!(registry.complete(lease.epoch(), request_id, method, Ok(reply)));
         let candidate = fresh.await.unwrap().unwrap();
         let (_session, _commands) = ingress
             .register_session(candidate, Transport::Mqtt)

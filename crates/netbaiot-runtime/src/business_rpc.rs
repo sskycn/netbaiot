@@ -6,8 +6,8 @@ use async_trait::async_trait;
 use netbaiot_core::{
     AuthenticatedDevice, Permissions, TenantId,
     business_rpc::{
-        AuthenticatedDeviceWire, BusinessRpcFrame, DeviceAuthenticateRequest,
-        ResolveVerifierRequest, ResolveVerifierResponse, RpcErrorCode,
+        AuthenticatedDeviceWire, DeviceAuthenticateRequest, ResolveVerifierRequest,
+        ResolveVerifierResponse, RpcErrorCode,
     },
 };
 use serde::{Serialize, de::DeserializeOwned};
@@ -88,9 +88,21 @@ struct Pending {
     _slot: OwnedSemaphorePermit,
     _bytes: OwnedSemaphorePermit,
 }
-/// The writer owns the outbound frame; its byte permit remains held until the frame is written.
+/// Transport-neutral outbound call. V2 and V3 adapters choose their own framing.
+pub enum BusinessRpcCall {
+    Request {
+        request_id: Uuid,
+        method: &'static str,
+        deadline_ms: u32,
+        body: Value,
+    },
+    Cancel {
+        request_id: Uuid,
+    },
+}
+/// The writer owns the outbound call; its byte permit remains held until encoded and written.
 pub struct BusinessRpcOutbound {
-    pub frame: BusinessRpcFrame,
+    pub call: BusinessRpcCall,
     pub queued_at: Instant,
     pub _bytes: OwnedSemaphorePermit,
 }
@@ -151,21 +163,17 @@ impl Drop for PendingGuard<'_> {
             None
         };
         if let Some(sender) = sender {
-            let frame = BusinessRpcFrame::Cancel {
+            let call = BusinessRpcCall::Cancel {
                 request_id: self.id,
             };
-            let size = serde_json::to_vec(&frame)
-                .ok()
-                .and_then(|bytes| u32::try_from(bytes.len()).ok());
-            if let Some(size) = size
-                && let Ok(bytes) = self
-                    .registry
-                    .pending_bytes
-                    .clone()
-                    .try_acquire_many_owned(size)
+            if let Ok(bytes) = self
+                .registry
+                .pending_bytes
+                .clone()
+                .try_acquire_many_owned(128)
             {
                 let _ = sender.try_send(BusinessRpcOutbound {
-                    frame,
+                    call,
                     queued_at: Instant::now(),
                     _bytes: bytes,
                 });
@@ -536,15 +544,15 @@ impl BusinessRpcRegistry {
             id,
         };
         let remaining = deadline.saturating_duration_since(Instant::now());
-        let frame = BusinessRpcFrame::Request {
+        let call = BusinessRpcCall::Request {
             request_id: id,
-            method: method.into(),
+            method,
             deadline_ms: remaining.as_millis().min(u32::MAX as u128) as u32,
             body: value,
         };
-        let wire_size = serde_json::to_vec(&frame)
-            .map_err(|_| Error::Internal)?
-            .len();
+        // Keep the V2 registry's bounded queue charge. Each transport separately bounds
+        // encoded metadata, queued body bytes, and its writer before using the call.
+        let wire_size = size.checked_add(160).ok_or(Error::Overloaded)?;
         let wire_count = u32::try_from(wire_size).map_err(|_| Error::Overloaded)?;
         let wire_bytes = self
             .pending_bytes
@@ -563,7 +571,7 @@ impl BusinessRpcRegistry {
         );
         sender
             .try_send(BusinessRpcOutbound {
-                frame,
+                call,
                 queued_at: Instant::now(),
                 _bytes: wire_bytes,
             })
@@ -786,16 +794,16 @@ mod tests {
                 }
             });
             let item = outbound.recv().await.unwrap();
-            let BusinessRpcFrame::Request {
+            let BusinessRpcCall::Request {
                 request_id, method, ..
-            } = item.frame
+            } = item.call
             else {
                 panic!("auth request expected")
             };
             assert!(registry.complete(
                 lease.epoch(),
                 request_id,
-                &method,
+                method,
                 Err(rpc_error_to_runtime(code))
             ));
             assert!(first.await.unwrap().is_err(), "{code:?}");
@@ -816,16 +824,16 @@ mod tests {
                 assert_eq!(metrics.get(Metric::AuthNegativeHits), 1);
             } else {
                 let item = outbound.recv().await.unwrap();
-                let BusinessRpcFrame::Request {
+                let BusinessRpcCall::Request {
                     request_id, method, ..
-                } = item.frame
+                } = item.call
                 else {
                     panic!("retry request expected")
                 };
                 assert!(registry.complete(
                     lease.epoch(),
                     request_id,
-                    &method,
+                    method,
                     Ok(test_identity("one"))
                 ));
                 second.await.unwrap().unwrap();
@@ -876,19 +884,19 @@ mod tests {
         });
         let first = recv.recv().await.unwrap();
         let second = recv.recv().await.unwrap();
-        let BusinessRpcFrame::Request {
+        let BusinessRpcCall::Request {
             request_id: id1,
             body: _body1,
             ..
-        } = first.frame
+        } = first.call
         else {
             panic!("request expected")
         };
-        let BusinessRpcFrame::Request {
+        let BusinessRpcCall::Request {
             request_id: id2,
             body: _body2,
             ..
-        } = second.frame
+        } = second.call
         else {
             panic!("request expected")
         };
@@ -996,7 +1004,7 @@ mod tests {
             }
         });
         let outbound = receive.recv().await.unwrap();
-        let BusinessRpcFrame::Request { request_id, .. } = outbound.frame else {
+        let BusinessRpcCall::Request { request_id, .. } = outbound.call else {
             panic!("request expected")
         };
         drop(outbound._bytes);
@@ -1037,7 +1045,7 @@ mod tests {
             }
         });
         let outbound = receive.recv().await.unwrap();
-        let BusinessRpcFrame::Request { request_id, .. } = outbound.frame else {
+        let BusinessRpcCall::Request { request_id, .. } = outbound.call else {
             panic!("request expected")
         };
         assert!(registry.complete(
@@ -1084,9 +1092,9 @@ mod tests {
             async move { cache.verify_signed("cred-udp", message, &tag).await }
         });
         let outbound = receive.recv().await.unwrap();
-        let BusinessRpcFrame::Request {
+        let BusinessRpcCall::Request {
             request_id, method, ..
-        } = outbound.frame
+        } = outbound.call
         else {
             panic!("verifier request expected")
         };
@@ -1094,7 +1102,7 @@ mod tests {
         assert!(registry.complete(
             lease.epoch(),
             request_id,
-            &method,
+            method,
             Ok(json!({"identity": test_identity("udp"), "verifier_key_hex": "07".repeat(32)}))
         ));
         first.await.unwrap().unwrap();
@@ -1136,9 +1144,9 @@ mod tests {
             async move { cache.verify_signed("cred-new", message, &tag).await }
         });
         let outbound = replacement_requests.recv().await.unwrap();
-        let BusinessRpcFrame::Request {
+        let BusinessRpcCall::Request {
             request_id, method, ..
-        } = outbound.frame
+        } = outbound.call
         else {
             panic!("verifier request expected")
         };
@@ -1147,7 +1155,7 @@ mod tests {
         assert!(registry.complete(
             new_lease.epoch(),
             request_id,
-            &method,
+            method,
             Ok(json!({"identity": identity, "verifier_key_hex": "07".repeat(32)}))
         ));
         recovered.await.unwrap().unwrap();
@@ -1190,9 +1198,9 @@ mod tests {
                 }
             });
             let outbound = receive.recv().await.unwrap();
-            let BusinessRpcFrame::Request {
+            let BusinessRpcCall::Request {
                 request_id, method, ..
-            } = outbound.frame
+            } = outbound.call
             else {
                 panic!("request expected")
             };
@@ -1200,7 +1208,7 @@ mod tests {
             cache.invalidate(&invalidation).unwrap();
             let mut identity = test_identity("one");
             identity["auth_revision"] = json!(2);
-            assert!(registry.complete(lease.epoch(), request_id, &method, Ok(identity.clone())));
+            assert!(registry.complete(lease.epoch(), request_id, method, Ok(identity.clone())));
             assert!(matches!(old.await.unwrap(), Err(Error::Unavailable)));
             assert_eq!(cache.usage().unwrap().0, 0);
             assert_eq!(registry.usage().unwrap().pending_items, 0);
@@ -1217,17 +1225,17 @@ mod tests {
                 }
             });
             let outbound = receive.recv().await.unwrap();
-            let BusinessRpcFrame::Request {
+            let BusinessRpcCall::Request {
                 request_id,
                 method,
                 body,
                 ..
-            } = outbound.frame
+            } = outbound.call
             else {
                 panic!("fresh request expected")
             };
             assert_eq!(body["min_auth_revision"], json!(2));
-            assert!(registry.complete(lease.epoch(), request_id, &method, Ok(identity)));
+            assert!(registry.complete(lease.epoch(), request_id, method, Ok(identity)));
             assert!(fresh.await.unwrap().is_ok());
         }
     }
@@ -1262,7 +1270,7 @@ mod tests {
             }
         });
         let outbound = receive.recv().await.unwrap();
-        let BusinessRpcFrame::Request { request_id, .. } = outbound.frame else {
+        let BusinessRpcCall::Request { request_id, .. } = outbound.call else {
             panic!("request expected")
         };
         drop(outbound._bytes);
@@ -1307,9 +1315,9 @@ mod tests {
             }
         });
         let outbound = receive.recv().await.unwrap();
-        let BusinessRpcFrame::Request {
+        let BusinessRpcCall::Request {
             request_id, method, ..
-        } = outbound.frame
+        } = outbound.call
         else {
             panic!("request expected")
         };
@@ -1320,7 +1328,7 @@ mod tests {
         assert!(matches!(overloaded, Err(Error::Overloaded)));
         assert_eq!(registry.usage().unwrap().pending_items, 1);
         drop(outbound._bytes);
-        assert!(registry.complete(lease.epoch(), request_id, &method, Ok(test_identity("one"))));
+        assert!(registry.complete(lease.epoch(), request_id, method, Ok(test_identity("one"))));
         first.await.unwrap().unwrap();
         // A cancelled call may enqueue a bounded Cancel frame. Drain it before
         // asserting byte permits return to their baseline.
@@ -1362,9 +1370,9 @@ mod tests {
             async move { cache.verify_signed("cred-udp", message, &tag).await }
         });
         let outbound = receive.recv().await.unwrap();
-        let BusinessRpcFrame::Request {
+        let BusinessRpcCall::Request {
             request_id, method, ..
-        } = outbound.frame
+        } = outbound.call
         else {
             panic!("verifier request expected")
         };
@@ -1374,7 +1382,7 @@ mod tests {
         let mut identity = test_identity("udp");
         identity["auth_revision"] = json!(2);
         let reply = json!({"identity": identity, "verifier_key_hex": "07".repeat(32)});
-        assert!(registry.complete(lease.epoch(), request_id, &method, Ok(reply.clone())));
+        assert!(registry.complete(lease.epoch(), request_id, method, Ok(reply.clone())));
         assert!(matches!(old.await.unwrap(), Err(Error::Unavailable)));
         assert_eq!(cache.usage().unwrap().0, 0);
         lease.advance_revision(2).unwrap();
@@ -1384,17 +1392,17 @@ mod tests {
             async move { cache.verify_signed("cred-udp", message, &tag).await }
         });
         let outbound = receive.recv().await.unwrap();
-        let BusinessRpcFrame::Request {
+        let BusinessRpcCall::Request {
             request_id,
             method,
             body,
             ..
-        } = outbound.frame
+        } = outbound.call
         else {
             panic!("fresh verifier request expected")
         };
         assert_eq!(body["min_auth_revision"], json!(2));
-        assert!(registry.complete(lease.epoch(), request_id, &method, Ok(reply)));
+        assert!(registry.complete(lease.epoch(), request_id, method, Ok(reply)));
         assert!(fresh.await.unwrap().is_ok());
     }
 
@@ -1429,7 +1437,7 @@ mod tests {
             }
         });
         let outbound = first_rx.recv().await.unwrap();
-        let BusinessRpcFrame::Request { request_id, .. } = outbound.frame else {
+        let BusinessRpcCall::Request { request_id, .. } = outbound.call else {
             panic!("request expected")
         };
         drop(outbound._bytes);
@@ -1484,14 +1492,14 @@ mod tests {
             }
         });
         let outbound = receive.recv().await.unwrap();
-        let BusinessRpcFrame::Request {
+        let BusinessRpcCall::Request {
             request_id, method, ..
-        } = outbound.frame
+        } = outbound.call
         else {
             panic!("request expected")
         };
         drop(outbound._bytes);
-        assert!(registry.complete(lease.epoch(), request_id, &method, Ok(test_identity("old"))));
+        assert!(registry.complete(lease.epoch(), request_id, method, Ok(test_identity("old"))));
         assert!(matches!(call.await.unwrap(), Err(Error::Invalid)));
         assert_eq!(registry.usage().unwrap().pending_items, 0);
         assert_eq!(registry.usage().unwrap().pending_bytes, 0);

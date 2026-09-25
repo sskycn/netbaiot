@@ -1,4 +1,5 @@
 //! Business RPC V2 client. The connection driver runs independently of event consumption.
+mod v3;
 use async_trait::async_trait;
 use netbaiot_protocol::{
     AuthInvalidation, CommandDispatch, DeviceCommand, EventAck, EventDelivery, EventFilter,
@@ -33,6 +34,7 @@ use tokio::{
 use tokio_rustls::{TlsConnector, rustls};
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
+pub use v3::{BusinessRpcV3Client, BusinessRpcV3ClientConfig, BusinessRpcV3Delivery};
 
 trait Io: AsyncRead + AsyncWrite + Unpin + Send {}
 impl<T: AsyncRead + AsyncWrite + Unpin + Send> Io for T {}

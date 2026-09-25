@@ -68,6 +68,18 @@ pub enum Metric {
     BusinessRpcReconnects,
     BusinessRpcRevisionGaps,
     BusinessRpcOfflineGraceExpirations,
+    BusinessRpcV3Connections,
+    BusinessRpcV3AbnormalClosures,
+    BusinessRpcV3StreamsOpened,
+    BusinessRpcV3StreamsReset,
+    BusinessRpcV3FramesSent,
+    BusinessRpcV3FramesReceived,
+    BusinessRpcV3DataBytesSent,
+    BusinessRpcV3DataBytesReceived,
+    BusinessRpcV3ConnectionWindowStalls,
+    BusinessRpcV3StreamWindowStalls,
+    BusinessRpcV3Overloads,
+    BusinessRpcV3ProtocolErrors,
 }
 #[derive(Clone, Copy)]
 #[repr(usize)]
@@ -87,7 +99,7 @@ pub enum BusinessRpcCallResult {
     Invalid,
 }
 
-const NAMES: [&str; 63] = [
+const NAMES: [&str; 75] = [
     "connections_accepted",
     "connections_rejected",
     "mqtt_connect_success",
@@ -151,6 +163,18 @@ const NAMES: [&str; 63] = [
     "business_rpc_reconnects",
     "business_rpc_revision_gaps",
     "business_rpc_offline_grace_expirations",
+    "business_rpc_v3_connections",
+    "business_rpc_v3_abnormal_closures",
+    "business_rpc_v3_streams_opened",
+    "business_rpc_v3_streams_reset",
+    "business_rpc_v3_frames_sent",
+    "business_rpc_v3_frames_received",
+    "business_rpc_v3_data_bytes_sent",
+    "business_rpc_v3_data_bytes_received",
+    "business_rpc_v3_connection_window_stalls",
+    "business_rpc_v3_stream_window_stalls",
+    "business_rpc_v3_overloads",
+    "business_rpc_v3_protocol_errors",
 ];
 
 /// Opt-in experiment counters, inactive unless lock timing is enabled.
@@ -208,9 +232,10 @@ pub enum Histogram {
     BusinessRpcAdmission,
     BusinessRpcRemoteWait,
     BusinessRpcQueueWait,
+    BusinessRpcV3SchedulerWait,
 }
 
-const HISTOGRAM_NAMES: [&str; 21] = [
+const HISTOGRAM_NAMES: [&str; 22] = [
     "mqtt_protocol_validation_us",
     "validation_to_admission_us",
     "admission_wait_us",
@@ -232,6 +257,7 @@ const HISTOGRAM_NAMES: [&str; 21] = [
     "business_rpc_admission_us",
     "business_rpc_remote_wait_us",
     "business_rpc_queue_wait_us",
+    "business_rpc_v3_scheduler_wait_us",
 ];
 const BOUNDS: [u64; 16] = [
     10, 25, 50, 100, 250, 500, 1_000, 2_500, 5_000, 10_000, 25_000, 50_000, 100_000, 500_000,
@@ -333,6 +359,13 @@ impl Default for HistogramState {
 pub struct Metrics {
     values: [AtomicU64; NAMES.len()],
     business_rpc_active: AtomicU64,
+    business_rpc_v3_active: AtomicU64,
+    business_rpc_v3_streams: AtomicU64,
+    business_rpc_v3_streams_peak: AtomicU64,
+    business_rpc_v3_queued_bytes: AtomicU64,
+    business_rpc_v3_queued_bytes_peak: AtomicU64,
+    business_rpc_v3_reassembly_bytes: AtomicU64,
+    business_rpc_v3_reassembly_bytes_peak: AtomicU64,
     business_rpc_method_results: [[AtomicU64; 6]; 2],
     business_rpc_remote_errors: [[AtomicU64; 11]; 2],
     management_auth_attempts: [AtomicU64; 15],
@@ -351,6 +384,13 @@ impl Default for Metrics {
         Self {
             values: std::array::from_fn(|_| AtomicU64::new(0)),
             business_rpc_active: AtomicU64::new(0),
+            business_rpc_v3_active: AtomicU64::new(0),
+            business_rpc_v3_streams: AtomicU64::new(0),
+            business_rpc_v3_streams_peak: AtomicU64::new(0),
+            business_rpc_v3_queued_bytes: AtomicU64::new(0),
+            business_rpc_v3_queued_bytes_peak: AtomicU64::new(0),
+            business_rpc_v3_reassembly_bytes: AtomicU64::new(0),
+            business_rpc_v3_reassembly_bytes_peak: AtomicU64::new(0),
             business_rpc_method_results: std::array::from_fn(|_| {
                 std::array::from_fn(|_| AtomicU64::new(0))
             }),
@@ -392,6 +432,49 @@ impl Metrics {
     }
     pub fn business_rpc_connection_finished(&self) {
         self.business_rpc_active.fetch_sub(1, Ordering::Relaxed);
+    }
+    pub fn business_rpc_v3_connection_started(&self) {
+        self.business_rpc_v3_active.fetch_add(1, Ordering::Relaxed);
+        self.inc(Metric::BusinessRpcV3Connections);
+    }
+    pub fn business_rpc_v3_connection_finished(&self) {
+        self.business_rpc_v3_active.fetch_sub(1, Ordering::Relaxed);
+    }
+    fn adjust_v3_gauge(gauge: &AtomicU64, previous: usize, current: usize) {
+        let delta = previous.abs_diff(current) as u64;
+        if current >= previous {
+            gauge.fetch_add(delta, Ordering::Relaxed);
+        } else {
+            gauge.fetch_sub(delta, Ordering::Relaxed);
+        }
+    }
+    pub fn business_rpc_v3_connection_gauges(
+        &self,
+        previous: (usize, usize),
+        current: (usize, usize),
+    ) {
+        Self::adjust_v3_gauge(&self.business_rpc_v3_streams, previous.0, current.0);
+        Self::adjust_v3_gauge(
+            &self.business_rpc_v3_reassembly_bytes,
+            previous.1,
+            current.1,
+        );
+        self.business_rpc_v3_streams_peak.fetch_max(
+            self.business_rpc_v3_streams.load(Ordering::Relaxed),
+            Ordering::Relaxed,
+        );
+        self.business_rpc_v3_reassembly_bytes_peak.fetch_max(
+            self.business_rpc_v3_reassembly_bytes
+                .load(Ordering::Relaxed),
+            Ordering::Relaxed,
+        );
+    }
+    pub fn business_rpc_v3_writer_bytes(&self, previous: usize, current: usize) {
+        Self::adjust_v3_gauge(&self.business_rpc_v3_queued_bytes, previous, current);
+        self.business_rpc_v3_queued_bytes_peak.fetch_max(
+            self.business_rpc_v3_queued_bytes.load(Ordering::Relaxed),
+            Ordering::Relaxed,
+        );
     }
     pub fn business_rpc_queue_add(&self, class: BusinessRpcQueueClass, bytes: u64) {
         self.business_rpc_queue_count[class as usize].fetch_add(1, Ordering::Relaxed);
@@ -496,6 +579,22 @@ impl Metrics {
         output.push_str(&format!(
             "netbaiot_business_rpc_active_connections {}\n",
             self.business_rpc_active.load(Ordering::Relaxed)
+        ));
+        output.push_str(&format!(
+            "netbaiot_business_rpc_v3_active_connections {}\n",
+            self.business_rpc_v3_active.load(Ordering::Relaxed)
+        ));
+        output.push_str(&format!(
+            "netbaiot_business_rpc_v3_active_streams {}\nnetbaiot_business_rpc_v3_queued_bytes {}\nnetbaiot_business_rpc_v3_reassembly_reserved_bytes {}\n",
+            self.business_rpc_v3_streams.load(Ordering::Relaxed),
+            self.business_rpc_v3_queued_bytes.load(Ordering::Relaxed),
+            self.business_rpc_v3_reassembly_bytes.load(Ordering::Relaxed),
+        ));
+        output.push_str(&format!(
+            "netbaiot_business_rpc_v3_peak_active_streams {}\nnetbaiot_business_rpc_v3_peak_queued_bytes {}\nnetbaiot_business_rpc_v3_peak_reassembly_reserved_bytes {}\n",
+            self.business_rpc_v3_streams_peak.load(Ordering::Relaxed),
+            self.business_rpc_v3_queued_bytes_peak.load(Ordering::Relaxed),
+            self.business_rpc_v3_reassembly_bytes_peak.load(Ordering::Relaxed),
         ));
         for (method_index, method) in ["device.authenticate", "device.resolve_verifier"]
             .iter()

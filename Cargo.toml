@@ -19,6 +19,7 @@ netbaiot-mqtt-wire = { path = "crates/netbaiot-mqtt-wire" }
 netbaiot-runtime = { path = "crates/netbaiot-runtime" }
 netbaiot-codecs = { path = "crates/netbaiot-codecs" }
 netbaiot-transports = { path = "crates/netbaiot-transports" }
+netbaiot-v3-mux = { path = "crates/netbaiot-v3-mux" }
 async-trait = "0.1"
 bytes = "1"
 hmac = "0.12"

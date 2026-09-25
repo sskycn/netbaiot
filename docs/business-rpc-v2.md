@@ -1,5 +1,7 @@
 # Business RPC Stream V2
 
+V2 remains supported on the same listener when V3 is enabled explicitly. V2 multiplexing schedules complete messages/frames; it does not provide independent application streams or DATA interleaving. See [Business RPC V3](business-rpc-v3.md) for the opt-in stream protocol.
+
 Business RPC V2 shares the `business_tcp` listener between device authentication, UDP verifier resolution, authorization control, confirmed events, and online device commands. The wire protocol is four byte big endian payload length followed by JSON. The length excludes the prefix; zero length, oversized frames, invalid JSON and unknown fields are rejected. V2 uses `hello.version = 2` independently of the V1 public protocol version. See `netbaiot-protocol::business_rpc` for the authoritative frame and method DTOs.
 
 ## Roles, identity and connection behavior
