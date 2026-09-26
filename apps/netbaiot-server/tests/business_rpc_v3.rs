@@ -166,6 +166,268 @@ async fn read_tcp_device(socket: &mut TcpStream) -> Vec<u8> {
 }
 
 #[tokio::test]
+async fn v3_command_real_tcp_short_dedup_ttl_and_shorter_command_ttl() {
+    let root = std::env::temp_dir().join(format!("netbaiot-v3-tcp-ttl-{}", uuid::Uuid::new_v4()));
+    std::fs::create_dir_all(&root).unwrap();
+    let mut config: Config =
+        serde_json::from_str(include_str!("../../../configs/development.json")).unwrap();
+    let reservations = [
+        TcpListener::bind("127.0.0.1:0").await.unwrap(),
+        TcpListener::bind("127.0.0.1:0").await.unwrap(),
+        TcpListener::bind("127.0.0.1:0").await.unwrap(),
+    ];
+    let addresses = reservations
+        .each_ref()
+        .map(|socket| socket.local_addr().unwrap());
+    config.device_ingress = addresses[0];
+    config.management_http = addresses[1];
+    config.business_tcp = Some(addresses[2]);
+    config.device_auth = Some(DeviceAuthSource::Static);
+    config.event_delivery = Some(EventDeliverySource::DevelopmentAudit);
+    config.limits.command_ttl_ms = 100;
+    config.limits.command_dedup_ttl_ms = 500;
+    config.spool_directory = root.join("spool");
+    config.business_rpc = Some(BusinessRpcConfig {
+        version: 2,
+        v3: Some(V3Limits::default()),
+        v3_send_ahead: None,
+        v3_experiment_socket_send_buffer_bytes: None,
+        tls: None,
+        identities: Vec::new(),
+        development_token_env: Some("NETBAIOT_BUSINESS_RPC_TOKEN".into()),
+        development_role: Some(BusinessRole::Application),
+        allow_v1: false,
+        max_connections: 8,
+        auth_max_inflight: 16,
+        max_auth_control_offline_ms: 0,
+    });
+    config.validate().unwrap();
+    let path = root.join("config.json");
+    std::fs::write(&path, serde_json::to_vec(&config).unwrap()).unwrap();
+    drop(reservations);
+    let mut server = Command::new(env!("CARGO_BIN_EXE_netbaiot-server"))
+        .arg(&path)
+        .env("NETBAIOT_ADMIN_SECRET", "a".repeat(64))
+        .env("NETBAIOT_BUSINESS_RPC_TOKEN", "v3-ttl-token")
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .kill_on_drop(true)
+        .spawn()
+        .unwrap();
+    let mut client_config =
+        BusinessRpcV3ClientConfig::development(addresses[2], "v3-ttl-token".into());
+    client_config.provider = false;
+    client_config.events = false;
+    let (business, _) = BusinessRpcV3Client::connect(client_config, None).unwrap();
+    tokio::time::timeout(Duration::from_secs(10), business.wait_ready())
+        .await
+        .unwrap()
+        .unwrap();
+    let mut device = TcpStream::connect(addresses[0]).await.unwrap();
+    let hello = serde_json::to_vec(&serde_json::json!({
+        "credential_id": "demo-device",
+        "secret": SECRET,
+    }))
+    .unwrap();
+    device
+        .write_all(&(hello.len() as u32).to_be_bytes())
+        .await
+        .unwrap();
+    device.write_all(&hello).await.unwrap();
+    assert_eq!(
+        read_tcp_device(&mut device).await,
+        br#"{"authenticated":true}"#
+    );
+
+    let command = command("short-ttl");
+    let first = business.send_command(&command).await.unwrap();
+    assert_eq!(first.state, DeliveryState::Queued);
+    let delivered: DeviceCommand =
+        serde_json::from_slice(&read_tcp_device(&mut device).await).unwrap();
+    assert_eq!(delivered.command_id, command.command_id);
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    // The 100 ms execution TTL has elapsed, but the 500 ms dedup receipt lives.
+    assert_eq!(business.send_command(&command).await.unwrap(), first);
+    assert!(
+        tokio::time::timeout(Duration::from_millis(100), read_tcp_device(&mut device))
+            .await
+            .is_err()
+    );
+    tokio::time::sleep(Duration::from_millis(300)).await;
+    // Once retention expires, the same caller input may establish new work.
+    assert_eq!(business.send_command(&command).await.unwrap(), first);
+    let again: DeviceCommand = serde_json::from_slice(&read_tcp_device(&mut device).await).unwrap();
+    assert_eq!(again.command_id, command.command_id);
+    business.shutdown().await;
+    server.start_kill().unwrap();
+    let _ = server.wait().await;
+    let _ = std::fs::remove_dir_all(root);
+}
+
+#[tokio::test]
+async fn v3_planned_restart_replays_event_but_resets_command_dedup() {
+    let root = std::env::temp_dir().join(format!("netbaiot-v3-restart-{}", uuid::Uuid::new_v4()));
+    std::fs::create_dir_all(&root).unwrap();
+    let mut config: Config =
+        serde_json::from_str(include_str!("../../../configs/development.json")).unwrap();
+    let reservations = [
+        TcpListener::bind("127.0.0.1:0").await.unwrap(),
+        TcpListener::bind("127.0.0.1:0").await.unwrap(),
+        TcpListener::bind("127.0.0.1:0").await.unwrap(),
+    ];
+    let addresses = reservations
+        .each_ref()
+        .map(|socket| socket.local_addr().unwrap());
+    config.device_ingress = addresses[0];
+    config.management_http = addresses[1];
+    config.business_tcp = Some(addresses[2]);
+    config.device_auth = Some(DeviceAuthSource::Static);
+    config.event_delivery = Some(EventDeliverySource::BusinessRpc);
+    config.limits.sink_timeout_ms = 300;
+    config.limits.shutdown_drain_timeout_ms = 300;
+    config.spool_directory = root.join("spool");
+    config.business_rpc = Some(BusinessRpcConfig {
+        version: 2,
+        v3: Some(V3Limits::default()),
+        v3_send_ahead: None,
+        v3_experiment_socket_send_buffer_bytes: None,
+        tls: None,
+        identities: Vec::new(),
+        development_token_env: Some("NETBAIOT_BUSINESS_RPC_TOKEN".into()),
+        development_role: Some(BusinessRole::Application),
+        allow_v1: false,
+        max_connections: 8,
+        auth_max_inflight: 16,
+        max_auth_control_offline_ms: 0,
+    });
+    config.validate().unwrap();
+    let path = root.join("config.json");
+    std::fs::write(&path, serde_json::to_vec(&config).unwrap()).unwrap();
+    drop(reservations);
+    let start = || {
+        Command::new(env!("CARGO_BIN_EXE_netbaiot-server"))
+            .arg(&path)
+            .env("NETBAIOT_ADMIN_SECRET", "a".repeat(64))
+            .env("NETBAIOT_BUSINESS_RPC_TOKEN", "v3-restart-token")
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .kill_on_drop(true)
+            .spawn()
+            .unwrap()
+    };
+    let client_config = || {
+        let mut value =
+            BusinessRpcV3ClientConfig::development(addresses[2], "v3-restart-token".into());
+        value.provider = false;
+        value
+    };
+    let connect_device = || async {
+        let mut device = TcpStream::connect(addresses[0]).await.unwrap();
+        let hello = serde_json::to_vec(&serde_json::json!({
+            "credential_id": "demo-device",
+            "secret": SECRET,
+        }))
+        .unwrap();
+        device
+            .write_all(&(hello.len() as u32).to_be_bytes())
+            .await
+            .unwrap();
+        device.write_all(&hello).await.unwrap();
+        assert_eq!(
+            read_tcp_device(&mut device).await,
+            br#"{"authenticated":true}"#
+        );
+        device
+    };
+    let mut first = start();
+    let (business, mut events) = BusinessRpcV3Client::connect(client_config(), None).unwrap();
+    tokio::time::timeout(Duration::from_secs(10), business.wait_ready())
+        .await
+        .unwrap()
+        .unwrap();
+    let mut device = connect_device().await;
+    let command = command("restart-duplicate-is-allowed");
+    assert_eq!(
+        business.send_command(&command).await.unwrap().state,
+        DeliveryState::Queued
+    );
+    let delivered: DeviceCommand =
+        serde_json::from_slice(&read_tcp_device(&mut device).await).unwrap();
+    assert_eq!(delivered.command_id, command.command_id);
+    let uplink = DeviceUplink::new(
+        SourceMessageId::new("v3-restart-heartbeat").unwrap(),
+        DeviceUplinkKind::Heartbeat(Heartbeat { sequence: 1 }),
+    );
+    let body = serde_json::to_vec(&uplink).unwrap();
+    device
+        .write_all(&(body.len() as u32).to_be_bytes())
+        .await
+        .unwrap();
+    device.write_all(&body).await.unwrap();
+    let _accepted = read_tcp_device(&mut device).await;
+    let first_delivery = tokio::time::timeout(Duration::from_secs(5), events.recv())
+        .await
+        .unwrap()
+        .unwrap();
+    let event_id = first_delivery.delivery.event.event_id;
+    let admin = NetbaIoTClient::builder()
+        .endpoint(format!("http://{}", addresses[1]))
+        .token("a".repeat(64))
+        .connect()
+        .await
+        .unwrap();
+    admin.runtime().drain().await.unwrap();
+    assert!(
+        tokio::time::timeout(Duration::from_secs(8), first.wait())
+            .await
+            .unwrap()
+            .unwrap()
+            .success()
+    );
+    drop(first_delivery);
+    business.shutdown().await;
+    drop(device);
+
+    let mut second = start();
+    let (business, mut events) = BusinessRpcV3Client::connect(client_config(), None).unwrap();
+    tokio::time::timeout(Duration::from_secs(10), business.wait_ready())
+        .await
+        .unwrap()
+        .unwrap();
+    let replay = tokio::time::timeout(Duration::from_secs(5), events.recv())
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(replay.delivery.event.event_id, event_id);
+    replay.ack().await.unwrap();
+    let metrics = reqwest::Client::builder()
+        .no_proxy()
+        .build()
+        .unwrap()
+        .get(format!("http://{}/api/v1/metrics", addresses[1]))
+        .bearer_auth("a".repeat(64))
+        .send()
+        .await
+        .unwrap()
+        .text()
+        .await
+        .unwrap();
+    assert!(metrics.contains("netbaiot_command_dedup_entries 0\n"));
+    let mut device = connect_device().await;
+    assert_eq!(
+        business.send_command(&command).await.unwrap().state,
+        DeliveryState::Queued
+    );
+    let second_delivery: DeviceCommand =
+        serde_json::from_slice(&read_tcp_device(&mut device).await).unwrap();
+    assert_eq!(second_delivery.command_id, command.command_id);
+    business.shutdown().await;
+    second.start_kill().unwrap();
+    let _ = second.wait().await;
+    let _ = std::fs::remove_dir_all(root);
+}
+
+#[tokio::test]
 async fn v3_command_real_tcp_tenant_scope_and_capacity() {
     use netbaiot_client::business_rpc::BusinessRpcTls;
     use netbaiot_server::{BusinessRpcIdentityConfig, ManagementTlsFiles};
