@@ -120,6 +120,8 @@ async fn command_pressure_preserves_auth_invalidation_and_event_ack() {
     config.business_rpc = Some(BusinessRpcConfig {
         version: 2,
         v3: None,
+        v3_send_ahead: None,
+        v3_experiment_socket_send_buffer_bytes: None,
         tls: Some(ManagementTlsFiles {
             certificate: fixtures.join("localhost-cert.pem").to_string_lossy().into(),
             private_key: fixtures.join("localhost-key.pem").to_string_lossy().into(),
@@ -325,6 +327,8 @@ async fn commands_role_dispatches_to_real_tcp_and_shares_http_dedup() {
     config.business_rpc = Some(BusinessRpcConfig {
         version: 2,
         v3: None,
+        v3_send_ahead: None,
+        v3_experiment_socket_send_buffer_bytes: None,
         tls: Some(ManagementTlsFiles {
             certificate: fixtures.join("localhost-cert.pem").to_string_lossy().into(),
             private_key: fixtures.join("localhost-key.pem").to_string_lossy().into(),
@@ -460,6 +464,8 @@ async fn business_rpc_command_mqtt_dedup_and_ack_use_real_sockets() {
     config.business_rpc = Some(BusinessRpcConfig {
         version: 2,
         v3: None,
+        v3_send_ahead: None,
+        v3_experiment_socket_send_buffer_bytes: None,
         tls: None,
         identities: Vec::new(),
         development_token_env: Some("NETBAIOT_BUSINESS_RPC_TOKEN".into()),
@@ -925,6 +931,8 @@ async fn one_socket_authentication_progresses_while_event_ack_waits() {
     config.business_rpc = Some(BusinessRpcConfig {
         version: 2,
         v3: None,
+        v3_send_ahead: None,
+        v3_experiment_socket_send_buffer_bytes: None,
         tls: None,
         identities: Vec::new(),
         development_token_env: Some("NETBAIOT_BUSINESS_RPC_TOKEN".into()),
@@ -1179,6 +1187,8 @@ async fn zero_offline_grace_revokes_live_session_and_requires_reset_sync() {
     config.business_rpc = Some(BusinessRpcConfig {
         version: 2,
         v3: None,
+        v3_send_ahead: None,
+        v3_experiment_socket_send_buffer_bytes: None,
         tls: None,
         identities: Vec::new(),
         development_token_env: Some("NETBAIOT_BUSINESS_RPC_TOKEN".into()),
@@ -1323,6 +1333,8 @@ async fn mtls_verifies_server_and_maps_exact_client_certificate() {
     config.business_rpc = Some(BusinessRpcConfig {
         version: 2,
         v3: None,
+        v3_send_ahead: None,
+        v3_experiment_socket_send_buffer_bytes: None,
         tls: Some(ManagementTlsFiles {
             certificate: fixtures.join("localhost-cert.pem").to_string_lossy().into(),
             private_key: fixtures.join("localhost-key.pem").to_string_lossy().into(),
@@ -1614,6 +1626,8 @@ async fn v1_spooled_required_event_replays_to_v2_with_stable_event_id() {
     config.business_rpc = Some(BusinessRpcConfig {
         version: 2,
         v3: None,
+        v3_send_ahead: None,
+        v3_experiment_socket_send_buffer_bytes: None,
         tls: None,
         identities: Vec::new(),
         development_token_env: Some("NETBAIOT_BUSINESS_RPC_TOKEN".into()),

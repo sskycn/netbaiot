@@ -1,0 +1,62 @@
+{
+  "platform": "macOS-26.6.2-arm64-arm-64bit",
+  "arch": "arm64",
+  "receiver_read_delay_ms": 200,
+  "receiver_read_bytes": 4096,
+  "receiver_read_interval_ms": 125,
+  "cases": [
+    {
+      "case": "default",
+      "requested_send_buffer": null,
+      "requested_tcp_notsent_lowat": null,
+      "actual_send_buffer": 146988,
+      "accepted_before_receiver_read": 949804,
+      "accepted_after_1_5s": 949804,
+      "receiver_consumed": 40960,
+      "status": "PASS"
+    },
+    {
+      "case": "small_sndbuf",
+      "requested_send_buffer": 4096,
+      "requested_tcp_notsent_lowat": null,
+      "actual_send_buffer": 4096,
+      "accepted_before_receiver_read": 135168,
+      "accepted_after_1_5s": 528384,
+      "receiver_consumed": 40960,
+      "status": "PASS"
+    },
+    {
+      "case": "notsent_8192",
+      "requested_send_buffer": null,
+      "requested_tcp_notsent_lowat": 8192,
+      "actual_send_buffer": 146988,
+      "actual_tcp_notsent_lowat": 8192,
+      "accepted_before_receiver_read": 540672,
+      "accepted_after_1_5s": 540672,
+      "receiver_consumed": 40960,
+      "status": "PASS"
+    },
+    {
+      "case": "notsent_16384",
+      "requested_send_buffer": null,
+      "requested_tcp_notsent_lowat": 16384,
+      "actual_send_buffer": 146988,
+      "actual_tcp_notsent_lowat": 16384,
+      "accepted_before_receiver_read": 557056,
+      "accepted_after_1_5s": 557056,
+      "receiver_consumed": 40960,
+      "status": "PASS"
+    },
+    {
+      "case": "notsent_32768",
+      "requested_send_buffer": null,
+      "requested_tcp_notsent_lowat": 32768,
+      "actual_send_buffer": 146988,
+      "actual_tcp_notsent_lowat": 32768,
+      "accepted_before_receiver_read": 573440,
+      "accepted_after_1_5s": 573440,
+      "receiver_consumed": 40960,
+      "status": "PASS"
+    }
+  ]
+}

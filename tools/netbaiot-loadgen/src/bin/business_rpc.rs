@@ -52,6 +52,8 @@ struct Config {
     duration_secs: u64,
     auth_concurrency: usize,
     #[serde(default)]
+    auth_unique_devices: bool,
+    #[serde(default)]
     auth_handler_delay_ms: u64,
     event_rate: u64,
     #[serde(default)]
@@ -534,9 +536,16 @@ async fn auth_load(config: Config, stats: SharedStats, until: Instant) {
     while Instant::now() < until || !tasks.is_empty() {
         while Instant::now() < until && tasks.len() < config.auth_concurrency {
             let config = config.clone();
-            // Reuse a bounded device set; presence and auth-cache capacity are
-            // independently bounded on the gateway under test.
-            let id = format!("load{}", next % 32);
+            // The default repeats a bounded device set to exercise auth-cache hits.
+            // The opt-in unique mode measures a fresh provider RPC for each attempt.
+            let id = format!(
+                "load{}",
+                if config.auth_unique_devices {
+                    next
+                } else {
+                    next % 32
+                }
+            );
             next += 1;
             tasks.spawn(async move {
                 let start = Instant::now();

@@ -1,0 +1,210 @@
+{
+  "duration_secs": 15,
+  "repeat": 3,
+  "bytes_per_second": 32768,
+  "delay_ms_per_read_per_direction": 25,
+  "event_rate": 1,
+  "auth_concurrency": 4,
+  "fresh_identities": true,
+  "no_proxy": true,
+  "trace_v3": false,
+  "failures": [],
+  "variants": {
+    "v3-baseline": {
+      "runs": 3,
+      "sample_counts": [
+        402,
+        439,
+        440
+      ],
+      "auth_success": [
+        400,
+        437,
+        437
+      ],
+      "auth_rejected": [
+        0,
+        0,
+        0
+      ],
+      "auth_timeout": [
+        2,
+        2,
+        3
+      ],
+      "provider_calls": [
+        401,
+        438,
+        438
+      ],
+      "p50_ms": {
+        "count": 3,
+        "median": 0.43,
+        "min": 0.35,
+        "max": 0.46
+      },
+      "p95_ms": {
+        "count": 3,
+        "median": 1.01,
+        "min": 0.91,
+        "max": 1.28
+      },
+      "p99_ms": {
+        "count": 3,
+        "median": 6724.0,
+        "min": 4560.0,
+        "max": 7565.0
+      },
+      "auth_per_second": {
+        "count": 3,
+        "median": 22.003913608192352,
+        "min": 21.938561736303757,
+        "max": 22.265874440950228
+      },
+      "event_payload_bytes_per_second": {
+        "count": 3,
+        "median": 16384.0,
+        "min": 16384.0,
+        "max": 16384.0
+      },
+      "cpu_percent": {
+        "count": 3,
+        "median": 0.6000000000000003,
+        "min": 0.3211538461538461,
+        "max": 0.7153846153846156
+      },
+      "rss_peak_kb": {
+        "count": 3,
+        "median": 9888,
+        "min": 9760,
+        "max": 9968
+      },
+      "event_completion_p50_ms": {
+        "count": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "event_completion_p95_ms": {
+        "count": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "competing_event_streams": [
+        0,
+        0,
+        0
+      ],
+      "interleaved_event_streams": [
+        0,
+        0,
+        0
+      ],
+      "preemption_p95_ms": {
+        "count": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      }
+    },
+    "v3-ahead-16384": {
+      "runs": 3,
+      "sample_counts": [
+        441,
+        435,
+        437
+      ],
+      "auth_success": [
+        439,
+        432,
+        437
+      ],
+      "auth_rejected": [
+        0,
+        0,
+        0
+      ],
+      "auth_timeout": [
+        2,
+        3,
+        0
+      ],
+      "provider_calls": [
+        440,
+        433,
+        438
+      ],
+      "p50_ms": {
+        "count": 3,
+        "median": 0.41,
+        "min": 0.35,
+        "max": 0.42
+      },
+      "p95_ms": {
+        "count": 3,
+        "median": 1.16,
+        "min": 0.94,
+        "max": 1.57
+      },
+      "p99_ms": {
+        "count": 3,
+        "median": 6996.0,
+        "min": 4658.0,
+        "max": 7584.0
+      },
+      "auth_per_second": {
+        "count": 3,
+        "median": 22.011496440136977,
+        "min": 20.492462807704744,
+        "max": 23.284577933739996
+      },
+      "event_payload_bytes_per_second": {
+        "count": 3,
+        "median": 16384.0,
+        "min": 16384.0,
+        "max": 16384.0
+      },
+      "cpu_percent": {
+        "count": 3,
+        "median": 0.6230769230769233,
+        "min": 0.4384615384615386,
+        "max": 0.8153846153846156
+      },
+      "rss_peak_kb": {
+        "count": 3,
+        "median": 9792,
+        "min": 9776,
+        "max": 10144
+      },
+      "event_completion_p50_ms": {
+        "count": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "event_completion_p95_ms": {
+        "count": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      },
+      "competing_event_streams": [
+        0,
+        0,
+        0
+      ],
+      "interleaved_event_streams": [
+        0,
+        0,
+        0
+      ],
+      "preemption_p95_ms": {
+        "count": 0,
+        "median": null,
+        "min": null,
+        "max": null
+      }
+    }
+  }
+}

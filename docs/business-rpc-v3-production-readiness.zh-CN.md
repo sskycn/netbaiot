@@ -56,3 +56,7 @@ python3 tools/netbaiot-loadgen/run_business_rpc_v3_hol.py --duration-secs 15 --o
 | 跨机器公网 RTT、长期 soak、持续大事件吞吐 | **NOT RUN** |
 
 V3 仍不包含 QUIC、transport 层 HOL 消除、`device.command.send`、command 幂等、离线命令、多节点路由、event inflight 大于 1 或新的二进制应用 DTO。业务消费者仍须按稳定 `event_id` 幂等处理；计划重启 spool 与突然故障的有界内存丢失语义保持原状。
+
+## HOL Phase 2（后续实测）
+
+[第二阶段报告](business-rpc-v3-hol2.zh-CN.md)保留本页基线并新增本地 send-ahead 的设计、socket/TLS 边界和原始证据。3×60 秒对照中，16/128 KiB 可选策略让 59–60/60 个 Event 出现真实跨流 DATA 穿插，Auth p95 中位数从 721 ms 降至 643 ms；但 3×15 秒持续积压中 Event 完成 p95 中位数从 212.8 ms 增至 291.2 ms，Auth/s 从 22.98 降至 21.19。**生产默认值保持不变**；这些是特定代理工作负载的结果，不是公网容量或 mTLS 性能声明。

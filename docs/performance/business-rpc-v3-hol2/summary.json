@@ -1,0 +1,23 @@
+{
+  "starting_head": "4d3583b1e6e4d57e5cfa8f8a94e3ee7b0aa43ea2",
+  "branch": "codex/business-rpc-v3",
+  "worktree_dirty_at_benchmark": true,
+  "platform": "macOS 26.6.2 arm64",
+  "recommended_default": "unchanged: 8192-byte frame, 262144-byte receive stream window, no send-ahead",
+  "candidate_opt_in": {
+    "stream_send_ahead_bytes": 16384,
+    "connection_send_ahead_bytes": 131072
+  },
+  "formal_60s": "formal-60s/summary.json",
+  "repeated_backlog_15s": "repeated-backlog-15s/summary.json",
+  "repeated_lan_15s_no_trace": "repeated-lan-15s-no-trace/summary.json",
+  "socket_probe": "socket-option-probe.json",
+  "scheduler_microbenchmark": "scheduler-microbench.csv",
+  "notes": [
+    "All 60-second formal V3 runs ACKed 60/60 offered Events.",
+    "16 KiB send-ahead improves low-rate Auth p95 but costs Event completion latency under repeated backlog.",
+    "TCP_NOTSENT_LOWAT was tested only in a standalone socket probe, not gateway V3.",
+    "The proxy delays each user-space read, not a measured network RTT.",
+    "Performance binaries were built from the dirty task worktree at the starting HEAD."
+  ]
+}

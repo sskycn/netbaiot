@@ -545,6 +545,27 @@ pub enum DataClass {
     Rpc,
     Event,
 }
+/// Local sender policy. These counters are independent of the peer's receive windows.
+/// A stream can submit at most `stream_bytes` of DATA before stream WINDOW_UPDATE;
+/// all streams together can submit at most `connection_bytes` before connection
+/// WINDOW_UPDATE. Bytes already submitted to an ordered TCP/TLS stream cannot be
+/// preempted by a later RPC.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct SendAheadLimits {
+    pub stream_bytes: u32,
+    pub connection_bytes: u32,
+}
+impl SendAheadLimits {
+    pub fn validate(self, limits: &V3Limits) -> Result<(), MuxError> {
+        if self.stream_bytes < limits.max_frame_payload_bytes
+            || self.connection_bytes < self.stream_bytes
+            || self.connection_bytes > 16 * 1024 * 1024
+        {
+            return Err(MuxError::FlowControl);
+        }
+        Ok(())
+    }
+}
 struct OutboundBody {
     bytes: Bytes,
     cursor: usize,
@@ -556,6 +577,9 @@ pub struct MuxScheduler {
     conn_window: u32,
     conn_max: u32,
     stream_max: u32,
+    send_ahead: Option<SendAheadLimits>,
+    conn_uncredited: u32,
+    stream_uncredited: HashMap<u32, u32>,
     queued_bytes: usize,
     byte_limit: usize,
     control: VecDeque<Frame>,
@@ -570,7 +594,17 @@ pub struct MuxScheduler {
 }
 impl MuxScheduler {
     pub fn new(limits: &V3Limits, byte_limit: usize) -> Result<Self, MuxError> {
+        Self::with_send_ahead(limits, byte_limit, None)
+    }
+    pub fn with_send_ahead(
+        limits: &V3Limits,
+        byte_limit: usize,
+        send_ahead: Option<SendAheadLimits>,
+    ) -> Result<Self, MuxError> {
         limits.validate().map_err(MuxError::Connection)?;
+        if let Some(policy) = send_ahead {
+            policy.validate(limits)?;
+        }
         if byte_limit == 0 {
             return Err(MuxError::Overloaded);
         }
@@ -579,6 +613,9 @@ impl MuxScheduler {
             conn_window: limits.initial_connection_window_bytes,
             conn_max: limits.initial_connection_window_bytes,
             stream_max: limits.initial_stream_window_bytes,
+            send_ahead,
+            conn_uncredited: 0,
+            stream_uncredited: HashMap::new(),
             queued_bytes: 0,
             byte_limit,
             control: VecDeque::new(),
@@ -613,6 +650,33 @@ impl MuxScheduler {
         }
         (connection, stream)
     }
+    pub fn stalled_send_ahead(&self) -> (bool, bool) {
+        let Some(policy) = self.send_ahead else {
+            return (false, false);
+        };
+        let mut connection = false;
+        let mut stream = false;
+        for (&id, body) in &self.bodies {
+            if body.cursor == body.bytes.len() {
+                continue;
+            }
+            if self.conn_uncredited >= policy.connection_bytes {
+                connection = true;
+            } else if self.stream_uncredited.get(&id).copied().unwrap_or(0) >= policy.stream_bytes {
+                stream = true;
+            }
+        }
+        (connection, stream)
+    }
+    pub fn submitted_uncredited(&self) -> (u32, u64) {
+        (
+            self.conn_uncredited,
+            self.stream_uncredited
+                .values()
+                .map(|value| u64::from(*value))
+                .sum(),
+        )
+    }
     pub fn queue_control(&mut self, frame: Frame) -> Result<(), MuxError> {
         let size = frame.payload.len() + 12;
         if self.control.len() >= 64
@@ -646,6 +710,9 @@ impl MuxScheduler {
         }
         self.queued_bytes = total;
         self.windows.entry(id).or_insert(self.stream_max);
+        if self.send_ahead.is_some() {
+            self.stream_uncredited.entry(id).or_insert(0);
+        }
         self.bodies.insert(id, OutboundBody { bytes, cursor: 0 });
         match class {
             DataClass::Rpc => self.rpc.push_back(id),
@@ -663,12 +730,16 @@ impl MuxScheduler {
                 .checked_add(increment)
                 .filter(|n| *n <= self.conn_max)
                 .ok_or(MuxError::Connection(V3WireError::Length))?;
+            self.conn_uncredited = self.conn_uncredited.saturating_sub(increment);
         } else {
             let window = self.windows.get_mut(&id).ok_or(MuxError::Stream)?;
             *window = window
                 .checked_add(increment)
                 .filter(|n| *n <= self.stream_max)
                 .ok_or(MuxError::FlowControl)?;
+            if let Some(outstanding) = self.stream_uncredited.get_mut(&id) {
+                *outstanding = outstanding.saturating_sub(increment);
+            }
         }
         Ok(())
     }
@@ -702,15 +773,47 @@ impl MuxScheduler {
                 .min(self.max_frame)
                 .min(*window as usize)
                 .min(self.conn_window as usize);
+            let outstanding = if self.send_ahead.is_some() {
+                *self.stream_uncredited.entry(id).or_insert(0)
+            } else {
+                0
+            };
+            let n = if let Some(policy) = self.send_ahead {
+                n.min(policy.stream_bytes.saturating_sub(outstanding) as usize)
+                    .min(policy.connection_bytes.saturating_sub(self.conn_uncredited) as usize)
+            } else {
+                n
+            };
             if n == 0 && remaining != 0 {
                 queue.push_back(id);
                 continue;
             }
+            let Some(sent) = u32::try_from(n).ok() else {
+                queue.push_back(id);
+                continue;
+            };
+            let (next_connection, next_stream) = if self.send_ahead.is_some() {
+                let Some(connection) = self.conn_uncredited.checked_add(sent) else {
+                    queue.push_back(id);
+                    continue;
+                };
+                let Some(stream) = outstanding.checked_add(sent) else {
+                    queue.push_back(id);
+                    continue;
+                };
+                (Some(connection), Some(stream))
+            } else {
+                (None, None)
+            };
             let end = n == remaining;
             let payload = body.bytes.slice(body.cursor..body.cursor + n);
             body.cursor += n;
-            *window -= n as u32;
-            self.conn_window -= n as u32;
+            *window -= sent;
+            self.conn_window -= sent;
+            if let (Some(connection), Some(stream)) = (next_connection, next_stream) {
+                self.conn_uncredited = connection;
+                self.stream_uncredited.insert(id, stream);
+            }
             if end {
                 let finished = self.bodies.remove(&id)?;
                 self.queued_bytes -= finished.bytes.len();
@@ -759,6 +862,7 @@ impl MuxScheduler {
             self.queued_bytes -= body.bytes.len();
         }
         self.windows.remove(&id);
+        self.stream_uncredited.remove(&id);
         self.rpc.retain(|entry| *entry != id);
         self.event.retain(|entry| *entry != id);
     }
@@ -832,6 +936,157 @@ mod tests {
         assert_eq!(second.header.stream_id, 3);
         assert_eq!(second.header.flags, V3_END_STREAM);
         assert!(s.queued_bytes() > 0);
+    }
+    #[test]
+    fn late_rpc_runs_when_bulk_send_ahead_is_exhausted() {
+        let mut scheduler = MuxScheduler::with_send_ahead(
+            &limits(),
+            2 * 1024 * 1024,
+            Some(SendAheadLimits {
+                stream_bytes: 16 * 1024,
+                connection_bytes: 32 * 1024,
+            }),
+        )
+        .unwrap();
+        scheduler
+            .queue_body(2, DataClass::Event, Bytes::from(vec![0; 1024 * 1024]))
+            .unwrap();
+        for _ in 0..2 {
+            assert_eq!(scheduler.next_frame().unwrap().header.stream_id, 2);
+        }
+        assert_eq!(scheduler.stalled_send_ahead(), (false, true));
+        assert!(scheduler.next_frame().is_none());
+        scheduler
+            .queue_body(4, DataClass::Rpc, Bytes::from(vec![1; 100]))
+            .unwrap();
+        assert_eq!(scheduler.next_frame().unwrap().header.stream_id, 4);
+        scheduler.reset(4);
+        assert_eq!(
+            scheduler.submitted_uncredited(),
+            (16 * 1024 + 100, 16 * 1024)
+        );
+        scheduler.window_update(2, 8192).unwrap();
+        assert_eq!(scheduler.next_frame().unwrap().header.stream_id, 2);
+        scheduler.reset(2);
+        assert_eq!(scheduler.submitted_uncredited().1, 0);
+    }
+    #[test]
+    fn three_bulk_streams_share_connection_send_ahead() {
+        let mut scheduler = MuxScheduler::with_send_ahead(
+            &limits(),
+            4 * 1024 * 1024,
+            Some(SendAheadLimits {
+                stream_bytes: 16 * 1024,
+                connection_bytes: 32 * 1024,
+            }),
+        )
+        .unwrap();
+        for id in [2, 4, 6] {
+            scheduler
+                .queue_body(id, DataClass::Event, Bytes::from(vec![0; 1024 * 1024]))
+                .unwrap();
+        }
+        for _ in 0..4 {
+            assert_eq!(scheduler.next_frame().unwrap().payload.len(), 8192);
+        }
+        assert_eq!(scheduler.submitted_uncredited().0, 32 * 1024);
+        assert!(scheduler.stalled_send_ahead().0);
+        assert!(scheduler.next_frame().is_none());
+        scheduler
+            .queue_body(1, DataClass::Rpc, Bytes::from(vec![1; 100]))
+            .unwrap();
+        assert!(scheduler.next_frame().is_none());
+        scheduler.window_update(0, 8192).unwrap();
+        assert_eq!(scheduler.next_frame().unwrap().header.stream_id, 1);
+    }
+    #[test]
+    fn reset_keeps_connection_responsibility_until_peer_credit_arrives() {
+        let mut scheduler = MuxScheduler::with_send_ahead(
+            &limits(),
+            100_000,
+            Some(SendAheadLimits {
+                stream_bytes: 8192,
+                connection_bytes: 8192,
+            }),
+        )
+        .unwrap();
+        scheduler
+            .queue_body(2, DataClass::Event, Bytes::from(vec![0; 20_000]))
+            .unwrap();
+        assert_eq!(scheduler.next_frame().unwrap().payload.len(), 8192);
+        scheduler.reset(2);
+        assert_eq!(scheduler.queued_bytes(), 0);
+        assert_eq!(scheduler.submitted_uncredited(), (8192, 0));
+        scheduler
+            .queue_body(3, DataClass::Rpc, Bytes::from_static(b"rpc"))
+            .unwrap();
+        assert!(scheduler.next_frame().is_none());
+        scheduler.window_update(0, 8192).unwrap();
+        assert_eq!(scheduler.next_frame().unwrap().header.stream_id, 3);
+    }
+    #[test]
+    fn invalid_send_ahead_never_creates_an_unsendable_frame() {
+        let invalid = [
+            SendAheadLimits {
+                stream_bytes: 1,
+                connection_bytes: 8192,
+            },
+            SendAheadLimits {
+                stream_bytes: 4096,
+                connection_bytes: 1,
+            },
+            SendAheadLimits {
+                stream_bytes: 8192,
+                connection_bytes: 16 * 1024 * 1024 + 1,
+            },
+        ];
+        for policy in invalid {
+            assert!(MuxScheduler::with_send_ahead(&limits(), 100_000, Some(policy)).is_err());
+        }
+    }
+    #[test]
+    fn eight_kib_send_ahead_progresses_with_large_receive_window() {
+        let limits = limits();
+        let mut sender = MuxScheduler::with_send_ahead(
+            &limits,
+            100_000,
+            Some(SendAheadLimits {
+                stream_bytes: 8192,
+                connection_bytes: 8192,
+            }),
+        )
+        .unwrap();
+        let mut receiver = StreamTable::new(
+            Initiator::Client,
+            limits.clone(),
+            100_000,
+            ReassemblyBudget::new(100_000),
+        )
+        .unwrap();
+        let request = V3Open::Rpc {
+            parent_stream_id: None,
+            request_id: Uuid::new_v4(),
+            method: "auth.sync".into(),
+            deadline_ms: 1000,
+            content_length: 20_000,
+        };
+        receiver.open_peer(2, &request).unwrap();
+        sender
+            .queue_body(2, DataClass::Rpc, Bytes::from(vec![0; 20_000]))
+            .unwrap();
+        let first = sender.next_frame().unwrap();
+        assert_eq!(first.payload.len(), 8192);
+        assert!(sender.next_frame().is_none());
+        let received = receiver.receive_data(2, &first.payload, false).unwrap();
+        assert_eq!(received.stream_update, 8192);
+        assert_eq!(received.connection_update, 8192);
+        receiver
+            .grant_credit(0, received.connection_update)
+            .unwrap();
+        receiver.grant_credit(2, received.stream_update).unwrap();
+        sender.window_update(0, received.connection_update).unwrap();
+        sender.window_update(2, received.stream_update).unwrap();
+        assert_eq!(sender.next_frame().unwrap().payload.len(), 8192);
     }
     #[tokio::test]
     async fn rpc_frame_reaches_wire_before_large_event_finishes() {
