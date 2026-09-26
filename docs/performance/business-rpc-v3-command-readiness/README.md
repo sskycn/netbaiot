@@ -34,5 +34,7 @@ Command 去重只在当前进程的配置保留窗口内生效。默认 `command
 | `readiness-30m-mtls-unpaced` | 正确性门禁 PASS，稳态就绪无效 | 1,733 条 Command 各投递一次，5,706 个 EventAccepted 全部 sink ACK，dedup 峰值 297；但未限速认证流量触发 19,048 次入口拒绝、139 次认证超时和 244 次 telemetry publish 失败。保留原始曲线，不用它证明正常稳态。 |
 | `readiness-30m-paced-60s-preflight-failure` | 正确性门禁 PASS，入口门禁 FAIL | 每秒 2 次认证后，仍因 50 台设备集中建连触发 5 次入口拒绝；调整一次性测试网关的每 IP 连接与建连速率预算。 |
 | `readiness-30m-paced-60s-preflight` | PASS | 每秒 2 次认证，入口拒绝、认证超时与 publish 失败均为 0；60 条 Command 各投递一次（MQTT 59、TCP 1），241 个 EventAccepted 全部 sink ACK。 |
+| `readiness-30m-mtls-paced-publish-failure` | 严格零 publish 错误门禁 FAIL | 入口拒绝与认证超时均为 0，1,791 条 Command 各投递一次、7,176 个 EventAccepted 全部 sink ACK；但 3,600 次本地 telemetry 入队中有 15 次显式失败。原始工具未记录错误类型与故障时间差，故保留样本并增加分类采样。 |
+| `fault-storm-20s-mtls` | PASS | Provider 7 秒、EventSubscription 5 秒重连；39 条 Command 各投递一次，99 个 EventAccepted 全部 sink ACK。一次 telemetry 本地入队返回 `Offline`，发生在 Provider 重连后 3 ms、EventSubscription 重连后约 2 秒；未建立 EventAccepted 责任。 |
 
 前三次失败是测试脚本/配置问题，没有证据表明网关静默丢失已接受的 required Event。尤其 r3 的网关指标显示 200 个 EventAccepted、200 个 sink ACK，但负载工具因 EOF 未写出完整 Command 明细；不可将其当作通过样本。

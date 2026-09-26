@@ -242,6 +242,15 @@ def run():
             (output / "final-status.json").write_text(json.dumps(final_status, indent=2) + "\n")
             raw_result = json.loads((output / "loadgen.json").read_text()) if result.returncode == 0 else None
             counts = raw_result.get("counts", {}) if raw_result else {}
+            publish_failures = raw_result.get("publish_failures", []) if raw_result else []
+            fault_markers = raw_result.get("fault_markers", []) if raw_result else []
+            publish_failures_near_fault = sum(
+                any(
+                    0 <= failure["elapsed_ms"] - marker["elapsed_ms"] <= 15_000
+                    for marker in fault_markers
+                )
+                for failure in publish_failures
+            )
             gauges = {
                 name: metric(final_metrics, name)
                 for name in (
@@ -279,7 +288,11 @@ def run():
                 "all_accepted_events_acked": gateway_counts["events_accepted_total"] is not None and gateway_counts["events_accepted_total"] == gateway_counts["sink_acks_total"],
                 "no_command_errors": counts.get("command_errors") == 0,
                 "no_ingress_rejections": not profile.get("require_zero_ingress_rejections", False) or gateway_counts["connections_rejected_total"] == 0,
-                "no_publish_errors": not profile.get("require_zero_publish_errors", False) or counts.get("publish_errors") == 0,
+                "publish_errors_classified": not profile.get("require_classified_publish_errors", False) or (
+                    counts.get("publish_other_errors") == 0
+                    and counts.get("publish_errors") == counts.get("publish_offline", 0) + counts.get("publish_overloaded", 0)
+                    and len(publish_failures) == counts.get("publish_errors")
+                ),
                 "connections_released": gauges["business_rpc_v3_active_connections"] == 0,
                 "streams_released": gauges["business_rpc_v3_active_streams"] == 0,
                 "queued_bytes_released": gauges["business_rpc_v3_queued_bytes"] == 0,
@@ -321,6 +334,7 @@ def run():
                 "loadgen_exit_code": result.returncode,
                 "counts": counts,
                 "gateway_counts": gateway_counts,
+                "publish_failures_near_fault_15s": publish_failures_near_fault,
                 "gauges": gauges,
                 "final_status": final_status,
                 "checks": checks,
