@@ -121,6 +121,13 @@ def run():
         spool_directory=str(output / "spool"),
         credentials=[],
     )
+    # The local workload uses one loopback IP and keeps all command devices
+    # connected. Raise only the connection quotas needed for this topology.
+    device_connections = profile["command_device_count"] + 1 + int(profile["tcp_command_device"])
+    gateway["limits"].update(
+        max_connections_per_ip=max(32, device_connections + 8),
+        max_connections_per_tenant=max(64, device_connections + 8),
+    )
     gateway["business_rpc"] = {
         "version": 2,
         "v3": V3_LIMITS,
