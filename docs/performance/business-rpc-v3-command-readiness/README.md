@@ -1,6 +1,6 @@
 # Business RPC V3 与 Command 组合验证
 
-本目录保存真实网关、真实 V3 socket 与真实 MQTT 设备的本机 mTLS 测量。正式结论以各次 `summary.json`、`loadgen.json` 和 `final-metrics.txt` 为准。脚本使用测试 CA 和测试证书，不代表公网、跨节点或生产证书环境。
+本目录保存真实网关、真实 V3 socket 与真实 MQTT 设备的本机 mTLS 测量。正式结论见 [综合报告](REPORT.md)，原始证据以各次 `summary.json`、`loadgen.json` 和 `final-metrics.txt` 为准。脚本使用测试 CA 和测试证书，不代表公网、跨节点或生产证书环境。
 
 ## 复现
 
@@ -36,5 +36,6 @@ Command 去重只在当前进程的配置保留窗口内生效。默认 `command
 | `readiness-30m-paced-60s-preflight` | PASS | 每秒 2 次认证，入口拒绝、认证超时与 publish 失败均为 0；60 条 Command 各投递一次（MQTT 59、TCP 1），241 个 EventAccepted 全部 sink ACK。 |
 | `readiness-30m-mtls-paced-publish-failure` | 严格零 publish 错误门禁 FAIL | 入口拒绝与认证超时均为 0，1,791 条 Command 各投递一次、7,176 个 EventAccepted 全部 sink ACK；但 3,600 次本地 telemetry 入队中有 15 次显式失败。原始工具未记录错误类型与故障时间差，故保留样本并增加分类采样。 |
 | `fault-storm-20s-mtls` | PASS | Provider 7 秒、EventSubscription 5 秒重连；39 条 Command 各投递一次，99 个 EventAccepted 全部 sink ACK。一次 telemetry 本地入队返回 `Offline`，发生在 Provider 重连后 3 ms、EventSubscription 重连后约 2 秒；未建立 EventAccepted 责任。 |
+| `readiness-30m-mtls-final` | PASS | 干净 SHA `270979d` 上运行；1,795 条 Command 各投递一次，7,176 个 EventAccepted 全部 sink ACK，入口拒绝 0；16 次 telemetry 本地入队 `Offline` 均在主动重连后 0–8 ms 内发生，终态 V3/RPC/required Event/dedup InFlight 归零。 |
 
 前三次失败是测试脚本/配置问题，没有证据表明网关静默丢失已接受的 required Event。尤其 r3 的网关指标显示 200 个 EventAccepted、200 个 sink ACK，但负载工具因 EOF 未写出完整 Command 明细；不可将其当作通过样本。
