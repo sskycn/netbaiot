@@ -1,0 +1,674 @@
+2026-09-26T01:15:09.375603Z  INFO netbaiot_server: runtime ready device_ingress=127.0.0.1:54845 management_http=127.0.0.1:54846 business_tcp=Some(127.0.0.1:54847)
+2026-09-26T01:15:09.784940Z  INFO netbaiot_transports::business_rpc: business RPC socket send buffer send_buffer_bytes=146988
+2026-09-26T01:15:09.867989Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=1 frame_type=Open payload_bytes=43
+2026-09-26T01:15:09.868259Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=3 frame_type=Open payload_bytes=157
+2026-09-26T01:15:09.868286Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=1 frame_type=Accept payload_bytes=41
+2026-09-26T01:15:09.868301Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=1 frame_type=Accept payload_bytes=41
+2026-09-26T01:15:09.868308Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=3 frame_type=Accept payload_bytes=45
+2026-09-26T01:15:09.868315Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=3 frame_type=Accept payload_bytes=45
+2026-09-26T01:15:09.950456Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=5 frame_type=Open payload_bytes=147
+2026-09-26T01:15:09.953469Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=5 frame_type=Data payload_bytes=95
+2026-09-26T01:15:09.953519Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:09.953563Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:09.953578Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 body entered scheduler stream_id=5 class=Rpc body_bytes=22
+2026-09-26T01:15:09.953595Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=5 frame_type=Response payload_bytes=34
+2026-09-26T01:15:09.953613Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=5 frame_type=Response payload_bytes=34
+2026-09-26T01:15:09.953624Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=5 frame_type=Data payload_bytes=22
+2026-09-26T01:15:09.953636Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=5 frame_type=Data payload_bytes=22
+2026-09-26T01:15:09.953674Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=0 frame_type=Ping payload_bytes=8
+2026-09-26T01:15:09.953694Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=0 frame_type=Ping payload_bytes=8
+2026-09-26T01:15:10.036777Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=Pong payload_bytes=8
+2026-09-26T01:15:10.036821Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.076549Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 body entered scheduler stream_id=2 class=Rpc body_bytes=200
+2026-09-26T01:15:10.078455Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=2 frame_type=Open payload_bytes=158
+2026-09-26T01:15:10.078486Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=2 frame_type=Open payload_bytes=158
+2026-09-26T01:15:10.078497Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=2 frame_type=Data payload_bytes=200
+2026-09-26T01:15:10.078507Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=2 frame_type=Data payload_bytes=200
+2026-09-26T01:15:10.133133Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.160418Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=2 frame_type=Response payload_bytes=35
+2026-09-26T01:15:10.163411Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=2 frame_type=Data payload_bytes=218
+2026-09-26T01:15:10.163480Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.163517Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.164143Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 body entered scheduler stream_id=4 class=Rpc body_bytes=196
+2026-09-26T01:15:10.164156Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 body entered scheduler stream_id=6 class=Rpc body_bytes=196
+2026-09-26T01:15:10.164163Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 body entered scheduler stream_id=8 class=Rpc body_bytes=196
+2026-09-26T01:15:10.164169Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 body entered scheduler stream_id=10 class=Rpc body_bytes=196
+2026-09-26T01:15:10.164176Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=4 frame_type=Open payload_bytes=158
+2026-09-26T01:15:10.164191Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=4 frame_type=Open payload_bytes=158
+2026-09-26T01:15:10.164198Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=6 frame_type=Open payload_bytes=158
+2026-09-26T01:15:10.164209Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=6 frame_type=Open payload_bytes=158
+2026-09-26T01:15:10.164215Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=8 frame_type=Open payload_bytes=158
+2026-09-26T01:15:10.164228Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=8 frame_type=Open payload_bytes=158
+2026-09-26T01:15:10.164234Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=4 frame_type=Data payload_bytes=196
+2026-09-26T01:15:10.164242Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=4 frame_type=Data payload_bytes=196
+2026-09-26T01:15:10.164295Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=10 frame_type=Open payload_bytes=158
+2026-09-26T01:15:10.164312Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=10 frame_type=Open payload_bytes=158
+2026-09-26T01:15:10.164320Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=6 frame_type=Data payload_bytes=196
+2026-09-26T01:15:10.164329Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=6 frame_type=Data payload_bytes=196
+2026-09-26T01:15:10.164336Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=8 frame_type=Data payload_bytes=196
+2026-09-26T01:15:10.164344Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=8 frame_type=Data payload_bytes=196
+2026-09-26T01:15:10.164360Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=10 frame_type=Data payload_bytes=196
+2026-09-26T01:15:10.164380Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=10 frame_type=Data payload_bytes=196
+2026-09-26T01:15:10.165902Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 body entered scheduler stream_id=12 class=Event body_bytes=17365
+2026-09-26T01:15:10.168327Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=12 frame_type=Open payload_bytes=184
+2026-09-26T01:15:10.168350Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=12 frame_type=Open payload_bytes=184
+2026-09-26T01:15:10.168368Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=12 frame_type=Data payload_bytes=8192
+2026-09-26T01:15:10.168377Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=12 frame_type=Data payload_bytes=8192
+2026-09-26T01:15:10.168382Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=12 frame_type=Data payload_bytes=8192
+2026-09-26T01:15:10.168397Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=12 frame_type=Data payload_bytes=8192
+2026-09-26T01:15:10.168405Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=12 frame_type=Data payload_bytes=981
+2026-09-26T01:15:10.168414Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=12 frame_type=Data payload_bytes=981
+2026-09-26T01:15:10.311074Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.311458Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.311465Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.311469Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.311473Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.311477Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=12 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.311481Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=10 frame_type=Response payload_bytes=35
+2026-09-26T01:15:10.311493Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=4 frame_type=Response payload_bytes=35
+2026-09-26T01:15:10.311497Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=8 frame_type=Response payload_bytes=35
+2026-09-26T01:15:10.311501Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=10 frame_type=Data payload_bytes=214
+2026-09-26T01:15:10.311539Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=6 frame_type=Response payload_bytes=35
+2026-09-26T01:15:10.311545Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=4 frame_type=Data payload_bytes=214
+2026-09-26T01:15:10.311556Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.311561Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=8 frame_type=Data payload_bytes=214
+2026-09-26T01:15:10.311586Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.311595Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.311608Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.311616Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.311629Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.311599Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=6 frame_type=Data payload_bytes=214
+2026-09-26T01:15:10.311748Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.311767Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.312453Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 body entered scheduler stream_id=14 class=Rpc body_bytes=196
+2026-09-26T01:15:10.312463Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=14 frame_type=Open payload_bytes=158
+2026-09-26T01:15:10.312476Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=14 frame_type=Open payload_bytes=158
+2026-09-26T01:15:10.312481Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 body entered scheduler stream_id=16 class=Rpc body_bytes=196
+2026-09-26T01:15:10.312486Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=16 frame_type=Open payload_bytes=158
+2026-09-26T01:15:10.312491Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=16 frame_type=Open payload_bytes=158
+2026-09-26T01:15:10.312496Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=14 frame_type=Data payload_bytes=196
+2026-09-26T01:15:10.312502Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=14 frame_type=Data payload_bytes=196
+2026-09-26T01:15:10.312506Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=16 frame_type=Data payload_bytes=196
+2026-09-26T01:15:10.312513Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=16 frame_type=Data payload_bytes=196
+2026-09-26T01:15:10.312552Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 body entered scheduler stream_id=18 class=Rpc body_bytes=196
+2026-09-26T01:15:10.312560Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 body entered scheduler stream_id=20 class=Rpc body_bytes=196
+2026-09-26T01:15:10.312564Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=18 frame_type=Open payload_bytes=158
+2026-09-26T01:15:10.312577Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=18 frame_type=Open payload_bytes=158
+2026-09-26T01:15:10.312582Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=20 frame_type=Open payload_bytes=158
+2026-09-26T01:15:10.312588Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=20 frame_type=Open payload_bytes=158
+2026-09-26T01:15:10.312592Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=18 frame_type=Data payload_bytes=196
+2026-09-26T01:15:10.312599Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=18 frame_type=Data payload_bytes=196
+2026-09-26T01:15:10.312604Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=20 frame_type=Data payload_bytes=196
+2026-09-26T01:15:10.312609Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=20 frame_type=Data payload_bytes=196
+2026-09-26T01:15:10.343500Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.346423Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=12 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.346434Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.370377Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=12 frame_type=Response payload_bytes=35
+2026-09-26T01:15:10.370400Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=12 frame_type=Data payload_bytes=118
+2026-09-26T01:15:10.370430Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 Event delivery acknowledged stream_id=12 completion_us=204534
+2026-09-26T01:15:10.370455Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.370479Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.400262Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.402331Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.402339Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.402344Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.402349Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=20 frame_type=Response payload_bytes=35
+2026-09-26T01:15:10.402357Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=16 frame_type=Response payload_bytes=35
+2026-09-26T01:15:10.402363Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=18 frame_type=Response payload_bytes=35
+2026-09-26T01:15:10.402367Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=14 frame_type=Response payload_bytes=35
+2026-09-26T01:15:10.402373Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=20 frame_type=Data payload_bytes=214
+2026-09-26T01:15:10.402392Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=16 frame_type=Data payload_bytes=214
+2026-09-26T01:15:10.402402Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=18 frame_type=Data payload_bytes=214
+2026-09-26T01:15:10.402402Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.402415Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=14 frame_type=Data payload_bytes=214
+2026-09-26T01:15:10.402423Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.402429Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.402433Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.402436Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.402440Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.402443Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.402447Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.402789Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 body entered scheduler stream_id=22 class=Rpc body_bytes=196
+2026-09-26T01:15:10.402795Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=22 frame_type=Open payload_bytes=158
+2026-09-26T01:15:10.402803Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=22 frame_type=Open payload_bytes=158
+2026-09-26T01:15:10.402820Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=22 frame_type=Data payload_bytes=196
+2026-09-26T01:15:10.402824Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=22 frame_type=Data payload_bytes=196
+2026-09-26T01:15:10.402876Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 body entered scheduler stream_id=24 class=Rpc body_bytes=197
+2026-09-26T01:15:10.402883Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=24 frame_type=Open payload_bytes=158
+2026-09-26T01:15:10.402889Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=24 frame_type=Open payload_bytes=158
+2026-09-26T01:15:10.402892Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 body entered scheduler stream_id=26 class=Rpc body_bytes=197
+2026-09-26T01:15:10.402895Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=26 frame_type=Open payload_bytes=158
+2026-09-26T01:15:10.402901Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=26 frame_type=Open payload_bytes=158
+2026-09-26T01:15:10.402904Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 body entered scheduler stream_id=28 class=Rpc body_bytes=196
+2026-09-26T01:15:10.402906Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=28 frame_type=Open payload_bytes=158
+2026-09-26T01:15:10.402910Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=28 frame_type=Open payload_bytes=158
+2026-09-26T01:15:10.402914Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=24 frame_type=Data payload_bytes=197
+2026-09-26T01:15:10.402917Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=24 frame_type=Data payload_bytes=197
+2026-09-26T01:15:10.402920Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=26 frame_type=Data payload_bytes=197
+2026-09-26T01:15:10.402924Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=26 frame_type=Data payload_bytes=197
+2026-09-26T01:15:10.402926Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=28 frame_type=Data payload_bytes=196
+2026-09-26T01:15:10.402929Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=28 frame_type=Data payload_bytes=196
+2026-09-26T01:15:10.512163Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.513334Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.513346Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.513350Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.513354Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=22 frame_type=Response payload_bytes=35
+2026-09-26T01:15:10.513361Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=28 frame_type=Response payload_bytes=35
+2026-09-26T01:15:10.513364Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=24 frame_type=Response payload_bytes=35
+2026-09-26T01:15:10.513367Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=26 frame_type=Response payload_bytes=35
+2026-09-26T01:15:10.513370Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=22 frame_type=Data payload_bytes=214
+2026-09-26T01:15:10.513392Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=28 frame_type=Data payload_bytes=214
+2026-09-26T01:15:10.513405Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.513407Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=24 frame_type=Data payload_bytes=215
+2026-09-26T01:15:10.513427Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=26 frame_type=Data payload_bytes=215
+2026-09-26T01:15:10.513438Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.513445Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.513452Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.513456Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.513462Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.513466Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.513471Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.513895Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 body entered scheduler stream_id=30 class=Rpc body_bytes=197
+2026-09-26T01:15:10.513902Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=30 frame_type=Open payload_bytes=158
+2026-09-26T01:15:10.513910Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=30 frame_type=Open payload_bytes=158
+2026-09-26T01:15:10.513914Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=30 frame_type=Data payload_bytes=197
+2026-09-26T01:15:10.513918Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=30 frame_type=Data payload_bytes=197
+2026-09-26T01:15:10.513956Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 body entered scheduler stream_id=32 class=Rpc body_bytes=197
+2026-09-26T01:15:10.513961Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=32 frame_type=Open payload_bytes=158
+2026-09-26T01:15:10.513966Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=32 frame_type=Open payload_bytes=158
+2026-09-26T01:15:10.513968Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=32 frame_type=Data payload_bytes=197
+2026-09-26T01:15:10.513972Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=32 frame_type=Data payload_bytes=197
+2026-09-26T01:15:10.513975Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 body entered scheduler stream_id=34 class=Rpc body_bytes=197
+2026-09-26T01:15:10.513978Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=34 frame_type=Open payload_bytes=158
+2026-09-26T01:15:10.513982Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=34 frame_type=Open payload_bytes=158
+2026-09-26T01:15:10.513984Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=34 frame_type=Data payload_bytes=197
+2026-09-26T01:15:10.513988Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=34 frame_type=Data payload_bytes=197
+2026-09-26T01:15:10.514004Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 body entered scheduler stream_id=36 class=Rpc body_bytes=197
+2026-09-26T01:15:10.514013Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=36 frame_type=Open payload_bytes=158
+2026-09-26T01:15:10.514017Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=36 frame_type=Open payload_bytes=158
+2026-09-26T01:15:10.514020Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=36 frame_type=Data payload_bytes=197
+2026-09-26T01:15:10.514027Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=36 frame_type=Data payload_bytes=197
+2026-09-26T01:15:10.628472Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.628495Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.628498Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.628501Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.628504Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=36 frame_type=Response payload_bytes=35
+2026-09-26T01:15:10.628509Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=34 frame_type=Response payload_bytes=35
+2026-09-26T01:15:10.628511Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=36 frame_type=Data payload_bytes=215
+2026-09-26T01:15:10.628528Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=32 frame_type=Response payload_bytes=35
+2026-09-26T01:15:10.628531Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=34 frame_type=Data payload_bytes=215
+2026-09-26T01:15:10.628537Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=32 frame_type=Data payload_bytes=215
+2026-09-26T01:15:10.628538Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.628542Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=30 frame_type=Response payload_bytes=35
+2026-09-26T01:15:10.628554Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=30 frame_type=Data payload_bytes=215
+2026-09-26T01:15:10.628556Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.628561Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.628565Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.628568Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.628571Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.628573Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.628577Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.628980Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 body entered scheduler stream_id=38 class=Rpc body_bytes=197
+2026-09-26T01:15:10.628986Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 body entered scheduler stream_id=40 class=Rpc body_bytes=197
+2026-09-26T01:15:10.628997Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 body entered scheduler stream_id=42 class=Rpc body_bytes=197
+2026-09-26T01:15:10.629000Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=38 frame_type=Open payload_bytes=158
+2026-09-26T01:15:10.629006Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=38 frame_type=Open payload_bytes=158
+2026-09-26T01:15:10.629008Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 body entered scheduler stream_id=44 class=Rpc body_bytes=197
+2026-09-26T01:15:10.629011Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=40 frame_type=Open payload_bytes=158
+2026-09-26T01:15:10.629014Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=40 frame_type=Open payload_bytes=158
+2026-09-26T01:15:10.629016Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=42 frame_type=Open payload_bytes=158
+2026-09-26T01:15:10.629018Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=42 frame_type=Open payload_bytes=158
+2026-09-26T01:15:10.629020Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=44 frame_type=Open payload_bytes=158
+2026-09-26T01:15:10.629023Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=44 frame_type=Open payload_bytes=158
+2026-09-26T01:15:10.629025Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=38 frame_type=Data payload_bytes=197
+2026-09-26T01:15:10.629028Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=38 frame_type=Data payload_bytes=197
+2026-09-26T01:15:10.629030Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=40 frame_type=Data payload_bytes=197
+2026-09-26T01:15:10.629033Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=40 frame_type=Data payload_bytes=197
+2026-09-26T01:15:10.629035Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=42 frame_type=Data payload_bytes=197
+2026-09-26T01:15:10.629038Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=42 frame_type=Data payload_bytes=197
+2026-09-26T01:15:10.629040Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=44 frame_type=Data payload_bytes=197
+2026-09-26T01:15:10.629045Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=44 frame_type=Data payload_bytes=197
+2026-09-26T01:15:10.744369Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.744382Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.744385Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.744387Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.744390Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=44 frame_type=Response payload_bytes=35
+2026-09-26T01:15:10.744396Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=38 frame_type=Response payload_bytes=35
+2026-09-26T01:15:10.744398Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=40 frame_type=Response payload_bytes=35
+2026-09-26T01:15:10.744400Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=42 frame_type=Response payload_bytes=35
+2026-09-26T01:15:10.744403Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=44 frame_type=Data payload_bytes=215
+2026-09-26T01:15:10.744423Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=38 frame_type=Data payload_bytes=215
+2026-09-26T01:15:10.744430Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=40 frame_type=Data payload_bytes=215
+2026-09-26T01:15:10.744430Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.744436Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=42 frame_type=Data payload_bytes=215
+2026-09-26T01:15:10.744448Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.744454Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.744458Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.744461Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.744465Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.744467Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.744470Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.744888Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 body entered scheduler stream_id=46 class=Rpc body_bytes=197
+2026-09-26T01:15:10.748447Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 body entered scheduler stream_id=48 class=Rpc body_bytes=197
+2026-09-26T01:15:10.748461Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 body entered scheduler stream_id=50 class=Rpc body_bytes=197
+2026-09-26T01:15:10.748463Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 body entered scheduler stream_id=52 class=Rpc body_bytes=197
+2026-09-26T01:15:10.748466Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=46 frame_type=Open payload_bytes=158
+2026-09-26T01:15:10.748474Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=46 frame_type=Open payload_bytes=158
+2026-09-26T01:15:10.748477Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=48 frame_type=Open payload_bytes=158
+2026-09-26T01:15:10.748481Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=48 frame_type=Open payload_bytes=158
+2026-09-26T01:15:10.748483Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=50 frame_type=Open payload_bytes=158
+2026-09-26T01:15:10.748486Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=50 frame_type=Open payload_bytes=158
+2026-09-26T01:15:10.748488Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=52 frame_type=Open payload_bytes=158
+2026-09-26T01:15:10.748492Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=52 frame_type=Open payload_bytes=158
+2026-09-26T01:15:10.748494Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=46 frame_type=Data payload_bytes=197
+2026-09-26T01:15:10.748497Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=46 frame_type=Data payload_bytes=197
+2026-09-26T01:15:10.748500Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=48 frame_type=Data payload_bytes=197
+2026-09-26T01:15:10.748507Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=48 frame_type=Data payload_bytes=197
+2026-09-26T01:15:10.748509Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=50 frame_type=Data payload_bytes=197
+2026-09-26T01:15:10.748512Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=50 frame_type=Data payload_bytes=197
+2026-09-26T01:15:10.748514Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=52 frame_type=Data payload_bytes=197
+2026-09-26T01:15:10.748518Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=52 frame_type=Data payload_bytes=197
+2026-09-26T01:15:10.860156Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.860173Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.860178Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.860182Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.860186Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=52 frame_type=Response payload_bytes=35
+2026-09-26T01:15:10.860196Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=46 frame_type=Response payload_bytes=35
+2026-09-26T01:15:10.860200Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=48 frame_type=Response payload_bytes=35
+2026-09-26T01:15:10.860203Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=50 frame_type=Response payload_bytes=35
+2026-09-26T01:15:10.860206Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=52 frame_type=Data payload_bytes=215
+2026-09-26T01:15:10.860228Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=46 frame_type=Data payload_bytes=215
+2026-09-26T01:15:10.860237Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=48 frame_type=Data payload_bytes=215
+2026-09-26T01:15:10.860236Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.860244Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=50 frame_type=Data payload_bytes=215
+2026-09-26T01:15:10.860259Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.860265Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.860271Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.860274Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.860278Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.860281Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.860286Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.860732Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 body entered scheduler stream_id=54 class=Rpc body_bytes=197
+2026-09-26T01:15:10.860741Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 body entered scheduler stream_id=56 class=Rpc body_bytes=197
+2026-09-26T01:15:10.860750Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 body entered scheduler stream_id=58 class=Rpc body_bytes=197
+2026-09-26T01:15:10.860754Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 body entered scheduler stream_id=60 class=Rpc body_bytes=197
+2026-09-26T01:15:10.860757Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=54 frame_type=Open payload_bytes=158
+2026-09-26T01:15:10.860766Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=54 frame_type=Open payload_bytes=158
+2026-09-26T01:15:10.860770Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=56 frame_type=Open payload_bytes=158
+2026-09-26T01:15:10.860775Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=56 frame_type=Open payload_bytes=158
+2026-09-26T01:15:10.860778Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=58 frame_type=Open payload_bytes=158
+2026-09-26T01:15:10.860782Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=58 frame_type=Open payload_bytes=158
+2026-09-26T01:15:10.860785Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=60 frame_type=Open payload_bytes=158
+2026-09-26T01:15:10.860796Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=60 frame_type=Open payload_bytes=158
+2026-09-26T01:15:10.860799Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=54 frame_type=Data payload_bytes=197
+2026-09-26T01:15:10.860804Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=54 frame_type=Data payload_bytes=197
+2026-09-26T01:15:10.860807Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=56 frame_type=Data payload_bytes=197
+2026-09-26T01:15:10.860811Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=56 frame_type=Data payload_bytes=197
+2026-09-26T01:15:10.860815Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=58 frame_type=Data payload_bytes=197
+2026-09-26T01:15:10.860820Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=58 frame_type=Data payload_bytes=197
+2026-09-26T01:15:10.860823Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=60 frame_type=Data payload_bytes=197
+2026-09-26T01:15:10.860827Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=60 frame_type=Data payload_bytes=197
+2026-09-26T01:15:10.975754Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.975768Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.975772Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.975776Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.975780Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=60 frame_type=Response payload_bytes=35
+2026-09-26T01:15:10.975787Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=54 frame_type=Response payload_bytes=35
+2026-09-26T01:15:10.975791Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=56 frame_type=Response payload_bytes=35
+2026-09-26T01:15:10.975794Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=60 frame_type=Data payload_bytes=215
+2026-09-26T01:15:10.975856Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=54 frame_type=Data payload_bytes=215
+2026-09-26T01:15:10.975862Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.975875Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.975879Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.975884Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.975864Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=56 frame_type=Data payload_bytes=215
+2026-09-26T01:15:10.975895Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=58 frame_type=Response payload_bytes=35
+2026-09-26T01:15:10.975899Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=58 frame_type=Data payload_bytes=215
+2026-09-26T01:15:10.975899Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.975914Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.975918Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.975922Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:10.976313Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 body entered scheduler stream_id=62 class=Rpc body_bytes=197
+2026-09-26T01:15:10.976318Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 body entered scheduler stream_id=64 class=Rpc body_bytes=197
+2026-09-26T01:15:10.976321Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=62 frame_type=Open payload_bytes=158
+2026-09-26T01:15:10.976328Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=62 frame_type=Open payload_bytes=158
+2026-09-26T01:15:10.976331Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 body entered scheduler stream_id=66 class=Rpc body_bytes=197
+2026-09-26T01:15:10.976333Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=64 frame_type=Open payload_bytes=158
+2026-09-26T01:15:10.976337Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=64 frame_type=Open payload_bytes=158
+2026-09-26T01:15:10.976339Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 body entered scheduler stream_id=68 class=Rpc body_bytes=197
+2026-09-26T01:15:10.976341Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=66 frame_type=Open payload_bytes=158
+2026-09-26T01:15:10.976345Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=66 frame_type=Open payload_bytes=158
+2026-09-26T01:15:10.976347Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=68 frame_type=Open payload_bytes=158
+2026-09-26T01:15:10.976350Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=68 frame_type=Open payload_bytes=158
+2026-09-26T01:15:10.976353Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=62 frame_type=Data payload_bytes=197
+2026-09-26T01:15:10.976358Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=62 frame_type=Data payload_bytes=197
+2026-09-26T01:15:10.976364Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=64 frame_type=Data payload_bytes=197
+2026-09-26T01:15:10.976368Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=64 frame_type=Data payload_bytes=197
+2026-09-26T01:15:10.976371Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=66 frame_type=Data payload_bytes=197
+2026-09-26T01:15:10.976374Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=66 frame_type=Data payload_bytes=197
+2026-09-26T01:15:10.976376Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=68 frame_type=Data payload_bytes=197
+2026-09-26T01:15:10.976379Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=68 frame_type=Data payload_bytes=197
+2026-09-26T01:15:11.092751Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:11.092764Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:11.092767Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:11.092770Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:11.092772Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=68 frame_type=Response payload_bytes=35
+2026-09-26T01:15:11.092778Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=68 frame_type=Data payload_bytes=215
+2026-09-26T01:15:11.092797Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=64 frame_type=Response payload_bytes=35
+2026-09-26T01:15:11.092800Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=62 frame_type=Response payload_bytes=35
+2026-09-26T01:15:11.092803Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=66 frame_type=Response payload_bytes=35
+2026-09-26T01:15:11.092803Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:11.092805Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=64 frame_type=Data payload_bytes=215
+2026-09-26T01:15:11.092817Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:11.092821Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=62 frame_type=Data payload_bytes=215
+2026-09-26T01:15:11.092830Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=66 frame_type=Data payload_bytes=215
+2026-09-26T01:15:11.092822Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:11.092890Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:11.092897Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:11.092901Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:11.092904Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:11.092908Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:11.165689Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 body entered scheduler stream_id=70 class=Event body_bytes=17365
+2026-09-26T01:15:11.167465Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=70 frame_type=Open payload_bytes=184
+2026-09-26T01:15:11.167486Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=70 frame_type=Open payload_bytes=184
+2026-09-26T01:15:11.167494Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=70 frame_type=Data payload_bytes=8192
+2026-09-26T01:15:11.167509Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=70 frame_type=Data payload_bytes=8192
+2026-09-26T01:15:11.167513Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=70 frame_type=Data payload_bytes=8192
+2026-09-26T01:15:11.167522Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=70 frame_type=Data payload_bytes=8192
+2026-09-26T01:15:11.167526Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=70 frame_type=Data payload_bytes=981
+2026-09-26T01:15:11.167530Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=70 frame_type=Data payload_bytes=981
+2026-09-26T01:15:11.311219Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:11.311397Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=70 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:11.338265Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:11.338455Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=70 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:11.338460Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:11.338464Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=70 frame_type=Response payload_bytes=35
+2026-09-26T01:15:11.338472Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=70 frame_type=Data payload_bytes=118
+2026-09-26T01:15:11.338481Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 Event delivery acknowledged stream_id=70 completion_us=172798
+2026-09-26T01:15:11.338495Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:11.338512Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:12.164473Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 body entered scheduler stream_id=72 class=Event body_bytes=17365
+2026-09-26T01:15:12.164505Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=72 frame_type=Open payload_bytes=184
+2026-09-26T01:15:12.164516Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=72 frame_type=Open payload_bytes=184
+2026-09-26T01:15:12.164521Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=72 frame_type=Data payload_bytes=8192
+2026-09-26T01:15:12.164525Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=72 frame_type=Data payload_bytes=8192
+2026-09-26T01:15:12.164528Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=72 frame_type=Data payload_bytes=8192
+2026-09-26T01:15:12.164538Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=72 frame_type=Data payload_bytes=8192
+2026-09-26T01:15:12.164541Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=72 frame_type=Data payload_bytes=981
+2026-09-26T01:15:12.164555Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=72 frame_type=Data payload_bytes=981
+2026-09-26T01:15:12.280862Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:12.282511Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=72 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:12.311253Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:12.311303Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=72 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:12.311313Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:12.338114Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=72 frame_type=Response payload_bytes=35
+2026-09-26T01:15:12.338134Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=72 frame_type=Data payload_bytes=118
+2026-09-26T01:15:12.338144Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 Event delivery acknowledged stream_id=72 completion_us=173676
+2026-09-26T01:15:12.338180Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:12.338198Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:12.367826Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=Ping payload_bytes=8
+2026-09-26T01:15:12.367840Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=0 frame_type=Pong payload_bytes=8
+2026-09-26T01:15:12.367852Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=0 frame_type=Pong payload_bytes=8
+2026-09-26T01:15:13.164873Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 body entered scheduler stream_id=74 class=Event body_bytes=17365
+2026-09-26T01:15:13.167403Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=74 frame_type=Open payload_bytes=184
+2026-09-26T01:15:13.167428Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=74 frame_type=Open payload_bytes=184
+2026-09-26T01:15:13.167437Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=74 frame_type=Data payload_bytes=8192
+2026-09-26T01:15:13.167449Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=74 frame_type=Data payload_bytes=8192
+2026-09-26T01:15:13.167455Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=74 frame_type=Data payload_bytes=8192
+2026-09-26T01:15:13.167472Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=74 frame_type=Data payload_bytes=8192
+2026-09-26T01:15:13.167480Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=74 frame_type=Data payload_bytes=981
+2026-09-26T01:15:13.167492Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=74 frame_type=Data payload_bytes=981
+2026-09-26T01:15:13.284921Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:13.287429Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=74 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:13.315163Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:13.315196Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=74 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:13.315203Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:13.342055Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=74 frame_type=Response payload_bytes=35
+2026-09-26T01:15:13.342074Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=74 frame_type=Data payload_bytes=118
+2026-09-26T01:15:13.342083Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 Event delivery acknowledged stream_id=74 completion_us=177224
+2026-09-26T01:15:13.342106Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:13.342122Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:14.165673Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 body entered scheduler stream_id=76 class=Event body_bytes=17365
+2026-09-26T01:15:14.166392Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=76 frame_type=Open payload_bytes=184
+2026-09-26T01:15:14.166407Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=76 frame_type=Open payload_bytes=184
+2026-09-26T01:15:14.166412Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=76 frame_type=Data payload_bytes=8192
+2026-09-26T01:15:14.166419Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=76 frame_type=Data payload_bytes=8192
+2026-09-26T01:15:14.166421Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=76 frame_type=Data payload_bytes=8192
+2026-09-26T01:15:14.166430Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=76 frame_type=Data payload_bytes=8192
+2026-09-26T01:15:14.166433Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=76 frame_type=Data payload_bytes=981
+2026-09-26T01:15:14.166442Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=76 frame_type=Data payload_bytes=981
+2026-09-26T01:15:14.282799Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:14.282814Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=76 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:14.313139Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:14.315440Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=76 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:14.315449Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:14.339925Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=76 frame_type=Response payload_bytes=35
+2026-09-26T01:15:14.339938Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=76 frame_type=Data payload_bytes=118
+2026-09-26T01:15:14.339946Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 Event delivery acknowledged stream_id=76 completion_us=174280
+2026-09-26T01:15:14.339958Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:14.339979Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:14.868836Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=Ping payload_bytes=8
+2026-09-26T01:15:14.869497Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=0 frame_type=Pong payload_bytes=8
+2026-09-26T01:15:14.869522Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=0 frame_type=Pong payload_bytes=8
+2026-09-26T01:15:15.165613Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 body entered scheduler stream_id=78 class=Event body_bytes=17365
+2026-09-26T01:15:15.165640Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=78 frame_type=Open payload_bytes=184
+2026-09-26T01:15:15.165658Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=78 frame_type=Open payload_bytes=184
+2026-09-26T01:15:15.165666Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=78 frame_type=Data payload_bytes=8192
+2026-09-26T01:15:15.165686Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=78 frame_type=Data payload_bytes=8192
+2026-09-26T01:15:15.165692Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=78 frame_type=Data payload_bytes=8192
+2026-09-26T01:15:15.165708Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=78 frame_type=Data payload_bytes=8192
+2026-09-26T01:15:15.165714Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=78 frame_type=Data payload_bytes=981
+2026-09-26T01:15:15.165726Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=78 frame_type=Data payload_bytes=981
+2026-09-26T01:15:15.276955Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:15.276974Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=78 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:15.312259Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:15.314541Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=78 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:15.314549Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:15.339189Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=78 frame_type=Response payload_bytes=35
+2026-09-26T01:15:15.340516Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=78 frame_type=Data payload_bytes=118
+2026-09-26T01:15:15.340543Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 Event delivery acknowledged stream_id=78 completion_us=174941
+2026-09-26T01:15:15.340561Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:15.340575Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:16.166516Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 body entered scheduler stream_id=80 class=Event body_bytes=17365
+2026-09-26T01:15:16.169549Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=80 frame_type=Open payload_bytes=184
+2026-09-26T01:15:16.169578Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=80 frame_type=Open payload_bytes=184
+2026-09-26T01:15:16.169588Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=80 frame_type=Data payload_bytes=8192
+2026-09-26T01:15:16.169599Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=80 frame_type=Data payload_bytes=8192
+2026-09-26T01:15:16.169605Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=80 frame_type=Data payload_bytes=8192
+2026-09-26T01:15:16.169620Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=80 frame_type=Data payload_bytes=8192
+2026-09-26T01:15:16.169626Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=80 frame_type=Data payload_bytes=981
+2026-09-26T01:15:16.169641Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=80 frame_type=Data payload_bytes=981
+2026-09-26T01:15:16.287064Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:16.287150Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=80 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:16.317525Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:16.317557Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=80 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:16.317564Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:16.344487Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=80 frame_type=Response payload_bytes=35
+2026-09-26T01:15:16.344533Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=80 frame_type=Data payload_bytes=118
+2026-09-26T01:15:16.344553Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 Event delivery acknowledged stream_id=80 completion_us=178048
+2026-09-26T01:15:16.344584Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:16.344615Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:17.165678Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 body entered scheduler stream_id=82 class=Event body_bytes=17365
+2026-09-26T01:15:17.167495Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=82 frame_type=Open payload_bytes=184
+2026-09-26T01:15:17.167514Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=82 frame_type=Open payload_bytes=184
+2026-09-26T01:15:17.167520Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=82 frame_type=Data payload_bytes=8192
+2026-09-26T01:15:17.167529Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=82 frame_type=Data payload_bytes=8192
+2026-09-26T01:15:17.167533Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=82 frame_type=Data payload_bytes=8192
+2026-09-26T01:15:17.167542Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=82 frame_type=Data payload_bytes=8192
+2026-09-26T01:15:17.167553Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=82 frame_type=Data payload_bytes=981
+2026-09-26T01:15:17.167558Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=82 frame_type=Data payload_bytes=981
+2026-09-26T01:15:17.282939Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:17.283726Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=82 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:17.340187Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:17.341551Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=82 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:17.341557Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:17.341561Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=82 frame_type=Response payload_bytes=35
+2026-09-26T01:15:17.341580Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=82 frame_type=Data payload_bytes=118
+2026-09-26T01:15:17.341588Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 Event delivery acknowledged stream_id=82 completion_us=175918
+2026-09-26T01:15:17.341608Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:17.341625Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:17.394300Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=Ping payload_bytes=8
+2026-09-26T01:15:17.394321Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=0 frame_type=Pong payload_bytes=8
+2026-09-26T01:15:17.394330Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=0 frame_type=Pong payload_bytes=8
+2026-09-26T01:15:18.166276Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 body entered scheduler stream_id=84 class=Event body_bytes=17365
+2026-09-26T01:15:18.167444Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=84 frame_type=Open payload_bytes=184
+2026-09-26T01:15:18.167477Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=84 frame_type=Open payload_bytes=184
+2026-09-26T01:15:18.167488Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=84 frame_type=Data payload_bytes=8192
+2026-09-26T01:15:18.167500Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=84 frame_type=Data payload_bytes=8192
+2026-09-26T01:15:18.167507Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=84 frame_type=Data payload_bytes=8192
+2026-09-26T01:15:18.167522Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=84 frame_type=Data payload_bytes=8192
+2026-09-26T01:15:18.167529Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=84 frame_type=Data payload_bytes=981
+2026-09-26T01:15:18.167538Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=84 frame_type=Data payload_bytes=981
+2026-09-26T01:15:18.283392Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:18.283421Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=84 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:18.313729Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:18.313746Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=84 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:18.313750Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:18.340591Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=84 frame_type=Response payload_bytes=35
+2026-09-26T01:15:18.340610Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=84 frame_type=Data payload_bytes=118
+2026-09-26T01:15:18.340618Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 Event delivery acknowledged stream_id=84 completion_us=174356
+2026-09-26T01:15:18.340635Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:18.340650Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:19.164942Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 body entered scheduler stream_id=86 class=Event body_bytes=17366
+2026-09-26T01:15:19.166471Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=86 frame_type=Open payload_bytes=184
+2026-09-26T01:15:19.166501Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=86 frame_type=Open payload_bytes=184
+2026-09-26T01:15:19.166508Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=86 frame_type=Data payload_bytes=8192
+2026-09-26T01:15:19.166517Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=86 frame_type=Data payload_bytes=8192
+2026-09-26T01:15:19.166521Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=86 frame_type=Data payload_bytes=8192
+2026-09-26T01:15:19.166533Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=86 frame_type=Data payload_bytes=8192
+2026-09-26T01:15:19.166540Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=86 frame_type=Data payload_bytes=982
+2026-09-26T01:15:19.166548Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=86 frame_type=Data payload_bytes=982
+2026-09-26T01:15:19.285365Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:19.285456Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=86 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:19.315691Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:19.317488Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=86 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:19.317498Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:19.342637Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=86 frame_type=Response payload_bytes=35
+2026-09-26T01:15:19.342669Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=86 frame_type=Data payload_bytes=118
+2026-09-26T01:15:19.342684Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 Event delivery acknowledged stream_id=86 completion_us=177751
+2026-09-26T01:15:19.342714Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:19.342739Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:19.868777Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=Ping payload_bytes=8
+2026-09-26T01:15:19.868800Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=0 frame_type=Pong payload_bytes=8
+2026-09-26T01:15:19.868810Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=0 frame_type=Pong payload_bytes=8
+2026-09-26T01:15:20.166260Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 body entered scheduler stream_id=88 class=Event body_bytes=17366
+2026-09-26T01:15:20.167482Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=88 frame_type=Open payload_bytes=184
+2026-09-26T01:15:20.167501Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=88 frame_type=Open payload_bytes=184
+2026-09-26T01:15:20.167509Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=88 frame_type=Data payload_bytes=8192
+2026-09-26T01:15:20.167529Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=88 frame_type=Data payload_bytes=8192
+2026-09-26T01:15:20.167534Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=88 frame_type=Data payload_bytes=8192
+2026-09-26T01:15:20.167557Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=88 frame_type=Data payload_bytes=8192
+2026-09-26T01:15:20.167561Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=88 frame_type=Data payload_bytes=982
+2026-09-26T01:15:20.167577Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=88 frame_type=Data payload_bytes=982
+2026-09-26T01:15:20.283004Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:20.283021Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=88 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:20.340199Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:20.340213Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=88 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:20.340217Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:20.340220Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=88 frame_type=Response payload_bytes=35
+2026-09-26T01:15:20.340226Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=88 frame_type=Data payload_bytes=118
+2026-09-26T01:15:20.340232Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 Event delivery acknowledged stream_id=88 completion_us=173979
+2026-09-26T01:15:20.340244Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:20.340258Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:21.166355Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 body entered scheduler stream_id=90 class=Event body_bytes=17366
+2026-09-26T01:15:21.167466Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=90 frame_type=Open payload_bytes=184
+2026-09-26T01:15:21.167490Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=90 frame_type=Open payload_bytes=184
+2026-09-26T01:15:21.167499Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=90 frame_type=Data payload_bytes=8192
+2026-09-26T01:15:21.167511Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=90 frame_type=Data payload_bytes=8192
+2026-09-26T01:15:21.167518Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=90 frame_type=Data payload_bytes=8192
+2026-09-26T01:15:21.167537Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=90 frame_type=Data payload_bytes=8192
+2026-09-26T01:15:21.167543Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=90 frame_type=Data payload_bytes=982
+2026-09-26T01:15:21.167560Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=90 frame_type=Data payload_bytes=982
+2026-09-26T01:15:21.285009Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:21.285384Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=90 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:21.342167Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:21.342188Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=90 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:21.342193Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:21.342198Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=90 frame_type=Response payload_bytes=35
+2026-09-26T01:15:21.342205Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=90 frame_type=Data payload_bytes=118
+2026-09-26T01:15:21.342214Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 Event delivery acknowledged stream_id=90 completion_us=175870
+2026-09-26T01:15:21.342231Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:21.342248Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:22.165915Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 body entered scheduler stream_id=92 class=Event body_bytes=17366
+2026-09-26T01:15:22.166476Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=92 frame_type=Open payload_bytes=184
+2026-09-26T01:15:22.166496Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=92 frame_type=Open payload_bytes=184
+2026-09-26T01:15:22.166502Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=92 frame_type=Data payload_bytes=8192
+2026-09-26T01:15:22.166509Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=92 frame_type=Data payload_bytes=8192
+2026-09-26T01:15:22.166512Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=92 frame_type=Data payload_bytes=8192
+2026-09-26T01:15:22.166522Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=92 frame_type=Data payload_bytes=8192
+2026-09-26T01:15:22.166525Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=92 frame_type=Data payload_bytes=982
+2026-09-26T01:15:22.166531Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=92 frame_type=Data payload_bytes=982
+2026-09-26T01:15:22.283057Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:22.284487Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=92 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:22.313337Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:22.316467Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=92 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:22.316475Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:22.340196Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=92 frame_type=Response payload_bytes=35
+2026-09-26T01:15:22.340215Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=92 frame_type=Data payload_bytes=118
+2026-09-26T01:15:22.340225Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 Event delivery acknowledged stream_id=92 completion_us=174318
+2026-09-26T01:15:22.340244Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:22.340260Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:22.393670Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=Ping payload_bytes=8
+2026-09-26T01:15:22.393689Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=0 frame_type=Pong payload_bytes=8
+2026-09-26T01:15:22.393701Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=0 frame_type=Pong payload_bytes=8
+2026-09-26T01:15:23.165927Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 body entered scheduler stream_id=94 class=Event body_bytes=17366
+2026-09-26T01:15:23.168567Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=94 frame_type=Open payload_bytes=184
+2026-09-26T01:15:23.168597Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=94 frame_type=Open payload_bytes=184
+2026-09-26T01:15:23.168602Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=94 frame_type=Data payload_bytes=8192
+2026-09-26T01:15:23.168608Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=94 frame_type=Data payload_bytes=8192
+2026-09-26T01:15:23.168611Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=94 frame_type=Data payload_bytes=8192
+2026-09-26T01:15:23.168621Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=94 frame_type=Data payload_bytes=8192
+2026-09-26T01:15:23.168624Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=94 frame_type=Data payload_bytes=982
+2026-09-26T01:15:23.168630Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=94 frame_type=Data payload_bytes=982
+2026-09-26T01:15:23.284882Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:23.284964Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=94 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:23.315230Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:23.315248Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=94 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:23.315253Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:23.342113Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=94 frame_type=Response payload_bytes=35
+2026-09-26T01:15:23.344342Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=94 frame_type=Data payload_bytes=118
+2026-09-26T01:15:23.344357Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 Event delivery acknowledged stream_id=94 completion_us=178436
+2026-09-26T01:15:23.344379Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:23.344397Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:24.166152Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 body entered scheduler stream_id=96 class=Event body_bytes=17366
+2026-09-26T01:15:24.167428Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=96 frame_type=Open payload_bytes=184
+2026-09-26T01:15:24.167456Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=96 frame_type=Open payload_bytes=184
+2026-09-26T01:15:24.167464Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=96 frame_type=Data payload_bytes=8192
+2026-09-26T01:15:24.167475Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=96 frame_type=Data payload_bytes=8192
+2026-09-26T01:15:24.167480Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=96 frame_type=Data payload_bytes=8192
+2026-09-26T01:15:24.167494Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=96 frame_type=Data payload_bytes=8192
+2026-09-26T01:15:24.167500Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=96 frame_type=Data payload_bytes=982
+2026-09-26T01:15:24.167508Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=96 frame_type=Data payload_bytes=982
+2026-09-26T01:15:24.287017Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:24.289648Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=96 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:24.317542Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:24.317571Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=96 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:24.317578Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:24.344510Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=96 frame_type=Response payload_bytes=35
+2026-09-26T01:15:24.344547Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=96 frame_type=Data payload_bytes=118
+2026-09-26T01:15:24.344564Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 Event delivery acknowledged stream_id=96 completion_us=178427
+2026-09-26T01:15:24.344595Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:24.344619Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:24.869215Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=Ping payload_bytes=8
+2026-09-26T01:15:24.870545Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=0 frame_type=Pong payload_bytes=8
+2026-09-26T01:15:24.870569Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=0 frame_type=Pong payload_bytes=8
+2026-09-26T01:15:25.165545Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 body entered scheduler stream_id=98 class=Event body_bytes=17366
+2026-09-26T01:15:25.167486Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=98 frame_type=Open payload_bytes=184
+2026-09-26T01:15:25.167499Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=98 frame_type=Open payload_bytes=184
+2026-09-26T01:15:25.167504Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=98 frame_type=Data payload_bytes=8192
+2026-09-26T01:15:25.167510Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=98 frame_type=Data payload_bytes=8192
+2026-09-26T01:15:25.167513Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=98 frame_type=Data payload_bytes=8192
+2026-09-26T01:15:25.167520Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=98 frame_type=Data payload_bytes=8192
+2026-09-26T01:15:25.167523Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=98 frame_type=Data payload_bytes=982
+2026-09-26T01:15:25.167528Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=98 frame_type=Data payload_bytes=982
+2026-09-26T01:15:25.285747Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:25.285764Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=98 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:25.342405Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:25.345398Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=98 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:25.345408Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=WindowUpdate payload_bytes=4
+2026-09-26T01:15:27.369462Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=Ping payload_bytes=8
+2026-09-26T01:15:27.370531Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 selected frame stream_id=0 frame_type=Pong payload_bytes=8
+2026-09-26T01:15:27.370553Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 writer completed frame stream_id=0 frame_type=Pong payload_bytes=8
+2026-09-26T01:15:29.129588Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 received frame stream_id=0 frame_type=GoAway payload_bytes=52
+2026-09-26T01:15:29.131504Z DEBUG netbaiot_transports::business_rpc::v3: business RPC V3 frame read failed error=Io
+2026-09-26T01:15:29.131578Z  WARN netbaiot_transports::business_rpc::v3: business RPC V3 connection closed abnormally error=device unavailable

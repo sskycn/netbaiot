@@ -186,18 +186,31 @@ type PendingWrite = (
     Option<oneshot::Sender<Result<()>>>,
     Option<std::time::Instant>,
 );
-
-async fn writer_loop<W: AsyncWrite + Unpin>(
-    mut writer: W,
-    mut rx: mpsc::Receiver<WriterMessage>,
+struct WriterContext {
     limits: V3Limits,
+    send_ahead: Option<V3SendAhead>,
     timeout: Duration,
     stop: CancellationToken,
     credit_tx: mpsc::Sender<(u32, u32)>,
     metrics: Arc<Metrics>,
+}
+
+async fn writer_loop<W: AsyncWrite + Unpin>(
+    mut writer: W,
+    mut rx: mpsc::Receiver<WriterMessage>,
+    context: WriterContext,
 ) -> Result<()> {
+    let WriterContext {
+        limits,
+        send_ahead,
+        timeout,
+        stop,
+        credit_tx,
+        metrics,
+    } = context;
     let mut scheduler =
-        MuxScheduler::new(&limits, OUTBOUND_BYTES).map_err(|_| Error::Configuration)?;
+        MuxScheduler::with_send_ahead(&limits, OUTBOUND_BYTES, send_ahead.map(V3SendAhead::as_mux))
+            .map_err(|_| Error::Configuration)?;
     let mut gauge = WriterGauge {
         metrics: metrics.clone(),
         reported: 0,
@@ -233,13 +246,25 @@ async fn writer_loop<W: AsyncWrite + Unpin>(
                     queued_at.elapsed().as_micros().min(u64::MAX as u128) as u64,
                 );
             }
-            tracing::debug!(stream_id = id, frame_type = ?frame.header.frame_type, payload_bytes = frame.payload.len(), "business RPC V3 sending frame");
+            let selected_at = std::time::Instant::now();
+            if frame.header.frame_type == V3FrameType::Data {
+                metrics.add(
+                    Metric::BusinessRpcV3DataBytesSelected,
+                    frame.payload.len() as u64,
+                );
+            }
+            tracing::debug!(stream_id = id, frame_type = ?frame.header.frame_type, payload_bytes = frame.payload.len(), "business RPC V3 selected frame");
             let completed =
                 frame.header.frame_type == V3FrameType::Data && frame.header.flags == V3_END_STREAM;
             let sent = netbaiot_v3_mux::write_frame(&mut writer, &frame, timeout)
                 .await
                 .map_err(|_| Error::Unavailable);
             if sent.is_ok() {
+                metrics.observe(
+                    Histogram::BusinessRpcV3WriterWait,
+                    selected_at.elapsed().as_micros().min(u64::MAX as u128) as u64,
+                );
+                tracing::debug!(stream_id = id, frame_type = ?frame.header.frame_type, payload_bytes = frame.payload.len(), "business RPC V3 writer completed frame");
                 metrics.inc(Metric::BusinessRpcV3FramesSent);
                 if frame.header.frame_type == V3FrameType::Data {
                     metrics.add(
@@ -279,6 +304,10 @@ async fn writer_loop<W: AsyncWrite + Unpin>(
         }
         if stream_stall {
             metrics.inc(Metric::BusinessRpcV3StreamWindowStalls);
+        }
+        let (connection_ahead_stall, stream_ahead_stall) = scheduler.stalled_send_ahead();
+        if connection_ahead_stall || stream_ahead_stall {
+            metrics.inc(Metric::BusinessRpcV3SendAheadStalls);
         }
         if let Some((frame, done, deadline)) = goaway.take() {
             // The reader has stopped admitting streams. Drain frames already queued by its
@@ -327,6 +356,7 @@ fn apply_writer_message(
             done,
             _permit,
         } => {
+            tracing::debug!(stream_id = id, class = ?class, body_bytes = body.len(), "business RPC V3 body entered scheduler");
             scheduler
                 .queue_body(id, class, body)
                 .map_err(|_| Error::Overloaded)?;
@@ -428,9 +458,21 @@ pub(super) async fn connection(
         let metrics = metrics.clone();
         let limits = limits.clone();
         let timeout = config.write_timeout;
+        let send_ahead = config.v3_send_ahead;
         async move {
-            let result =
-                writer_loop(writer, rx, limits, timeout, writer_stop, credit_tx, metrics).await;
+            let result = writer_loop(
+                writer,
+                rx,
+                WriterContext {
+                    limits,
+                    send_ahead,
+                    timeout,
+                    stop: writer_stop,
+                    credit_tx,
+                    metrics,
+                },
+            )
+            .await;
             writer_closed.cancel();
             result
         }
@@ -466,6 +508,7 @@ pub(super) async fn connection(
 
 struct PendingEvent {
     id: u32,
+    queued_at: std::time::Instant,
     delivery_id: netbaiot_core::DeliveryId,
     event_id: netbaiot_core::EventId,
     result: oneshot::Sender<std::result::Result<SinkAck, SinkError>>,
@@ -578,6 +621,11 @@ fn complete_response(
                     && ack.event_id == event.event_id.0
             });
         if success {
+            tracing::debug!(
+                stream_id = id,
+                completion_us = event.queued_at.elapsed().as_micros(),
+                "business RPC V3 Event delivery acknowledged"
+            );
             services.ingress.metrics.inc(Metric::BusinessRpcEventAcks);
             if let Some(started) = event.started {
                 services.ingress.metrics.observe(
@@ -839,7 +887,7 @@ async fn reader_loop<R: AsyncRead + Unpin + Send + 'static>(
                     Err(_) => { close_stream!(id); let _ = delivery.result.send(Err(SinkError::Retryable)); send(&tx, reset(id, V3ResetCode::Overloaded, &limits)?)?; continue; }
                 };
                 streams.mark_local_end(id).map_err(|_| Error::Invalid)?;
-                pending_event = Some(PendingEvent { id, delivery_id, event_id, result: delivery.result, written: Some(written), deadline: None, started: None });
+                pending_event = Some(PendingEvent { id, queued_at: std::time::Instant::now(), delivery_id, event_id, result: delivery.result, written: Some(written), deadline: None, started: None });
             }
             frame = frames.recv() => {
                 let frame = match frame { Some(Ok(frame)) => frame, Some(Err(error)) => {
@@ -1059,4 +1107,60 @@ async fn reader_loop<R: AsyncRead + Unpin + Send + 'static>(
     }
     drop(provider);
     result
+}
+
+#[cfg(test)]
+mod send_ahead_tests {
+    use super::*;
+
+    #[tokio::test(start_paused = true)]
+    async fn exhausted_send_ahead_waits_for_a_wake_source() {
+        let limits = V3Limits::default();
+        let metrics = Arc::new(Metrics::default());
+        let (writer, mut reader) = tokio::io::duplex(32 * 1024);
+        let (tx, rx) = mpsc::channel(8);
+        let (credit_tx, _credit_rx) = mpsc::channel(8);
+        let stop = CancellationToken::new();
+        let task = tokio::spawn(writer_loop(
+            writer,
+            rx,
+            WriterContext {
+                limits: limits.clone(),
+                send_ahead: Some(V3SendAhead {
+                    stream_bytes: 8192,
+                    connection_bytes: 8192,
+                }),
+                timeout: Duration::from_secs(5),
+                stop: stop.clone(),
+                credit_tx,
+                metrics: metrics.clone(),
+            },
+        ));
+        let permit = Arc::new(Semaphore::new(20_000))
+            .try_acquire_many_owned(20_000)
+            .unwrap();
+        tx.send(WriterMessage::Body {
+            id: 2,
+            class: DataClass::Event,
+            body: Bytes::from(vec![1; 20_000]),
+            done: None,
+            _permit: permit,
+        })
+        .await
+        .unwrap();
+        let first = netbaiot_v3_mux::read_frame(&mut reader, 8192, Duration::from_secs(5))
+            .await
+            .unwrap();
+        assert_eq!(first.payload.len(), 8192);
+        tokio::task::yield_now().await;
+        tokio::time::advance(Duration::from_secs(60)).await;
+        tokio::task::yield_now().await;
+        assert!(
+            metrics
+                .render()
+                .contains("netbaiot_business_rpc_v3_send_ahead_stalls_total 1\n")
+        );
+        stop.cancel();
+        assert!(task.await.unwrap().is_ok());
+    }
 }

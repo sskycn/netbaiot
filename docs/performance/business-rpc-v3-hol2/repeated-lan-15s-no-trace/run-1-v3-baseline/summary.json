@@ -1,0 +1,61 @@
+{
+  "mode": "v3-8192",
+  "source": "docs/performance/business-rpc-v3-hol2/repeated-lan-15s-no-trace/run-1-v3-baseline",
+  "sample_count": 402,
+  "auth_latency_ms": {
+    "max": 10003.0,
+    "p50": 0.46,
+    "p95": 1.28,
+    "p99": 4560.0
+  },
+  "auth_per_second": 22.003913608192352,
+  "event_acks": 15,
+  "event_throughput_payload_bytes_per_second": 16384.0,
+  "event_completion_ms": {
+    "count": 0,
+    "p50": null,
+    "p95": null
+  },
+  "cpu_percent": 0.7153846153846156,
+  "rss_peak_kb": 9760,
+  "event_streams": 0,
+  "competing_event_streams": 0,
+  "interleaved_event_streams": 0,
+  "wire_interleaved_event_streams": null,
+  "preemption_ms": {
+    "count": 0,
+    "p50": null,
+    "p95": null,
+    "max": null
+  },
+  "socket_send_buffer_bytes": null,
+  "socket_accepted_bytes": 0,
+  "socket_write_calls": 0,
+  "v3_metrics": {
+    "business_rpc_v3_connections_total": 1.0,
+    "business_rpc_v3_abnormal_closures_total": 1.0,
+    "business_rpc_v3_streams_opened_total": 420.0,
+    "business_rpc_v3_streams_reset_total": 0.0,
+    "business_rpc_v3_frames_sent_total": 1294.0,
+    "business_rpc_v3_frames_received_total": 1326.0,
+    "business_rpc_v3_data_bytes_sent_total": 357160.0,
+    "business_rpc_v3_data_bytes_selected_total": 357160.0,
+    "business_rpc_v3_data_bytes_received_total": 88374.0,
+    "business_rpc_v3_connection_window_stalls_total": 0.0,
+    "business_rpc_v3_stream_window_stalls_total": 0.0,
+    "business_rpc_v3_send_ahead_stalls_total": 0.0,
+    "business_rpc_v3_overloads_total": 0.0,
+    "business_rpc_v3_protocol_errors_total": 0.0,
+    "business_rpc_v3_active_connections": 0.0,
+    "business_rpc_v3_active_streams": 0.0,
+    "business_rpc_v3_queued_bytes": 0.0,
+    "business_rpc_v3_reassembly_reserved_bytes": 0.0,
+    "business_rpc_v3_peak_active_streams": 7.0,
+    "business_rpc_v3_peak_queued_bytes": 17562.0,
+    "business_rpc_v3_peak_reassembly_reserved_bytes": 642.0,
+    "business_rpc_v3_scheduler_wait_us_count": 418.0,
+    "business_rpc_v3_scheduler_wait_us_sum": 4590.0,
+    "business_rpc_v3_writer_wait_us_count": 1294.0,
+    "business_rpc_v3_writer_wait_us_sum": 8718.0
+  }
+}

@@ -114,6 +114,8 @@ async fn real_socket_v3_provider_event_and_invalidation() {
     config.business_rpc = Some(BusinessRpcConfig {
         version: 2,
         v3: Some(V3Limits::default()),
+        v3_send_ahead: None,
+        v3_experiment_socket_send_buffer_bytes: None,
         tls: None,
         identities: Vec::new(),
         development_token_env: Some("NETBAIOT_BUSINESS_RPC_TOKEN".into()),
@@ -297,6 +299,8 @@ async fn v3_hello_is_rejected_when_v3_is_disabled() {
     config.business_rpc = Some(BusinessRpcConfig {
         version: 2,
         v3: None,
+        v3_send_ahead: None,
+        v3_experiment_socket_send_buffer_bytes: None,
         tls: None,
         identities: Vec::new(),
         development_token_env: Some("NETBAIOT_BUSINESS_RPC_TOKEN".into()),
@@ -390,6 +394,8 @@ async fn v3_mtls_authenticates_before_role_free_stream_authorization() {
     config.business_rpc = Some(BusinessRpcConfig {
         version: 2,
         v3: Some(V3Limits::default()),
+        v3_send_ahead: None,
+        v3_experiment_socket_send_buffer_bytes: None,
         tls: Some(ManagementTlsFiles {
             certificate: fixtures.join("localhost-cert.pem").to_string_lossy().into(),
             private_key: fixtures.join("localhost-key.pem").to_string_lossy().into(),

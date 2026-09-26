@@ -75,9 +75,11 @@ pub enum Metric {
     BusinessRpcV3FramesSent,
     BusinessRpcV3FramesReceived,
     BusinessRpcV3DataBytesSent,
+    BusinessRpcV3DataBytesSelected,
     BusinessRpcV3DataBytesReceived,
     BusinessRpcV3ConnectionWindowStalls,
     BusinessRpcV3StreamWindowStalls,
+    BusinessRpcV3SendAheadStalls,
     BusinessRpcV3Overloads,
     BusinessRpcV3ProtocolErrors,
 }
@@ -99,7 +101,7 @@ pub enum BusinessRpcCallResult {
     Invalid,
 }
 
-const NAMES: [&str; 75] = [
+const NAMES: [&str; 77] = [
     "connections_accepted",
     "connections_rejected",
     "mqtt_connect_success",
@@ -170,9 +172,11 @@ const NAMES: [&str; 75] = [
     "business_rpc_v3_frames_sent",
     "business_rpc_v3_frames_received",
     "business_rpc_v3_data_bytes_sent",
+    "business_rpc_v3_data_bytes_selected",
     "business_rpc_v3_data_bytes_received",
     "business_rpc_v3_connection_window_stalls",
     "business_rpc_v3_stream_window_stalls",
+    "business_rpc_v3_send_ahead_stalls",
     "business_rpc_v3_overloads",
     "business_rpc_v3_protocol_errors",
 ];
@@ -233,9 +237,10 @@ pub enum Histogram {
     BusinessRpcRemoteWait,
     BusinessRpcQueueWait,
     BusinessRpcV3SchedulerWait,
+    BusinessRpcV3WriterWait,
 }
 
-const HISTOGRAM_NAMES: [&str; 22] = [
+const HISTOGRAM_NAMES: [&str; 23] = [
     "mqtt_protocol_validation_us",
     "validation_to_admission_us",
     "admission_wait_us",
@@ -258,6 +263,7 @@ const HISTOGRAM_NAMES: [&str; 22] = [
     "business_rpc_remote_wait_us",
     "business_rpc_queue_wait_us",
     "business_rpc_v3_scheduler_wait_us",
+    "business_rpc_v3_writer_wait_us",
 ];
 const BOUNDS: [u64; 16] = [
     10, 25, 50, 100, 250, 500, 1_000, 2_500, 5_000, 10_000, 25_000, 50_000, 100_000, 500_000,

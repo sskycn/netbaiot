@@ -10,6 +10,7 @@ use netbaiot_transports::{
     Services,
     business_rpc::{
         self, BusinessIdentity, BusinessPrincipal, BusinessRpcServices, BusinessRpcTransportConfig,
+        V3SendAhead,
     },
     mqtt::broker::MqttBroker,
     serve_device_ingress, serve_management_http,
@@ -95,6 +96,11 @@ pub struct BusinessRpcConfig {
     /// V3 is available on the same listener only when explicitly configured.
     #[serde(default)]
     pub v3: Option<business_rpc_v3::V3Limits>,
+    /// Local sender policy, separate from the negotiated V3 receive windows.
+    #[serde(default)]
+    pub v3_send_ahead: Option<V3SendAhead>,
+    #[serde(default)]
+    pub v3_experiment_socket_send_buffer_bytes: Option<usize>,
     pub tls: Option<ManagementTlsFiles>,
     #[serde(default)]
     pub identities: Vec<BusinessRpcIdentityConfig>,
@@ -210,6 +216,16 @@ impl Config {
         if let Some(rpc) = &self.business_rpc {
             if rpc.version != BUSINESS_RPC_VERSION
                 || rpc.v3.as_ref().is_some_and(|v3| v3.validate().is_err())
+                || rpc.v3_send_ahead.is_some_and(|policy| {
+                    rpc.v3
+                        .as_ref()
+                        .is_none_or(|limits| policy.as_mux().validate(limits).is_err())
+                })
+                || rpc
+                    .v3_experiment_socket_send_buffer_bytes
+                    .is_some_and(|size| {
+                        rpc.v3.is_none() || !(4096..=4 * 1024 * 1024).contains(&size)
+                    })
                 || self.business_tcp.is_none()
                 || rpc.max_connections == 0
                 || rpc.auth_max_inflight == 0
@@ -1125,6 +1141,8 @@ pub async fn run_with_credentials(
                 identity,
                 tls,
                 v3: rpc.v3.clone(),
+                v3_send_ahead: rpc.v3_send_ahead,
+                v3_experiment_socket_send_buffer_bytes: rpc.v3_experiment_socket_send_buffer_bytes,
                 max_connections: rpc.max_connections,
                 max_frame_bytes: 8 * 1024 * 1024,
                 auth_max_inflight: rpc.auth_max_inflight,
@@ -1443,6 +1461,25 @@ mod reliability_tests {
         limits.initial_connection_window_bytes = limits.initial_stream_window_bytes - 1;
         config.business_rpc.as_mut().unwrap().v3 = Some(limits);
         assert!(config.validate().is_err());
+
+        let rpc = config.business_rpc.as_mut().unwrap();
+        rpc.v3 = Some(business_rpc_v3::V3Limits::default());
+        rpc.v3_send_ahead = Some(V3SendAhead {
+            stream_bytes: 1,
+            connection_bytes: 8192,
+        });
+        assert!(config.validate().is_err());
+        config.business_rpc.as_mut().unwrap().v3_send_ahead = Some(V3SendAhead {
+            stream_bytes: 8192,
+            connection_bytes: 131072,
+        });
+        assert!(config.validate().is_ok());
+        config
+            .business_rpc
+            .as_mut()
+            .unwrap()
+            .v3_experiment_socket_send_buffer_bytes = Some(1);
+        assert!(config.validate().is_err());
     }
 
     #[test]
@@ -1458,6 +1495,8 @@ mod reliability_tests {
             config.business_rpc = Some(BusinessRpcConfig {
                 version: 2,
                 v3: None,
+                v3_send_ahead: None,
+                v3_experiment_socket_send_buffer_bytes: None,
                 tls: Some(ManagementTlsFiles {
                     certificate: "cert".into(),
                     private_key: "key".into(),

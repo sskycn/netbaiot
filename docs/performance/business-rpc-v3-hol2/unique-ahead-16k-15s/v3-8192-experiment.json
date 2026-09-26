@@ -1,0 +1,54 @@
+{
+  "git_sha": "4d3583b1e6e4d57e5cfa8f8a94e3ee7b0aa43ea2",
+  "gateway_config": {
+    "version": 2,
+    "v3": {
+      "max_frame_payload_bytes": 8192,
+      "max_concurrent_streams": 256,
+      "initial_stream_window_bytes": 262144,
+      "initial_connection_window_bytes": 4194304,
+      "heartbeat_ms": 5000
+    },
+    "v3_send_ahead": {
+      "stream_bytes": 16384,
+      "connection_bytes": 131072
+    },
+    "v3_experiment_socket_send_buffer_bytes": null,
+    "tls": null,
+    "development_token_env": "NETBAIOT_BUSINESS_RPC_TOKEN"
+  },
+  "load_config": {
+    "scenario": "multiplexed",
+    "business_address": "127.0.0.1:56874",
+    "topology": "v3",
+    "frame_payload_bytes": 8192,
+    "stream_window_bytes": null,
+    "network_profile": "user_proxy",
+    "device_address": "127.0.0.1:56871",
+    "udp_address": "127.0.0.1:56871",
+    "management_url": "http://127.0.0.1:56872",
+    "duration_secs": 15,
+    "auth_concurrency": 4,
+    "auth_unique_devices": true,
+    "auth_handler_delay_ms": 0,
+    "event_rate": 1,
+    "event_payload_bytes": 16384,
+    "event_ack_delay_ms": 0,
+    "event_reconnect_every_secs": 0,
+    "auth_reconnect_every_secs": 0,
+    "invalidate_every_secs": 0,
+    "verifier_rate": 0,
+    "reconnect_cycles": 10,
+    "reconnect_pause_ms": 0,
+    "sample_period_ms": 250,
+    "warmup_secs": 2,
+    "recovery_secs": 2
+  },
+  "proxy": {
+    "delay_ms_per_read_per_direction": 25,
+    "bytes_per_second_per_direction": 32768,
+    "read_limit_bytes": 16384
+  },
+  "os": "Darwin",
+  "arch": "arm64"
+}

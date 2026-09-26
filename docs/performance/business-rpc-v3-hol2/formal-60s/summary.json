@@ -1,0 +1,446 @@
+{
+  "duration_secs": 60,
+  "repeat": 3,
+  "bytes_per_second": 32768,
+  "delay_ms_per_read_per_direction": 25,
+  "event_rate": 1,
+  "auth_concurrency": 4,
+  "fresh_identities": true,
+  "failures": [],
+  "variants": {
+    "multiplexed": {
+      "runs": 3,
+      "sample_counts": [
+        913,
+        911,
+        891
+      ],
+      "auth_success": [
+        913,
+        911,
+        891
+      ],
+      "auth_rejected": [
+        0,
+        0,
+        0
+      ],
+      "auth_timeout": [
+        0,
+        0,
+        0
+      ],
+      "provider_calls": [
+        914,
+        912,
+        892
+      ],
+      "p50_ms": {
+        "count": 3,
+        "median": 147.0,
+        "min": 142.0,
+        "max": 147.0
+      },
+      "p95_ms": {
+        "count": 3,
+        "median": 693.0,
+        "min": 684.0,
+        "max": 695.0
+      },
+      "p99_ms": {
+        "count": 3,
+        "median": 720.0,
+        "min": 719.0,
+        "max": 721.0
+      },
+      "auth_per_second": {
+        "count": 3,
+        "median": 14.571499708886908,
+        "min": 14.2515643905283,
+        "max": 14.604792865301116
+      },
+      "event_payload_bytes_per_second": {
+        "count": 3,
+        "median": 16384.0,
+        "min": 16384.0,
+        "max": 16384.0
+      },
+      "cpu_percent": {
+        "count": 3,
+        "median": 0.8978448275862065,
+        "min": 0.809913793103448,
+        "max": 0.9254310344827582
+      },
+      "rss_peak_kb": {
+        "count": 3,
+        "median": 14176,
+        "min": 11920,
+        "max": 15408
+      }
+    },
+    "dual": {
+      "runs": 3,
+      "sample_counts": [
+        1626,
+        1425,
+        1268
+      ],
+      "auth_success": [
+        1626,
+        1425,
+        1268
+      ],
+      "auth_rejected": [
+        0,
+        0,
+        0
+      ],
+      "auth_timeout": [
+        0,
+        0,
+        0
+      ],
+      "provider_calls": [
+        1627,
+        1426,
+        1269
+      ],
+      "p50_ms": {
+        "count": 3,
+        "median": 169.0,
+        "min": 148.0,
+        "max": 190.0
+      },
+      "p95_ms": {
+        "count": 3,
+        "median": 171.0,
+        "min": 150.0,
+        "max": 194.0
+      },
+      "p99_ms": {
+        "count": 3,
+        "median": 171.0,
+        "min": 151.0,
+        "max": 195.0
+      },
+      "auth_per_second": {
+        "count": 3,
+        "median": 22.79519615568052,
+        "min": 20.201284370735866,
+        "max": 25.904192462923533
+      },
+      "event_payload_bytes_per_second": {
+        "count": 3,
+        "median": 16384.0,
+        "min": 16384.0,
+        "max": 16384.0
+      },
+      "cpu_percent": {
+        "count": 3,
+        "median": 1.7732758620689664,
+        "min": 1.0336206896551725,
+        "max": 1.8400862068965516
+      },
+      "rss_peak_kb": {
+        "count": 3,
+        "median": 15072,
+        "min": 14496,
+        "max": 15328
+      }
+    },
+    "v3-baseline": {
+      "runs": 3,
+      "sample_counts": [
+        695,
+        671,
+        721
+      ],
+      "auth_success": [
+        695,
+        671,
+        721
+      ],
+      "auth_rejected": [
+        0,
+        0,
+        0
+      ],
+      "auth_timeout": [
+        0,
+        0,
+        0
+      ],
+      "provider_calls": [
+        696,
+        672,
+        722
+      ],
+      "p50_ms": {
+        "count": 3,
+        "median": 193.0,
+        "min": 192.0,
+        "max": 196.0
+      },
+      "p95_ms": {
+        "count": 3,
+        "median": 721.0,
+        "min": 707.0,
+        "max": 733.0
+      },
+      "p99_ms": {
+        "count": 3,
+        "median": 734.0,
+        "min": 724.0,
+        "max": 740.0
+      },
+      "auth_per_second": {
+        "count": 3,
+        "median": 11.028560236758576,
+        "min": 10.732565543308164,
+        "max": 11.488713611184322
+      },
+      "event_payload_bytes_per_second": {
+        "count": 3,
+        "median": 16384.0,
+        "min": 16384.0,
+        "max": 16384.0
+      },
+      "cpu_percent": {
+        "count": 3,
+        "median": 0.7012931034482753,
+        "min": 0.6043103448275857,
+        "max": 0.8396551724137931
+      },
+      "rss_peak_kb": {
+        "count": 3,
+        "median": 11776,
+        "min": 11504,
+        "max": 12256
+      },
+      "event_completion_p50_ms": {
+        "count": 3,
+        "median": 763.415,
+        "min": 763.045,
+        "max": 764.176
+      },
+      "event_completion_p95_ms": {
+        "count": 3,
+        "median": 803.86,
+        "min": 797.927,
+        "max": 806.109
+      },
+      "competing_event_streams": [
+        0,
+        1,
+        0
+      ],
+      "interleaved_event_streams": [
+        0,
+        1,
+        0
+      ],
+      "preemption_p95_ms": {
+        "count": 1,
+        "median": 0.19598007202148438,
+        "min": 0.19598007202148438,
+        "max": 0.19598007202148438
+      }
+    },
+    "v3-ahead-8192": {
+      "runs": 3,
+      "sample_counts": [
+        745,
+        779,
+        812
+      ],
+      "auth_success": [
+        745,
+        779,
+        812
+      ],
+      "auth_rejected": [
+        0,
+        0,
+        0
+      ],
+      "auth_timeout": [
+        0,
+        0,
+        0
+      ],
+      "provider_calls": [
+        746,
+        780,
+        813
+      ],
+      "p50_ms": {
+        "count": 3,
+        "median": 355.0,
+        "min": 352.0,
+        "max": 358.0
+      },
+      "p95_ms": {
+        "count": 3,
+        "median": 449.0,
+        "min": 448.0,
+        "max": 453.0
+      },
+      "p99_ms": {
+        "count": 3,
+        "median": 450.0,
+        "min": 449.0,
+        "max": 454.0
+      },
+      "auth_per_second": {
+        "count": 3,
+        "median": 12.460289558428027,
+        "min": 11.915647293544867,
+        "max": 12.88479660263336
+      },
+      "event_payload_bytes_per_second": {
+        "count": 3,
+        "median": 16384.0,
+        "min": 16384.0,
+        "max": 16384.0
+      },
+      "cpu_percent": {
+        "count": 3,
+        "median": 0.884051724137931,
+        "min": 0.697413793103448,
+        "max": 1.0853448275862068
+      },
+      "rss_peak_kb": {
+        "count": 3,
+        "median": 11920,
+        "min": 11744,
+        "max": 12304
+      },
+      "event_completion_p50_ms": {
+        "count": 3,
+        "median": 849.998,
+        "min": 847.246,
+        "max": 880.882
+      },
+      "event_completion_p95_ms": {
+        "count": 3,
+        "median": 1013.405,
+        "min": 961.82,
+        "max": 1014.768
+      },
+      "competing_event_streams": [
+        60,
+        60,
+        60
+      ],
+      "interleaved_event_streams": [
+        60,
+        60,
+        60
+      ],
+      "preemption_p95_ms": {
+        "count": 3,
+        "median": 0.23698806762695312,
+        "min": 0.2129077911376953,
+        "max": 0.2548694610595703
+      }
+    },
+    "v3-ahead-16384": {
+      "runs": 3,
+      "sample_counts": [
+        721,
+        725,
+        741
+      ],
+      "auth_success": [
+        721,
+        725,
+        741
+      ],
+      "auth_rejected": [
+        0,
+        0,
+        0
+      ],
+      "auth_timeout": [
+        0,
+        0,
+        0
+      ],
+      "provider_calls": [
+        722,
+        726,
+        742
+      ],
+      "p50_ms": {
+        "count": 3,
+        "median": 193.0,
+        "min": 192.0,
+        "max": 196.0
+      },
+      "p95_ms": {
+        "count": 3,
+        "median": 643.0,
+        "min": 640.0,
+        "max": 643.0
+      },
+      "p99_ms": {
+        "count": 3,
+        "median": 669.0,
+        "min": 648.0,
+        "max": 674.0
+      },
+      "auth_per_second": {
+        "count": 3,
+        "median": 11.55008573475463,
+        "min": 11.532646667643803,
+        "max": 11.761070635972454
+      },
+      "event_payload_bytes_per_second": {
+        "count": 3,
+        "median": 16384.0,
+        "min": 16384.0,
+        "max": 16384.0
+      },
+      "cpu_percent": {
+        "count": 3,
+        "median": 0.5607758620689653,
+        "min": 0.5577586206896548,
+        "max": 0.7081896551724138
+      },
+      "rss_peak_kb": {
+        "count": 3,
+        "median": 11504,
+        "min": 11424,
+        "max": 11680
+      },
+      "event_completion_p50_ms": {
+        "count": 3,
+        "median": 705.41,
+        "min": 705.084,
+        "max": 707.82
+      },
+      "event_completion_p95_ms": {
+        "count": 3,
+        "median": 737.654,
+        "min": 731.814,
+        "max": 784.856
+      },
+      "competing_event_streams": [
+        59,
+        60,
+        59
+      ],
+      "interleaved_event_streams": [
+        59,
+        60,
+        59
+      ],
+      "preemption_p95_ms": {
+        "count": 3,
+        "median": 0.202178955078125,
+        "min": 0.17309188842773438,
+        "max": 0.25200843811035156
+      }
+    }
+  }
+}

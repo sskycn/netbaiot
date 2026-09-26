@@ -1,0 +1,14 @@
+   Compiling smallvec v1.15.2
+   Compiling syn v3.0.4
+   Compiling parking_lot_core v0.9.12
+   Compiling parking_lot v0.12.5
+   Compiling serde_derive v1.0.229
+   Compiling thiserror-impl v2.0.20
+   Compiling tokio-macros v2.7.2
+   Compiling tokio v1.53.1
+   Compiling thiserror v2.0.20
+   Compiling serde v1.0.229
+   Compiling netbaiot-protocol v0.2.1 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-protocol)
+   Compiling netbaiot-v3-mux v0.2.1 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-v3-mux)
+    Finished `bench` profile [optimized] target(s) in 9.09s
+     Running benches/send_ahead.rs (target/release/deps/send_ahead-7862f19e5ed5ddd7)

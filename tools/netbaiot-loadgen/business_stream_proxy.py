@@ -81,6 +81,7 @@ async def main():
                             sink.write_eof()
                             await sink.drain()
                         return
+                    read_chunk_bytes = len(chunk)
                     if capture:
                         remaining = max(0, 2 * 1024 * 1024 - capture_seen)
                         capture_buffer.extend(chunk[:remaining])
@@ -103,6 +104,8 @@ async def main():
                                     if len(capture_buffer) < 12 + length:
                                         break
                                     output.write(json.dumps({
+                                        "observed_at_ns": time.monotonic_ns(),
+                                        "read_chunk_bytes": read_chunk_bytes,
                                         "stream_id": int.from_bytes(capture_buffer[4:8], "big"),
                                         "frame_type": capture_buffer[8],
                                         "flags": capture_buffer[9],

@@ -1,0 +1,208 @@
+{
+  "duration_secs": 15,
+  "repeat": 3,
+  "bytes_per_second": 262144,
+  "delay_ms_per_read_per_direction": 25,
+  "event_rate": 2,
+  "auth_concurrency": 16,
+  "fresh_identities": true,
+  "failures": [],
+  "variants": {
+    "v3-baseline": {
+      "runs": 3,
+      "sample_counts": [
+        460,
+        462,
+        461
+      ],
+      "auth_success": [
+        460,
+        460,
+        461
+      ],
+      "auth_rejected": [
+        0,
+        0,
+        0
+      ],
+      "auth_timeout": [
+        0,
+        2,
+        0
+      ],
+      "provider_calls": [
+        461,
+        462,
+        462
+      ],
+      "p50_ms": {
+        "count": 3,
+        "median": 149.0,
+        "min": 132.0,
+        "max": 185.0
+      },
+      "p95_ms": {
+        "count": 3,
+        "median": 2043.0,
+        "min": 2013.0,
+        "max": 2129.0
+      },
+      "p99_ms": {
+        "count": 3,
+        "median": 5315.0,
+        "min": 5088.0,
+        "max": 5951.0
+      },
+      "auth_per_second": {
+        "count": 3,
+        "median": 22.978909956441978,
+        "min": 22.793846398690473,
+        "max": 23.892655379342674
+      },
+      "event_payload_bytes_per_second": {
+        "count": 3,
+        "median": 32768.0,
+        "min": 32768.0,
+        "max": 32768.0
+      },
+      "cpu_percent": {
+        "count": 3,
+        "median": 2.036538461538461,
+        "min": 1.330769230769231,
+        "max": 2.048076923076923
+      },
+      "rss_peak_kb": {
+        "count": 3,
+        "median": 11408,
+        "min": 11088,
+        "max": 12080
+      },
+      "event_completion_p50_ms": {
+        "count": 3,
+        "median": 182.925,
+        "min": 178.641,
+        "max": 205.235
+      },
+      "event_completion_p95_ms": {
+        "count": 3,
+        "median": 212.795,
+        "min": 208.282,
+        "max": 239.743
+      },
+      "competing_event_streams": [
+        1,
+        4,
+        1
+      ],
+      "interleaved_event_streams": [
+        0,
+        4,
+        1
+      ],
+      "preemption_p95_ms": {
+        "count": 3,
+        "median": 0.07009506225585938,
+        "min": 0.034809112548828125,
+        "max": 0.1361370086669922
+      }
+    },
+    "v3-ahead-16384": {
+      "runs": 3,
+      "sample_counts": [
+        461,
+        459,
+        456
+      ],
+      "auth_success": [
+        461,
+        459,
+        455
+      ],
+      "auth_rejected": [
+        0,
+        0,
+        0
+      ],
+      "auth_timeout": [
+        0,
+        0,
+        1
+      ],
+      "provider_calls": [
+        462,
+        460,
+        456
+      ],
+      "p50_ms": {
+        "count": 3,
+        "median": 141.0,
+        "min": 126.0,
+        "max": 219.0
+      },
+      "p95_ms": {
+        "count": 3,
+        "median": 1927.0,
+        "min": 1912.0,
+        "max": 2109.0
+      },
+      "p99_ms": {
+        "count": 3,
+        "median": 4810.0,
+        "min": 4460.0,
+        "max": 6731.0
+      },
+      "auth_per_second": {
+        "count": 3,
+        "median": 21.19086274252786,
+        "min": 21.085897376344942,
+        "max": 23.61957745009087
+      },
+      "event_payload_bytes_per_second": {
+        "count": 3,
+        "median": 32768.0,
+        "min": 32768.0,
+        "max": 32768.0
+      },
+      "cpu_percent": {
+        "count": 3,
+        "median": 2.0192307692307696,
+        "min": 0.9192307692307694,
+        "max": 2.5269230769230764
+      },
+      "rss_peak_kb": {
+        "count": 3,
+        "median": 11664,
+        "min": 11424,
+        "max": 12160
+      },
+      "event_completion_p50_ms": {
+        "count": 3,
+        "median": 262.48,
+        "min": 256.419,
+        "max": 271.871
+      },
+      "event_completion_p95_ms": {
+        "count": 3,
+        "median": 291.222,
+        "min": 282.441,
+        "max": 642.752
+      },
+      "competing_event_streams": [
+        14,
+        16,
+        18
+      ],
+      "interleaved_event_streams": [
+        14,
+        16,
+        18
+      ],
+      "preemption_p95_ms": {
+        "count": 3,
+        "median": 0.2238750457763672,
+        "min": 0.13113021850585938,
+        "max": 228.64484786987305
+      }
+    }
+  }
+}

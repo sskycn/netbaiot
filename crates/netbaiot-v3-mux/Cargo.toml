@@ -17,3 +17,7 @@ workspace = true
 
 [dev-dependencies]
 uuid.workspace = true
+
+[[bench]]
+name = "send_ahead"
+harness = false

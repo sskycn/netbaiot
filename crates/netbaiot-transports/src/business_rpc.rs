@@ -17,20 +17,22 @@ use netbaiot_runtime::{
     SinkAck, SinkError,
     metrics::{BusinessRpcQueueClass, Histogram, Metric, Metrics},
 };
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
     collections::HashMap,
     net::SocketAddr,
+    pin::Pin,
     sync::{
         Arc, Mutex,
         atomic::{AtomicBool, AtomicU64, Ordering},
     },
+    task::{Context, Poll},
     time::Duration,
 };
 use subtle::ConstantTimeEq;
 use tokio::{
-    io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
+    io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, ReadBuf},
     net::{TcpListener, TcpStream},
     sync::{OwnedSemaphorePermit, Semaphore, mpsc, oneshot},
     task::JoinSet,
@@ -41,6 +43,59 @@ use uuid::Uuid;
 
 trait Io: AsyncRead + AsyncWrite + Unpin + Send {}
 impl<T: AsyncRead + AsyncWrite + Unpin + Send> Io for T {}
+
+/// Experiment-only observation at the Tokio socket boundary. `Ready(Ok(n))` means
+/// the socket accepted `n` bytes, not that the peer received or ACKed them.
+struct ObservedSocket {
+    inner: TcpStream,
+    trace: bool,
+}
+impl AsyncRead for ObservedSocket {
+    fn poll_read(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<std::io::Result<()>> {
+        Pin::new(&mut self.inner).poll_read(cx, buf)
+    }
+}
+impl AsyncWrite for ObservedSocket {
+    fn poll_write(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<std::io::Result<usize>> {
+        let result = Pin::new(&mut self.inner).poll_write(cx, buf);
+        if self.trace
+            && let Poll::Ready(Ok(bytes)) = &result
+        {
+            tracing::debug!(bytes, "business RPC socket accepted write bytes");
+        }
+        result
+    }
+    fn poll_write_vectored(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        bufs: &[std::io::IoSlice<'_>],
+    ) -> Poll<std::io::Result<usize>> {
+        let result = Pin::new(&mut self.inner).poll_write_vectored(cx, bufs);
+        if self.trace
+            && let Poll::Ready(Ok(bytes)) = &result
+        {
+            tracing::debug!(bytes, "business RPC socket accepted vectored write bytes");
+        }
+        result
+    }
+    fn is_write_vectored(&self) -> bool {
+        self.inner.is_write_vectored()
+    }
+    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+        Pin::new(&mut self.inner).poll_flush(cx)
+    }
+    fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+        Pin::new(&mut self.inner).poll_shutdown(cx)
+    }
+}
 
 struct ActiveBusinessConnection(Arc<Metrics>);
 impl Drop for ActiveBusinessConnection {
@@ -114,6 +169,9 @@ pub struct BusinessRpcTransportConfig {
     pub identity: BusinessIdentity,
     pub tls: Option<TlsAcceptor>,
     pub v3: Option<netbaiot_core::business_rpc_v3::V3Limits>,
+    pub v3_send_ahead: Option<V3SendAhead>,
+    /// Experiment only: OS socket send buffer request, outside the V3 protocol.
+    pub v3_experiment_socket_send_buffer_bytes: Option<usize>,
     pub max_connections: usize,
     pub max_frame_bytes: usize,
     pub auth_max_inflight: usize,
@@ -123,10 +181,33 @@ pub struct BusinessRpcTransportConfig {
     pub write_timeout: Duration,
     pub event_ack_timeout: Duration,
 }
+/// Sender-local V3 scheduling limits; these are never sent in the V3 Hello.
+#[derive(Clone, Copy, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct V3SendAhead {
+    pub stream_bytes: u32,
+    pub connection_bytes: u32,
+}
+impl V3SendAhead {
+    pub fn as_mux(self) -> netbaiot_v3_mux::SendAheadLimits {
+        netbaiot_v3_mux::SendAheadLimits {
+            stream_bytes: self.stream_bytes,
+            connection_bytes: self.connection_bytes,
+        }
+    }
+}
 impl BusinessRpcTransportConfig {
     pub fn validate(&self, address: SocketAddr) -> Result<()> {
         if self.max_connections == 0
             || self.v3.as_ref().is_some_and(|v3| v3.validate().is_err())
+            || self.v3_send_ahead.is_some_and(|policy| {
+                self.v3
+                    .as_ref()
+                    .is_none_or(|limits| policy.as_mux().validate(limits).is_err())
+            })
+            || self
+                .v3_experiment_socket_send_buffer_bytes
+                .is_some_and(|size| self.v3.is_none() || !(4096..=4 * 1024 * 1024).contains(&size))
             || self.max_connections > 1024
             || self.max_frame_bytes < BUSINESS_RPC_AUTH_MAX_BYTES
             || self.max_frame_bytes > 8 * 1024 * 1024
@@ -372,6 +453,23 @@ async fn connection_inner(
     first_frame: Option<Vec<u8>>,
 ) -> Result<()> {
     let metrics = services.ingress.metrics.clone();
+    if config.v3.is_some() {
+        let socket = socket2::SockRef::from(&stream);
+        if let Some(bytes) = config.v3_experiment_socket_send_buffer_bytes {
+            socket
+                .set_send_buffer_size(bytes)
+                .map_err(|_| Error::Configuration)?;
+        }
+        let actual = socket.send_buffer_size().map_err(|_| Error::Unavailable)?;
+        tracing::info!(
+            send_buffer_bytes = actual,
+            "business RPC socket send buffer"
+        );
+    }
+    let stream = ObservedSocket {
+        inner: stream,
+        trace: config.v3.is_some() && std::env::var_os("NETBAIOT_V3_SOCKET_TRACE").is_some(),
+    };
     let (mut io, certificate): (Box<dyn Io>, Option<Vec<u8>>) = if let Some(acceptor) = &config.tls
     {
         let tls = tokio::time::timeout(config.handshake_timeout, acceptor.accept(stream))
