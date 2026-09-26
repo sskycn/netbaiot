@@ -8,8 +8,9 @@ use netbaiot_client::business_rpc::{
     BusinessRpcV3Delivery,
 };
 use netbaiot_core::{
-    AuthInvalidation, CodecId, DeviceId, DeviceKey, DeviceUplink, DeviceUplinkKind, Heartbeat,
-    ProductId, Scalar, SourceMessageId, TenantId,
+    AuthInvalidation, CodecId, CommandAck, CommandId, DeliveryState, DeviceCommand,
+    DeviceCommandPayload, DeviceEventKind, DeviceId, DeviceKey, DeviceUplink, DeviceUplinkKind,
+    ExecutionState, Heartbeat, ProductId, Scalar, SourceMessageId, TenantId,
     business_rpc::{
         AuthenticatedDeviceWire, BusinessRole, DeviceAuthenticateRequest, ResolveVerifierRequest,
         ResolveVerifierResponse, RpcError, RpcErrorCode,
@@ -29,7 +30,11 @@ use std::{
     },
     time::{Duration, Instant},
 };
-use tokio::{net::UdpSocket, task::JoinSet};
+use tokio::{
+    io::{AsyncReadExt, AsyncWriteExt},
+    net::{TcpStream, UdpSocket},
+    task::JoinSet,
+};
 
 type Result<T> = std::result::Result<T, Box<dyn Error + Send + Sync>>;
 const SECRET: &str = "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f";
@@ -50,6 +55,14 @@ struct Config {
     management_url: Option<String>,
     gateway_pid: Option<u32>,
     duration_secs: u64,
+    #[serde(default)]
+    command_rate: u64,
+    #[serde(default)]
+    command_device_count: usize,
+    #[serde(default)]
+    tcp_command_device: bool,
+    #[serde(default, skip_serializing)]
+    command_transport: Option<BusinessTransport>,
     auth_concurrency: usize,
     #[serde(default)]
     auth_unique_devices: bool,
@@ -112,6 +125,15 @@ enum Topology {
     Multiplexed,
     Dual,
     V3,
+    V3Dual,
+}
+impl Topology {
+    fn separate(self) -> bool {
+        matches!(self, Self::Dual | Self::V3Dual)
+    }
+    fn v3(self) -> bool {
+        matches!(self, Self::V3 | Self::V3Dual)
+    }
 }
 impl Config {
     fn validate(&self) -> Result<()> {
@@ -135,6 +157,13 @@ impl Config {
             || self.auth_concurrency > 256
             || self.auth_handler_delay_ms > 5_000
             || self.event_rate > 10_000
+            || self.command_rate > 1_000
+            || self.command_rate.saturating_mul(self.duration_secs) > 100_000
+            || self.command_device_count > 200
+            || (self.command_rate > 0
+                && (!self.topology.v3()
+                    || self.command_device_count == 0
+                    || self.command_transport.is_none()))
             || self.event_payload_bytes > 16_384
             || self
                 .frame_payload_bytes
@@ -294,6 +323,22 @@ struct Counts {
     events: u64,
     event_acks: u64,
     event_retries: u64,
+    command_requests: u64,
+    command_accepted: u64,
+    command_outcome_unknown: u64,
+    command_errors: u64,
+    command_unavailable: u64,
+    command_delivery_after_unavailable: u64,
+    command_accepted_without_delivery: u64,
+    tcp_command_reconnects: u64,
+    command_device_deliveries: u64,
+    mqtt_command_device_deliveries: u64,
+    tcp_command_device_deliveries: u64,
+    command_device_duplicates: u64,
+    command_device_acks: u64,
+    command_ack_event_attempts: u64,
+    command_ack_event_unique: u64,
+    command_ack_event_acks: u64,
     publish_attempts: u64,
     publish_enqueued: u64,
     publish_errors: u64,
@@ -361,11 +406,38 @@ impl Histogram {
 #[derive(Default)]
 struct Stats {
     counts: Counts,
+    command_traces: BTreeMap<CommandId, CommandTrace>,
+    command_device_seen: HashSet<CommandId>,
+    command_unavailable_ids: HashSet<CommandId>,
+    command_ack_event_seen: HashSet<netbaiot_core::EventId>,
     auth_latency: Histogram,
     ack_latency: Histogram,
     tls_handshake: Histogram,
     sync_ready: Histogram,
     full_ready: Histogram,
+}
+#[derive(Serialize)]
+struct CommandTrace {
+    command_id: CommandId,
+    attempts: u32,
+    rpc_outcomes: Vec<&'static str>,
+    device_deliveries: u32,
+    device_ack_submissions: u32,
+    command_ack_event_attempts: u32,
+    command_ack_event_unique: u32,
+}
+impl CommandTrace {
+    fn new(command_id: CommandId) -> Self {
+        Self {
+            command_id,
+            attempts: 1,
+            rpc_outcomes: Vec::new(),
+            device_deliveries: 0,
+            device_ack_submissions: 0,
+            command_ack_event_attempts: 0,
+            command_ack_event_unique: 0,
+        }
+    }
 }
 type SharedStats = Arc<Mutex<Stats>>;
 
@@ -457,6 +529,16 @@ impl AnyDelivery {
             Self::V3(delivery) => &delivery.delivery.event.source_message_id,
         }
     }
+    fn command_ack_id(&self) -> Option<CommandId> {
+        let kind = match self {
+            Self::V2(delivery) => &delivery.delivery.event.kind,
+            Self::V3(delivery) => &delivery.delivery.event.kind,
+        };
+        match kind {
+            DeviceEventKind::CommandAck(ack) => Some(ack.command_id),
+            _ => None,
+        }
+    }
     async fn ack(self) -> std::result::Result<(), BusinessRpcClientError> {
         match self {
             Self::V2(delivery) => delivery.ack().await,
@@ -482,7 +564,7 @@ async fn connect_event_business(
     role: BusinessRole,
     stats: &SharedStats,
 ) -> Result<(AnyBusiness, AnyDeliveries)> {
-    if config.topology != Topology::V3 {
+    if !config.topology.v3() {
         let (client, deliveries) = connect_business(config, handler, role, Some(stats)).await?;
         return Ok((AnyBusiness::V2(client), AnyDeliveries::V2(deliveries)));
     }
@@ -490,6 +572,8 @@ async fn connect_event_business(
         config.business_address,
         std::env::var("NETBAIOT_BUSINESS_RPC_TOKEN").unwrap_or_default(),
     );
+    settings.provider = role.auth_control();
+    settings.events = role.events();
     if let BusinessTransport::Mtls {
         server_name,
         ca_pem,
@@ -504,6 +588,7 @@ async fn connect_event_business(
             certificate_pem: certificate_pem.clone(),
             private_key_pem: private_key_pem.clone(),
         });
+        settings.filter.tenant = Some(TenantId::new("demo")?);
     }
     if let Some(frame_bytes) = config.frame_payload_bytes {
         settings.limits.max_frame_payload_bytes = frame_bytes;
@@ -515,6 +600,33 @@ async fn connect_event_business(
     let (client, deliveries) = BusinessRpcV3Client::connect(settings, Some(handler))?;
     tokio::time::timeout(Duration::from_secs(10), client.wait_ready()).await??;
     Ok((AnyBusiness::V3(client), AnyDeliveries::V3(deliveries)))
+}
+
+async fn connect_command_business(config: &Config) -> Result<BusinessRpcV3Client> {
+    let mut settings = BusinessRpcV3ClientConfig::development(
+        config.business_address,
+        std::env::var("NETBAIOT_BUSINESS_RPC_TOKEN").unwrap_or_default(),
+    );
+    settings.provider = false;
+    settings.events = false;
+    if let Some(BusinessTransport::Mtls {
+        server_name,
+        ca_pem,
+        certificate_pem,
+        private_key_pem,
+    }) = &config.command_transport
+    {
+        settings.token = None;
+        settings.tls = Some(BusinessRpcTls {
+            server_name: server_name.clone(),
+            ca_pem: ca_pem.clone(),
+            certificate_pem: certificate_pem.clone(),
+            private_key_pem: private_key_pem.clone(),
+        });
+    }
+    let (client, _) = BusinessRpcV3Client::connect(settings, None)?;
+    tokio::time::timeout(Duration::from_secs(10), client.wait_ready()).await??;
+    Ok(client)
 }
 async fn device(config: &Config, id: &str) -> Result<DeviceClient> {
     let client = DeviceClient::builder()
@@ -529,6 +641,42 @@ async fn device(config: &Config, id: &str) -> Result<DeviceClient> {
         .connect()
         .await?;
     Ok(client)
+}
+
+async fn tcp_command_device(config: &Config) -> Result<TcpStream> {
+    let mut socket = TcpStream::connect(config.device_address).await?;
+    let hello = serde_json::to_vec(&serde_json::json!({
+        "credential_id": "cred-tcp-command",
+        "secret": SECRET,
+    }))?;
+    socket
+        .write_all(&u32::try_from(hello.len())?.to_be_bytes())
+        .await?;
+    socket.write_all(&hello).await?;
+    let mut header = [0u8; 4];
+    socket.read_exact(&mut header).await?;
+    let length = u32::from_be_bytes(header) as usize;
+    if length > 1024 {
+        return Err("oversized TCP authentication response".into());
+    }
+    let mut body = vec![0; length];
+    socket.read_exact(&mut body).await?;
+    if body != br#"{"authenticated":true}"# {
+        return Err("TCP command device was not authenticated".into());
+    }
+    Ok(socket)
+}
+
+async fn reconnect_tcp_command_device(config: &Config, until: Instant) -> Option<TcpStream> {
+    while Instant::now() < until {
+        if let Ok(Ok(socket)) =
+            tokio::time::timeout(Duration::from_secs(2), tcp_command_device(config)).await
+        {
+            return Some(socket);
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    None
 }
 async fn auth_load(config: Config, stats: SharedStats, until: Instant) {
     let mut tasks = JoinSet::new();
@@ -585,14 +733,14 @@ async fn event_load(
     outage: bool,
 ) -> Result<(u64, Option<Percentiles>)> {
     let handler = Arc::new(Handler::new(config));
-    let auth_role = if config.topology == Topology::Dual {
+    let auth_role = if config.topology.separate() {
         BusinessRole::AuthControl
     } else {
         BusinessRole::Multiplexed
     };
     let (mut business, auth_deliveries) =
         connect_event_business(config, handler.clone(), auth_role, &stats).await?;
-    let (mut event_business, mut deliveries) = if config.topology == Topology::Dual {
+    let (mut event_business, mut deliveries) = if config.topology.separate() {
         let (events, deliveries) =
             connect_event_business(config, handler.clone(), BusinessRole::Events, &stats).await?;
         (Some(events), deliveries)
@@ -600,7 +748,144 @@ async fn event_load(
         (None, auth_deliveries)
     };
     let publisher = device(config, "publisher").await?;
+    let command_business = if config.command_rate > 0 {
+        Some(connect_command_business(config).await?)
+    } else {
+        None
+    };
+    let mut command_receivers = Vec::new();
+    for index in 0..config.command_device_count {
+        let client = device(config, &format!("command-{index}")).await?;
+        let commands = client.commands()?;
+        client.wait_until_connected(Duration::from_secs(5)).await?;
+        command_receivers.push((client, commands));
+    }
+    let tcp_command_socket = if config.command_rate > 0 && config.tcp_command_device {
+        Some(tcp_command_device(config).await?)
+    } else {
+        None
+    };
     let until = Instant::now() + Duration::from_secs(config.duration_secs);
+    let command_worker_until = until + Duration::from_secs(2);
+    let mut command_devices = Vec::new();
+    let mut command_workers = JoinSet::new();
+    for (client, mut commands) in command_receivers {
+        let worker_client = client.clone();
+        let worker_stats = stats.clone();
+        command_workers.spawn(async move {
+            loop {
+                let received = tokio::select! {
+                    _ = tokio::time::sleep_until(command_worker_until.into()) => break,
+                    received = commands.recv() => received,
+                };
+                let Some(command) = received else { break };
+                {
+                    let mut state = worker_stats.lock().unwrap();
+                    state.counts.command_device_deliveries += 1;
+                    state.counts.mqtt_command_device_deliveries += 1;
+                    if !state.command_device_seen.insert(command.command_id) {
+                        state.counts.command_device_duplicates += 1;
+                    }
+                    if let Some(trace) = state.command_traces.get_mut(&command.command_id) {
+                        trace.device_deliveries += 1;
+                    }
+                }
+                if worker_client
+                    .ack_command(command.command_id, ExecutionState::Succeeded)
+                    .await
+                    .is_ok()
+                {
+                    let mut state = worker_stats.lock().unwrap();
+                    state.counts.command_device_acks += 1;
+                    if let Some(trace) = state.command_traces.get_mut(&command.command_id) {
+                        trace.device_ack_submissions += 1;
+                    }
+                }
+            }
+            Ok::<(), Box<dyn Error + Send + Sync>>(())
+        });
+        command_devices.push(client);
+    }
+    if let Some(mut socket) = tcp_command_socket {
+        let worker_stats = stats.clone();
+        let tcp_config = config.clone();
+        command_workers.spawn(async move {
+            loop {
+                let mut header = [0u8; 4];
+                let read = tokio::select! {
+                    _ = tokio::time::sleep_until(command_worker_until.into()) => break,
+                    read = socket.read_exact(&mut header) => read,
+                };
+                if read.is_err() {
+                    let Some(reconnected) =
+                        reconnect_tcp_command_device(&tcp_config, command_worker_until).await
+                    else {
+                        break;
+                    };
+                    worker_stats.lock().unwrap().counts.tcp_command_reconnects += 1;
+                    socket = reconnected;
+                    continue;
+                }
+                let length = u32::from_be_bytes(header) as usize;
+                if length > 65_536 {
+                    return Err("oversized TCP command frame".into());
+                }
+                let mut body = vec![0; length];
+                if socket.read_exact(&mut body).await.is_err() {
+                    let Some(reconnected) =
+                        reconnect_tcp_command_device(&tcp_config, command_worker_until).await
+                    else {
+                        break;
+                    };
+                    worker_stats.lock().unwrap().counts.tcp_command_reconnects += 1;
+                    socket = reconnected;
+                    continue;
+                }
+                let Ok(command) = serde_json::from_slice::<DeviceCommand>(&body) else {
+                    // A TCP EventAccepted receipt may follow an application ACK.
+                    continue;
+                };
+                {
+                    let mut state = worker_stats.lock().unwrap();
+                    state.counts.command_device_deliveries += 1;
+                    state.counts.tcp_command_device_deliveries += 1;
+                    if !state.command_device_seen.insert(command.command_id) {
+                        state.counts.command_device_duplicates += 1;
+                    }
+                    if let Some(trace) = state.command_traces.get_mut(&command.command_id) {
+                        trace.device_deliveries += 1;
+                    }
+                }
+                let ack = DeviceUplink::new(
+                    SourceMessageId::new(format!("tcp-command-ack-{}", uuid::Uuid::new_v4()))?,
+                    DeviceUplinkKind::CommandAck(CommandAck {
+                        command_id: command.command_id,
+                        execution: ExecutionState::Succeeded,
+                    }),
+                );
+                let encoded = serde_json::to_vec(&ack)?;
+                let header = u32::try_from(encoded.len())?.to_be_bytes();
+                if socket.write_all(&header).await.is_err()
+                    || socket.write_all(&encoded).await.is_err()
+                {
+                    let Some(reconnected) =
+                        reconnect_tcp_command_device(&tcp_config, command_worker_until).await
+                    else {
+                        break;
+                    };
+                    worker_stats.lock().unwrap().counts.tcp_command_reconnects += 1;
+                    socket = reconnected;
+                    continue;
+                }
+                let mut state = worker_stats.lock().unwrap();
+                state.counts.command_device_acks += 1;
+                if let Some(trace) = state.command_traces.get_mut(&command.command_id) {
+                    trace.device_ack_submissions += 1;
+                }
+            }
+            Ok::<(), Box<dyn Error + Send + Sync>>(())
+        });
+    }
     let outage_until = Instant::now() + Duration::from_secs(config.duration_secs / 2);
     let mut workers = JoinSet::new();
     let auth_config = config.clone();
@@ -618,6 +903,10 @@ async fn event_load(
         1.0 / config.event_rate.max(1) as f64,
     ));
     tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+    let mut command_tick = tokio::time::interval(Duration::from_secs_f64(
+        1.0 / config.command_rate.max(1) as f64,
+    ));
+    command_tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
     let reconnect_period = Duration::from_secs(config.event_reconnect_every_secs.max(1));
     let mut reconnect_tick = tokio::time::interval_at(
         tokio::time::Instant::now() + reconnect_period,
@@ -635,10 +924,103 @@ async fn event_load(
     );
     let mut revision = 1u64;
     let mut sequence = 0u64;
+    let mut command_sequence = 0u64;
     let mut seen = HashSet::new();
     let source_prefix = format!("load-{}-", uuid::Uuid::new_v4().simple());
     while Instant::now() < until {
         tokio::select! {
+            _ = command_tick.tick(), if config.command_rate > 0 => {
+                let index = command_sequence as usize
+                    % (config.command_device_count + usize::from(config.tcp_command_device));
+                command_sequence += 1;
+                let target = if index == config.command_device_count {
+                    "tcp-command".to_owned()
+                } else {
+                    format!("command-{index}")
+                };
+                let command = DeviceCommand {
+                    command_id: CommandId::generate(),
+                    device: identity(&target, 1)
+                        .map_err(|_| "invalid command device")?.device_key,
+                    expires_at: None,
+                    payload: DeviceCommandPayload {
+                        name: "readiness-ping".into(),
+                        arguments: Default::default(),
+                    },
+                };
+                let Some(client) = &command_business else { return Err("missing command client".into()); };
+                {
+                    let mut state = stats.lock().unwrap();
+                    state.counts.command_requests += 1;
+                    state.command_traces.insert(command.command_id, CommandTrace::new(command.command_id));
+                }
+                let result = client.send_command(&command).await;
+                match result {
+                    Ok(receipt) if receipt.state == DeliveryState::Queued => {
+                        {
+                            let mut state = stats.lock().unwrap();
+                            state.counts.command_accepted += 1;
+                            if let Some(trace) = state.command_traces.get_mut(&command.command_id) {
+                                trace.rpc_outcomes.push("queued");
+                            }
+                        }
+                        if command_sequence.is_multiple_of(10) {
+                            {
+                                let mut state = stats.lock().unwrap();
+                                state.counts.command_requests += 1;
+                                if let Some(trace) = state.command_traces.get_mut(&command.command_id) {
+                                    trace.attempts += 1;
+                                }
+                            }
+                            let retry_ok = matches!(client.send_command(&command).await, Ok(retry) if retry == receipt);
+                            let mut state = stats.lock().unwrap();
+                            if let Some(trace) = state.command_traces.get_mut(&command.command_id) {
+                                trace.rpc_outcomes.push(if retry_ok { "dedup_queued" } else { "retry_error" });
+                            }
+                            if !retry_ok {
+                                state.counts.command_errors += 1;
+                            }
+                        }
+                    }
+                    Err(BusinessRpcClientError::OutcomeUnknown) => {
+                        {
+                            let mut state = stats.lock().unwrap();
+                            state.counts.command_outcome_unknown += 1;
+                            state.counts.command_requests += 1;
+                            if let Some(trace) = state.command_traces.get_mut(&command.command_id) {
+                                trace.rpc_outcomes.push("outcome_unknown");
+                                trace.attempts += 1;
+                            }
+                        }
+                        let retry_ok = client.send_command(&command).await.is_ok();
+                        let mut state = stats.lock().unwrap();
+                        if let Some(trace) = state.command_traces.get_mut(&command.command_id) {
+                            trace.rpc_outcomes.push(if retry_ok { "queued_after_unknown" } else { "retry_error" });
+                        }
+                        if retry_ok {
+                            state.counts.command_accepted += 1;
+                        } else {
+                            state.counts.command_errors += 1;
+                        }
+                    }
+                    Err(BusinessRpcClientError::Remote(RpcErrorCode::Unavailable))
+                    | Err(BusinessRpcClientError::Unavailable) => {
+                        let mut state = stats.lock().unwrap();
+                        state.counts.command_unavailable += 1;
+                        state.command_unavailable_ids.insert(command.command_id);
+                        if let Some(trace) = state.command_traces.get_mut(&command.command_id) {
+                            trace.rpc_outcomes.push("unavailable");
+                        }
+                    }
+                    _ => {
+                        let mut state = stats.lock().unwrap();
+                        state.counts.command_errors += 1;
+                        if let Some(trace) = state.command_traces.get_mut(&command.command_id) {
+                            trace.rpc_outcomes.push("unexpected_error");
+                        }
+                    }
+                }
+            }
             _ = invalidate_tick.tick(), if config.invalidate_every_secs > 0 => {
                 revision = revision.saturating_add(1);
                 let device = identity("udp", revision).map_err(|_| "invalid verifier identity")?.device_key;
@@ -648,7 +1030,7 @@ async fn event_load(
                     stats.lock().unwrap().counts.sync_failures += 1;
                 }
             }
-            _ = auth_reconnect_tick.tick(), if config.auth_reconnect_every_secs > 0 && config.topology == Topology::Dual => {
+            _ = auth_reconnect_tick.tick(), if config.auth_reconnect_every_secs > 0 && config.topology.separate() => {
                 business.shutdown().await;
                 match connect_event_business(config, handler.clone(), BusinessRole::AuthControl, &stats).await {
                     Ok((next, _)) => {
@@ -665,10 +1047,10 @@ async fn event_load(
             _ = reconnect_tick.tick(), if config.event_reconnect_every_secs > 0 => {
                 if let Some(events) = event_business.take() { events.shutdown().await; }
                 else { business.shutdown().await; }
-                let role = if config.topology == Topology::Dual { BusinessRole::Events } else { BusinessRole::Multiplexed };
+                let role = if config.topology.separate() { BusinessRole::Events } else { BusinessRole::Multiplexed };
                 match connect_event_business(config, handler.clone(), role, &stats).await {
                     Ok((next, next_deliveries)) => {
-                        if config.topology == Topology::Dual { event_business = Some(next); }
+                        if config.topology.separate() { event_business = Some(next); }
                         else { business = next; revision = 1; }
                         deliveries = next_deliveries;
                         stats.lock().unwrap().counts.reconnects += 1;
@@ -703,6 +1085,25 @@ async fn event_load(
             }
             received = deliveries.recv() => {
                 let Some(delivery) = received else { break };
+                if let Some(command_id) = delivery.command_ack_id() {
+                    let event_id = delivery.event_id();
+                    {
+                        let mut state = stats.lock().unwrap();
+                        state.counts.command_ack_event_attempts += 1;
+                        let unique = state.command_ack_event_seen.insert(event_id);
+                        if unique {
+                            state.counts.command_ack_event_unique += 1;
+                        }
+                        if let Some(trace) = state.command_traces.get_mut(&command_id) {
+                            trace.command_ack_event_attempts += 1;
+                            if unique { trace.command_ack_event_unique += 1; }
+                        }
+                    }
+                    if delivery.ack().await.is_ok() {
+                        stats.lock().unwrap().counts.command_ack_event_acks += 1;
+                    }
+                    continue;
+                }
                 if !delivery.source_message_id().as_str().starts_with(&source_prefix) {
                     let _ = delivery.ack().await;
                     continue;
@@ -727,9 +1128,65 @@ async fn event_load(
     while let Some(result) = workers.join_next().await {
         result??;
     }
+    if config.command_rate > 0 {
+        let drain_until = Instant::now() + Duration::from_secs(5);
+        while Instant::now() < drain_until {
+            let Ok(Some(delivery)) =
+                tokio::time::timeout(Duration::from_millis(200), deliveries.recv()).await
+            else {
+                continue;
+            };
+            if let Some(command_id) = delivery.command_ack_id() {
+                let event_id = delivery.event_id();
+                {
+                    let mut state = stats.lock().unwrap();
+                    state.counts.command_ack_event_attempts += 1;
+                    let unique = state.command_ack_event_seen.insert(event_id);
+                    if unique {
+                        state.counts.command_ack_event_unique += 1;
+                    }
+                    if let Some(trace) = state.command_traces.get_mut(&command_id) {
+                        trace.command_ack_event_attempts += 1;
+                        if unique {
+                            trace.command_ack_event_unique += 1;
+                        }
+                    }
+                }
+                if delivery.ack().await.is_ok() {
+                    stats.lock().unwrap().counts.command_ack_event_acks += 1;
+                }
+            } else if delivery
+                .source_message_id()
+                .as_str()
+                .starts_with(&source_prefix)
+            {
+                {
+                    let mut state = stats.lock().unwrap();
+                    state.counts.events += 1;
+                    if !seen.insert(delivery.event_id()) {
+                        state.counts.event_retries += 1;
+                    }
+                }
+                if delivery.ack().await.is_ok() {
+                    stats.lock().unwrap().counts.event_acks += 1;
+                }
+            } else {
+                let _ = delivery.ack().await;
+            }
+        }
+    }
     let _ = publisher
         .shutdown_with_timeout(Duration::from_secs(1))
         .await;
+    for client in command_devices {
+        let _ = client.shutdown_with_timeout(Duration::from_secs(1)).await;
+    }
+    while let Some(result) = command_workers.join_next().await {
+        result??;
+    }
+    if let Some(client) = command_business {
+        client.shutdown().await;
+    }
     business.shutdown().await;
     if let Some(events) = event_business {
         events.shutdown().await;
@@ -949,11 +1406,25 @@ struct Peaks {
     pending_bytes_last: u64,
     active_business_connections_peak: u64,
     active_business_connections_last: u64,
+    v3_active_streams_peak: u64,
+    v3_active_streams_last: u64,
+    v3_queued_bytes_peak: u64,
+    v3_queued_bytes_last: u64,
+    v3_reassembly_bytes_peak: u64,
+    v3_reassembly_bytes_last: u64,
+    command_dedup_entries_peak: u64,
+    command_dedup_entries_last: u64,
+    command_dedup_inflight_peak: u64,
+    command_dedup_inflight_last: u64,
     auth_queue_items: u64,
     control_queue_items: u64,
     control_queue_bytes: u64,
+    control_queue_bytes_last: u64,
     event_queue_items: u64,
     event_queue_bytes: u64,
+    event_queue_bytes_last: u64,
+    command_queue_bytes_peak: u64,
+    command_queue_bytes_last: u64,
     late_responses_total: u64,
     overloads_total: u64,
     provider_sync_success_total: u64,
@@ -972,6 +1443,14 @@ struct Milestone {
     pending_items: Option<u64>,
     pending_bytes: Option<u64>,
     connections: Option<u64>,
+    v3_active_streams: Option<u64>,
+    v3_queued_bytes: Option<u64>,
+    v3_reassembly_bytes: Option<u64>,
+    command_dedup_entries: Option<u64>,
+    command_dedup_inflight: Option<u64>,
+    control_queue_bytes: Option<u64>,
+    event_queue_bytes: Option<u64>,
+    command_queue_bytes: Option<u64>,
     reconnects: u64,
     sync_failures: u64,
     late_responses_total: Option<u64>,
@@ -1118,6 +1597,26 @@ async fn sample_gateway(
             guard.active_business_connections_peak = guard
                 .active_business_connections_peak
                 .max(guard.active_business_connections_last);
+            guard.v3_active_streams_last =
+                metric(&body, "netbaiot_business_rpc_v3_active_streams ");
+            guard.v3_active_streams_peak = guard
+                .v3_active_streams_peak
+                .max(guard.v3_active_streams_last);
+            guard.v3_queued_bytes_last = metric(&body, "netbaiot_business_rpc_v3_queued_bytes ");
+            guard.v3_queued_bytes_peak = guard.v3_queued_bytes_peak.max(guard.v3_queued_bytes_last);
+            guard.v3_reassembly_bytes_last =
+                metric(&body, "netbaiot_business_rpc_v3_reassembly_reserved_bytes ");
+            guard.v3_reassembly_bytes_peak = guard
+                .v3_reassembly_bytes_peak
+                .max(guard.v3_reassembly_bytes_last);
+            guard.command_dedup_entries_last = metric(&body, "netbaiot_command_dedup_entries ");
+            guard.command_dedup_entries_peak = guard
+                .command_dedup_entries_peak
+                .max(guard.command_dedup_entries_last);
+            guard.command_dedup_inflight_last = metric(&body, "netbaiot_command_dedup_inflight ");
+            guard.command_dedup_inflight_peak = guard
+                .command_dedup_inflight_peak
+                .max(guard.command_dedup_inflight_last);
             guard.auth_queue_items = guard
                 .auth_queue_items
                 .max(metric(&body, "netbaiot_business_rpc_auth_queue "));
@@ -1129,6 +1628,10 @@ async fn sample_gateway(
                 &body,
                 "netbaiot_business_rpc_queue_bytes{class=\"control\"} ",
             ));
+            guard.control_queue_bytes_last = metric(
+                &body,
+                "netbaiot_business_rpc_queue_bytes{class=\"control\"} ",
+            );
             guard.event_queue_items = guard.event_queue_items.max(metric(
                 &body,
                 "netbaiot_business_rpc_queue_count{class=\"event\"} ",
@@ -1137,6 +1640,15 @@ async fn sample_gateway(
                 &body,
                 "netbaiot_business_rpc_queue_bytes{class=\"event\"} ",
             ));
+            guard.event_queue_bytes_last =
+                metric(&body, "netbaiot_business_rpc_queue_bytes{class=\"event\"} ");
+            guard.command_queue_bytes_last = metric(
+                &body,
+                "netbaiot_business_rpc_queue_bytes{class=\"command\"} ",
+            );
+            guard.command_queue_bytes_peak = guard
+                .command_queue_bytes_peak
+                .max(guard.command_queue_bytes_last);
             guard.late_responses_total =
                 metric(&body, "netbaiot_business_rpc_late_responses_total ");
             guard.overloads_total = metric(&body, "netbaiot_business_rpc_overloads_total ");
@@ -1165,6 +1677,28 @@ async fn sample_gateway(
                 connections: guard
                     .metrics_observed
                     .then_some(guard.active_business_connections_last),
+                v3_active_streams: guard
+                    .metrics_observed
+                    .then_some(guard.v3_active_streams_last),
+                v3_queued_bytes: guard.metrics_observed.then_some(guard.v3_queued_bytes_last),
+                v3_reassembly_bytes: guard
+                    .metrics_observed
+                    .then_some(guard.v3_reassembly_bytes_last),
+                command_dedup_entries: guard
+                    .metrics_observed
+                    .then_some(guard.command_dedup_entries_last),
+                command_dedup_inflight: guard
+                    .metrics_observed
+                    .then_some(guard.command_dedup_inflight_last),
+                control_queue_bytes: guard
+                    .metrics_observed
+                    .then_some(guard.control_queue_bytes_last),
+                event_queue_bytes: guard
+                    .metrics_observed
+                    .then_some(guard.event_queue_bytes_last),
+                command_queue_bytes: guard
+                    .metrics_observed
+                    .then_some(guard.command_queue_bytes_last),
                 reconnects: counts.reconnects,
                 sync_failures: counts.sync_failures,
                 late_responses_total: guard.metrics_observed.then_some(guard.late_responses_total),
@@ -1360,6 +1894,21 @@ async fn main() -> Result<()> {
     let gateway_after = read_gateway_metrics(&config).await;
     let elapsed = started.elapsed();
     let mut state = stats.lock().unwrap();
+    state.counts.command_delivery_after_unavailable = state
+        .command_unavailable_ids
+        .intersection(&state.command_device_seen)
+        .count() as u64;
+    state.counts.command_accepted_without_delivery = state
+        .command_traces
+        .values()
+        .filter(|trace| {
+            trace.device_deliveries == 0
+                && trace
+                    .rpc_outcomes
+                    .iter()
+                    .any(|outcome| matches!(*outcome, "queued" | "queued_after_unknown"))
+        })
+        .count() as u64;
     state.counts.latency_ms = state.auth_latency.summary();
     state.counts.event_ack_ms = state.ack_latency.summary();
     let git_commit = std::process::Command::new("git")
@@ -1422,6 +1971,7 @@ async fn main() -> Result<()> {
             "events_per_second": state.counts.events as f64 / elapsed.as_secs_f64().max(0.001),
             "event_acks_per_second": state.counts.event_acks as f64 / elapsed.as_secs_f64().max(0.001),
             "counts": state.counts,
+            "command_traces": state.command_traces.values().collect::<Vec<_>>(),
         "verifier_provider_calls": verifier_calls,
         "verifier_calls_before_invalidation": verifier_calls_before_invalidation,
             "auth_provider_calls": provider_auth_calls,

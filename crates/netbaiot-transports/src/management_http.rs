@@ -278,6 +278,14 @@ async fn handle_management(
         }
         (hyper::Method::GET, "/api/v1/metrics") => {
             let mut body = services.ingress.metrics.render();
+            if let Ok((total, inflight)) = services.commands.usage() {
+                body.push_str(&format!(
+                    "netbaiot_command_dedup_entries {}\nnetbaiot_command_dedup_inflight {}\nnetbaiot_command_dedup_accepted {}\n",
+                    total,
+                    inflight,
+                    total.saturating_sub(inflight),
+                ));
+            }
             if let Some(registry) = &services.business_auth {
                 body.push_str(&registry.render_metrics());
             }

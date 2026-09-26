@@ -238,6 +238,77 @@ async fn command_service_capacity_expiry_and_invalid_expiry_cleanup() {
     assert_eq!(ingress.metrics.get(Metric::CommandDedupEvictions), 2);
 }
 
+#[tokio::test]
+async fn command_dedup_expiry_is_ordered_and_lazily_reclaimed() {
+    let provider = Arc::new(CountingProvider {
+        calls: AtomicUsize::new(0),
+        auth: auth(),
+        delay: false,
+    });
+    let limits = Limits {
+        command_dedup_max_entries: 2,
+        command_dedup_ttl_ms: 500,
+        ..Limits::default()
+    };
+    let (ingress, services, _) = runtime(limits, provider);
+    let (_lease, mut device_rx) = ingress
+        .sessions
+        .register(Arc::new(auth()), Transport::Tcp)
+        .unwrap();
+    let first = live_command();
+    let second = live_command();
+    services.commands.send(first.clone()).await.unwrap();
+    assert_eq!(device_rx.try_recv().unwrap().command_id, first.command_id);
+    tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+    services.commands.send(second.clone()).await.unwrap();
+    assert_eq!(device_rx.try_recv().unwrap().command_id, second.command_id);
+    tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+
+    // The physical registry retains expired entries until the next send.
+    assert_eq!(services.commands.usage().unwrap(), (2, 0));
+    services.commands.send(second.clone()).await.unwrap();
+    assert_eq!(services.commands.usage().unwrap(), (1, 0));
+    assert!(device_rx.try_recv().is_err());
+    services.commands.send(first.clone()).await.unwrap();
+    assert_eq!(device_rx.try_recv().unwrap().command_id, first.command_id);
+    assert_eq!(services.commands.usage().unwrap(), (2, 0));
+    assert_eq!(ingress.metrics.get(Metric::CommandDedupEvictions), 1);
+
+    tokio::time::sleep(std::time::Duration::from_millis(550)).await;
+    assert_eq!(services.commands.usage().unwrap(), (2, 0));
+    let third = live_command();
+    services.commands.send(third.clone()).await.unwrap();
+    assert_eq!(device_rx.try_recv().unwrap().command_id, third.command_id);
+    assert_eq!(services.commands.usage().unwrap(), (1, 0));
+    assert_eq!(ingress.metrics.get(Metric::CommandDedupEvictions), 3);
+}
+
+#[tokio::test]
+async fn accepted_receipt_survives_command_ttl_within_dedup_window() {
+    let provider = Arc::new(CountingProvider {
+        calls: AtomicUsize::new(0),
+        auth: auth(),
+        delay: false,
+    });
+    let limits = Limits {
+        command_ttl_ms: 100,
+        command_dedup_ttl_ms: 1_000,
+        ..Limits::default()
+    };
+    let (ingress, services, _) = runtime(limits, provider);
+    let (_lease, mut device_rx) = ingress
+        .sessions
+        .register(Arc::new(auth()), Transport::Tcp)
+        .unwrap();
+    let command = live_command();
+    let first = services.commands.send(command.clone()).await.unwrap();
+    assert_eq!(device_rx.try_recv().unwrap().command_id, command.command_id);
+    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+    assert_eq!(services.commands.send(command).await.unwrap(), first);
+    assert!(device_rx.try_recv().is_err());
+    assert_eq!(services.commands.usage().unwrap(), (1, 0));
+}
+
 fn runtime(
     limits: Limits,
     provider: Arc<CountingProvider>,

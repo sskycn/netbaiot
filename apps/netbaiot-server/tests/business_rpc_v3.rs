@@ -192,7 +192,7 @@ async fn v3_command_real_tcp_tenant_scope_and_capacity() {
     config.limits.max_pending_commands_per_device = 1;
     config.limits.max_pending_commands_per_tenant = 1;
     config.limits.max_pending_commands = 1;
-    config.limits.command_dedup_max_entries = 1;
+    config.limits.command_dedup_max_entries = 2;
     config.spool_directory = root.join("spool");
     let fixtures = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures");
     let pem = std::fs::read(fixtures.join("management-client.pem")).unwrap();
@@ -262,6 +262,20 @@ async fn v3_command_real_tcp_tenant_scope_and_capacity() {
         .await
         .unwrap()
         .unwrap();
+    let mut v2_config =
+        BusinessRpcClientConfig::development(addresses[2], "unused".into(), BusinessRole::Commands);
+    v2_config.token = None;
+    v2_config.tls = Some(BusinessRpcTls {
+        server_name: "localhost".into(),
+        ca_pem: fixtures.join("localhost-cert.pem"),
+        certificate_pem: fixtures.join("management-client.pem"),
+        private_key_pem: fixtures.join("management-client-key.pem"),
+    });
+    let (v2, _) = BusinessRpcClient::connect(v2_config, None).unwrap();
+    tokio::time::timeout(Duration::from_secs(10), v2.wait_ready())
+        .await
+        .unwrap()
+        .unwrap();
 
     let mut socket = TcpStream::connect(addresses[0]).await.unwrap();
     let handshake =
@@ -289,6 +303,13 @@ async fn v3_command_real_tcp_tenant_scope_and_capacity() {
         serde_json::from_slice(&read_tcp_device(&mut socket).await).unwrap();
     assert_eq!(received.command_id, accepted_command.command_id);
     assert_eq!(received.payload, accepted_command.payload);
+    assert_eq!(v2.send_command(&accepted_command).await.unwrap(), accepted);
+    let v2_first = command("v2-first");
+    let v2_receipt = v2.send_command(&v2_first).await.unwrap();
+    let received: DeviceCommand =
+        serde_json::from_slice(&read_tcp_device(&mut socket).await).unwrap();
+    assert_eq!(received.command_id, v2_first.command_id);
+    assert_eq!(business.send_command(&v2_first).await.unwrap(), v2_receipt);
     let full = business.send_command(&command("capacity")).await;
     assert!(
         matches!(
@@ -302,6 +323,7 @@ async fn v3_command_real_tcp_tenant_scope_and_capacity() {
             .await
             .is_err()
     );
+    v2.shutdown().await;
     business.shutdown().await;
     server.start_kill().unwrap();
     let _ = server.wait().await;
