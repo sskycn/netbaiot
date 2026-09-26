@@ -8,7 +8,15 @@ Hello/Ready 是有长度上限的 JSON 握手；Ready 返回新的 `connection_e
 
 Stream 0 仅用于 PING、PONG、连接 WINDOW_UPDATE 和 GOAWAY。客户端 stream ID 为奇数，网关为偶数，同一连接上严格递增且不复用。用尽最后一个合法本地 ID 后，端点发送 GOAWAY NO_ERROR 并重连，不回绕。传输流身份是 `(connection_epoch, stream_id)`，不能替代业务 `request_id`、稳定 `event_id`、`delivery_id` 和 `subscription_id`。GOAWAY 的 `last_stream_id` 表示已考虑的最高对端 stream；重连生成新 epoch。
 
-Provider 和 EventSubscription 是长寿命父流。Provider 下有网关发起的 `device.authenticate`、`device.resolve_verifier` 子 RPC，以及客户端发起的 `auth.sync`、`auth.invalidate` 子 RPC。初始 reset sync 完成且客户端通过 PING/PONG 确认响应后，Provider 才进入 Serving。EventSubscription 下有网关发起的 EventDelivery 子流，每个订阅仍只允许一个 delivery 在途。应用提交后才调用 `BusinessRpcV3Delivery::ack()`，失败时调用 `nack()`。socket 写入、WINDOW_UPDATE、SDK 收到事件都不等于业务 ACK。重试时 `delivery_id` 可变，`event_id` 保持稳定。V3 不增加 Command RPC。
+Provider 和 EventSubscription 是长寿命父流。Provider 下有网关发起的 `device.authenticate`、`device.resolve_verifier` 子 RPC，以及客户端发起的 `auth.sync`、`auth.invalidate` 子 RPC。初始 reset sync 完成且客户端通过 PING/PONG 确认响应后，Provider 才进入 Serving。EventSubscription 下有网关发起的 EventDelivery 子流，每个订阅仍只允许一个 delivery 在途。应用提交后才调用 `BusinessRpcV3Delivery::ack()`，失败时调用 `nack()`。socket 写入、WINDOW_UPDATE、SDK 收到事件都不等于业务 ACK。重试时 `delivery_id` 可变，`event_id` 保持稳定。
+
+## 在线设备命令
+
+`device.command.send` 使用独立的客户端 RPC 流，不需要父流。OPEN 带方法名、每次新生成的 `request_id`、deadline 和 body 长度；DATA 带 `DeviceCommandSendRequest { command }` JSON 并以 END_STREAM 结束。网关用 RESPONSE/DATA 返回 `DeviceCommandSendResponse { dispatch }`。BusinessPrincipal 的 `call_methods` 必须允许此方法，租户范围也必须涵盖目标设备。方法授权先于 DTO 解码，租户授权先于会话查询；V3 帧与 mux wire 均未改变。
+
+业务端调用 `BusinessRpcV3Client::send_command(&command)`。`Queued` 只表示当前本地 MQTT/TCP 设备会话已接受下发，不表示设备已收到或执行。设备稍后上报的 `CommandAck` 仍作为普通 EventDelivery 按 `command_id` 匹配。提交后断线或超时返回 `OutcomeUnknown`；重连后用相同内容和 `command_id` 显式重试。每次 RPC 有新的 `request_id` 和 stream ID。同一 `(tenant_id, command_id)` 内容冲突返回 `Conflict`；设备离线或命令未就绪返回 `Unavailable`。下发成功后 RESET_STREAM 不撤销命令。排空期间新命令被拒绝，已保留的回执仍可查询。
+
+HTTP `/api/v1/devices/commands`、V2 和 V3 共用一个 `CommandService` 和进程内幂等表。`command_dedup_max_entries` 默认 4096，`command_dedup_ttl_ms` 默认 300000。窗口内同内容重试返回原回执，不再次下发；表满返回 `Overloaded`，失败的下发不会占用 ID。此表不持久化，崩溃或重启后幂等历史丢失，不保证跨重启 exactly-once。业务命令历史和离线重试仍由业务系统负责。
 
 单个 writer 按协商大小惰性切分 body，并在不同流间调度 DATA。RPC 与 Event 的调度份额为 4:1，连续 control 帧最多四个，没有发送 credit 的流会跳过；同一流的 OPEN/RESPONSE 一定先于 DATA。发送 DATA 同时扣除连接和流窗口，WINDOW_UPDATE 实际写出后才返还接收 credit，与应用 Event ACK 分离。RESET_STREAM 结束单流，父流 reset 同时清理子流；连接协议错误和 principal 过期发送 GOAWAY 并关闭。单流错误应通过 RESET_STREAM 隔离。
 

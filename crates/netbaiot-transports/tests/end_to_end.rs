@@ -71,6 +71,173 @@ fn payload(sequence: usize) -> Vec<u8> {
     .into_bytes()
 }
 
+fn live_command() -> DeviceCommand {
+    DeviceCommand {
+        command_id: CommandId::generate(),
+        device: auth().device_key,
+        expires_at: None,
+        payload: DeviceCommandPayload {
+            name: "set".into(),
+            arguments: Default::default(),
+        },
+    }
+}
+
+#[tokio::test]
+async fn command_service_retries_conflicts_and_drain_share_one_dispatch() {
+    let provider = Arc::new(CountingProvider {
+        calls: AtomicUsize::new(0),
+        auth: auth(),
+        delay: false,
+    });
+    let (ingress, services, _) = runtime(Limits::default(), provider);
+    let mut command = live_command();
+    command
+        .payload
+        .arguments
+        .insert("first".into(), Scalar::Number(1.0));
+    command
+        .payload
+        .arguments
+        .insert("second".into(), Scalar::Number(2.0));
+    assert!(matches!(
+        services.commands.send(command.clone()).await,
+        Err(Error::Unavailable)
+    ));
+    let (_lease, mut device_rx) = ingress
+        .sessions
+        .register(Arc::new(auth()), Transport::Tcp)
+        .unwrap();
+
+    // A None expiry is fingerprinted before the Gateway fills in its actual TTL.
+    let first = services.commands.send(command.clone()).await.unwrap();
+    let mut reordered = command.clone();
+    reordered.payload.arguments.clear();
+    reordered
+        .payload
+        .arguments
+        .insert("second".into(), Scalar::Number(2.0));
+    reordered
+        .payload
+        .arguments
+        .insert("first".into(), Scalar::Number(1.0));
+    let repeated = services.commands.send(reordered).await.unwrap();
+    assert_eq!(first, repeated);
+    assert_eq!(first.state, DeliveryState::Queued);
+    assert_eq!(device_rx.try_recv().unwrap().command_id, command.command_id);
+    assert!(device_rx.try_recv().is_err());
+
+    let mut changed = command.clone();
+    changed.payload.name = "different".into();
+    assert!(matches!(
+        services.commands.send(changed).await,
+        Err(Error::Conflict)
+    ));
+    let mut changed = command.clone();
+    changed.device.device_id = DeviceId::new("other").unwrap();
+    assert!(matches!(
+        services.commands.send(changed).await,
+        Err(Error::Conflict)
+    ));
+    let mut changed = command.clone();
+    changed.expires_at = Some(now_ms() + 1_000);
+    assert!(matches!(
+        services.commands.send(changed).await,
+        Err(Error::Conflict)
+    ));
+    assert!(device_rx.try_recv().is_err());
+
+    ingress.lifecycle.begin_quiesce().await.unwrap();
+    assert_eq!(
+        services.commands.send(command.clone()).await.unwrap(),
+        first
+    );
+    command.command_id = CommandId::generate();
+    assert!(matches!(
+        services.commands.send(command).await,
+        Err(Error::Draining)
+    ));
+    assert_eq!(services.commands.usage().unwrap(), (1, 0));
+}
+
+#[tokio::test]
+async fn command_service_concurrent_same_id_reaches_device_once() {
+    let provider = Arc::new(CountingProvider {
+        calls: AtomicUsize::new(0),
+        auth: auth(),
+        delay: false,
+    });
+    let (ingress, services, _) = runtime(Limits::default(), provider);
+    let (_lease, mut device_rx) = ingress
+        .sessions
+        .register(Arc::new(auth()), Transport::Tcp)
+        .unwrap();
+    let command = live_command();
+    let mut jobs = tokio::task::JoinSet::new();
+    for _ in 0..32 {
+        let service = services.commands.clone();
+        let command = command.clone();
+        jobs.spawn(async move { service.send(command).await });
+    }
+    while let Some(result) = jobs.join_next().await {
+        assert_eq!(result.unwrap().unwrap().command_id, command.command_id);
+    }
+    assert_eq!(device_rx.try_recv().unwrap().command_id, command.command_id);
+    assert!(device_rx.try_recv().is_err());
+    assert_eq!(ingress.metrics.get(Metric::CommandQueued), 1);
+    assert_eq!(services.commands.usage().unwrap(), (1, 0));
+}
+
+#[tokio::test]
+async fn command_service_capacity_expiry_and_invalid_expiry_cleanup() {
+    let provider = Arc::new(CountingProvider {
+        calls: AtomicUsize::new(0),
+        auth: auth(),
+        delay: false,
+    });
+    let limits = Limits {
+        command_dedup_max_entries: 1,
+        command_dedup_ttl_ms: 10,
+        ..Limits::default()
+    };
+    let (ingress, services, _) = runtime(limits, provider);
+    let (_lease, mut device_rx) = ingress
+        .sessions
+        .register(Arc::new(auth()), Transport::Tcp)
+        .unwrap();
+    let first = live_command();
+    let mut invalid = live_command();
+    invalid.expires_at = Some(now_ms() - 1);
+    assert!(matches!(
+        services.commands.send(invalid.clone()).await,
+        Err(Error::Invalid)
+    ));
+    invalid.expires_at = Some(now_ms() + 1_000);
+    services.commands.send(invalid.clone()).await.unwrap();
+    assert_eq!(device_rx.try_recv().unwrap().command_id, invalid.command_id);
+    assert_eq!(
+        services
+            .commands
+            .send(invalid.clone())
+            .await
+            .unwrap()
+            .command_id,
+        invalid.command_id
+    );
+    assert!(matches!(
+        services.commands.send(first.clone()).await,
+        Err(Error::Overloaded)
+    ));
+    tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+    services.commands.send(invalid).await.unwrap();
+    assert!(device_rx.try_recv().is_ok());
+    tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+    services.commands.send(first).await.unwrap();
+    assert!(device_rx.try_recv().is_ok());
+    assert_eq!(services.commands.usage().unwrap(), (1, 0));
+    assert_eq!(ingress.metrics.get(Metric::CommandDedupEvictions), 2);
+}
+
 fn runtime(
     limits: Limits,
     provider: Arc<CountingProvider>,

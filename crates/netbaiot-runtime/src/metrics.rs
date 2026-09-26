@@ -38,6 +38,11 @@ pub enum Metric {
     CommandReceived,
     CommandAcked,
     CommandFailed,
+    CommandDedupHits,
+    CommandDedupConflicts,
+    CommandDedupReservations,
+    CommandDedupEvictions,
+    CommandDedupOverloads,
     EventsAccepted,
     EventsRejected,
     EventBytes,
@@ -82,6 +87,9 @@ pub enum Metric {
     BusinessRpcV3SendAheadStalls,
     BusinessRpcV3Overloads,
     BusinessRpcV3ProtocolErrors,
+    BusinessRpcV3CommandRequests,
+    BusinessRpcV3CommandAccepted,
+    BusinessRpcV3CommandErrors,
 }
 #[derive(Clone, Copy)]
 #[repr(usize)]
@@ -101,7 +109,7 @@ pub enum BusinessRpcCallResult {
     Invalid,
 }
 
-const NAMES: [&str; 77] = [
+const NAMES: [&str; 85] = [
     "connections_accepted",
     "connections_rejected",
     "mqtt_connect_success",
@@ -135,6 +143,11 @@ const NAMES: [&str; 77] = [
     "command_received",
     "command_acked",
     "command_failed",
+    "command_dedup_hits",
+    "command_dedup_conflicts",
+    "command_dedup_reservations",
+    "command_dedup_evictions",
+    "command_dedup_overloads",
     "events_accepted",
     "events_rejected",
     "event_bytes",
@@ -179,6 +192,9 @@ const NAMES: [&str; 77] = [
     "business_rpc_v3_send_ahead_stalls",
     "business_rpc_v3_overloads",
     "business_rpc_v3_protocol_errors",
+    "business_rpc_v3_command_requests",
+    "business_rpc_v3_command_accepted",
+    "business_rpc_v3_command_errors",
 ];
 
 /// Opt-in experiment counters, inactive unless lock timing is enabled.

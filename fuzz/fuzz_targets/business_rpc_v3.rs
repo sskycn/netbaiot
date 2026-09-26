@@ -1,6 +1,6 @@
 #![no_main]
 use libfuzzer_sys::fuzz_target;
-use netbaiot_core::business_rpc_v3::{V3FrameHeader, V3FrameType, V3GoAway, V3Open, V3Reset, V3Response};
+use netbaiot_core::business_rpc_v3::{DeviceCommandSendRequest, V3FrameHeader, V3FrameType, V3GoAway, V3Open, V3Reset, V3Response};
 use netbaiot_v3_mux::{Initiator, MuxScheduler, ReassemblyBudget, StreamTable};
 
 fuzz_target!(|data: &[u8]| {
@@ -33,7 +33,11 @@ fuzz_target!(|data: &[u8]| {
                 }
             }
             V3FrameType::Data => {
-                let _ = table.receive_data(header.stream_id, payload, header.flags != 0);
+                if let Ok(received) = table.receive_data(header.stream_id, payload, header.flags != 0)
+                    && let Some(body) = received.complete
+                {
+                    let _ = serde_json::from_slice::<DeviceCommandSendRequest>(&body);
+                }
             }
             V3FrameType::WindowUpdate => {
                 if let Ok(bytes) = <[u8; 4]>::try_from(payload) {

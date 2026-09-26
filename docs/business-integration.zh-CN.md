@@ -24,4 +24,8 @@ Hello、subscribe、事件 ACK 读取和写入都有硬性截止时间和帧大�
 
 ## 通过 Business RPC V2 发送在线设备命令
 
-仅发送命令的业务服务使用 mTLS `commands` 身份；同时收需确认事件与发命令则用 `application`。两者均需 `call_methods: ["device.command.send"]`；`application` 还需 `sink_id: "tcp-rpc"`。`BusinessRpcClient::send_command(&command)` 返回 `Queued` 只代表网关已接受当前在线会话的命令，不等待设备执行。后续按 `command_id` 匹配 `CommandAck` 事件，完成业务事务后再 ACK 事件。结果未知时由业务方决定重试，并保留相同 `command_id`；每次 RPC 的 `request_id` 独立。进程内幂等窗口为 `command_ttl_ms`，重启后不保留。离线命令由业务系统负责，网关直接拒绝。管理 HTTP `/api/v1/devices/commands` 继续服务运维及旧客户端，并共用命令幂等语义。限制和错误详见 [Business RPC Stream V2](business-rpc-v2.zh-CN.md)。
+仅发送命令的业务服务使用 mTLS `commands` 身份；同时收需确认事件与发命令则用 `application`。两者均需 `call_methods: ["device.command.send"]`；`application` 还需 `sink_id: "tcp-rpc"`。`BusinessRpcClient::send_command(&command)` 返回 `Queued` 只代表网关已接受当前在线会话的命令，不等待设备执行。后续按 `command_id` 匹配 `CommandAck` 事件，完成业务事务后再 ACK 事件。结果未知时由业务方决定重试，并保留相同 `command_id`；每次 RPC 的 `request_id` 独立。进程内幂等窗口为 `command_dedup_ttl_ms`，重启后不保留。离线命令由业务系统负责，网关直接拒绝。管理 HTTP `/api/v1/devices/commands` 继续服务运维及旧客户端，并共用命令幂等语义。限制和错误详见 [Business RPC Stream V2](business-rpc-v2.zh-CN.md)。
+
+## 通过 Business RPC V3 发送在线设备命令
+
+配置允许 `device.command.send` 的 mTLS BusinessPrincipal，并限制目标租户；若还消费事件，增加 `sink_id: "tcp-rpc"`。启用 `business_rpc.v3`，调用 `BusinessRpcV3Client::wait_ready()` 后使用 `send_command(&command)`。V3 使用独立 RPC 流，与 V2 共用命令请求及响应 DTO。`Queued`、`CommandAck`、`OutcomeUnknown`、冲突、离线和进程内幂等语义见 [Business RPC V3](business-rpc-v3.zh-CN.md)。仅发命令时可设置 `provider = false`、`events = false`。示例见 [V3 命令客户端](../crates/netbaiot-client/examples/business_v3_command.rs)。

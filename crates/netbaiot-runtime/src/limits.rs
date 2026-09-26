@@ -77,6 +77,9 @@ pub struct Limits {
     pub max_pending_commands_per_tenant: usize,
     pub max_pending_commands: usize,
     pub max_command_bytes: usize,
+    /// Process-local accepted and in-flight CommandId reservations.
+    pub command_dedup_max_entries: usize,
+    pub command_dedup_ttl_ms: u64,
     pub max_devices: usize,
     pub max_devices_per_tenant: usize,
     /// Retention window for disconnected device presence. Active sessions are never evicted.
@@ -218,6 +221,8 @@ impl Default for Limits {
             max_pending_commands_per_tenant: 128,
             max_pending_commands: 1_024,
             max_command_bytes: 16_384,
+            command_dedup_max_entries: 4_096,
+            command_dedup_ttl_ms: 300_000,
             max_devices: 1_024,
             max_devices_per_tenant: 128,
             presence_ttl_ms: 3_600_000,
@@ -400,6 +405,8 @@ impl Limits {
             || self.max_ingress_bytes < max_frame
             || self.max_ingress_wait_bytes < max_frame
             || self.max_command_bytes > self.max_write_buffer_per_connection
+            || self.command_dedup_max_entries > 65_536
+            || self.command_dedup_ttl_ms > 86_400_000
             || self.replay_ttl_ms <= self.udp_clock_skew_ms.saturating_mul(2)
         {
             return Err(Error::Configuration);

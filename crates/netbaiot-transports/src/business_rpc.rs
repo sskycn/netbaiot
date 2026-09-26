@@ -13,8 +13,8 @@ use netbaiot_core::{
 };
 use netbaiot_runtime::{
     BusinessEventRequest, BusinessProviderScope, BusinessRpcCall, BusinessRpcEventSink,
-    BusinessRpcOutbound, BusinessRpcRegistry, CommandRouter, Error, Ingress, ProviderLease, Result,
-    SinkAck, SinkError,
+    BusinessRpcOutbound, BusinessRpcRegistry, CommandService, Error, Ingress, ProviderLease,
+    Result, SinkAck, SinkError,
     metrics::{BusinessRpcQueueClass, Histogram, Metric, Metrics},
 };
 use serde::{Deserialize, Serialize};
@@ -248,7 +248,7 @@ pub struct BusinessRpcServices {
     pub sink: Arc<BusinessRpcEventSink>,
     pub ingress: Arc<Ingress>,
     pub mqtt: Arc<MqttBroker>,
-    pub commands: Arc<CommandRouter>,
+    pub commands: Arc<CommandService>,
 }
 
 pub async fn serve(
@@ -1078,11 +1078,15 @@ fn command_error(error: Error) -> RpcErrorCode {
     }
 }
 
-fn process_command_request(
+async fn process_command_request<F, Fut>(
     request: CommandRequest,
     principal: &BusinessPrincipal,
-    dispatch: impl FnOnce(netbaiot_core::DeviceCommand) -> Result<netbaiot_core::CommandDispatch>,
-) -> BusinessRpcFrame {
+    dispatch: F,
+) -> BusinessRpcFrame
+where
+    F: FnOnce(netbaiot_core::DeviceCommand) -> Fut,
+    Fut: std::future::Future<Output = Result<netbaiot_core::CommandDispatch>>,
+{
     let method = "device.command.send";
     if request.cancelled.load(Ordering::Acquire) || tokio::time::Instant::now() >= request.deadline
     {
@@ -1117,18 +1121,27 @@ fn process_command_request(
                 "command request expired",
             )
         }
-        Ok(input) => match dispatch(input.command) {
-            Ok(dispatch) => response(
+        Ok(input) => match tokio::time::timeout_at(request.deadline, dispatch(input.command)).await
+        {
+            Err(_) => error(
                 request.request_id,
                 method,
-                Ok(DeviceCommandSendResponse { dispatch }),
+                RpcErrorCode::Timeout,
+                "command request expired",
             ),
-            Err(failure) => error(
-                request.request_id,
-                method,
-                command_error(failure),
-                "command dispatch rejected",
-            ),
+            Ok(result) => match result {
+                Ok(dispatch) => response(
+                    request.request_id,
+                    method,
+                    Ok(DeviceCommandSendResponse { dispatch }),
+                ),
+                Err(failure) => error(
+                    request.request_id,
+                    method,
+                    command_error(failure),
+                    "command dispatch rejected",
+                ),
+            },
         },
     }
 }
@@ -1149,7 +1162,8 @@ async fn command_loop(
         let request_id = request.request_id;
         let reply = process_command_request(request, &principal, |command| {
             services.commands.send(command)
-        });
+        })
+        .await;
         if let Ok(mut pending) = cancellations.lock() {
             pending.remove(&request_id);
         } else {
@@ -1513,8 +1527,8 @@ mod tests {
         assert_eq!(command_error(Error::Codec), RpcErrorCode::InvalidRequest);
     }
 
-    #[test]
-    fn command_scope_deadline_and_cancel_precede_dispatch() {
+    #[tokio::test]
+    async fn command_scope_deadline_and_cancel_precede_dispatch() {
         let principal = BusinessPrincipal {
             id: "commands".into(),
             role: BusinessRole::Commands,
@@ -1554,8 +1568,9 @@ mod tests {
         let forbidden = process_command_request(
             make_request(&command, future, Arc::new(AtomicBool::new(false))),
             &principal,
-            |_| panic!("scope denial must precede session lookup"),
-        );
+            |_| async { panic!("scope denial must precede session lookup") },
+        )
+        .await;
         assert!(matches!(
             forbidden,
             BusinessRpcFrame::Response {
@@ -1574,8 +1589,9 @@ mod tests {
                 Arc::new(AtomicBool::new(false)),
             ),
             &principal,
-            |_| panic!("deadline must precede dispatch"),
-        );
+            |_| async { panic!("deadline must precede dispatch") },
+        )
+        .await;
         assert!(matches!(
             expired,
             BusinessRpcFrame::Response {
@@ -1590,8 +1606,9 @@ mod tests {
         let skipped = process_command_request(
             make_request(&command, future, cancelled),
             &principal,
-            |_| panic!("cancelled work must not dispatch"),
-        );
+            |_| async { panic!("cancelled work must not dispatch") },
+        )
+        .await;
         assert!(matches!(
             skipped,
             BusinessRpcFrame::Response {
@@ -1607,14 +1624,15 @@ mod tests {
         let accepted = process_command_request(
             make_request(&command, future, cancelled_after_admission),
             &principal,
-            move |command| {
+            move |command| async move {
                 flag.store(true, Ordering::Release);
                 Ok(netbaiot_core::CommandDispatch {
                     command_id: command.command_id,
                     state: DeliveryState::Queued,
                 })
             },
-        );
+        )
+        .await;
         assert!(matches!(
             accepted,
             BusinessRpcFrame::Response {

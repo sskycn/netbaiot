@@ -1,14 +1,15 @@
 //! Business RPC V3 client. V2's public client and wire contract are unchanged.
 use super::{
-    BusinessAuthHandler, BusinessRpcClientConfig, BusinessRpcClientError as Error, BusinessRpcTls,
-    Io, connect_io,
+    BorrowedCommandRequest, BoundedCommandBody, BusinessAuthHandler, BusinessRpcClientConfig,
+    BusinessRpcClientError as Error, BusinessRpcTls, Io, connect_io,
 };
 use bytes::Bytes;
 use netbaiot_protocol::{
-    AuthInvalidation, EventDelivery, EventFilter, SubscriptionId,
+    AuthInvalidation, CommandDispatch, CommandId, DeviceCommand, EventDelivery, EventFilter,
+    SubscriptionId,
     business_rpc::{
-        AuthInvalidateRequest, AuthInvalidateResponse, AuthSyncRequest, AuthSyncResponse, RpcError,
-        RpcErrorCode,
+        AuthInvalidateRequest, AuthInvalidateResponse, AuthSyncRequest, AuthSyncResponse,
+        DeviceCommandSendResponse, RpcError, RpcErrorCode,
     },
     business_rpc_v3::{
         BUSINESS_RPC_V3_VERSION, V3_END_STREAM, V3Accept, V3Bootstrap, V3EventAck, V3EventStatus,
@@ -38,6 +39,7 @@ use uuid::Uuid;
 
 const OUTBOUND_BYTES: usize = 16 * 1024 * 1024;
 const REASSEMBLY_BYTES: usize = 16 * 1024 * 1024;
+type PendingCommands = HashMap<u32, (CommandId, oneshot::Sender<Result<CommandDispatch, Error>>)>;
 
 #[derive(Clone)]
 pub struct BusinessRpcV3ClientConfig {
@@ -76,8 +78,7 @@ impl BusinessRpcV3ClientConfig {
         }
     }
     fn validate(&self) -> Result<(), Error> {
-        if !self.provider && !self.events
-            || self.auth_revision == 0
+        if self.auth_revision == 0
             || self.authority_incarnation.is_nil()
             || self.limits.validate().is_err()
             || self.filter.validate().is_err()
@@ -117,6 +118,12 @@ enum Command {
         u64,
         AuthInvalidateRequest,
         oneshot::Sender<Result<AuthInvalidateResponse, Error>>,
+    ),
+    Dispatch(
+        u64,
+        CommandId,
+        Bytes,
+        oneshot::Sender<Result<CommandDispatch, Error>>,
     ),
     EventAck {
         epoch: u64,
@@ -264,6 +271,31 @@ impl BusinessRpcV3Client {
             .await
             .map_err(|_| Error::Timeout)?
             .map_err(|_| Error::Unavailable)?
+    }
+    /// A successful response is Queued at the live Gateway session, not device
+    /// execution. Connection loss after submission has an unknown outcome; callers
+    /// choose whether to retry the same semantic command and command_id.
+    pub async fn send_command(&self, command: &DeviceCommand) -> Result<CommandDispatch, Error> {
+        if !self.ready() {
+            return Err(Error::Unavailable);
+        }
+        let mut encoded = BoundedCommandBody(Vec::new());
+        serde_json::to_writer(&mut encoded, &BorrowedCommandRequest { command })
+            .map_err(|_| Error::Protocol)?;
+        let (done, receive) = oneshot::channel();
+        self.inner
+            .commands
+            .try_send(Command::Dispatch(
+                self.inner.epoch.load(Ordering::Acquire),
+                command.command_id,
+                Bytes::from(encoded.0),
+                done,
+            ))
+            .map_err(|_| Error::Overloaded)?;
+        tokio::time::timeout(self.inner.timeout, receive)
+            .await
+            .map_err(|_| Error::OutcomeUnknown)?
+            .map_err(|_| Error::OutcomeUnknown)?
     }
     pub async fn shutdown(&self) {
         self.inner.shutdown.cancel();
@@ -733,6 +765,7 @@ async fn connected(
     let mut pong_written: Option<oneshot::Receiver<Result<(), Error>>> = None;
     let mut invalidations =
         HashMap::<u32, oneshot::Sender<Result<AuthInvalidateResponse, Error>>>::new();
+    let mut pending_commands = PendingCommands::new();
     let mut response_meta = HashMap::<u32, V3Response>::new();
     let mut inbound_rpc = HashMap::<u32, String>::new();
     let mut inbound_events = HashMap::<u32, (Uuid, Uuid)>::new();
@@ -760,6 +793,7 @@ async fn connected(
                 inbound_events.remove(&stream_id);
                 response_meta.remove(&stream_id);
                 invalidations.remove(&stream_id);
+                pending_commands.remove(&stream_id);
                 if let Some(handle) = handler_handles.remove(&stream_id) {
                     handle.abort();
                 }
@@ -811,6 +845,9 @@ async fn connected(
         }};
     }
     let result: Result<(), Error> = async {
+        if !config.provider && !config.events {
+            mark_ready(ready, config, false, false);
+        }
         loop {
         if streams.local_ids_exhausted() {
             ready.send_replace(false);
@@ -830,6 +867,7 @@ async fn connected(
         }
         if draining.is_some()
             && invalidations.is_empty()
+            && pending_commands.is_empty()
             && handlers.is_empty()
             && streams.active()
                 <= usize::from(provider_id.is_some()) + usize::from(subscription_stream.is_some())
@@ -931,6 +969,32 @@ async fn connected(
                         streams.mark_local_end(id).map_err(|_| Error::Protocol)?;
                         invalidations.insert(id, done);
                     }
+                    Command::Dispatch(command_epoch, command_id, bytes, done) => {
+                        if draining.is_some() || command_epoch != epoch {
+                            let _ = done.send(Err(Error::Unavailable));
+                            continue;
+                        }
+                        let open = V3Open::Rpc {
+                            parent_stream_id: None,
+                            request_id: Uuid::new_v4(),
+                            method: "device.command.send".into(),
+                            deadline_ms: config.request_timeout.as_millis().clamp(1, 60_000) as u32,
+                            content_length: u32::try_from(bytes.len()).map_err(|_| Error::Overloaded)?,
+                        };
+                        let id = match streams.open_local(&open) {
+                            Ok(id) => id,
+                            Err(_) => { let _ = done.send(Err(Error::Overloaded)); continue; }
+                        };
+                        enqueue(&writer_tx, metadata(id, V3FrameType::Open, &open, &limits)?)?;
+                        if body(&writer_tx, &outbound, id, DataClass::Rpc, bytes, None).is_err() {
+                            let _ = streams.reset(id);
+                            let _ = done.send(Err(Error::Overloaded));
+                            reset(&writer_tx, id, V3ResetCode::Overloaded, &limits)?;
+                            continue;
+                        }
+                        streams.mark_local_end(id).map_err(|_| Error::Protocol)?;
+                        pending_commands.insert(id, (command_id, done));
+                    }
                     Command::EventAck { epoch: delivery_epoch, id, delivery_id, event_id, success, done } => {
                         if delivery_epoch != epoch { let _ = done.send(Err(Error::Unavailable)); continue; }
                         if streams.mark_local_end(id).is_err() { let _ = done.send(Err(Error::Unavailable)); continue; }
@@ -1011,7 +1075,7 @@ async fn connected(
                             Ok(response) if response.validate().is_ok() => response,
                             _ => { fail_stream!(id, V3ResetCode::ProtocolError); continue; }
                         };
-                        if Some(id) != sync_id && !invalidations.contains_key(&id) { reset(&writer_tx, id, V3ResetCode::StreamClosed, &limits)?; continue; }
+                        if Some(id) != sync_id && !invalidations.contains_key(&id) && !pending_commands.contains_key(&id) { reset(&writer_tx, id, V3ResetCode::StreamClosed, &limits)?; continue; }
                         if let Err(error) = streams.mark_response(id, response.content_length as usize) {
                             if let Some(code) = stream_error(error) { fail_stream!(id, code); continue; }
                             break Err(Error::Protocol);
@@ -1026,7 +1090,7 @@ async fn connected(
                                 }
                             };
                             if let Some(bytes) = received.complete
-                                && complete_client_response(id, &bytes, &mut sync_id, &mut sync_response_ok, &mut invalidations, &mut response_meta).is_err()
+                                && complete_client_response(id, &bytes, &mut sync_id, &mut sync_response_ok, &mut invalidations, &mut pending_commands, &mut response_meta).is_err()
                             {
                                 fail_stream!(id, V3ResetCode::ProtocolError);
                             }
@@ -1048,8 +1112,8 @@ async fn connected(
                             if received.stream_update > 0 { enqueue(&writer_tx, fixed(id, V3FrameType::WindowUpdate, &received.stream_update.to_be_bytes(), &limits)?)?; }
                         }
                         if let Some(bytes) = received.complete {
-                            if Some(id) == sync_id || invalidations.contains_key(&id) {
-                                if complete_client_response(id, &bytes, &mut sync_id, &mut sync_response_ok, &mut invalidations, &mut response_meta).is_err() {
+                            if Some(id) == sync_id || invalidations.contains_key(&id) || pending_commands.contains_key(&id) {
+                                if complete_client_response(id, &bytes, &mut sync_id, &mut sync_response_ok, &mut invalidations, &mut pending_commands, &mut response_meta).is_err() {
                                     fail_stream!(id, V3ResetCode::ProtocolError);
                                 }
                             } else if let Some(method) = inbound_rpc.remove(&id) {
@@ -1103,6 +1167,11 @@ async fn connected(
                             let _ = streams.reset(id);
                             let _ = writer_tx.try_send(WriterMessage::Reset(id));
                         }
+                        for id in pending_commands.keys().copied().filter(|id| *id > away.last_stream_id).collect::<Vec<_>>() {
+                            pending_commands.remove(&id);
+                            let _ = streams.reset(id);
+                            let _ = writer_tx.try_send(WriterMessage::Reset(id));
+                        }
                         ready.send_replace(false);
                         if draining.is_none() {
                             draining = Some(tokio::time::Instant::now() + config.request_timeout);
@@ -1126,6 +1195,7 @@ fn complete_client_response(
     sync_id: &mut Option<u32>,
     sync_response_ok: &mut bool,
     invalidations: &mut HashMap<u32, oneshot::Sender<Result<AuthInvalidateResponse, Error>>>,
+    pending_commands: &mut PendingCommands,
     meta: &mut HashMap<u32, V3Response>,
 ) -> Result<(), Error> {
     let response = meta.remove(&id).ok_or(Error::Protocol)?;
@@ -1141,6 +1211,21 @@ fn complete_client_response(
             Err(Error::Remote(error.code))
         } else {
             serde_json::from_slice(bytes).map_err(|_| Error::Protocol)
+        };
+        let _ = done.send(result);
+    } else if let Some((expected, done)) = pending_commands.remove(&id) {
+        let result = if let Some(error) = response.error {
+            Err(Error::Remote(error.code))
+        } else {
+            serde_json::from_slice::<DeviceCommandSendResponse>(bytes)
+                .map_err(|_| Error::Protocol)
+                .and_then(|value| {
+                    if value.dispatch.command_id == expected {
+                        Ok(value.dispatch)
+                    } else {
+                        Err(Error::Protocol)
+                    }
+                })
         };
         let _ = done.send(result);
     }

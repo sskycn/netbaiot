@@ -1157,7 +1157,7 @@ pub async fn run_with_credentials(
                 sink: sink.clone(),
                 ingress: ingress.clone(),
                 mqtt: mqtt_broker.clone(),
-                commands: base_services.router.clone(),
+                commands: base_services.commands.clone(),
             });
             if rpc.allow_v1 {
                 let secret = business_stream_token
