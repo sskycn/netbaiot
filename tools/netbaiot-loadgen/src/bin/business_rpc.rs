@@ -345,6 +345,9 @@ struct Counts {
     publish_attempts: u64,
     publish_enqueued: u64,
     publish_errors: u64,
+    publish_offline: u64,
+    publish_overloaded: u64,
+    publish_other_errors: u64,
     reconnects: u64,
     sync_failures: u64,
     invalidations: u64,
@@ -409,6 +412,8 @@ impl Histogram {
 #[derive(Default)]
 struct Stats {
     counts: Counts,
+    publish_failures: Vec<TimedObservation>,
+    fault_markers: Vec<TimedObservation>,
     command_traces: BTreeMap<CommandId, CommandTrace>,
     command_device_seen: HashSet<CommandId>,
     command_unavailable_ids: HashSet<CommandId>,
@@ -418,6 +423,11 @@ struct Stats {
     tls_handshake: Histogram,
     sync_ready: Histogram,
     full_ready: Histogram,
+}
+#[derive(Serialize)]
+struct TimedObservation {
+    elapsed_ms: u64,
+    kind: &'static str,
 }
 #[derive(Serialize)]
 struct CommandTrace {
@@ -775,6 +785,7 @@ async fn event_load(
         None
     };
     let until = Instant::now() + Duration::from_secs(config.duration_secs);
+    let workload_started = until - Duration::from_secs(config.duration_secs);
     let command_worker_until = until + Duration::from_secs(2);
     let mut command_devices = Vec::new();
     let mut command_workers = JoinSet::new();
@@ -1040,6 +1051,12 @@ async fn event_load(
                 }
             }
             _ = auth_reconnect_tick.tick(), if config.auth_reconnect_every_secs > 0 && config.topology.separate() => {
+                {
+                    let mut state = stats.lock().unwrap();
+                    if state.fault_markers.len() < 1_000 {
+                        state.fault_markers.push(TimedObservation { elapsed_ms: workload_started.elapsed().as_millis() as u64, kind: "provider_reconnect" });
+                    }
+                }
                 business.shutdown().await;
                 match connect_event_business(config, handler.clone(), BusinessRole::AuthControl, &stats).await {
                     Ok((next, _)) => {
@@ -1054,6 +1071,12 @@ async fn event_load(
                 }
             }
             _ = reconnect_tick.tick(), if config.event_reconnect_every_secs > 0 => {
+                {
+                    let mut state = stats.lock().unwrap();
+                    if state.fault_markers.len() < 1_000 {
+                        state.fault_markers.push(TimedObservation { elapsed_ms: workload_started.elapsed().as_millis() as u64, kind: "event_subscription_reconnect" });
+                    }
+                }
                 if let Some(events) = event_business.take() { events.shutdown().await; }
                 else { business.shutdown().await; }
                 let role = if config.topology.separate() { BusinessRole::Events } else { BusinessRole::Multiplexed };
@@ -1089,8 +1112,29 @@ async fn event_load(
                 let published = publisher.publish(payload, PublishQos::AtLeastOnce).await;
                 let mut state = stats.lock().unwrap();
                 state.counts.publish_attempts += 1;
-                if published.is_ok() { state.counts.publish_enqueued += 1; }
-                else { state.counts.publish_errors += 1; }
+                match published {
+                    Ok(()) => state.counts.publish_enqueued += 1,
+                    Err(error) => {
+                        state.counts.publish_errors += 1;
+                        let kind = match error {
+                            DeviceSdkError::Offline => {
+                                state.counts.publish_offline += 1;
+                                "offline"
+                            }
+                            DeviceSdkError::Overloaded => {
+                                state.counts.publish_overloaded += 1;
+                                "overloaded"
+                            }
+                            _ => {
+                                state.counts.publish_other_errors += 1;
+                                "other"
+                            }
+                        };
+                        if state.publish_failures.len() < 1_000 {
+                            state.publish_failures.push(TimedObservation { elapsed_ms: workload_started.elapsed().as_millis() as u64, kind });
+                        }
+                    }
+                }
             }
             received = deliveries.recv() => {
                 let Some(delivery) = received else { break };
@@ -1980,6 +2024,8 @@ async fn main() -> Result<()> {
             "events_per_second": state.counts.events as f64 / elapsed.as_secs_f64().max(0.001),
             "event_acks_per_second": state.counts.event_acks as f64 / elapsed.as_secs_f64().max(0.001),
             "counts": state.counts,
+            "publish_failures": &state.publish_failures,
+            "fault_markers": &state.fault_markers,
             "command_traces": state.command_traces.values().collect::<Vec<_>>(),
         "verifier_provider_calls": verifier_calls,
         "verifier_calls_before_invalidation": verifier_calls_before_invalidation,

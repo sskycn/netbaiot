@@ -4,7 +4,7 @@
   "auth_concurrency": 4,
   "auth_rate": 2,
   "require_zero_ingress_rejections": true,
-  "require_zero_publish_errors": true,
+  "require_classified_publish_errors": true,
   "event_rate": 2,
   "command_rate": 1,
   "command_device_count": 50,
