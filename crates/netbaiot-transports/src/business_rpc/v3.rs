@@ -10,6 +10,7 @@ use netbaiot_v3_mux::{
 };
 use serde::de::DeserializeOwned;
 use std::{collections::HashMap, sync::OnceLock};
+use tokio::task::{AbortHandle, JoinSet};
 
 const CONNECTION_REASSEMBLY_BYTES: usize = 16 * 1024 * 1024;
 const GLOBAL_REASSEMBLY_BYTES: usize = 128 * 1024 * 1024;
@@ -557,7 +558,8 @@ fn classify_stream_error(error: MuxError) -> Option<V3ResetCode> {
 struct CancelWork<'a> {
     tx: &'a mpsc::Sender<WriterMessage>,
     services: &'a BusinessRpcServices,
-    incoming_rpc: &'a mut HashMap<u32, (Uuid, String)>,
+    incoming_rpc: &'a mut HashMap<u32, IncomingRpc>,
+    command_handles: &'a mut HashMap<u32, AbortHandle>,
     control_requests: &'a mut HashMap<Uuid, u32>,
     outbound_auth: &'a mut HashMap<u32, (Uuid, String)>,
     response_meta: &'a mut HashMap<u32, V3Response>,
@@ -568,6 +570,7 @@ fn cancel_stream_work(id: u32, epoch: u64, work: CancelWork<'_>) {
         tx,
         services,
         incoming_rpc,
+        command_handles,
         control_requests,
         outbound_auth,
         response_meta,
@@ -575,6 +578,9 @@ fn cancel_stream_work(id: u32, epoch: u64, work: CancelWork<'_>) {
     } = work;
     let _ = tx.try_send(WriterMessage::Reset { id });
     incoming_rpc.remove(&id);
+    if let Some(handle) = command_handles.remove(&id) {
+        handle.abort();
+    }
     control_requests.retain(|_, stream_id| *stream_id != id);
     response_meta.remove(&id);
     if let Some((request_id, method)) = outbound_auth.remove(&id) {
@@ -587,6 +593,15 @@ fn cancel_stream_work(id: u32, epoch: u64, work: CancelWork<'_>) {
     {
         let _ = event.result.send(Err(SinkError::Retryable));
     }
+}
+struct IncomingRpc {
+    request_id: Uuid,
+    method: String,
+    deadline: tokio::time::Instant,
+}
+struct CommandReply {
+    id: u32,
+    result: Result<netbaiot_core::CommandDispatch>,
 }
 fn complete_response(
     id: u32,
@@ -694,7 +709,9 @@ async fn reader_loop<R: AsyncRead + Unpin + Send + 'static>(
     let mut subscription: Option<(u32, SubscriptionId, u64)> = None;
     let mut events_rx: Option<mpsc::Receiver<BusinessEventRequest>> = None;
     let mut pending_event: Option<PendingEvent> = None;
-    let mut incoming_rpc = HashMap::<u32, (Uuid, String)>::new();
+    let mut incoming_rpc = HashMap::<u32, IncomingRpc>::new();
+    let mut command_jobs = JoinSet::<CommandReply>::new();
+    let mut command_handles = HashMap::<u32, AbortHandle>::new();
     let mut control_requests = HashMap::<Uuid, u32>::new();
     let mut outbound_auth = HashMap::<u32, (Uuid, String)>::new();
     let mut response_meta = HashMap::<u32, V3Response>::new();
@@ -725,6 +742,7 @@ async fn reader_loop<R: AsyncRead + Unpin + Send + 'static>(
                         tx: &tx,
                         services: &services,
                         incoming_rpc: &mut incoming_rpc,
+                        command_handles: &mut command_handles,
                         control_requests: &mut control_requests,
                         outbound_auth: &mut outbound_auth,
                         response_meta: &mut response_meta,
@@ -771,12 +789,16 @@ async fn reader_loop<R: AsyncRead + Unpin + Send + 'static>(
             && pending_event.is_none()
             && control_requests.is_empty()
             && incoming_rpc.is_empty()
+            && command_jobs.is_empty()
             && sync_ping.is_none()
             && sync_written.is_none()
         {
             break Ok(());
         }
         let event_deadline = pending_event.as_ref().and_then(|event| event.deadline);
+        let command_deadline = incoming_rpc.values()
+            .filter(|rpc| rpc.method == "device.command.send")
+            .map(|rpc| rpc.deadline).min();
         tokio::select! {
             biased;
             _ = stop.cancelled() => break Ok(()),
@@ -792,6 +814,46 @@ async fn reader_loop<R: AsyncRead + Unpin + Send + 'static>(
             _ = tokio::time::sleep_until(expiry_deadline.unwrap_or_else(tokio::time::Instant::now)), if expiry_deadline.is_some() => break Err(Error::Forbidden),
             _ = tokio::time::sleep_until(event_deadline.unwrap_or_else(tokio::time::Instant::now)), if event_deadline.is_some() => {
                 if let Some(event) = pending_event.as_ref() { let id = event.id; services.ingress.metrics.inc(Metric::BusinessRpcTimeouts); close_stream!(id); let _ = send(&tx, reset(id, V3ResetCode::Cancel, &limits)?); }
+            }
+            _ = tokio::time::sleep_until(command_deadline.unwrap_or_else(tokio::time::Instant::now)), if command_deadline.is_some() => {
+                let now = tokio::time::Instant::now();
+                let expired: Vec<u32> = incoming_rpc.iter()
+                    .filter_map(|(&id, rpc)| (rpc.method == "device.command.send" && rpc.deadline <= now).then_some(id))
+                    .collect();
+                for id in expired {
+                    incoming_rpc.remove(&id);
+                    let _ = streams.reset(id);
+                    services.ingress.metrics.inc(Metric::BusinessRpcV3CommandErrors);
+                    rpc_error_reply(&tx, id, RpcErrorCode::Timeout, &limits)?;
+                }
+            }
+            reply = command_jobs.join_next(), if !command_jobs.is_empty() => {
+                let Some(reply) = reply else { continue; };
+                let CommandReply { id, result } = match reply {
+                    Ok(reply) => reply,
+                    Err(error) if error.is_cancelled() => continue,
+                    Err(_) => return Err(Error::Internal),
+                };
+                command_handles.remove(&id);
+                let accepted = result.is_ok();
+                if accepted { services.ingress.metrics.inc(Metric::BusinessRpcV3CommandAccepted); }
+                else { services.ingress.metrics.inc(Metric::BusinessRpcV3CommandErrors); }
+                let bytes = match result {
+                    Ok(dispatch) => serde_json::to_vec(&DeviceCommandSendResponse { dispatch }).map_err(|_| Error::Internal)?,
+                    Err(error) => {
+                        if streams.mark_local_end(id).is_ok() {
+                            rpc_error_reply(&tx, id, command_error(error), &limits)?;
+                        }
+                        continue;
+                    }
+                };
+                if streams.mark_local_end(id).is_err() { continue; }
+                let response = V3Response { content_length: u32::try_from(bytes.len()).map_err(|_| Error::Overloaded)?, error: None };
+                send(&tx, metadata(id, V3FrameType::Response, &response, &limits)?)?;
+                if send_body(&tx, &outbound, id, DataClass::Rpc, Bytes::from(bytes)).is_err() {
+                    close_stream!(id);
+                    send(&tx, reset(id, V3ResetCode::Overloaded, &limits)?)?;
+                }
             }
             written = event_written(&mut pending_event), if pending_event.as_ref().is_some_and(|event| event.written.is_some()) => {
                 if let Some(event) = pending_event.as_mut() {
@@ -960,10 +1022,22 @@ async fn reader_loop<R: AsyncRead + Unpin + Send + 'static>(
                             };
                             send(&tx, metadata(id, V3FrameType::Accept, &V3Accept { provider_epoch: None, sync_required: false }, &limits)?)?;
                             subscription = Some((id, *subscription_id, generation)); events_rx = Some(event_rx);
-                        } else if let V3Open::Rpc { parent_stream_id, request_id, method, deadline_ms, .. } = &open {
-                            if !matches!(method.as_str(), "auth.sync" | "auth.invalidate") || !principal.call_methods.iter().any(|allowed| allowed == method) || provider.as_ref().map(|(parent, _)| *parent) != *parent_stream_id {
+                        } else if let V3Open::Rpc { parent_stream_id, request_id, method, deadline_ms, content_length } = &open {
+                            let is_command = method == "device.command.send";
+                            let parent_valid = if is_command {
+                                parent_stream_id.is_none()
+                            } else {
+                                provider.as_ref().map(|(parent, _)| *parent) == *parent_stream_id
+                            };
+                            if !matches!(method.as_str(), "auth.sync" | "auth.invalidate" | "device.command.send") || !principal.call_methods.iter().any(|allowed| allowed == method) || !parent_valid {
                                 streams.refuse_peer(id).map_err(|_| Error::Invalid)?;
                                 rpc_error_reply(&tx, id, RpcErrorCode::Forbidden, &limits)?; continue;
+                            }
+                            // Authorization precedes any command-specific body admission.
+                            if is_command && (*content_length as usize > services.ingress.limits.max_command_bytes.saturating_add(32)) {
+                                streams.refuse_peer(id).map_err(|_| Error::Invalid)?;
+                                services.ingress.metrics.inc(Metric::BusinessRpcV3CommandErrors);
+                                rpc_error_reply(&tx, id, RpcErrorCode::InvalidRequest, &limits)?; continue;
                             }
                             if *deadline_ms == 0 { streams.refuse_peer(id).map_err(|_| Error::Invalid)?; send(&tx, reset(id, V3ResetCode::ProtocolError, &limits)?)?; continue; }
                             if let Err(error) = streams.open_peer(id, &open) {
@@ -971,7 +1045,11 @@ async fn reader_loop<R: AsyncRead + Unpin + Send + 'static>(
                                 break Err(Error::Invalid);
                             }
                             services.ingress.metrics.inc(Metric::BusinessRpcV3StreamsOpened);
-                            incoming_rpc.insert(id, (*request_id, method.clone()));
+                            incoming_rpc.insert(id, IncomingRpc {
+                                request_id: *request_id,
+                                method: method.clone(),
+                                deadline: tokio::time::Instant::now() + Duration::from_millis(u64::from(*deadline_ms)),
+                            });
                         } else { streams.refuse_peer(id).map_err(|_| Error::Invalid)?; send(&tx, reset(id, V3ResetCode::RefusedStream, &limits)?)?; }
                     }
                     V3FrameType::Data => {
@@ -987,11 +1065,51 @@ async fn reader_loop<R: AsyncRead + Unpin + Send + 'static>(
                             if received.stream_update > 0 { send(&tx, fixed(id, V3FrameType::WindowUpdate, &received.stream_update.to_be_bytes(), &limits)?)?; }
                         }
                         if let Some(body) = received.complete {
-                            if let Some((request_id, method)) = incoming_rpc.remove(&id) {
-                                let body = serde_json::from_slice(&body).unwrap_or(serde_json::Value::Null);
-                                if let Some(work) = &control_tx {
-                                    if work.try_send(ControlRequest { request_id, method, body }).is_ok() { control_requests.insert(request_id, id); }
-                                    else { rpc_error_reply(&tx, id, RpcErrorCode::Overloaded, &limits)?; let _ = streams.reset(id); }
+                            if let Some(rpc) = incoming_rpc.remove(&id) {
+                                if rpc.method == "device.command.send" {
+                                    services.ingress.metrics.inc(Metric::BusinessRpcV3CommandRequests);
+                                    if tokio::time::Instant::now() >= rpc.deadline {
+                                        services.ingress.metrics.inc(Metric::BusinessRpcV3CommandErrors);
+                                        rpc_error_reply(&tx, id, RpcErrorCode::Timeout, &limits)?;
+                                        streams.mark_local_end(id).map_err(|_| Error::Invalid)?;
+                                        continue;
+                                    }
+                                    let request: DeviceCommandSendRequest = match serde_json::from_slice(&body) {
+                                        Ok(request) => request,
+                                        Err(_) => {
+                                            services.ingress.metrics.inc(Metric::BusinessRpcV3CommandErrors);
+                                            rpc_error_reply(&tx, id, RpcErrorCode::InvalidRequest, &limits)?;
+                                            streams.mark_local_end(id).map_err(|_| Error::Invalid)?;
+                                            continue;
+                                        }
+                                    };
+                                    if !principal.allows_tenant(&request.command.device.tenant_id) {
+                                        services.ingress.metrics.inc(Metric::BusinessRpcV3CommandErrors);
+                                        rpc_error_reply(&tx, id, RpcErrorCode::Forbidden, &limits)?;
+                                        streams.mark_local_end(id).map_err(|_| Error::Invalid)?;
+                                        continue;
+                                    }
+                                    if command_jobs.len() >= config.auth_max_inflight {
+                                        services.ingress.metrics.inc(Metric::BusinessRpcV3CommandErrors);
+                                        rpc_error_reply(&tx, id, RpcErrorCode::Overloaded, &limits)?;
+                                        streams.mark_local_end(id).map_err(|_| Error::Invalid)?;
+                                        continue;
+                                    }
+                                    let service = services.commands.clone();
+                                    let command = request.command;
+                                    let deadline = rpc.deadline;
+                                    let handle = command_jobs.spawn(async move {
+                                        let result = tokio::time::timeout_at(deadline, service.send(command))
+                                            .await.unwrap_or(Err(Error::Timeout));
+                                        CommandReply { id, result }
+                                    });
+                                    command_handles.insert(id, handle);
+                                } else {
+                                    let body = serde_json::from_slice(&body).unwrap_or(serde_json::Value::Null);
+                                    if let Some(work) = &control_tx {
+                                        if work.try_send(ControlRequest { request_id: rpc.request_id, method: rpc.method, body }).is_ok() { control_requests.insert(rpc.request_id, id); }
+                                        else { rpc_error_reply(&tx, id, RpcErrorCode::Overloaded, &limits)?; let _ = streams.reset(id); }
+                                    }
                                 }
                             } else if outbound_auth.contains_key(&id) || pending_event.as_ref().is_some_and(|event| event.id == id) {
                                 complete_response(id, &body, &provider, &services, &mut outbound_auth, &mut response_meta, &mut pending_event)?;
@@ -1058,6 +1176,7 @@ async fn reader_loop<R: AsyncRead + Unpin + Send + 'static>(
                                 let _ = streams.reset(child);
                                 cancel_stream_work(child, epoch, CancelWork {
                                     tx: &tx, services: &services, incoming_rpc: &mut incoming_rpc,
+                                    command_handles: &mut command_handles,
                                     control_requests: &mut control_requests, outbound_auth: &mut outbound_auth,
                                     response_meta: &mut response_meta, pending_event: &mut pending_event,
                                 });
@@ -1105,6 +1224,7 @@ async fn reader_loop<R: AsyncRead + Unpin + Send + 'static>(
         worker.abort();
         let _ = worker.await;
     }
+    command_jobs.abort_all();
     drop(provider);
     result
 }

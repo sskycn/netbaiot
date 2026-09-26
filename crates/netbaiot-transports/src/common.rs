@@ -23,6 +23,7 @@ pub struct Services {
     pub http_slots: Arc<tokio::sync::Semaphore>,
     pub ingress: Arc<Ingress>,
     pub router: Arc<CommandRouter>,
+    pub commands: Arc<CommandService>,
     pub connections: Arc<Connections>,
     pub rates: Arc<RateLimiter>,
     pub management_request_rates: Arc<RateLimiter>,
@@ -43,6 +44,7 @@ impl Services {
         mqtt: Arc<MqttBroker>,
     ) -> Arc<Self> {
         let limits = ingress.limits.clone();
+        let router = Arc::new(CommandRouter::new(ingress.clone()));
         Arc::new(Self {
             admin: None,
             management_auth: None,
@@ -50,7 +52,8 @@ impl Services {
             shutdown,
             control_lock: Arc::new(tokio::sync::Mutex::new(())),
             http_slots: Arc::new(tokio::sync::Semaphore::new(limits.max_ingress)),
-            router: Arc::new(CommandRouter::new(ingress.clone())),
+            commands: Arc::new(CommandService::new(router.clone())),
+            router,
             connections: Connections::new(limits.clone(), ingress.metrics.clone()),
             rates: Arc::new(RateLimiter::new(limits.clone())),
             management_request_rates: Arc::new(RateLimiter::new(limits.clone())),

@@ -104,6 +104,7 @@ async fn command_pressure_preserves_auth_invalidation_and_event_ack() {
     config.limits.max_pending_commands_per_device = 8;
     config.limits.max_pending_commands_per_tenant = 8;
     config.limits.max_pending_commands = 8;
+    config.limits.command_dedup_max_entries = 4;
     config.spool_directory = root.join("spool");
     let fixtures = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures");
     let fingerprint = |file: &str| {
@@ -314,6 +315,7 @@ async fn commands_role_dispatches_to_real_tcp_and_shares_http_dedup() {
     config.limits.max_pending_commands_per_device = 1;
     config.limits.max_pending_commands_per_tenant = 1;
     config.limits.max_pending_commands = 1;
+    config.limits.command_dedup_max_entries = 1;
     let fixtures = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures");
     let cert_pem = std::fs::read(fixtures.join("management-client.pem")).unwrap();
     let cert = rustls_pemfile::certs(&mut cert_pem.as_slice())

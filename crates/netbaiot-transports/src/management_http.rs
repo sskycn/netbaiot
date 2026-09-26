@@ -321,7 +321,7 @@ async fn handle_management(
                     .metrics
                     .management_authz_denied(AdminScope::DeviceCommand)
             })?;
-            let result = match services.router.send(command) {
+            let result = match services.commands.send(command).await {
                 Ok(result) => result,
                 Err(Error::Unavailable) => {
                     let request_id = Uuid::new_v4().to_string();

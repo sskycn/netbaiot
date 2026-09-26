@@ -1,6 +1,8 @@
 //! Business RPC V3 bootstrap and binary framing contract.
 //! V2's length-prefixed JSON frame contract remains in `business_rpc`.
 use crate::{EventFilter, SubscriptionId, business_rpc::RpcError};
+// The V3 application method uses the established command JSON DTO unchanged.
+pub use crate::business_rpc::{DeviceCommandSendRequest, DeviceCommandSendResponse};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
