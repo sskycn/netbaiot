@@ -1,0 +1,41 @@
+{
+  "scenario": "soak",
+  "business_address": "127.0.0.1:58512",
+  "device_address": "127.0.0.1:58510",
+  "udp_address": "127.0.0.1:58510",
+  "management_url": "http://127.0.0.1:58511",
+  "gateway_pid": 72382,
+  "duration_secs": 60,
+  "auth_concurrency": 4,
+  "event_rate": 2,
+  "command_rate": 1,
+  "command_device_count": 12,
+  "tcp_command_device": true,
+  "event_ack_delay_ms": 0,
+  "event_reconnect_every_secs": 30,
+  "invalidate_every_secs": 20,
+  "verifier_rate": 1,
+  "reconnect_cycles": 0,
+  "reconnect_pause_ms": 0,
+  "sample_period_ms": 1000,
+  "snapshot_every_secs": 5,
+  "warmup_secs": 5,
+  "recovery_secs": 5,
+  "business_transport": {
+    "mode": "mtls",
+    "server_name": "localhost",
+    "ca_pem": "/Users/sam/Dev/work/sskycn/netbaiot/tests/fixtures/localhost-cert.pem",
+    "certificate_pem": "/Users/sam/Dev/work/sskycn/netbaiot/tests/fixtures/management-client.pem",
+    "private_key_pem": "/Users/sam/Dev/work/sskycn/netbaiot/tests/fixtures/management-client-key.pem"
+  },
+  "command_transport": {
+    "mode": "mtls",
+    "server_name": "localhost",
+    "ca_pem": "/Users/sam/Dev/work/sskycn/netbaiot/tests/fixtures/localhost-cert.pem",
+    "certificate_pem": "/Users/sam/Dev/work/sskycn/netbaiot/tests/fixtures/business-command-client.pem",
+    "private_key_pem": "/Users/sam/Dev/work/sskycn/netbaiot/tests/fixtures/business-command-client-key.pem"
+  },
+  "topology": "v3",
+  "network_profile": "local_mtls",
+  "event_payload_bytes": 1024
+}

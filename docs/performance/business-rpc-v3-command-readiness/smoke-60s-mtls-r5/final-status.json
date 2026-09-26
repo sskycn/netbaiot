@@ -1,0 +1,16 @@
+{
+  "active_connections": {
+    "mqtt": 0,
+    "tcp": 0,
+    "udp": 0
+  },
+  "auth_cache_bytes": 7618,
+  "auth_cache_entries": 47,
+  "business_auth_serving": false,
+  "business_rpc_pending": 0,
+  "event_bytes": 0,
+  "event_count": 0,
+  "lifecycle": "running",
+  "pending_required": 0,
+  "runtime_tasks": 8
+}

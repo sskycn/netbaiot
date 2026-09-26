@@ -1,0 +1,14 @@
+{
+  "duration_secs": 60,
+  "topology": "v3_dual",
+  "auth_concurrency": 4,
+  "event_rate": 2,
+  "command_rate": 1,
+  "command_device_count": 12,
+  "tcp_command_device": true,
+  "event_ack_delay_ms": 0,
+  "event_reconnect_every_secs": 30,
+  "auth_reconnect_every_secs": 45,
+  "invalidate_every_secs": 20,
+  "verifier_rate": 1
+}

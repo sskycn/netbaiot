@@ -1,0 +1,76 @@
+{
+  "device_ingress": "127.0.0.1:64394",
+  "management_http": "127.0.0.1:64395",
+  "business_tcp": "127.0.0.1:64396",
+  "development": true,
+  "limits": {},
+  "tls": null,
+  "delivery_url": null,
+  "auth_provider_url": null,
+  "spool_directory": "/Users/sam/Dev/work/sskycn/netbaiot/docs/performance/business-rpc-v3-command-readiness/smoke-60s-mtls-v3-dual/spool",
+  "credentials": [],
+  "device_auth": "business_rpc",
+  "event_delivery": "business_rpc",
+  "business_rpc": {
+    "version": 2,
+    "v3": {
+      "max_frame_payload_bytes": 8192,
+      "max_concurrent_streams": 256,
+      "initial_stream_window_bytes": 262144,
+      "initial_connection_window_bytes": 4194304,
+      "heartbeat_ms": 5000
+    },
+    "v3_send_ahead": null,
+    "v3_experiment_socket_send_buffer_bytes": null,
+    "tls": {
+      "certificate": "/Users/sam/Dev/work/sskycn/netbaiot/tests/fixtures/localhost-cert.pem",
+      "private_key": "/Users/sam/Dev/work/sskycn/netbaiot/tests/fixtures/localhost-key.pem",
+      "client_ca": "/Users/sam/Dev/work/sskycn/netbaiot/tests/fixtures/business-rpc-test-client-cas.pem",
+      "require_client_certificate": true
+    },
+    "identities": [
+      {
+        "certificate_sha256": "11f4bff56b5222f417339eed1c67c8efb2593cefcd2fda1e6e32fa52d2c7504c",
+        "principal_id": "multiplexed",
+        "role": "multiplexed",
+        "provider_id": "primary",
+        "sink_id": "tcp-rpc",
+        "provide_methods": [
+          "device.authenticate",
+          "device.resolve_verifier"
+        ],
+        "call_methods": [
+          "auth.sync",
+          "auth.invalidate"
+        ],
+        "global": false,
+        "tenants": [
+          "demo"
+        ],
+        "expires_at_ms": null
+      },
+      {
+        "certificate_sha256": "40adf67aa0506bf3fa4e812bce02cf1b3e2367d80d930bfd0a0fd1ce92db19ee",
+        "principal_id": "commands",
+        "role": "commands",
+        "provider_id": null,
+        "sink_id": null,
+        "provide_methods": [],
+        "call_methods": [
+          "device.command.send"
+        ],
+        "global": false,
+        "tenants": [
+          "demo"
+        ],
+        "expires_at_ms": null
+      }
+    ],
+    "development_token_env": null,
+    "development_role": null,
+    "allow_v1": false,
+    "max_connections": 8,
+    "auth_max_inflight": 32,
+    "max_auth_control_offline_ms": 30000
+  }
+}
