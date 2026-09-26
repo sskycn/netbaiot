@@ -1,0 +1,99 @@
+{
+  "start_time_unix": 1790394055.932002,
+  "duration_secs": 1800,
+  "git_sha": "5d2beabe1c625a4c2ee7bc7aad66326df7cf27ec",
+  "branch": "codex/v3-command-readiness",
+  "dirty": false,
+  "environment": {
+    "os": "macOS-26.6.2-arm64-arm-64bit",
+    "kernel": "25.6.0",
+    "architecture": "arm64",
+    "cpu": "Apple M4",
+    "ram_bytes": "17179869184",
+    "rust": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
+    "cargo": "cargo 1.97.1 (c980f4866 2026-06-30)",
+    "profile": "release",
+    "business_transport": "mtls",
+    "business_rpc_version": 3
+  },
+  "config": {
+    "duration_secs": 1800,
+    "topology": "v3_dual",
+    "auth_concurrency": 4,
+    "event_rate": 2,
+    "command_rate": 1,
+    "command_device_count": 50,
+    "tcp_command_device": true,
+    "event_ack_delay_ms": 10,
+    "event_reconnect_every_secs": 45,
+    "auth_reconnect_every_secs": 60,
+    "invalidate_every_secs": 20,
+    "verifier_rate": 1
+  },
+  "limits_config": {
+    "source": "gateway defaults; see gateway-config.json",
+    "command_ttl_ms": 300000,
+    "command_dedup_ttl_ms": 300000,
+    "command_dedup_max_entries": 4096
+  },
+  "v3_limits": {
+    "max_frame_payload_bytes": 8192,
+    "max_concurrent_streams": 256,
+    "initial_stream_window_bytes": 262144,
+    "initial_connection_window_bytes": 4194304,
+    "heartbeat_ms": 5000
+  },
+  "random_seed": null,
+  "gateway_config": "gateway-config.json",
+  "loadgen_config": "loadgen-config.json",
+  "loadgen_exit_code": 1,
+  "counts": {},
+  "gauges": {
+    "business_rpc_v3_active_connections": 0,
+    "business_rpc_v3_active_streams": 0,
+    "business_rpc_v3_queued_bytes": 0,
+    "business_rpc_v3_reassembly_reserved_bytes": 0,
+    "business_rpc_pending": 0,
+    "business_rpc_pending_bytes": 0,
+    "command_dedup_entries": 0,
+    "command_dedup_inflight": 0,
+    "command_dedup_accepted": 0
+  },
+  "final_status": {
+    "active_connections": {
+      "mqtt": 0,
+      "tcp": 0,
+      "udp": 0
+    },
+    "auth_cache_bytes": 5354,
+    "auth_cache_entries": 32,
+    "business_auth_serving": false,
+    "business_rpc_pending": 0,
+    "event_bytes": 0,
+    "event_count": 0,
+    "lifecycle": "running",
+    "pending_required": 0,
+    "runtime_tasks": 8
+  },
+  "checks": {
+    "loadgen_exit": false,
+    "gateway_alive": true,
+    "real_commands_delivered": false,
+    "mqtt_commands_delivered": false,
+    "tcp_commands_delivered": false,
+    "no_duplicate_device_delivery": false,
+    "no_delivery_after_unavailable": false,
+    "device_application_acks": true,
+    "command_ack_event_seen": false,
+    "no_command_errors": false,
+    "connections_released": true,
+    "streams_released": true,
+    "queued_bytes_released": true,
+    "reassembly_released": true,
+    "rpc_pending_released": true,
+    "required_events_drained": true,
+    "dedup_inflight_released": true,
+    "dedup_bounded": true
+  },
+  "pass": false
+}

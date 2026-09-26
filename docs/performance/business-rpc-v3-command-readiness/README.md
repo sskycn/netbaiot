@@ -29,5 +29,7 @@ Command 去重只在当前进程的配置保留窗口内生效。默认 `command
 | `smoke-60s-mtls-r5` | PASS | 加入逐 Command trace 后重跑，59 次设备投递与 59 个唯一 CommandAck Event，重复投递 0。 |
 | `smoke-60s-mtls-v3-dual` | PASS | Provider 与 EventSubscription 独立重连，60 次设备投递与 60 个唯一 CommandAck Event，重复投递 0。 |
 | `smoke-60s-mtls-final` | PASS | 延长设备观察窗口后，60 条 Command 已接纳且全部到达设备，60 个唯一 CommandAck Event，最终 required pending 0。 |
+| `readiness-30m-mtls-startup-failure` | 未进入负载 | 50 台 MQTT 设备共用 loopback IP，超过测试网关默认 `max_connections_per_ip=32`；认证缓存记录了 32 个设备，随后设备连接超时。脚本现在按设备数设置 IP 与租户连接上限。 |
+| `readiness-30m-mtls-50-device-preflight` | 15 秒连接预检 | 50 台 MQTT 加一台 TCP 设备成功初始化；16 条 Command 全部到达 MQTT 并产生唯一 CommandAck Event。时长不足以轮询到 TCP 命令，也不是 30 分钟通过结果。 |
 
 前三次失败是测试脚本/配置问题，没有证据表明网关静默丢失已接受的 required Event。尤其 r3 的网关指标显示 200 个 EventAccepted、200 个 sink ACK，但负载工具因 EOF 未写出完整 Command 明细；不可将其当作通过样本。
