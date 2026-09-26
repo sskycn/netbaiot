@@ -124,9 +124,11 @@ def run():
     # The local workload uses one loopback IP and keeps all command devices
     # connected. Raise only the connection quotas needed for this topology.
     device_connections = profile["command_device_count"] + 1 + int(profile["tcp_command_device"])
+    loopback_headroom = max(96, device_connections + 8)
     gateway["limits"].update(
-        max_connections_per_ip=max(32, device_connections + 8),
-        max_connections_per_tenant=max(64, device_connections + 8),
+        max_connections_per_ip=loopback_headroom,
+        max_connections_per_tenant=loopback_headroom,
+        requests_per_ip_second=loopback_headroom,
     )
     gateway["business_rpc"] = {
         "version": 2,
@@ -172,6 +174,7 @@ def run():
         "gateway_pid": None,
         "duration_secs": profile["duration_secs"],
         "auth_concurrency": profile["auth_concurrency"],
+        "auth_rate": profile.get("auth_rate", 0),
         "event_rate": profile["event_rate"],
         "command_rate": profile["command_rate"],
         "command_device_count": profile["command_device_count"],
@@ -253,6 +256,15 @@ def run():
                     "command_dedup_accepted",
                 )
             }
+            gateway_counts = {
+                name: metric(final_metrics, name)
+                for name in (
+                    "connections_rejected_total",
+                    "events_accepted_total",
+                    "sink_acks_total",
+                    "sink_retries_total",
+                )
+            }
             checks = {
                 "loadgen_exit": result.returncode == 0,
                 "gateway_alive": server.poll() is None,
@@ -262,8 +274,12 @@ def run():
                 "no_duplicate_device_delivery": counts.get("command_device_duplicates") == 0,
                 "no_delivery_after_unavailable": counts.get("command_delivery_after_unavailable") == 0,
                 "device_application_acks": counts.get("command_device_acks") == counts.get("command_device_deliveries"),
-                "command_ack_event_seen": counts.get("command_ack_event_unique", 0) > 0,
+                "all_accepted_commands_delivered": counts.get("command_accepted", 0) > 0 and counts.get("command_accepted") == counts.get("command_device_deliveries"),
+                "all_command_ack_events_acked": counts.get("command_ack_event_unique", 0) > 0 and counts.get("command_ack_event_unique") == counts.get("command_ack_event_acks") == counts.get("command_accepted"),
+                "all_accepted_events_acked": gateway_counts["events_accepted_total"] is not None and gateway_counts["events_accepted_total"] == gateway_counts["sink_acks_total"],
                 "no_command_errors": counts.get("command_errors") == 0,
+                "no_ingress_rejections": not profile.get("require_zero_ingress_rejections", False) or gateway_counts["connections_rejected_total"] == 0,
+                "no_publish_errors": not profile.get("require_zero_publish_errors", False) or counts.get("publish_errors") == 0,
                 "connections_released": gauges["business_rpc_v3_active_connections"] == 0,
                 "streams_released": gauges["business_rpc_v3_active_streams"] == 0,
                 "queued_bytes_released": gauges["business_rpc_v3_queued_bytes"] == 0,
@@ -304,6 +320,7 @@ def run():
                 "loadgen_config": "loadgen-config.json",
                 "loadgen_exit_code": result.returncode,
                 "counts": counts,
+                "gateway_counts": gateway_counts,
                 "gauges": gauges,
                 "final_status": final_status,
                 "checks": checks,

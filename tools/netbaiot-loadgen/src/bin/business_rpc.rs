@@ -65,6 +65,8 @@ struct Config {
     command_transport: Option<BusinessTransport>,
     auth_concurrency: usize,
     #[serde(default)]
+    auth_rate: u64,
+    #[serde(default)]
     auth_unique_devices: bool,
     #[serde(default)]
     auth_handler_delay_ms: u64,
@@ -155,6 +157,7 @@ impl Config {
             || self.recovery_secs > 600
             || self.auth_concurrency == 0
             || self.auth_concurrency > 256
+            || self.auth_rate > 1_000
             || self.auth_handler_delay_ms > 5_000
             || self.event_rate > 10_000
             || self.command_rate > 1_000
@@ -683,6 +686,12 @@ async fn auth_load(config: Config, stats: SharedStats, until: Instant) {
     let mut next = 0u64;
     while Instant::now() < until || !tasks.is_empty() {
         while Instant::now() < until && tasks.len() < config.auth_concurrency {
+            if config.auth_rate > 0 {
+                tokio::time::sleep(Duration::from_secs_f64(1.0 / config.auth_rate as f64)).await;
+                if Instant::now() >= until {
+                    break;
+                }
+            }
             let config = config.clone();
             // The default repeats a bounded device set to exercise auth-cache hits.
             // The opt-in unique mode measures a fresh provider RPC for each attempt.
