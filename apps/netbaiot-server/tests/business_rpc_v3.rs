@@ -723,6 +723,49 @@ async fn v3_command_real_mqtt_dedup_http_ack_and_lost_response() {
 
     business.shutdown().await;
     device.shutdown();
+    // Closing the V3 client must release every command RPC stream, queued body,
+    // and reassembly reservation, including the reset and lost-response paths.
+    let http = reqwest::Client::builder().no_proxy().build().unwrap();
+    let mut observed = String::new();
+    let cleanup = tokio::time::timeout(Duration::from_secs(5), async {
+        loop {
+            let request = http
+                .get(format!("http://{}/api/v1/metrics", addresses[1]))
+                .bearer_auth("a".repeat(64))
+                .send()
+                .await;
+            let Ok(metrics) = request else {
+                observed = format!("request error: {:?}", request.err());
+                tokio::time::sleep(Duration::from_millis(20)).await;
+                continue;
+            };
+            assert_eq!(metrics.status(), reqwest::StatusCode::OK);
+            let Ok(body) = metrics.text().await else {
+                observed = "response body error".into();
+                tokio::time::sleep(Duration::from_millis(20)).await;
+                continue;
+            };
+            observed = body
+                .lines()
+                .filter(|line| line.starts_with("netbaiot_business_rpc_v3_"))
+                .collect::<Vec<_>>()
+                .join("; ");
+            if [
+                "netbaiot_business_rpc_v3_active_connections 0\n",
+                "netbaiot_business_rpc_v3_active_streams 0\n",
+                "netbaiot_business_rpc_v3_queued_bytes 0\n",
+                "netbaiot_business_rpc_v3_reassembly_reserved_bytes 0\n",
+            ]
+            .iter()
+            .all(|line| body.contains(line))
+            {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+    })
+    .await;
+    assert!(cleanup.is_ok(), "V3 cleanup timed out: {observed}");
     server.start_kill().unwrap();
     let _ = server.wait().await;
     let _ = std::fs::remove_dir_all(root);
