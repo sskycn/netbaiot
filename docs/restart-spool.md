@@ -34,15 +34,15 @@ If business processed an event but its ACK was lost, the pending record is repla
 with the same `event_id`. This can duplicate processing and is why consumers must be
 idempotent.
 
-The MQTT snapshot is `NBMQ | version u32 | generation u64 | payload length u32 |
-JSON snapshot | SHA-256`. One JSON image contains mutually consistent sessions,
-subscriptions, offline QoS messages, inbound/outbound QoS state, packet allocator,
-and retained state. It uses the same private-directory, temp-file, fsync, rename,
-and directory-fsync rules. Its independent `mqtt_recovery_max_bytes` bound is large
-enough for the configured global session plus retained-state ceilings; it does not
-incorrectly inherit the 1 MiB EventBus record limit. Unknown versions, mismatched
-generation, checksum/length failure, or configured bound violations fail startup. See
-[mqtt-session-recovery.md](mqtt-session-recovery.md).
+The MQTT snapshot uses compact NBMQ v6 typed records: a version/generation header
+and checksum, bounded binary records with lengths and checksums, and a final
+record-count, byte-count and whole-stream SHA-256 trailer. Sessions, subscriptions,
+QoS state, retained data and pending Wills are encoded from one coherent view without
+a whole-state clone. Readers accept v1–v5 for migration under version-specific bounds.
+The independent `mqtt_recovery_max_bytes` ceiling covers configured broker state;
+it does not inherit the EventBus record limit. Both formats retain private-directory,
+file fsync, atomic rename and directory-fsync rules. See
+[mqtt-session-recovery.md](mqtt-session-recovery.md) for compatibility and rollback.
 
 The two files do not claim a cross-domain database transaction. Each responsibility
 is complete and independently replay-safe before successful shutdown. Failure of

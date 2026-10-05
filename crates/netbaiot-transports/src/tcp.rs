@@ -96,13 +96,20 @@ pub async fn connection(
     .await?;
     connection.authenticate(&candidate.auth.device_key)?;
     let auth = Arc::new(candidate.auth.clone());
-    let (session, mut outbound) = s.ingress.register_session(candidate, Transport::Tcp)?;
+    let registration = s.ingress.lifecycle.begin_admission()?;
+    let (session, mut outbound, ()) = s.ingress.register_session_admitted_with(
+        &registration,
+        candidate,
+        Transport::Tcp,
+        |_, _| Ok(()),
+    )?;
     write(
         &mut stream,
         &framer.encode(br#"{"authenticated":true}"#)?,
         l.write_timeout_ms,
     )
     .await?;
+    drop(registration);
     let mut last = Instant::now();
     loop {
         tokio::select! {
@@ -111,9 +118,13 @@ pub async fn connection(
             _ = session.cancel.cancelled() => break,
             item = outbound.recv() => {
                 let Some(item) = item else { break };
-                if item.expires_at <= now_ms() { continue; }
+                if item.progress.as_ref().map_or_else(|| item.expires_at <= now_ms(), |progress| !progress.begin_transfer()) {
+                    if item.progress.is_none() { s.router.transport_state(DeliveryState::Expired); }
+                    continue;
+                }
                 let frame = framer.encode(&item.bytes)?;
                 write(&mut stream, &frame, l.write_timeout_ms).await?;
+                if let Some(progress) = &item.progress { progress.update(DeliveryState::Sent); }
                 s.router.transport_state(DeliveryState::Sent);
             }
             frame = next(&mut reader, &mut stream, &framer, last + Duration::from_millis(l.idle_timeout_ms)) => {

@@ -14,6 +14,7 @@ use tokio_util::sync::CancellationToken;
 pub struct QueuedCommand {
     pub command_id: CommandId,
     pub expires_at: Timestamp,
+    pub progress: Option<Arc<CommandProgress>>,
     queued: Arc<AtomicUsize>,
     pub bytes: Vec<u8>,
     _bytes: Vec<BytesPermit>,
@@ -23,6 +24,9 @@ pub struct QueuedCommand {
 impl Drop for QueuedCommand {
     fn drop(&mut self) {
         self.queued.fetch_sub(1, Ordering::Relaxed);
+        if let Some(progress) = &self.progress {
+            progress.abandon_unsent();
+        }
     }
 }
 
@@ -49,6 +53,16 @@ impl SessionEndpoint {
     }
 
     pub fn enqueue(&self, command: &DeviceCommand, bytes: Vec<u8>) -> Result<()> {
+        self.enqueue_tracked(command, bytes, None)
+    }
+
+    pub fn enqueue_tracked(
+        &self,
+        command: &DeviceCommand,
+        bytes: Vec<u8>,
+        progress: Option<Arc<CommandProgress>>,
+    ) -> Result<()> {
+        let expires_at = command.expires_at.ok_or(Error::Invalid)?;
         if self.cancel.is_cancelled() || command.device != self.auth.device_key {
             return Err(Error::Unavailable);
         }
@@ -75,7 +89,8 @@ impl SessionEndpoint {
         self.sender
             .try_send(QueuedCommand {
                 command_id: command.command_id,
-                expires_at: command.expires_at.ok_or(Error::Invalid)?,
+                expires_at,
+                progress,
                 queued: self.queued.clone(),
                 bytes,
                 _bytes: permits,
@@ -727,5 +742,113 @@ mod tests {
             .unwrap()
             .enqueue(&command(&second.device_key), vec![5])
             .unwrap();
+    }
+    #[test]
+    fn enqueue_validation_and_every_reservation_failure_roll_back() {
+        for failure in [
+            "missing_expiry",
+            "channel",
+            "connection_bytes",
+            "tenant_bytes",
+            "global_bytes",
+            "connection_slots",
+            "tenant_slots",
+            "global_slots",
+            "closed",
+        ] {
+            let limits = Arc::new(Limits {
+                max_outbound_messages_per_connection: 1,
+                max_pending_commands_per_device: 2,
+                max_pending_commands_per_tenant: 2,
+                max_pending_commands: 2,
+                max_outbound_bytes_per_connection: 8,
+                max_outbound_bytes_per_tenant: 8,
+                max_outbound_bytes: 8,
+                ..Limits::default()
+            });
+            let sessions = Sessions::new(limits);
+            let auth = auth("accounting");
+            let (_lease, mut receiver) = sessions.register(auth.clone(), Transport::Tcp).unwrap();
+            let endpoint = sessions.lookup(&auth.device_key).unwrap().unwrap();
+            let mut command = DeviceCommand {
+                command_id: CommandId::generate(),
+                device: auth.device_key.clone(),
+                expires_at: Some(now_ms() + 1000),
+                payload: DeviceCommandPayload {
+                    name: "test".into(),
+                    arguments: Default::default(),
+                },
+            };
+            let slots = match failure {
+                "connection_slots" => Some(
+                    endpoint
+                        .connection_slots
+                        .clone()
+                        .try_acquire_many_owned(2)
+                        .unwrap(),
+                ),
+                "tenant_slots" => Some(
+                    endpoint
+                        .tenant_slots
+                        .clone()
+                        .try_acquire_many_owned(2)
+                        .unwrap(),
+                ),
+                "global_slots" => Some(
+                    endpoint
+                        .global_slots
+                        .clone()
+                        .try_acquire_many_owned(2)
+                        .unwrap(),
+                ),
+                _ => None,
+            };
+            let bytes = match failure {
+                "connection_bytes" => Some(endpoint.connection_bytes.reserve(8).unwrap()),
+                "tenant_bytes" => Some(endpoint.tenant_bytes.reserve(8).unwrap()),
+                "global_bytes" => Some(endpoint.global_bytes.reserve(8).unwrap()),
+                _ => None,
+            };
+            if failure == "missing_expiry" {
+                command.expires_at = None;
+            }
+            if failure == "channel" {
+                endpoint.enqueue(&command, vec![1]).unwrap();
+            }
+            if failure == "closed" {
+                receiver.close();
+            }
+            let before = (
+                sessions.queued_messages(),
+                sessions.queued_bytes(),
+                endpoint.connection_slots.available_permits(),
+                endpoint.tenant_slots.available_permits(),
+                endpoint.global_slots.available_permits(),
+                endpoint.connection_bytes.available(),
+                endpoint.tenant_bytes.available(),
+                endpoint.global_bytes.available(),
+            );
+            assert!(endpoint.enqueue(&command, vec![1]).is_err(), "{failure}");
+            let after = (
+                sessions.queued_messages(),
+                sessions.queued_bytes(),
+                endpoint.connection_slots.available_permits(),
+                endpoint.tenant_slots.available_permits(),
+                endpoint.global_slots.available_permits(),
+                endpoint.connection_bytes.available(),
+                endpoint.tenant_bytes.available(),
+                endpoint.global_bytes.available(),
+            );
+            assert_eq!(before, after, "{failure}");
+            drop((slots, bytes, receiver));
+            assert_eq!(sessions.queued_messages(), 0, "{failure}");
+            assert_eq!(sessions.queued_bytes(), 0, "{failure}");
+            assert_eq!(endpoint.connection_slots.available_permits(), 2);
+            assert_eq!(endpoint.tenant_slots.available_permits(), 2);
+            assert_eq!(endpoint.global_slots.available_permits(), 2);
+            assert_eq!(endpoint.connection_bytes.available(), 8);
+            assert_eq!(endpoint.tenant_bytes.available(), 8);
+            assert_eq!(endpoint.global_bytes.available(), 8);
+        }
     }
 }

@@ -36,10 +36,19 @@ only then readiness is enabled. Recovered EventBus segment files are removed onl
 after required work drains. MQTT reconnect still authenticates before session
 resume; restored state never contains credentials.
 
-MQTT recovery writes NBMQ v5 incrementally as bounded typed records plus a final
-record-count, byte-count, and whole-stream-digest trailer. It reads v1 through v5;
+MQTT recovery writes NBMQ v6 incrementally as bounded typed records plus a final
+record-count, byte-count, and whole-stream-digest trailer. It reads v1 through v6;
 the larger legacy v1 ceiling is selected only after the prefix identifies v1.
 Recovery validates topic/filter syntax, packet identifiers, legal QoS per
 state, non-QoS0 offline backlog, retained consistency, ordering, duplicates, and
 authorization/codec provenance and session ACL ownership before the replacement
 broker state becomes visible.
+
+Control mutations acquire lifecycle admission before their first side effect and
+retain it through completion: HTTP auth invalidation, control/routes replacement,
+Business RPC V2/V3 auth sync/invalidation, provider-offline revocation, commands and
+MQTT/TCP session establishment. Quiesce waits for admitted operations before broker
+recovery starts. New mutations return HTTP 503 `draining` / RPC `unavailable`;
+command retries also obey this fence. Diagnostic reads remain available and repeated
+drain requests remain idempotent. Admission closes before stopping MQTT owners;
+existing QoS/Will cleanup finishes before their tasks are joined and snapshot begins.

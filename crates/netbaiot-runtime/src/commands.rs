@@ -9,9 +9,111 @@ use std::{
 };
 use tokio::sync::watch;
 
+/// Volatile, fixed-size status shared by the bounded dedup entry and transport.
+/// Each dispatch gets a fresh instance, fencing late updates after dedup eviction.
+/// Dispatching is deliberately distinct from Queued: once a write starts, a lost
+/// receipt cannot prove expiry or justify an automatic retry.
+pub struct CommandProgress {
+    state: std::sync::atomic::AtomicU8,
+    expires_at: Timestamp,
+    metrics: Arc<Metrics>,
+}
+
+impl std::fmt::Debug for CommandProgress {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CommandProgress").finish_non_exhaustive()
+    }
+}
+
+impl CommandProgress {
+    pub fn new(expires_at: Timestamp, metrics: Arc<Metrics>) -> Arc<Self> {
+        Arc::new(Self {
+            state: std::sync::atomic::AtomicU8::new(0),
+            expires_at,
+            metrics,
+        })
+    }
+
+    pub fn state(&self) -> DeliveryState {
+        self.expire(now_ms());
+        match self.state.load(std::sync::atomic::Ordering::Acquire) {
+            0 => DeliveryState::Queued,
+            1 => DeliveryState::Dispatching,
+            2 => DeliveryState::Sent,
+            3 => DeliveryState::Received,
+            4 => DeliveryState::Expired,
+            _ => DeliveryState::Failed,
+        }
+    }
+
+    pub fn expire(&self, now: Timestamp) -> bool {
+        use std::sync::atomic::Ordering;
+        if now >= self.expires_at
+            && self
+                .state
+                .compare_exchange(0, 4, Ordering::AcqRel, Ordering::Acquire)
+                .is_ok()
+        {
+            self.metrics.inc(Metric::CommandFailed);
+        }
+        self.state.load(Ordering::Acquire) == 4
+    }
+
+    pub fn begin_transfer(&self) -> bool {
+        use std::sync::atomic::Ordering;
+        if self.expire(now_ms()) {
+            return false;
+        }
+        matches!(
+            self.state
+                .compare_exchange(0, 1, Ordering::AcqRel, Ordering::Acquire),
+            Ok(_) | Err(1 | 2)
+        )
+    }
+
+    #[allow(deprecated)] // fetch_update supports the Rust 1.88 MSRV.
+    pub fn abandon_unsent(&self) {
+        use std::sync::atomic::Ordering;
+        self.expire(now_ms());
+        if self
+            .state
+            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |old| {
+                (old <= 1).then_some(5)
+            })
+            .is_ok()
+        {
+            self.metrics.inc(Metric::CommandFailed);
+        }
+    }
+
+    #[allow(deprecated)] // fetch_update supports the Rust 1.88 MSRV.
+    pub fn update(&self, state: DeliveryState) {
+        use std::sync::atomic::Ordering;
+        let next = match state {
+            DeliveryState::Sent => 2,
+            DeliveryState::Received => 3,
+            DeliveryState::Failed => 5,
+            _ => return,
+        };
+        let _ = self
+            .state
+            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |old| {
+                // A transport failure does not cancel an already-started MQTT
+                // QoS exchange. A later successful write/exact ACK is newer
+                // evidence; expiry and an observed receipt remain terminal.
+                if matches!(old, 3 | 4) || (next == 2 && !matches!(old, 1 | 5)) {
+                    None
+                } else {
+                    Some(next)
+                }
+            });
+    }
+}
+
 struct AcceptedCommand {
     fingerprint: [u8; 32],
     dispatch: CommandDispatch,
+    progress: Arc<CommandProgress>,
     retained_until: Instant,
 }
 
@@ -57,8 +159,18 @@ impl CommandRouter {
 
     /// Actual local-session dispatch authority. Callers use CommandService for
     /// semantic validation and process-local idempotency before reaching this path.
-    pub fn send(&self, mut command: DeviceCommand) -> Result<CommandDispatch> {
-        let _gate = self.ingress.lifecycle.begin_admission()?;
+    pub fn send(&self, command: DeviceCommand) -> Result<CommandDispatch> {
+        let admission = self.ingress.lifecycle.begin_admission()?;
+        self.send_admitted(command, &admission, None)
+    }
+
+    fn send_admitted(
+        &self,
+        mut command: DeviceCommand,
+        admission: &AdmissionGuard<'_>,
+        progress: Option<Arc<CommandProgress>>,
+    ) -> Result<CommandDispatch> {
+        admission.check(&self.ingress.lifecycle)?;
         let now = now_ms();
         let maximum = now.saturating_add(self.ingress.limits.command_ttl_ms as i64);
         let expires_at = command.expires_at.unwrap_or(maximum);
@@ -91,9 +203,11 @@ impl CommandRouter {
         if bytes.len() > self.ingress.limits.max_command_bytes {
             return Err(Error::Invalid);
         }
-        endpoint.enqueue(&command, bytes).inspect_err(|_| {
-            self.ingress.metrics.inc(Metric::QueueRejects);
-        })?;
+        endpoint
+            .enqueue_tracked(&command, bytes, progress)
+            .inspect_err(|_| {
+                self.ingress.metrics.inc(Metric::QueueRejects);
+            })?;
         self.ingress.metrics.inc(Metric::CommandQueued);
         Ok(CommandDispatch {
             command_id: command.command_id,
@@ -150,6 +264,7 @@ impl CommandService {
     /// await. The first successful Router::send establishes responsibility before
     /// response production. Failed dispatch removes the reservation for retry.
     pub async fn send(&self, command: DeviceCommand) -> Result<CommandDispatch> {
+        let admission = self.router.ingress.lifecycle.begin_admission()?;
         if command.command_id.0.is_nil() {
             return Err(Error::Invalid);
         }
@@ -182,7 +297,9 @@ impl CommandService {
                             return Err(Error::Conflict);
                         }
                         self.router.ingress.metrics.inc(Metric::CommandDedupHits);
-                        return Ok(accepted.dispatch.clone());
+                        let mut dispatch = accepted.dispatch.clone();
+                        dispatch.state = accepted.progress.state();
+                        return Ok(dispatch);
                     }
                     Some(CommandEntry::InFlight {
                         fingerprint: existing,
@@ -239,7 +356,10 @@ impl CommandService {
             prepared.expires_at = Some(expires_at);
             // Synchronous, bounded admission has no cancellation point between
             // Router::send and recording its Accepted receipt.
-            let result = self.router.send(prepared);
+            let progress = CommandProgress::new(expires_at, self.router.ingress.metrics.clone());
+            let result = self
+                .router
+                .send_admitted(prepared, &admission, Some(progress.clone()));
             // Once Router::send succeeds, a receipt must be recorded even if a
             // previous panicking task poisoned this mutex.
             let mut state = self
@@ -256,6 +376,7 @@ impl CommandService {
                         CommandEntry::Accepted(AcceptedCommand {
                             fingerprint,
                             dispatch: dispatch.clone(),
+                            progress,
                             retained_until,
                         }),
                     );

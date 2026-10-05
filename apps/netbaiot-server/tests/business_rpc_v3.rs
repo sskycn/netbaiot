@@ -246,8 +246,10 @@ async fn v3_command_real_tcp_short_dedup_ttl_and_shorter_command_ttl() {
         serde_json::from_slice(&read_tcp_device(&mut device).await).unwrap();
     assert_eq!(delivered.command_id, command.command_id);
     tokio::time::sleep(Duration::from_millis(200)).await;
-    // The 100 ms execution TTL has elapsed, but the 500 ms dedup receipt lives.
-    assert_eq!(business.send_command(&command).await.unwrap(), first);
+    // Sending TTL cannot turn an already written command into Expired.
+    let latest = business.send_command(&command).await.unwrap();
+    assert_eq!(latest.command_id, first.command_id);
+    assert_eq!(latest.state, DeliveryState::Sent);
     assert!(
         tokio::time::timeout(Duration::from_millis(100), read_tcp_device(&mut device))
             .await
@@ -565,13 +567,25 @@ async fn v3_command_real_tcp_tenant_scope_and_capacity() {
         serde_json::from_slice(&read_tcp_device(&mut socket).await).unwrap();
     assert_eq!(received.command_id, accepted_command.command_id);
     assert_eq!(received.payload, accepted_command.payload);
-    assert_eq!(v2.send_command(&accepted_command).await.unwrap(), accepted);
+    assert_eq!(
+        v2.send_command(&accepted_command).await.unwrap(),
+        netbaiot_core::CommandDispatch {
+            state: DeliveryState::Sent,
+            ..accepted
+        }
+    );
     let v2_first = command("v2-first");
     let v2_receipt = v2.send_command(&v2_first).await.unwrap();
     let received: DeviceCommand =
         serde_json::from_slice(&read_tcp_device(&mut socket).await).unwrap();
     assert_eq!(received.command_id, v2_first.command_id);
-    assert_eq!(business.send_command(&v2_first).await.unwrap(), v2_receipt);
+    assert_eq!(
+        business.send_command(&v2_first).await.unwrap(),
+        netbaiot_core::CommandDispatch {
+            state: DeliveryState::Sent,
+            ..v2_receipt
+        }
+    );
     let full = business.send_command(&command("capacity")).await;
     assert!(
         matches!(
@@ -747,8 +761,8 @@ async fn v3_command_real_mqtt_dedup_http_ack_and_lost_response() {
             .command_id,
         retry.command_id
     );
-    assert_eq!(business.send_command(&retry).await.unwrap(), accepted);
-    assert_eq!(admin.commands().send(&retry).await.unwrap(), accepted);
+    assert_sent_receipt(business.send_command(&retry).await.unwrap(), &accepted);
+    assert_sent_receipt(admin.commands().send(&retry).await.unwrap(), &accepted);
 
     let from_http = command("http-first");
     let http_dispatch = admin.commands().send(&from_http).await.unwrap();
@@ -760,9 +774,9 @@ async fn v3_command_real_mqtt_dedup_http_ack_and_lost_response() {
             .command_id,
         from_http.command_id
     );
-    assert_eq!(
+    assert_sent_receipt(
         business.send_command(&from_http).await.unwrap(),
-        http_dispatch
+        &http_dispatch,
     );
 
     let mut fragmented = command("fragmented-v3-data");
@@ -1458,4 +1472,15 @@ async fn v3_mtls_authenticates_before_role_free_stream_authorization() {
     server.start_kill().unwrap();
     let _ = server.wait().await;
     let _ = std::fs::remove_dir_all(root);
+}
+
+fn assert_sent_receipt(
+    latest: netbaiot_core::CommandDispatch,
+    initial: &netbaiot_core::CommandDispatch,
+) {
+    assert_eq!(latest.command_id, initial.command_id);
+    assert!(matches!(
+        latest.state,
+        DeliveryState::Sent | DeliveryState::Received
+    ));
 }

@@ -79,10 +79,23 @@ async fn send_broker_frame(
 ) -> Result<()> {
     let mut pending = Some(frame);
     while let Some(frame) = pending.take() {
-        let (bytes, budget, command) = match frame {
+        let (bytes, budget, command, progress) = match frame {
             BrokerFrame::Publish(delivery) => {
-                if delivery.packet_id.is_none() && delivery.message.expired(now_ms()) {
-                    return Ok(());
+                if delivery.packet_id.is_none() {
+                    let now = now_ms();
+                    if delivery.message.expired(now) {
+                        if let Some(progress) = &delivery.progress {
+                            progress.expire(now);
+                        } else if delivery.command {
+                            services.router.transport_state(DeliveryState::Expired);
+                        }
+                        return Ok(());
+                    }
+                    if let Some(progress) = &delivery.progress
+                        && !progress.begin_transfer()
+                    {
+                        return Ok(());
+                    }
                 }
                 let bytes = publish(
                     &delivery.message.topic,
@@ -92,7 +105,12 @@ async fn send_broker_frame(
                     delivery.message.retain,
                     delivery.dup,
                     &services.ingress.limits,
-                )?;
+                )
+                .inspect_err(|_| {
+                    if let Some(progress) = &delivery.progress {
+                        progress.abandon_unsent();
+                    }
+                })?;
                 if delivery.packet_id.is_some()
                     && !services
                         .mqtt
@@ -101,16 +119,28 @@ async fn send_broker_frame(
                     pending = services.mqtt.next_offline(key, generation)?;
                     continue;
                 }
-                (bytes, delivery._budget, delivery.command)
+                (bytes, delivery._budget, delivery.command, delivery.progress)
             }
             // PUBREL's MQTT 3.1.1 fixed-header flags are always 0010.
-            BrokerFrame::Pubrel { packet_id, dup: _ } => (ack(0x62, packet_id), Vec::new(), false),
+            BrokerFrame::Pubrel { packet_id, dup: _ } => {
+                (ack(0x62, packet_id), Vec::new(), false, None)
+            }
         };
         let sent = send(stream, services, &bytes).await;
         let charged = !budget.is_empty();
         drop(budget);
         if charged {
             services.mqtt.outbound_bytes_released()?;
+        }
+        if let Some(progress) = progress {
+            progress.update(if sent.is_ok() {
+                DeliveryState::Sent
+            } else {
+                DeliveryState::Failed
+            });
+        }
+        if command && sent.is_err() {
+            services.router.transport_state(DeliveryState::Failed);
         }
         sent?;
         if command {
@@ -269,8 +299,10 @@ pub async fn connection(
     let requested_client_id = connect.client_id.clone();
     let clean_session = connect.clean_session;
     let mqtt = services.mqtt.clone();
+    let registration = services.ingress.lifecycle.begin_admission()?;
     let (live_session, mut commands, (mut attachment, client_id)) =
-        services.ingress.register_session_with(
+        services.ingress.register_session_admitted_with(
+            &registration,
             candidate,
             Transport::Mqtt,
             move |bound_auth, _generation| {
@@ -320,6 +352,7 @@ pub async fn connection(
             .subscription_qos(&attachment.key, &down_topic)?
             .is_some(),
     )?;
+    drop(registration);
     let keepalive = if connect.keep_alive == 0 {
         None
     } else {
@@ -340,17 +373,23 @@ pub async fn connection(
                     return Err(Error::Timeout);
                 }
                 command = commands.recv() => {
-                    let Some(command) = command else { break };
-                    if command.expires_at <= now_ms() { continue }
+                    let Some(mut command) = command else { break };
+                    if command.progress.as_ref().map_or_else(|| command.expires_at <= now_ms(), |progress| progress.expire(now_ms())) {
+                        if command.progress.is_none() { services.router.transport_state(DeliveryState::Expired); }
+                        continue;
+                    }
                     let down = topic(&auth.device_key, TopicKind::Down);
                     let Some(qos) = services.mqtt.subscription_qos(&attachment.key, &down)? else {
+                        if let Some(progress) = &command.progress { progress.update(DeliveryState::Failed); }
                         services.router.transport_state(DeliveryState::Failed);
                         continue;
                     };
-                    if services.mqtt.send_live(&attachment.key, attachment.generation, BrokerMessage {
+                    let progress = command.progress.take();
+                    if services.mqtt.send_live_tracked(&attachment.key, attachment.generation, BrokerMessage {
                         topic: down, payload: command.bytes.to_vec(), qos, retain: false,
-                        properties: Default::default(),
-                    }).is_err() {
+                        properties: broker::PublishProperties { expires_at_ms: Some(command.expires_at), ..Default::default() },
+                    }, progress.clone()).is_err() {
+                        if let Some(progress) = progress { progress.update(DeliveryState::Failed); }
                         services.router.transport_state(DeliveryState::Failed);
                     }
                 }

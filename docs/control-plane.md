@@ -27,3 +27,12 @@ rollout/rollback and offline reconciliation belong to business applications.
 Online changes use ordinary `DeviceCommand` over MQTT/TCP and return `CommandAck`.
 The gateway neither interprets command names nor compares application revisions.
 See [migration](remove-device-config.md).
+
+Control mutations acquire lifecycle admission before their first side effect and
+retain it through completion: HTTP auth invalidation, control/routes replacement,
+Business RPC V2/V3 auth sync/invalidation, provider-offline revocation, commands and
+MQTT/TCP session establishment. Quiesce waits for admitted operations before broker
+recovery starts. New mutations return HTTP 503 `draining` / RPC `unavailable`;
+command retries also obey this fence. Diagnostic reads remain available and repeated
+drain requests remain idempotent. Admission closes before stopping MQTT owners;
+existing QoS/Will cleanup finishes before their tasks are joined and snapshot begins.

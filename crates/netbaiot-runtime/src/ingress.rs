@@ -168,6 +168,22 @@ impl Ingress {
         transport: Transport,
         finalize: impl FnOnce(&AuthenticatedDevice, u64) -> Result<T>,
     ) -> Result<(SessionLease, tokio::sync::mpsc::Receiver<QueuedCommand>, T)> {
+        // Admission precedes the auth-registration lock; quiesce waits through
+        // freshness validation, broker attachment and live-generation publication.
+        let admission = self.lifecycle.begin_admission()?;
+        self.register_session_admitted_with(&admission, candidate, transport, finalize)
+    }
+
+    /// Transport owners retain this token through their bounded handshake write
+    /// and Will/readiness setup. The synchronous lock order is unchanged.
+    pub fn register_session_admitted_with<T>(
+        &self,
+        admission: &AdmissionGuard<'_>,
+        candidate: AuthenticatedSessionCandidate,
+        transport: Transport,
+        finalize: impl FnOnce(&AuthenticatedDevice, u64) -> Result<T>,
+    ) -> Result<(SessionLease, tokio::sync::mpsc::Receiver<QueuedCommand>, T)> {
+        admission.check(&self.lifecycle)?;
         let _gate = lock(&self.auth_registration)?;
         if !self.auth_cache.candidate_is_current(&candidate)? {
             self.metrics.inc(Metric::AuthFailures);
@@ -193,6 +209,19 @@ impl Ingress {
         invalidation: &AuthInvalidation,
         finalize: impl FnOnce() -> Result<T>,
     ) -> Result<(Vec<DeviceKey>, usize, T)> {
+        let admission = self.lifecycle.begin_admission()?;
+        self.invalidate_auth_admitted_with(&admission, invalidation, finalize)
+    }
+
+    /// Continue a larger admitted control operation without re-entering the gate.
+    /// Its caller keeps the token through revision/authority publication as well.
+    pub fn invalidate_auth_admitted_with<T>(
+        &self,
+        admission: &AdmissionGuard<'_>,
+        invalidation: &AuthInvalidation,
+        finalize: impl FnOnce() -> Result<T>,
+    ) -> Result<(Vec<DeviceKey>, usize, T)> {
+        admission.check(&self.lifecycle)?;
         let _gate = lock(&self.auth_registration)?;
         let devices = self.auth_cache.invalidate(invalidation)?;
         let disconnected = self.sessions.disconnect_matching(invalidation)?;

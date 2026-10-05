@@ -51,3 +51,20 @@ completion signs and tries to send NBA1 under the auth-cache lock, so invalidati
 cannot race an old signer past that boundary. Unrelated invalidations conservatively
 suppress outstanding receipts too; accepted work remains committed and may be
 confirmed by an authenticated retry.
+
+## HTTP authority service authentication
+
+Set `NETBAIOT_AUTH_PROVIDER_TOKEN` in the gateway process environment (or inject it
+from a secret manager). Both secret authentication and UDP verifier resolution send
+`Authorization: Bearer <token>` through the same request builder. Do not put this
+secret in JSON configuration, device credentials, logs or recovery files. Values
+must be nonempty, at most 4096 bytes and contain only visible ASCII without spaces.
+An invalid or non-Unicode environment value fails startup with a generic error.
+The header is marked sensitive; the provider has no credential-bearing Debug output.
+
+The token is optional for backwards compatibility, including loopback development.
+A non-loopback HTTPS authority without a token emits a fixed warning; production
+should require and validate a separate service token. HTTPS (or loopback HTTP),
+disabled redirects, no_proxy, request deadlines, response-size and concurrency bounds
+remain unchanged. Environment changes take effect on gateway restart. Future mTLS
+can extend this client construction without changing device authentication semantics.

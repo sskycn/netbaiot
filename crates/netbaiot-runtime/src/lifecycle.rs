@@ -44,8 +44,11 @@ impl Lifecycle {
         if self.state() != LifecycleState::Running {
             return Err(Error::Draining);
         }
-        self.active_admissions.fetch_add(1, Ordering::AcqRel);
-        if self.state() != LifecycleState::Running {
+        // The counter increment, closing transition, and second state check
+        // share one total order. Acquire/release on two independent atomics can
+        // otherwise let both sides observe the other's previous value.
+        self.active_admissions.fetch_add(1, Ordering::SeqCst);
+        if self.state.load(Ordering::SeqCst) != lifecycle_code(LifecycleState::Running) {
             self.release_admission();
             return Err(Error::Draining);
         }
@@ -57,7 +60,7 @@ impl Lifecycle {
         loop {
             let notified = self.changed.notified();
             tokio::pin!(notified);
-            if self.active_admissions.load(Ordering::Acquire) == 0 {
+            if self.active_admissions.load(Ordering::SeqCst) == 0 {
                 break;
             }
             notified.await;
@@ -78,7 +81,7 @@ impl Lifecycle {
             .compare_exchange(
                 lifecycle_code(current),
                 lifecycle_code(LifecycleState::Drained),
-                Ordering::AcqRel,
+                Ordering::SeqCst,
                 Ordering::Acquire,
             )
             .map_err(|_| Error::Conflict)?;
@@ -91,7 +94,7 @@ impl Lifecycle {
             .compare_exchange(
                 lifecycle_code(from),
                 lifecycle_code(to),
-                Ordering::AcqRel,
+                Ordering::SeqCst,
                 Ordering::Acquire,
             )
             .map_err(|_| Error::Conflict)?;
@@ -100,7 +103,7 @@ impl Lifecycle {
     }
 
     fn release_admission(&self) {
-        if self.active_admissions.fetch_sub(1, Ordering::AcqRel) == 1 {
+        if self.active_admissions.fetch_sub(1, Ordering::SeqCst) == 1 {
             self.changed.notify_waiters();
         }
     }
@@ -120,6 +123,18 @@ const fn lifecycle_code(state: LifecycleState) -> u8 {
 impl Drop for AdmissionGuard<'_> {
     fn drop(&mut self) {
         self.lifecycle.release_admission();
+    }
+}
+
+impl AdmissionGuard<'_> {
+    /// An admitted operation may finish after quiesce closes the gate. Tokens cannot
+    /// be borrowed from a different runtime to bypass its lifecycle boundary.
+    pub(crate) fn check(&self, lifecycle: &Lifecycle) -> Result<()> {
+        if std::ptr::eq(self.lifecycle, lifecycle) {
+            Ok(())
+        } else {
+            Err(Error::Invalid)
+        }
     }
 }
 

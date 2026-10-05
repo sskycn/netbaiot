@@ -1,0 +1,58 @@
+[
+  {
+    "file": "apps/netbaiot-server/src/lib.rs",
+    "test": "http_auth_provider_authenticates_both_authority_requests_and_redacts_token"
+  },
+  {
+    "file": "apps/netbaiot-server/src/lib.rs",
+    "test": "http_auth_provider_token_validation_preserves_transport_policy"
+  },
+  {
+    "file": "crates/netbaiot-runtime/src/sessions.rs",
+    "test": "enqueue_validation_and_every_reservation_failure_roll_back"
+  },
+  {
+    "file": "crates/netbaiot-transports/src/business_rpc.rs",
+    "test": "shared_v2_v3_control_worker_rejects_sync_and_invalidation_after_quiesce"
+  },
+  {
+    "file": "crates/netbaiot-transports/src/mqtt/broker.rs",
+    "test": "expired_command_at_broker_handoff_releases_all_responsibility"
+  },
+  {
+    "file": "crates/netbaiot-transports/src/mqtt/broker.rs",
+    "test": "command_progress_follows_started_qos_recovery_after_write_failure"
+  },
+  {
+    "file": "crates/netbaiot-transports/src/mqtt/broker.rs",
+    "test": "command_progress_expiry_and_exact_ack_transitions_for_both_mqtt_versions"
+  },
+  {
+    "file": "crates/netbaiot-transports/tests/end_to_end.rs",
+    "test": "authenticated_candidates_cannot_register_after_quiesce"
+  },
+  {
+    "file": "crates/netbaiot-transports/tests/end_to_end.rs",
+    "test": "quiesce_waits_for_invalidation_before_committing_mqtt_recovery"
+  },
+  {
+    "file": "crates/netbaiot-transports/tests/end_to_end.rs",
+    "test": "management_mutations_close_but_diagnostics_and_drain_remain_available"
+  },
+  {
+    "file": "crates/netbaiot-transports/tests/end_to_end.rs",
+    "test": "command_dedup_tracks_sent_receipts_and_fences_evicted_dispatch_updates"
+  },
+  {
+    "file": "crates/netbaiot-transports/src/udp_replay_tests.rs",
+    "test": "replay_indexes_match_legacy_under_expiry_rotation_duplicates_and_clock_reversal"
+  },
+  {
+    "file": "crates/netbaiot-transports/src/udp_replay_tests.rs",
+    "test": "replay_refresh_never_accumulates_expiry_nodes"
+  },
+  {
+    "file": "crates/netbaiot-transports/src/udp_replay_tests.rs",
+    "test": "replay_hot_path_probe"
+  }
+]

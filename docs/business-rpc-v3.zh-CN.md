@@ -14,9 +14,9 @@ Provider 和 EventSubscription 是长寿命父流。Provider 下有网关发起�
 
 `device.command.send` 使用独立的客户端 RPC 流，不需要父流。OPEN 带方法名、每次新生成的 `request_id`、deadline 和 body 长度；DATA 带 `DeviceCommandSendRequest { command }` JSON 并以 END_STREAM 结束。网关用 RESPONSE/DATA 返回 `DeviceCommandSendResponse { dispatch }`。BusinessPrincipal 的 `call_methods` 必须允许此方法，租户范围也必须涵盖目标设备。方法授权先于 DTO 解码，租户授权先于会话查询；V3 帧与 mux wire 均未改变。
 
-业务端调用 `BusinessRpcV3Client::send_command(&command)`。`Queued` 只表示当前本地 MQTT/TCP 设备会话已接受下发，不表示设备已收到或执行。设备稍后上报的 `CommandAck` 仍作为普通 EventDelivery 按 `command_id` 匹配。提交后断线或超时返回 `OutcomeUnknown`；重连后用相同内容和 `command_id` 显式重试。每次 RPC 有新的 `request_id` 和 stream ID。同一 `(tenant_id, command_id)` 内容冲突返回 `Conflict`；设备离线或命令未就绪返回 `Unavailable`。下发成功后 RESET_STREAM 不撤销命令。排空期间新命令被拒绝，已保留的回执仍可查询。
+业务端调用 `BusinessRpcV3Client::send_command(&command)`。`Queued` 只表示当前本地 MQTT/TCP 设备会话已接受下发，不表示设备已收到或执行。设备稍后上报的 `CommandAck` 仍作为普通 EventDelivery 按 `command_id` 匹配。提交后断线或超时返回 `OutcomeUnknown`；重连后用相同内容和 `command_id` 显式重试。每次 RPC 有新的 `request_id` 和 stream ID。同一 `(tenant_id, command_id)` 内容冲突返回 `Conflict`；设备离线或命令未就绪返回 `Unavailable`。下发成功后 RESET_STREAM 不撤销命令。排空期间所有命令提交（包括去重重试）均被拒绝。
 
-HTTP `/api/v1/devices/commands`、V2 和 V3 共用一个 `CommandService` 和进程内幂等表。`command_dedup_max_entries` 默认 4096，`command_dedup_ttl_ms` 默认 300000。窗口内同内容重试返回原回执，不再次下发；表满返回 `Overloaded`，失败的下发不会占用 ID。此表不持久化，崩溃或重启后幂等历史丢失，不保证跨重启 exactly-once。业务命令历史和离线重试仍由业务系统负责。
+HTTP `/api/v1/devices/commands`、V2 和 V3 共用一个 `CommandService` 和进程内幂等表。`command_dedup_max_entries` 默认 4096，`command_dedup_ttl_ms` 默认 300000。窗口内同内容重试返回最新已知回执状态，不再次下发；表满返回 `Overloaded`，失败的下发不会占用 ID。此表不持久化，崩溃或重启后幂等历史丢失，不保证跨重启 exactly-once。业务命令历史和离线重试仍由业务系统负责。
 
 单个 writer 按协商大小惰性切分 body，并在不同流间调度 DATA。RPC 与 Event 的调度份额为 4:1，连续 control 帧最多四个，没有发送 credit 的流会跳过；同一流的 OPEN/RESPONSE 一定先于 DATA。发送 DATA 同时扣除连接和流窗口，WINDOW_UPDATE 实际写出后才返还接收 credit，与应用 Event ACK 分离。RESET_STREAM 结束单流，父流 reset 同时清理子流；连接协议错误和 principal 过期发送 GOAWAY 并关闭。单流错误应通过 RESET_STREAM 隔离。
 
@@ -39,3 +39,5 @@ HTTP `/api/v1/devices/commands`、V2 和 V3 共用一个 `CommandService` 和进
 客户端显式使用 `BusinessRpcV3ClientConfig` 与 `BusinessRpcV3Client::connect`，在依赖 Provider/订阅前等待 `wait_ready()`。重连有有界退避并重建父流；旧事件句柄受 epoch 栅栏保护，不能在新连接上 ACK。TCP 自身仍有队头阻塞，丢包可能暂停所有流；V3 解决的是应用层整帧写入造成的阻塞。迁移时保留 V2，显式启用 V3，先迁移一个客户端，再以相同负载比较认证延迟、ACK 和资源占用。
 
 实际 16 KiB Event 限速短测尚未证明默认 256 KiB 流窗口下有稳定、明显的认证尾延迟改善；原因与原始数字见 [V3 生产就绪测量](business-rpc-v3-production-readiness.zh-CN.md)。
+
+进程内回执使用现有 Queued/Dispatching/Sent/Received/Expired/Failed 状态。未开始发送的命令按实际 TTL 过期并计入 CommandFailed；已开始写入或等待 receipt 的命令不会因 TTL 被误标 Expired。发送前 admission 失败释放 ID，已接受命令的后续传输失败保留状态至去重 TTL 结束。不会自动重试、持久化命令历史或把传输状态当作执行结果。

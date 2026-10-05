@@ -475,6 +475,7 @@ async fn handle_management(
             .map_err(|_| Error::Invalid)?;
             let revision = snapshot.revision;
             let routes = snapshot.routes.clone();
+            let _admission = services.ingress.lifecycle.begin_admission()?;
             let _mutation = services.control_lock.lock().await;
             services
                 .ingress
@@ -495,6 +496,7 @@ async fn handle_management(
                 &body(req, services.ingress.limits.max_http_body_size).await?,
             )
             .map_err(|_| Error::Invalid)?;
+            let _admission = services.ingress.lifecycle.begin_admission()?;
             let _mutation = services.control_lock.lock().await;
             services
                 .ingress

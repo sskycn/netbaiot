@@ -42,3 +42,15 @@ connected local MQTT/TCP session accepted the command into its count-and-byte qu
 An offline device returns unavailable. Transport write (`SENT`), MQTT PUBACK/device
 receipt, and device execution ACK are distinct. Execution results return as
 `DeviceEventKind::CommandAck` with the same `command_id`.
+
+Dedup receipts report the latest process-local transport state using the existing
+`queued`, `dispatching`, `sent`, `received`, `expired`, and `failed` values. An unsent
+queued command expires at its effective deadline even when dedup retention is longer;
+expiry increments `CommandFailed` once. `Dispatching` starts before the socket write,
+`Sent` means the write completed, and MQTT `Received` requires the matching positive
+QoS ACK. None proves device execution. TTL cannot expire an already-started transfer.
+A pre-admission dispatch failure releases the ID for retry. A later transport failure
+keeps the accepted ID/status until retention ends; no automatic retry is introduced.
+Late updates from an evicted dispatch cannot change a newer dispatch with the same ID.
+No command progress or dedup history is written to recovery. Business applications
+retain durable history, idempotency and offline retry decisions.

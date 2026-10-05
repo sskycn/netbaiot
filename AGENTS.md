@@ -2,8 +2,8 @@
 
 ## Product
 
-NetbaIoT is a high-performance, low-memory, database-free, event-driven IoT
-protocol gateway and real-time event router written in Rust.
+NetbaIoT is a database-free, memory-first, event-driven IoT ingress gateway and
+real-time event router written in Rust.
 
 Supported device transports are embedded MQTT, generic TCP, and UDP.
 NetbaIoT implements MQTT directly; do not introduce an external broker.
@@ -94,11 +94,18 @@ DeviceCommand payloads; no special command name, permission or transport is adde
 
 ## Embedded MQTT
 
-The supported broker profile is MQTT 3.1.1 with QoS0/1/2, CleanSession 0/1,
-persistent sessions, retained messages, LWT, exact/`+`/`#` subscriptions, and
-planned-restart recovery. MQTT 5, MQTT-SN, shared subscriptions, and broker
-clustering remain out of scope. Do not remove implemented MQTT 3.1.1 behavior as
-though it were unsupported.
+The embedded broker implements MQTT 3.1.1 and a bounded MQTT 5.0 profile (see
+`docs/protocol-support.md` and `docs/mqtt.md`). Both support QoS0/1/2, persistent
+sessions, retained messages, Will, exact/`+`/`#` subscriptions, and planned-restart
+recovery. MQTT 3.1.1 supports CleanSession 0/1. MQTT 5.0 supports Clean Start,
+Session Expiry Interval, Message Expiry, Will Delay, Receive Maximum, Maximum Packet
+Size, No Local, Retain As Published, Retain Handling, and bounded payload/content/
+response/correlation/user metadata.
+
+MQTT-SN, shared subscriptions, Topic Alias, Subscription Identifier, Enhanced
+Authentication, WebSocket, bridge mode, `$SYS` services, and broker clustering are
+not implemented. Do not describe them as supported. Do not remove implemented
+MQTT 3.1.1 or MQTT 5.0 behavior as though it were unsupported.
 
 Preserve incremental parsing, hard Remaining Length limits, strict UTF-8, canonical
 topic namespaces, authenticated identity checks, packet deadlines, bounded packet
@@ -158,7 +165,12 @@ STARTING -> RUNNING -> QUIESCING -> DRAINING -> SPOOLING -> DRAINED -> EXIT
 
 Quiesce first makes readiness false, closes the ingress admission gate, waits for
 active admission guards, stops new connections/uploads/commands/control mutation,
-then drains accepted required deliveries.
+then drains accepted required deliveries. Management auth/control/routes mutation,
+Business RPC V2/V3 auth sync/invalidation, offline-provider revocation, command
+dispatch (including dedup retries), and final MQTT/TCP session establishment hold
+admission guards through their complete side effects. Diagnostic reads and the
+idempotent drain request remain available. Never substitute a readiness check for
+this fence.
 
 Before a successful planned exit, every pending required delivery must either:
 
@@ -307,9 +319,9 @@ CONNACK writes.
 
 Tenant inflight release must wake bounded pending work for other active sessions in
 the tenant; ACK handlers must not scan all sessions. Recovery limits must cover
-compact NBMQ v3 records for every admitted legal state. Writes are streaming and
+compact NBMQ v6 records for every admitted legal state. Writes are streaming and
 bounded per record and finish with an authoritative record-count/byte-count/whole-stream
-digest trailer; NBMQ v1 and v2 remain read-only compatible under separate ceilings. A structural recovery
+digest trailer; NBMQ v1–v5 remain read-only compatible under version-specific ceilings. A structural recovery
 failure is not retryable, but EventBus required work must still drain or spool before
 the process remains alive and unready.
 

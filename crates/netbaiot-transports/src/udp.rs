@@ -1,7 +1,10 @@
 use crate::common::Services;
 use netbaiot_core::*;
 use netbaiot_runtime::*;
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::{BTreeSet, HashMap},
+    sync::Arc,
+};
 use tokio::net::UdpSocket;
 use tokio_util::sync::CancellationToken;
 pub const ACK_SIZE: usize = 64;
@@ -104,14 +107,34 @@ pub enum ReplayDecision {
     New,
     AcceptedDuplicate,
 }
+type ReplayKey = (DeviceKey, [u8; 16], u32);
+type ReplayExpiry = (i64, TenantId, ProductId, DeviceId, [u8; 16], u32);
+fn expiry_key(expires: i64, key: &ReplayKey) -> ReplayExpiry {
+    (
+        expires,
+        key.0.tenant_id.clone(),
+        key.0.product_id.clone(),
+        key.0.device_id.clone(),
+        key.1,
+        key.2,
+    )
+}
 pub struct ReplayWindow {
-    entries: HashMap<(DeviceKey, [u8; 16], u32), Replay>,
+    entries: HashMap<ReplayKey, Replay>,
+    // Exactly one expiry key per live entry: refresh removes the previous key.
+    // No stale heap nodes accumulate under a hot device or a backwards wall clock.
+    expirations: BTreeSet<ReplayExpiry>,
+    devices: HashMap<DeviceKey, usize>,
+    tenants: HashMap<TenantId, usize>,
     limits: Arc<Limits>,
 }
 impl ReplayWindow {
     pub fn new(limits: Arc<Limits>) -> Self {
         Self {
             entries: HashMap::new(),
+            expirations: BTreeSet::new(),
+            devices: HashMap::new(),
+            tenants: HashMap::new(),
             limits,
         }
     }
@@ -127,7 +150,7 @@ impl ReplayWindow {
         if now.abs_diff(timestamp) > self.limits.udp_clock_skew_ms {
             return Err(Error::Authentication);
         }
-        self.entries.retain(|_, v| v.expires > now);
+        self.prune(now);
         let key = (device.clone(), boot, credential_version);
         if let Some(entry) = self.entries.get(&key) {
             if seq <= entry.max {
@@ -140,13 +163,9 @@ impl ReplayWindow {
                 }
             }
         } else if self.entries.len() >= self.limits.max_replay_entries
-            || self.entries.keys().filter(|(d, _, _)| d == device).count()
+            || self.devices.get(device).copied().unwrap_or(0)
                 >= self.limits.max_replay_entries_per_device
-            || self
-                .entries
-                .keys()
-                .filter(|(d, _, _)| d.tenant_id == device.tenant_id)
-                .count()
+            || self.tenants.get(&device.tenant_id).copied().unwrap_or(0)
                 >= self.limits.max_replay_entries_per_tenant
         {
             return Err(Error::Overloaded);
@@ -163,14 +182,23 @@ impl ReplayWindow {
         seq: u64,
         now: i64,
     ) {
-        let e = self
-            .entries
-            .entry((device, boot, credential_version))
-            .or_insert(Replay {
-                max: seq,
-                bits: 0,
-                expires: 0,
-            });
+        let key = (device, boot, credential_version);
+        let expires = now.saturating_add(self.limits.replay_ttl_ms as i64);
+        let previous = self.entries.get(&key).map(|entry| entry.expires);
+        if previous != Some(expires) {
+            if let Some(previous) = previous {
+                self.expirations.remove(&expiry_key(previous, &key));
+            } else {
+                *self.devices.entry(key.0.clone()).or_default() += 1;
+                *self.tenants.entry(key.0.tenant_id.clone()).or_default() += 1;
+            }
+            self.expirations.insert(expiry_key(expires, &key));
+        }
+        let e = self.entries.entry(key).or_insert(Replay {
+            max: seq,
+            bits: 0,
+            expires,
+        });
         if seq > e.max {
             let delta = seq - e.max;
             e.bits = if delta >= 64 { 0 } else { e.bits << delta };
@@ -180,9 +208,46 @@ impl ReplayWindow {
         if delta < 64 {
             e.bits |= 1 << delta;
         }
-        e.expires = now.saturating_add(self.limits.replay_ttl_ms as i64);
+        e.expires = expires;
+    }
+
+    fn prune(&mut self, now: i64) {
+        while self.expirations.first().is_some_and(|entry| entry.0 <= now) {
+            let Some((_, tenant_id, product_id, device_id, boot, version)) =
+                self.expirations.pop_first()
+            else {
+                break;
+            };
+            let device = DeviceKey {
+                tenant_id,
+                product_id,
+                device_id,
+            };
+            if self
+                .entries
+                .remove(&(device.clone(), boot, version))
+                .is_some()
+            {
+                if let Some(count) = self.devices.get_mut(&device) {
+                    *count -= 1;
+                    if *count == 0 {
+                        self.devices.remove(&device);
+                    }
+                }
+                if let Some(count) = self.tenants.get_mut(&device.tenant_id) {
+                    *count -= 1;
+                    if *count == 0 {
+                        self.tenants.remove(&device.tenant_id);
+                    }
+                }
+            }
+        }
     }
 }
+#[cfg(test)]
+#[path = "udp_replay_tests.rs"]
+mod replay_tests;
+
 pub async fn serve(socket: UdpSocket, s: Arc<Services>, stop: CancellationToken) -> Result<()> {
     let l = &s.ingress.limits;
     let mut input = vec![0; l.max_udp_datagram_size + 1];

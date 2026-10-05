@@ -1,0 +1,734 @@
+{
+  "initial_final_validation": [
+    {
+      "name": "fmt",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "exit": 0,
+      "seconds": 0.349
+    },
+    {
+      "name": "clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "--workspace",
+        "--all-targets",
+        "--all-features",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0,
+      "seconds": 0.133
+    },
+    {
+      "name": "workspace",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--workspace",
+        "--all-features"
+      ],
+      "exit": 0,
+      "seconds": 50.972
+    },
+    {
+      "name": "build-server",
+      "command": [
+        "cargo",
+        "build",
+        "--locked",
+        "-p",
+        "netbaiot-server"
+      ],
+      "exit": 0,
+      "seconds": 5.525
+    },
+    {
+      "name": "mqtt-regressions",
+      "command": [
+        "python3",
+        "tests/mqtt_protocol_regressions.py",
+        "--repo",
+        ".",
+        "--output",
+        "/Users/sam/Dev/work/sskycn/netbaiot/target/hardening-validation/mqtt-regressions.json"
+      ],
+      "exit": 0,
+      "seconds": 6.174
+    },
+    {
+      "name": "mqtt-release-gate",
+      "command": [
+        "python3",
+        "tests/mqtt_conformance/run.py",
+        "--release-gate",
+        "--no-build"
+      ],
+      "exit": 0,
+      "seconds": 44.189
+    },
+    {
+      "name": "mqtt-v5-raw",
+      "command": [
+        "python3",
+        "tests/mqtt_conformance/v5_smoke.py"
+      ],
+      "exit": 0,
+      "seconds": 9.217
+    },
+    {
+      "name": "mqtt-v5-mosquitto",
+      "command": [
+        "python3",
+        "tests/mqtt_conformance/v5_mosquitto.py"
+      ],
+      "exit": 0,
+      "seconds": 7.158
+    },
+    {
+      "name": "build-sdk",
+      "command": [
+        "cargo",
+        "build",
+        "--locked",
+        "-p",
+        "netbaiot-device-sdk",
+        "--example",
+        "device_mqtt"
+      ],
+      "exit": 0,
+      "seconds": 10.432
+    },
+    {
+      "name": "sdk-mosquitto",
+      "command": [
+        "python3",
+        "tests/run_device_profile_mosquitto.py"
+      ],
+      "exit": 0,
+      "seconds": 1.918
+    },
+    {
+      "name": "sdk-profile",
+      "command": [
+        "python3",
+        "tests/measure_device_profile.py"
+      ],
+      "exit": 0,
+      "seconds": 6.508
+    },
+    {
+      "name": "restart-soak",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "netbaiot-server",
+        "--test",
+        "server",
+        "subprocess_graceful_restart_sixty_second_soak",
+        "--",
+        "--ignored",
+        "--nocapture"
+      ],
+      "exit": 0,
+      "seconds": 64.309
+    }
+  ],
+  "after_self_review_and_msrv": [
+    {
+      "name": "msrv-fmt",
+      "command": [
+        "cargo",
+        "+1.88.0",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "exit": 0,
+      "seconds": 1.851
+    },
+    {
+      "name": "msrv-clippy",
+      "command": [
+        "cargo",
+        "+1.88.0",
+        "clippy",
+        "--locked",
+        "--workspace",
+        "--all-targets",
+        "--all-features",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0,
+      "seconds": 15.709
+    },
+    {
+      "name": "msrv-workspace",
+      "command": [
+        "cargo",
+        "+1.88.0",
+        "test",
+        "--locked",
+        "--workspace",
+        "--all-features"
+      ],
+      "exit": 0,
+      "seconds": 82.154
+    },
+    {
+      "name": "fmt-final",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "exit": 0,
+      "seconds": 0.622
+    },
+    {
+      "name": "clippy-final",
+      "command": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "--workspace",
+        "--all-targets",
+        "--all-features",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0,
+      "seconds": 3.353
+    },
+    {
+      "name": "workspace-final",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--workspace",
+        "--all-features"
+      ],
+      "exit": 0,
+      "seconds": 54.932
+    },
+    {
+      "name": "build-server-final",
+      "command": [
+        "cargo",
+        "build",
+        "--locked",
+        "-p",
+        "netbaiot-server"
+      ],
+      "exit": 0,
+      "seconds": 0.186
+    },
+    {
+      "name": "mqtt-regressions-final",
+      "command": [
+        "python3",
+        "tests/mqtt_protocol_regressions.py",
+        "--repo",
+        ".",
+        "--output",
+        "/Users/sam/Dev/work/sskycn/netbaiot/target/hardening-validation/mqtt-regressions.json"
+      ],
+      "exit": 0,
+      "seconds": 5.918
+    },
+    {
+      "name": "mqtt-release-gate-final",
+      "command": [
+        "python3",
+        "tests/mqtt_conformance/run.py",
+        "--release-gate",
+        "--no-build"
+      ],
+      "exit": 0,
+      "seconds": 24.826
+    },
+    {
+      "name": "mqtt-v5-raw-final",
+      "command": [
+        "python3",
+        "tests/mqtt_conformance/v5_smoke.py"
+      ],
+      "exit": 0,
+      "seconds": 7.982
+    },
+    {
+      "name": "mqtt-v5-mosquitto-final",
+      "command": [
+        "python3",
+        "tests/mqtt_conformance/v5_mosquitto.py"
+      ],
+      "exit": 0,
+      "seconds": 6.932
+    }
+  ],
+  "initial_fuzz": [
+    {
+      "target": "mqtt_device_profile",
+      "command": [
+        "cargo",
+        "+nightly",
+        "fuzz",
+        "run",
+        "mqtt_device_profile",
+        "--",
+        "-runs=10000",
+        "-timeout=5",
+        "-max_len=131072"
+      ],
+      "exit": 0,
+      "seconds": 51.658
+    },
+    {
+      "target": "mqtt_packet",
+      "command": [
+        "cargo",
+        "+nightly",
+        "fuzz",
+        "run",
+        "mqtt_packet",
+        "--",
+        "-runs=10000",
+        "-timeout=5",
+        "-max_len=131072"
+      ],
+      "exit": 0,
+      "seconds": 2.657
+    },
+    {
+      "target": "mqtt_v5_packet",
+      "command": [
+        "cargo",
+        "+nightly",
+        "fuzz",
+        "run",
+        "mqtt_v5_packet",
+        "--",
+        "-runs=10000",
+        "-timeout=5",
+        "-max_len=131072"
+      ],
+      "exit": 0,
+      "seconds": 2.383
+    },
+    {
+      "target": "mqtt_state",
+      "command": [
+        "cargo",
+        "+nightly",
+        "fuzz",
+        "run",
+        "mqtt_state",
+        "--",
+        "-runs=10000",
+        "-timeout=5",
+        "-max_len=131072"
+      ],
+      "exit": 0,
+      "seconds": 3.976
+    },
+    {
+      "target": "mqtt_recovery",
+      "command": [
+        "cargo",
+        "+nightly",
+        "fuzz",
+        "run",
+        "mqtt_recovery",
+        "--",
+        "-runs=10000",
+        "-timeout=5",
+        "-max_len=131072"
+      ],
+      "exit": 0,
+      "seconds": 2.998
+    },
+    {
+      "target": "udp_envelope",
+      "command": [
+        "cargo",
+        "+nightly",
+        "fuzz",
+        "run",
+        "udp_envelope",
+        "--",
+        "-runs=10000",
+        "-timeout=5",
+        "-max_len=131072"
+      ],
+      "exit": 0,
+      "seconds": 2.925
+    },
+    {
+      "target": "tcp_frame",
+      "command": [
+        "cargo",
+        "+nightly",
+        "fuzz",
+        "run",
+        "tcp_frame",
+        "--",
+        "-runs=10000",
+        "-timeout=5",
+        "-max_len=131072"
+      ],
+      "exit": 0,
+      "seconds": 2.341
+    },
+    {
+      "target": "restart_spool",
+      "command": [
+        "cargo",
+        "+nightly",
+        "fuzz",
+        "run",
+        "restart_spool",
+        "--",
+        "-runs=10000",
+        "-timeout=5",
+        "-max_len=131072"
+      ],
+      "exit": 0,
+      "seconds": 2.12
+    },
+    {
+      "target": "business_stream",
+      "command": [
+        "cargo",
+        "+nightly",
+        "fuzz",
+        "run",
+        "business_stream",
+        "--",
+        "-runs=10000",
+        "-timeout=5",
+        "-max_len=131072"
+      ],
+      "exit": 0,
+      "seconds": 2.88
+    },
+    {
+      "target": "business_rpc_v2",
+      "command": [
+        "cargo",
+        "+nightly",
+        "fuzz",
+        "run",
+        "business_rpc_v2",
+        "--",
+        "-runs=10000",
+        "-timeout=5",
+        "-max_len=131072"
+      ],
+      "exit": 0,
+      "seconds": 7.196
+    },
+    {
+      "target": "business_rpc_v3",
+      "command": [
+        "cargo",
+        "+nightly",
+        "fuzz",
+        "run",
+        "business_rpc_v3",
+        "--",
+        "-runs=10000",
+        "-timeout=5",
+        "-max_len=131072"
+      ],
+      "exit": 0,
+      "seconds": 3.6
+    }
+  ],
+  "after_self_review_fuzz": [
+    {
+      "target": "mqtt_device_profile",
+      "command": [
+        "cargo",
+        "+nightly",
+        "fuzz",
+        "run",
+        "mqtt_device_profile",
+        "--",
+        "-runs=10000",
+        "-timeout=5",
+        "-max_len=131072"
+      ],
+      "exit": 0,
+      "seconds": 20.837
+    },
+    {
+      "target": "mqtt_packet",
+      "command": [
+        "cargo",
+        "+nightly",
+        "fuzz",
+        "run",
+        "mqtt_packet",
+        "--",
+        "-runs=10000",
+        "-timeout=5",
+        "-max_len=131072"
+      ],
+      "exit": 0,
+      "seconds": 2.459
+    },
+    {
+      "target": "mqtt_v5_packet",
+      "command": [
+        "cargo",
+        "+nightly",
+        "fuzz",
+        "run",
+        "mqtt_v5_packet",
+        "--",
+        "-runs=10000",
+        "-timeout=5",
+        "-max_len=131072"
+      ],
+      "exit": 0,
+      "seconds": 2.294
+    },
+    {
+      "target": "mqtt_state",
+      "command": [
+        "cargo",
+        "+nightly",
+        "fuzz",
+        "run",
+        "mqtt_state",
+        "--",
+        "-runs=10000",
+        "-timeout=5",
+        "-max_len=131072"
+      ],
+      "exit": 0,
+      "seconds": 3.93
+    },
+    {
+      "target": "mqtt_recovery",
+      "command": [
+        "cargo",
+        "+nightly",
+        "fuzz",
+        "run",
+        "mqtt_recovery",
+        "--",
+        "-runs=10000",
+        "-timeout=5",
+        "-max_len=131072"
+      ],
+      "exit": 0,
+      "seconds": 2.958
+    },
+    {
+      "target": "udp_envelope",
+      "command": [
+        "cargo",
+        "+nightly",
+        "fuzz",
+        "run",
+        "udp_envelope",
+        "--",
+        "-runs=10000",
+        "-timeout=5",
+        "-max_len=131072"
+      ],
+      "exit": 0,
+      "seconds": 2.704
+    },
+    {
+      "target": "tcp_frame",
+      "command": [
+        "cargo",
+        "+nightly",
+        "fuzz",
+        "run",
+        "tcp_frame",
+        "--",
+        "-runs=10000",
+        "-timeout=5",
+        "-max_len=131072"
+      ],
+      "exit": 0,
+      "seconds": 2.235
+    },
+    {
+      "target": "restart_spool",
+      "command": [
+        "cargo",
+        "+nightly",
+        "fuzz",
+        "run",
+        "restart_spool",
+        "--",
+        "-runs=10000",
+        "-timeout=5",
+        "-max_len=131072"
+      ],
+      "exit": 0,
+      "seconds": 2.02
+    },
+    {
+      "target": "business_stream",
+      "command": [
+        "cargo",
+        "+nightly",
+        "fuzz",
+        "run",
+        "business_stream",
+        "--",
+        "-runs=10000",
+        "-timeout=5",
+        "-max_len=131072"
+      ],
+      "exit": 0,
+      "seconds": 2.73
+    },
+    {
+      "target": "business_rpc_v2",
+      "command": [
+        "cargo",
+        "+nightly",
+        "fuzz",
+        "run",
+        "business_rpc_v2",
+        "--",
+        "-runs=10000",
+        "-timeout=5",
+        "-max_len=131072"
+      ],
+      "exit": 0,
+      "seconds": 7.039
+    },
+    {
+      "target": "business_rpc_v3",
+      "command": [
+        "cargo",
+        "+nightly",
+        "fuzz",
+        "run",
+        "business_rpc_v3",
+        "--",
+        "-runs=10000",
+        "-timeout=5",
+        "-max_len=131072"
+      ],
+      "exit": 0,
+      "seconds": 3.34
+    }
+  ],
+  "workspace_totals": {
+    "workspace": {
+      "passed": 391,
+      "failed": 0,
+      "ignored": 15
+    },
+    "workspace-final": {
+      "passed": 393,
+      "failed": 0,
+      "ignored": 15
+    },
+    "msrv-workspace": {
+      "passed": 393,
+      "failed": 0,
+      "ignored": 15
+    }
+  },
+  "earlier_test_attempts": [
+    {
+      "log": "netbaiot-focused.log",
+      "totals": {
+        "passed": 79,
+        "failed": 2,
+        "ignored": 1
+      },
+      "failed_tests": [
+        "management_auth::tests::jwks_https_cache_outage_oversize_timeout_and_refresh_rate_limit",
+        "management_auth::tests::jwks_refresh_is_single_flight_and_cancellation_releases_lock"
+      ]
+    },
+    {
+      "log": "netbaiot-focused2.log",
+      "totals": {
+        "passed": 227,
+        "failed": 1,
+        "ignored": 13
+      },
+      "failed_tests": [
+        "business_rpc::tests::shared_v2_v3_control_worker_rejects_sync_and_invalidation_after_quiesce"
+      ]
+    },
+    {
+      "log": "netbaiot-stage1-tests.log",
+      "totals": {
+        "passed": 158,
+        "failed": 3,
+        "ignored": 1
+      },
+      "failed_tests": [
+        "one_socket_authentication_progresses_while_event_ack_waits",
+        "commands_role_dispatches_to_real_tcp_and_shares_http_dedup",
+        "business_rpc_command_mqtt_dedup_and_ack_use_real_sockets"
+      ]
+    },
+    {
+      "log": "netbaiot-stage1-tests2.log",
+      "totals": {
+        "passed": 389,
+        "failed": 0,
+        "ignored": 14
+      },
+      "failed_tests": []
+    },
+    {
+      "log": "netbaiot-auth-rerun.log",
+      "totals": {
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0
+      },
+      "failed_tests": []
+    },
+    {
+      "log": "netbaiot-udp-tests.log",
+      "totals": {
+        "passed": 15,
+        "failed": 0,
+        "ignored": 1
+      },
+      "failed_tests": []
+    },
+    {
+      "log": "netbaiot-final-command-tests.log",
+      "totals": {
+        "passed": 19,
+        "failed": 0,
+        "ignored": 0
+      },
+      "failed_tests": []
+    }
+  ]
+}

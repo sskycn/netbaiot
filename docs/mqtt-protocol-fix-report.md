@@ -2,7 +2,7 @@
 
 Baseline: `d4f7612a350d8c66e670ec897f3e7263ed2f00ff` on `main`. The script's `e9c9b066...` is a historical audit reference, not the code tested here. The working tree was clean before `tests/mqtt_protocol_regressions.py` was copied from the repository's existing local audit branch. No historical checkout was used.
 
-Normative sources: [MQTT 3.1.1 OASIS Standard](https://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html) and [MQTT 5.0 OASIS Standard](https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html). The root `AGENTS.md` still describes MQTT 5 as out of scope; the current implementation and `docs/mqtt.md` implement and document it. This audit preserves both versions.
+Normative sources: [MQTT 3.1.1 OASIS Standard](https://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html) and [MQTT 5.0 OASIS Standard](https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html). At the time of that audit, root `AGENTS.md` still described MQTT 5 as out of scope. The current rules and implementation now agree on the MQTT 5 profile in `docs/mqtt.md`. This audit preserves both versions.
 
 The rebuilt baseline binary produced seven `FAIL` results in `target/mqtt-audit/before.json`. These are observations, not seven independent normative violations. Every case used an isolated loopback broker and synthetic credentials.
 

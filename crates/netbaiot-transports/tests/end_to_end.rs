@@ -148,10 +148,10 @@ async fn command_service_retries_conflicts_and_drain_share_one_dispatch() {
     assert!(device_rx.try_recv().is_err());
 
     ingress.lifecycle.begin_quiesce().await.unwrap();
-    assert_eq!(
-        services.commands.send(command.clone()).await.unwrap(),
-        first
-    );
+    assert!(matches!(
+        services.commands.send(command.clone()).await,
+        Err(Error::Draining)
+    ));
     command.command_id = CommandId::generate();
     assert!(matches!(
         services.commands.send(command).await,
@@ -301,10 +301,14 @@ async fn accepted_receipt_survives_command_ttl_within_dedup_window() {
         .register(Arc::new(auth()), Transport::Tcp)
         .unwrap();
     let command = live_command();
-    let first = services.commands.send(command.clone()).await.unwrap();
-    assert_eq!(device_rx.try_recv().unwrap().command_id, command.command_id);
+    services.commands.send(command.clone()).await.unwrap();
     tokio::time::sleep(std::time::Duration::from_millis(200)).await;
-    assert_eq!(services.commands.send(command).await.unwrap(), first);
+    assert_eq!(
+        services.commands.send(command).await.unwrap().state,
+        DeliveryState::Expired
+    );
+    drop(device_rx.try_recv().unwrap());
+    assert_eq!(ingress.metrics.get(Metric::CommandFailed), 1);
     assert!(device_rx.try_recv().is_err());
     assert_eq!(services.commands.usage().unwrap(), (1, 0));
 }
@@ -1429,4 +1433,276 @@ async fn fragmented_mqtt_qos1_puback_follows_event_acceptance() {
     assert_eq!(provider.calls.load(Ordering::Relaxed), 1);
     stop.cancel();
     task.await.unwrap().unwrap();
+}
+
+#[tokio::test]
+async fn authenticated_candidates_cannot_register_after_quiesce() {
+    for (transport, v5) in [
+        (Transport::Mqtt, false),
+        (Transport::Mqtt, true),
+        (Transport::Tcp, false),
+    ] {
+        let provider = Arc::new(CountingProvider {
+            calls: AtomicUsize::new(0),
+            auth: auth(),
+            delay: false,
+        });
+        let (ingress, services, _) = runtime(Limits::default(), provider);
+        let candidate = ingress
+            .authenticate_session(AuthenticationRequest::Secret {
+                credential_id: "a",
+                secret: b"secret",
+            })
+            .await
+            .unwrap();
+        ingress.lifecycle.begin_quiesce().await.unwrap();
+        assert!(matches!(
+            ingress.register_session_with(candidate, transport, |auth, _| {
+                match (transport, v5) {
+                    (Transport::Mqtt, true) => services
+                        .mqtt
+                        .attach_v5(auth, "late".into(), false, 60, 8)
+                        .map(Some),
+                    (Transport::Mqtt, false) => {
+                        services.mqtt.attach(auth, "late".into(), false).map(Some)
+                    }
+                    _ => Ok(None),
+                }
+            }),
+            Err(Error::Draining)
+        ));
+        assert!(ingress.sessions.list(0, 10).unwrap().is_empty());
+        assert_eq!(
+            serde_json::to_value(services.mqtt.snapshot().unwrap()).unwrap()["sessions"],
+            serde_json::json!([])
+        );
+        ingress.events.stop_workers().await.unwrap();
+    }
+}
+
+#[tokio::test]
+async fn quiesce_waits_for_invalidation_before_committing_mqtt_recovery() {
+    for admitted_before in [true, false] {
+        let provider = Arc::new(CountingProvider {
+            calls: AtomicUsize::new(0),
+            auth: auth(),
+            delay: false,
+        });
+        let (ingress, services, _) = runtime(Limits::default(), provider);
+        let attachment = services
+            .mqtt
+            .attach(&auth(), "persistent-drain".into(), false)
+            .unwrap();
+        drop(attachment);
+        let directory =
+            std::env::temp_dir().join(format!("netbaiot-fence-{}", uuid::Uuid::new_v4()));
+        if admitted_before {
+            let (entered, wait_entered) = tokio::sync::oneshot::channel();
+            let (resume, wait_resume) = std::sync::mpsc::channel();
+            let owner = ingress.clone();
+            let broker = services.mqtt.clone();
+            let mutation = std::thread::spawn(move || {
+                owner.invalidate_auth_with(&AuthInvalidation::All, || {
+                    entered.send(()).unwrap();
+                    wait_resume.recv().unwrap();
+                    broker.invalidate_sessions(&AuthInvalidation::All)
+                })
+            });
+            wait_entered.await.unwrap();
+            let lifecycle = ingress.lifecycle.clone();
+            let quiesce = tokio::spawn(async move { lifecycle.begin_quiesce().await });
+            tokio::task::yield_now().await;
+            assert_eq!(ingress.lifecycle.state(), LifecycleState::Quiescing);
+            assert!(!quiesce.is_finished());
+            resume.send(()).unwrap();
+            assert_eq!(mutation.join().unwrap().unwrap().2, 1);
+            quiesce.await.unwrap().unwrap();
+        } else {
+            ingress.lifecycle.begin_quiesce().await.unwrap();
+            assert!(matches!(
+                ingress.invalidate_auth_with(&AuthInvalidation::All, || services
+                    .mqtt
+                    .invalidate_sessions(&AuthInvalidation::All)),
+                Err(Error::Draining)
+            ));
+        }
+        services.mqtt.commit_to(&directory).await.unwrap();
+        // The management listener remains available after this point. A successful
+        // late invalidation must never coexist with an older committed session.
+        assert!(matches!(
+            ingress.invalidate_auth_with(&AuthInvalidation::All, || services
+                .mqtt
+                .invalidate_sessions(&AuthInvalidation::All)),
+            Err(Error::Draining)
+        ));
+        let restored = netbaiot_transports::mqtt::broker::MqttBroker::new(ingress.limits.clone());
+        assert!(restored.recover_from(&directory).await.unwrap());
+        let attachment = restored
+            .attach(&auth(), "persistent-drain".into(), false)
+            .unwrap();
+        assert_eq!(attachment.session_present, !admitted_before);
+        drop(attachment);
+        std::fs::remove_dir_all(directory).unwrap();
+        ingress.events.stop_workers().await.unwrap();
+    }
+}
+
+#[tokio::test]
+async fn management_mutations_close_but_diagnostics_and_drain_remain_available() {
+    let provider = Arc::new(CountingProvider {
+        calls: AtomicUsize::new(0),
+        auth: auth(),
+        delay: false,
+    });
+    let (ingress, mut services, _) = runtime(Limits::default(), provider);
+    let secret = "ab".repeat(32);
+    Arc::get_mut(&mut services).unwrap().admin = Some(Arc::new(
+        AdminAccess::new(&secret, Default::default(), &ingress.limits).unwrap(),
+    ));
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let stop = CancellationToken::new();
+    let server = tokio::spawn(netbaiot_transports::serve_management_http(
+        listener,
+        services,
+        None,
+        stop.clone(),
+    ));
+    async fn request(
+        address: std::net::SocketAddr,
+        secret: &str,
+        method: &str,
+        path: &str,
+        body: &str,
+    ) -> String {
+        let mut stream = TcpStream::connect(address).await.unwrap();
+        stream.write_all(format!("{method} /api/v1/{path} HTTP/1.1\r\nHost: localhost\r\nAuthorization: Bearer {secret}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}", body.len()).as_bytes()).await.unwrap();
+        let mut response = String::new();
+        stream.read_to_string(&mut response).await.unwrap();
+        response
+    }
+    let requests = [
+        (
+            "POST",
+            "auth/invalidate",
+            serde_json::to_string(&AuthInvalidation::All).unwrap(),
+        ),
+        (
+            "PUT",
+            "control/snapshot",
+            r#"{"revision":2,"products":[],"routes":[{"tenant":null,"sinks":["sink"]}]}"#.into(),
+        ),
+        (
+            "PUT",
+            "routes",
+            r#"{"revision":3,"routes":[{"tenant":null,"sinks":["sink"]}]}"#.into(),
+        ),
+        (
+            "POST",
+            "devices/commands",
+            serde_json::to_string(&live_command()).unwrap(),
+        ),
+    ];
+    let (_session, _rx) = ingress
+        .sessions
+        .register(Arc::new(auth()), Transport::Tcp)
+        .unwrap();
+    let mut live = None;
+    for (method, path, body) in &requests {
+        if *path == "devices/commands" {
+            live = Some(
+                ingress
+                    .sessions
+                    .register(Arc::new(auth()), Transport::Tcp)
+                    .unwrap(),
+            );
+        }
+        let response = request(address, &secret, method, path, body).await;
+        assert!(response.starts_with("HTTP/1.1 2"), "{path}: {response}");
+    }
+    drop(live);
+    // Keep a guard to expose Quiescing, not only the later Draining state.
+    let guard = ingress.lifecycle.begin_admission().unwrap();
+    let lifecycle = ingress.lifecycle.clone();
+    let quiesce = tokio::spawn(async move { lifecycle.begin_quiesce().await });
+    tokio::task::yield_now().await;
+    for (method, path, body) in &requests {
+        let response = request(address, &secret, method, path, body).await;
+        assert!(response.starts_with("HTTP/1.1 503"), "{path}: {response}");
+        assert!(response.contains("draining"), "{response}");
+    }
+    for path in ["health", "status", "metrics", "connections"] {
+        assert!(
+            request(address, &secret, "GET", path, "")
+                .await
+                .starts_with("HTTP/1.1 200")
+        );
+    }
+    assert!(
+        request(address, &secret, "GET", "ready", "")
+            .await
+            .starts_with("HTTP/1.1 503")
+    );
+    for _ in 0..2 {
+        assert!(
+            request(address, &secret, "POST", "drain", "")
+                .await
+                .starts_with("HTTP/1.1 202")
+        );
+    }
+    drop(guard);
+    quiesce.await.unwrap().unwrap();
+    stop.cancel();
+    server.await.unwrap().unwrap();
+    ingress.events.stop_workers().await.unwrap();
+}
+
+#[tokio::test]
+async fn command_dedup_tracks_sent_receipts_and_fences_evicted_dispatch_updates() {
+    let provider = Arc::new(CountingProvider {
+        calls: AtomicUsize::new(0),
+        auth: auth(),
+        delay: false,
+    });
+    let (ingress, services, _) = runtime(
+        Limits {
+            command_dedup_ttl_ms: 50,
+            ..Limits::default()
+        },
+        provider,
+    );
+    let (_lease, mut receiver) = ingress
+        .sessions
+        .register(Arc::new(auth()), Transport::Tcp)
+        .unwrap();
+    let command = live_command();
+    services.commands.send(command.clone()).await.unwrap();
+    let old = receiver.try_recv().unwrap();
+    let progress = old.progress.as_ref().unwrap().clone();
+    assert!(progress.begin_transfer());
+    progress.update(DeliveryState::Sent);
+    assert!(!progress.expire(i64::MAX));
+    drop(old);
+    assert_eq!(
+        services.commands.send(command.clone()).await.unwrap().state,
+        DeliveryState::Sent
+    );
+    tokio::time::sleep(std::time::Duration::from_millis(60)).await;
+    assert_eq!(
+        services.commands.send(command.clone()).await.unwrap().state,
+        DeliveryState::Queued
+    );
+    let new = receiver.try_recv().unwrap();
+    progress.update(DeliveryState::Received);
+    assert_eq!(
+        services.commands.send(command.clone()).await.unwrap().state,
+        DeliveryState::Queued
+    );
+    drop(new);
+    assert_eq!(
+        services.commands.send(command).await.unwrap().state,
+        DeliveryState::Failed
+    );
+    assert!(receiver.try_recv().is_err());
+    ingress.events.stop_workers().await.unwrap();
 }

@@ -33,7 +33,7 @@ spool relationship values.
 | Sink timeout/retry | 5 s / 5 attempts / max age 1 h |
 | Restart spool | 100,000 records / 256 MiB total |
 | Spool segment/record | 64 MiB / 1 MiB |
-| MQTT recovery image | 202,178,660 B default; compact NBMQ v5 bound including profiles, delayed-Will owners, properties, and integrity trailer |
+| MQTT recovery image | 202,195,044 B default; compact NBMQ v6 bound including profiles, delayed-Will owners, properties, and integrity trailer |
 
 Every sink queue is independently count and byte charged. Global event accounting
 charges the shared event once; each sink charges its delivery responsibility.
@@ -63,13 +63,19 @@ byte limits.
 TLS, allocator-retained pages, Tokio, and kernel socket buffers are not exactly
 represented by logical accounting and require process-level measurement.
 
-UDP NBA1 uses a fixed 64-byte stack buffer and no queue/tasks. Replay values remain
-24 bytes; including the key, bucket payload grows from 88 to 96 bytes on the
-measured 64-bit host because credential version is now part of identity. At 1024
-entries this is 8192 extra live-entry bytes; HashMap spare buckets/allocator costs
-are additional (about 16 KiB extra bucket payload including spare slots at the
-default ceiling with the measured toolchain; not an RSS bound). No payload or
-event_id is retained for duplicate ACKs. See [measurements](udp-reliable-ack.md).
+UDP NBA1 uses a fixed 64-byte stack buffer and no queue/tasks. Replay identity is
+`(DeviceKey, boot_id, credential_version)`; no payload or event_id is retained for
+duplicate ACKs. In addition to the replay map, expiry now has exactly one ordered
+index entry per live record. Per-device and per-tenant counters each have at most
+one entry per represented identity. Refresh replaces the old expiry entry;
+expiration removes zero counters. Every index is bounded by the admitted replay
+record count, and identity lengths retain their protocol bounds. Tree nodes,
+duplicated bounded identity strings, hash capacity and allocator overhead add
+memory; the historical 96-byte replay-map bucket measurement in
+[UDP ACK measurements](udp-reliable-ack.md) is not the complete footprint of this
+implementation. Current paired timing measurements and their limitations are in
+[the hardening report](lifecycle-command-hardening.md). No current replay RSS
+bound is claimed.
 
 Device ingress admission has a connection-level anti-monopoly ceiling. MQTT
 and TCP each default to at most 192 classified device connections. Pending TLS and

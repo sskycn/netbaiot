@@ -800,6 +800,7 @@ async fn connection_inner(
                         .compare_exchange(revision, 0, Ordering::AcqRel, Ordering::Acquire)
                         .is_ok()
                     && let Some(lease) = provider.as_ref()
+                    && let Ok(_admission) = services.ingress.lifecycle.begin_admission()
                 {
                     lease.mark_serving(revision)?;
                 }
@@ -978,29 +979,25 @@ async fn connection_inner(
                     )?;
                     continue;
                 }
-                if method == "auth.sync" {
-                    if sync_confirmation
+                if method == "auth.sync"
+                    && sync_confirmation
                         .compare_exchange(0, u64::MAX, Ordering::AcqRel, Ordering::Acquire)
                         .is_err()
-                    {
-                        queue(
-                            &control_tx,
-                            &control_budget,
-                            &metrics,
-                            BusinessRpcQueueClass::Control,
-                            error(
-                                request_id,
-                                &method,
-                                RpcErrorCode::Conflict,
-                                "sync already pending",
-                            ),
-                            None,
-                        )?;
-                        continue;
-                    }
-                    if let Some(lease) = provider.as_ref() {
-                        lease.mark_syncing()?;
-                    }
+                {
+                    queue(
+                        &control_tx,
+                        &control_budget,
+                        &metrics,
+                        BusinessRpcQueueClass::Control,
+                        error(
+                            request_id,
+                            &method,
+                            RpcErrorCode::Conflict,
+                            "sync already pending",
+                        ),
+                        None,
+                    )?;
+                    continue;
                 }
                 let method_for_error = method.clone();
                 if control_work_tx
@@ -1203,167 +1200,213 @@ async fn control_loop(
         body,
     }) = tokio::select! { _ = stop.cancelled() => None, request = requests.recv() => request }
     {
-        let reply = match method.as_str() {
-            "auth.sync" => match serde_json::from_value::<AuthSyncRequest>(body) {
-                Ok(request)
-                    if request.reset
-                        && request.auth_revision > 0
-                        && request.auth_revision < u64::MAX =>
-                {
-                    let invalidate = AuthInvalidation::All;
-                    let mqtt = services.mqtt.clone();
-                    match services
-                        .ingress
-                        .invalidate_auth_with(&invalidate, || mqtt.invalidate_sessions(&invalidate))
-                    {
-                        Ok(_) => {
-                            revision = Some((request.authority_incarnation, request.auth_revision));
-                            confirmation.store(request.auth_revision, Ordering::Release);
-                            response(
-                                request_id,
-                                &method,
-                                Ok(AuthSyncResponse {
-                                    applied_revision: request.auth_revision,
-                                }),
-                            )
-                        }
-                        Err(_) => error(request_id, &method, RpcErrorCode::Internal, "sync failed"),
-                    }
-                }
-                _ => error(
-                    request_id,
-                    &method,
-                    RpcErrorCode::InvalidRequest,
-                    "invalid sync request",
-                ),
-            },
-            "auth.invalidate" => match serde_json::from_value::<AuthInvalidateRequest>(body) {
-                Ok(request) if request.auth_revision == 0 || request.auth_revision == u64::MAX => {
-                    error(
-                        request_id,
-                        &method,
-                        RpcErrorCode::InvalidRequest,
-                        "invalid revision",
-                    )
-                }
-                Ok(request) if !principal.permits_invalidation(&request.invalidation) => error(
-                    request_id,
-                    &method,
-                    RpcErrorCode::Forbidden,
-                    "invalidation scope not permitted",
-                ),
-                Ok(request)
-                    if revision == Some((request.authority_incarnation, request.auth_revision)) =>
-                {
-                    response(
-                        request_id,
-                        &method,
-                        Ok(AuthInvalidateResponse {
-                            applied_revision: request.auth_revision,
-                            invalidated_cache_entries: 0,
-                            disconnected_connections: 0,
-                            invalidated_mqtt_sessions: 0,
-                        }),
-                    )
-                }
-                Ok(request)
-                    if revision.is_some_and(|(inc, rev)| {
-                        inc == request.authority_incarnation && request.auth_revision < rev
-                    }) =>
-                {
-                    error(
-                        request_id,
-                        &method,
-                        RpcErrorCode::StaleRevision,
-                        "stale invalidation revision",
-                    )
-                }
-                Ok(request)
-                    if revision.is_some_and(|(inc, rev)| {
-                        inc == request.authority_incarnation
-                            && rev.checked_add(1) == Some(request.auth_revision)
-                    }) && services.registry.is_serving() =>
-                {
-                    let mqtt = services.mqtt.clone();
-                    match services
-                        .ingress
-                        .invalidate_auth_with(&request.invalidation, || {
-                            mqtt.invalidate_sessions(&request.invalidation)
-                        }) {
-                        Ok((devices, disconnected, mqtt_sessions)) => {
-                            revision = Some((request.authority_incarnation, request.auth_revision));
-                            if lease.advance_revision(request.auth_revision).is_err() {
+        // Both V2 and V3 use this worker. Keep the guard until all auth and
+        // revision side effects finish; queued requests acquire no earlier rights.
+        let reply = match services.ingress.lifecycle.begin_admission() {
+            Err(_) => error(
+                request_id,
+                &method,
+                RpcErrorCode::Unavailable,
+                "service is draining",
+            ),
+            Ok(admission) => {
+                let reply = match method.as_str() {
+                    "auth.sync" => match serde_json::from_value::<AuthSyncRequest>(body) {
+                        Ok(request)
+                            if request.reset
+                                && request.auth_revision > 0
+                                && request.auth_revision < u64::MAX =>
+                        {
+                            if lease.mark_syncing().is_err() {
                                 stop.cancel();
                                 break;
                             }
-                            response(
-                                request_id,
-                                &method,
-                                Ok(AuthInvalidateResponse {
-                                    applied_revision: request.auth_revision,
-                                    invalidated_cache_entries: devices.len(),
-                                    disconnected_connections: disconnected,
-                                    invalidated_mqtt_sessions: mqtt_sessions,
-                                }),
-                            )
+                            let invalidate = AuthInvalidation::All;
+                            let mqtt = services.mqtt.clone();
+                            match services.ingress.invalidate_auth_admitted_with(
+                                &admission,
+                                &invalidate,
+                                || mqtt.invalidate_sessions(&invalidate),
+                            ) {
+                                Ok(_) => {
+                                    revision = Some((
+                                        request.authority_incarnation,
+                                        request.auth_revision,
+                                    ));
+                                    confirmation.store(request.auth_revision, Ordering::Release);
+                                    response(
+                                        request_id,
+                                        &method,
+                                        Ok(AuthSyncResponse {
+                                            applied_revision: request.auth_revision,
+                                        }),
+                                    )
+                                }
+                                Err(_) => error(
+                                    request_id,
+                                    &method,
+                                    RpcErrorCode::Internal,
+                                    "sync failed",
+                                ),
+                            }
                         }
-                        Err(_) => error(
+                        _ => error(
                             request_id,
                             &method,
-                            RpcErrorCode::Internal,
-                            "invalidation failed",
+                            RpcErrorCode::InvalidRequest,
+                            "invalid sync request",
                         ),
+                    },
+                    "auth.invalidate" => {
+                        match serde_json::from_value::<AuthInvalidateRequest>(body) {
+                            Ok(request)
+                                if request.auth_revision == 0
+                                    || request.auth_revision == u64::MAX =>
+                            {
+                                error(
+                                    request_id,
+                                    &method,
+                                    RpcErrorCode::InvalidRequest,
+                                    "invalid revision",
+                                )
+                            }
+                            Ok(request)
+                                if !principal.permits_invalidation(&request.invalidation) =>
+                            {
+                                error(
+                                    request_id,
+                                    &method,
+                                    RpcErrorCode::Forbidden,
+                                    "invalidation scope not permitted",
+                                )
+                            }
+                            Ok(request)
+                                if revision
+                                    == Some((
+                                        request.authority_incarnation,
+                                        request.auth_revision,
+                                    )) =>
+                            {
+                                response(
+                                    request_id,
+                                    &method,
+                                    Ok(AuthInvalidateResponse {
+                                        applied_revision: request.auth_revision,
+                                        invalidated_cache_entries: 0,
+                                        disconnected_connections: 0,
+                                        invalidated_mqtt_sessions: 0,
+                                    }),
+                                )
+                            }
+                            Ok(request)
+                                if revision.is_some_and(|(inc, rev)| {
+                                    inc == request.authority_incarnation
+                                        && request.auth_revision < rev
+                                }) =>
+                            {
+                                error(
+                                    request_id,
+                                    &method,
+                                    RpcErrorCode::StaleRevision,
+                                    "stale invalidation revision",
+                                )
+                            }
+                            Ok(request)
+                                if revision.is_some_and(|(inc, rev)| {
+                                    inc == request.authority_incarnation
+                                        && rev.checked_add(1) == Some(request.auth_revision)
+                                }) && services.registry.is_serving() =>
+                            {
+                                let mqtt = services.mqtt.clone();
+                                match services.ingress.invalidate_auth_admitted_with(
+                                    &admission,
+                                    &request.invalidation,
+                                    || mqtt.invalidate_sessions(&request.invalidation),
+                                ) {
+                                    Ok((devices, disconnected, mqtt_sessions)) => {
+                                        revision = Some((
+                                            request.authority_incarnation,
+                                            request.auth_revision,
+                                        ));
+                                        if lease.advance_revision(request.auth_revision).is_err() {
+                                            stop.cancel();
+                                            break;
+                                        }
+                                        response(
+                                            request_id,
+                                            &method,
+                                            Ok(AuthInvalidateResponse {
+                                                applied_revision: request.auth_revision,
+                                                invalidated_cache_entries: devices.len(),
+                                                disconnected_connections: disconnected,
+                                                invalidated_mqtt_sessions: mqtt_sessions,
+                                            }),
+                                        )
+                                    }
+                                    Err(_) => error(
+                                        request_id,
+                                        &method,
+                                        RpcErrorCode::Internal,
+                                        "invalidation failed",
+                                    ),
+                                }
+                            }
+                            Ok(_) => {
+                                services
+                                    .ingress
+                                    .metrics
+                                    .inc(Metric::BusinessRpcRevisionGaps);
+                                confirmation.store(0, Ordering::Release);
+                                if lease.mark_syncing().is_err() {
+                                    stop.cancel();
+                                    break;
+                                }
+                                revision = None;
+                                // A missing revision can hide a device revocation. Revoke all
+                                // local authorization before accepting the reset handshake.
+                                let invalidate = AuthInvalidation::All;
+                                let mqtt = services.mqtt.clone();
+                                if services
+                                    .ingress
+                                    .invalidate_auth_admitted_with(&admission, &invalidate, || {
+                                        mqtt.invalidate_sessions(&invalidate)
+                                    })
+                                    .is_err()
+                                {
+                                    stop.cancel();
+                                    break;
+                                }
+                                error(
+                                    request_id,
+                                    &method,
+                                    RpcErrorCode::StaleRevision,
+                                    "reset sync required",
+                                )
+                            }
+                            Err(_) => error(
+                                request_id,
+                                &method,
+                                RpcErrorCode::InvalidRequest,
+                                "invalid invalidation request",
+                            ),
+                        }
                     }
-                }
-                Ok(_) => {
-                    services
-                        .ingress
-                        .metrics
-                        .inc(Metric::BusinessRpcRevisionGaps);
-                    confirmation.store(0, Ordering::Release);
-                    if lease.mark_syncing().is_err() {
-                        stop.cancel();
-                        break;
-                    }
-                    revision = None;
-                    // A missing revision can hide a device revocation. Revoke all
-                    // local authorization before accepting the reset handshake.
-                    let invalidate = AuthInvalidation::All;
-                    let mqtt = services.mqtt.clone();
-                    if services
-                        .ingress
-                        .invalidate_auth_with(&invalidate, || mqtt.invalidate_sessions(&invalidate))
-                        .is_err()
-                    {
-                        stop.cancel();
-                        break;
-                    }
-                    error(
+                    _ => error(
                         request_id,
                         &method,
-                        RpcErrorCode::StaleRevision,
-                        "reset sync required",
-                    )
+                        RpcErrorCode::UnknownMethod,
+                        "unknown method",
+                    ),
+                };
+                if method == "auth.sync"
+                    && !matches!(&reply, BusinessRpcFrame::Response { error: None, .. })
+                {
+                    confirmation.store(0, Ordering::Release);
                 }
-                Err(_) => error(
-                    request_id,
-                    &method,
-                    RpcErrorCode::InvalidRequest,
-                    "invalid invalidation request",
-                ),
-            },
-            _ => error(
-                request_id,
-                &method,
-                RpcErrorCode::UnknownMethod,
-                "unknown method",
-            ),
+                drop(admission);
+                reply
+            }
         };
-        if method == "auth.sync"
-            && !matches!(&reply, BusinessRpcFrame::Response { error: None, .. })
-        {
-            confirmation.store(0, Ordering::Release);
-        }
         let success = matches!(&reply, BusinessRpcFrame::Response { error: None, .. });
         let metric = match (method.as_str(), success) {
             ("auth.sync", true) => Some(Metric::BusinessRpcProviderSyncSuccess),
@@ -1915,5 +1958,157 @@ mod tests {
             read_frame(&mut receiver, 256, Duration::from_millis(5)).await,
             Err(Error::Timeout)
         ));
+    }
+    #[tokio::test]
+    async fn shared_v2_v3_control_worker_rejects_sync_and_invalidation_after_quiesce() {
+        use netbaiot_runtime::*;
+        let limits = Arc::new(Limits::default());
+        let metrics = Arc::new(Metrics::default());
+        let registry = BusinessRpcRegistry::new(4, 65536, Duration::from_secs(1)).unwrap();
+        let sink = BusinessRpcEventSink::new();
+        let sink_id = SinkId::new("rpc").unwrap();
+        let events = EventBus::new(
+            limits.clone(),
+            metrics.clone(),
+            vec![SinkDefinition::bounded(
+                sink_id.clone(),
+                SinkDeliveryMode::ConfirmedRequired,
+                sink.clone(),
+                &limits,
+            )],
+            vec![netbaiot_core::RouteDefinition {
+                tenant: None,
+                sinks: vec![sink_id],
+            }],
+            1,
+        )
+        .unwrap();
+        let lifecycle = Arc::new(Lifecycle::starting());
+        lifecycle.mark_running().unwrap();
+        let ingress = Arc::new(Ingress::new(
+            limits.clone(),
+            AuthCache::new(
+                BusinessRpcAuthProvider::new(registry.clone()),
+                limits.clone(),
+                metrics.clone(),
+            ),
+            CodecRegistry::new(vec![(
+                netbaiot_core::CodecId::new("netbaiot-json").unwrap(),
+                1,
+                Arc::new(netbaiot_codecs::JsonV1::default()),
+            )])
+            .unwrap(),
+            events.clone(),
+            GatewayControl::empty(limits.clone()),
+            metrics,
+            Sessions::new(limits.clone()),
+            lifecycle.clone(),
+        ));
+        let mqtt = MqttBroker::new(limits);
+        let services = Arc::new(BusinessRpcServices {
+            registry: registry.clone(),
+            sink,
+            mqtt,
+            commands: Arc::new(CommandService::new(Arc::new(CommandRouter::new(
+                ingress.clone(),
+            )))),
+            ingress,
+        });
+        let (provider_tx, _provider_rx) = mpsc::channel(4);
+        let lease = Arc::new(
+            registry
+                .register(
+                    provider_tx,
+                    BusinessProviderScope {
+                        global: true,
+                        tenants: vec![],
+                    },
+                )
+                .unwrap(),
+        );
+        let principal = BusinessPrincipal {
+            id: "test".into(),
+            role: BusinessRole::AuthControl,
+            provider_id: Some("primary".into()),
+            sink_id: None,
+            provide_methods: vec![
+                "device.authenticate".into(),
+                "device.resolve_verifier".into(),
+            ],
+            call_methods: vec!["auth.sync".into(), "auth.invalidate".into()],
+            global: true,
+            tenants: vec![],
+            expires_at_ms: None,
+        };
+        let (work_tx, work_rx) = mpsc::channel(4);
+        let (reply_tx, mut reply_rx) = mpsc::channel(4);
+        let confirmation = Arc::new(AtomicU64::new(0));
+        let stop = CancellationToken::new();
+        let worker = tokio::spawn(control_loop(
+            work_rx,
+            reply_tx,
+            Arc::new(Semaphore::new(65536)),
+            services,
+            (lease.clone(), principal),
+            confirmation.clone(),
+            stop.clone(),
+        ));
+        let incarnation = Uuid::new_v4();
+        let sync = serde_json::to_value(AuthSyncRequest {
+            authority_incarnation: incarnation,
+            auth_revision: 1,
+            reset: true,
+        })
+        .unwrap();
+        work_tx
+            .send(ControlRequest {
+                request_id: Uuid::new_v4(),
+                method: "auth.sync".into(),
+                body: sync.clone(),
+            })
+            .await
+            .unwrap();
+        assert!(matches!(
+            reply_rx.recv().await.unwrap().frame,
+            BusinessRpcFrame::Response { error: None, .. }
+        ));
+        lease.mark_serving(1).unwrap();
+        lifecycle.begin_quiesce().await.unwrap();
+        for (method, body) in [
+            ("auth.sync", sync),
+            (
+                "auth.invalidate",
+                serde_json::to_value(AuthInvalidateRequest {
+                    authority_incarnation: incarnation,
+                    auth_revision: 2,
+                    invalidation: AuthInvalidation::All,
+                })
+                .unwrap(),
+            ),
+        ] {
+            work_tx
+                .send(ControlRequest {
+                    request_id: Uuid::new_v4(),
+                    method: method.into(),
+                    body,
+                })
+                .await
+                .unwrap();
+            assert!(matches!(
+                reply_rx.recv().await.unwrap().frame,
+                BusinessRpcFrame::Response {
+                    error: Some(RpcError {
+                        code: RpcErrorCode::Unavailable,
+                        ..
+                    }),
+                    ..
+                }
+            ));
+        }
+        assert!(registry.is_serving()); // Rejected sync did not demote the authority.
+        assert_eq!(confirmation.load(Ordering::Acquire), 1);
+        stop.cancel();
+        worker.await.unwrap();
+        events.stop_workers().await.unwrap();
     }
 }

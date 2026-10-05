@@ -238,6 +238,7 @@ pub struct BrokerDelivery {
     pub packet_id: Option<u16>,
     pub dup: bool,
     pub command: bool,
+    pub progress: Option<Arc<netbaiot_runtime::CommandProgress>>,
     /// Includes the connection, tenant and process charge while this physical
     /// outbound copy waits in the channel or is being written to the socket.
     pub(super) _budget: Vec<BytesPermit>,
@@ -330,6 +331,8 @@ struct StoredSession {
     outbound: HashMap<u16, OutboundState>,
     #[serde(skip)]
     command_outbound: HashSet<u16>,
+    #[serde(skip)]
+    command_progress: HashMap<u16, Arc<netbaiot_runtime::CommandProgress>>,
     /// Original transmission order for reconnect retransmission (MQTT-4.6.0-1).
     #[serde(default)]
     outbound_order: VecDeque<u16>,
@@ -378,6 +381,7 @@ impl StoredSession {
             inbound_reservations: HashMap::new(),
             outbound: HashMap::new(),
             command_outbound: HashSet::new(),
+            command_progress: HashMap::new(),
             outbound_order: VecDeque::new(),
             next_packet_id: 1,
             state_bytes,
@@ -437,6 +441,9 @@ impl StoredSession {
 
     fn remove_outbound(&mut self, packet_id: u16) -> Option<OutboundState> {
         self.command_outbound.remove(&packet_id);
+        if let Some(progress) = self.command_progress.remove(&packet_id) {
+            progress.abandon_unsent();
+        }
         self.sent.remove(&packet_id);
         self.send_window.remove(&packet_id);
         self.started_outbound.remove(&packet_id);
@@ -1665,9 +1672,15 @@ impl MqttBroker {
         sync_session_usage(&mut state, key)?;
         for (message, admission) in retained.into_iter().zip(replay_plan) {
             let result = match admission {
-                RetainedReplayAdmission::Live(budget) => {
-                    enqueue(&mut state, key, message, &self.limits, Some(budget), false)
-                }
+                RetainedReplayAdmission::Live(budget) => enqueue(
+                    &mut state,
+                    key,
+                    message,
+                    &self.limits,
+                    Some(budget),
+                    false,
+                    None,
+                ),
                 RetainedReplayAdmission::Offline => {
                     queue_offline(&mut state, key, message, &self.limits)
                 }
@@ -2357,6 +2370,16 @@ impl MqttBroker {
         generation: u64,
         message: BrokerMessage,
     ) -> Result<()> {
+        self.send_live_tracked(key, generation, message, None)
+    }
+
+    pub fn send_live_tracked(
+        &self,
+        key: &SessionKey,
+        generation: u64,
+        message: BrokerMessage,
+        progress: Option<Arc<netbaiot_runtime::CommandProgress>>,
+    ) -> Result<()> {
         let mut state = lock(&self.state)?;
         check_owner(&state, key, generation).map_err(|_| Error::Unavailable)?;
         let subscribed = state.sessions.get(key).is_some_and(|session| {
@@ -2365,7 +2388,15 @@ impl MqttBroker {
                 .keys()
                 .any(|filter| topic_matches(filter, &message.topic))
         });
-        if !subscribed || message.expired(now_ms()) {
+        let now = now_ms();
+        if message.expired(now) {
+            if let Some(progress) = progress {
+                progress.expire(now);
+                return Ok(());
+            }
+            return Err(Error::Unavailable);
+        }
+        if !subscribed {
             return Err(Error::Unavailable);
         }
         let active = state.active.get(key).ok_or(Error::Unavailable)?;
@@ -2389,7 +2420,15 @@ impl MqttBroker {
                 return Err(Error::Overloaded);
             }
         }
-        enqueue(&mut state, key, message, &self.limits, Some(budget), true)
+        enqueue(
+            &mut state,
+            key,
+            message,
+            &self.limits,
+            Some(budget),
+            true,
+            progress,
+        )
     }
 
     pub fn next_offline(&self, key: &SessionKey, generation: u64) -> Result<Option<BrokerFrame>> {
@@ -2440,7 +2479,17 @@ impl MqttBroker {
     }
 
     pub fn puback(&self, key: &SessionKey, generation: u64, packet_id: u16) -> Result<bool> {
-        self.complete_outbound(key, generation, packet_id, OutboundAck::Puback)
+        self.puback_result(key, generation, packet_id, true)
+    }
+
+    pub fn puback_result(
+        &self,
+        key: &SessionKey,
+        generation: u64,
+        packet_id: u16,
+        success: bool,
+    ) -> Result<bool> {
+        self.complete_outbound(key, generation, packet_id, OutboundAck::Puback, success)
     }
 
     /// Atomically crosses the first-transfer boundary for a queued MQTT 5 PUBLISH.
@@ -2463,7 +2512,13 @@ impl MqttBroker {
         if !matching {
             return Ok(false);
         }
-        if delivery.message.expired(now_ms()) && !session.started_outbound.contains(&packet_id) {
+        if !session.started_outbound.contains(&packet_id)
+            && (delivery.message.expired(now_ms())
+                || delivery
+                    .progress
+                    .as_ref()
+                    .is_some_and(|progress| !progress.begin_transfer()))
+        {
             let outbound = session.remove_outbound(packet_id).ok_or(Error::Internal)?;
             let charge = outbound.bytes();
             session.state_bytes = session.state_bytes.saturating_sub(charge);
@@ -2548,6 +2603,9 @@ impl MqttBroker {
             Some(_) => return Err(Error::Conflict),
             None => return Err(Error::Invalid),
         }
+        if let Some(progress) = session.command_progress.get(&packet_id) {
+            progress.update(netbaiot_core::DeliveryState::Failed);
+        }
         let command = session.command_outbound.contains(&packet_id);
         let outbound = session.remove_outbound(packet_id).ok_or(Error::Internal)?;
         let charge = outbound.bytes();
@@ -2559,7 +2617,17 @@ impl MqttBroker {
     }
 
     pub fn pubcomp(&self, key: &SessionKey, generation: u64, packet_id: u16) -> Result<bool> {
-        self.complete_outbound(key, generation, packet_id, OutboundAck::Pubcomp)
+        self.pubcomp_result(key, generation, packet_id, true)
+    }
+
+    pub fn pubcomp_result(
+        &self,
+        key: &SessionKey,
+        generation: u64,
+        packet_id: u16,
+        success: bool,
+    ) -> Result<bool> {
+        self.complete_outbound(key, generation, packet_id, OutboundAck::Pubcomp, success)
     }
 
     fn complete_outbound(
@@ -2568,6 +2636,7 @@ impl MqttBroker {
         generation: u64,
         packet_id: u16,
         ack: OutboundAck,
+        success: bool,
     ) -> Result<bool> {
         let mut state = lock(&self.state)?;
         check_owner(&state, key, generation)?;
@@ -2582,6 +2651,13 @@ impl MqttBroker {
         );
         if !expected {
             return Err(Error::Invalid);
+        }
+        if let Some(progress) = session.command_progress.get(&packet_id) {
+            progress.update(if success {
+                netbaiot_core::DeliveryState::Received
+            } else {
+                netbaiot_core::DeliveryState::Failed
+            });
         }
         let command = session.command_outbound.contains(&packet_id);
         let outbound = session.remove_outbound(packet_id).ok_or(Error::Internal)?;
@@ -3275,6 +3351,7 @@ fn next_unsent_frame(state: &mut BrokerState, key: &SessionKey) -> Result<Option
                     packet_id: Some(*id),
                     dup: true,
                     command: session.command_outbound.contains(id),
+                    progress: session.command_progress.get(id).cloned(),
                     _budget: budget,
                 }))
             }
@@ -3383,6 +3460,7 @@ fn promote_offline(
                 packet_id: Some(id),
                 dup: false,
                 command: false,
+                progress: None,
                 _budget: budget,
             })),
             bytes,
@@ -3545,6 +3623,9 @@ fn remove_session(state: &mut BrokerState, key: &SessionKey) -> Result<()> {
         active.cancel.cancel()
     }
     if let Some(session) = state.sessions.remove(key) {
+        for progress in session.command_progress.values() {
+            progress.abandon_unsent();
+        }
         for reservation in session.inbound_reservations.values() {
             release_retained_reservation(state, &key.device.tenant_id, *reservation);
         }
@@ -3698,6 +3779,7 @@ fn resume_frames(
                     packet_id: Some(*packet_id),
                     dup: true,
                     command: session.command_outbound.contains(packet_id),
+                    progress: session.command_progress.get(packet_id).cloned(),
                     _budget: budget,
                 }))
             }
@@ -3758,6 +3840,7 @@ fn resume_frames(
             packet_id: Some(id),
             dup: false,
             command: false,
+            progress: None,
             _budget: budget,
         })));
     }
@@ -3771,8 +3854,13 @@ fn enqueue(
     limits: &Limits,
     pre_budget: Option<Vec<BytesPermit>>,
     command: bool,
+    progress: Option<Arc<netbaiot_runtime::CommandProgress>>,
 ) -> Result<()> {
-    if message.expired(now_ms()) {
+    let now = now_ms();
+    if message.expired(now) {
+        if let Some(progress) = progress {
+            progress.expire(now);
+        }
         return Ok(());
     }
     let active = state.active.get(key).cloned();
@@ -3815,6 +3903,7 @@ fn enqueue(
                     packet_id: None,
                     dup: false,
                     command,
+                    progress,
                     _budget: budget,
                 })),
                 None,
@@ -3841,6 +3930,9 @@ fn enqueue(
             session.insert_outbound(id, outbound);
             if command {
                 session.command_outbound.insert(id);
+                if let Some(progress) = &progress {
+                    session.command_progress.insert(id, progress.clone());
+                }
             }
             session.sent.insert(id);
             session.send_window.insert(id);
@@ -3853,6 +3945,7 @@ fn enqueue(
                     packet_id: Some(id),
                     dup: false,
                     command,
+                    progress,
                     _budget: budget,
                 })),
                 Some(id),
@@ -4110,6 +4203,7 @@ fn route_locked(
                     packet_id: None,
                     dup: false,
                     command: false,
+                    progress: None,
                     _budget: target.budget,
                 }));
                 if active.sender.try_send(frame).is_ok() {
@@ -4144,6 +4238,7 @@ fn route_locked(
                     packet_id: Some(packet_id),
                     dup: false,
                     command: false,
+                    progress: None,
                     _budget: target.budget,
                 }));
                 if let Some(active) = state.active.get(&target.key)
@@ -4965,6 +5060,12 @@ fn write_recovery(directory: &Path, limits: &Limits, broker: &MqttBroker) -> Res
     let temporary = directory.join(format!(".{RECOVERY_FILE}.tmp"));
     let committed = directory.join(RECOVERY_FILE);
     let mut file = open_private_replace(&temporary)?;
+    // Shutdown has fenced control mutations and joined device/maintenance owners.
+    // Keep one coherent view while streaming bounded records: cloning payload state
+    // would increase peak memory by up to the entire admitted broker state. This
+    // lock can span slow disk I/O, but commit runs on spawn_blocking, off Tokio
+    // workers. Prefer bounded memory/coherence over shorter lock hold until a
+    // measured ownership-transfer design proves Will/QoS/recovery equivalence.
     let state = lock(&broker.state)?;
     let mut header = [0u8; RECOVERY_PREFIX_BYTES];
     header[..4].copy_from_slice(RECOVERY_MAGIC);
@@ -12099,6 +12200,248 @@ mod tests {
         ));
 
         fs::remove_dir_all(directory).unwrap();
+    }
+    #[test]
+    fn expired_command_at_broker_handoff_releases_all_responsibility() {
+        use netbaiot_core::DeliveryState;
+        use netbaiot_runtime::CommandProgress;
+        let broker = MqttBroker::new(Arc::new(Limits::default()));
+        let device = auth("expired-handoff");
+        let mut attachment = broker.attach(&device, "client".into(), false).unwrap();
+        let topic = "v1/t/t/p/p/d/expired-handoff/down";
+        broker
+            .subscribe(&attachment.key, attachment.generation, topic, 2)
+            .unwrap();
+        let usage = broker.usage().unwrap();
+        for qos in 0..=2 {
+            let metrics = Arc::new(Metrics::default());
+            let expiry = now_ms() - 1;
+            let progress = CommandProgress::new(expiry, metrics.clone());
+            let message = BrokerMessage {
+                topic: topic.into(),
+                payload: vec![1],
+                qos,
+                retain: false,
+                properties: PublishProperties {
+                    expires_at_ms: Some(expiry),
+                    ..Default::default()
+                },
+            };
+            broker
+                .send_live_tracked(
+                    &attachment.key,
+                    attachment.generation,
+                    message.clone(),
+                    Some(progress.clone()),
+                )
+                .unwrap();
+            // The final enqueue check must also handle expiry after preflight.
+            enqueue(
+                &mut broker.state.lock().unwrap(),
+                &attachment.key,
+                message,
+                &broker.limits,
+                None,
+                true,
+                Some(progress.clone()),
+            )
+            .unwrap();
+            progress.update(DeliveryState::Sent);
+            assert_eq!(progress.state(), DeliveryState::Expired);
+            assert_eq!(metrics.get(netbaiot_runtime::Metric::CommandFailed), 1);
+            assert!(attachment.receiver.try_recv().is_err());
+            assert_eq!(broker.usage().unwrap(), usage);
+        }
+        attachment.detach().unwrap();
+    }
+
+    #[test]
+    fn command_progress_follows_started_qos_recovery_after_write_failure() {
+        use netbaiot_core::DeliveryState;
+        use netbaiot_runtime::CommandProgress;
+        for v5 in [false, true] {
+            for qos in [1, 2] {
+                let broker = MqttBroker::new(Arc::new(Limits::default()));
+                let device = auth("progress-reconnect");
+                let attach = || {
+                    if v5 {
+                        broker.attach_v5(&device, "progress".into(), false, 60, 8)
+                    } else {
+                        broker.attach(&device, "progress".into(), false)
+                    }
+                    .unwrap()
+                };
+                let mut attachment = attach();
+                let topic = "v1/t/t/p/p/d/progress-reconnect/down";
+                broker
+                    .subscribe(&attachment.key, attachment.generation, topic, qos)
+                    .unwrap();
+                let expiry = now_ms() + 10_000;
+                let progress = CommandProgress::new(expiry, Arc::new(Metrics::default()));
+                broker
+                    .send_live_tracked(
+                        &attachment.key,
+                        attachment.generation,
+                        BrokerMessage {
+                            topic: topic.into(),
+                            payload: vec![1],
+                            qos,
+                            retain: false,
+                            properties: PublishProperties {
+                                expires_at_ms: Some(expiry),
+                                ..Default::default()
+                            },
+                        },
+                        Some(progress.clone()),
+                    )
+                    .unwrap();
+                let BrokerFrame::Publish(delivery) = attachment.receiver.try_recv().unwrap() else {
+                    panic!("publish expected")
+                };
+                let id = delivery.packet_id.unwrap();
+                assert!(
+                    broker
+                        .begin_outbound_transfer(&attachment.key, attachment.generation, &delivery)
+                        .unwrap()
+                );
+                progress.update(DeliveryState::Failed); // The write outcome is uncertain.
+                assert!(!progress.expire(expiry));
+                attachment.detach().unwrap();
+                let mut resumed = attach();
+                let BrokerFrame::Publish(retransmit) = resumed.receiver.try_recv().unwrap() else {
+                    panic!("retransmitted publish expected")
+                };
+                assert_eq!(retransmit.packet_id, Some(id));
+                assert!(Arc::ptr_eq(
+                    retransmit.progress.as_ref().unwrap(),
+                    &progress
+                ));
+                assert!(
+                    broker
+                        .begin_outbound_transfer(&resumed.key, resumed.generation, &retransmit)
+                        .unwrap()
+                );
+                progress.update(DeliveryState::Sent);
+                assert_eq!(progress.state(), DeliveryState::Sent);
+                // Exact protocol acknowledgement is newer evidence even if the
+                // most recent write failed after the device received its bytes.
+                progress.update(DeliveryState::Failed);
+                assert!(
+                    broker
+                        .pubcomp(&resumed.key, resumed.generation, id)
+                        .is_err()
+                );
+                assert_eq!(progress.state(), DeliveryState::Failed);
+                if qos == 1 {
+                    broker.puback(&resumed.key, resumed.generation, id).unwrap();
+                } else {
+                    broker.pubrec(&resumed.key, resumed.generation, id).unwrap();
+                    broker
+                        .pubcomp(&resumed.key, resumed.generation, id)
+                        .unwrap();
+                }
+                assert_eq!(progress.state(), DeliveryState::Received);
+                progress.update(DeliveryState::Failed); // Stale failure cannot undo ACK.
+                assert_eq!(progress.state(), DeliveryState::Received);
+                resumed.detach().unwrap();
+            }
+        }
+    }
+
+    #[test]
+    fn command_progress_expiry_and_exact_ack_transitions_for_both_mqtt_versions() {
+        use netbaiot_core::DeliveryState;
+        use netbaiot_runtime::CommandProgress;
+        for v5 in [false, true] {
+            let metrics = Arc::new(netbaiot_runtime::Metrics::default());
+            let broker = MqttBroker::new(Arc::new(Limits::default()));
+            let device = auth("progress");
+            let mut attachment = if v5 {
+                broker
+                    .attach_v5(&device, "progress".into(), false, 60, 8)
+                    .unwrap()
+            } else {
+                broker.attach(&device, "progress".into(), false).unwrap()
+            };
+            let topic = "v1/t/t/p/p/d/progress/down";
+            broker
+                .subscribe(&attachment.key, attachment.generation, topic, 1)
+                .unwrap();
+            for expired in [true, false] {
+                let expiry = now_ms() + 10_000;
+                let progress = CommandProgress::new(expiry, metrics.clone());
+                broker
+                    .send_live_tracked(
+                        &attachment.key,
+                        attachment.generation,
+                        BrokerMessage {
+                            topic: topic.into(),
+                            payload: vec![1],
+                            qos: 1,
+                            retain: false,
+                            properties: PublishProperties {
+                                expires_at_ms: Some(expiry),
+                                ..Default::default()
+                            },
+                        },
+                        Some(progress.clone()),
+                    )
+                    .unwrap();
+                let BrokerFrame::Publish(delivery) = attachment.receiver.try_recv().unwrap() else {
+                    panic!("publish expected")
+                };
+                let id = delivery.packet_id.unwrap();
+                if expired {
+                    assert!(progress.expire(expiry));
+                    assert!(
+                        !broker
+                            .begin_outbound_transfer(
+                                &attachment.key,
+                                attachment.generation,
+                                &delivery
+                            )
+                            .unwrap()
+                    );
+                    assert_eq!(progress.state(), DeliveryState::Expired);
+                    assert_eq!(metrics.get(netbaiot_runtime::Metric::CommandFailed), 1);
+                    assert!(
+                        !broker.state.lock().unwrap().sessions[&attachment.key]
+                            .outbound
+                            .contains_key(&id)
+                    );
+                } else {
+                    assert!(
+                        broker
+                            .begin_outbound_transfer(
+                                &attachment.key,
+                                attachment.generation,
+                                &delivery
+                            )
+                            .unwrap()
+                    );
+                    progress.update(DeliveryState::Sent);
+                    assert!(!progress.expire(expiry));
+                    assert!(
+                        broker
+                            .pubcomp(&attachment.key, attachment.generation, id)
+                            .is_err()
+                    );
+                    assert_eq!(progress.state(), DeliveryState::Sent);
+                    assert!(
+                        broker
+                            .puback(&attachment.key, attachment.generation, id)
+                            .unwrap()
+                    );
+                    assert_eq!(progress.state(), DeliveryState::Received);
+                }
+                assert!(
+                    broker.state.lock().unwrap().sessions[&attachment.key]
+                        .command_progress
+                        .is_empty()
+                );
+            }
+            drop(attachment);
+        }
     }
 }
 

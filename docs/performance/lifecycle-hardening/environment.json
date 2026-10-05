@@ -1,0 +1,10 @@
+{
+  "date": "2026-10-05",
+  "platform": "macOS-27.0.1-arm64-arm-64bit",
+  "machine": "arm64",
+  "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)",
+  "baseline_commit": "ef8d54c",
+  "mode": "release; local operation microbenchmarks; not production capacity",
+  "replay_pairs": 7,
+  "replay_operations_per_sample": 20000
+}

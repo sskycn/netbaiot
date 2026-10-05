@@ -424,7 +424,8 @@ async fn commands_role_dispatches_to_real_tcp_and_shares_http_dedup() {
         .await
         .unwrap();
     let duplicate = admin.commands().send(&command).await.unwrap();
-    assert_eq!(duplicate, accepted);
+    assert_eq!(duplicate.command_id, accepted.command_id);
+    assert_eq!(duplicate.state, DeliveryState::Sent);
     assert!(matches!(
         business.send_command(&demo_command("capacity")).await,
         Err(BusinessRpcClientError::Remote(RpcErrorCode::Overloaded))
@@ -598,7 +599,11 @@ async fn business_rpc_command_mqtt_dedup_and_ack_use_real_sockets() {
     );
 
     let same = business.send_command(&retry).await.unwrap();
-    assert_eq!(same, accepted);
+    assert_eq!(same.command_id, accepted.command_id);
+    assert!(matches!(
+        same.state,
+        DeliveryState::Sent | DeliveryState::Received
+    ));
     // All attempts for this new ID race before any caller receives a dispatch.
     let simultaneous = demo_command("concurrent-first");
     let mut concurrent = tokio::task::JoinSet::new();
@@ -607,14 +612,16 @@ async fn business_rpc_command_mqtt_dedup_and_ack_use_real_sockets() {
         let simultaneous = simultaneous.clone();
         concurrent.spawn(async move { business.send_command(&simultaneous).await });
     }
-    let mut concurrent_dispatch = None;
     while let Some(result) = concurrent.join_next().await {
         let dispatch = result.unwrap().unwrap();
         assert_eq!(dispatch.command_id, simultaneous.command_id);
-        if let Some(previous) = concurrent_dispatch {
-            assert_eq!(dispatch, previous);
-        }
-        concurrent_dispatch = Some(dispatch);
+        assert!(matches!(
+            dispatch.state,
+            DeliveryState::Queued
+                | DeliveryState::Dispatching
+                | DeliveryState::Sent
+                | DeliveryState::Received
+        ));
     }
     assert_eq!(
         tokio::time::timeout(Duration::from_secs(5), commands.recv())

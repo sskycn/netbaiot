@@ -179,6 +179,7 @@ impl ReassemblyBudget {
     pub fn used(&self) -> usize {
         self.used.load(Ordering::Relaxed)
     }
+    #[allow(deprecated)] // fetch_update supports the Rust 1.88 MSRV.
     fn reserve(self: &Arc<Self>, bytes: usize) -> Result<Reservation, MuxError> {
         self.used
             .fetch_update(Ordering::AcqRel, Ordering::Relaxed, |used| {

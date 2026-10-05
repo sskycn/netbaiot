@@ -12,4 +12,6 @@ MQTT 快照或 EventBus spool 失败会阻止主动关机。结构性 MQTT 恢�
 
 启动时先校验/恢复 MQTT broker 快照，再按原 ID 恢复 EventBus spool 段，初始化 sinks/监听器，最后才启用 readiness。只有必需工作全部完成 drain 后才会删除已恢复的 EventBus 段。MQTT 重连仍须先认证再恢复会话；恢复状态不包含凭据。
 
-MQTT 恢复会以增量方式写入 NBMQ v3 有界类型记录，并在末尾附上记录数、字节数和整条流的摘要。它可以读取 v1、v2 和 v3；只有根据文件前缀识别出 v1 后才会采用更大的 v1 兼容上限。完成新 broker 状态替换前，会校验 topic/filter 语法、packet ID、各状态允许的 QoS、离线队列中的非 QoS0 消息、retain 一致性、顺序、重复项、授权/codec 来源，以及 session ACL 所有权。
+MQTT 恢复会以增量方式写入 NBMQ v6 有界类型记录，并在末尾附上记录数、字节数和整条流的摘要。它可以读取 v1–v6；只有根据文件前缀识别出 v1 后才会采用更大的 v1 兼容上限。完成新 broker 状态替换前，会校验 topic/filter 语法、packet ID、各状态允许的 QoS、离线队列中的非 QoS0 消息、retain 一致性、顺序、重复项、授权/codec 来源，以及 session ACL 所有权。
+
+控制面 mutation、V2/V3 auth.sync/auth.invalidate、provider 离线撤销、命令提交（含去重重试）与 MQTT/TCP 最终建连均持有 lifecycle admission guard。Quiescing 后拒绝新操作，等待已获准操作完成，再等待 MQTT owner 的 QoS/Will 清理并写入快照。诊断读取和幂等 drain 请求仍可使用。

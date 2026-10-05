@@ -1150,7 +1150,8 @@ async fn reader_loop<R: AsyncRead + Unpin + Send + 'static>(
                         if sync_ping == Some(nonce) {
                             sync_ping = None;
                             let revision = confirmation.swap(0, Ordering::AcqRel);
-                            if revision != 0 && revision != u64::MAX && let Some((_, lease)) = &provider { lease.mark_serving(revision)?; }
+                            if revision != 0 && revision != u64::MAX && let Some((_, lease)) = &provider
+                                && let Ok(_admission) = services.ingress.lifecycle.begin_admission() { lease.mark_serving(revision)?; }
                         }
                     }
                     V3FrameType::ResetStream | V3FrameType::CloseStream => {
