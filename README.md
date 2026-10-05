@@ -12,6 +12,7 @@ Your business data stays in your backend.
 
 [![CI](https://img.shields.io/github/actions/workflow/status/sskycn/netbaiot/ci.yml?branch=main)](https://github.com/sskycn/netbaiot/actions/workflows/ci.yml)
 [![License](https://img.shields.io/github/license/sskycn/netbaiot)](LICENSE)
+[![Latest release](https://img.shields.io/github/v/release/sskycn/netbaiot)](https://github.com/sskycn/netbaiot/releases)
 [![Rust](https://img.shields.io/badge/rust-1.88%2B-orange?logo=rust)](Cargo.toml)
 
 **Quick links:** [5-minute Quick Start](docs/quick-start.md) · [Architecture](docs/architecture.md) · [Protocol support](docs/protocol-support.md) · [Delivery semantics](docs/delivery-semantics.md) · [Benchmarks](docs/benchmarks.md) · [Security](docs/security.md) · [中文](README.zh-CN.md)
