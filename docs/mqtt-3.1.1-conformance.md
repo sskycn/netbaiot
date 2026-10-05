@@ -36,7 +36,7 @@ The normative source is MQTT 3.1.1 with Errata 01.
 | Whole-packet deadline | PASS | `SLOWLORIS-001`; independent of MQTT keepalive |
 | Malformed and illegal sequences | PASS | `CONNECT-003`, `HEADER-001`, `REMAINING-001`, `SUB-002`, `SEQUENCE-001/002`, packet unit/fuzz suites |
 | ACL and identity isolation | PROFILE (PASS) | `SECURITY-ACL-001`, `SECURITY-SESSION-001`; canonical authenticated device namespace |
-| Planned restart recovery | PASS | session/QoS1/QoS2/retained/pending-Will subprocess and unit coverage, NBMQ v1/v2 compatibility, NBMQ v3 whole-image integrity, ownership validation, and `MQTT-RECOVERY-BINARY-WORSTCASE-001` |
+| Planned restart recovery | PASS | session/QoS1/QoS2/retained/pending-Will subprocess and unit coverage, streaming NBMQ v6 whole-image integrity, read-only v1–v5 compatibility, ownership validation, and `MQTT-RECOVERY-BINARY-WORSTCASE-001` |
 | TLS interoperability | PASS | `tests/run_mosquitto_tls_interop.py`; test CA/hostname verification succeeds and untrusted CA fails |
 | Abrupt crash durability | PROFILE | recent memory state may be lost; no crash durability claim |
 | MQTT 5, WebSocket, shared subscriptions, bridges | NOT_APPLICABLE | MQTT 5 has its own implemented profile; the other entries are outside this MQTT 3.1.1 checklist |
@@ -71,8 +71,8 @@ Paho is optional and was unavailable in the current environment; historical Paho
   admission without deep session clones or repeated scans, retained replacement and
   accepted-Will responsibility, bounded queues/state, and source ACK suppression on
   failed ownership.
-- Restart-state conformance: PASS for NBMQ v3 whole-image integrity, read-only NBMQ
-  v1/v2 compatibility under version-specific ceilings, semantic/ACL ownership
+- Restart-state conformance: PASS for NBMQ v6 whole-image integrity, read-only NBMQ
+  v1–v5 compatibility under version-specific ceilings, semantic/ACL ownership
   rejection, session incarnation persistence, and interrupted QoS2 delivery
   normalization.
 - Security/authorization persistence: PASS for credential, generation, permission,

@@ -1,51 +1,70 @@
 # NetbaIoT
 
-[简体中文](README.zh-CN.md)
+**An IoT gateway that stays a gateway.**
 
-NetbaIoT is a database-free, memory-first IoT protocol gateway and real-time event
-router. It accepts device traffic over embedded MQTT 3.1.1 and MQTT 5.0, generic framed
-TCP, and authenticated UDP; normalizes it into `DeviceEvent`; and sends it to
-confirmed or best-effort business sinks.
+NetbaIoT is a database-free, memory-first IoT ingress gateway and real-time event
+router written in Rust. Devices connect over MQTT 3.1.1, MQTT 5.0, framed TCP, or
+authenticated UDP. NetbaIoT validates and normalizes uplinks into `DeviceEvent`s,
+then routes them to your business services.
 
-The runtime never requires PostgreSQL or another database. Business systems own
-durable business data and offline commands. NetbaIoT's only persistent mechanism is
-a bounded local restart spool used when a planned graceful shutdown cannot finish
-all already accepted required deliveries.
+**MQTT 3.1.1 / MQTT 5.0 / framed TCP / authenticated UDP in → `DeviceEvent` out.**
+Your business data stays in your backend.
 
-## Quick start
+[![CI](https://img.shields.io/github/actions/workflow/status/sskycn/netbaiot/ci.yml?branch=main)](https://github.com/sskycn/netbaiot/actions/workflows/ci.yml)
+[![License](https://img.shields.io/github/license/sskycn/netbaiot)](LICENSE)
+[![Rust](https://img.shields.io/badge/rust-1.88%2B-orange?logo=rust)](Cargo.toml)
 
-Requirements: Rust 1.88 or newer, Python 3, `curl`, and Mosquitto client
-tools. Mosquitto is only a client here; NetbaIoT includes its own MQTT 3.1.1/MQTT 5.0
-broker.
+**Quick links:** [5-minute Quick Start](docs/quick-start.md) · [Architecture](docs/architecture.md) · [Protocol support](docs/protocol-support.md) · [Delivery semantics](docs/delivery-semantics.md) · [Benchmarks](docs/benchmarks.md) · [Security](docs/security.md) · [中文](README.zh-CN.md)
 
-Build the locked workspace, start the tutorial business consumer, then start the
-gateway:
-
-```bash
-cargo +1.88.0 build --locked
-python3 examples/business_http_sink.py
+```mermaid
+flowchart LR
+    M[MQTT 3.1.1 / MQTT 5.0]
+    T[Framed TCP]
+    U[Authenticated UDP]
+    M --> G
+    T --> G
+    U --> G
+    G[NetbaIoT]
+    G --> A[Authentication and ACL]
+    A --> C[Versioned device codec]
+    C --> E[Normalized DeviceEvent]
+    E --> R[Bounded event router]
+    R --> B[Your business services]
 ```
 
-In another terminal:
+## Why NetbaIoT?
+
+- **No runtime database dependency.** The gateway accepts and routes live device
+  traffic without PostgreSQL, Redis, or a message store. Business systems own
+  durable telemetry, workflows, analytics, and offline command intent.
+- **Several device transports, one event model.** MQTT, framed TCP, and signed
+  UDP uplinks use the configured versioned codec and produce the same public
+  `DeviceEvent` type.
+- **Acceptance has a defined boundary.** A producer receipt means the required
+  sink queues admitted and enqueued the event. It does not mean a business
+  database committed it. See [delivery semantics](docs/delivery-semantics.md).
+- **Resource use is bounded.** Connection, packet, cache, event, queue, sink,
+  command, subscription, replay, and recovery state have count and byte limits.
+- **Planned restart recovery is explicit.** A graceful shutdown drains required
+  work or commits pending work to the local recovery spool. This is not crash
+  durability; abrupt failures can lose recent in-memory work.
+
+## Quick Start
+
+Requirements: Rust 1.88+, Python 3, and Mosquitto client tools (`mosquitto_pub`).
+Mosquitto is only the client; NetbaIoT runs its own MQTT broker. The demo binds
+loopback and uses credentials from `configs/tutorial.json`; they are for local
+development only.
+
+Terminal 1 starts the gateway and a small webhook receiver:
 
 ```bash
-export NETBAIOT_ADMIN_SECRET=abababababababababababababababababababababababababababababababab
-cargo run -p netbaiot-server -- configs/tutorial.json
+./scripts/demo/start.sh
 ```
 
-Development listeners are:
+Wait for the `runtime ready` log before publishing.
 
-- single device ingress: `127.0.0.1:8080` (TCP: MQTT/framed TCP; UDP: NBI1/NBA1)
-- separate management HTTP: `127.0.0.1:9090`
-- optional `business_tcp` remains separate.
-
-Port 443 is a deployment choice for firewall compatibility, not an HTTPS promise.
-Production can use `device_ingress=0.0.0.0:443`: MQTTS and TLS TCP share
-one certificate; UDP uses the same numeric port and remains HMAC authenticated,
-not encrypted. No ALPN or custom preface is required. The four old device address
-fields are replaced by `device_ingress`; see [migration details](docs/architecture.md).
-
-Publish the first device event with a standard MQTT 3.1.1 client:
+Terminal 2 publishes one event:
 
 ```bash
 mosquitto_pub -h 127.0.0.1 -p 8080 -V mqttv311 \
@@ -54,71 +73,149 @@ mosquitto_pub -h 127.0.0.1 -p 8080 -V mqttv311 \
   -m '{"schema_version":1,"source_message_id":"demo:1","kind":"heartbeat","data":{"sequence":1}}'
 ```
 
-MQTT 5.0 clients use the same listener and canonical topics; change the example to
-`-V mqttv5`. MQTT 3.1.1 remains the default SDK mode. See the
-[MQTT compatibility profile](docs/mqtt.md) for supported MQTT 5 properties and
-features that are outside this release.
+The first terminal prints the normalized event after the webhook receives it.
+Stop the demo with Ctrl-C. MQTT 5.0 uses the same listener and topic; change
+`-V mqttv311` to `-V mqttv5`. The full [Quick Start](docs/quick-start.md) explains
+the event fields, development credentials, TCP/UDP examples, and graceful stop.
 
-MQTT QoS1 PUBACK means the event crossed the bounded
-`EventAccepted` boundary. It does not mean that a business database stored it.
-The Python terminal prints the normalized event and acknowledges it with HTTP
-204. Continue with the Chinese [10-minute end-to-end tutorial](docs/getting-started.md)
-for MQTT publish and subscribe, a live command, CLI usage, and graceful shutdown.
+## How it works
 
-Set a 64-character `NETBAIOT_ADMIN_SECRET` to enable legacy bootstrap management calls. This token has full scope and Global resource access; disable it with `"legacy_static_token_enabled": false` after moving to scoped API Keys, RS256 JWT, or management mTLS. A request uses one management credential, and JWKS outages return 503. See [management authentication](docs/management-auth.md). Production
-configurations must specify a confirmed webhook or framed TCP/RPC business sink.
-The business sink must deduplicate by stable `event_id` because retry and restart
-replay can duplicate delivery.
+```text
+Devices → transport and authentication → versioned codec → DeviceEvent
+        → bounded EventBus → business webhook or confirmed TCP/RPC consumer
+```
 
-Dependency audits run in CI. The optional Device Profile SDK now uses the repository's
-MQTT wire crate and rustls; the former `rumqttc` dependency and its
-`rustls-webpki 0.102.x` audit exceptions have been removed.
+The public Rust `DeviceEvent` type contains a `DeviceKey` and a tagged event
+kind. The built-in HTTP webhook maps it to this business envelope, which is what
+the Quick Start receiver prints:
 
-See the [complete user guide](docs/user-guide.md), [architecture](docs/architecture.md), [delivery semantics](docs/delivery-semantics.md),
-[HTTP API](docs/http-api.md), [MQTT profile](docs/mqtt.md), and the
-[refactor report](docs/pure-event-bus-refactor.md).
-
-
-Device HTTP has been removed. Existing clients must migrate to MQTT, framed TCP or
-UDP; automatic device config pull has no replacement. See the
-[breaking changes and migration](docs/remove-device-http.md).
-
-## Official Rust clients
-
-Business systems use `netbaiot-client`; event ACK is explicit and occurs after
-application processing:
-
-```rust
-let client = NetbaIoTClient::builder()
-    .endpoint(endpoint)
-    .token(token)
-    .event_address(event_address)
-    .connect()
-    .await?;
-let mut events = client.events().subscribe(EventFilter::default()).await?;
-while let Some(delivery) = events.next().await {
-    let delivery = delivery?;
-    handle(delivery.event()).await?;
-    delivery.ack().await?;
+```json
+{
+  "event_id": "2b13d944-bb18-40df-8043-a636807fc023",
+  "source_message_id": "demo:1",
+  "tenant_id": "demo",
+  "product_id": "sensor",
+  "device_id": "device-1",
+  "event_type": "heartbeat",
+  "received_at": 1791203077827,
+  "occurred_at": null,
+  "payload": { "kind": "heartbeat", "data": { "sequence": 1 } }
 }
 ```
 
-Commands use `client.commands().send(&command)` and operations use `client.runtime()`. An offline device returns
-typed `ClientError::DeviceOffline`; commands are never stored by NetbaIoT.
+`event_id` is assigned by the gateway and stays stable across retries and
+planned-restart replay. Consumers should persist it with their business update
+and deduplicate it. Your backend can store or forward the event using the systems
+you already operate; NetbaIoT does not require a particular database or queue.
 
-The optional `netbaiot-device-sdk` supports standard MQTT telemetry/commands
-without lock-in. Standard MQTT 3.1.1 clients remain
-first-class. The `netbaiot` CLI exposes status, event subscribe, command,
-auth cache invalidation, and explicit drain operations. See [SDK overview](docs/sdk.md),
-[business client](docs/client.md), [device SDK](docs/device-sdk.md), and
-[CLI](docs/cli.md).
+## When should I use NetbaIoT?
 
-UDP v1.1 returns a signed 64-byte NBA1 receipt after EventAccepted. Lost ACKs can be retried with the exact original NBI1 datagram without duplicate ingestion within the live replay window. See [UDP protocol and retry limits](docs/device-protocol.md#udp-acknowledgement-nba1).
+NetbaIoT may fit when you already own a business backend, need MQTT/TCP/UDP
+device ingress, want protocol-specific uplinks normalized to one event type, and
+want durable business state and offline workflows to remain in your application.
+It is also a fit when bounded queues and visible acceptance/failure semantics are
+important design constraints.
 
-NetbaIoT does not own or persist device desired configuration. Applications own
-persistent desired/reported state, revisions/history, retries, rollout, rollback,
-and offline reconciliation. Configuration changes can travel to online MQTT/TCP
-devices as ordinary `DeviceCommand` values. Devices return `CommandAck`; the
-application decides whether its desired state has converged. Commands remain
-online-only; UDP remains sessionless with no downlink. See the
-[ownership migration](docs/remove-device-config.md).
+## When should I not use NetbaIoT?
+
+Choose a different component or pair NetbaIoT with one if your requirement is a
+complete IoT cloud product with built-in dashboards, time-series storage, device
+OTA, or a rule-engine UI; a clustered or high-availability MQTT service; MQTT
+over WebSocket, shared subscriptions, MQTT-SN, or bridge mode; or crash-durable
+message storage. Those are not provided by this gateway.
+
+## Supported protocols
+
+| Ingress | Current profile |
+| --- | --- |
+| MQTT | Embedded MQTT 3.1.1 and MQTT 5.0 broker; QoS 0/1/2, retained messages, Will, bounded persistent sessions, and exact/`+`/`#` subscriptions |
+| TCP | Length-prefixed generic frames and MQTT share the device TCP listener; non-loopback TCP requires TLS |
+| UDP | NBI1 uplink with HMAC authentication, timestamp checks, replay protection, and signed NBA1 acceptance receipt; no encryption or downlink |
+| Business egress | Confirmed HTTP webhook or framed TCP/RPC consumer; independent bounded queues and ACK rules |
+
+See the [protocol support matrix](docs/protocol-support.md) and detailed
+[MQTT profile](docs/mqtt.md). UDP authentication does not provide confidentiality:
+**authenticated is not encrypted**.
+
+## Commands and reliability
+
+Commands are sent only to a currently connected local MQTT/TCP session. An offline
+device returns unavailable; the gateway does not queue commands for later.
+Transport write, device receipt, and device execution are separate states.
+Execution acknowledgements return as ordinary `DeviceEvent`s. The business
+application owns durable command intent and retry policy.
+
+Required sink fanout is admitted atomically. Required sinks acknowledge delivery;
+best-effort sinks follow their bounded drop policy. Delivery is at-least-once, so
+retries and recovery can repeat an event. MQTT PUBACK means `EventAccepted`, not
+business database commit. See [delivery semantics](docs/delivery-semantics.md),
+[reliability](docs/reliability.md), and [restart recovery](docs/restart-spool.md).
+
+## Security
+
+MQTT and TCP authenticate a connection and bind its device identity. Non-loopback
+device TCP requires TLS. Management HTTP has a separate authorization boundary;
+device credentials do not authorize management operations. UDP uses HMAC and replay
+checks, but does not encrypt payloads. Secrets must be injected through protected
+configuration/environment and must not be logged. Read the [security overview](docs/security.md)
+and [operations guide](docs/operations-guide.md) before deployment.
+
+## Benchmarks
+
+The repository contains measured loopback and subsystem experiments, with host,
+build, load, and caveats in the reports. Several results are historical and do not
+establish capacity for the current revision or a production deployment. The
+[benchmark overview](docs/benchmarks.md) explains what the numbers do and do not
+show; the detailed [performance baseline](docs/performance-baseline.md) preserves
+the original measurements and setup.
+
+## Current limitations
+
+- NetbaIoT is a single-node gateway. Shared live sessions and command routing
+  across nodes and clustered high availability are not implemented.
+- HTTP is not a device ingress protocol. The HTTP listener is for management and
+  is separate from device connections.
+- There is no built-in dashboard, durable business database, offline command
+  store, device configuration reconciler, OTA system, or rule-engine UI.
+- MQTT over WebSocket, MQTT-SN, shared subscriptions, broker bridge mode, and
+  `$SYS` services are outside the supported MQTT profile.
+- UDP is authenticated but unencrypted and sessionless; it has no command
+  downlink.
+- Recovery is for successful planned graceful shutdowns. It is not a general
+  database and does not make arbitrary process or machine crashes durable.
+- The workspace is version `0.2.2` and has not reached 1.0. Review protocol and
+  migration notes before upgrading; do not assume every API is stable.
+
+## Documentation
+
+- [5-minute Quick Start](docs/quick-start.md) · [10-minute end-to-end tutorial](docs/getting-started.md)
+- [Design philosophy](docs/design-philosophy.md) · [How NetbaIoT compares by intended role](docs/comparison.md)
+- [Protocol support](docs/protocol-support.md) · [MQTT 3.1.1/5.0 profile](docs/mqtt.md) · [Device wire format](docs/device-protocol.md)
+- [Delivery semantics](docs/delivery-semantics.md) · [Reliability](docs/reliability.md) · [Restart spool](docs/restart-spool.md)
+- [Security](docs/security.md) · [Operations](docs/operations-guide.md) · [Troubleshooting](docs/troubleshooting.md)
+- [Business integration and clients](docs/business-integration-guide.md) · [CLI](docs/cli.md) · [Device SDK](docs/device-sdk.md)
+- [Benchmark overview](docs/benchmarks.md) · [Performance baseline](docs/performance-baseline.md)
+- [Release notes template](docs/release-template.md) · [Project descriptions and launch drafts](docs/project-description.md)
+
+## Build and release
+
+Build from source with the workspace's minimum supported Rust toolchain:
+
+```bash
+cargo +1.88.0 build --locked
+```
+
+Tagged releases are built by GitHub Actions for Linux, macOS, and Windows; see
+[Releases](https://github.com/sskycn/netbaiot/releases). There is no official
+Docker image in this repository. The command-line client is `netbaiot`; see the
+[CLI guide](docs/cli.md).
+
+## Contributing
+
+Read [AGENTS.md](AGENTS.md) for the architecture and correctness constraints.
+Bug reports and focused pull requests are welcome. Changes to public protocol or
+MQTT behavior should include compatibility evidence and focused tests.
+
+## License
+
+NetbaIoT is licensed under [AGPL-3.0-or-later](LICENSE).
