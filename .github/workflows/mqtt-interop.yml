@@ -53,11 +53,20 @@ jobs:
           name: mqtt-protocol-regressions
           path: target/mqtt-audit/ci.json
           if-no-files-found: warn
+      - name: Check release evidence classification
+        run: python3 -m unittest discover -s tests/mqtt_conformance -p 'test_*.py' -v
       - name: Run complete MQTT release gate
         run: >-
           python3 scripts/ci_annotate.py
           --title "MQTT release gate failed"
           -- python3 tests/mqtt_conformance/run.py --release-gate
+      - name: Retain release and reference timing evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mqtt-release-gate
+          path: target/mqtt-conformance/results.json
+          if-no-files-found: warn
       - name: Run MQTT 5 raw and Mosquitto client gates
         run: |
           python3 tests/mqtt_conformance/v5_smoke.py

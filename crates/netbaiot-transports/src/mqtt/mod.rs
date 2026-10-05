@@ -80,7 +80,7 @@ async fn send_broker_frame(
     let mut pending = Some(frame);
     while let Some(frame) = pending.take() {
         let (bytes, budget, command, progress) = match frame {
-            BrokerFrame::Publish(delivery) => {
+            BrokerFrame::Publish(mut delivery) => {
                 if delivery.packet_id.is_none() {
                     let now = now_ms();
                     if delivery.message.expired(now) {
@@ -89,11 +89,6 @@ async fn send_broker_frame(
                         } else if delivery.command {
                             services.router.transport_state(DeliveryState::Expired);
                         }
-                        return Ok(());
-                    }
-                    if let Some(progress) = &delivery.progress
-                        && !progress.begin_transfer()
-                    {
                         return Ok(());
                     }
                 }
@@ -111,6 +106,9 @@ async fn send_broker_frame(
                         progress.abandon_unsent();
                     }
                 })?;
+                if delivery.packet_id.is_none() && !delivery.begin_qos0_transfer() {
+                    return Ok(());
+                }
                 if delivery.packet_id.is_some()
                     && !services
                         .mqtt
@@ -389,8 +387,8 @@ pub async fn connection(
                         topic: down, payload: command.bytes.to_vec(), qos, retain: false,
                         properties: broker::PublishProperties { expires_at_ms: Some(command.expires_at), ..Default::default() },
                     }, progress.clone()).is_err() {
-                        if let Some(progress) = progress { progress.update(DeliveryState::Failed); }
-                        services.router.transport_state(DeliveryState::Failed);
+                        if let Some(progress) = progress { progress.abandon_unsent(); }
+                        else { services.router.transport_state(DeliveryState::Failed); }
                     }
                 }
                 frame = attachment.receiver.recv() => {
@@ -597,3 +595,6 @@ mod tests {
         assert!(state.transition(ConnectionState::Authenticating).is_err());
     }
 }
+
+#[cfg(test)]
+mod command_tests;

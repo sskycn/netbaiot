@@ -239,9 +239,36 @@ pub struct BrokerDelivery {
     pub dup: bool,
     pub command: bool,
     pub progress: Option<Arc<netbaiot_runtime::CommandProgress>>,
+    unsent_command: UnsentCommandGuard,
     /// Includes the connection, tenant and process charge while this physical
     /// outbound copy waits in the channel or is being written to the socket.
     pub(super) _budget: Vec<BytesPermit>,
+}
+
+#[derive(Debug, Default)]
+struct UnsentCommandGuard(Option<Arc<netbaiot_runtime::CommandProgress>>);
+
+impl Drop for UnsentCommandGuard {
+    fn drop(&mut self) {
+        // QoS0 has no protocol ACK or persistent responsibility to finish the
+        // command after this physical frame is lost during connection teardown.
+        if let Some(progress) = &self.0 {
+            progress.abandon_unsent();
+        }
+    }
+}
+
+impl BrokerDelivery {
+    pub(super) fn begin_qos0_transfer(&mut self) -> bool {
+        if let Some(progress) = &self.progress
+            && !progress.begin_transfer()
+        {
+            return false;
+        }
+        // Encoding succeeded; the transport now owns the socket write outcome.
+        self.unsent_command.0.take();
+        true
+    }
 }
 
 #[derive(Debug)]
@@ -3352,6 +3379,7 @@ fn next_unsent_frame(state: &mut BrokerState, key: &SessionKey) -> Result<Option
                     dup: true,
                     command: session.command_outbound.contains(id),
                     progress: session.command_progress.get(id).cloned(),
+                    unsent_command: UnsentCommandGuard::default(),
                     _budget: budget,
                 }))
             }
@@ -3461,6 +3489,7 @@ fn promote_offline(
                 dup: false,
                 command: false,
                 progress: None,
+                unsent_command: UnsentCommandGuard::default(),
                 _budget: budget,
             })),
             bytes,
@@ -3780,6 +3809,7 @@ fn resume_frames(
                     dup: true,
                     command: session.command_outbound.contains(packet_id),
                     progress: session.command_progress.get(packet_id).cloned(),
+                    unsent_command: UnsentCommandGuard::default(),
                     _budget: budget,
                 }))
             }
@@ -3841,6 +3871,7 @@ fn resume_frames(
             dup: false,
             command: false,
             progress: None,
+            unsent_command: UnsentCommandGuard::default(),
             _budget: budget,
         })));
     }
@@ -3903,6 +3934,7 @@ fn enqueue(
                     packet_id: None,
                     dup: false,
                     command,
+                    unsent_command: UnsentCommandGuard(progress.clone()),
                     progress,
                     _budget: budget,
                 })),
@@ -3945,6 +3977,7 @@ fn enqueue(
                     packet_id: Some(id),
                     dup: false,
                     command,
+                    unsent_command: UnsentCommandGuard::default(),
                     progress,
                     _budget: budget,
                 })),
@@ -4204,6 +4237,7 @@ fn route_locked(
                     dup: false,
                     command: false,
                     progress: None,
+                    unsent_command: UnsentCommandGuard::default(),
                     _budget: target.budget,
                 }));
                 if active.sender.try_send(frame).is_ok() {
@@ -4239,6 +4273,7 @@ fn route_locked(
                     dup: false,
                     command: false,
                     progress: None,
+                    unsent_command: UnsentCommandGuard::default(),
                     _budget: target.budget,
                 }));
                 if let Some(active) = state.active.get(&target.key)
@@ -12201,6 +12236,120 @@ mod tests {
 
         fs::remove_dir_all(directory).unwrap();
     }
+    #[test]
+    fn qos0_drop_and_closed_receiver_release_all_command_resources() {
+        use netbaiot_core::DeliveryState;
+        use netbaiot_runtime::{CommandProgress, Metric};
+        for v5 in [false, true] {
+            for closed_before_enqueue in [false, true] {
+                let broker = MqttBroker::new(Arc::new(Limits::default()));
+                let device = auth("qos0-cleanup");
+                let mut attachment = if v5 {
+                    broker.attach_v5(&device, "command".into(), false, 60, 8)
+                } else {
+                    broker.attach(&device, "command".into(), false)
+                }
+                .unwrap();
+                let topic = "v1/t/t/p/p/d/qos0-cleanup/down";
+                broker
+                    .subscribe(&attachment.key, attachment.generation, topic, 0)
+                    .unwrap();
+                let baseline = broker.usage().unwrap();
+                let (active, packet_id) = {
+                    let state = broker.state.lock().unwrap();
+                    (
+                        state.active[&attachment.key].clone(),
+                        state.sessions[&attachment.key].next_packet_id,
+                    )
+                };
+                let available = (
+                    active.connection_bytes.available(),
+                    active.tenant_bytes.available(),
+                    active.global_bytes.available(),
+                );
+                let metrics = Arc::new(Metrics::default());
+                let progress = CommandProgress::new(now_ms() + 60_000, metrics.clone());
+                if closed_before_enqueue {
+                    attachment.receiver.close();
+                }
+                let result = broker.send_live_tracked(
+                    &attachment.key,
+                    attachment.generation,
+                    BrokerMessage {
+                        topic: topic.into(),
+                        payload: vec![1],
+                        qos: 0,
+                        retain: false,
+                        properties: PublishProperties::default(),
+                    },
+                    Some(progress.clone()),
+                );
+                assert_eq!(result.is_err(), closed_before_enqueue);
+                if !closed_before_enqueue {
+                    assert_eq!(progress.state(), DeliveryState::Queued);
+                    assert_eq!(attachment.receiver.len(), 1);
+                    assert!(active.connection_bytes.available() < available.0);
+                }
+                let key = attachment.key.clone();
+                drop(attachment);
+                progress.abandon_unsent(); // Same handoff-error cleanup as the connection loops.
+                assert_eq!(progress.state(), DeliveryState::Failed);
+                assert_eq!(metrics.get(Metric::CommandFailed), 1);
+                assert_eq!(Arc::strong_count(&progress), 1);
+                assert_eq!(
+                    (
+                        active.connection_bytes.available(),
+                        active.tenant_bytes.available(),
+                        active.global_bytes.available()
+                    ),
+                    available
+                );
+                assert_eq!(broker.usage().unwrap(), baseline);
+                let state = broker.state.lock().unwrap();
+                let session = &state.sessions[&key];
+                assert_eq!(session.next_packet_id, packet_id);
+                assert!(session.outbound.is_empty());
+                assert!(session.outbound_order.is_empty());
+                assert!(session.command_progress.is_empty());
+                assert!(session.command_outbound.is_empty());
+                assert!(session.started_outbound.is_empty());
+                assert!(session.send_window.is_empty());
+                assert!(session.sent.is_empty());
+                assert!(session.offline.is_empty());
+                assert_accounting_consistent(&state);
+            }
+        }
+    }
+
+    #[test]
+    fn qos0_drop_cleanup_and_expiry_count_one_terminal_failure() {
+        use netbaiot_core::DeliveryState;
+        use netbaiot_runtime::{CommandProgress, Metric};
+        let metrics = Arc::new(Metrics::default());
+        let expiry = now_ms() + 60_000;
+        let progress = CommandProgress::new(expiry, metrics.clone());
+        let guard = UnsentCommandGuard(Some(progress.clone()));
+        let barrier = std::sync::Barrier::new(3);
+        std::thread::scope(|scope| {
+            scope.spawn(|| {
+                barrier.wait();
+                progress.abandon_unsent();
+            });
+            scope.spawn(|| {
+                barrier.wait();
+                progress.expire(expiry);
+            });
+            barrier.wait();
+            drop(guard);
+        });
+        assert!(matches!(
+            progress.state(),
+            DeliveryState::Failed | DeliveryState::Expired
+        ));
+        assert_eq!(metrics.get(Metric::CommandFailed), 1);
+        assert_eq!(Arc::strong_count(&progress), 1);
+    }
+
     #[test]
     fn expired_command_at_broker_handoff_releases_all_responsibility() {
         use netbaiot_core::DeliveryState;

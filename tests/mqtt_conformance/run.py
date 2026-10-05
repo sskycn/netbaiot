@@ -12,6 +12,7 @@ import subprocess
 import sys
 import time
 import traceback
+from dataclasses import dataclass
 
 from common import (
     MOSQUITTO,
@@ -86,6 +87,38 @@ def no_packet(client: RawClient, timeout: float = 0.2) -> None:
     raise AssertionError(f"unexpected packet {packet}")
 
 
+# Only this timing observation may be non-PASS without failing the release gate.
+# Normative coverage still requires literal PASS evidence for every requirement.
+REFERENCE_KEEPALIVE_RESULTS = {"REFERENCE_TIMEOUT", "REFERENCE_DIFFERENT"}
+
+
+class ReferenceKeepaliveTimeout(TimeoutError):
+    pass
+
+
+@dataclass(frozen=True)
+class ReferenceObservation:
+    result: str
+    details: str
+
+
+def release_evidence_satisfied(test_id: str, result: object) -> bool:
+    return result == "PASS" or (
+        test_id == "DIFF-KEEPALIVE-001" and result in REFERENCE_KEEPALIVE_RESULTS
+    )
+
+
+def normative_coverage(catalog: dict, by_id: dict) -> str:
+    missing = [
+        requirement
+        for requirement, entry in catalog["normative_requirements"].items()
+        if not all(by_id.get(test_id) == "PASS" for test_id in entry["evidence"])
+    ]
+    if missing:
+        raise AssertionError(f"requirements without current PASS evidence: {missing}")
+    return f"{len(catalog['normative_requirements'])}/125 requirements have current PASS evidence"
+
+
 class Results:
     def __init__(self, implementation: str, only: str | None = None) -> None:
         self.implementation = implementation
@@ -99,6 +132,10 @@ class Results:
         try:
             details = callback() or "completed"
             result = "PASS"
+            if isinstance(details, ReferenceObservation):
+                if test_id != "DIFF-KEEPALIVE-001" or details.result not in REFERENCE_KEEPALIVE_RESULTS:
+                    raise ValueError("reference observation is only valid for differential keepalive timing")
+                result, details = details.result, details.details
         except Exception as error:  # keep the entire release-gate matrix observable
             details = f"{type(error).__name__}: {error}; {traceback.format_exc(limit=2).strip()}"
             result = "FAIL"
@@ -113,6 +150,21 @@ class Results:
                 "details": details,
             }
         )
+
+    def summary(self) -> dict[str, int]:
+        return {
+            "total": len(self.items),
+            "pass": sum(item["result"] == "PASS" for item in self.items),
+            "reference_observations": sum(
+                item["test_id"] == "DIFF-KEEPALIVE-001"
+                and item["result"] in REFERENCE_KEEPALIVE_RESULTS
+                for item in self.items
+            ),
+            "fail": sum(
+                not release_evidence_satisfied(item["test_id"], item["result"])
+                for item in self.items
+            ),
+        }
 
     def required_missing(self, test_id: str, details: str) -> None:
         self.items.append(
@@ -961,30 +1013,51 @@ def differential_vectors(netbaiot_port: int, mosquitto_port: int, results: Resul
 
     compare("DIFF-DUPLICATE-CLIENT-001", "duplicate-client", duplicate_client)
 
-    def keepalive(port: int, credentials: bool):
-        client, _ = open_client(port, "diff-keepalive", clean=True, credentials=credentials, keepalive=1)
-        started = time.monotonic()
-        # The raw NetbaIoT case above enforces the tighter 1.5x deadline.
-        # Mosquitto's periodic keepalive sweep can run later on loaded CI hosts.
-        # Keep a finite reference-broker bound without changing the gateway check.
-        timeout = 2.6 if credentials else 4.5
+    def observe_keepalive(port: int, credentials: bool, timeout: float) -> float:
+        client = RawClient("127.0.0.1", port)
         try:
-            client.expect_closed(timeout=timeout)
-        except TimeoutError as error:
-            broker = "NetbaIoT" if credentials else "Mosquitto"
-            raise AssertionError(f"{broker} did not close within {timeout}s") from error
+            client.send(connect(
+                b"diff-keepalive", clean=True, keepalive=1,
+                username=USERNAME_A.encode() if credentials else None,
+                password=PASSWORD.encode() if credentials else None,
+            ))
+            connack = client.recv()
+            assert connack == (0x20, b"\x00\x00"), connack
+            started = time.monotonic()
+            try:
+                client.expect_closed(timeout=timeout)
+            except TimeoutError as error:
+                if credentials:
+                    raise
+                raise ReferenceKeepaliveTimeout from error
+            return time.monotonic() - started
         finally:
             client.close()
-        elapsed = time.monotonic() - started
-        # The broker's keepalive clock starts while CONNECT is being processed,
-        # before this post-CONNACK measurement begins.  Keep a lower bound that
-        # still rejects an immediate close without assuming the handshake and
-        # scheduler consumed less than 300 ms on a loaded CI host.
-        upper_bound = 2.5 if credentials else 4.0
-        assert 1.0 <= elapsed <= upper_bound, elapsed
-        return "closed-within-keepalive-bound"
 
-    compare("DIFF-KEEPALIVE-001", "keepalive", keepalive)
+    def keepalive() -> str | ReferenceObservation:
+        # The gateway must pass its own bound even if the reference never closes.
+        # KEEPALIVE-001 independently remains required normative PASS evidence.
+        elapsed = observe_keepalive(netbaiot_port, True, 2.6)
+        assert 1.0 <= elapsed <= 2.5, f"NetbaIoT keepalive close at {elapsed:.3f}s"
+        details = f"NetbaIoT met differential keepalive bound (closed at {elapsed:.3f}s); "
+        try:
+            reference = observe_keepalive(mosquitto_port, False, 4.5)
+        except ReferenceKeepaliveTimeout:
+            return ReferenceObservation(
+                "REFERENCE_TIMEOUT",
+                details + "Mosquitto did not close within 4.5s on this runner; reference equality unverified",
+            )
+        if not 1.0 <= reference <= 4.0:
+            return ReferenceObservation(
+                "REFERENCE_DIFFERENT",
+                details + f"Mosquitto closed at {reference:.3f}s outside reference timing window [1.0, 4.0]s",
+            )
+        return details + f"Mosquitto closed at {reference:.3f}s within reference timing window"
+
+    results.run(
+        "DIFF-KEEPALIVE-001", "differential/keepalive",
+        "NetbaIoT keepalive bound plus reference-only timing observation", keepalive,
+    )
 
 
 def main() -> int:
@@ -1150,21 +1223,11 @@ def main() -> int:
         if args.only is None:
             by_id = {item["test_id"]: item["result"] for item in results.items}
 
-            def normative_coverage() -> str:
-                missing = []
-                for requirement, entry in catalog["normative_requirements"].items():
-                    evidence = entry["evidence"]
-                    if not all(by_id.get(test_id) == "PASS" for test_id in evidence):
-                        missing.append(requirement)
-                if missing:
-                    raise AssertionError(f"requirements without current PASS evidence: {missing}")
-                return f"{len(catalog['normative_requirements'])}/125 requirements have current PASS evidence"
-
             results.run(
                 "NORMATIVE-COVERAGE-001",
                 "traceability",
                 "all applicable MQTT 3.1.1 requirements",
-                normative_coverage,
+                lambda: normative_coverage(catalog, by_id),
             )
             required_ids = (
                 list(catalog["netbaiot_raw"])
@@ -1179,7 +1242,8 @@ def main() -> int:
             )
             final_by_id = {item["test_id"]: item["result"] for item in results.items}
             incomplete = [
-                test_id for test_id in required_ids if final_by_id.get(test_id) != "PASS"
+                test_id for test_id in required_ids
+                if not release_evidence_satisfied(test_id, final_by_id.get(test_id))
             ]
             if incomplete:
                 results.items.append(
@@ -1190,7 +1254,7 @@ def main() -> int:
                         "implementation": "harness",
                         "result": "FAIL",
                         "duration_ms": 0,
-                        "details": f"missing or non-PASS required evidence: {incomplete}",
+                        "details": f"missing or unsuccessful required evidence: {incomplete}",
                     }
                 )
 
@@ -1214,14 +1278,10 @@ def main() -> int:
         return 2
 
     document = {
-        "schema_version": 1,
+        "schema_version": 2,
         "suite": "NetbaIoT MQTT 3.1.1 raw conformance",
         "results": results.items,
-        "summary": {
-            "total": len(results.items),
-            "pass": sum(item["result"] == "PASS" for item in results.items),
-            "fail": sum(item["result"] != "PASS" for item in results.items),
-        },
+        "summary": results.summary(),
     }
     output.write_text(json.dumps(document, indent=2) + "\n")
     print(json.dumps(document["summary"], indent=2))

@@ -50,6 +50,15 @@ differential, restart evidence, and 29 named Rust fault invariants; missing requ
 dependencies are `SKIPPED_REQUIRED` and fail the gate. The current release run is
 76/76 PASS, including `NORMATIVE-COVERAGE-001` at 125/125.
 
+New harness reports use schema version 2. `KEEPALIVE-001` still requires a real
+NetbaIoT PASS with its unchanged deadline. `DIFF-KEEPALIVE-001` checks NetbaIoT's
+bound before observing Mosquitto for at most 4.5 seconds. Only that reference
+timing observation may report `REFERENCE_TIMEOUT` or `REFERENCE_DIFFERENT` without
+failing the release gate; neither status claims equality or counts as PASS.
+The summary records these separately as `reference_observations`. Missing
+dependencies, reference handshake/protocol errors, all other differential
+mismatches, and missing normative PASS evidence still fail the gate.
+
 The real-client suite is `tests/run_mosquitto_cli_interop.py`, which forces
 `-V mqttv311`. It covers authentication, QoS0/1/2, exact/`+`/`#`, unsubscribe,
 retained replace/delete/replay, persistent offline QoS1/2, and Will QoS0/1/2.

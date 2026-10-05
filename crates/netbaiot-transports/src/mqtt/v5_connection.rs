@@ -97,7 +97,7 @@ async fn fail_with_reason(
     Err(error)
 }
 
-async fn send_frame(
+pub(super) async fn send_frame(
     stream: &mut BoxStream,
     services: &Services,
     key: &broker::SessionKey,
@@ -109,7 +109,7 @@ async fn send_frame(
     let mut pending = Some(frame);
     while let Some(frame) = pending.take() {
         let (bytes, budget, command, progress) = match frame {
-            BrokerFrame::Publish(delivery) => {
+            BrokerFrame::Publish(mut delivery) => {
                 if delivery.packet_id.is_none() {
                     let now = now_ms();
                     if delivery.message.expired(now) {
@@ -118,11 +118,6 @@ async fn send_frame(
                         } else if delivery.command {
                             services.router.transport_state(DeliveryState::Expired);
                         }
-                        return Ok(());
-                    }
-                    if let Some(progress) = &delivery.progress
-                        && !progress.begin_transfer()
-                    {
                         return Ok(());
                     }
                 }
@@ -156,6 +151,9 @@ async fn send_frame(
                     maximum.min(services.ingress.limits.max_mqtt_packet_size),
                 ) {
                     Ok(bytes) => {
+                        if delivery.packet_id.is_none() && !delivery.begin_qos0_transfer() {
+                            return Ok(());
+                        }
                         if delivery.packet_id.is_some()
                             && !services
                                 .mqtt
@@ -485,8 +483,8 @@ pub(super) async fn connection(
                             ..Default::default()
                         },
                     }, progress.clone()).is_err() {
-                        if let Some(progress) = progress { progress.update(DeliveryState::Failed); }
-                        services.router.transport_state(DeliveryState::Failed);
+                        if let Some(progress) = progress { progress.abandon_unsent(); }
+                        else { services.router.transport_state(DeliveryState::Failed); }
                     }
                 }
                 frame = attachment.receiver.recv() => {
