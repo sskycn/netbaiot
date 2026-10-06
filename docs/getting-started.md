@@ -4,6 +4,9 @@
 
 本章核心流程已由 `scripts/tutorial_smoke.sh` 在实现基线上实际运行；脚本自动选择空闲 loopback 端口，以免开发机已有服务占用文档中的固定端口。固定端口的命令与 `configs/tutorial.json` 一致；若端口冲突，请停止占用者或复制配置后修改全部相关命令。
 
+先体验可运行 `cargo run --locked -p netbaiot-cli -- demo --once`，它不需要 Python 或
+Mosquitto。下面保留手动集成教程，用于了解 webhook、标准 MQTT 和在线命令。
+
 ## 1. 环境要求
 
 - Rust `1.88.0` 或更高；推荐当前 stable。workspace 使用 Rust edition 2024。

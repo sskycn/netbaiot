@@ -70,6 +70,20 @@ def run_demo(root):
         environment["PATH"] = f"{guard}{os.pathsep}{environment.get('PATH', '')}"
         environment["TMPDIR"] = str(working)
         environment["RUST_LOG"] = "info"
+        # The preferred first-use path invokes only the extracted Rust binary.
+        cli = root / "netbaiot"
+        for arguments in (["version"], ["config", "check", "--config", "configs/tutorial.json"], ["demo", "--once"]):
+            native_environment = environment.copy()
+            native_environment["PATH"] = ""  # no Python, Mosquitto or Cargo fallback
+            native = subprocess.run([str(cli), *arguments], cwd=root, env=native_environment,
+                check=True, capture_output=True, text=True, timeout=30)
+            if arguments[0] == "demo":
+                for stage in ("Gateway started", "Demo device authenticated", "Heartbeat EventAccepted", "Business sink acknowledged", "Shutdown completed"):
+                    if stage not in native.stdout:
+                        raise RuntimeError(f"native demo missing stage: {stage}")
+                if list(working.glob("netbaiot-demo-*")):
+                    raise RuntimeError("native demo left temporary recovery storage")
+        print("Archive native CLI PASS: version, config check, demo --once, empty PATH")
         log = working / "demo.log"
         with log.open("w") as output:
             process = subprocess.Popen(["bash", "scripts/demo/start.sh"], cwd=root,

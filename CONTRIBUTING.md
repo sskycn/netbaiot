@@ -14,7 +14,8 @@ cargo build --locked
 cargo install --locked cargo-audit
 ```
 
-The [Quick Start](docs/quick-start.md) runs a local gateway and webhook.
+Try `cargo run --locked -p netbaiot-cli -- demo --once` first. The
+[Quick Start](docs/quick-start.md) also retains the manual webhook examples.
 
 ## Before opening a PR
 

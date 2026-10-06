@@ -1,0 +1,39 @@
+name: Native developer experience
+on:
+  pull_request:
+  push:
+    branches: [main, codex/developer-experience-phase1]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  dx:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.88.0
+      - name: CLI, startup, cancellation and recovery regressions
+        timeout-minutes: 20
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo test --locked --workspace --all-features 2>&1 | tee dx-platform.log
+      - name: Actual first-use commands
+        timeout-minutes: 5
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo run --locked -p netbaiot-cli -- version 2>&1 | tee -a dx-platform.log
+          cargo run --locked -p netbaiot-cli -- config limits 2>&1 | tee -a dx-platform.log
+          cargo run --locked -p netbaiot-cli -- config check --config configs/tutorial.json 2>&1 | tee -a dx-platform.log
+          cargo run --locked -p netbaiot-cli -- demo --once 2>&1 | tee -a dx-platform.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: native-dx-${{ matrix.os }}-${{ github.sha }}
+          path: dx-platform.log

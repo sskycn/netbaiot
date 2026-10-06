@@ -5,6 +5,7 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
+serde_path_to_error = "0.1"
 netbaiot-core.workspace = true
 netbaiot-runtime.workspace = true
 netbaiot-codecs.workspace = true

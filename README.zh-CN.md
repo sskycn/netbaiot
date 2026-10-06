@@ -48,32 +48,39 @@ flowchart LR
 
 ## 快速开始
 
-macOS/Linux 脚本需要 Python 3.9+ 和 Mosquitto 客户端工具（`mosquitto_pub`）。
-源码用户另需 Rust 1.88+；二进制发布包用户解压后在包目录运行，无需 Rust。
-Windows 用户使用 [Quick Start 中的手动命令](docs/quick-start.md#windows-manual-start)。
-Mosquitto 仅作为客户端；NetbaIoT 自带 MQTT broker。Demo 仅监听 loopback，并使用
-`configs/tutorial.json` 中的本地演示凭据，**不可用于生产**。
-
-终端 1 启动网关和简单 webhook 接收器：
+源码用户（Rust 1.88+）：
 
 ```bash
-./scripts/demo/start.sh
+cargo run --locked -p netbaiot-cli -- demo
 ```
 
-看到 `runtime ready` 日志后再发布消息。
-
-终端 2 发布一条设备事件：
+解压二进制发布包后：
 
 ```bash
-mosquitto_pub -h 127.0.0.1 -p 8080 -V mqttv311 \
-  -u demo-device -P 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f \
-  -i quickstart -t v1/t/demo/p/sensor/d/device-1/up -q 1 \
-  -m '{"schema_version":1,"source_message_id":"demo:1","kind":"heartbeat","data":{"sequence":1}}'
+./netbaiot demo
+# 完成一条端到端示例后退出：
+./netbaiot demo --once
 ```
 
-第一个终端会打印 webhook 收到的规范化事件。按 Ctrl-C 停止。MQTT 5.0 使用同一
-监听器和 topic，将 `-V mqttv311` 改为 `-V mqttv5`。完整[Quick Start](docs/quick-start.md)
-解释事件字段、开发凭据、TCP/UDP 示例和优雅停止方式。
+Windows PowerShell 使用 `.\netbaiot.exe demo`。这个纯 Rust demo 在 loopback
+动态端口启动网关与有界业务接收器，通过真实 MQTT 认证和发布 heartbeat，分别等待
+PUBACK 与业务 sink ACK，再打印包含实际端口的 `mosquitto_pub` 命令。第一次体验无需
+Python 或 Mosquitto；按 Ctrl-C 排空并清理临时 recovery 目录。演示设备凭据**不可用于生产**。
+
+NetbaIoT 自己实现 MQTT broker，普通 MQTT 客户端仍是一等使用方式。可执行 demo
+打印的命令，或使用 [手动 MQTT 示例](docs/quick-start.md#manual-mqtt-example)中的
+`mosquitto_pub -V mqttv311`；MQTT 5 改为 `-V mqttv5`。
+
+检查并启动自己的 JSON 配置：
+
+```bash
+./netbaiot config check --config configs/tutorial.json
+./netbaiot serve --config configs/tutorial.json
+```
+
+教程配置需要手动 webhook；只体验设备接入可使用带进程内 audit sink 的
+`configs/development.json`。详见 [CLI](docs/cli.md)、[Quick Start](docs/quick-start.md)
+和[运维指南](docs/operations-guide.md)。
 
 ## 工作方式
 
