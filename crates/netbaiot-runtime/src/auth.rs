@@ -5,7 +5,7 @@ use netbaiot_core::*;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
-    collections::{HashMap, VecDeque},
+    collections::{BTreeSet, HashMap, VecDeque},
     hash::{Hash, Hasher},
     sync::{Arc, Mutex},
     time::{Duration, Instant},
@@ -89,7 +89,7 @@ pub trait DeviceAuthenticator: Send + Sync {
     async fn resolve_verifier(&self, credential_id: &str) -> Result<DeviceVerifier>;
 }
 
-#[derive(Clone, Eq)]
+#[derive(Clone, Eq, PartialOrd, Ord)]
 struct AuthCacheKey {
     credential_id: Arc<str>,
     fingerprint: [u8; 32],
@@ -127,6 +127,9 @@ struct CacheEntry {
 struct AuthCacheState {
     entries: HashMap<AuthCacheKey, CacheEntry>,
     order: VecDeque<AuthCacheKey>,
+    // Exactly one node per entry. Removal/replacement never leaves stale nodes.
+    // Key clones share credential_id storage; node count shares the cache ceiling.
+    expirations: BTreeSet<(Instant, AuthCacheKey)>,
     bytes: usize,
     inflight: HashMap<AuthCacheKey, Inflight>,
     epoch: u64,
@@ -185,6 +188,7 @@ impl AuthCache {
             state: Mutex::new(AuthCacheState {
                 entries: HashMap::new(),
                 order: VecDeque::new(),
+                expirations: BTreeSet::new(),
                 bytes: 0,
                 inflight: HashMap::new(),
                 epoch: 1,
@@ -323,29 +327,15 @@ impl AuthCache {
                     }
                     CachedAuth::Negative => 1,
                 };
-            while (state.entries.len() >= self.limits.auth_cache_max_entries
-                || state.bytes.saturating_add(bytes) > self.limits.auth_cache_max_bytes)
-                && !state.entries.is_empty()
-            {
-                if let Some(old) = state.order.pop_front()
-                    && let Some(entry) = state.entries.remove(&old)
-                {
-                    state.bytes = state.bytes.saturating_sub(entry.bytes);
-                    self.metrics.inc(Metric::AuthEvictions);
-                }
-            }
-            if bytes <= self.limits.auth_cache_max_bytes {
-                state.bytes += bytes;
-                state.order.push_back(key.clone());
-                state.entries.insert(
-                    key,
-                    CacheEntry {
-                        value,
-                        expires: Instant::now() + Duration::from_millis(ttl),
-                        bytes,
-                    },
-                );
-            }
+            insert_cache_entry(
+                &mut state,
+                &self.limits,
+                &self.metrics,
+                key,
+                value,
+                ttl,
+                bytes,
+            );
             let _ = completed.completed.send(true);
             return result.map(|auth| AuthenticatedSessionCandidate {
                 auth,
@@ -529,15 +519,22 @@ impl AuthCache {
         let mut state = lock(&self.state)?;
         state.epoch = state.epoch.wrapping_add(1).max(1);
         let mut devices = std::collections::HashSet::new();
-        state.entries.retain(|_, entry| {
+        let AuthCacheState {
+            entries,
+            order,
+            expirations,
+            bytes,
+            ..
+        } = &mut *state;
+        entries.retain(|key, entry| {
             let auth = match &entry.value {
-                CachedAuth::Positive(auth) => auth,
-                CachedAuth::Verifier(verifier) => verifier.identity(),
+                CachedAuth::Positive(auth) => Some(auth),
+                CachedAuth::Verifier(verifier) => Some(verifier.identity()),
                 // Negative entries have no trusted device/product/tenant association.
                 // Remove them on any invalidation so a newly enabled credential can recover.
-                CachedAuth::Negative => return false,
+                CachedAuth::Negative => None,
             };
-            let remove = match invalidation {
+            let remove = auth.is_none_or(|auth| match invalidation {
                 AuthInvalidation::Device { device } => &auth.device_key == device,
                 AuthInvalidation::Product {
                     tenant_id,
@@ -554,19 +551,17 @@ impl AuthCache {
                     auth.auth_generation == *generation
                 }
                 AuthInvalidation::All => true,
-            };
+            });
             if remove {
-                devices.insert(auth.device_key.clone());
+                if let Some(auth) = auth {
+                    devices.insert(auth.device_key.clone());
+                }
+                expirations.remove(&(entry.expires, key.clone()));
+                *bytes = bytes.saturating_sub(entry.bytes);
             }
             !remove
         });
-        state.bytes = state.entries.values().map(|entry| entry.bytes).sum();
-        let live = state
-            .entries
-            .keys()
-            .cloned()
-            .collect::<std::collections::HashSet<_>>();
-        state.order.retain(|key| live.contains(key));
+        order.retain(|key| entries.contains_key(key));
         self.metrics.inc(Metric::AuthInvalidations);
         Ok(devices.into_iter().collect())
     }
@@ -621,41 +616,66 @@ fn insert_cache_entry(
     ttl: u64,
     bytes: usize,
 ) {
+    // Defensively replace all old ownership before charging/installing the new value.
+    if remove_cache_entry(state, &key).is_some() {
+        state.order.retain(|old| old != &key);
+    }
     while (state.entries.len() >= limits.auth_cache_max_entries
         || state.bytes.saturating_add(bytes) > limits.auth_cache_max_bytes)
         && !state.entries.is_empty()
     {
         if let Some(old) = state.order.pop_front()
-            && let Some(entry) = state.entries.remove(&old)
+            && remove_cache_entry(state, &old).is_some()
         {
-            state.bytes = state.bytes.saturating_sub(entry.bytes);
             metrics.inc(Metric::AuthEvictions);
         }
     }
-    if bytes <= limits.auth_cache_max_bytes {
+    if limits.auth_cache_max_entries > 0 && bytes <= limits.auth_cache_max_bytes {
+        let expires = Instant::now() + Duration::from_millis(ttl);
         state.bytes += bytes;
         state.order.push_back(key.clone());
+        state.expirations.insert((expires, key.clone()));
         state.entries.insert(
             key,
             CacheEntry {
                 value,
-                expires: Instant::now() + Duration::from_millis(ttl),
+                expires,
                 bytes,
             },
         );
     }
 }
 
+// The caller owns FIFO removal: pop_front for eviction, one retain for replacement.
+fn remove_cache_entry(state: &mut AuthCacheState, key: &AuthCacheKey) -> Option<CacheEntry> {
+    let entry = state.entries.remove(key)?;
+    state.expirations.remove(&(entry.expires, key.clone()));
+    state.bytes = state.bytes.saturating_sub(entry.bytes);
+    Some(entry)
+}
+
 fn prune_expired(state: &mut AuthCacheState) {
     let now = Instant::now();
-    state.entries.retain(|_, entry| entry.expires > now);
-    state.bytes = state.entries.values().map(|entry| entry.bytes).sum();
-    let live = state
-        .entries
-        .keys()
-        .cloned()
-        .collect::<std::collections::HashSet<_>>();
-    state.order.retain(|key| live.contains(key));
+    let mut removed = false;
+    while state
+        .expirations
+        .first()
+        .is_some_and(|entry| entry.0 <= now)
+    {
+        let Some((_, key)) = state.expirations.pop_first() else {
+            break;
+        };
+        if let Some(entry) = state.entries.remove(&key) {
+            state.bytes = state.bytes.saturating_sub(entry.bytes);
+            removed = true;
+        }
+    }
+    // Live hits never scan either table/order and never allocate a temporary live set.
+    // Even a burst of expirations scans FIFO ownership only once, not once per key.
+    if removed {
+        let entries = &state.entries;
+        state.order.retain(|key| entries.contains_key(key));
+    }
 }
 struct Entry {
     key: [u8; 32],
@@ -912,6 +932,12 @@ mod cache_tests {
             for entry in state.entries.values_mut() {
                 entry.expires = Instant::now() - Duration::from_secs(1);
             }
+            // Fixture-only mutation must update the exact expiry index too.
+            state.expirations = state
+                .entries
+                .iter()
+                .map(|(key, entry)| (entry.expires, key.clone()))
+                .collect();
             let region = Region::new(AUDIT_ALLOCATOR);
             let start = std::time::Instant::now();
             prune_expired(&mut state);
