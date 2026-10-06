@@ -110,7 +110,8 @@ struct DeliveryRecord {
 
 struct SinkState {
     definition: SinkDefinition,
-    queue: VecDeque<DeliveryRecord>,
+    ready: VecDeque<DeliveryRecord>,
+    delayed: BTreeMap<Instant, VecDeque<DeliveryRecord>>,
     used_count: usize,
     used_bytes: usize,
     inflight: usize,
@@ -283,7 +284,8 @@ impl EventBus {
                 definition.id.clone(),
                 SinkState {
                     definition,
-                    queue: VecDeque::new(),
+                    ready: VecDeque::new(),
+                    delayed: BTreeMap::new(),
                     used_count: 0,
                     used_bytes: 0,
                     inflight: 0,
@@ -424,7 +426,7 @@ impl EventBus {
             }
             sink.used_count += 1;
             sink.used_bytes += bytes;
-            sink.queue.push_back(DeliveryRecord {
+            sink.ready.push_back(DeliveryRecord {
                 event: event.clone(),
                 bytes,
                 accepted_at: now,
@@ -551,7 +553,7 @@ impl EventBus {
                 if let Some(sink) = state.sinks.get_mut(id) {
                     sink.used_count += 1;
                     sink.used_bytes += bytes;
-                    sink.queue.push_back(DeliveryRecord {
+                    sink.ready.push_back(DeliveryRecord {
                         event: event.clone(),
                         bytes,
                         accepted_at: record.accepted_at,
@@ -770,24 +772,26 @@ impl EventBus {
     fn take_ready(&self, id: &SinkId) -> Result<Option<DeliveryRecord>> {
         let mut state = self.lock_state(EventBusProbe::TakeReady)?;
         let sink = state.sinks.get_mut(id).ok_or(Error::Internal)?;
-        let queue_len = sink.queue.len();
+        let queue_len = sink.used_count.saturating_sub(sink.inflight);
         let now = Instant::now();
         let selection_started = self.metrics.lock_timing_enabled().then(Instant::now);
-        let position = sink
-            .queue
-            .iter()
-            .enumerate()
-            .filter(|(_, record)| record.next_attempt <= now)
-            .min_by_key(|(_, record)| record.next_attempt)
-            .map(|(position, _)| position);
-        let selection_ns = selection_started.map(|started| started.elapsed().as_nanos() as u64);
-        let record = if let Some(position) = position {
-            let record = sink.queue.remove(position).ok_or(Error::Internal)?;
+        // Ready work remains FIFO. Due retries join the tail; later admissions
+        // cannot overtake them. Both queues remain covered by the same quotas.
+        while sink
+            .delayed
+            .first_key_value()
+            .is_some_and(|(deadline, _)| *deadline <= now)
+        {
+            let Some((_, mut records)) = sink.delayed.pop_first() else {
+                break;
+            };
+            sink.ready.append(&mut records);
+        }
+        let record = sink.ready.pop_front();
+        if record.is_some() {
             sink.inflight += 1;
-            Some(record)
-        } else {
-            None
-        };
+        }
+        let selection_ns = selection_started.map(|started| started.elapsed().as_nanos() as u64);
         if let Some(selection_ns) = selection_ns {
             state._timing.dequeue = Some((queue_len, usize::from(record.is_some()), selection_ns));
         }
@@ -798,11 +802,13 @@ impl EventBus {
         let state = self.lock_state(EventBusProbe::NextDelay)?;
         let sink = state.sinks.get(id).ok_or(Error::Internal)?;
         let now = Instant::now();
+        if !sink.ready.is_empty() {
+            return Ok(Some(Duration::ZERO));
+        }
         Ok(sink
-            .queue
-            .iter()
-            .map(|record| record.next_attempt.saturating_duration_since(now))
-            .min())
+            .delayed
+            .first_key_value()
+            .map(|(deadline, _)| deadline.saturating_duration_since(now)))
     }
 
     fn complete(
@@ -835,7 +841,10 @@ impl EventBus {
             let seed = record.event.event_id.0.as_u128() as u64 ^ u64::from(record.attempt);
             record.next_attempt = Instant::now() + Duration::from_millis(1 + seed % cap.max(1));
             let sink = state.sinks.get_mut(id).ok_or(Error::Internal)?;
-            sink.queue.push_back(record);
+            sink.delayed
+                .entry(record.next_attempt)
+                .or_default()
+                .push_back(record);
             self.metrics.event_bus_probe(EventBusProbe::NotifyWorker);
             sink.notify.notify_one();
             self.metrics.inc(Metric::SinkRetries);
@@ -846,7 +855,10 @@ impl EventBus {
             record.next_attempt =
                 Instant::now() + Duration::from_millis(self.limits.retry_max_ms.max(1));
             let sink = state.sinks.get_mut(id).ok_or(Error::Internal)?;
-            sink.queue.push_back(record);
+            sink.delayed
+                .entry(record.next_attempt)
+                .or_default()
+                .push_back(record);
             self.metrics.event_bus_probe(EventBusProbe::NotifyWorker);
             sink.notify.notify_one();
             self.metrics.inc(Metric::SinkFailures);
@@ -1409,7 +1421,7 @@ mod tests {
             let state = bus.state.lock().unwrap();
             for id in ["a", "b"] {
                 let sink = &state.sinks[&SinkId::new(id).unwrap()];
-                assert_eq!((sink.used_count, sink.queue.len()), (1, 1));
+                assert_eq!((sink.used_count, sink.ready.len()), (1, 1));
                 assert_eq!(sink.used_bytes, before.bytes);
             }
         }
@@ -1497,7 +1509,11 @@ mod tests {
                 accepted.push(index + 100);
             }
             for sink in bus.state.lock().unwrap().sinks.values() {
-                if sink.used_count != 0 || sink.used_bytes != 0 || !sink.queue.is_empty() {
+                if sink.used_count != 0
+                    || sink.used_bytes != 0
+                    || !sink.ready.is_empty()
+                    || !sink.delayed.is_empty()
+                {
                     accepted.push(index + 200);
                 }
             }
@@ -1634,7 +1650,8 @@ mod tests {
             assert!(state.sinks.values().all(|sink| sink.used_count == 0
                 && sink.used_bytes == 0
                 && sink.inflight == 0
-                && sink.queue.is_empty()));
+                && sink.ready.is_empty()
+                && sink.delayed.is_empty()));
         }
     }
 
@@ -1671,8 +1688,13 @@ mod tests {
             }
             {
                 let mut state = bus.state.lock().unwrap();
-                for record in &mut state.sinks.get_mut(&id).unwrap().queue {
-                    record.next_attempt = Instant::now() + Duration::from_secs(3_600);
+                let sink = state.sinks.get_mut(&id).unwrap();
+                for mut record in sink.ready.drain(..) {
+                    record.next_attempt = Instant::now() + Duration::from_secs(3600);
+                    sink.delayed
+                        .entry(record.next_attempt)
+                        .or_default()
+                        .push_back(record);
                 }
             }
             let mut take_ns = Vec::new();
@@ -1746,7 +1768,7 @@ mod tests {
         .unwrap();
         assert!(matches!(bus.publish(event(8)), Err(Error::Overloaded)));
         let state = bus.state.lock().unwrap();
-        assert!(state.sinks.get(&second).unwrap().queue.is_empty());
+        assert!(state.sinks.get(&second).unwrap().ready.is_empty());
         assert!(state.active.is_empty());
     }
 
@@ -1880,7 +1902,7 @@ mod tests {
                                 sink.used_count,
                                 sink.used_bytes,
                                 sink.inflight,
-                                sink.queue.len(),
+                                sink.ready.len(),
                             )
                         })
                         .collect::<Vec<_>>()
@@ -2340,5 +2362,216 @@ mod tests {
         );
         assert_eq!(bus.usage().unwrap(), EventBusUsage::default());
         bus.stop_workers().await.unwrap();
+    }
+    #[test]
+    fn ready_deliveries_are_fifo_and_release_all_accounting() {
+        let bus = route_bus(Limits::default(), vec![route(None, &["a"])]).unwrap();
+        let id = SinkId::new("a").unwrap();
+        let definition = bus.state.lock().unwrap().sinks[&id].definition.clone();
+        let events = [
+            named_event("first"),
+            named_event("second"),
+            named_event("third"),
+        ];
+        let ids = events.each_ref().map(|event| event.event_id);
+        for event in events {
+            bus.publish(event).unwrap();
+        }
+        for expected in ids {
+            let record = bus.take_ready(&id).unwrap().unwrap();
+            assert_eq!(record.event.event_id, expected);
+            bus.complete(&id, record, Ok(SinkAck), &definition).unwrap();
+        }
+        assert!(bus.take_ready(&id).unwrap().is_none());
+        assert_eq!(bus.usage().unwrap(), EventBusUsage::default());
+    }
+
+    #[tokio::test]
+    async fn delayed_same_deadline_fifo_survives_shutdown_and_spooling() {
+        let bus = route_bus(Limits::default(), vec![route(None, &["a"])]).unwrap();
+        let id = SinkId::new("a").unwrap();
+        let definition = bus.state.lock().unwrap().sinks[&id].definition.clone();
+        let events = [named_event("retry-first"), named_event("retry-second")];
+        let ids = events.each_ref().map(|event| event.event_id);
+        for event in events {
+            bus.publish(event).unwrap();
+        }
+        for _ in 0..2 {
+            let record = bus.take_ready(&id).unwrap().unwrap();
+            bus.complete(&id, record, Err(SinkError::Retryable), &definition)
+                .unwrap();
+        }
+        let bytes = bus.usage().unwrap().bytes;
+        {
+            let mut state = bus.state.lock().unwrap();
+            let sink = state.sinks.get_mut(&id).unwrap();
+            let mut records = std::mem::take(&mut sink.delayed)
+                .into_values()
+                .flatten()
+                .collect::<Vec<_>>();
+            let future = Instant::now() + Duration::from_secs(60);
+            for expected in ids {
+                let position = records
+                    .iter()
+                    .position(|record| record.event.event_id == expected)
+                    .unwrap();
+                let mut record = records.remove(position);
+                record.next_attempt = future;
+                sink.delayed.entry(future).or_default().push_back(record);
+            }
+            assert!(sink.ready.is_empty());
+            assert_eq!(sink.delayed.len(), 1);
+            assert_eq!(sink.delayed[&future].len(), 2);
+            assert_eq!(sink.used_count, 2);
+            assert_eq!(
+                sink.used_bytes,
+                sink.delayed[&future].iter().map(|r| r.bytes).sum::<usize>()
+            );
+        }
+        assert!(bus.take_ready(&id).unwrap().is_none());
+        assert!(bus.next_ready_delay(&id).unwrap().unwrap() > Duration::ZERO);
+        let ready = named_event("later-ready");
+        let ready_id = ready.event_id;
+        bus.publish(ready).unwrap();
+        let record = bus.take_ready(&id).unwrap().unwrap();
+        assert_eq!(record.event.event_id, ready_id);
+        bus.complete(&id, record, Ok(SinkAck), &definition).unwrap();
+        bus.close_admission().unwrap();
+        bus.stop_workers().await.unwrap();
+        let spooled = bus.spool_records().unwrap();
+        assert_eq!(spooled.len(), 2);
+        assert!(spooled.iter().all(|record| record.pending_sinks == vec![id.clone()] && record.attempts[&id] == 1));
+        assert_eq!(bus.usage().unwrap().bytes, bytes);
+        {
+            let mut state = bus.state.lock().unwrap();
+            let sink = state.sinks.get_mut(&id).unwrap();
+            let (_, mut records) = sink.delayed.pop_first().unwrap();
+            let due = Instant::now();
+            for record in &mut records {
+                record.next_attempt = due;
+            }
+            sink.delayed.insert(due, records);
+        }
+        assert_eq!(bus.next_ready_delay(&id).unwrap(), Some(Duration::ZERO));
+        for expected in ids {
+            let record = bus.take_ready(&id).unwrap().unwrap();
+            assert_eq!(record.event.event_id, expected);
+            assert_eq!(record.attempt, 1);
+            bus.complete(&id, record, Ok(SinkAck), &definition).unwrap();
+        }
+        assert_eq!(bus.next_ready_delay(&id).unwrap(), None);
+        assert_eq!(bus.usage().unwrap(), EventBusUsage::default());
+        assert!(bus.spool_records().unwrap().is_empty());
+    }
+
+    #[test]
+    #[ignore = "serial release queue benchmark"]
+    fn ready_retry_queue_scaling() {
+        use crate::hotspot_bench::measure;
+        fn metric(text: &str, name: &str) -> f64 {
+            text.lines()
+                .find_map(|line| {
+                    line.strip_prefix(name)
+                        .and_then(|value| value.trim().parse().ok())
+                })
+                .unwrap()
+        }
+        for depth in [0, 100, 1000, 4096] {
+            for retry_percent in [0, 10, 50] {
+                let memory = stats_alloc::Region::new(&stats_alloc::INSTRUMENTED_SYSTEM);
+                let limits = Arc::new(Limits {
+                    sink_queue_max_count: 5000,
+                    ..Limits::default()
+                });
+                let id = SinkId::new("queue").unwrap();
+                let metrics = Arc::new(Metrics::with_lock_timing());
+                let definition = SinkDefinition::bounded(
+                    id.clone(),
+                    SinkDeliveryMode::ConfirmedRequired,
+                    Arc::new(Ack),
+                    &limits,
+                );
+                let bus = EventBus::new_paused(
+                    limits,
+                    metrics.clone(),
+                    vec![definition],
+                    vec![RouteDefinition {
+                        tenant: None,
+                        sinks: vec![id.clone()],
+                    }],
+                    1,
+                )
+                .unwrap();
+                for _ in 0..depth {
+                    bus.publish(event(8)).unwrap();
+                }
+                {
+                    let mut state = bus.state.lock().unwrap();
+                    let sink = state.sinks.get_mut(&id).unwrap();
+                    for _ in 0..depth * retry_percent / 100 {
+                        let mut record = sink.ready.pop_front().unwrap();
+                        record.next_attempt = Instant::now() + Duration::from_secs(3600);
+                        sink.delayed
+                            .entry(record.next_attempt)
+                            .or_default()
+                            .push_back(record);
+                    }
+                }
+                let heap = memory.change();
+                println!(
+                    "EVENT_QUEUE_MEMORY,{depth},{retry_percent},{}",
+                    heap.bytes_allocated as i128 - heap.bytes_deallocated as i128
+                );
+                let name = format!("dequeue_retry{retry_percent}");
+                let before = metrics.render();
+                measure(
+                    &name,
+                    depth,
+                    2000,
+                    || (),
+                    |_| bus.take_ready(&id).unwrap(),
+                    |record| {
+                        if let Some(mut record) = record {
+                            record.next_attempt = Instant::now();
+                            let mut state = bus.state.lock().unwrap();
+                            let sink = state.sinks.get_mut(&id).unwrap();
+                            sink.inflight -= 1;
+                            sink.ready.push_back(record);
+                        }
+                    },
+                );
+                let after = metrics.render();
+                for (site, label) in [
+                    ("take_ready", name),
+                    ("next_ready_delay", format!("deadline_retry{retry_percent}")),
+                ] {
+                    let (start, finish) = if site == "next_ready_delay" {
+                        let before = metrics.render();
+                        measure(
+                            &label,
+                            depth,
+                            2000,
+                            || (),
+                            |_| bus.next_ready_delay(&id).unwrap(),
+                            |_| {},
+                        );
+                        (before, metrics.render())
+                    } else {
+                        (before.clone(), after.clone())
+                    };
+                    let count_name = format!("netbaiot_event_bus_site_{site}_hold_ns_count");
+                    let count = metric(&finish, &count_name) - metric(&start, &count_name);
+                    let wait_name = format!("netbaiot_event_bus_site_{site}_wait_ns_sum");
+                    let hold_name = format!("netbaiot_event_bus_site_{site}_hold_ns_sum");
+                    let wait = metric(&finish, &wait_name) - metric(&start, &wait_name);
+                    let hold = metric(&finish, &hold_name) - metric(&start, &hold_name);
+                    println!(
+                        "EVENT_QUEUE_LOCK,{label},{depth},{count},{:.3},{:.3}",
+                        wait / count,
+                        hold / count
+                    );
+                }
+            }
+        }
     }
 }
