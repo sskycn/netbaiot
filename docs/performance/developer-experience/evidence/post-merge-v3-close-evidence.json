@@ -1,0 +1,50 @@
+{
+  "first_main_commit": "bcf55097bee7225ce52109c96da5166fcbf86641",
+  "first_main_runs": [
+    {
+      "id": 37462050496,
+      "name": "Rust checks",
+      "head_sha": "bcf55097bee7225ce52109c96da5166fcbf86641",
+      "conclusion": "success",
+      "html_url": "https://github.com/sskycn/netbaiot/actions/runs/37462050496"
+    },
+    {
+      "id": 37462049614,
+      "name": "MQTT Device Profile decoder fuzz smoke",
+      "head_sha": "bcf55097bee7225ce52109c96da5166fcbf86641",
+      "conclusion": "success",
+      "html_url": "https://github.com/sskycn/netbaiot/actions/runs/37462049614"
+    },
+    {
+      "id": 37462049715,
+      "name": "Native recovery and lifecycle",
+      "head_sha": "bcf55097bee7225ce52109c96da5166fcbf86641",
+      "conclusion": "failure",
+      "html_url": "https://github.com/sskycn/netbaiot/actions/runs/37462049715"
+    },
+    {
+      "id": 37462049578,
+      "name": "Native developer experience",
+      "head_sha": "bcf55097bee7225ce52109c96da5166fcbf86641",
+      "conclusion": "success",
+      "html_url": "https://github.com/sskycn/netbaiot/actions/runs/37462049578"
+    }
+  ],
+  "failure_artifact": {
+    "id": 11413655122,
+    "name": "native-recovery-macos-latest-bcf55097bee7225ce52109c96da5166fcbf86641",
+    "digest": "sha256:281f598d19ae3ca0b8bfa6162a4bcc8bb899f83c926fe85c91bac0a28c6c3977"
+  },
+  "raw_failure_log_sha256": "f2a11a96e1cdf2e4f75df63f32431c239aec55f55c0bfcc3d6e7b95900ed5140",
+  "baseline_focused_repeat": {
+    "passed": 20,
+    "failed": 0,
+    "concurrency": 4,
+    "note": "Does not reproduce the CI failure or establish its exact writer state."
+  },
+  "deterministic_cancellation_regressions": {
+    "before_fix": "0 passed; 2 failed",
+    "after_fix": "2 passed; 0 failed"
+  },
+  "real_v3_socket_after_fix": "7 passed; 0 failed"
+}

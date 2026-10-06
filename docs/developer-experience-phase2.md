@@ -5,7 +5,7 @@
 ## Baseline
 
 - 第二阶段起点：干净的 `9ea710dbbe1fd0d4fe5d7d9bc954d54b4af35e8e`，分支 `codex/developer-experience-phase1`。名称沿用已授权DX任务分支，两个阶段独立提交。
-- 本阶段实现提交：`bd08ca785e814b2408085dae49760505a2115a32`；最终代码提交：`f9e10475afea2d8709dc41489997b411d9061abf`。报告与执行证据单独提交，不改变已验证源码。
+- 本阶段实现提交：`bd08ca785e814b2408085dae49760505a2115a32`；合并前最后代码提交：`f9e10475afea2d8709dc41489997b411d9061abf`。报告与执行证据单独提交；合并后补充的V3关闭修复见下文，最终main SHA由交付记录给出。
 - 合并前main/origin/main基线为f68bfd4；workspace0.2.3；macOS arm64 / stable1.99.0 +实际Rust1.88.0。
 - 起点已经实际具备serve/demo/check/limits/version、共享server入口与诊断、兼容server；没有只依照“第一阶段应已完成”的假设。检查了当前tools/scripts/config/docs/workflows/fuzz及依赖图。
 
@@ -154,6 +154,16 @@ source指纹含新模块，actual CLI、full logs、manifest在[证据目录](pe
 ## Cross-platform
 
 macOS arm64本阶段上述本地检查全部实际PASS，包含host archive。最终f9e1047的[三平台原生CI](https://github.com/sskycn/netbaiot/actions/runs/37457928928)和[常规Rust/release gate](https://github.com/sskycn/netbaiot/actions/runs/37457929637)均PASS。原生平台完整workspace计数为Linux/macOS各433 passed、Windows430 passed，均0 failed/16 ignored；Windows少3项为Unix限定测试，不计为PASS。每个平台均实际执行demo/init/check/doctor/schema与两个drift检查。官方artifact ZIP SHA256校验及原始日志摘要已保存于[最终CI证据](performance/developer-experience/evidence/phase2-final-ci-verification.json)。第一阶段结果仍单独记录。
+
+## 合并后的V3关闭回归
+
+首次合并main提交`bcf55097bee7225ce52109c96da5166fcbf86641`的Rust/release gate、三平台DX、decoder fuzz均PASS；[原生恢复工作流](https://github.com/sskycn/netbaiot/actions/runs/37462049715)的Linux/Windows PASS，macOS完整workspace在旧V3 lost-response测试失败。最后采样为active_connections=1，active_streams/queued_bytes/reassembly_reserved_bytes均0；保留[失败日志及官方artifact摘要](performance/developer-experience/evidence/post-merge-v3-close-evidence.json)。本地原测试单次及4并发共20次均PASS，不能据此否认CI失败，也不能从该日志断定当次writer具体停在哪个await。
+
+代码检查发现两个可确定复现的关闭缺口：writer的socket write与GOAWAY drain deadline没有响应owner cancellation。新增两个paused-time测试，保留10秒write deadline，同时要求取消后100毫秒内join；修复前均因Elapsed失败，修复后均PASS，后者也断言全部byte permits与queued-byte gauge归零。真实V3全部7项随后PASS，原lost-response测试5秒deadline及四项零usage断言未改。
+
+修复只让gateway V3 writer在socket write/GOAWAY等待中响应其owner cancellation；reader遇到EOF/Unavailable时不再等待无法完成的GOAWAY交换，由connection取消并join writer。正常关闭仍先按原有期限完成GOAWAY/drain，再取消writer；未观察ACK的required delivery仍由sink/EventBus拥有，不能因连接取消称为业务ACK。没有修改wire、身份/代际、默认limits、生产rate limit或断言。此修复解决已由确定性测试证明的问题；首次macOS失败的精确I/O状态没有现场日志，不夸大因果结论。
+
+修复后完整stable/Rust1.88检查均PASS，各435 passed、0 failed、16 ignored，包含fmt和严格clippy；[命令/耗时/原始日志摘要](performance/developer-experience/evidence/post-merge-v3-close-validation.json)和执行摘录已保存，preflight/source manifest也PASS。修复后main原生CI由最终交付记录补充；[修复后的源码指纹](performance/developer-experience/evidence/post-merge-v3-close-source-manifest.json)与原f9e1047证据分别保留。未改decoder；原main decoder fuzz smoke已实际通过。未重跑长负载、硬件I/O或Windows控制台Ctrl-C，不新增容量或硬件故障覆盖结论。
 
 ## git diff --stat
 

@@ -257,9 +257,13 @@ async fn writer_loop<W: AsyncWrite + Unpin>(
             tracing::debug!(stream_id = id, frame_type = ?frame.header.frame_type, payload_bytes = frame.payload.len(), "business RPC V3 selected frame");
             let completed =
                 frame.header.frame_type == V3FrameType::Data && frame.header.flags == V3_END_STREAM;
-            let sent = netbaiot_v3_mux::write_frame(&mut writer, &frame, timeout)
-                .await
-                .map_err(|_| Error::Unavailable);
+            let sent = tokio::select! {
+                biased;
+                _ = stop.cancelled() => return Ok(()),
+                sent = netbaiot_v3_mux::write_frame(&mut writer, &frame, timeout) => {
+                    sent.map_err(|_| Error::Unavailable)
+                }
+            };
             if sent.is_ok() {
                 metrics.observe(
                     Histogram::BusinessRpcV3WriterWait,
@@ -315,12 +319,20 @@ async fn writer_loop<W: AsyncWrite + Unpin>(
             // accepted work, but never wait indefinitely for peer flow credit.
             if scheduler.has_pending_frames() && tokio::time::Instant::now() < deadline {
                 goaway = Some((frame, done, deadline));
-                tokio::time::sleep_until(deadline).await;
+                tokio::select! {
+                    biased;
+                    _ = stop.cancelled() => return Ok(()),
+                    _ = tokio::time::sleep_until(deadline) => {}
+                }
                 continue;
             }
-            let result = netbaiot_v3_mux::write_frame(&mut writer, &frame, timeout)
-                .await
-                .map_err(|_| Error::Unavailable);
+            let result = tokio::select! {
+                biased;
+                _ = stop.cancelled() => return Ok(()),
+                sent = netbaiot_v3_mux::write_frame(&mut writer, &frame, timeout) => {
+                    sent.map_err(|_| Error::Unavailable)
+                }
+            };
             let _ = done.send(());
             return result;
         }
@@ -1203,16 +1215,21 @@ async fn reader_loop<R: AsyncRead + Unpin + Send + 'static>(
         }
         Err(_) => netbaiot_core::business_rpc_v3::V3GoAwayCode::ProtocolError,
     };
-    if let Ok(frame) = metadata(
-        0,
-        V3FrameType::GoAway,
-        &V3GoAway {
-            last_stream_id,
-            code,
-            message: String::new(),
-        },
-        &limits,
-    ) {
+    // EOF or a failed writer cannot complete a GOAWAY exchange. Return ownership
+    // immediately so connection() cancels and joins the writer instead of waiting
+    // another write deadline. Unacknowledged deliveries remain with their sink owner.
+    if !matches!(&result, Err(Error::Unavailable))
+        && let Ok(frame) = metadata(
+            0,
+            V3FrameType::GoAway,
+            &V3GoAway {
+                last_stream_id,
+                code,
+                message: String::new(),
+            },
+            &limits,
+        )
+    {
         let (done, written) = oneshot::channel();
         if tx.try_send(WriterMessage::GoAway { frame, done }).is_ok() {
             let _ = tokio::time::timeout(config.write_timeout, written).await;
@@ -1233,6 +1250,117 @@ async fn reader_loop<R: AsyncRead + Unpin + Send + 'static>(
 #[cfg(test)]
 mod send_ahead_tests {
     use super::*;
+
+    #[tokio::test(start_paused = true)]
+    async fn shutdown_cancels_writer_waiting_on_socket() {
+        let limits = V3Limits::default();
+        let (writer, mut reader) = tokio::io::duplex(1);
+        let (tx, rx) = mpsc::channel(8);
+        let (credit_tx, _credit_rx) = mpsc::channel(8);
+        let stop = CancellationToken::new();
+        let task = tokio::spawn(writer_loop(
+            writer,
+            rx,
+            WriterContext {
+                limits: limits.clone(),
+                send_ahead: None,
+                timeout: Duration::from_secs(10),
+                stop: stop.clone(),
+                credit_tx,
+                metrics: Arc::new(Metrics::default()),
+            },
+        ));
+        tx.send(WriterMessage::Frame(
+            fixed(0, V3FrameType::Ping, &[0; 8], &limits).unwrap(),
+        ))
+        .await
+        .unwrap();
+        // One byte proves the writer entered a socket write; leave the rest blocked.
+        reader.read_u8().await.unwrap();
+        stop.cancel();
+        assert!(
+            tokio::time::timeout(Duration::from_millis(100), task)
+                .await
+                .unwrap()
+                .unwrap()
+                .is_ok()
+        );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn shutdown_cancels_goaway_waiting_for_peer_credit() {
+        let limits = V3Limits::default();
+        let (writer, mut reader) = tokio::io::duplex(32 * 1024);
+        let (tx, rx) = mpsc::channel(8);
+        let (credit_tx, _credit_rx) = mpsc::channel(8);
+        let stop = CancellationToken::new();
+        let metrics = Arc::new(Metrics::default());
+        let task = tokio::spawn(writer_loop(
+            writer,
+            rx,
+            WriterContext {
+                limits: limits.clone(),
+                send_ahead: Some(V3SendAhead {
+                    stream_bytes: 8192,
+                    connection_bytes: 8192,
+                }),
+                timeout: Duration::from_secs(10),
+                stop: stop.clone(),
+                credit_tx,
+                metrics: metrics.clone(),
+            },
+        ));
+        let budget = Arc::new(Semaphore::new(20_000));
+        tx.send(WriterMessage::Body {
+            id: 2,
+            class: DataClass::Event,
+            body: Bytes::from(vec![1; 20_000]),
+            done: None,
+            _permit: budget.clone().try_acquire_many_owned(20_000).unwrap(),
+        })
+        .await
+        .unwrap();
+        let first = netbaiot_v3_mux::read_frame(&mut reader, 8192, Duration::from_secs(5))
+            .await
+            .unwrap();
+        assert_eq!(first.payload.len(), 8192);
+        let (done, mut written) = oneshot::channel();
+        tx.send(WriterMessage::GoAway {
+            frame: metadata(
+                0,
+                V3FrameType::GoAway,
+                &V3GoAway {
+                    last_stream_id: 0,
+                    code: netbaiot_core::business_rpc_v3::V3GoAwayCode::Shutdown,
+                    message: String::new(),
+                },
+                &limits,
+            )
+            .unwrap(),
+            done,
+        })
+        .await
+        .unwrap();
+        tokio::task::yield_now().await;
+        assert!(matches!(
+            written.try_recv(),
+            Err(oneshot::error::TryRecvError::Empty)
+        ));
+        stop.cancel();
+        assert!(
+            tokio::time::timeout(Duration::from_millis(100), task)
+                .await
+                .unwrap()
+                .unwrap()
+                .is_ok()
+        );
+        assert_eq!(budget.available_permits(), 20_000);
+        assert!(
+            metrics
+                .render()
+                .contains("netbaiot_business_rpc_v3_queued_bytes 0\n")
+        );
+    }
 
     #[tokio::test(start_paused = true)]
     async fn exhausted_send_ahead_waits_for_a_wake_source() {

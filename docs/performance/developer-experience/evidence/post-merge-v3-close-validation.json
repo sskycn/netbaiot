@@ -1,0 +1,34 @@
+[
+  {
+    "command": [
+      "cargo",
+      "+stable",
+      "xtask",
+      "check"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 81.06,
+    "workspace_totals": {
+      "passed": 435,
+      "failed": 0,
+      "ignored": 16
+    },
+    "raw_log_sha256": "b5a5bd75ca322c18bb8b989b723014bbe879aac48197cbe02ec5678e84df9ece"
+  },
+  {
+    "command": [
+      "cargo",
+      "+1.88.0",
+      "xtask",
+      "check"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 82.58,
+    "workspace_totals": {
+      "passed": 435,
+      "failed": 0,
+      "ignored": 16
+    },
+    "raw_log_sha256": "e5b7e4395c8053677afe1985f8750d88df5f06dafa902339e52e30adac7a598c"
+  }
+]
