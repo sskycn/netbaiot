@@ -2,42 +2,51 @@
   "implementation": "eb20e865b368b14f32bceac580c7215ed1ae2634",
   "commands": [
     {
-      "log": "docs/performance/remove-device-config/validation/before-build.log",
       "sha256": "f49048e83c96bb682eef87ac53948a5751f23235f76793fe9cf2214151463a1d",
       "command": "cargo +1.88.0 build --release -p netbaiot-server -p netbaiot-client -p netbaiot-loadgen (baseline)",
       "result": "passed",
-      "explanation": null
+      "explanation": null,
+      "log_original_path": "docs/performance/remove-device-config/validation/before-build.log",
+      "log_size_bytes": 615,
+      "log_sha256": "6834b785a84e8a18570e3e32cc43f29fb42621628e2be183f20b3ea8dfdb5923"
     },
     {
-      "log": "docs/performance/remove-device-config/validation/after-build.log",
       "sha256": "8c29a7e5128e4ebbb6a494cdc652ab328c8c653fe73a58ca942b5bd2ca9fc06d",
       "command": "cargo +1.88.0 build --release -p netbaiot-server -p netbaiot-client -p netbaiot-loadgen (candidate)",
       "result": "passed",
-      "explanation": null
+      "explanation": null,
+      "log_original_path": "docs/performance/remove-device-config/validation/after-build.log",
+      "log_size_bytes": 616,
+      "log_sha256": "937dea5b92794d163b2a46f768f31c0a4325db303b7d5b437f327b3ef656517a"
     },
     {
-      "log": "docs/performance/remove-device-config/validation/fmt.log",
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "command": "cargo +1.88.0 fmt --all -- --check",
       "result": "passed",
-      "explanation": null
+      "explanation": null,
+      "log_original_path": "docs/performance/remove-device-config/validation/fmt.log",
+      "log_size_bytes": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
     {
-      "log": "docs/performance/remove-device-config/validation/check.log",
       "sha256": "f7d579f0b589f5b376281acc662c9f90f9b3568fcad137ee447a568700587862",
       "command": "cargo +1.88.0 check --workspace --all-targets",
       "result": "passed",
-      "explanation": null
+      "explanation": null,
+      "log_original_path": "docs/performance/remove-device-config/validation/check.log",
+      "log_size_bytes": 138,
+      "log_sha256": "23e034dbb7580df496f8794fef42e303fe3daeaff8f45e9d5b1dd5c91657509a"
     },
     {
-      "log": "docs/performance/remove-device-config/validation/clippy.log",
       "sha256": "1ccd04426c8217dcda4a122cfed98142d2fb24e2a1d43971abc99925a7d9d127",
       "command": "cargo +1.88.0 clippy --workspace --all-targets --all-features -- -D warnings",
       "result": "passed",
-      "explanation": null
+      "explanation": null,
+      "log_original_path": "docs/performance/remove-device-config/validation/clippy.log",
+      "log_size_bytes": 138,
+      "log_sha256": "c3057c9a8cc06b2284592d4f97b93df4eacd4a9ce33f62f97f41f056ab8f5147"
     },
     {
-      "log": "docs/performance/remove-device-config/validation/tests-all-targets.log",
       "sha256": "a0027aa4e21f46abc5297982203bef50c6095059725c63d0ca402d9fdfc7b52f",
       "command": "cargo +1.88.0 test --workspace --all-targets --all-features",
       "result": "passed",
@@ -46,10 +55,12 @@
         "passed": 174,
         "failed": 0,
         "ignored": 4
-      }
+      },
+      "log_original_path": "docs/performance/remove-device-config/validation/tests-all-targets.log",
+      "log_size_bytes": 23709,
+      "log_sha256": "a0027aa4e21f46abc5297982203bef50c6095059725c63d0ca402d9fdfc7b52f"
     },
     {
-      "log": "docs/performance/remove-device-config/validation/tests-workspace.log",
       "sha256": "000ac209af2cfae96f7d2b69b89c3d4647ad0501f0a0b0434f64f0de9f8237e9",
       "command": "cargo +1.88.0 test --workspace --all-features",
       "result": "passed",
@@ -58,148 +69,189 @@
         "passed": 174,
         "failed": 0,
         "ignored": 4
-      }
+      },
+      "log_original_path": "docs/performance/remove-device-config/validation/tests-workspace.log",
+      "log_size_bytes": 18381,
+      "log_sha256": "000ac209af2cfae96f7d2b69b89c3d4647ad0501f0a0b0434f64f0de9f8237e9"
     },
     {
-      "log": "docs/performance/remove-device-config/validation/official-client-focused.log",
       "sha256": "4f268d7749fb14b4382efdccc2925ab5604e041e1b25437ab148ad6f9b9e75ee",
       "command": "cargo +1.88.0 test -p netbaiot-server --test official_client",
       "result": "passed",
-      "explanation": null
+      "explanation": null,
+      "log_original_path": "docs/performance/remove-device-config/validation/official-client-focused.log",
+      "log_size_bytes": 581,
+      "log_sha256": "412ac10d331fc1c0d0880f382176a494d3bc89955cfd8f975632305ba81f6d02"
     },
     {
-      "log": "docs/performance/remove-device-config/validation/qos2-restart-focused.log",
       "sha256": "37b1e614ec6d346b9673920bbb23a14ce57e5d1e2efde4881c73645b88b9116a",
       "command": "cargo +1.88.0 test -p netbaiot-server --test server subprocess_mqtt_qos2_resumes_outbound_and_inbound_restart_stages -- --nocapture",
       "result": "passed",
-      "explanation": null
+      "explanation": null,
+      "log_original_path": "docs/performance/remove-device-config/validation/qos2-restart-focused.log",
+      "log_size_bytes": 336,
+      "log_sha256": "37b1e614ec6d346b9673920bbb23a14ce57e5d1e2efde4881c73645b88b9116a"
     },
     {
-      "log": "docs/performance/remove-device-config/validation/mqtt-release-gate.log",
       "sha256": "23d097b0e34d8b2ca2e908eca860e1fe57bfcfeba7fa0548e0724574f25320f4",
       "command": "RUSTUP_TOOLCHAIN=1.88.0 python3 tests/mqtt_conformance/run.py --release-gate",
       "result": "passed",
-      "explanation": null
+      "explanation": null,
+      "log_original_path": "docs/performance/remove-device-config/validation/mqtt-release-gate.log",
+      "log_size_bytes": 8751,
+      "log_sha256": "a07eea54d79c2b66399b020ca39435fdd5ea225bc59b58db3a088d01d21d5f0e"
     },
     {
-      "log": "docs/performance/remove-device-config/validation/tutorial-smoke.log",
       "sha256": "686dc7dce01fc29ddc9f2cfdb9d8f4a3e861edc5dad738792f2cf3b8089a6de5",
       "command": "RUSTUP_TOOLCHAIN=1.88.0 bash scripts/tutorial_smoke.sh",
       "result": "passed",
-      "explanation": null
+      "explanation": null,
+      "log_original_path": "docs/performance/remove-device-config/validation/tutorial-smoke.log",
+      "log_size_bytes": 1549,
+      "log_sha256": "1e9f3ae92d0a7834c96b9f7d7ffa08d96f95f280691b0d1be8b8664991b86669"
     },
     {
-      "log": "docs/performance/remove-device-config/validation/restart-soak.log",
       "sha256": "2e88dd0a9299fc71189eeac419c102add40a9feebf550fda4169a45027291979",
       "command": "cargo +1.88.0 test -p netbaiot-server --test server subprocess_graceful_restart_sixty_second_soak -- --ignored --nocapture",
       "result": "passed",
-      "explanation": null
+      "explanation": null,
+      "log_original_path": "docs/performance/remove-device-config/validation/restart-soak.log",
+      "log_size_bytes": 406,
+      "log_sha256": "2e88dd0a9299fc71189eeac419c102add40a9feebf550fda4169a45027291979"
     },
     {
-      "log": "docs/performance/remove-device-config/validation/perf-tool-tests.log",
       "sha256": "4c979c0d06f0e9e2109df48cae7f69ac5d403754045b4cfe404fe744e7390b47",
       "command": "PYTHONPYCACHEPREFIX=target/remove-device-config/pycache python3 -m unittest discover -s scripts/perf -p 'test_*.py'",
       "result": "passed",
-      "explanation": null
+      "explanation": null,
+      "log_original_path": "docs/performance/remove-device-config/validation/perf-tool-tests.log",
+      "log_size_bytes": 103,
+      "log_sha256": "4c979c0d06f0e9e2109df48cae7f69ac5d403754045b4cfe404fe744e7390b47"
     },
     {
-      "log": "docs/performance/remove-device-config/validation/fuzz-json-codec.log",
       "sha256": "e3874d9020b757b523d0ea7c6206afab88e822db76daf1d9d9cbb07594b923f1",
       "command": "CARGO_NET_OFFLINE=true cargo +nightly fuzz run json_codec -- -max_total_time=60 -max_len=65537",
       "result": "passed",
       "explanation": null,
       "runs": 8530825,
-      "seconds": 61
+      "seconds": 61,
+      "log_original_path": "docs/performance/remove-device-config/validation/fuzz-json-codec.log",
+      "log_size_bytes": 1538031,
+      "log_sha256": "3bdc3d9b7198ef61fe3d30075492c37afb2c06f8419478466c70f8496eca91a8"
     },
     {
-      "log": "docs/performance/remove-device-config/validation/fuzz-classifier.log",
       "sha256": "8b468815e39c520468a477502ac49081af9df25eb3b62c83f16d87ad4ff8e1ce",
       "command": "CARGO_NET_OFFLINE=true cargo +nightly fuzz run device_classifier -- -max_total_time=60 -max_len=65537",
       "result": "passed",
       "explanation": null,
       "runs": 1103173,
-      "seconds": 61
+      "seconds": 61,
+      "log_original_path": "docs/performance/remove-device-config/validation/fuzz-classifier.log",
+      "log_size_bytes": 1480,
+      "log_sha256": "d580485b5837b1a9f10dfe62c2aa1f391b229e2261b7914019d5cc3a7ac6e33b"
     },
     {
-      "log": "docs/performance/remove-device-config/validation/fuzz-udp.log",
       "sha256": "f2c4fffcf889eb13b0912bf4687e361d3d9d2b5d5b88574501fd09c6c20138f6",
       "command": "CARGO_NET_OFFLINE=true cargo +nightly fuzz run udp_envelope -- -max_total_time=60 -max_len=1201",
       "result": "passed",
       "explanation": null,
       "runs": 670330,
-      "seconds": 61
+      "seconds": 61,
+      "log_original_path": "docs/performance/remove-device-config/validation/fuzz-udp.log",
+      "log_size_bytes": 24256,
+      "log_sha256": "051a3401326c655eaac1a7fb699102a1326a2ee23a814119fa7c01bdeb77b1af"
     },
     {
-      "log": "docs/performance/remove-device-config/validation/fuzz-restart-spool.log",
       "sha256": "00646b0a738a50b682f0a76c18974d95c9aca52eb4984ab7fed2e830b94748a2",
       "command": "CARGO_NET_OFFLINE=true cargo +nightly fuzz run restart_spool -- -max_total_time=60 -max_len=1048576",
       "result": "passed",
       "explanation": null,
       "runs": 2838735,
-      "seconds": 61
+      "seconds": 61,
+      "log_original_path": "docs/performance/remove-device-config/validation/fuzz-restart-spool.log",
+      "log_size_bytes": 19561,
+      "log_sha256": "b64ffe517832e6ec846274321d242e2ab7feb29a1d8a9dbd0e7640783adafa74"
     },
     {
-      "log": "docs/performance/remove-device-config/validation/fuzz-restart-spool-seeded.log",
       "sha256": "0464fa562dde5387d61b58576beebd17bbbe8a19d014cab77c7942b0120afa75",
       "command": "CARGO_NET_OFFLINE=true cargo +nightly fuzz run restart_spool -- -max_total_time=60 -max_len=1048576",
       "result": "passed",
       "explanation": null,
       "runs": 2266290,
-      "seconds": 61
+      "seconds": 61,
+      "log_original_path": "docs/performance/remove-device-config/validation/fuzz-restart-spool-seeded.log",
+      "log_size_bytes": 7701,
+      "log_sha256": "45b9713c0c2eebe97bc03f87427c5f9395d795d82dcdf0dcc7947a0a803c8354"
     },
     {
-      "log": "docs/performance/remove-device-config/validation/clippy-initial-unused-import.log",
       "sha256": "b34089e32a4b559c419c4566256606ea22275ca3d6f6d407a0d8301eb694dc5a",
       "command": null,
       "result": "intermediate failure",
-      "explanation": "unused test import; fixed"
+      "explanation": "unused test import; fixed",
+      "log_original_path": "docs/performance/remove-device-config/validation/clippy-initial-unused-import.log",
+      "log_size_bytes": 1105,
+      "log_sha256": "ce07a630757ca37d2ebdfe752964e0621506c7e1685ad4bce36b39a3b0f73715"
     },
     {
-      "log": "docs/performance/remove-device-config/validation/tests-initial-assertions.log",
       "sha256": "26fc37ceb83da0f61bfa1dbd918a71e00594b85bb7d0e031404bdfa0af3e4e1b",
       "command": null,
       "result": "intermediate failure",
-      "explanation": "new TTL/command-name test assertions; fixed"
+      "explanation": "new TTL/command-name test assertions; fixed",
+      "log_original_path": "docs/performance/remove-device-config/validation/tests-initial-assertions.log",
+      "log_size_bytes": 12842,
+      "log_sha256": "17c4d38f5cca0277c88bb3314ae53feb06db54e8a3859bde7ac17156ade041ff"
     },
     {
-      "log": "docs/performance/remove-device-config/validation/official-client-rate-limit.log",
       "sha256": "3589b9f4fecebf3cffc40e26c7ba459bb3a502b7978357f6469cd8d38df59fd4",
       "command": null,
       "result": "intermediate failure",
-      "explanation": "expanded test hit default per-IP rate; test allowance increased"
+      "explanation": "expanded test hit default per-IP rate; test allowance increased",
+      "log_original_path": "docs/performance/remove-device-config/validation/official-client-rate-limit.log",
+      "log_size_bytes": 1211,
+      "log_sha256": "9b8b1579bf5a067f791994d84d3147ea20062d4dc49c2d6a3ce974a73d44e387"
     },
     {
-      "log": "docs/performance/remove-device-config/validation/tests-workspace-initial-timeout.log",
       "sha256": "3216dbf4408ee4d1cd5a4dcf6e1c538fb5429267322b9162083172e2ab696cbe",
       "command": null,
       "result": "intermediate failure",
-      "explanation": "existing QoS2 restart readiness timeout; focused and full rerun passed"
+      "explanation": "existing QoS2 restart readiness timeout; focused and full rerun passed",
+      "log_original_path": "docs/performance/remove-device-config/validation/tests-workspace-initial-timeout.log",
+      "log_size_bytes": 11628,
+      "log_sha256": "a73a700d2eb5e4741a690a5317bb90689863bb0c3c70666f115679fcbe73543c"
     },
     {
-      "log": "docs/performance/remove-device-config/validation/before-benchmark.log",
       "sha256": "6f4dd2d5eb20ef4451a47f11658adbfe92f7d3a03679cfda554466fc3236b92d",
       "command": "python3 scripts/perf/device_protocol_benchmark.py --plan docs/performance/remove-device-config/plans.json --server target/remove-device-config/before-server --loadgen target/remove-device-config/loadgen --baseline 8ec59f37530659d65fe4ea398aba831b156d1d6b --label config-before --output docs/performance/remove-device-config",
       "result": "intermediate failure",
-      "explanation": "first baseline UDP server failed before readiness; raw failed record retained, UDP measurement rerun"
+      "explanation": "first baseline UDP server failed before readiness; raw failed record retained, UDP measurement rerun",
+      "log_original_path": "docs/performance/remove-device-config/validation/before-benchmark.log",
+      "log_size_bytes": 5146,
+      "log_sha256": "ae4297c033512de0e9d33ef6282bfd2fe9506eeef57a774d4d7b251290a91c60"
     },
     {
-      "log": "docs/performance/remove-device-config/validation/before-udp-retry.log",
       "sha256": "e3f3e3baed2d0a3d73e39cf25731074472bbc17a77454c6ac1308892bf58e781",
       "command": "python3 scripts/perf/device_protocol_benchmark.py --plan docs/performance/remove-device-config/before-udp-retry-plan.json --server target/remove-device-config/before-server --loadgen target/remove-device-config/loadgen --baseline 8ec59f37530659d65fe4ea398aba831b156d1d6b --label config-before-retry --output docs/performance/remove-device-config",
       "result": "passed",
-      "explanation": null
+      "explanation": null,
+      "log_original_path": "docs/performance/remove-device-config/validation/before-udp-retry.log",
+      "log_size_bytes": 847,
+      "log_sha256": "e3f3e3baed2d0a3d73e39cf25731074472bbc17a77454c6ac1308892bf58e781"
     },
     {
-      "log": "docs/performance/remove-device-config/validation/after-benchmark.log",
       "sha256": "de8ad52f6102dcf3bc925e7d963f7fdfcae03a0d1cab335842e80fbe0d89451c",
       "command": "python3 scripts/perf/device_protocol_benchmark.py --plan docs/performance/remove-device-config/after-plans.json --server target/remove-device-config/after-server --loadgen target/remove-device-config/loadgen --baseline 8ec59f37530659d65fe4ea398aba831b156d1d6b --label config-after --output docs/performance/remove-device-config",
-      "result": "passed"
+      "result": "passed",
+      "log_original_path": "docs/performance/remove-device-config/validation/after-benchmark.log",
+      "log_size_bytes": 3570,
+      "log_sha256": "de8ad52f6102dcf3bc925e7d963f7fdfcae03a0d1cab335842e80fbe0d89451c"
     },
     {
-      "log": "docs/performance/remove-device-config/validation/performance-summary.log",
       "sha256": "70099dce7e0ce988adf4909aabc834f4851a8ba6b8e2e428dd9f4a583a987d9b",
       "command": "python3 scripts/perf/device_config_summary.py",
-      "result": "passed"
+      "result": "passed",
+      "log_original_path": "docs/performance/remove-device-config/validation/performance-summary.log",
+      "log_size_bytes": 225,
+      "log_sha256": "70099dce7e0ce988adf4909aabc834f4851a8ba6b8e2e428dd9f4a583a987d9b"
     }
   ],
   "ignored": [
@@ -207,5 +259,7 @@
     "subprocess_graceful_restart_sixty_second_soak (separately run)",
     "mqtt_recovery_streaming_benchmark_manual",
     "mqtt_route_preflight_benchmark_manual"
-  ]
+  ],
+  "archive_manifest": "../../archive-manifest.json",
+  "raw_evidence_status": "Raw files are not hosted; exact original paths, sizes, and SHA-256 values are in the archive manifest."
 }

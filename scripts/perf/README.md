@@ -120,7 +120,7 @@ The server uses ten workers in this loopback harness. Freeze the same generator
 binary for both sides; run serialized without compilation or concurrent tests.
 
 ```bash
-python3 scripts/perf/device_protocol_benchmark.py --server target/remove-device-http/before-server --loadgen target/remove-device-http/loadgen --plan docs/performance/remove-device-http/before-plan.json --label before --output docs/performance/remove-device-http
+python3 scripts/perf/device_protocol_benchmark.py --server target/remove-device-http/before-server --loadgen target/remove-device-http/loadgen --plan docs/performance/remove-device-http/before-plan.json --label before --output target/performance/remove-device-http
 ```
 
 See [results and limits](../../docs/remove-device-http.md). The old four-protocol

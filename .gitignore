@@ -1,4 +1,11 @@
 /target/
+/target/performance/
+/target/evidence/
+/artifacts/performance/
+/artifacts/evidence/
+/local-performance-archive/
+*.perf.raw.json
+*.benchmark.raw.json
 /fuzz/target/
 /fuzz/artifacts/
 /fuzz/corpus/

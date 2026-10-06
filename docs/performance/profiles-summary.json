@@ -1,6 +1,5 @@
 {
   "downlink_sql_profile.sample": {
-    "source": "downlink_sql_profile.sample.txt",
     "sha256": "1c6e26787fbf8b3addfbf7d1801f05fed5ced731edb57cbeeceb774c4c26ed8e",
     "method": "exclusive leaves of sample wall-time call graph; parked leaves separated; inlining and syscall attribution limit precision; not exact CPU percentages",
     "root_thread_samples": 24013,
@@ -189,10 +188,12 @@
           "_RNvMs1_NtNtNtNtCs4Xcul6vvGsG_5tokio7runtime9scheduler12multi_thread5queueINtB5_5StealINtNtCslJsSqIQKwiA_5alloc4sync3ArcNtNtB7_6handle6HandleEE10steal_intoBd_  (in netbaiot-server) + 124  [0x102cd12e0]"
         ]
       }
-    }
+    },
+    "source_original_path": "docs/performance/downlink_sql_profile.sample.txt",
+    "source_size_bytes": 279747,
+    "source_sha256": "897a60e5812fa6384a6a40b77a81b3d99a99e60916d7374d989b0690af4f8d34"
   },
   "profile_churn_tls.sample": {
-    "source": "profile_churn_tls.sample.txt",
     "sha256": "ca0a228b89e5a08d78acefb569306776c94e725658db206534f78225212e6744",
     "method": "exclusive leaves of sample wall-time call graph; parked leaves separated; inlining and syscall attribution limit precision; not exact CPU percentages",
     "root_thread_samples": 83094,
@@ -661,10 +662,12 @@
           "_RNvXs0_NtCsfWqwhADioj4_18tracing_subscriber3fmtINtB5_10SubscriberNtNtB5_6format13DefaultFieldsNtB13_6FormatNtNtNtB7_6filter3env9EnvFilterENtNtCs8dt54CNuBMv_12tracing_core10subscriber10Subscriber12current_spanCsjV7I2mTZQHz_15netbaiot_server  (in netbaiot-server) + 0  [0x1020768a8]  mod.rs:427"
         ]
       }
-    }
+    },
+    "source_original_path": "docs/performance/profile_churn_tls.sample.txt",
+    "source_size_bytes": 1482648,
+    "source_sha256": "3053145d15984d838a9d406ef0542015b6f83efde73570a9e6f461df8c912122"
   },
   "profile_downlink_clean.sample": {
-    "source": "profile_downlink_clean.sample.txt",
     "sha256": "4e663ef2937d7f7d1e9ce30c38a16eaea1ceec118f6464d4bbad65cb6a75d51e",
     "method": "exclusive leaves of sample wall-time call graph; parked leaves separated; inlining and syscall attribution limit precision; not exact CPU percentages",
     "root_thread_samples": 83281,
@@ -963,10 +966,12 @@
           "_RNvXs3_NtNtCsgtPOCBgevO_4core4hash3sipINtB5_6HasherNtB5_11Sip13RoundsENtB7_6Hasher5writeCsboI9iCZITS_16netbaiot_runtime  (in netbaiot-server) + 68  [0x1030678e8]"
         ]
       }
-    }
+    },
+    "source_original_path": "docs/performance/profile_downlink_clean.sample.txt",
+    "source_size_bytes": 606532,
+    "source_sha256": "dc5a3bbfab48b87daa4561b5da68846aeddf135e76ad8114873686ceaf2c350e"
   },
   "profile_idle_2000.sample": {
-    "source": "profile_idle_2000.sample.txt",
     "sha256": "ea07247e8502c66017b49e49fbc0954e336a3bc0bf030700bc8d065eea55eb0d",
     "method": "exclusive leaves of sample wall-time call graph; parked leaves separated; inlining and syscall attribution limit precision; not exact CPU percentages",
     "root_thread_samples": 83974,
@@ -1299,10 +1304,12 @@
           "_RNvXs0_NtNtCsfWqwhADioj4_18tracing_subscriber8registry7shardedNtB5_8RegistryNtNtCs8dt54CNuBMv_12tracing_core10subscriber10Subscriber12current_span  (in netbaiot-server) + 348  [0x102a26558]"
         ]
       }
-    }
+    },
+    "source_original_path": "docs/performance/profile_idle_2000.sample.txt",
+    "source_size_bytes": 569714,
+    "source_sha256": "db4c72709c9e64a42ac361330900a6ebc25310393d2b0d65849a1b33974f1599"
   },
   "profile_idle_tls_3400.sample": {
-    "source": "profile_idle_tls_3400.sample.txt",
     "sha256": "b97b4c622bc6a45fb49095f75a3a375a9e241b963d028ea7961976b4eecdf8e7",
     "method": "exclusive leaves of sample wall-time call graph; parked leaves separated; inlining and syscall attribution limit precision; not exact CPU percentages",
     "root_thread_samples": 83765,
@@ -1638,10 +1645,12 @@
           "writev  (in libsystem_kernel.dylib) + 8  [0x18d16bb8c]"
         ]
       }
-    }
+    },
+    "source_original_path": "docs/performance/profile_idle_tls_3400.sample.txt",
+    "source_size_bytes": 655788,
+    "source_sha256": "a19cc54ae5377d8c468228b9ddbb982a2f171709244e02432f00e00a5e92f055"
   },
   "profile_uplink.sample": {
-    "source": "profile_uplink.sample.txt",
     "sha256": "cd82b8fa7ca7d9336666e74c01992debdcc2c6f954c5e34722361ad93c9dc2e5",
     "method": "exclusive leaves of sample wall-time call graph; parked leaves separated; inlining and syscall attribution limit precision; not exact CPU percentages",
     "root_thread_samples": 90486,
@@ -2033,6 +2042,11 @@
           "_RNvNtNtCs3fu9mYSfxQO_19netbaiot_transports4mqtt6packet11valid_topic  (in netbaiot-server) + 212  [0x10255812c]"
         ]
       }
-    }
-  }
+    },
+    "source_original_path": "docs/performance/profile_uplink.sample.txt",
+    "source_size_bytes": 935482,
+    "source_sha256": "6988b558c9bf9cb126155c0459c5d8b0c5b36bf5a527d3673ff519567ca60c45"
+  },
+  "archive_manifest": "archive-manifest.json",
+  "raw_evidence_status": "Raw files are not hosted; exact original paths, sizes, and SHA-256 values are in the archive manifest."
 }

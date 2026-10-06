@@ -1,0 +1,5 @@
+Initial allocator instrumentation failed before the print/assert ordering fix:
+test auth::expiry_tests::expiry_index_memory_audit ... FAILED
+assertion `left == right` failed
+  left: 872
+ right: 808

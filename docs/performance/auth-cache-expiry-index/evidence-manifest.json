@@ -53,5 +53,7 @@
     "validation/focused-udp.log": "5d9226afb5238c086cb3ed57787081f3f41df5d8c803365e8afea8df53afb759",
     "validation/stable-clippy.log": "957a1be15ace21038b22c97d54d471ef1b796f67ef3596bb21861a2cbb61b34f",
     "validation/focused-auth-expiry.log": "dfe9a7850050113b572c45a8186a50ec46defd206c66b64f89e2a39b98522ec4"
-  }
+  },
+  "archive_manifest": "../archive-manifest.json",
+  "raw_evidence_status": "Full raw files were removed from tracked docs/performance; checksum keys identify original files and archive-manifest.json records their paths, sizes, and SHA-256."
 }

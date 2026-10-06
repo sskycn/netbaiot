@@ -47,4 +47,9 @@ jobs:
         if: always()
         with:
           name: native-dx-${{ matrix.os }}-${{ github.sha }}
-          path: dx-platform.log
+          path: |
+            dx-platform.log
+            target/performance/
+            target/evidence/
+          if-no-files-found: warn
+          retention-days: 14

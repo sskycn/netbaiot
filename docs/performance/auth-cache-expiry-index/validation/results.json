@@ -20,10 +20,12 @@
       ],
       "exit_code": 0,
       "elapsed_seconds": 3.415,
-      "log": "docs/performance/auth-cache-expiry-index/validation/focused-auth-existing.log",
       "passed": 6,
       "failed": 0,
-      "ignored": 1
+      "ignored": 1,
+      "log_original_path": "docs/performance/auth-cache-expiry-index/validation/focused-auth-existing.log",
+      "log_size_bytes": 1034,
+      "log_sha256": "db6c604a0025efda23776f3030f5de10ec78d308a8a704ef4b8421efa153fb6e"
     },
     {
       "name": "focused-auth-expiry",
@@ -40,10 +42,12 @@
       ],
       "exit_code": 0,
       "elapsed_seconds": 8.022,
-      "log": "docs/performance/auth-cache-expiry-index/validation/focused-auth-expiry.log",
       "passed": 11,
       "failed": 0,
-      "ignored": 1
+      "ignored": 1,
+      "log_original_path": "docs/performance/auth-cache-expiry-index/validation/focused-auth-expiry.log",
+      "log_size_bytes": 1970,
+      "log_sha256": "dfe9a7850050113b572c45a8186a50ec46defd206c66b64f89e2a39b98522ec4"
     },
     {
       "name": "focused-udp",
@@ -60,10 +64,12 @@
       ],
       "exit_code": 0,
       "elapsed_seconds": 12.033,
-      "log": "docs/performance/auth-cache-expiry-index/validation/focused-udp.log",
       "passed": 17,
       "failed": 0,
-      "ignored": 1
+      "ignored": 1,
+      "log_original_path": "docs/performance/auth-cache-expiry-index/validation/focused-udp.log",
+      "log_size_bytes": 2348,
+      "log_sha256": "5d9226afb5238c086cb3ed57787081f3f41df5d8c803365e8afea8df53afb759"
     },
     {
       "name": "focused-end-to-end",
@@ -79,10 +85,12 @@
       ],
       "exit_code": 0,
       "elapsed_seconds": 1.259,
-      "log": "docs/performance/auth-cache-expiry-index/validation/focused-end-to-end.log",
       "passed": 24,
       "failed": 0,
-      "ignored": 0
+      "ignored": 0,
+      "log_original_path": "docs/performance/auth-cache-expiry-index/validation/focused-end-to-end.log",
+      "log_size_bytes": 1954,
+      "log_sha256": "f2384995d33d4d05e740a9fa09383ea6f85446d7e64df9e4780b0f834d061428"
     },
     {
       "name": "1.88.0-fmt",
@@ -96,10 +104,12 @@
       ],
       "exit_code": 0,
       "elapsed_seconds": 0.573,
-      "log": "docs/performance/auth-cache-expiry-index/validation/1.88.0-fmt.log",
       "passed": 0,
       "failed": 0,
-      "ignored": 0
+      "ignored": 0,
+      "log_original_path": "docs/performance/auth-cache-expiry-index/validation/1.88.0-fmt.log",
+      "log_size_bytes": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
     {
       "name": "1.88.0-clippy",
@@ -117,10 +127,12 @@
       ],
       "exit_code": 0,
       "elapsed_seconds": 9.619,
-      "log": "docs/performance/auth-cache-expiry-index/validation/1.88.0-clippy.log",
       "passed": 0,
       "failed": 0,
-      "ignored": 0
+      "ignored": 0,
+      "log_original_path": "docs/performance/auth-cache-expiry-index/validation/1.88.0-clippy.log",
+      "log_size_bytes": 984,
+      "log_sha256": "426512ce0898fc499effa0bf02e5cd89ca55b3682d70a26fe0976f23a6917305"
     },
     {
       "name": "1.88.0-workspace-tests",
@@ -134,10 +146,12 @@
       ],
       "exit_code": 0,
       "elapsed_seconds": 89.795,
-      "log": "docs/performance/auth-cache-expiry-index/validation/1.88.0-workspace-tests.log",
       "passed": 449,
       "failed": 0,
-      "ignored": 17
+      "ignored": 17,
+      "log_original_path": "docs/performance/auth-cache-expiry-index/validation/1.88.0-workspace-tests.log",
+      "log_size_bytes": 46576,
+      "log_sha256": "6042505ab773f111e71a2c563eb2844e2909104e46e475eee12d48a845c0d20d"
     },
     {
       "name": "stable-fmt",
@@ -151,10 +165,12 @@
       ],
       "exit_code": 0,
       "elapsed_seconds": 0.484,
-      "log": "docs/performance/auth-cache-expiry-index/validation/stable-fmt.log",
       "passed": 0,
       "failed": 0,
-      "ignored": 0
+      "ignored": 0,
+      "log_original_path": "docs/performance/auth-cache-expiry-index/validation/stable-fmt.log",
+      "log_size_bytes": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
     {
       "name": "stable-clippy",
@@ -172,10 +188,12 @@
       ],
       "exit_code": 0,
       "elapsed_seconds": 5.44,
-      "log": "docs/performance/auth-cache-expiry-index/validation/stable-clippy.log",
       "passed": 0,
       "failed": 0,
-      "ignored": 0
+      "ignored": 0,
+      "log_original_path": "docs/performance/auth-cache-expiry-index/validation/stable-clippy.log",
+      "log_size_bytes": 857,
+      "log_sha256": "957a1be15ace21038b22c97d54d471ef1b796f67ef3596bb21861a2cbb61b34f"
     },
     {
       "name": "stable-workspace-tests",
@@ -189,10 +207,12 @@
       ],
       "exit_code": 0,
       "elapsed_seconds": 86.23,
-      "log": "docs/performance/auth-cache-expiry-index/validation/stable-workspace-tests.log",
       "passed": 449,
       "failed": 0,
-      "ignored": 17
+      "ignored": 17,
+      "log_original_path": "docs/performance/auth-cache-expiry-index/validation/stable-workspace-tests.log",
+      "log_size_bytes": 46512,
+      "log_sha256": "6cac63482003f0efb5abd1d8cf4d0001de7001c7c5f3cd65fd83f8fda52677a2"
     },
     {
       "name": "xtask-check",
@@ -204,10 +224,12 @@
       ],
       "exit_code": 0,
       "elapsed_seconds": 84.414,
-      "log": "docs/performance/auth-cache-expiry-index/validation/xtask-check.log",
       "passed": 449,
       "failed": 0,
-      "ignored": 17
+      "ignored": 17,
+      "log_original_path": "docs/performance/auth-cache-expiry-index/validation/xtask-check.log",
+      "log_size_bytes": 47860,
+      "log_sha256": "4b6014e6cd23eecb45dd93ccf8cbd24e5d44281dae687ac66f47a13fe3c019e8"
     },
     {
       "name": "xtask-check-release-rust",
@@ -222,10 +244,12 @@
       ],
       "exit_code": 0,
       "elapsed_seconds": 52.904,
-      "log": "docs/performance/auth-cache-expiry-index/validation/xtask-check-release-rust.log",
       "passed": 449,
       "failed": 0,
-      "ignored": 17
+      "ignored": 17,
+      "log_original_path": "docs/performance/auth-cache-expiry-index/validation/xtask-check-release-rust.log",
+      "log_size_bytes": 46056,
+      "log_sha256": "7d6304aaec750771bc69fa01f04211ff7d91547d6ee3d281df49cbfd8f574753"
     },
     {
       "name": "udp-seed-corpus",
@@ -235,10 +259,12 @@
       ],
       "exit_code": 0,
       "elapsed_seconds": 0.03,
-      "log": "docs/performance/auth-cache-expiry-index/validation/udp-seed-corpus.log",
       "passed": 0,
       "failed": 0,
-      "ignored": 0
+      "ignored": 0,
+      "log_original_path": "docs/performance/auth-cache-expiry-index/validation/udp-seed-corpus.log",
+      "log_size_bytes": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
     {
       "name": "udp-fuzz-smoke",
@@ -254,10 +280,14 @@
       ],
       "exit_code": 0,
       "elapsed_seconds": 47.397,
-      "log": "docs/performance/auth-cache-expiry-index/validation/udp-fuzz-smoke.log",
       "passed": 0,
       "failed": 0,
-      "ignored": 0
+      "ignored": 0,
+      "log_original_path": "docs/performance/auth-cache-expiry-index/validation/udp-fuzz-smoke.log",
+      "log_size_bytes": 8516,
+      "log_sha256": "9a4b12ce2d50f563b77f8fb98f3b6492bfe04c3b7c0946a55c75e76f33334fe7"
     }
-  ]
+  ],
+  "archive_manifest": "../../archive-manifest.json",
+  "raw_evidence_status": "Raw files are not hosted; exact original paths, sizes, and SHA-256 values are in the archive manifest."
 }

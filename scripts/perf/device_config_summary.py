@@ -6,7 +6,7 @@ from pathlib import Path
 import statistics
 
 ROOT = Path(__file__).resolve().parents[2]
-RAW = ROOT / 'docs/performance/remove-device-config'
+RAW = ROOT / 'target/performance/remove-device-config'
 
 
 def digest(path):
@@ -32,7 +32,9 @@ def summarize():
         assert raw['loadgen_tokio_workers'] == 4 and raw['server_tokio_workers'] == 10, path
         if 'result' not in raw:
             assert not raw['samples'] and raw['load_stop'] is None, path
-            excluded.append(dict(raw=str(path.relative_to(ROOT)), reason='server failed before readiness/load', server_log=raw['server_log_tail']))
+            excluded.append(dict(raw_original_path=str(path.relative_to(ROOT)),
+                raw_size_bytes=path.stat().st_size, raw_sha256=digest(path),
+                reason='server failed before readiness/load'))
             continue
         assert raw['loadgen_exit'] == 0 and raw['load_stop'] == {'exit_code': 0, 'forced': False}, path
         assert raw['server_stop'] == {'exit_code': 0, 'forced': False}, path
@@ -54,7 +56,9 @@ def summarize():
         samples = [s for s in raw['samples'] if 0 <= s['t'] < 30 and s.get('server')]
         assert len(samples) >= 20, path
         cpu = (samples[-1]['server']['cpu_seconds'] - samples[0]['server']['cpu_seconds']) / (samples[-1]['t'] - samples[0]['t'])
-        rows.append(dict(side=side, protocol=protocol, repeat=raw['repeat'], raw=str(path.relative_to(ROOT)), raw_sha256=digest(path),
+        rows.append(dict(side=side, protocol=protocol, repeat=raw['repeat'],
+            raw_original_path=str(path.relative_to(ROOT)), raw_size_bytes=path.stat().st_size,
+            raw_sha256=digest(path),
             accepted_per_second=counts['accepted']/30, accepted_attempted_pct=100*counts['accepted']/counts['attempted'],
             accepted_offered_pct=100*counts['accepted']/30/raw['plan']['groups'][0]['rate'],
             receipt_p95_ms=latency['p95_ms'], receipt_p99_ms=latency['p99_ms'], server_cpu_cores=cpu,

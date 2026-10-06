@@ -95,7 +95,7 @@
 | 256 | 212→38 | 2258→52 | 257→176 |
 | 1024 | 746→39 | 9773→53 | 786→187 |
 
-depth=0 的 duplicate 列实际为空窗口 check 基线。check+commit 每次推进时钟，强制 expiry 索引刷新；小窗口更慢是真实代价。check 的 HashMap 查询/计数均摊 O(1)，树最小项查询/刷新存在树高成本，批量回收 O(k log N)，不声称严格 O(1)。额外索引 RSS 未单独测量。原始数据见 [udp-replay.txt](performance/lifecycle-hardening/udp-replay.txt) 与 [环境](performance/lifecycle-hardening/environment.json)。
+depth=0 的 duplicate 列实际为空窗口 check 基线。check+commit 每次推进时钟，强制 expiry 索引刷新；小窗口更慢是真实代价。check 的 HashMap 查询/计数均摊 O(1)，树最小项查询/刷新存在树高成本，批量回收 O(k log N)，不声称严格 O(1)。额外索引 RSS 未单独测量。原始数据已从 Git 清理；路径、大小和 SHA-256 见[性能证据归档清单](performance/archive-manifest.json)，环境信息见 [environment.json](performance/lifecycle-hardening/environment.json)。
 
 ## 7. EventBus retry queue：测量与保留决定
 
@@ -116,7 +116,7 @@ depth=0 的 duplicate 列实际为空窗口 check 基线。check+commit 每次�
 | 10000 | 4375/5125/5208 | 25000/29250/30584 | 375/458/500 |
 | 16383 | 6292/6541/8292 | 36583/39584/45042 | 292/375/459 |
 
-[结果] 确认扫描成本随深度增长，未证明新实现的收益或生产吞吐。完整数据：[eventbus-retry.txt](performance/lifecycle-hardening/eventbus-retry.txt)。
+[结果] 确认扫描成本随深度增长，未证明新实现的收益或生产吞吐。清理前原始数据的路径、大小和 SHA-256 见[性能证据归档清单](performance/archive-manifest.json)。
 
 后续设计应把唯一 DeliveryRecord owner 放在有界 slot arena，ready FIFO 与 deadline 有序索引仅引用 slot/generation。queued、delayed、inflight 必须互斥；deadline 索引每个 delayed owner 恰有一项，取消/ACK 删除它，不能无限积累 stale heap 节点。顺序应明确采用 deadline 加稳定 sequence，并证明与当前 retry fairness 的兼容性。完整迁移前必须验证：
 
@@ -138,7 +138,7 @@ depth=0 的 duplicate 列实际为空窗口 check 基线。check+commit 每次�
 
 [测试] 现有 corruption/semantic invalid、旧格式兼容、Will/QoS2/takeover、子进程计划重启、spool failure 和 SIGKILL；另运行 10/50/100 MiB streaming recovery benchmark。
 
-[结果] 本机逻辑 payload 10/50/100 MiB 对应文件 10,501,150 / 52,505,702 / 105,012,162 bytes；commit 78/200/388 ms，decode 39/185/369 ms，最大 record 72,320 bytes。不是 mutex hold time 的独立测量，也未测此运行的 RSS 峰值或慢磁盘尾延迟。数据：[mqtt-recovery.txt](performance/lifecycle-hardening/mqtt-recovery.txt)。未来 ownership-transfer 方案必须先证明冻结 writer、Will/QoS 完整性和峰值内存，当前不做复杂重构。
+[结果] 本机逻辑 payload 10/50/100 MiB 对应文件 10,501,150 / 52,505,702 / 105,012,162 bytes；commit 78/200/388 ms，decode 39/185/369 ms，最大 record 72,320 bytes。不是 mutex hold time 的独立测量，也未测此运行的 RSS 峰值或慢磁盘尾延迟。清理前原始数据的路径、大小和 SHA-256 见[性能证据归档清单](performance/archive-manifest.json)。未来 ownership-transfer 方案必须先证明冻结 writer、Will/QoS 完整性和峰值内存，当前不做复杂重构。
 
 ## 9. 文档与兼容性
 

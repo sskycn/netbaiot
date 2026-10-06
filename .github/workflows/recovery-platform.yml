@@ -37,4 +37,9 @@ jobs:
         if: always()
         with:
           name: native-recovery-${{ matrix.os }}-${{ github.sha }}
-          path: native-recovery.log
+          path: |
+            native-recovery.log
+            target/performance/
+            target/evidence/
+          if-no-files-found: warn
+          retention-days: 14

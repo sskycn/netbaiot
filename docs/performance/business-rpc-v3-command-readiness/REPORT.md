@@ -2,7 +2,7 @@
 
 ## 基线、范围与判定
 
-起始 `main` 为 `343df9b3bcbff0e29db1e822812b5062b41a9f17`，高于任务文本中提到的 `58d49aa` 一个 v0.2.2 发布提交。正式 30 分钟样本在干净的 `codex/v3-command-readiness` 提交 `270979dea68dd7759099bc2542687e9dda1de8e6` 上运行。原始 [正式汇总](readiness-30m-mtls-final/summary.json)、[逐命令和时间序列](readiness-30m-mtls-final/loadgen.json)、[网关指标](readiness-30m-mtls-final/final-metrics.txt) 与 [配置](readiness-30m-mtls-final/gateway-config.json) 均保留。随后新增的短 TTL 与计划重启代码只在测试文件中，不改变运行时或该长测所用产品代码。
+起始 `main` 为 `343df9b3bcbff0e29db1e822812b5062b41a9f17`，高于任务文本中提到的 `58d49aa` 一个 v0.2.2 发布提交。正式 30 分钟样本在干净的 `codex/v3-command-readiness` 提交 `270979dea68dd7759099bc2542687e9dda1de8e6` 上运行。正式汇总和配置仍保留；逐命令 trace 与完整网关指标已从 Git 移除，其原始路径、大小与 SHA-256 在 [archive manifest](../archive-manifest.json) 中。本机完整文件保存在忽略的 `local-performance-archive/` 副本中，未上传 Actions Artifact。随后新增的短 TTL 与计划重启代码只在测试文件中，不改变运行时或该长测所用产品代码。
 
 环境为 macOS 26.6.2 / arm64 / Apple M4 / 16 GiB RAM、Rust 1.97.1、release 构建、本机 loopback、测试 CA 的双向 TLS。V3 配置是原默认的 8 KiB DATA payload、256 KiB 流窗口、4 MiB 连接窗口、256 并发流，`v3_send_ahead=null`。一次性测试网关把共用 loopback IP 的连接及建连速率预算设为 96，正常认证新连接按 2/s 限速；默认 Command 有效期和去重保留期各 300,000 ms，去重容量 4,096。该负载是稳定性验证，不是容量上限测量。
 
@@ -68,7 +68,7 @@ RSS 在 360–900 秒、900–1,440 秒、1,440–1,800 秒三段的中位数分
 
 ## 失败样本与生产边界
 
-原始失败结果没有删除：[未限速 30 分钟](readiness-30m-mtls-unpaced/summary.json) 的正确性门禁通过，但认证流量触发 19,048 次入口拒绝、139 次认证超时、244 次 telemetry 入队失败，不能用作正常稳态证据。[限速但零 publish 错误门禁失败的 30 分钟样本](readiness-30m-mtls-paced-publish-failure/summary.json) 已无入口拒绝或认证超时，但 15 次显式入队失败当时未分类。随后 [20 秒故障风暴](fault-storm-20s-mtls/summary.json) 和正式分类长测表明观测到的此类失败为主动重连瞬间的本地 `Offline`，已接纳 Event 的责任保持完整。更早的启动/60 秒失败和预检也在 [README](README.md) 中逐项保留。
+重要失败结论与精简 `summary.json` 仍保留：[未限速 30 分钟](readiness-30m-mtls-unpaced/summary.json) 的正确性门禁通过，但认证流量触发 19,048 次入口拒绝、139 次认证超时、244 次 telemetry 入队失败，不能用作正常稳态证据。[限速但零 publish 错误门禁失败的 30 分钟样本](readiness-30m-mtls-paced-publish-failure/summary.json) 已无入口拒绝或认证超时，但 15 次显式入队失败当时未分类。随后 [20 秒故障风暴](fault-storm-20s-mtls/summary.json) 和正式分类长测表明观测到的此类失败为主动重连瞬间的本地 `Offline`，已接纳 Event 的责任保持完整。更早的启动/60 秒失败和预检也在 [README](README.md) 中逐项保留。完整失败 trace 可根据报告中的复现方法重新生成至 `target/performance/`。
 
 本轮未运行公网、Linux `tc netem` 真实丢包、1 小时、6 小时、多节点、生产证书、长时故障风暴或 V3 principal 过期后的混合恢复。没有在正式 30 分钟场景中执行整机计划重启、MQTT session takeover、同设备授权版本变更、revision gap、Command response-loss 注入或随机 RESET；这些由定向测试覆盖其中一部分，不能表述为长测已覆盖。客户端 API 不暴露逐次 RPC request_id/stream_id，因此逐 Command trace 保留 CommandId、尝试结果、设备收件和 ACK，但不能宣称逐个验证内部 request_id/stream_id 更换。没有测 Command 各阶段完整延迟拆解、dedup 命中延迟或 lock wait，也没有可靠的公网性能对照。
 

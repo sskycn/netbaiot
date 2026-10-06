@@ -38,7 +38,7 @@ bytes 和 FIFO ownership；正常 miss 不执行 FIFO retain。count/byte evicti
 owner，并同步删除 expiry。拒绝超预算插入不会留下半个索引记录。
 普通 hit 不提升 FIFO 位置，不改变为 LRU。
 
-替换防御取得实际 RED→GREEN：[旧实现日志](replacement-red.log)显示旧 helper
+替换防御取得实际 RED→GREEN：[精选失败摘录](replacement-red.excerpt.log)显示旧 helper
 替换 100 B 为 200 B 后错误累计到 300 B；相同回归现已通过，且检查 expiry/order 唯一性。
 全部删除路径都在同一原有 mutex 下更新，没有 lazy stale nodes。expiry 和 FIFO 长度始终
 等于 entries 长度，受 auth_cache_max_entries 限制；重复过期/插入/失效不会增加 stale ownership。
@@ -109,11 +109,11 @@ expire-all 为每次命令一批，取三批中位数。所有结果包含首轮
 由原 benchmark 内 provider count 断言验证。
 
 完整逐批 hit/mutex/alloc/prune/expire-all 数据见 [measurements.json](measurements.json)。
-原始 stdout/stderr：[before-1](before-1.log)、[before-2](before-2.log)、[before-3](before-3.log)、
-[after-1](after-1.log)、[after-2](after-2.log)、[after-3](after-3.log)。
-提交的工具日志仅规范化行尾空格和 EOF 空行；数值、断言和失败记录未删改。
-精确原件指纹见 [raw-log-fingerprints.json](raw-log-fingerprints.json)，原件也保留于本机 target。
-[before-runs](before-runs.json)、[after-runs](after-runs.json)记录完整命令、耗时和退出码。
+完整 benchmark stdout/stderr 已移出 Git；原始路径、大小、SHA-256 与源提交见
+[archive manifest](../archive-manifest.json)，日志指纹也保留在
+[raw-log-fingerprints.json](raw-log-fingerprints.json)。本机原件位于 repo-root
+`local-performance-archive/`，没有已知的 Actions Artifact。[before-runs](before-runs.json)
+和 [after-runs](after-runs.json)保留命令、耗时、退出码与原始日志 provenance。
 优化后的 fixture 批量改变 deadline 时同步重建 index，此准备不在计时区间，
 真实 prune 仍通过同一个 production helper。
 
@@ -136,7 +136,7 @@ cargo +stable test --release -p netbaiot-runtime expiry_index_memory_audit -- --
 | 512 | 64,888 | 126.734 | 79 |
 | 4096 | 521,528 | 127.326 | 635 |
 
-三次值相同；[memory 原始数据](measurements.json)及 [运行记录](index-memory-runs.json)。
+三次值相同；[memory 汇总数据](measurements.json)及 [运行记录](index-memory-runs.json)。
 本平台 tuple=72 B（key=56 B，Instant=16 B），BTreeSet 本体=24 B；节点的固定数组、
 内部指针和空槽使实际 retained 超过 tuple 大小。keys 和 Arc payload 在测量前准备，
 计数只包括树分配；tree drop 后分配/释放完全相等。测的是 allocator 请求字节，
@@ -150,7 +150,7 @@ cargo +stable test --release -p netbaiot-runtime expiry_index_memory_audit -- --
 logical cache budget 说成精确 RSS 上限，也不能声称这项优化没有常驻成本。
 
 初次 memory probe 在打印 floating-point 数据后才核对 allocator，std formatter 的一次
-64 B 初始化污染了结果，见 [失败日志](index-memory-instrumentation-fail.log)。修正为
+64 B 初始化污染了结果，见[失败摘录](index-memory-instrumentation-fail.excerpt.log)。修正为
 tree drop、读取计数及断言都先于打印，没有放宽释放断言；随后三个原样测量通过。
 
 ## 真实 UDP 配对
@@ -163,13 +163,14 @@ window=4、256 B payload，3 s warmup、1 s ramp、15 s 测量。
 三对分别 before→after / after→before / before→after 串行运行，无并行编译/测试。
 
 ```bash
-python3 scripts/perf/device_protocol_benchmark.py --server target/auth-cache-expiry-index/before-server --candidate target/auth-cache-expiry-index/after-server --loadgen target/auth-cache-expiry-index/loadgen --plan docs/performance/auth-cache-expiry-index/udp-plan.json --label auth-expiry --baseline 76b28a1f401687c455dbc464f509be5e3fe74510 --output docs/performance/auth-cache-expiry-index/udp
+python3 scripts/perf/device_protocol_benchmark.py --server target/auth-cache-expiry-index/before-server --candidate target/auth-cache-expiry-index/after-server --loadgen target/auth-cache-expiry-index/loadgen --plan docs/performance/auth-cache-expiry-index/udp-plan.json --label auth-expiry --baseline 76b28a1f401687c455dbc464f509be5e3fe74510 --output target/performance/auth-cache-expiry-index/udp
 ```
 
-完整计划见 [udp-plan.json](udp-plan.json)，逐秒 RSS/queues/counters、binary hashes、
-sampled tasks 和每次停机结果在 [UDP raw records](udp/)，归纳见 [udp-summary.json](udp-summary.json)。
-性能数据未删改；重复的公开 fixture credential 内容已从提交记录省去，由原 harness
-按 worker offset 重建。保留原记录 SHA256，本机原件在 target 下。
+完整计划见 [udp-plan.json](udp-plan.json)，归纳见 [udp-summary.json](udp-summary.json)。
+逐秒 RSS/queues/counters、binary hashes、sampled tasks 和每次停机结果已移出 Git；
+原始路径与 SHA-256 在 [archive manifest](../archive-manifest.json) 中。本机原件由
+`local-performance-archive/` 保留；当前没有对应的 hosted artifact。重复的公开 fixture
+credential 内容仍由原 harness 按 worker offset 重建。
 
 | Run | Accepted/s before / after | Acceptance p99 ms before / after | Server CPU% before / after |
 |---:|---:|---:|---:|
@@ -198,8 +199,9 @@ send failure、draining、ReplayWindow 资源边界、新增 4096-entry 真实 s
 
 ## 最终验证与未运行项
 
-验证命令及逐项结果见 [validation/results.json](validation/results.json)，所有日志在
-[validation/](validation/)。记录 source SHA256，最终文档提交不改变已验证代码。
+验证命令及逐项结果见 [validation/results.json](validation/results.json)。完整命令日志
+已移出 Git；原始路径与 SHA-256 在 [archive manifest](../archive-manifest.json) 中。
+记录 source SHA256，最终文档提交不改变已验证代码。
 MSRV/stable fmt、严格 clippy、完整 workspace 均已通过，各 **449 passed / 0 failed /
 17 ignored**。focused cache **6 PASS**、新增 expiry **11 PASS**、UDP **17 PASS**、
 end_to_end **24 PASS**（包括真实 MQTT 10,000 publishes、TCP bound AuthContext、registration
@@ -224,7 +226,7 @@ UDP fuzz 使用 ASan，10,000 runs，exit=0，PASS；seed corpus 生成也 exit=
 fuzz 是现有 UDP envelope/verifier/replay
 短 ASan smoke，不是长期 fuzz，也不覆盖 async AuthCache 调度的所有 interleavings。
 一次早期 broad filter `auth::` 也选中了 management_auth 的 JWKS socket fixtures；
-受 sandbox 禁止监听而失败，见 [原始日志](validation/sandbox-listener-failure.log)。
+受 sandbox 禁止监听而失败。完整失败日志已移出 Git，路径和 SHA-256 收录在 archive manifest。
 允许本地监听的后续完整 MSRV/stable suite 原样重跑通过，未修改或延长现有断言。
 
 NOT RUN：新分支 Windows/Linux native CI、独立主机 UDP 性能、4096-device 网络性能、

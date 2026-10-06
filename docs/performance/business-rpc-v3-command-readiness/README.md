@@ -1,16 +1,16 @@
 # Business RPC V3 与 Command 组合验证
 
-本目录保存真实网关、真实 V3 socket 与真实 MQTT 设备的本机 mTLS 测量。正式结论见 [综合报告](REPORT.md)，原始证据以各次 `summary.json`、`loadgen.json` 和 `final-metrics.txt` 为准。脚本使用测试 CA 和测试证书，不代表公网、跨节点或生产证书环境。
+本目录保存真实网关、真实 V3 socket 与真实 MQTT 设备的本机 mTLS 测量。正式结论见 [综合报告](REPORT.md)，保留的各次 `summary.json` 汇总结果、命令数和验收计数。逐命令 traces 与完整网关指标日志已从 Git 移除，原路径、大小和 SHA-256 见 [archive manifest](../archive-manifest.json)；本机原件保存在 repo-root `local-performance-archive/` 副本中。该 raw evidence 目前没有托管在 Actions Artifact 上。脚本使用测试 CA 和测试证书，不代表公网、跨节点或生产证书环境。
 
 ## 复现
 
 ```sh
 cargo build --locked --release -p netbaiot-server -p netbaiot-loadgen --bins
-python3 tools/netbaiot-loadgen/run_business_rpc_v3_command_readiness.py configs/business-rpc-command-readiness/smoke-60s.json --output docs/performance/business-rpc-v3-command-readiness/smoke-60s-mtls-final
-python3 tools/netbaiot-loadgen/run_business_rpc_v3_command_readiness.py configs/business-rpc-command-readiness/readiness-30m.json --output docs/performance/business-rpc-v3-command-readiness/readiness-30m-mtls
+python3 tools/netbaiot-loadgen/run_business_rpc_v3_command_readiness.py configs/business-rpc-command-readiness/smoke-60s.json --output target/performance/business-rpc-v3-command-readiness/smoke-60s-mtls-final
+python3 tools/netbaiot-loadgen/run_business_rpc_v3_command_readiness.py configs/business-rpc-command-readiness/readiness-30m.json --output target/performance/business-rpc-v3-command-readiness/readiness-30m-mtls
 ```
 
-脚本启动一次性本地网关，Provider/Event 身份与 Command 身份使用不同的 mTLS 客户端证书。`command_device_deliveries` 在模拟 MQTT/TCP 设备收到应用 Command 时增加，并分别统计两种 southbound transport；`command_device_acks` 在设备提交应用 ACK 时增加，`command_ack_event_unique` 在业务端按 `event_id` 去重后增加。`loadgen.json` 的 `command_traces` 逐个记录 CommandId、RPC 尝试和结果、设备投递及 ACK。当前客户端 API 不公开内部 RPC request_id，因此结果不声称逐个记录 request_id。RPC 的 Queued 回执不计入设备执行。每十个新 Command 对同一 `command_id` 和同一内容进行一次显式重试。
+脚本启动一次性本地网关，Provider/Event 身份与 Command 身份使用不同的 mTLS 客户端证书。`command_device_deliveries` 在模拟 MQTT/TCP 设备收到应用 Command 时增加，并分别统计两种 southbound transport；`command_device_acks` 在设备提交应用 ACK 时增加，`command_ack_event_unique` 在业务端按 `event_id` 去重后增加。raw `command_traces` 逐个记录 CommandId、RPC 尝试和结果、设备投递及 ACK，运行输出写到 `target/performance/`。当前客户端 API 不公开内部 RPC request_id，因此结果不声称逐个记录 request_id。RPC 的 Queued 回执不计入设备执行。每十个新 Command 对同一 `command_id` 和同一内容进行一次显式重试。
 
 该负载包含远程设备认证、UDP verifier 查询、telemetry/EventDelivery/EventAck、真实 MQTT/TCP Command/CommandAck、`auth.invalidate` 和 Provider/Event 连接重建。正式 `v3_dual` 配置分别重建 Provider 与 EventSubscription，以观察父流故障隔离；早期 `r4/r5` 合并连接样本在重连时同时重建两者。response-loss RST、跨 HTTP/V2/V3 去重、离线与 takeover 仍需结合单独集成测试判定。
 

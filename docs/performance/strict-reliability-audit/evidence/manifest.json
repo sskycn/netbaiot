@@ -88,5 +88,7 @@
   "current_recovery_source_sha256": {
     "crates/netbaiot-runtime/src/spool.rs": "d505d05f8905688a1396cfd7a4fdc48cdde7755275140ef46b7de6e7d632e9ac",
     "crates/netbaiot-transports/src/mqtt/broker.rs": "39a6647fbfb5bd4634c4d27cee4f363a10400566482cd3f83d1cd0f0259c16a8"
-  }
+  },
+  "archive_manifest": "../../archive-manifest.json",
+  "raw_evidence_status": "Full raw files were removed from tracked docs/performance; checksum keys identify original files and archive-manifest.json records their paths, sizes, and SHA-256."
 }

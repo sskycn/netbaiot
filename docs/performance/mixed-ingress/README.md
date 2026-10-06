@@ -4,21 +4,26 @@
 >
 > Worker-count correction: all generator binaries explicitly used four Tokio
 > workers. Raw metadata and diagnostic labels requesting two workers were ineffective;
-> the alleged 2→4 scaling experiment is invalid. Raw measurements are unchanged.
+> the alleged 2→4 scaling experiment is invalid. The reported aggregate measurements
+> are unchanged; full per-run raw files were removed from Git and are indexed in the
+> [archive manifest](../archive-manifest.json), with a local copy retained.
 > See [erratum](../../mixed-ingress-capacity-audit.md#worker-count-erratum-device-http-removal-review).
 
 # Mixed ingress audit evidence
 
 The human report is [mixed-ingress-capacity-audit.md](../../mixed-ingress-capacity-audit.md).
 The generated index is [mixed-ingress-capacity-results.json](../../mixed-ingress-capacity-results.json).
-`plan.json` identifies the formal matrix; other root JSON files retain calibration,
-initial starvation reproductions, and isolated experiments. Do not pool different
-scenario names or binary hashes into a single capacity estimate.
+`plan.json` identifies the formal matrix; retained root JSON files are compact
+calibration summaries and experiment metadata. Full generated records are in the
+archive manifest and local pre-cleanup copy. Do not pool different scenario names
+or binary hashes into a single capacity estimate.
 
-Each run preserves the exact server configuration, workload, source revision,
-binary SHA256 hashes, UTC epoch timestamp, duration, client receipt histograms and
-error counters, one-second management/process samples, cooldown ownership, kernel
-counter snapshots, and owned child exit status. Public test credentials are fixtures.
+The original per-run records captured the exact server configuration, workload,
+source revision, binary SHA256 hashes, UTC epoch timestamp, duration, client receipt
+histograms and error counters, one-second management/process samples, cooldown
+ownership, kernel counter snapshots, and owned child exit status. The compact report
+and selected metadata retain the experiment conclusions; full raw files are in the
+archive manifest and local pre-cleanup copy. Public test credentials are fixtures.
 `baseline-environment.json` describes the host and toolchain. Its checkout revision
 is the audit-tool revision, while each run's `production_revision` and
 `server_sha256` identify the measured server.
@@ -42,18 +47,18 @@ One-second maxima are sampled peaks and can miss shorter excursions. Kernel coun
 this does not prove that listen-queue overflow was absent.
 
 `harness_version: 2` closes the management HTTP client after every request/failure.
-Six earlier default-IP observer failures are retained under `diagnostics/` and
-excluded from the formal matrix. Older calibration and pending-cap comparisons
-also retain any `CannotSendRequest` observer state errors; their independent client
-and process measurements remain inspectable. Use the corrected formal runs for
+Six earlier default-IP observer failures are summarized under `diagnostics/` and
+excluded from the formal matrix; their raw records are indexed in the archive
+manifest. Older calibration and pending-cap comparisons also recorded
+`CannotSendRequest` observer state errors. Use the corrected formal runs for
 management recovery and cleanup conclusions.
 
 Regenerate summaries after the campaign has finished:
 
 ```sh
-python3 scripts/perf/mixed_ingress_report.py --output docs/mixed-ingress-capacity-results.json
+python3 scripts/perf/mixed_ingress_report.py --directory target/performance/mixed-ingress --output docs/mixed-ingress-capacity-results.json
 python3 scripts/perf/mixed_ingress_tables.py docs/mixed-ingress-capacity-results.json <tmp>/mixed-ingress-tables.md
-python3 scripts/perf/mixed_ingress_verify.py --directory docs/performance/mixed-ingress --plan docs/performance/mixed-ingress/plan.json --output docs/performance/mixed-ingress/matrix-verification.json
+python3 scripts/perf/mixed_ingress_verify.py --directory target/performance/mixed-ingress --plan docs/performance/mixed-ingress/plan.json --output docs/performance/mixed-ingress/matrix-verification.json
 ```
 
 Run these commands from the repository root. `matrix-verification.json` records
@@ -67,7 +72,7 @@ in the report. Build `netbaiot-loadgen` at audit-tool revision
 checkout, then run:
 
 ```sh
-python3 scripts/perf/mixed_ingress_audit.py --candidate target/mixed-audit/final-server --loadgen target/mixed-audit/final-loadgen --plan docs/performance/mixed-ingress/plan.json --output <tmp>/netbaiot-mixed-evidence
+python3 scripts/perf/mixed_ingress_audit.py --candidate target/mixed-audit/final-server --loadgen target/mixed-audit/final-loadgen --plan docs/performance/mixed-ingress/plan.json --output target/performance/mixed-ingress
 ```
 
 Use a fresh checkout/output directory for a new campaign; the harness deliberately

@@ -50,7 +50,7 @@ cargo run --locked --release -p netbaiot-loadgen --bin business_rpc -- configs/b
 
 ## 实测与边界
 
-原始 JSON 位于 [`docs/performance/business-rpc-v2/`](performance/business-rpc-v2/)。环境为 macOS Darwin 25.6.0、arm64、Rust stable 1.97.1；网关和工具均为 **dev profile**，同机回环明文，单个网关进程，管理指标每 250 ms 采样。普通场景的网关 `auth_max_inflight=16`、正缓存 TTL 30 秒、sink ACK 超时 8 秒；认证饱和场景单独重启网关，`auth_max_inflight=2`、正缓存 TTL 2 ms、负缓存 TTL 1 ms。业务 handler 延迟和场景并发在 JSON 的 `config` 中记录。五分钟 soak 开始时的工具版本尚未在 JSON 中内嵌配置；其实际参数为 `duration_secs=300`、`reconnect_cycles=300`、`reconnect_pause_ms=1000`、`auth_concurrency=4`、`warmup_secs=10`、`recovery_secs=5`、`sample_period_ms=250`。
+紧凑的逐场景汇总 JSON 位于 [`docs/performance/business-rpc-v2/`](performance/business-rpc-v2/)。完整逐采样 raw 输出已移出 Git，路径、大小及 SHA-256 收录于 [archive manifest](performance/archive-manifest.json)；本机原件在忽略的 `local-performance-archive/` 中，当前未托管为 Actions Artifact。环境为 macOS Darwin 25.6.0、arm64、Rust stable 1.97.1；网关和工具均为 **dev profile**，同机回环明文，单个网关进程，管理指标每 250 ms 采样。普通场景的网关 `auth_max_inflight=16`、正缓存 TTL 30 秒、sink ACK 超时 8 秒；认证饱和场景单独重启网关，`auth_max_inflight=2`、正缓存 TTL 2 ms、负缓存 TTL 1 ms。业务 handler 延迟和场景并发在 JSON 的 `config` 中记录。五分钟 soak 开始时的工具版本尚未在 JSON 中内嵌配置；其实际参数为 `duration_secs=300`、`reconnect_cycles=300`、`reconnect_pause_ms=1000`、`auth_concurrency=4`、`warmup_secs=10`、`recovery_secs=5`、`sample_period_ms=250`。
 
 负载二进制构建于最后一项极端 principal 到期时间 `checked_add` 防溢出修复之前；该修复不改变本节正常到期配置的执行路径。修复后的代码通过了稳定版与 Rust 1.88 全量测试、MQTT conformance、V2 fuzz 和重启 soak。负载场景没有因这一行修复再重跑，结果据实作为该构建的回归测量保存。
 

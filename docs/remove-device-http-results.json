@@ -212,8 +212,7 @@
       "side": "before",
       "protocol": "mqtt",
       "repeat": 0,
-      "raw": "docs/performance/remove-device-http/before-remove-http-mqtt-0.json",
-      "raw_sha256": "84104d6b7e99cc8ae134fcc93906c5ad501ab09e1f2abf65bca343d6f3e2daae",
+      "raw_sha256": "6e34ac8e855392d432bc34dc7daa6d77f7ab4756cf713da5b9225bffcd12f2b0",
       "accepted_per_second": 43806.4,
       "accepted_attempted_pct": 97.37251176968319,
       "offered_per_second": 45000,
@@ -326,14 +325,16 @@
         "runtime_tasks": 5,
         "fds": 12
       },
-      "actual_loadgen_workers": 4
+      "actual_loadgen_workers": 4,
+      "raw_original_path": "docs/performance/remove-device-http/before-remove-http-mqtt-0.json",
+      "raw_size_bytes": 155329,
+      "raw_archive_manifest": "performance/archive-manifest.json"
     },
     {
       "side": "before",
       "protocol": "mqtt",
       "repeat": 1,
-      "raw": "docs/performance/remove-device-http/before-remove-http-mqtt-1.json",
-      "raw_sha256": "883f5ce50560ba99124c9115b6ce678c629d74dfc978fcb6519c48bc97ad9a32",
+      "raw_sha256": "315c4683a2f59eb54e3e2eea7f0daba7d17d18715d35385fd4e60869e9c78d57",
       "accepted_per_second": 43664.23333333333,
       "accepted_attempted_pct": 97.10406206703816,
       "offered_per_second": 45000,
@@ -446,14 +447,16 @@
         "runtime_tasks": 5,
         "fds": 12
       },
-      "actual_loadgen_workers": 4
+      "actual_loadgen_workers": 4,
+      "raw_original_path": "docs/performance/remove-device-http/before-remove-http-mqtt-1.json",
+      "raw_size_bytes": 155858,
+      "raw_archive_manifest": "performance/archive-manifest.json"
     },
     {
       "side": "before",
       "protocol": "mqtt",
       "repeat": 2,
-      "raw": "docs/performance/remove-device-http/before-remove-http-mqtt-2.json",
-      "raw_sha256": "677bc4055b87b6b31236aac327fff16f6dbca06d68e5837f3f93b64c2640d421",
+      "raw_sha256": "6c846d8c6efbfa6734948c21a1eb732aeac8610bd5fdef0e357da3523bb14bfe",
       "accepted_per_second": 43687.23333333333,
       "accepted_attempted_pct": 97.15931667625448,
       "offered_per_second": 45000,
@@ -566,14 +569,16 @@
         "runtime_tasks": 5,
         "fds": 12
       },
-      "actual_loadgen_workers": 4
+      "actual_loadgen_workers": 4,
+      "raw_original_path": "docs/performance/remove-device-http/before-remove-http-mqtt-2.json",
+      "raw_size_bytes": 155947,
+      "raw_archive_manifest": "performance/archive-manifest.json"
     },
     {
       "side": "before",
       "protocol": "tcp",
       "repeat": 0,
-      "raw": "docs/performance/remove-device-http/before-remove-http-tcp-0.json",
-      "raw_sha256": "7673ce3ba624fae8e2cc263d7aed2be9df14f74c6934ae74138140ea2d4618c4",
+      "raw_sha256": "5e6406ccdd44d4d185298d758ec84f07e93cfa2a46d09f76fff28fdc7b113078",
       "accepted_per_second": 43790.26666666667,
       "accepted_attempted_pct": 97.37842595852715,
       "offered_per_second": 45000,
@@ -686,14 +691,16 @@
         "runtime_tasks": 5,
         "fds": 12
       },
-      "actual_loadgen_workers": 4
+      "actual_loadgen_workers": 4,
+      "raw_original_path": "docs/performance/remove-device-http/before-remove-http-tcp-0.json",
+      "raw_size_bytes": 154566,
+      "raw_archive_manifest": "performance/archive-manifest.json"
     },
     {
       "side": "before",
       "protocol": "tcp",
       "repeat": 1,
-      "raw": "docs/performance/remove-device-http/before-remove-http-tcp-1.json",
-      "raw_sha256": "60479ac0a1083a1cfbe7a78fa101dcff9fb3316bdb707d6ec8f3236acd67e090",
+      "raw_sha256": "efb8b13d589a4a53b1693b67635d533bf81a96ad308783e6d338ec635189c5b6",
       "accepted_per_second": 43744.833333333336,
       "accepted_attempted_pct": 97.33612408873356,
       "offered_per_second": 45000,
@@ -806,14 +813,16 @@
         "runtime_tasks": 5,
         "fds": 12
       },
-      "actual_loadgen_workers": 4
+      "actual_loadgen_workers": 4,
+      "raw_original_path": "docs/performance/remove-device-http/before-remove-http-tcp-1.json",
+      "raw_size_bytes": 154625,
+      "raw_archive_manifest": "performance/archive-manifest.json"
     },
     {
       "side": "before",
       "protocol": "tcp",
       "repeat": 2,
-      "raw": "docs/performance/remove-device-http/before-remove-http-tcp-2.json",
-      "raw_sha256": "baf712fb8bab0074c530e25ba1b7cf89ad72c7b7eb70a743e1b95c276ccaa4ea",
+      "raw_sha256": "6482fd0eedba51bc7c692451fb9dc62171565a5d5d97a5f5d38f7f91498edf67",
       "accepted_per_second": 43697.13333333333,
       "accepted_attempted_pct": 97.21369208601936,
       "offered_per_second": 45000,
@@ -926,14 +935,16 @@
         "runtime_tasks": 5,
         "fds": 12
       },
-      "actual_loadgen_workers": 4
+      "actual_loadgen_workers": 4,
+      "raw_original_path": "docs/performance/remove-device-http/before-remove-http-tcp-2.json",
+      "raw_size_bytes": 154581,
+      "raw_archive_manifest": "performance/archive-manifest.json"
     },
     {
       "side": "before",
       "protocol": "udp",
       "repeat": 0,
-      "raw": "docs/performance/remove-device-http/before-remove-http-udp-0.json",
-      "raw_sha256": "e07ddeccf89d761c22754d52257b2c2908eff3d44904d1511f2bc5068e77042b",
+      "raw_sha256": "d811e91930af4ba92d68273763fb43915492db0158eb70a6fd5eb5351dcec0c5",
       "accepted_per_second": 79995.73333333334,
       "accepted_attempted_pct": 100.0,
       "offered_per_second": 80000,
@@ -1039,14 +1050,16 @@
         "runtime_tasks": 5,
         "fds": 12
       },
-      "actual_loadgen_workers": 4
+      "actual_loadgen_workers": 4,
+      "raw_original_path": "docs/performance/remove-device-http/before-remove-http-udp-0.json",
+      "raw_size_bytes": 134357,
+      "raw_archive_manifest": "performance/archive-manifest.json"
     },
     {
       "side": "before",
       "protocol": "udp",
       "repeat": 1,
-      "raw": "docs/performance/remove-device-http/before-remove-http-udp-1.json",
-      "raw_sha256": "9a069451792ae241682da28d3ecf1e74793aaadf86bee130f8ae65853b51946b",
+      "raw_sha256": "40524efc7a22d20b6cc78e97858f5e018b3627b571b231eb81835ce82ee1a09f",
       "accepted_per_second": 79941.7,
       "accepted_attempted_pct": 100.0,
       "offered_per_second": 80000,
@@ -1152,14 +1165,16 @@
         "runtime_tasks": 5,
         "fds": 12
       },
-      "actual_loadgen_workers": 4
+      "actual_loadgen_workers": 4,
+      "raw_original_path": "docs/performance/remove-device-http/before-remove-http-udp-1.json",
+      "raw_size_bytes": 133801,
+      "raw_archive_manifest": "performance/archive-manifest.json"
     },
     {
       "side": "before",
       "protocol": "udp",
       "repeat": 2,
-      "raw": "docs/performance/remove-device-http/before-remove-http-udp-2.json",
-      "raw_sha256": "20723ed949b8aa91b1294838904c45ef16f5cb69c0a10e92e77f2620d5238f75",
+      "raw_sha256": "588630edf35ac3af9bb8b7868f4fcc31e03993f81f757e6269f021a687711230",
       "accepted_per_second": 79920.66666666667,
       "accepted_attempted_pct": 100.0,
       "offered_per_second": 80000,
@@ -1265,14 +1280,16 @@
         "runtime_tasks": 5,
         "fds": 12
       },
-      "actual_loadgen_workers": 4
+      "actual_loadgen_workers": 4,
+      "raw_original_path": "docs/performance/remove-device-http/before-remove-http-udp-2.json",
+      "raw_size_bytes": 133745,
+      "raw_archive_manifest": "performance/archive-manifest.json"
     },
     {
       "side": "before",
       "protocol": "mqtts",
       "repeat": 0,
-      "raw": "docs/performance/remove-device-http/before-remove-http-mqtts-0.json",
-      "raw_sha256": "81f6d565b69f44d0a06a853d098b2a2d08e03dd1beb78d8014a8d792bca28002",
+      "raw_sha256": "e2675f0cf6161a46a0c9548dc06cb13b6f457c44df654ec3998ee54f43ac0c15",
       "accepted_per_second": 43757.36666666667,
       "accepted_attempted_pct": 97.64980677891714,
       "offered_per_second": 45000,
@@ -1385,14 +1402,16 @@
         "runtime_tasks": 5,
         "fds": 12
       },
-      "actual_loadgen_workers": 4
+      "actual_loadgen_workers": 4,
+      "raw_original_path": "docs/performance/remove-device-http/before-remove-http-mqtts-0.json",
+      "raw_size_bytes": 155946,
+      "raw_archive_manifest": "performance/archive-manifest.json"
     },
     {
       "side": "before",
       "protocol": "mqtts",
       "repeat": 1,
-      "raw": "docs/performance/remove-device-http/before-remove-http-mqtts-1.json",
-      "raw_sha256": "ffc4ce785f9f3ea9b819741520fbd6630e4a011e44128501c71be08f232c0b7c",
+      "raw_sha256": "d801c440f2dc5c8501d1f4c1b172967778007fbdb8d064eaa4353b09984227f8",
       "accepted_per_second": 43733.53333333333,
       "accepted_attempted_pct": 97.59255443623822,
       "offered_per_second": 45000,
@@ -1505,14 +1524,16 @@
         "runtime_tasks": 5,
         "fds": 12
       },
-      "actual_loadgen_workers": 4
+      "actual_loadgen_workers": 4,
+      "raw_original_path": "docs/performance/remove-device-http/before-remove-http-mqtts-1.json",
+      "raw_size_bytes": 155885,
+      "raw_archive_manifest": "performance/archive-manifest.json"
     },
     {
       "side": "before",
       "protocol": "mqtts",
       "repeat": 2,
-      "raw": "docs/performance/remove-device-http/before-remove-http-mqtts-2.json",
-      "raw_sha256": "2b48e754eb7f32ec12606fdc57d7f95bd8568d2a0ea5128e44e2e5d1285c132a",
+      "raw_sha256": "4c3b3d43c574f7d7084b6d16c8b960fedca8092df8fca076af63b8986786b1e0",
       "accepted_per_second": 43670.03333333333,
       "accepted_attempted_pct": 97.46709251294688,
       "offered_per_second": 45000,
@@ -1625,14 +1646,16 @@
         "runtime_tasks": 5,
         "fds": 12
       },
-      "actual_loadgen_workers": 4
+      "actual_loadgen_workers": 4,
+      "raw_original_path": "docs/performance/remove-device-http/before-remove-http-mqtts-2.json",
+      "raw_size_bytes": 156058,
+      "raw_archive_manifest": "performance/archive-manifest.json"
     },
     {
       "side": "before",
       "protocol": "tls-tcp",
       "repeat": 0,
-      "raw": "docs/performance/remove-device-http/before-remove-http-tls-tcp-0.json",
-      "raw_sha256": "e83e29d8dd2fe24cad650b66f0a9a03b820778d2e85c6d2e0dc85da70fcae221",
+      "raw_sha256": "29099ff4bedb75e55b73fcd56dc300f0c5489e733c8033e319b34afd79a3618f",
       "accepted_per_second": 43786.566666666666,
       "accepted_attempted_pct": 97.76405882528059,
       "offered_per_second": 45000,
@@ -1745,14 +1768,16 @@
         "runtime_tasks": 5,
         "fds": 12
       },
-      "actual_loadgen_workers": 4
+      "actual_loadgen_workers": 4,
+      "raw_original_path": "docs/performance/remove-device-http/before-remove-http-tls-tcp-0.json",
+      "raw_size_bytes": 154602,
+      "raw_archive_manifest": "performance/archive-manifest.json"
     },
     {
       "side": "before",
       "protocol": "tls-tcp",
       "repeat": 1,
-      "raw": "docs/performance/remove-device-http/before-remove-http-tls-tcp-1.json",
-      "raw_sha256": "b6fbde1dc45feb0b53163685bfa9b61b795fc82f78316fdbc10e3d5542b40a2c",
+      "raw_sha256": "3b3d58096b7a047dd29e3216a77f47f2a255340f5375d431bbbeba3732546948",
       "accepted_per_second": 43830.53333333333,
       "accepted_attempted_pct": 97.78850008143365,
       "offered_per_second": 45000,
@@ -1865,14 +1890,16 @@
         "runtime_tasks": 5,
         "fds": 12
       },
-      "actual_loadgen_workers": 4
+      "actual_loadgen_workers": 4,
+      "raw_original_path": "docs/performance/remove-device-http/before-remove-http-tls-tcp-1.json",
+      "raw_size_bytes": 154482,
+      "raw_archive_manifest": "performance/archive-manifest.json"
     },
     {
       "side": "before",
       "protocol": "tls-tcp",
       "repeat": 2,
-      "raw": "docs/performance/remove-device-http/before-remove-http-tls-tcp-2.json",
-      "raw_sha256": "8d87aad64338ca052dde582d6b7808d895d153859d6e69d5ab0cd7fb0df0e3ac",
+      "raw_sha256": "e690381d4749c87275b16c1da799767fe74a2efcb6d0d20448258e1b390f045e",
       "accepted_per_second": 43880.3,
       "accepted_attempted_pct": 97.84597614518924,
       "offered_per_second": 45000,
@@ -1985,14 +2012,16 @@
         "runtime_tasks": 5,
         "fds": 12
       },
-      "actual_loadgen_workers": 4
+      "actual_loadgen_workers": 4,
+      "raw_original_path": "docs/performance/remove-device-http/before-remove-http-tls-tcp-2.json",
+      "raw_size_bytes": 154524,
+      "raw_archive_manifest": "performance/archive-manifest.json"
     },
     {
       "side": "after",
       "protocol": "mqtt",
       "repeat": 0,
-      "raw": "docs/performance/remove-device-http/after-remove-http-mqtt-0.json",
-      "raw_sha256": "646ac5460503cec8ac5b3a4b68552e63626d49139ac1d1275637f79c4c5e18eb",
+      "raw_sha256": "b466016a3d74886dac4b0795f0c8c33f29015737ec25c7a581f16041937db379",
       "accepted_per_second": 43650.933333333334,
       "accepted_attempted_pct": 97.053548400485,
       "offered_per_second": 45000,
@@ -2105,14 +2134,16 @@
         "runtime_tasks": 5,
         "fds": 12
       },
-      "actual_loadgen_workers": 4
+      "actual_loadgen_workers": 4,
+      "raw_original_path": "docs/performance/remove-device-http/after-remove-http-mqtt-0.json",
+      "raw_size_bytes": 156094,
+      "raw_archive_manifest": "performance/archive-manifest.json"
     },
     {
       "side": "after",
       "protocol": "mqtt",
       "repeat": 1,
-      "raw": "docs/performance/remove-device-http/after-remove-http-mqtt-1.json",
-      "raw_sha256": "867287c03028e97b4adb68756790ab74c6aa5636890910e331f791abcba45898",
+      "raw_sha256": "853d2f2b58ce1384c9a7afaf8b2b8d92c93091ce1c579a5a1e34c3a8bb26635c",
       "accepted_per_second": 43586.8,
       "accepted_attempted_pct": 96.96650602034391,
       "offered_per_second": 45000,
@@ -2225,14 +2256,16 @@
         "runtime_tasks": 5,
         "fds": 12
       },
-      "actual_loadgen_workers": 4
+      "actual_loadgen_workers": 4,
+      "raw_original_path": "docs/performance/remove-device-http/after-remove-http-mqtt-1.json",
+      "raw_size_bytes": 156041,
+      "raw_archive_manifest": "performance/archive-manifest.json"
     },
     {
       "side": "after",
       "protocol": "mqtt",
       "repeat": 2,
-      "raw": "docs/performance/remove-device-http/after-remove-http-mqtt-2.json",
-      "raw_sha256": "6d5c857432d909a0cce4b9cc5c2dfb584e71ea1c89a4008e1058bc27b3e5f207",
+      "raw_sha256": "847ac4baa67663cb88a63c4886de7c1a9e90526f23eb6c703cf313e8a7eeb2ba",
       "accepted_per_second": 43470.0,
       "accepted_attempted_pct": 96.74719907177291,
       "offered_per_second": 45000,
@@ -2345,14 +2378,16 @@
         "runtime_tasks": 5,
         "fds": 12
       },
-      "actual_loadgen_workers": 4
+      "actual_loadgen_workers": 4,
+      "raw_original_path": "docs/performance/remove-device-http/after-remove-http-mqtt-2.json",
+      "raw_size_bytes": 156159,
+      "raw_archive_manifest": "performance/archive-manifest.json"
     },
     {
       "side": "after",
       "protocol": "tcp",
       "repeat": 0,
-      "raw": "docs/performance/remove-device-http/after-remove-http-tcp-0.json",
-      "raw_sha256": "9efce2ed69f86e3dac94a4702ca111c44d04f1c4889059b207a0f812d0d73fcb",
+      "raw_sha256": "e84cf1787ff1dc1faf58f6d868f9695b7d59012110ed73e835ed424f09338151",
       "accepted_per_second": 43445.23333333333,
       "accepted_attempted_pct": 96.70047164736773,
       "offered_per_second": 45000,
@@ -2465,14 +2500,16 @@
         "runtime_tasks": 5,
         "fds": 12
       },
-      "actual_loadgen_workers": 4
+      "actual_loadgen_workers": 4,
+      "raw_original_path": "docs/performance/remove-device-http/after-remove-http-tcp-0.json",
+      "raw_size_bytes": 154732,
+      "raw_archive_manifest": "performance/archive-manifest.json"
     },
     {
       "side": "after",
       "protocol": "tcp",
       "repeat": 1,
-      "raw": "docs/performance/remove-device-http/after-remove-http-tcp-1.json",
-      "raw_sha256": "6452d83640d11453279ba6e6946c61f5d74f2427de02cc57d7eb738d3a75144f",
+      "raw_sha256": "570edcda6551ca7cbeeaee823ba873edbac73531572ec8f3594b4f6ba840c99b",
       "accepted_per_second": 43580.6,
       "accepted_attempted_pct": 96.94710545614713,
       "offered_per_second": 45000,
@@ -2585,14 +2622,16 @@
         "runtime_tasks": 5,
         "fds": 12
       },
-      "actual_loadgen_workers": 4
+      "actual_loadgen_workers": 4,
+      "raw_original_path": "docs/performance/remove-device-http/after-remove-http-tcp-1.json",
+      "raw_size_bytes": 154634,
+      "raw_archive_manifest": "performance/archive-manifest.json"
     },
     {
       "side": "after",
       "protocol": "tcp",
       "repeat": 2,
-      "raw": "docs/performance/remove-device-http/after-remove-http-tcp-2.json",
-      "raw_sha256": "53c3c946357cfdf96826c9f521fc2aeba3743d20a6f41399ceef9aed1e171733",
+      "raw_sha256": "b48749cce0adcc5fe549752155816ffd7bcac0fde97cf0620ed76f34d50852bf",
       "accepted_per_second": 43444.53333333333,
       "accepted_attempted_pct": 96.69245703933248,
       "offered_per_second": 45000,
@@ -2705,14 +2744,16 @@
         "runtime_tasks": 5,
         "fds": 12
       },
-      "actual_loadgen_workers": 4
+      "actual_loadgen_workers": 4,
+      "raw_original_path": "docs/performance/remove-device-http/after-remove-http-tcp-2.json",
+      "raw_size_bytes": 154741,
+      "raw_archive_manifest": "performance/archive-manifest.json"
     },
     {
       "side": "after",
       "protocol": "udp",
       "repeat": 0,
-      "raw": "docs/performance/remove-device-http/after-remove-http-udp-0.json",
-      "raw_sha256": "19bbd7871a1ea637ac3391df2c32405ef1d18d5d4ec05155f81ef8aa2d81272a",
+      "raw_sha256": "5921303e4c5487d9e84c21a9f1c0c622a65bd57e7741c9ebc9f9c6d83cd3c87f",
       "accepted_per_second": 79930.06666666667,
       "accepted_attempted_pct": 100.0,
       "offered_per_second": 80000,
@@ -2818,14 +2859,16 @@
         "runtime_tasks": 5,
         "fds": 12
       },
-      "actual_loadgen_workers": 4
+      "actual_loadgen_workers": 4,
+      "raw_original_path": "docs/performance/remove-device-http/after-remove-http-udp-0.json",
+      "raw_size_bytes": 137113,
+      "raw_archive_manifest": "performance/archive-manifest.json"
     },
     {
       "side": "after",
       "protocol": "udp",
       "repeat": 1,
-      "raw": "docs/performance/remove-device-http/after-remove-http-udp-1.json",
-      "raw_sha256": "fc37171e9e2b632ee8472425b480b8a0f947ada134dd9d0b889d431c8e22128e",
+      "raw_sha256": "bffed3feb88b9c91273e34d8bc0f77341c8341debf9d5929985ce4cbc24f58d1",
       "accepted_per_second": 78118.2,
       "accepted_attempted_pct": 100.0,
       "offered_per_second": 80000,
@@ -2931,14 +2974,16 @@
         "runtime_tasks": 5,
         "fds": 12
       },
-      "actual_loadgen_workers": 4
+      "actual_loadgen_workers": 4,
+      "raw_original_path": "docs/performance/remove-device-http/after-remove-http-udp-1.json",
+      "raw_size_bytes": 134519,
+      "raw_archive_manifest": "performance/archive-manifest.json"
     },
     {
       "side": "after",
       "protocol": "udp",
       "repeat": 2,
-      "raw": "docs/performance/remove-device-http/after-remove-http-udp-2.json",
-      "raw_sha256": "cdfe73a923c7dd10a6b2fa02267b26683542def59e04c718a2cd20de63299496",
+      "raw_sha256": "13ef53714af99d7674ae262d8eec96bc2541775b996cc0bbd3941e59b5b67d5f",
       "accepted_per_second": 79949.1,
       "accepted_attempted_pct": 100.0,
       "offered_per_second": 80000,
@@ -3044,14 +3089,16 @@
         "runtime_tasks": 5,
         "fds": 12
       },
-      "actual_loadgen_workers": 4
+      "actual_loadgen_workers": 4,
+      "raw_original_path": "docs/performance/remove-device-http/after-remove-http-udp-2.json",
+      "raw_size_bytes": 134180,
+      "raw_archive_manifest": "performance/archive-manifest.json"
     },
     {
       "side": "after",
       "protocol": "mqtts",
       "repeat": 0,
-      "raw": "docs/performance/remove-device-http/after-remove-http-mqtts-0.json",
-      "raw_sha256": "04ba82bcf691108c1f715e1cb144c036b841bb1b7090cfe41234c5204fd97a24",
+      "raw_sha256": "bd2068fb2767692b24b814c7dd4bad903317d415b68681ae56ade4588045ebc8",
       "accepted_per_second": 43855.96666666667,
       "accepted_attempted_pct": 97.82007272867861,
       "offered_per_second": 45000,
@@ -3164,14 +3211,16 @@
         "runtime_tasks": 5,
         "fds": 12
       },
-      "actual_loadgen_workers": 4
+      "actual_loadgen_workers": 4,
+      "raw_original_path": "docs/performance/remove-device-http/after-remove-http-mqtts-0.json",
+      "raw_size_bytes": 156128,
+      "raw_archive_manifest": "performance/archive-manifest.json"
     },
     {
       "side": "after",
       "protocol": "mqtts",
       "repeat": 1,
-      "raw": "docs/performance/remove-device-http/after-remove-http-mqtts-1.json",
-      "raw_sha256": "c57e1e03ade77b272e77334b17074a254db96be6b77177a21f45631707424c48",
+      "raw_sha256": "3c550f3282afc340151a103ba7dcf71e62385e07febb6b6a2e25dca9bf599fd6",
       "accepted_per_second": 43805.166666666664,
       "accepted_attempted_pct": 97.72725413600037,
       "offered_per_second": 45000,
@@ -3284,14 +3333,16 @@
         "runtime_tasks": 5,
         "fds": 12
       },
-      "actual_loadgen_workers": 4
+      "actual_loadgen_workers": 4,
+      "raw_original_path": "docs/performance/remove-device-http/after-remove-http-mqtts-1.json",
+      "raw_size_bytes": 156229,
+      "raw_archive_manifest": "performance/archive-manifest.json"
     },
     {
       "side": "after",
       "protocol": "mqtts",
       "repeat": 2,
-      "raw": "docs/performance/remove-device-http/after-remove-http-mqtts-2.json",
-      "raw_sha256": "c6f18f09b809bd3c218c0f5c5e01d99a7f04c19778ab9cbd8af852f41bee7939",
+      "raw_sha256": "fbfd354f6319c90bc2231221212dffe0d05b9148e6a8a25e0edb06a19d154f37",
       "accepted_per_second": 43827.23333333333,
       "accepted_attempted_pct": 97.75009664852648,
       "offered_per_second": 45000,
@@ -3404,14 +3455,16 @@
         "runtime_tasks": 5,
         "fds": 12
       },
-      "actual_loadgen_workers": 4
+      "actual_loadgen_workers": 4,
+      "raw_original_path": "docs/performance/remove-device-http/after-remove-http-mqtts-2.json",
+      "raw_size_bytes": 155973,
+      "raw_archive_manifest": "performance/archive-manifest.json"
     },
     {
       "side": "after",
       "protocol": "tls-tcp",
       "repeat": 0,
-      "raw": "docs/performance/remove-device-http/after-remove-http-tls-tcp-0.json",
-      "raw_sha256": "98970301d11e599001b47c373bed74cfa9c6446bdf09744f567e37dcdf85e4cb",
+      "raw_sha256": "ba37a245f0e35cfefc30b8c61bb2266b1ded50a52ae1d1b2daa8583413119f6c",
       "accepted_per_second": 43822.333333333336,
       "accepted_attempted_pct": 97.74614419204987,
       "offered_per_second": 45000,
@@ -3524,14 +3577,16 @@
         "runtime_tasks": 5,
         "fds": 12
       },
-      "actual_loadgen_workers": 4
+      "actual_loadgen_workers": 4,
+      "raw_original_path": "docs/performance/remove-device-http/after-remove-http-tls-tcp-0.json",
+      "raw_size_bytes": 154659,
+      "raw_archive_manifest": "performance/archive-manifest.json"
     },
     {
       "side": "after",
       "protocol": "tls-tcp",
       "repeat": 1,
-      "raw": "docs/performance/remove-device-http/after-remove-http-tls-tcp-1.json",
-      "raw_sha256": "b2be59473a7764f8f83ed8f93692bff4368c22708fb8042e5b5460a9379ef4f8",
+      "raw_sha256": "8509d4cee418e829cacb2ea771637cb32ad99eecd60db950d423b0f079541f68",
       "accepted_per_second": 43823.3,
       "accepted_attempted_pct": 97.729117605081,
       "offered_per_second": 45000,
@@ -3644,14 +3699,16 @@
         "runtime_tasks": 5,
         "fds": 12
       },
-      "actual_loadgen_workers": 4
+      "actual_loadgen_workers": 4,
+      "raw_original_path": "docs/performance/remove-device-http/after-remove-http-tls-tcp-1.json",
+      "raw_size_bytes": 154870,
+      "raw_archive_manifest": "performance/archive-manifest.json"
     },
     {
       "side": "after",
       "protocol": "tls-tcp",
       "repeat": 2,
-      "raw": "docs/performance/remove-device-http/after-remove-http-tls-tcp-2.json",
-      "raw_sha256": "2b22a1a4b73a1f67d5f08b69f1326133b4a8dc21b5bc4cbc00eb4e6770e0acf0",
+      "raw_sha256": "52d97915a9181cd441ac7868a6e814e926cd2261fb0ae0227565f02983f56465",
       "accepted_per_second": 43843.46666666667,
       "accepted_attempted_pct": 97.79997204236474,
       "offered_per_second": 45000,
@@ -3764,7 +3821,10 @@
         "runtime_tasks": 5,
         "fds": 12
       },
-      "actual_loadgen_workers": 4
+      "actual_loadgen_workers": 4,
+      "raw_original_path": "docs/performance/remove-device-http/after-remove-http-tls-tcp-2.json",
+      "raw_size_bytes": 154795,
+      "raw_archive_manifest": "performance/archive-manifest.json"
     }
   ],
   "cleanup_checks": "30/30 passed",
@@ -3842,113 +3902,161 @@
       {
         "command": "cargo +1.88.0 fmt --all -- --check",
         "result": "PASS",
-        "log": "docs/performance/remove-device-http/validation/fmt.log",
-        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "log_original_path": "docs/performance/remove-device-http/validation/fmt.log",
+        "log_size_bytes": 0,
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "log_archive_manifest": "performance/archive-manifest.json"
       },
       {
         "command": "cargo +1.88.0 check --workspace --all-targets",
         "result": "PASS",
-        "log": "docs/performance/remove-device-http/validation/check.log",
-        "sha256": "6afe8cc1add70d3fe0e8b0a70ac490063b207f97b3b7fb2329efebeab2e17e22"
+        "sha256": "6afe8cc1add70d3fe0e8b0a70ac490063b207f97b3b7fb2329efebeab2e17e22",
+        "log_original_path": "docs/performance/remove-device-http/validation/check.log",
+        "log_size_bytes": 489,
+        "log_sha256": "6c0a210ba28051724b768e545a53dd1d26a835f37ca14f465f74ed47b453843d",
+        "log_archive_manifest": "performance/archive-manifest.json"
       },
       {
         "command": "cargo +1.88.0 clippy --workspace --all-targets --all-features -- -D warnings",
         "result": "PASS",
-        "log": "docs/performance/remove-device-http/validation/clippy.log",
-        "sha256": "ec09dfe33656e9892bb9c3a54d8b47335b450959c481fd3312ad054f8144beb6"
+        "sha256": "ec09dfe33656e9892bb9c3a54d8b47335b450959c481fd3312ad054f8144beb6",
+        "log_original_path": "docs/performance/remove-device-http/validation/clippy.log",
+        "log_size_bytes": 761,
+        "log_sha256": "3f689f4550f0df1ab1326f2d8eaa644516d148c4a966f74ce181c86a2c429304",
+        "log_archive_manifest": "performance/archive-manifest.json"
       },
       {
         "command": "cargo +1.88.0 test --workspace --all-targets --all-features",
         "result": "PASS",
-        "log": "docs/performance/remove-device-http/validation/test-all-targets.log",
         "sha256": "6d17971f27d4e88931021c66adc72088f203ec593acef0af0518bbe2ee569c63",
         "passed": 171,
         "failed": 0,
-        "ignored": 4
+        "ignored": 4,
+        "log_original_path": "docs/performance/remove-device-http/validation/test-all-targets.log",
+        "log_size_bytes": 23721,
+        "log_sha256": "56193b9aef448692c262291605bd7620e07879ea886076950ee2e8dca0a238ad",
+        "log_archive_manifest": "performance/archive-manifest.json"
       },
       {
         "command": "cargo +1.88.0 test --workspace --all-features",
         "result": "PASS",
-        "log": "docs/performance/remove-device-http/validation/test-all-features.log",
         "sha256": "fb2e78708b8a3f856e3aa2cff6d2bcc1d53f14a926e4e352c7b9cce494c9be82",
         "passed": 171,
         "failed": 0,
-        "ignored": 4
+        "ignored": 4,
+        "log_original_path": "docs/performance/remove-device-http/validation/test-all-features.log",
+        "log_size_bytes": 18452,
+        "log_sha256": "17c55c076bf78b4534beb7fc309fae38a70644fe9cc6ae0a00329c25a9610ea5",
+        "log_archive_manifest": "performance/archive-manifest.json"
       },
       {
         "command": "RUSTUP_TOOLCHAIN=1.88.0 python3 tests/mqtt_conformance/run.py --release-gate",
         "result": "PASS",
-        "log": "docs/performance/remove-device-http/validation/mqtt-release-gate.log",
         "sha256": "9e669abbc135e031e03fe01387341e5c8dc1a855cdbaf97ab8502484d58355ff",
         "total": 76,
         "pass": 76,
-        "fail": 0
+        "fail": 0,
+        "log_original_path": "docs/performance/remove-device-http/validation/mqtt-release-gate.log",
+        "log_size_bytes": 8751,
+        "log_sha256": "9e84271477677327ac8f7807ee4b336aa8caddb145b53b80959a29e8f3ff77ac",
+        "log_archive_manifest": "performance/archive-manifest.json"
       },
       {
         "command": "RUSTUP_TOOLCHAIN=1.88.0 bash scripts/tutorial_smoke.sh",
         "result": "PASS",
-        "log": "docs/performance/remove-device-http/validation/tutorial-smoke.log",
-        "sha256": "d307afd0be0495c906379b8692684158bf1cbdb937e4bcbeae74e4ca9ec82612"
+        "sha256": "d307afd0be0495c906379b8692684158bf1cbdb937e4bcbeae74e4ca9ec82612",
+        "log_original_path": "docs/performance/remove-device-http/validation/tutorial-smoke.log",
+        "log_size_bytes": 1471,
+        "log_sha256": "d307afd0be0495c906379b8692684158bf1cbdb937e4bcbeae74e4ca9ec82612",
+        "log_archive_manifest": "performance/archive-manifest.json"
       },
       {
         "command": "cargo +1.88.0 test -p netbaiot-server --test server subprocess_graceful_restart_sixty_second_soak -- --ignored --nocapture",
         "result": "PASS",
-        "log": "docs/performance/remove-device-http/validation/restart-soak.log",
-        "sha256": "7ea614ddb873b116e38104ff01e12b84dc6bfc366a000daae241267c7c8d1096"
+        "sha256": "7ea614ddb873b116e38104ff01e12b84dc6bfc366a000daae241267c7c8d1096",
+        "log_original_path": "docs/performance/remove-device-http/validation/restart-soak.log",
+        "log_size_bytes": 406,
+        "log_sha256": "7ea614ddb873b116e38104ff01e12b84dc6bfc366a000daae241267c7c8d1096",
+        "log_archive_manifest": "performance/archive-manifest.json"
       },
       {
         "command": "CARGO_NET_OFFLINE=true cargo +nightly fuzz run device_classifier -- -max_total_time=60 -max_len=65537",
         "result": "PASS",
-        "log": "docs/performance/remove-device-http/validation/fuzz-classifier.log",
         "sha256": "bc426b27f4b506d260c91817d6893726f3d56ed5db5459b02bedd7aad1a55eb2",
         "iterations": 1120415,
         "seconds": 61,
-        "sanitizer": "address"
+        "sanitizer": "address",
+        "log_original_path": "docs/performance/remove-device-http/validation/fuzz-classifier.log",
+        "log_size_bytes": 1713,
+        "log_sha256": "3dad28c88e60d5beb0958434ebd1f2d1db82bc490cf236d531ae7db6a1e71ced",
+        "log_archive_manifest": "performance/archive-manifest.json"
       },
       {
         "command": "CARGO_NET_OFFLINE=true cargo +nightly fuzz run udp_envelope -- -max_total_time=60 -max_len=1201",
         "result": "PASS",
-        "log": "docs/performance/remove-device-http/validation/fuzz-udp.log",
         "sha256": "7e860cfcf52b94a15946f99846ec8f6ec12bfff7da3d96ce35af5a59f3fee6b4",
         "iterations": 673155,
         "seconds": 61,
-        "sanitizer": "address"
+        "sanitizer": "address",
+        "log_original_path": "docs/performance/remove-device-http/validation/fuzz-udp.log",
+        "log_size_bytes": 52146,
+        "log_sha256": "62cd467183c8426a32f32984756240cc7b1dc8b0626105018a0204001ac66d06",
+        "log_archive_manifest": "performance/archive-manifest.json"
       },
       {
         "command": "python3 -m unittest discover -s scripts/perf -p 'test_*.py'",
         "result": "PASS",
-        "log": "docs/performance/remove-device-http/validation/perf-tool-tests.log",
-        "sha256": "4c979c0d06f0e9e2109df48cae7f69ac5d403754045b4cfe404fe744e7390b47"
+        "sha256": "4c979c0d06f0e9e2109df48cae7f69ac5d403754045b4cfe404fe744e7390b47",
+        "log_original_path": "docs/performance/remove-device-http/validation/perf-tool-tests.log",
+        "log_size_bytes": 103,
+        "log_sha256": "4c979c0d06f0e9e2109df48cae7f69ac5d403754045b4cfe404fe744e7390b47",
+        "log_archive_manifest": "performance/archive-manifest.json"
       },
       {
         "command": "cargo +1.88.0 fmt --all -- --check",
         "result": "PASS",
-        "log": "docs/performance/remove-device-http/validation/final-fmt.log",
-        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "log_original_path": "docs/performance/remove-device-http/validation/final-fmt.log",
+        "log_size_bytes": 0,
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "log_archive_manifest": "performance/archive-manifest.json"
       },
       {
         "command": "cargo +1.88.0 check --workspace --all-targets",
         "result": "PASS",
-        "log": "docs/performance/remove-device-http/validation/final-check.log",
-        "sha256": "629beb97ce8970c91fa96204a43687c8cc5f56573c3d5340485d25711d5d40eb"
+        "sha256": "629beb97ce8970c91fa96204a43687c8cc5f56573c3d5340485d25711d5d40eb",
+        "log_original_path": "docs/performance/remove-device-http/validation/final-check.log",
+        "log_size_bytes": 761,
+        "log_sha256": "5c46d7d3264c102c7a1ba4ba552c5a0c346b9f18b88e23d620af207efda2f4e5",
+        "log_archive_manifest": "performance/archive-manifest.json"
       },
       {
         "command": "cargo +1.88.0 clippy --workspace --all-targets --all-features -- -D warnings",
         "result": "PASS",
-        "log": "docs/performance/remove-device-http/validation/final-clippy.log",
-        "sha256": "056dd255e50223daf071ea386449d05254063bd5ec9d3bfb0597a710bae40521"
+        "sha256": "056dd255e50223daf071ea386449d05254063bd5ec9d3bfb0597a710bae40521",
+        "log_original_path": "docs/performance/remove-device-http/validation/final-clippy.log",
+        "log_size_bytes": 761,
+        "log_sha256": "cedc113f301cdda7b2dbfd9abfd7f650c220d1a25a951453bb178eb59efc6020",
+        "log_archive_manifest": "performance/archive-manifest.json"
       },
       {
         "command": "cargo +1.88.0 test -p netbaiot-server --test official_client",
         "result": "PASS",
-        "log": "docs/performance/remove-device-http/validation/final-official-client.log",
-        "sha256": "de3c90c830948ea2607983197423db3af7719848eedc5f3bd6f20ba24cb8e2af"
+        "sha256": "de3c90c830948ea2607983197423db3af7719848eedc5f3bd6f20ba24cb8e2af",
+        "log_original_path": "docs/performance/remove-device-http/validation/final-official-client.log",
+        "log_size_bytes": 1075,
+        "log_sha256": "538698cda67fbc2155448b8af92c92c8b60242ecd53e32a80685960d95ae178d",
+        "log_archive_manifest": "performance/archive-manifest.json"
       },
       {
         "command": "python3 -m unittest discover -s scripts/perf -p 'test_*.py'",
         "result": "PASS",
-        "log": "docs/performance/remove-device-http/validation/final-perf-tool-tests.log",
-        "sha256": "533131dad8973c589ae697ab1dd346cc55caa134cd1e536cedf26f1b057c0f1f"
+        "sha256": "533131dad8973c589ae697ab1dd346cc55caa134cd1e536cedf26f1b057c0f1f",
+        "log_original_path": "docs/performance/remove-device-http/validation/final-perf-tool-tests.log",
+        "log_size_bytes": 103,
+        "log_sha256": "533131dad8973c589ae697ab1dd346cc55caa134cd1e536cedf26f1b057c0f1f",
+        "log_archive_manifest": "performance/archive-manifest.json"
       }
     ],
     "not_run": [
@@ -3965,5 +4073,6 @@
     "UDP is sessionless and unencrypted; recent in-memory state can be lost on abrupt crash.",
     "No replacement automatic device config-pull protocol. Management configuration and application commands remain.",
     "No separate-host, multi-hour soak, power-loss or syscall profiling in this task."
-  ]
+  ],
+  "raw_evidence_status": "Original raw files are indexed in performance/archive-manifest.json; no hosted artifact is known."
 }

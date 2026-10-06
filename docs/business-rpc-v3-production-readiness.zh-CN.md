@@ -12,7 +12,7 @@
 
 ```sh
 cargo build --locked --release -p netbaiot-server -p netbaiot-loadgen --bins
-python3 tools/netbaiot-loadgen/run_business_rpc_v3_hol.py --duration-secs 15 --output docs/performance/business-rpc-v3/final-15s
+python3 tools/netbaiot-loadgen/run_business_rpc_v3_hol.py --duration-secs 15 --output target/performance/business-rpc-v3/final-15s
 ```
 
 结果的 auth 延迟是设备端到端连接时间，包含 MQTT 建连、网关缓存及 RPC；网关 `business_rpc_auth_latency_us` 是单独的 RPC 指标。`p95/p99` 为本次短样本统计，不是服务等级保证。CPU 为 250 ms 采样的网关工作期平均；RSS 是采样峰值。`auth/s` 由 loadgen 的实际运行秒数计算，并非可持续吞吐能力。
@@ -31,9 +31,9 @@ python3 tools/netbaiot-loadgen/run_business_rpc_v3_hol.py --duration-secs 15 --o
 
 ## HOL 原因调查
 
-以 `NETBAIOT_HOL_CAPTURE=1` 重跑 10 秒 V3 8 KiB 模式。代理仅记录 gateway→client 的 V3 帧头顺序，不保存 Hello、令牌或 Event payload；[默认窗口帧头追踪](performance/business-rpc-v3/trace-default/v3-8192-1-down.jsonl) 可直接复核。256 KiB 流窗口时，11 个 Event 子流各分成 3 个 DATA 帧，但 **0/11** 在自身首末 DATA 之间出现 Auth DATA。流窗口大于实际约 17 KiB 的 Event body，网关可以在 Auth 请求到达 writer 前把全部 Event 分片送入 TCP 字节流；之后的调度无法抢占这些已经排队的字节。这是本次负载没有呈现明显收益的直接 wire 证据。该轮设备认证 p95/p99 为 1758/4396 ms；[原始 JSON](performance/business-rpc-v3/trace-default/v3-8192.json) 和 metrics 同目录保留。
+以 `NETBAIOT_HOL_CAPTURE=1` 重跑 10 秒 V3 8 KiB 模式。代理仅记录 gateway→client 的 V3 帧头顺序，不保存 Hello、令牌或 Event payload；清理前的[默认窗口帧头追踪](performance/archive-manifest.json)可按原始路径和 SHA-256 核查。256 KiB 流窗口时，11 个 Event 子流各分成 3 个 DATA 帧，但 **0/11** 在自身首末 DATA 之间出现 Auth DATA。流窗口大于实际约 17 KiB 的 Event body，网关可以在 Auth 请求到达 writer 前把全部 Event 分片送入 TCP 字节流；之后的调度无法抢占这些已经排队的字节。这是本次负载没有呈现明显收益的直接 wire 证据。该轮设备认证 p95/p99 为 1758/4396 ms；保留的汇总 JSON 和 metrics 见同目录。
 
-只将 V3 客户端协商的初始流窗口改为 8 KiB，保持同一 16 KiB Event、代理、10 秒时长与 8 KiB 帧上限，[对照帧头追踪](performance/business-rpc-v3/trace-window-8192/v3-8192-1-down.jsonl) 中 **3/11** 个 Event 有 Auth DATA 穿插（共 16 个 Auth DATA 帧），网关流窗口停顿计数 36；设备认证 p95/p99 为 1693/4589 ms，见 [原始 JSON](performance/business-rpc-v3/trace-window-8192/v3-8192.json)。流控给调度器实际抢占机会，但也可能让大消息逐窗口等待往返。两次短测的 p95 差仅 65 ms，p99 反而高 193 ms，不能据此把默认流窗口降至 8 KiB。可通过 `--stream-window-bytes 8192 --modes v3-8192` 复现该诊断。
+只将 V3 客户端协商的初始流窗口改为 8 KiB，保持同一 16 KiB Event、代理、10 秒时长与 8 KiB 帧上限，清理前的[对照帧头追踪](performance/archive-manifest.json)记录 **3/11** 个 Event 有 Auth DATA 穿插（共 16 个 Auth DATA 帧），网关流窗口停顿计数 36；设备认证 p95/p99 为 1693/4589 ms，见保留的[汇总 JSON](performance/business-rpc-v3/trace-window-8192/v3-8192.json)。流控给调度器实际抢占机会，但也可能让大消息逐窗口等待往返。两次短测的 p95 差仅 65 ms，p99 反而高 193 ms，不能据此把默认流窗口降至 8 KiB。可通过 `--stream-window-bytes 8192 --modes v3-8192` 复现该诊断。
 
 ## 资源和故障边界
 

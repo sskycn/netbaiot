@@ -4,17 +4,17 @@
 
 ## 环境和数据来源
 
-原始结果见 [`performance/business-rpc-v2/`](performance/business-rpc-v2/)。机器为 Mac16,10、10 逻辑 CPU、macOS Darwin 25.6.0、arm64、Rust 1.97.1。网关及 loadgen 为 release profile，单机回环；设备侧为 MQTT 3.1.1，**Business TCP 使用 mTLS**，采用仓库公开的测试证书。业务地址、设备地址、管理地址为不同回环端口；两种业务拓扑均使用同一个 `business_tcp` 地址。管理指标使用 250 ms 采样，CPU 用 `ps` 进程百分比采样；`peak_sampled` 是采样最大值。原始 JSON 的 `git_commit` 为起始 SHA 且 `git_dirty=true`，表示二进制由本任务工作树构建，不能把该 SHA 当作这些测量的干净提交版本。
+保留的逐场景 JSON 汇总见 [`performance/business-rpc-v2/`](performance/business-rpc-v2/)。完整原始运行记录已从 Git 移除，原始路径、大小和 SHA-256 见[性能证据归档清单](performance/archive-manifest.json)；清理前文件保存在本机 `local-performance-archive/`。机器为 Mac16,10、10 逻辑 CPU、macOS Darwin 25.6.0、arm64、Rust 1.97.1。网关及 loadgen 为 release profile，单机回环；设备侧为 MQTT 3.1.1，**Business TCP 使用 mTLS**，采用仓库公开的测试证书。业务地址、设备地址、管理地址为不同回环端口；两种业务拓扑均使用同一个 `business_tcp` 地址。管理指标使用 250 ms 采样，CPU 用 `ps` 进程百分比采样；`peak_sampled` 是采样最大值。保留 JSON 中的 `git_commit` 为起始 SHA 且 `git_dirty=true`，表示二进制由本任务工作树构建，不能把该 SHA 当作这些测量的干净提交版本。
 
 普通测量网关配置：`business_rpc.max_connections=8`、`auth_max_inflight=16`、正/负 auth cache TTL 为 100/10 ms、每 IP 请求上限 512/s、sink ACK timeout 为默认 5 s、事件窗口 1。过载测量单独使用 `auth_max_inflight=2`、正/负 TTL 为 2/1 ms、handler 延迟 100 ms。负载参数、时长、拓扑、mTLS 模式和申报的网络 profile 均在每个 JSON 内；业务证书和私钥路径、token 内容均不进入结果。`network_injection=external_unverified` 表明 loadgen 记录了操作者申报的代理参数，不能自行证明系统层 RTT。事件大小是 telemetry 文本值字节数，序列化帧还包含字段和事件元数据；当前默认 codec 每字段 256 字节、最多 64 字段，因此本轮选择 1,024 和 16,384 文本字节，没有以非法 64 KiB 事件凑数据。
 
 下表是上述工作树在本机的**观测值**，不是生产容量。网关直方图用固定微秒桶，JSON 报告的 p50/p95/p99 是桶上界；没有精确最大值时 `max=null`。客户端 TLS、Ready、handler 和设备端到端直方图有实测最大值。设备端到端认证包含 MQTT 连接、SDK 重试、缓存、RPC 和 session 注册，不能视为纯 RPC RTT。
 
-| 运行（原始 JSON） | 数量 | 客户端 TLS p50/p95/p99/max ms | 客户端 Ready p50/p95/p99/max ms | 网关 CPU baseline/平均/采样峰值 % | 网关 RSS baseline/warm/peak/recovery KiB |
+| 运行（汇总 JSON） | 数量 | 客户端 TLS p50/p95/p99/max ms | 客户端 Ready p50/p95/p99/max ms | 网关 CPU baseline/平均/采样峰值 % | 网关 RSS baseline/warm/peak/recovery KiB |
 | --- | ---: | --- | --- | --- | --- |
 | [mTLS handshake](performance/business-rpc-v2/readiness-mtls-handshake.json) | 3985/3985 成功，5 s | 0.82/0.99/1.19/2.01 | 1.21/1.37/1.60/3.74 | 0.2/43.2/44.1 | 6704/7952/8096/8096 |
 
-| 运行（原始 JSON） | 设备端到端 p50/p95/p99/max ms | 网关 `rpc_total` p50/p95/p99/max ms | 客户端 handler p50/p95/p99/max ms | 网关 CPU baseline/平均/采样峰值 % | RSS baseline/warm/peak/recovery KiB |
+| 运行（汇总 JSON） | 设备端到端 p50/p95/p99/max ms | 网关 `rpc_total` p50/p95/p99/max ms | 客户端 handler p50/p95/p99/max ms | 网关 CPU baseline/平均/采样峰值 % | RSS baseline/warm/peak/recovery KiB |
 | --- | --- | --- | --- | --- | --- |
 | [mTLS steady auth](performance/business-rpc-v2/readiness-mtls-steady-auth.json)，308/308 成功，10 s | 46.64/685/1753/4887 | ≤0.25/≤0.25/≤0.5/null | 0.01/0.01/0.01/0.04 | 0/0.72/1.4 | 7536/7952/8064/8064 |
 

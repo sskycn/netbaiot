@@ -11,17 +11,19 @@ by five seconds of warmup and a one-second client ramp. Trials run serially, all
 before followed by all after, without concurrent compilation, tests or benchmarks.
 They are local comparison windows, not current production capacity certification.
 
-Each raw run records server and frozen-generator hashes, exact limits/workload,
-signed or stream receipts, successful-receipt latency histograms, rejection/error
-counters, one-second CPU/RSS/task/queue samples, kernel counters, and cooldown plus
-owned-child shutdown. `before-environment.json` and `after-environment.json` record
-the host/toolchain. The same baseline generator executable is used on both sides;
-the current source independently removes its obsolete Device HTTP modes.
+The compact aggregate result records per-run rates, receipt percentiles, error
+counters, cleanup checks, and the hashes of each raw run. The full runs include
+one-second CPU/RSS/task/queue samples, kernel counters, cooldown and child shutdown;
+they were removed from Git and are indexed in the [archive manifest](../archive-manifest.json).
+The pre-cleanup local copy retains the original records. `before-environment.json`
+and `after-environment.json` record the host/toolchain. The same baseline generator
+executable is used on both sides; the current source independently removes its
+obsolete Device HTTP modes.
 
 **Worker metadata correction:** the frozen generator explicitly uses four Tokio
 workers. The before records inherited the old harness's incorrect value of two,
 which only represented `TOKIO_WORKER_THREADS` requested in the environment.
-It never overrode the macro. Raw files are unmodified; see
+It never overrode the macro. Original files were not modified before archiving; see
 `metadata-corrections.json`. After records correctly report four. The old mixed
 worker diagnostic is invalidated in the historical report. The runtime worker
 count did not change between these measurements.
@@ -31,8 +33,8 @@ remove or rename only this task's completed `target/mixed-audit/{before,after}-r
 run folders if intentionally repeating):
 
 ```sh
-python3 scripts/perf/device_protocol_benchmark.py --server target/remove-device-http/before-server --loadgen target/remove-device-http/loadgen --plan docs/performance/remove-device-http/before-plan.json --label before --output docs/performance/remove-device-http
-python3 scripts/perf/device_protocol_benchmark.py --server target/remove-device-http/after-server --loadgen target/remove-device-http/loadgen --plan docs/performance/remove-device-http/after-plan.json --label after --output docs/performance/remove-device-http
+python3 scripts/perf/device_protocol_benchmark.py --server target/remove-device-http/before-server --loadgen target/remove-device-http/loadgen --plan docs/performance/remove-device-http/before-plan.json --label before --output target/performance/remove-device-http
+python3 scripts/perf/device_protocol_benchmark.py --server target/remove-device-http/after-server --loadgen target/remove-device-http/loadgen --plan docs/performance/remove-device-http/after-plan.json --label after --output target/performance/remove-device-http
 python3 scripts/perf/device_protocol_summary.py
 ```
 
@@ -43,8 +45,10 @@ post-exit spool file permitted by these healthy trials is the MQTT recovery imag
 Management connections are excluded from the after device status summary; the
 before server reports the observing management connection in its legacy `http` key.
 
-`validation/` preserves required Rust checks, full tests, MQTT release gate,
-real tutorial, restart soak and fuzz logs. `config-preflight.json` has the five
+`validation/index.json` preserves the command, exit status, and log hashes for
+required Rust checks, full tests, MQTT release gate, real tutorial, restart soak,
+and fuzz runs. Full logs are indexed in the archive manifest and retained in the
+pre-cleanup local copy. `config-preflight.json` has the five
 TLS/config validation cases. `before-sdk-dependencies.txt`,
 `after-sdk-dependencies.txt`, and build metadata cover native normal dependencies
 and release artifact sizes; the dependency counts exclude the SDK root package.

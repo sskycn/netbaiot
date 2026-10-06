@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "allowlist": [
+    {
+      "path": "summary.json",
+      "max_bytes": 945324,
+      "reason": "Historical aggregate of 163 scenario-level summaries retained with its original values for audit; it contains no per-request sample arrays and is not a current production-capacity claim."
+    },
+    {
+      "path": "dataset_100000.json",
+      "max_bytes": 276356,
+      "reason": "Historical database-era query-plan aggregate retained for provenance; three plan and execution-time records per query, not current gateway-capacity evidence."
+    },
+    {
+      "path": "dataset_1000000.json",
+      "max_bytes": 288881,
+      "reason": "Historical database-era query-plan aggregate retained for provenance; three plan and execution-time records per query, not current gateway-capacity evidence."
+    },
+    {
+      "path": "optimization/dataset_10000.json",
+      "max_bytes": 280952,
+      "reason": "Historical database-era query-plan aggregate retained for provenance; three plan and execution-time records per query, not current gateway-capacity evidence."
+    },
+    {
+      "path": "optimization/dataset_100000.json",
+      "max_bytes": 300136,
+      "reason": "Historical database-era query-plan aggregate retained for provenance; three plan and execution-time records per query, not current gateway-capacity evidence."
+    },
+    {
+      "path": "optimization/dataset_1000000.json",
+      "max_bytes": 312631,
+      "reason": "Historical database-era query-plan aggregate retained for provenance; three plan and execution-time records per query, not current gateway-capacity evidence."
+    },
+    {
+      "path": "auth-cache-expiry-index/replacement-red.excerpt.log",
+      "max_bytes": 1024,
+      "reason": "Curated red regression excerpt showing the old cache replacement accounting failure; the full source log and SHA-256 are in archive-manifest.json."
+    },
+    {
+      "path": "auth-cache-expiry-index/index-memory-instrumentation-fail.excerpt.log",
+      "max_bytes": 1024,
+      "reason": "Curated initial instrumentation mismatch retained to document the measurement correction; the full source log and SHA-256 are in archive-manifest.json."
+    }
+  ]
+}

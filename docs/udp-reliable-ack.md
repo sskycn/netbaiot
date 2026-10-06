@@ -141,10 +141,10 @@ python3 scripts/perf/udp_ack_compare.py --baseline /path/to/ef9a883-server \
 ```
 
 The baseline binary was built and preserved from the exact baseline before edits.
-[Final raw measurements](performance/udp-ack/comparison.json),
+[retained comparison summary](performance/udp-ack/comparison.json),
 [diagnostic cost split](performance/udp-ack/sign-cost.json),
-[binary hashes](performance/udp-ack/builds.json), and
-[validation summary](performance/udp-ack/validation.txt) are committed with this report.
+[binary hashes](performance/udp-ack/builds.json), and the
+[archive manifest](performance/archive-manifest.json) are committed with this report.
 
 ## Memory and remaining limitations
 

@@ -50,7 +50,10 @@ def summarize(root):
                 assert len(samples) >= 20, path
                 cpu = (samples[-1]['server']['cpu_seconds'] - samples[0]['server']['cpu_seconds']) / (samples[-1]['t'] - samples[0]['t'])
                 counter_delta = {key: value - raw['idle']['counters'].get(key, 0) for key, value in raw['cooldown']['counters'].items()}
-                rows.append(dict(side=side, protocol=kind, repeat=repeat, raw=str(path), raw_sha256=digest(path), accepted_per_second=counts['accepted']/seconds,
+                rows.append(dict(side=side, protocol=kind, repeat=repeat,
+                    raw_original_path=str(path.resolve().relative_to(ROOT.resolve())),
+                    raw_size_bytes=path.stat().st_size, raw_sha256=digest(path),
+                    accepted_per_second=counts['accepted']/seconds,
                     accepted_attempted_pct=100*counts['accepted']/counts['attempted'], offered_per_second=raw['plan']['groups'][0]['rate'],
                     accepted_offered_pct=100*counts['accepted']/seconds/raw['plan']['groups'][0]['rate'],
                     receipt_p99_ms=latency['p99_ms'], server_cpu_cores=cpu,
@@ -86,7 +89,7 @@ def summarize(root):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--input', type=Path, default=Path('docs/performance/remove-device-http'))
+    parser.add_argument('--input', type=Path, default=Path('target/performance/remove-device-http'))
     parser.add_argument('--output', type=Path, default=Path('docs/remove-device-http-results.json'))
     args = parser.parse_args()
     result = summarize(args.input)

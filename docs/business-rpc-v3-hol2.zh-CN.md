@@ -76,7 +76,7 @@ Discovery 固定 16 KiB Event、1 Event/s、4 Auth 并发、25 ms/方向/次 rea
 
 另在 **256 KiB/s/方向、2 Event/s、16 Auth 并发、15 秒、fresh identity** 重复三轮，Event ACK 均为 30/30：原默认 Auth p95 中位数 2043 ms（2013–2129），p99 5315 ms（5088–5951），Auth/s 22.98，Event completion p50/p95 为 182.9/212.8 ms；16 KiB 候选相应为 1927 ms（1912–2109）、4810 ms（4460–6731）、21.19/s、262.5/291.2 ms。即 Auth p95 仅约 −5.7%，Auth/s 约 −7.8%，Event p95 约 **+36.9%**；机会/穿插从基线 1/1、4/4、1/0，变成候选 14/14、16/16、18/18。候选某轮 preemption p95 达 228.6 ms，不能声称所有轮都是亚毫秒。一次更早的相同单轮候选只 ACK 28/30，结果保留；rate=10/s 的过载试验仅 10 次成功入队、9 次 ACK，不作为成功的 sustained throughput。
 
-无代理、无 debug frame trace 的 loopback 场景重复三轮：原默认 Auth p50/p95 中位数 0.43/1.01 ms，16 KiB 为 0.41/1.16 ms，Event 都 ACK 15/15，Auth/s 22.00/22.01，CPU 0.60/0.62%，RSS 9888/9792 KiB；p95 范围分别 0.91–1.28 与 0.94–1.57 ms，没有明确 LAN 优势。两组 p99 中位数达 6.724/6.996 s，分别有 2/2/3 与 2/3/0 次 timeout；极少数超时主导 p99，不能归因于 mux。含 debug trace 的 LAN 初次对照受到记录开销明显干扰，原始输出仍保留但不用于普通 LAN 延迟结论。
+无代理、无 debug frame trace 的 loopback 场景重复三轮：原默认 Auth p50/p95 中位数 0.43/1.01 ms，16 KiB 为 0.41/1.16 ms，Event 都 ACK 15/15，Auth/s 22.00/22.01，CPU 0.60/0.62%，RSS 9888/9792 KiB；p95 范围分别 0.91–1.28 与 0.94–1.57 ms，没有明确 LAN 优势。两组 p99 中位数达 6.724/6.996 s，分别有 2/2/3 与 2/3/0 次 timeout；极少数超时主导 p99，不能归因于 mux。含 debug trace 的 LAN 初次对照受到记录开销明显干扰，不用于普通 LAN 延迟结论；原始输出已从 Git 移除，路径、大小和 SHA-256 见[性能证据归档清单](performance/archive-manifest.json)。
 
 ## Socket Experiments
 
@@ -109,4 +109,4 @@ V3 能调度尚未提交到有序 TCP/TLS 流的 application DATA。后到的 st
 
 ## Remaining Limits
 
-当前业务 telemetry payload 上限为 16 KiB；1 MiB generic mux body 仅在单元测试和微基准使用，未为了本实验改变业务/协议上限。1 MiB 真实 Event sustained workload **NOT RUN**。仍未实现 QUIC、`device.command.send`、离线命令或多节点路由；Event inflight 仍为 1。16 KiB 候选的 15 秒持续积压虽改善 Auth p95，但不构成长期可靠性或生产容量证明。TCP packet-loss HOL、跨机器 RTT 和长期公网 soak 未测。原始成功和失败输出、配置及重现实验说明见 [HOL2 证据目录](performance/business-rpc-v3-hol2/README.md)。
+当前业务 telemetry payload 上限为 16 KiB；1 MiB generic mux body 仅在单元测试和微基准使用，未为了本实验改变业务/协议上限。1 MiB 真实 Event sustained workload **NOT RUN**。仍未实现 QUIC、`device.command.send`、离线命令或多节点路由；Event inflight 仍为 1。16 KiB 候选的 15 秒持续积压虽改善 Auth p95，但不构成长期可靠性或生产容量证明。TCP packet-loss HOL、跨机器 RTT 和长期公网 soak 未测。保留的汇总、配置及重现实验说明见 [HOL2 证据目录](performance/business-rpc-v3-hol2/README.md)；原始成功和失败输出已从 Git 移除，其路径、大小和 SHA-256 见[性能证据归档清单](performance/archive-manifest.json)，本机原件在忽略的 `local-performance-archive/` 中。

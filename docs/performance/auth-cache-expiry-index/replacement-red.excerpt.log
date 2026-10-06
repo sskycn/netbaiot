@@ -1,0 +1,5 @@
+RED regression before the accounting fix:
+test auth::cache_tests::replacement_releases_old_bytes_and_fifo_ownership ... FAILED
+assertion `left == right` failed
+  left: 300
+ right: 200

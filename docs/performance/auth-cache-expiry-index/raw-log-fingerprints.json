@@ -1,5 +1,5 @@
 {
-  "normalization": "Trailing spaces and trailing blank lines only; all measurement/test contents preserved. Exact original files in target/auth-cache-expiry-index/raw-logs and doc commit 9bb1885.",
+  "normalization": "Historical source log fingerprints; full files are preserved locally in local-performance-archive/ and indexed in archive-manifest.json.",
   "original_sha256": {
     "after-1.log": "76a006e64e13b0fc63c1cff79ce4b6aa8c26e71d35f35089c8c10bb82b140658",
     "after-2.log": "7336f515fc46c70b59c41a39a1aab7427373bf36527e4f361b54f0287224b4b6",
@@ -17,5 +17,7 @@
     "validation/udp-fuzz-smoke.log": "1d2dbddba9b69c3cbc39c8f411a51a21c49b1098d5beb0f2dc8501c12ab99c52",
     "validation/focused-udp.log": "21d74a3ea86e3dac3d2302597267b0ff9cb4fbc63382e500e6241d89cb8e84dd",
     "validation/focused-auth-expiry.log": "b62256f4190203becb2e9e88befeeaaf07a1ddd5f377980ac292eab9ed02bc5a"
-  }
+  },
+  "archive_manifest": "../archive-manifest.json",
+  "raw_evidence_status": "Full raw files were removed from tracked docs/performance; checksum keys identify original files and archive-manifest.json records their paths, sizes, and SHA-256."
 }

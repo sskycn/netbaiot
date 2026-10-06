@@ -309,7 +309,7 @@ def main():
     parser.add_argument('--label', default='baseline')
     parser.add_argument('--baseline', default=BASELINE, help='Source revision of the frozen baseline server')
     parser.add_argument('--resume', action='store_true', help='Skip only matching, completed successful raw records')
-    parser.add_argument('--output', type=Path, default=ROOT / 'docs/performance/remove-device-http')
+    parser.add_argument('--output', type=Path, default=ROOT / 'target/performance/remove-device-http')
     args = parser.parse_args()
     args.server = args.server.resolve(); args.loadgen = args.loadgen.resolve()
     args.server_hash = digest(args.server); args.loadgen_hash = digest(args.loadgen)

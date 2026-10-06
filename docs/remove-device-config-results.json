@@ -182,8 +182,7 @@
       "side": "after",
       "protocol": "mqtt",
       "repeat": 0,
-      "raw": "docs/performance/remove-device-config/config-after-mqtt-0.json",
-      "raw_sha256": "49ab5e5fdb77200b725ef32ec82524d6ede4999b6cd120552b85e3329404d794",
+      "raw_sha256": "604246a9a4889a43164e773ce18b96fbc68a8117e93e25d12f0a4232810ac2f4",
       "accepted_per_second": 43748.1,
       "accepted_attempted_pct": 97.24638153653733,
       "accepted_offered_pct": 97.218,
@@ -295,14 +294,16 @@
         "device_connections": 0,
         "runtime_tasks": 5,
         "fds": 12
-      }
+      },
+      "raw_original_path": "docs/performance/remove-device-config/config-after-mqtt-0.json",
+      "raw_size_bytes": 153848,
+      "raw_archive_manifest": "performance/archive-manifest.json"
     },
     {
       "side": "after",
       "protocol": "mqtt",
       "repeat": 1,
-      "raw": "docs/performance/remove-device-config/config-after-mqtt-1.json",
-      "raw_sha256": "daf9ea57dd24afbc582030349f64a1426913315f08a13bc5e2d49056a2ae2029",
+      "raw_sha256": "08c0ba95a7b20b5f8fa409615794a37350482f2e11b753c7d9bb9fb6c19ac050",
       "accepted_per_second": 43637.53333333333,
       "accepted_attempted_pct": 97.10118913402086,
       "accepted_offered_pct": 96.97229629629629,
@@ -414,14 +415,16 @@
         "device_connections": 0,
         "runtime_tasks": 5,
         "fds": 12
-      }
+      },
+      "raw_original_path": "docs/performance/remove-device-config/config-after-mqtt-1.json",
+      "raw_size_bytes": 153904,
+      "raw_archive_manifest": "performance/archive-manifest.json"
     },
     {
       "side": "after",
       "protocol": "mqtt",
       "repeat": 2,
-      "raw": "docs/performance/remove-device-config/config-after-mqtt-2.json",
-      "raw_sha256": "45ee5902cb2a612787c0d8be92bdcd47be105764da77bdf4c66c36d7fe815053",
+      "raw_sha256": "76a4ad318d39b4236e5004daa785533331c68f544110545b01d989691590371b",
       "accepted_per_second": 43726.666666666664,
       "accepted_attempted_pct": 97.30732141532528,
       "accepted_offered_pct": 97.17037037037038,
@@ -533,14 +536,16 @@
         "device_connections": 0,
         "runtime_tasks": 5,
         "fds": 12
-      }
+      },
+      "raw_original_path": "docs/performance/remove-device-config/config-after-mqtt-2.json",
+      "raw_size_bytes": 153940,
+      "raw_archive_manifest": "performance/archive-manifest.json"
     },
     {
       "side": "after",
       "protocol": "tcp",
       "repeat": 0,
-      "raw": "docs/performance/remove-device-config/config-after-tcp-0.json",
-      "raw_sha256": "2d078949aeb275fe134ae5412104a1aa89686a119a9eb13780c9cf6beeb0ceb3",
+      "raw_sha256": "66978edcda20a3e97430f1f2eb72f333507512aa3f3e5ce8080645e4617d6c44",
       "accepted_per_second": 43727.13333333333,
       "accepted_attempted_pct": 97.26002209420434,
       "accepted_offered_pct": 97.1714074074074,
@@ -652,14 +657,16 @@
         "device_connections": 0,
         "runtime_tasks": 5,
         "fds": 12
-      }
+      },
+      "raw_original_path": "docs/performance/remove-device-config/config-after-tcp-0.json",
+      "raw_size_bytes": 152582,
+      "raw_archive_manifest": "performance/archive-manifest.json"
     },
     {
       "side": "after",
       "protocol": "tcp",
       "repeat": 1,
-      "raw": "docs/performance/remove-device-config/config-after-tcp-1.json",
-      "raw_sha256": "809df8afc6a84a98411162f6e14d2c59286ab786c35b84d8222bd1936a00fcad",
+      "raw_sha256": "df827a6058a96fc59b5e8ba397b6b7ce8637eb214786f2a23ac9a100ff0aacdf",
       "accepted_per_second": 43766.03333333333,
       "accepted_attempted_pct": 97.3479888785913,
       "accepted_offered_pct": 97.25785185185184,
@@ -771,14 +778,16 @@
         "device_connections": 0,
         "runtime_tasks": 5,
         "fds": 12
-      }
+      },
+      "raw_original_path": "docs/performance/remove-device-config/config-after-tcp-1.json",
+      "raw_size_bytes": 152539,
+      "raw_archive_manifest": "performance/archive-manifest.json"
     },
     {
       "side": "after",
       "protocol": "tcp",
       "repeat": 2,
-      "raw": "docs/performance/remove-device-config/config-after-tcp-2.json",
-      "raw_sha256": "f5edc85645f6edf48511b060ddb0911093dc07a7d7e100af1a15956c481aa3ac",
+      "raw_sha256": "1d926460febea3b5c1016063b348e186b56632515628b758515b0be3672159ff",
       "accepted_per_second": 43724.76666666667,
       "accepted_attempted_pct": 97.24942246842481,
       "accepted_offered_pct": 97.16614814814815,
@@ -890,14 +899,16 @@
         "device_connections": 0,
         "runtime_tasks": 5,
         "fds": 12
-      }
+      },
+      "raw_original_path": "docs/performance/remove-device-config/config-after-tcp-2.json",
+      "raw_size_bytes": 152579,
+      "raw_archive_manifest": "performance/archive-manifest.json"
     },
     {
       "side": "after",
       "protocol": "udp",
       "repeat": 0,
-      "raw": "docs/performance/remove-device-config/config-after-udp-0.json",
-      "raw_sha256": "4f01e2bb50ab37cdf8aa44213e4b8b42fbbdaea11bcdf66263f34c7e9abf14c8",
+      "raw_sha256": "b02b1a34f2cc6458b37680a15e295c198109f156e8bb8b1c1bd2efa1cace67d7",
       "accepted_per_second": 79656.36666666667,
       "accepted_attempted_pct": 100.0,
       "accepted_offered_pct": 99.57045833333333,
@@ -1002,14 +1013,16 @@
         "device_connections": 0,
         "runtime_tasks": 5,
         "fds": 12
-      }
+      },
+      "raw_original_path": "docs/performance/remove-device-config/config-after-udp-0.json",
+      "raw_size_bytes": 135095,
+      "raw_archive_manifest": "performance/archive-manifest.json"
     },
     {
       "side": "after",
       "protocol": "udp",
       "repeat": 1,
-      "raw": "docs/performance/remove-device-config/config-after-udp-1.json",
-      "raw_sha256": "89bfd3c14b4b8afc417d22f82a0394facda19b2ba931d02d76c079ac82a29096",
+      "raw_sha256": "7c232103c032da34baccc61e3ecff71a41846f360be9c58506a23d8a5b0bc968",
       "accepted_per_second": 79926.7,
       "accepted_attempted_pct": 100.0,
       "accepted_offered_pct": 99.908375,
@@ -1114,14 +1127,16 @@
         "device_connections": 0,
         "runtime_tasks": 5,
         "fds": 12
-      }
+      },
+      "raw_original_path": "docs/performance/remove-device-config/config-after-udp-1.json",
+      "raw_size_bytes": 131888,
+      "raw_archive_manifest": "performance/archive-manifest.json"
     },
     {
       "side": "after",
       "protocol": "udp",
       "repeat": 2,
-      "raw": "docs/performance/remove-device-config/config-after-udp-2.json",
-      "raw_sha256": "88cc0a7354f2028cdc53626558964cce6c8b78cb96d7a666fba3d3b319c44108",
+      "raw_sha256": "21eb64399704f50d9345821d9403cf614866b51d255672784705f077714d06f0",
       "accepted_per_second": 79830.03333333334,
       "accepted_attempted_pct": 100.0,
       "accepted_offered_pct": 99.78754166666667,
@@ -1226,14 +1241,16 @@
         "device_connections": 0,
         "runtime_tasks": 5,
         "fds": 12
-      }
+      },
+      "raw_original_path": "docs/performance/remove-device-config/config-after-udp-2.json",
+      "raw_size_bytes": 132297,
+      "raw_archive_manifest": "performance/archive-manifest.json"
     },
     {
       "side": "before",
       "protocol": "mqtt",
       "repeat": 0,
-      "raw": "docs/performance/remove-device-config/config-before-mqtt-0.json",
-      "raw_sha256": "cd09aec328e9a74e995231d411914cfd6a691b591a34d1bb660d35a121ef037c",
+      "raw_sha256": "d973c094ceb4ef53ecee58bedce18b3dc2ebbb0b825aacd1a61c1a6e9356720c",
       "accepted_per_second": 43669.73333333333,
       "accepted_attempted_pct": 97.09649973170637,
       "accepted_offered_pct": 97.04385185185184,
@@ -1345,14 +1362,16 @@
         "device_connections": 0,
         "runtime_tasks": 5,
         "fds": 12
-      }
+      },
+      "raw_original_path": "docs/performance/remove-device-config/config-before-mqtt-0.json",
+      "raw_size_bytes": 155460,
+      "raw_archive_manifest": "performance/archive-manifest.json"
     },
     {
       "side": "before",
       "protocol": "mqtt",
       "repeat": 1,
-      "raw": "docs/performance/remove-device-config/config-before-mqtt-1.json",
-      "raw_sha256": "b1998533d93a38179c58d85ee985942b802d2495fb0786b72d69676beeff52b8",
+      "raw_sha256": "9888733f379d06853608a3fc9fa77e6e7d868da731f79de8a2c1c14b6d74a87f",
       "accepted_per_second": 43657.066666666666,
       "accepted_attempted_pct": 97.13060561271371,
       "accepted_offered_pct": 97.01570370370371,
@@ -1464,14 +1483,16 @@
         "device_connections": 0,
         "runtime_tasks": 5,
         "fds": 12
-      }
+      },
+      "raw_original_path": "docs/performance/remove-device-config/config-before-mqtt-1.json",
+      "raw_size_bytes": 156068,
+      "raw_archive_manifest": "performance/archive-manifest.json"
     },
     {
       "side": "before",
       "protocol": "mqtt",
       "repeat": 2,
-      "raw": "docs/performance/remove-device-config/config-before-mqtt-2.json",
-      "raw_sha256": "9c71d9b424b5c920b2766514cbe617cf7db315309d1370917422640e85b33c28",
+      "raw_sha256": "2113dd10ddb21a239134904a12d813cb22fa000f4b53b7d4b07bd0622b8e21a4",
       "accepted_per_second": 43595.5,
       "accepted_attempted_pct": 96.96019180527672,
       "accepted_offered_pct": 96.8788888888889,
@@ -1583,14 +1604,16 @@
         "device_connections": 0,
         "runtime_tasks": 5,
         "fds": 12
-      }
+      },
+      "raw_original_path": "docs/performance/remove-device-config/config-before-mqtt-2.json",
+      "raw_size_bytes": 155949,
+      "raw_archive_manifest": "performance/archive-manifest.json"
     },
     {
       "side": "before",
       "protocol": "udp",
       "repeat": 0,
-      "raw": "docs/performance/remove-device-config/config-before-retry-udp-0.json",
-      "raw_sha256": "53aeed663f0cd73f48e17172d6ef7d9263a621554cc2dd059fbbfcc062f48f94",
+      "raw_sha256": "dd44f03dab08ae31ae4a586bdddcff0d5774aa04f3c736f683fd0a983dc60b0e",
       "accepted_per_second": 76896.96666666666,
       "accepted_attempted_pct": 100.0,
       "accepted_offered_pct": 96.12120833333334,
@@ -1695,14 +1718,16 @@
         "device_connections": 0,
         "runtime_tasks": 5,
         "fds": 12
-      }
+      },
+      "raw_original_path": "docs/performance/remove-device-config/config-before-retry-udp-0.json",
+      "raw_size_bytes": 137637,
+      "raw_archive_manifest": "performance/archive-manifest.json"
     },
     {
       "side": "before",
       "protocol": "udp",
       "repeat": 1,
-      "raw": "docs/performance/remove-device-config/config-before-retry-udp-1.json",
-      "raw_sha256": "493ab90d684669ca6a348c3964a4268e8f003cabb1a359e5f10d3fba0b83f2ad",
+      "raw_sha256": "8789d515b52bf6e49e3106342d8bed50e45cc4998989b50c86f8db03663768da",
       "accepted_per_second": 79289.6,
       "accepted_attempted_pct": 100.0,
       "accepted_offered_pct": 99.112,
@@ -1807,14 +1832,16 @@
         "device_connections": 0,
         "runtime_tasks": 5,
         "fds": 12
-      }
+      },
+      "raw_original_path": "docs/performance/remove-device-config/config-before-retry-udp-1.json",
+      "raw_size_bytes": 134551,
+      "raw_archive_manifest": "performance/archive-manifest.json"
     },
     {
       "side": "before",
       "protocol": "udp",
       "repeat": 2,
-      "raw": "docs/performance/remove-device-config/config-before-retry-udp-2.json",
-      "raw_sha256": "41f7a750271a8f25f666beabc486af6b48bfbb61fb57c50ec416f6a333205225",
+      "raw_sha256": "c1d505c2cf15251c3c4b0439ae2d83335a26696b4895151548d2bc86f8495b20",
       "accepted_per_second": 79317.06666666667,
       "accepted_attempted_pct": 100.0,
       "accepted_offered_pct": 99.14633333333333,
@@ -1919,14 +1946,16 @@
         "device_connections": 0,
         "runtime_tasks": 5,
         "fds": 12
-      }
+      },
+      "raw_original_path": "docs/performance/remove-device-config/config-before-retry-udp-2.json",
+      "raw_size_bytes": 134572,
+      "raw_archive_manifest": "performance/archive-manifest.json"
     },
     {
       "side": "before",
       "protocol": "tcp",
       "repeat": 0,
-      "raw": "docs/performance/remove-device-config/config-before-tcp-0.json",
-      "raw_sha256": "cfd558f9d1db73d8b8d951a5ea5fbe5bcabb23f5dbee0596427411ec126162a0",
+      "raw_sha256": "6777e2c9f6b75477b09e8882f79a0ac2175763680360b343afc6e31f0ab32857",
       "accepted_per_second": 43660.833333333336,
       "accepted_attempted_pct": 97.12796502332866,
       "accepted_offered_pct": 97.02407407407406,
@@ -2038,14 +2067,16 @@
         "device_connections": 0,
         "runtime_tasks": 5,
         "fds": 12
-      }
+      },
+      "raw_original_path": "docs/performance/remove-device-config/config-before-tcp-0.json",
+      "raw_size_bytes": 154568,
+      "raw_archive_manifest": "performance/archive-manifest.json"
     },
     {
       "side": "before",
       "protocol": "tcp",
       "repeat": 1,
-      "raw": "docs/performance/remove-device-config/config-before-tcp-1.json",
-      "raw_sha256": "25a321aeeaadc55d710ab16a0461fa34650d5666ef51d3065e57c388754eacd6",
+      "raw_sha256": "e69d21de78afdf55801b8f4fa41c8e34724030f077221ba4ca0b29081767942e",
       "accepted_per_second": 43650.1,
       "accepted_attempted_pct": 97.06773822681109,
       "accepted_offered_pct": 97.00022222222222,
@@ -2157,14 +2188,16 @@
         "device_connections": 0,
         "runtime_tasks": 5,
         "fds": 12
-      }
+      },
+      "raw_original_path": "docs/performance/remove-device-config/config-before-tcp-1.json",
+      "raw_size_bytes": 154773,
+      "raw_archive_manifest": "performance/archive-manifest.json"
     },
     {
       "side": "before",
       "protocol": "tcp",
       "repeat": 2,
-      "raw": "docs/performance/remove-device-config/config-before-tcp-2.json",
-      "raw_sha256": "f162e96e59829ae4e9e158dc77babef6f88757cf921b3e5979547c4211e066d3",
+      "raw_sha256": "acace8923a3821800de317bb59ad430c01a5e6bdecbbfc2a4b695330c1213a09",
       "accepted_per_second": 43693.63333333333,
       "accepted_attempted_pct": 97.25393802292737,
       "accepted_offered_pct": 97.09696296296296,
@@ -2276,14 +2309,22 @@
         "device_connections": 0,
         "runtime_tasks": 5,
         "fds": 12
-      }
+      },
+      "raw_original_path": "docs/performance/remove-device-config/config-before-tcp-2.json",
+      "raw_size_bytes": 154753,
+      "raw_archive_manifest": "performance/archive-manifest.json"
     }
   ],
   "excluded": [
     {
-      "raw": "docs/performance/remove-device-config/config-before-udp-0.json",
       "reason": "server failed before readiness/load",
-      "server_log": "Error: Unavailable\n"
+      "raw_original_path": "docs/performance/remove-device-config/config-before-udp-0.json",
+      "raw_size_bytes": 11424,
+      "raw_sha256": "16d1931c9deee3d5922e181e624d7c2f1cb7d9432031eb64b29da95ba0a2a227",
+      "raw_archive_manifest": "performance/archive-manifest.json",
+      "server_log_sha256": "a8d173cc4446473c987206bfd67926cd1baf7204b523b84630d099f71d6f4387",
+      "server_log_size_bytes": 19,
+      "server_log_omitted_from_summary": true
     }
   ],
   "cleanup_checks": "18/18 passed",
@@ -2292,5 +2333,6 @@
     "Stream modes hit admission limits; UDP client window may shed scheduled sends. See accepted/offered and raw counters.",
     "Peak and idle RSS are sampled process values, not exact object accounting or proof of a memory reduction.",
     "No separate-host, multi-hour soak, power-loss or syscall profiling. TLS correctness is tested but TLS throughput is not rerun here."
-  ]
+  ],
+  "raw_evidence_status": "Original raw files are indexed in performance/archive-manifest.json; no hosted artifact is known."
 }

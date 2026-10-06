@@ -33,10 +33,15 @@ jobs:
           name: mqtt-protocol-regressions
           path: target/mqtt-audit/ci.json
           if-no-files-found: warn
+          retention-days: 14
       - name: Retain release and reference timing evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: mqtt-release-gate
-          path: target/mqtt-conformance/results.json
+          path: |
+            target/mqtt-conformance/results.json
+            target/performance/
+            target/evidence/
           if-no-files-found: warn
+          retention-days: 14

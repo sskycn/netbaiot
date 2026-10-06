@@ -188,8 +188,10 @@ All current production declarations and handlers for device business configurati
 are gone. Negative tests intentionally use old wire names, status keys, paths and
 startup fields. The result verifier asserts removed status keys are absent. Current
 protocol and migration docs name rejected inputs to explain the breaking change.
-Annotated historical Markdown and historical raw benchmark JSON/logs retain their
-original evidence, including old cache fields in baseline status samples.
+Annotated historical Markdown and compact benchmark summaries retain the original
+conclusions, including old cache fields in baseline status samples. Full raw
+benchmark JSON and logs are indexed in the performance archive manifest and kept in
+the local pre-cleanup copy.
 
 The protocol crate now needs `serde_json` only as a dev dependency. No database,
 external broker, runtime dependency or replacement configuration client was added.
@@ -205,14 +207,18 @@ Rust sources/tests/examples/benchmarks account for **23 files, +547 / -762 lines
 profiles/routes and focused replacement tests. Measurement artifacts and this
 report are a separate evidence commit and are not counted as runtime code savings.
 
-Including the report, raw measurements, validation logs and verifier, the complete
-task changes 129 files, +19,690 / -880 lines. The added evidence is not production code.
+Including the report, retained measurement summaries, validation index and verifier,
+the complete task changes 129 files, +19,690 / -880 lines. Full raw measurements and
+validation logs are indexed in the archive manifest. The added evidence is not
+production code.
 
 ## Binary and dependencies
 
 Both versions were built with Rust 1.88.0 and the same command/package selection,
 then copied to immutable task-local paths before measurement. Hashes and dependency
-trees are stored with the [raw evidence](performance/remove-device-config/).
+trees are stored with the [experiment metadata](performance/remove-device-config/).
+Full benchmark outputs are indexed in [archive-manifest.json](performance/archive-manifest.json)
+and the pre-cleanup local copy.
 
 | Artifact / graph | Before | After | Delta |
 | --- | ---: | ---: | ---: |
@@ -286,14 +292,17 @@ All **18/18** measured runs exited gracefully and returned event count/bytes,
 pending required work and device connection counts to zero, with task/FD counts
 back at their idle values. Server/loadgen artifact hashes match the frozen inputs.
 One additional baseline UDP attempt failed before readiness and never started load;
-it is preserved and excluded. The harness now reserves the same device port for
+its concise failure summary remains in the aggregate results, while the original
+raw record is indexed in the archive manifest and local copy. It is excluded. The harness now reserves the same device port for
 both TCP and UDP before handoff (a TCP-only reservation cannot exclude unrelated
 UDP use); the original bind failure's exact cause was not instrumented. All three
 UDP measurements were rerun under the paired reservation. The OS handoff race is
 reduced, not eliminated.
 
-[Machine-readable results](remove-device-config-results.json) contain individual
-runs, ranges, counters, hashes, failed-start evidence and cleanup checks. Reproduce
+[Machine-readable results](remove-device-config-results.json) contain compact
+per-run aggregates, ranges, counters, raw-file hashes, failed-start summaries and
+cleanup checks. Full raw paths, sizes and hashes are in
+[archive-manifest.json](performance/archive-manifest.json). Reproduce
 using the saved plans and artifact revisions with `device_protocol_benchmark.py`;
 run `python3 scripts/perf/device_config_summary.py` to verify and regenerate the
 aggregate. Full commands are in the validation index.

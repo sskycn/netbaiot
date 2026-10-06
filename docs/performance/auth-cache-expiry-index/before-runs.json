@@ -16,7 +16,9 @@
     ],
     "exit_code": 0,
     "elapsed_seconds": 17.956,
-    "log": "docs/performance/auth-cache-expiry-index/before-1.log"
+    "log_original_path": "docs/performance/auth-cache-expiry-index/before-1.log",
+    "log_size_bytes": 6110,
+    "log_sha256": "96728573ec772bb869f217401c38b3cc60295f3eb09dad56f555bb11bdaebd2b"
   },
   {
     "run": 2,
@@ -35,7 +37,9 @@
     ],
     "exit_code": 0,
     "elapsed_seconds": 1.332,
-    "log": "docs/performance/auth-cache-expiry-index/before-2.log"
+    "log_original_path": "docs/performance/auth-cache-expiry-index/before-2.log",
+    "log_size_bytes": 2414,
+    "log_sha256": "003e166cba725b844575f0c7c8a28e6f8babc39958f5030c64a01dfaa3eab388"
   },
   {
     "run": 3,
@@ -54,6 +58,8 @@
     ],
     "exit_code": 0,
     "elapsed_seconds": 1.328,
-    "log": "docs/performance/auth-cache-expiry-index/before-3.log"
+    "log_original_path": "docs/performance/auth-cache-expiry-index/before-3.log",
+    "log_size_bytes": 2413,
+    "log_sha256": "8039a9d26837cf9ec127cf65b72464913c85763a405fc0cddedfdb8bdede358c"
   }
 ]

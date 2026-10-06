@@ -3,7 +3,6 @@
     {
       "label": "after",
       "run": "auth-expiry-udp512-r0",
-      "raw_file": "after-auth-expiry-udp512-r0-0.json",
       "accepted_per_second": 39996.2,
       "scheduled": 599945,
       "attempted": 599943,
@@ -24,12 +23,14 @@
       "warm_auth_entries": 512,
       "post_warm_auth_misses": 0,
       "server_sha256": "29420d57d349e2b2032ad92266495127aaf94119579181f032f2ae75e44565ac",
-      "loadgen_sha256": "d6fb6f19b08c9e7915a6b800d0465f39d1fbce1eaa0f2b6bfaad1aeea045e009"
+      "loadgen_sha256": "d6fb6f19b08c9e7915a6b800d0465f39d1fbce1eaa0f2b6bfaad1aeea045e009",
+      "raw_original_path": "docs/performance/auth-cache-expiry-index/udp/after-auth-expiry-udp512-r0-0.json",
+      "raw_size_bytes": 133866,
+      "raw_sha256": "7257e384261dd980c7b2c36e9dd958f4b74f7ecbfe5971b214f40f5e1320d708"
     },
     {
       "label": "after",
       "run": "auth-expiry-udp512-r1",
-      "raw_file": "after-auth-expiry-udp512-r1-0.json",
       "accepted_per_second": 40002.666666666664,
       "scheduled": 600040,
       "attempted": 600040,
@@ -49,12 +50,14 @@
       "warm_auth_entries": 512,
       "post_warm_auth_misses": 0,
       "server_sha256": "29420d57d349e2b2032ad92266495127aaf94119579181f032f2ae75e44565ac",
-      "loadgen_sha256": "d6fb6f19b08c9e7915a6b800d0465f39d1fbce1eaa0f2b6bfaad1aeea045e009"
+      "loadgen_sha256": "d6fb6f19b08c9e7915a6b800d0465f39d1fbce1eaa0f2b6bfaad1aeea045e009",
+      "raw_original_path": "docs/performance/auth-cache-expiry-index/udp/after-auth-expiry-udp512-r1-0.json",
+      "raw_size_bytes": 133839,
+      "raw_sha256": "0d4cdb26c9e32c6d8a847d4063df22a8ff0dae0d715a84d5e7c4bfb9654c6d56"
     },
     {
       "label": "after",
       "run": "auth-expiry-udp512-r2",
-      "raw_file": "after-auth-expiry-udp512-r2-0.json",
       "accepted_per_second": 39997.86666666667,
       "scheduled": 599967,
       "attempted": 599968,
@@ -75,12 +78,14 @@
       "warm_auth_entries": 512,
       "post_warm_auth_misses": 0,
       "server_sha256": "29420d57d349e2b2032ad92266495127aaf94119579181f032f2ae75e44565ac",
-      "loadgen_sha256": "d6fb6f19b08c9e7915a6b800d0465f39d1fbce1eaa0f2b6bfaad1aeea045e009"
+      "loadgen_sha256": "d6fb6f19b08c9e7915a6b800d0465f39d1fbce1eaa0f2b6bfaad1aeea045e009",
+      "raw_original_path": "docs/performance/auth-cache-expiry-index/udp/after-auth-expiry-udp512-r2-0.json",
+      "raw_size_bytes": 138670,
+      "raw_sha256": "9eaacd0c7a9f8eaff4acf2aa384e12ed53b26d97d560156ccb911f75398b80cf"
     },
     {
       "label": "before",
       "run": "auth-expiry-udp512-r0",
-      "raw_file": "before-auth-expiry-udp512-r0-0.json",
       "accepted_per_second": 24391.733333333334,
       "scheduled": 600000,
       "attempted": 372865,
@@ -100,12 +105,14 @@
       "warm_auth_entries": 512,
       "post_warm_auth_misses": 0,
       "server_sha256": "0e07f0c70aa3fa62019690809c4757d29b4189107d6d3154ce197f55d4fc81d7",
-      "loadgen_sha256": "d6fb6f19b08c9e7915a6b800d0465f39d1fbce1eaa0f2b6bfaad1aeea045e009"
+      "loadgen_sha256": "d6fb6f19b08c9e7915a6b800d0465f39d1fbce1eaa0f2b6bfaad1aeea045e009",
+      "raw_original_path": "docs/performance/auth-cache-expiry-index/udp/before-auth-expiry-udp512-r0-0.json",
+      "raw_size_bytes": 139867,
+      "raw_sha256": "fdd30e942e36b52c130ca071b914508ec7deac666eafdc01b35e04c80f85cf9e"
     },
     {
       "label": "before",
       "run": "auth-expiry-udp512-r1",
-      "raw_file": "before-auth-expiry-udp512-r1-0.json",
       "accepted_per_second": 24182.0,
       "scheduled": 600000,
       "attempted": 369789,
@@ -126,12 +133,14 @@
       "warm_auth_entries": 512,
       "post_warm_auth_misses": 0,
       "server_sha256": "0e07f0c70aa3fa62019690809c4757d29b4189107d6d3154ce197f55d4fc81d7",
-      "loadgen_sha256": "d6fb6f19b08c9e7915a6b800d0465f39d1fbce1eaa0f2b6bfaad1aeea045e009"
+      "loadgen_sha256": "d6fb6f19b08c9e7915a6b800d0465f39d1fbce1eaa0f2b6bfaad1aeea045e009",
+      "raw_original_path": "docs/performance/auth-cache-expiry-index/udp/before-auth-expiry-udp512-r1-0.json",
+      "raw_size_bytes": 139735,
+      "raw_sha256": "8c95feda248bbf56bcdb2ab7de0fc56c418f2c0a8894a5646109b88ed2edb501"
     },
     {
       "label": "before",
       "run": "auth-expiry-udp512-r2",
-      "raw_file": "before-auth-expiry-udp512-r2-0.json",
       "accepted_per_second": 24149.933333333334,
       "scheduled": 600014,
       "attempted": 369246,
@@ -153,7 +162,10 @@
       "warm_auth_entries": 512,
       "post_warm_auth_misses": 0,
       "server_sha256": "0e07f0c70aa3fa62019690809c4757d29b4189107d6d3154ce197f55d4fc81d7",
-      "loadgen_sha256": "d6fb6f19b08c9e7915a6b800d0465f39d1fbce1eaa0f2b6bfaad1aeea045e009"
+      "loadgen_sha256": "d6fb6f19b08c9e7915a6b800d0465f39d1fbce1eaa0f2b6bfaad1aeea045e009",
+      "raw_original_path": "docs/performance/auth-cache-expiry-index/udp/before-auth-expiry-udp512-r2-0.json",
+      "raw_size_bytes": 144525,
+      "raw_sha256": "731bf970a573c81137f8a1c7e33f89ed0dfb2e21c5c108dd1bc457906522f484"
     }
   ],
   "median": {
@@ -171,5 +183,7 @@
       "server_rss_max_kib": 9808,
       "peak_pending_required": 22
     }
-  }
+  },
+  "archive_manifest": "../archive-manifest.json",
+  "raw_evidence_status": "Raw files are not hosted; exact original paths, sizes, and SHA-256 values are in the archive manifest."
 }

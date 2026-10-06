@@ -124,7 +124,7 @@ Rust 1.88.0 commands on the implementation above:
 | `cargo +1.88.0 test -p netbaiot-server --test server subprocess_graceful_restart_sixty_second_soak -- --ignored --nocapture` | PASS, 61.83 s, forced-spool/recovery pair plus 12 healthy process generations |
 | `CARGO_NET_OFFLINE=true cargo +nightly fuzz run device_classifier -- -max_total_time=60 -max_len=65537` | PASS, 1,120,415 iterations, 61 s, ASan |
 | `CARGO_NET_OFFLINE=true cargo +nightly fuzz run udp_envelope -- -max_total_time=60 -max_len=1201` | PASS, 673,155 iterations, 61 s, ASan |
-| `python3 scripts/perf/dual_host_preflight.py --server target/remove-device-http/after-server --output docs/performance/remove-device-http/config-preflight.json` | 5/5 PASS; loopback, IPv4/IPv6 TLS requirement, required-sink validation |
+| `python3 scripts/perf/dual_host_preflight.py --server target/remove-device-http/after-server --output target/performance/remove-device-http/config-preflight.json` | 5/5 PASS; loopback, IPv4/IPv6 TLS requirement, required-sink validation |
 | `python3 -m unittest discover -s scripts/perf -p 'test_*.py'` | 5/5 PASS; Python AST and shell syntax checks also passed |
 
 Final documentation/comment edits were followed by passing fmt/check/clippy, the
@@ -174,9 +174,14 @@ benchmark tooling and raw evidence are additional changes.
 
 ## Performance
 
-The machine-readable [results](remove-device-http-results.json), 30 raw run records,
-plans, binary hashes and environment files are in
-[the evidence directory](performance/remove-device-http/README.md).
+The machine-readable [results](remove-device-http-results.json) retain compact
+per-run aggregates, checks, and raw-file hashes. Methods and plans remain in
+[the evidence directory](performance/remove-device-http/README.md). Full run
+records are generated under `target/performance/remove-device-http/`; historical
+raw file paths, sizes, and hashes are indexed in
+[the archive manifest](performance/archive-manifest.json). The raw files are not
+currently hosted as workflow artifacts and can be regenerated using the saved
+plans and binary revisions.
 Five protocol modes were each measured 3 × 30 seconds before and after, with
 5-second warmup and 1-second worker ramp. Same Apple M4/10-core macOS loopback host;
 10 server Tokio workers and **4 actual generator workers**. Stream modes offer
