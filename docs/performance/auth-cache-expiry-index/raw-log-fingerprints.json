@@ -1,0 +1,21 @@
+{
+  "normalization": "Trailing spaces and trailing blank lines only; all measurement/test contents preserved. Exact original files in target/auth-cache-expiry-index/raw-logs and doc commit 9bb1885.",
+  "original_sha256": {
+    "after-1.log": "76a006e64e13b0fc63c1cff79ce4b6aa8c26e71d35f35089c8c10bb82b140658",
+    "after-2.log": "7336f515fc46c70b59c41a39a1aab7427373bf36527e4f361b54f0287224b4b6",
+    "after-3.log": "92096ea8e32ced9286ebebd9b5e783b077e5f646d8bf96ab9edd1823afa9e817",
+    "index-memory-1.log": "4cdb2f0568b7811efe6f32740a0995f276f5fa97ba0a1fa0814b180652c109be",
+    "index-memory-3.log": "1f3be97018549791b6816cbc8819fd98f3b38696d75483a9b090f6b5661dc978",
+    "index-memory-2.log": "1f4da7b038d1b626ee8a2c5a5f82d5692c98a055c3a3834a2ff90476587d8532",
+    "before-2.log": "06b712e4178452a35c0a86695a35ea7f48895e722759d9b4dabf64ed0029de80",
+    "before-3.log": "8f7b5c47644dd150aa83d134c3cc8186c0544feb35e39bdcf96ed8508e372fcf",
+    "before-1.log": "09e987822b5e97427ef15a49d215c6bbdc82366fda1a148678bbed4ad921ae7c",
+    "validation/1.88.0-workspace-tests.log": "19a7131d6f73291e15e454a8fbb6646577fa9312fabf6d905bc88fe6e22a03fd",
+    "validation/focused-auth-existing.log": "b257bc419d5380351a6696c4dc1edbcdffc28646c4b9f11eb0b40243ae228fe2",
+    "validation/focused-end-to-end.log": "112c225930c02f2d3bc0d7b24f71b4687a84824f892bf4b3690ccdd88b93c8e4",
+    "validation/stable-workspace-tests.log": "c5e5a8d42e0b7f130f91dfe96872578c7892f13d8d83a60644a417dbeb894360",
+    "validation/udp-fuzz-smoke.log": "1d2dbddba9b69c3cbc39c8f411a51a21c49b1098d5beb0f2dc8501c12ab99c52",
+    "validation/focused-udp.log": "21d74a3ea86e3dac3d2302597267b0ff9cb4fbc63382e500e6241d89cb8e84dd",
+    "validation/focused-auth-expiry.log": "b62256f4190203becb2e9e88befeeaaf07a1ddd5f377980ac292eab9ed02bc5a"
+  }
+}

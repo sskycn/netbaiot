@@ -111,6 +111,8 @@ expire-all 为每次命令一批，取三批中位数。所有结果包含首轮
 完整逐批 hit/mutex/alloc/prune/expire-all 数据见 [measurements.json](measurements.json)。
 原始 stdout/stderr：[before-1](before-1.log)、[before-2](before-2.log)、[before-3](before-3.log)、
 [after-1](after-1.log)、[after-2](after-2.log)、[after-3](after-3.log)。
+提交的工具日志仅规范化行尾空格和 EOF 空行；数值、断言和失败记录未删改。
+精确原件指纹见 [raw-log-fingerprints.json](raw-log-fingerprints.json)，原件也保留于本机 target。
 [before-runs](before-runs.json)、[after-runs](after-runs.json)记录完整命令、耗时和退出码。
 优化后的 fixture 批量改变 deadline 时同步重建 index，此准备不在计时区间，
 真实 prune 仍通过同一个 production helper。
