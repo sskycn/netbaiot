@@ -24,16 +24,16 @@
   "business_transport": {
     "mode": "mtls",
     "server_name": "localhost",
-    "ca_pem": "/Users/sam/Dev/work/sskycn/netbaiot/tests/fixtures/localhost-cert.pem",
-    "certificate_pem": "/Users/sam/Dev/work/sskycn/netbaiot/tests/fixtures/management-client.pem",
-    "private_key_pem": "/Users/sam/Dev/work/sskycn/netbaiot/tests/fixtures/management-client-key.pem"
+    "ca_pem": "<repo>/tests/fixtures/localhost-cert.pem",
+    "certificate_pem": "<repo>/tests/fixtures/management-client.pem",
+    "private_key_pem": "<repo>/tests/fixtures/management-client-key.pem"
   },
   "command_transport": {
     "mode": "mtls",
     "server_name": "localhost",
-    "ca_pem": "/Users/sam/Dev/work/sskycn/netbaiot/tests/fixtures/localhost-cert.pem",
-    "certificate_pem": "/Users/sam/Dev/work/sskycn/netbaiot/tests/fixtures/business-command-client.pem",
-    "private_key_pem": "/Users/sam/Dev/work/sskycn/netbaiot/tests/fixtures/business-command-client-key.pem"
+    "ca_pem": "<repo>/tests/fixtures/localhost-cert.pem",
+    "certificate_pem": "<repo>/tests/fixtures/business-command-client.pem",
+    "private_key_pem": "<repo>/tests/fixtures/business-command-client-key.pem"
   },
   "topology": "v3",
   "network_profile": "local_mtls",

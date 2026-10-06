@@ -1,29 +1,11 @@
 name: MQTT external interoperability
 
 on:
+  workflow_call:
   workflow_dispatch:
-  push:
-    branches: [main]
-    tags: ["v*"]
-    paths:
-      - ".github/workflows/mqtt-interop.yml"
-      - "apps/netbaiot-server/**"
-      - "crates/netbaiot-transports/src/mqtt/**"
-      - "crates/netbaiot-device-sdk/**"
-      - "crates/netbaiot-mqtt-wire/**"
-      - "crates/netbaiot-runtime/**"
-      - "tests/mqtt_conformance/**"
-      - "tests/mqtt_protocol_regressions.py"
-      - "tests/mosquitto_cli_interop.py"
-      - "tests/run_mosquitto_cli_interop.py"
-      - "tests/run_mosquitto_tls_interop.py"
-      - "tests/run_device_profile_mosquitto.py"
-      - "tests/measure_device_profile.py"
-      - "scripts/ci_annotate.py"
-      - "Cargo.toml"
-      - "Cargo.lock"
-  release:
-    types: [published]
+
+permissions:
+  contents: read
 
 jobs:
   release-gate:

@@ -4,10 +4,16 @@ set -euo pipefail
 ROOT_DIR=$(cd "$(dirname "$0")/../.." && pwd)
 RUN_DIR=$(mktemp -d "${TMPDIR:-/tmp}/netbaiot-demo.XXXXXX")
 SINK_PID=
+SERVER_PID=
 
 cleanup() {
   status=$?
   trap - EXIT INT TERM
+  # Keep the webhook alive until accepted work has drained from the gateway.
+  if [[ -n "$SERVER_PID" ]]; then
+    kill -TERM "$SERVER_PID" 2>/dev/null || true
+    wait "$SERVER_PID" 2>/dev/null || true
+  fi
   if [[ -n "$SINK_PID" ]]; then
     kill "$SINK_PID" 2>/dev/null || true
     wait "$SINK_PID" 2>/dev/null || true
@@ -19,10 +25,21 @@ trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
-command -v cargo >/dev/null || { echo "cargo is required" >&2; exit 1; }
 command -v python3 >/dev/null || { echo "python3 is required" >&2; exit 1; }
 
 cd "$ROOT_DIR"
+if [[ -x "$ROOT_DIR/netbaiot-server" ]]; then
+  SERVER="$ROOT_DIR/netbaiot-server"
+elif [[ -f "$ROOT_DIR/netbaiot-server.exe" ]]; then
+  SERVER="$ROOT_DIR/netbaiot-server.exe"
+elif [[ -f "$ROOT_DIR/Cargo.toml" ]]; then
+  command -v cargo >/dev/null || { echo "Rust 1.88+ and cargo are required for a source checkout" >&2; exit 1; }
+  cargo build --locked -p netbaiot-server
+  SERVER="$ROOT_DIR/target/debug/netbaiot-server"
+else
+  echo "no packaged server binary or source Cargo.toml found" >&2
+  exit 1
+fi
 python3 - "$ROOT_DIR/configs/tutorial.json" "$RUN_DIR/config.json" "$RUN_DIR/spool" <<'PY'
 import json
 import sys
@@ -62,4 +79,8 @@ printf '%s\n' \
   'Webhook:       127.0.0.1:18080/events' \
   'Wait for the runtime ready log, then publish from another terminal; Ctrl-C stops the demo.'
 
-cargo run --locked -p netbaiot-server -- "$RUN_DIR/config.json"
+export RUST_LOG="${RUST_LOG:-info}"
+"$SERVER" "$RUN_DIR/config.json" &
+SERVER_PID=$!
+wait "$SERVER_PID"
+SERVER_PID=

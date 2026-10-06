@@ -5,6 +5,22 @@ database-free device listeners and reports accepted-event and transport latency.
 Do not use the historical PostgreSQL-era JSON results in `docs/performance` as
 evidence for the current architecture.
 
+Published evidence uses `<repo>`, `<tmp>`, and `<home>` path placeholders. These
+are archival inputs, not directly runnable configurations: substitute your own
+paths before replaying a run. The V3 command-readiness and HOL harnesses scrub
+their completed output (including failure logs) after child processes stop, using
+dynamically discovered roots. Live configs retain real paths while a run is active.
+For other drivers, sanitize evidence before copying it into documentation:
+
+```bash
+python3 scripts/scrub_paths.py target/perf-audit --write
+python3 scripts/scrub_paths.py docs/performance
+```
+
+Release preflight rejects unsanitized performance paths. Scrubbing is not secret
+redaction: only publish runs made with public test fixtures and inspect the
+output for secrets separately. Do not publish a still-running harness directory.
+
 Build release binaries:
 
 ```bash

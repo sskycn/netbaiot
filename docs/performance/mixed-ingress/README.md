@@ -52,7 +52,7 @@ Regenerate summaries after the campaign has finished:
 
 ```sh
 python3 scripts/perf/mixed_ingress_report.py --output docs/mixed-ingress-capacity-results.json
-python3 scripts/perf/mixed_ingress_tables.py docs/mixed-ingress-capacity-results.json /tmp/mixed-ingress-tables.md
+python3 scripts/perf/mixed_ingress_tables.py docs/mixed-ingress-capacity-results.json <tmp>/mixed-ingress-tables.md
 python3 scripts/perf/mixed_ingress_verify.py --directory docs/performance/mixed-ingress --plan docs/performance/mixed-ingress/plan.json --output docs/performance/mixed-ingress/matrix-verification.json
 ```
 
@@ -67,7 +67,7 @@ in the report. Build `netbaiot-loadgen` at audit-tool revision
 checkout, then run:
 
 ```sh
-python3 scripts/perf/mixed_ingress_audit.py --candidate target/mixed-audit/final-server --loadgen target/mixed-audit/final-loadgen --plan docs/performance/mixed-ingress/plan.json --output /tmp/netbaiot-mixed-evidence
+python3 scripts/perf/mixed_ingress_audit.py --candidate target/mixed-audit/final-server --loadgen target/mixed-audit/final-loadgen --plan docs/performance/mixed-ingress/plan.json --output <tmp>/netbaiot-mixed-evidence
 ```
 
 Use a fresh checkout/output directory for a new campaign; the harness deliberately

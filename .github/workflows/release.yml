@@ -1,6 +1,12 @@
 name: GitHub Release
 
 on:
+  workflow_dispatch:
+    inputs:
+      release-tag:
+        description: Candidate version (vX.Y.Z); verifies/builds/smokes without publishing
+        required: true
+        type: string
   push:
     tags:
       - "v*"
@@ -8,10 +14,20 @@ on:
 permissions:
   contents: read
 
+env:
+  RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.release-tag || github.ref_name }}
+
 jobs:
+  verify:
+    uses: ./.github/workflows/release-verify.yml
+    with:
+      release-tag: ${{ github.event_name == 'workflow_dispatch' && inputs.release-tag || github.ref_name }}
+
   build:
     name: Build ${{ matrix.target }}
+    needs: verify
     runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -34,21 +50,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Verify tag matches workspace version
-        shell: bash
-        run: |
-          version="$(awk '
-            /^\[workspace\.package\]$/ { in_workspace_package = 1; next }
-            /^\[/ { in_workspace_package = 0 }
-            in_workspace_package && $1 == "version" {
-              gsub(/"/, "", $3)
-              print $3
-              exit
-            }
-          ' Cargo.toml)"
-          test -n "$version"
-          test "$GITHUB_REF_NAME" = "v$version"
-
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
@@ -70,19 +71,10 @@ jobs:
 
       - name: Package release archive
         shell: bash
-        run: |
-          suffix=''
-          if [[ "${{ matrix.target }}" == *windows* ]]; then
-            suffix='.exe'
-          fi
-          package_name="netbaiot-${GITHUB_REF_NAME}-${{ matrix.target }}"
-          package_dir="dist/$package_name"
-          build_dir="target/${{ matrix.target }}/release"
-          mkdir -p "$package_dir"
-          cp "$build_dir/netbaiot-server$suffix" "$package_dir/"
-          cp "$build_dir/netbaiot$suffix" "$package_dir/"
-          cp LICENSE NOTICE README.md README.zh-CN.md "$package_dir/"
-          tar -czf "dist/$package_name.tar.gz" -C dist "$package_name"
+        run: >-
+          python3 scripts/release_package.py package
+          --tag "$RELEASE_TAG" --target "${{ matrix.target }}"
+          --build-dir "target/${{ matrix.target }}/release" --dist dist
 
       - uses: actions/upload-artifact@v4
         with:
@@ -91,31 +83,73 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
-  publish:
-    name: Publish GitHub Release
+  archive-set:
+    name: Verify five archives and checksums
     needs: build
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
+    timeout-minutes: 10
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           path: dist
+          pattern: release-*
+          merge-multiple: true
+      - run: python3 scripts/release_package.py checksums --tag "$RELEASE_TAG" --dist dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-checksums
+          path: dist/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 1
+
+  archive-smoke:
+    name: Run Linux archive Quick Start
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-x86_64-unknown-linux-gnu
+          path: dist
+      - name: Install test-only MQTT client
+        run: sudo apt-get update && sudo apt-get install --yes mosquitto-clients
+      - name: Extract and run the actual archive
+        run: >-
+          python3 tests/release_archive_smoke.py
+          "dist/netbaiot-${RELEASE_TAG}-x86_64-unknown-linux-gnu.tar.gz"
+
+  publish:
+    name: Publish GitHub Release
+    if: github.event_name == 'push'
+    needs: [verify, build, archive-set, archive-smoke]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: release-*
           merge-multiple: true
 
       - name: Generate checksums and publish release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          cd dist
-          sha256sum *.tar.gz > SHA256SUMS
-          cd ..
-          args=(release create "$GITHUB_REF_NAME" dist/*
+          python3 scripts/release_package.py checksums --tag "$RELEASE_TAG" --dist dist
+          notes_file="docs/releases/${RELEASE_TAG}.md"
+          test -s "$notes_file"
+          args=(release create "$RELEASE_TAG" dist/*
             --repo "$GITHUB_REPOSITORY"
-            --title "NetbaIoT $GITHUB_REF_NAME"
-            --generate-notes
-            --target "$GITHUB_SHA")
-          if [[ "$GITHUB_REF_NAME" == *-* ]]; then
+            --title "NetbaIoT $RELEASE_TAG"
+            --notes-file "$notes_file"
+            --verify-tag)
+          if [[ "$RELEASE_TAG" == *-* ]]; then
             args+=(--prerelease)
           fi
           gh "${args[@]}"

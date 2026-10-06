@@ -2,6 +2,7 @@
 """Run a disposable local mTLS V3 Auth/Event/Command mixed workload."""
 
 import argparse
+import atexit
 import hashlib
 import json
 import os
@@ -17,6 +18,8 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "scripts"))
+from scrub_paths import scrub_text, scrub_tree
 FIXTURES = ROOT / "tests" / "fixtures"
 ADMIN_SECRET = "a" * 64
 V3_LIMITS = {
@@ -107,6 +110,9 @@ def run():
     profile = json.loads(args.profile.read_text())
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=True)
+    # Live configs need actual paths. Sanitize evidence only after child owners
+    # have stopped, including startup/validation failures.
+    atexit.register(scrub_tree, output, repo_root=ROOT, write=True)
     device_port, admin_port, business_port = free_port(), free_port(), free_port()
     if len({device_port, admin_port, business_port}) != 3:
         raise RuntimeError("port reservation collision")
@@ -341,7 +347,7 @@ def run():
                 "pass": all(checks.values()),
             }
             (output / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
-            print(json.dumps(summary, indent=2))
+            print(scrub_text(json.dumps(summary, indent=2), repo_root=ROOT))
             return 0 if summary["pass"] else 1
         finally:
             if server.poll() is None:

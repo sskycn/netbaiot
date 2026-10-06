@@ -1,7 +1,7 @@
 {
   "audit_baseline": "e9c9b06658ed811b1261c0cd40bf07a8df485ee6",
   "checkout_head": "ef8d54c8bdc1c5ba5633c0a60328f5cda9f6f6b2",
-  "binary_path": "/Users/sam/Dev/work/sskycn/netbaiot/target/debug/netbaiot-server",
+  "binary_path": "<repo>/target/debug/netbaiot-server",
   "binary_sha256": "b1d8ae4f7b6f040bc759b1f7e152381dc8f5e0403de50b6ebe0d83212b9ec2dd",
   "tracked_diff_sha256": "6e5943bad5a08c18c3f786a50ea36d559469c27e14874616d5365057db2fe2ab",
   "untracked_manifest_sha256": "bb7f1db4b56fc5a98a83aacda0c5d87b83336f73bc2330c468ad203dd2b68e71",

@@ -1,5 +1,9 @@
 # Security overview
 
+For undisclosed vulnerabilities, follow the [Security Policy](../SECURITY.md)
+and use the repository's private reporting form. Do not post exploit details in
+a public issue.
+
 ## Device authentication
 
 MQTT and TCP authenticate at connection setup and bind an immutable device

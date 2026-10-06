@@ -15,8 +15,8 @@ Reproduce after building release binaries:
 
 ```sh
 cargo build --locked --release -p netbaiot-server -p netbaiot-loadgen --bins
-python3 tools/netbaiot-loadgen/run_business_rpc_v3_hol_formal.py --output /tmp/netbaiot-hol2-formal
-python3 tools/netbaiot-loadgen/run_business_rpc_v3_hol_matrix.py --output /tmp/netbaiot-hol2-matrix --trace-gateway
+python3 tools/netbaiot-loadgen/run_business_rpc_v3_hol_formal.py --output <tmp>/netbaiot-hol2-formal
+python3 tools/netbaiot-loadgen/run_business_rpc_v3_hol_matrix.py --output <tmp>/netbaiot-hol2-matrix --trace-gateway
 cargo bench --locked -p netbaiot-v3-mux --bench send_ahead
 ```
 

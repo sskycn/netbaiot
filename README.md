@@ -52,7 +52,10 @@ flowchart LR
 
 ## Quick Start
 
-Requirements: Rust 1.88+, Python 3, and Mosquitto client tools (`mosquitto_pub`).
+On macOS/Linux, install Python 3.9+ and Mosquitto client tools (`mosquitto_pub`).
+For a source checkout, also install Rust 1.88+. For a downloaded binary archive,
+extract it and run from its package directory; Rust is not required.
+Windows users can follow the manual commands in the [Quick Start](docs/quick-start.md#windows-manual-start).
 Mosquitto is only the client; NetbaIoT runs its own MQTT broker. The demo binds
 loopback and uses credentials from `configs/tutorial.json`; they are for local
 development only.
@@ -159,7 +162,8 @@ device TCP requires TLS. Management HTTP has a separate authorization boundary;
 device credentials do not authorize management operations. UDP uses HMAC and replay
 checks, but does not encrypt payloads. Secrets must be injected through protected
 configuration/environment and must not be logged. Read the [security overview](docs/security.md)
-and [operations guide](docs/operations-guide.md) before deployment.
+and [operations guide](docs/operations-guide.md) before deployment. Report undisclosed
+vulnerabilities through the [Security Policy](SECURITY.md).
 
 ## Benchmarks
 
@@ -184,7 +188,7 @@ the original measurements and setup.
   downlink.
 - Recovery is for successful planned graceful shutdowns. It is not a general
   database and does not make arbitrary process or machine crashes durable.
-- The workspace is version `0.2.2` and has not reached 1.0. Review protocol and
+- The workspace is version `0.2.3` and has not reached 1.0. Review protocol and
   migration notes before upgrading; do not assume every API is stable.
 
 ## Documentation
@@ -196,7 +200,7 @@ the original measurements and setup.
 - [Security](docs/security.md) · [Operations](docs/operations-guide.md) · [Troubleshooting](docs/troubleshooting.md)
 - [Business integration and clients](docs/business-integration-guide.md) · [CLI](docs/cli.md) · [Device SDK](docs/device-sdk.md)
 - [Benchmark overview](docs/benchmarks.md) · [Performance baseline](docs/performance-baseline.md)
-- [Release notes template](docs/release-template.md) · [Project descriptions and launch drafts](docs/project-description.md)
+- [v0.2.3 release notes](docs/releases/v0.2.3.md) · [Release notes template](docs/release-template.md) · [Project descriptions and launch drafts](docs/project-description.md)
 
 ## Build and release
 
@@ -213,6 +217,7 @@ Docker image in this repository. The command-line client is `netbaiot`; see the
 
 ## Contributing
 
+Start with [CONTRIBUTING.md](CONTRIBUTING.md) for setup and required checks.
 Read [AGENTS.md](AGENTS.md) for the architecture and correctness constraints.
 Bug reports and focused pull requests are welcome. Changes to public protocol or
 MQTT behavior should include compatibility evidence and focused tests.

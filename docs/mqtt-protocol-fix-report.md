@@ -115,7 +115,7 @@ fixture edits. `mqtt-interop.yml` explicitly watches
 `tests/mqtt_protocol_regressions.py` and `tests/mqtt_conformance/**`, so the
 updated raw runner, common binary selector and fixed samples trigger the
 external MQTT gate on a push. The final local gate used the witnessed isolated
-binary `/private/tmp/netbaiot-accept-final-target/debug/netbaiot-server`
+binary `<tmp>/netbaiot-accept-final-target/debug/netbaiot-server`
 (SHA-256 `93a1dcee678a4aa60eb9ec011049378cd2f14e6ba634e322837a2fb869137e32`);
 its hash was unchanged before and after each Python suite. The final local
 results are Rust fmt/Clippy/workspace tests on 1.88.0 and stable **PASS**,

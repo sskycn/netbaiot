@@ -6,17 +6,21 @@ The script writes loadgen JSON, metrics, and logs so each result is reviewable.
 Optional capture stores V3 frame headers only, without tokens or Event bodies.
 """
 import argparse
+import atexit
 import json
 import os
 from pathlib import Path
 import socket
 import subprocess
+import sys
 import tempfile
 import time
 import urllib.request
 
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "scripts"))
+from scrub_paths import scrub_tree
 GATEWAY = ROOT / "target/release/netbaiot-server"
 LOADGEN = ROOT / "target/release/business_rpc"
 PROXY = ROOT / "tools/netbaiot-loadgen/business_stream_proxy.py"
@@ -235,6 +239,7 @@ def main():
     if not GATEWAY.is_file() or not LOADGEN.is_file():
         parser.error("build release gateway and loadgen first")
     args.output.mkdir(parents=True, exist_ok=True)
+    atexit.register(scrub_tree, args.output, repo_root=ROOT, write=True)
     for mode in args.modes:
         if mode.startswith("v3-") and args.stream_window_bytes is not None:
             if args.stream_window_bytes < int(mode.split("-")[1]):

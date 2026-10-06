@@ -2,7 +2,7 @@
   "kind": "configuration-preflight-not-capacity",
   "source_sha": "945fe5e386d623c32e2c7d2d0568fe0c058107ec",
   "source_status": "M AGENTS.md\n M Cargo.lock\n M Cargo.toml\n M README.md\n M README.zh-CN.md\n M apps/netbaiot-cli/tests/smoke.rs\n M apps/netbaiot-server/src/lib.rs\n M apps/netbaiot-server/tests/official_client.rs\n M apps/netbaiot-server/tests/server.rs\n M crates/netbaiot-device-sdk/Cargo.toml\n D crates/netbaiot-device-sdk/examples/device_config_pull.rs\n D crates/netbaiot-device-sdk/examples/device_http_upload.rs\n M crates/netbaiot-device-sdk/src/lib.rs\n M crates/netbaiot-protocol/src/lib.rs\n M crates/netbaiot-runtime/src/ingress.rs\n M crates/netbaiot-runtime/src/metrics.rs\n M crates/netbaiot-runtime/src/quota.rs\n M crates/netbaiot-transports/src/classifier.rs\n M crates/netbaiot-transports/src/common.rs\n D crates/netbaiot-transports/src/http.rs\n M crates/netbaiot-transports/src/lib.rs\n M docs/architecture.md\n M docs/architecture.zh-CN.md\n M docs/business-integration-guide.md\n M docs/delivery-semantics.md\n M docs/delivery-semantics.zh-CN.md\n M docs/dependencies.md\n M docs/device-integration-guide.md\n M docs/device-protocol.md\n M docs/device-protocol.zh-CN.md\n M docs/device-sdk.md\n M docs/device-sdk.zh-CN.md\n M docs/getting-started.md\n M docs/http-api.md\n M docs/http-api.zh-CN.md\n M docs/mixed-ingress-capacity-audit.md\n M docs/mqtt.md\n M docs/mqtt.zh-CN.md\n M docs/operations-guide.md\n M docs/performance-dual-host-qos1-capacity.md\n M docs/performance-eventid-experiment.md\n M docs/performance/mixed-ingress/README.md\n M docs/public-protocol.md\n M docs/public-protocol.zh-CN.md\n M docs/pure-event-bus-refactor.md\n M docs/reliability-followup-audit.md\n M docs/resource-budgets.md\n M docs/sdk-client-implementation-report.md\n M docs/sdk.md\n M docs/sdk.zh-CN.md\n M docs/single-device-ingress.md\n M docs/troubleshooting.md\n M docs/udp-reliable-ack.md\n M docs/user-guide.md\n M scripts/perf/README.md\n M scripts/perf/connection_memory.py\n M scripts/perf/dual_host_preflight.py\n D scripts/perf/ingress_compare.py\n D scripts/perf/mixed_ingress_audit.py\n D scripts/perf/mixed_ingress_plan.py\n D scripts/perf/mixed_ingress_progress.py\n D scripts/perf/mixed_ingress_report.py\n D scripts/perf/mixed_ingress_semantics.py\n D scripts/perf/mixed_ingress_tables.py\n D scripts/perf/mixed_ingress_verify.py\n M scripts/tutorial_smoke.sh\n M tools/netbaiot-loadgen/src/main.rs\n M tools/netbaiot-loadgen/src/mixed.rs\n?? crates/netbaiot-transports/src/management_http.rs\n?? docs/performance/remove-device-http/\n?? scripts/perf/device_protocol_benchmark.py\n?? scripts/perf/device_protocol_progress.py",
-  "server_binary": "/Users/sam/Dev/work/sskycn/netbaiot/target/remove-device-http/after-server",
+  "server_binary": "<repo>/target/remove-device-http/after-server",
   "server_sha256": "e4d084ba997b834530527a7bc4ae17245f8076fcfe34de8e6397e79e7f4a9060",
   "hostname": "X",
   "platform": "macOS-26.6.2-arm64-arm-64bit",
@@ -25,7 +25,7 @@
         "tls": null,
         "delivery_url": null,
         "auth_provider_url": null,
-        "spool_directory": "/var/folders/sz/lwplsmrn1118kbdhlmrnf7fc0000gn/T/netbaiot-dual-preflight-db19vf6t/spool",
+        "spool_directory": "<tmp>/netbaiot-dual-preflight-db19vf6t/spool",
         "device_configs": [
           {
             "device": {
@@ -77,7 +77,7 @@
         "tls": null,
         "delivery_url": null,
         "auth_provider_url": null,
-        "spool_directory": "/var/folders/sz/lwplsmrn1118kbdhlmrnf7fc0000gn/T/netbaiot-dual-preflight-db19vf6t/spool",
+        "spool_directory": "<tmp>/netbaiot-dual-preflight-db19vf6t/spool",
         "device_configs": [
           {
             "device": {
@@ -129,7 +129,7 @@
         "tls": null,
         "delivery_url": "http://127.0.0.1:24006/events",
         "auth_provider_url": null,
-        "spool_directory": "/var/folders/sz/lwplsmrn1118kbdhlmrnf7fc0000gn/T/netbaiot-dual-preflight-db19vf6t/spool",
+        "spool_directory": "<tmp>/netbaiot-dual-preflight-db19vf6t/spool",
         "device_configs": [
           {
             "device": {
@@ -181,7 +181,7 @@
         "tls": null,
         "delivery_url": "http://127.0.0.1:24006/events",
         "auth_provider_url": null,
-        "spool_directory": "/var/folders/sz/lwplsmrn1118kbdhlmrnf7fc0000gn/T/netbaiot-dual-preflight-db19vf6t/spool",
+        "spool_directory": "<tmp>/netbaiot-dual-preflight-db19vf6t/spool",
         "device_configs": [
           {
             "device": {
@@ -233,7 +233,7 @@
         "tls": null,
         "delivery_url": null,
         "auth_provider_url": null,
-        "spool_directory": "/var/folders/sz/lwplsmrn1118kbdhlmrnf7fc0000gn/T/netbaiot-dual-preflight-db19vf6t/spool",
+        "spool_directory": "<tmp>/netbaiot-dual-preflight-db19vf6t/spool",
         "device_configs": [
           {
             "device": {

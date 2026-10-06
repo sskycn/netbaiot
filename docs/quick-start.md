@@ -7,8 +7,8 @@ bootstrap management token outside local development.
 
 ## Requirements
 
-- Rust 1.88 or newer
-- Python 3
+- Rust 1.88 or newer **only for a source checkout**
+- Python 3.9 or newer
 - Mosquitto client tools (`mosquitto_pub`)
 
 Mosquitto is only a client in this walkthrough. NetbaIoT implements its own MQTT
@@ -18,13 +18,15 @@ cached yet.
 
 ## Start the gateway and webhook
 
-From the repository root, in Terminal 1:
+On macOS/Linux, from the repository root or extracted binary package directory,
+in Terminal 1:
 
 ```bash
 ./scripts/demo/start.sh
 ```
 
-The script builds and starts the server, starts
+The script uses the packaged `netbaiot-server` when present; in a source checkout
+it builds `target/debug/netbaiot-server` with Cargo. It starts
 [`examples/business_http_sink.py`](../examples/business_http_sink.py), binds all
 listeners to `127.0.0.1`, and puts restart files under a temporary directory. The
 webhook prints each accepted JSON event and returns HTTP 204. The tutorial's fixed
@@ -81,6 +83,41 @@ before relying on those receipts.
 
 To use MQTT 5.0, run the same command with `-V mqttv5`. The supported MQTT 5.0
 properties and exclusions are listed in the [protocol support matrix](protocol-support.md).
+
+## Windows manual start
+
+The Bash script above is the macOS/Linux entry point. On Windows, extract the
+Windows archive and open PowerShell terminals in its package directory. Install
+Python 3.9+ and Mosquitto client tools. Rust is only needed if building from source.
+
+Terminal 1 runs the webhook:
+
+```powershell
+py -3 -u examples/business_http_sink.py --listen 127.0.0.1 --port 18080
+```
+
+Terminal 2 runs the packaged server with the same loopback tutorial config:
+
+```powershell
+$env:NETBAIOT_ADMIN_SECRET = "abababababababababababababababababababababababababababababababab"
+$env:RUST_LOG = "info"
+.\netbaiot-server.exe configs/tutorial.json
+```
+
+For a source checkout, first run `cargo build --locked -p netbaiot-server`, then
+use `.\target\debug\netbaiot-server.exe configs/tutorial.json` instead. Wait for
+`runtime ready`. Terminal 3 publishes using a file so Windows shell argument
+quoting does not change the JSON:
+
+```powershell
+'{"schema_version":1,"source_message_id":"demo:1","kind":"heartbeat","data":{"sequence":1}}' | Set-Content -Encoding ascii demo-event.json
+mosquitto_pub.exe -h 127.0.0.1 -p 8080 -V mqttv311 -u demo-device -P 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f -i quickstart -t v1/t/demo/p/sensor/d/device-1/up -q 1 -f demo-event.json
+```
+
+The webhook prints the event in Terminal 1. Stop the server with Ctrl-C and wait
+for graceful shutdown, then stop the webhook. This manual configuration puts
+restart files in `var/tutorial-restart-spool`; unlike the Bash demo, it does not
+remove that directory automatically. These credentials are local tutorial values.
 
 ## Try framed TCP or authenticated UDP
 

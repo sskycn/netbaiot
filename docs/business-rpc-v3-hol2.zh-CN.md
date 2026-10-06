@@ -7,7 +7,7 @@
 | starting HEAD | `4d3583b1e6e4d57e5cfa8f8a94e3ee7b0aa43ea2` |
 | ending HEAD | 本报告所在任务分支提交；准确 SHA 以 `git rev-parse HEAD` 为准 |
 | branch | `codex/business-rpc-v3` |
-| worktree | `/Users/sam/Dev/work/sskycn/netbaiot` |
+| worktree | `<home>/Dev/work/sskycn/netbaiot` |
 | 平台 | macOS 26.6.2、arm64、本机 loopback、release 网关和 loadgen |
 
 实验 JSON 的 `git_sha` 是构建时的 **starting HEAD**，且当时工作区有未提交代码；不能把数据归于原始提交。各模式重新启动网关并使用独立 spool。正式测量使用开发令牌和明文 loopback，mTLS 仅由真实 socket 集成测试覆盖。`auth/s` 是此工作负载的完成速率，Event payload B/s 是已 ACK payload 字节数除以标称时长，均不是最大容量。

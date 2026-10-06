@@ -1,0 +1,63 @@
+name: Release verification
+
+on:
+  workflow_call:
+    inputs:
+      release-tag:
+        description: Exact release tag; empty checks the current workspace version
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Validate version, notes, package inputs and published paths
+        env:
+          RELEASE_TAG: ${{ inputs.release-tag }}
+        run: python3 scripts/release_preflight.py --tag "$RELEASE_TAG"
+      - name: Test release tooling failure paths
+        run: python3 -m unittest discover -s tests -p 'test_release_*.py' -v
+
+  rust:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        toolchain: ["1.88.0", stable]
+    env:
+      RUSTUP_TOOLCHAIN: ${{ matrix.toolchain }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ matrix.toolchain }}
+          components: rustfmt, clippy
+      - run: rustc --version --verbose
+      - run: cargo --version --verbose
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
+      - name: Run workspace tests
+        run: >-
+          python3 scripts/ci_annotate.py
+          --title "Rust workspace tests failed"
+          -- cargo test --locked --workspace --all-features
+
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo install --locked cargo-audit
+      - run: cargo audit
+
+  mqtt:
+    uses: ./.github/workflows/mqtt-interop.yml

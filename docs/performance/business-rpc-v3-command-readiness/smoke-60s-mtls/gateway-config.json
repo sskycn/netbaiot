@@ -7,7 +7,7 @@
   "tls": null,
   "delivery_url": null,
   "auth_provider_url": null,
-  "spool_directory": "/Users/sam/Dev/work/sskycn/netbaiot/docs/performance/business-rpc-v3-command-readiness/smoke-60s-mtls/spool",
+  "spool_directory": "<repo>/docs/performance/business-rpc-v3-command-readiness/smoke-60s-mtls/spool",
   "credentials": [],
   "device_auth": "business_rpc",
   "event_delivery": "business_rpc",
@@ -23,9 +23,9 @@
     "v3_send_ahead": null,
     "v3_experiment_socket_send_buffer_bytes": null,
     "tls": {
-      "certificate": "/Users/sam/Dev/work/sskycn/netbaiot/tests/fixtures/localhost-cert.pem",
-      "private_key": "/Users/sam/Dev/work/sskycn/netbaiot/tests/fixtures/localhost-key.pem",
-      "client_ca": "/Users/sam/Dev/work/sskycn/netbaiot/tests/fixtures/business-rpc-test-client-cas.pem",
+      "certificate": "<repo>/tests/fixtures/localhost-cert.pem",
+      "private_key": "<repo>/tests/fixtures/localhost-key.pem",
+      "client_ca": "<repo>/tests/fixtures/business-rpc-test-client-cas.pem",
       "require_client_certificate": true
     },
     "identities": [

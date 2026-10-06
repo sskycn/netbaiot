@@ -60,7 +60,7 @@
         "--repo",
         ".",
         "--output",
-        "/Users/sam/Dev/work/sskycn/netbaiot/target/hardening-validation/mqtt-regressions.json"
+        "<repo>/target/hardening-validation/mqtt-regressions.json"
       ],
       "exit": 0,
       "seconds": 6.174
@@ -249,7 +249,7 @@
         "--repo",
         ".",
         "--output",
-        "/Users/sam/Dev/work/sskycn/netbaiot/target/hardening-validation/mqtt-regressions.json"
+        "<repo>/target/hardening-validation/mqtt-regressions.json"
       ],
       "exit": 0,
       "seconds": 5.918

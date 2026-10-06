@@ -36,6 +36,8 @@ tag="$1"
 [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]] || \
   fail "标签格式无效：$tag（需要 vX.Y.Z，可带 prerelease/build metadata）。"
 new_version="${tag#v}"
+[[ -s "docs/releases/$tag.md" ]] || \
+  fail "缺少正式 release notes：docs/releases/$tag.md（不会创建或推送标签）。"
 
 if [[ -n "$(git status --porcelain --untracked-files=all)" ]]; then
   fail '工作区有未提交或未跟踪的文件。请先提交或清理，再发布。'
@@ -117,6 +119,9 @@ PY
   fi
   printf '已提交版本更新：%s -> %s\n' "$old_version" "$new_version"
 fi
+
+python3 scripts/release_preflight.py --tag "$tag" || \
+  fail 'Release preflight 未通过；没有创建或推送标签。'
 
 git tag -a "$tag" -m "Release $tag"
 if ! git push --atomic origin "HEAD:refs/heads/$branch" "refs/tags/$tag"; then

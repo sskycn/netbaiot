@@ -1,35 +1,29 @@
 name: Rust checks
-on: [push, pull_request]
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+permissions:
+  contents: read
+
 jobs:
-  test:
+  verify:
+    uses: ./.github/workflows/release-verify.yml
+
+  archive-smoke:
+    name: Linux binary Quick Start
+    needs: verify
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        toolchain: ["1.88.0", stable]
-    env:
-      RUSTUP_TOOLCHAIN: ${{ matrix.toolchain }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: ${{ matrix.toolchain }}
-          components: rustfmt, clippy
-      - run: rustc --version --verbose
-      - run: cargo --version --verbose
-      - run: cargo fmt --all -- --check
-      - run: cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
-      - name: Run workspace tests
-        run: >-
-          python3 scripts/ci_annotate.py
-          --title "Rust workspace tests failed"
-          -- cargo test --locked --workspace --all-features
-      - if: matrix.toolchain == 'stable'
-        run: python3 tests/mqtt_conformance/run.py --netbaiot-only
-  audit:
-    runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      - run: cargo install --locked cargo-audit
-      - run: cargo audit
+      - run: sudo apt-get update && sudo apt-get install --yes mosquitto-clients
+      - run: cargo build --locked --release -p netbaiot-server -p netbaiot-cli
+      - name: Package and execute the extracted archive
+        run: |
+          tag="$(python3 -c 'import sys; sys.path.insert(0,"scripts"); from release_preflight import ROOT,workspace_version; print("v"+workspace_version(ROOT))')"
+          python3 scripts/release_package.py package --tag "$tag" \
+            --target x86_64-unknown-linux-gnu --build-dir target/release --dist dist
+          python3 tests/release_archive_smoke.py "dist/netbaiot-${tag}-x86_64-unknown-linux-gnu.tar.gz"

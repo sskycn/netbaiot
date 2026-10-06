@@ -48,8 +48,10 @@ flowchart LR
 
 ## 快速开始
 
-需要 Rust 1.88+、Python 3 和 Mosquitto 客户端工具（`mosquitto_pub`）。Mosquitto
-仅作为客户端；NetbaIoT 自带 MQTT broker。Demo 仅监听 loopback，并使用
+macOS/Linux 脚本需要 Python 3.9+ 和 Mosquitto 客户端工具（`mosquitto_pub`）。
+源码用户另需 Rust 1.88+；二进制发布包用户解压后在包目录运行，无需 Rust。
+Windows 用户使用 [Quick Start 中的手动命令](docs/quick-start.md#windows-manual-start)。
+Mosquitto 仅作为客户端；NetbaIoT 自带 MQTT broker。Demo 仅监听 loopback，并使用
 `configs/tutorial.json` 中的本地演示凭据，**不可用于生产**。
 
 终端 1 启动网关和简单 webhook 接收器：
@@ -141,7 +143,7 @@ mosquitto_pub -h 127.0.0.1 -p 8080 -V mqttv311 \
 MQTT 和 TCP 在连接时认证并绑定设备身份。非 loopback 设备 TCP 必须使用 TLS。管理 HTTP
 使用独立授权边界，设备凭据不能授权管理操作。UDP 使用 HMAC 和重放检查，但不加密载荷。
 应通过受保护的配置或环境注入密钥，不要记录密钥。部署前阅读[安全概述](docs/security.md)
-和[运维指南](docs/operations-guide.md)。
+和[运维指南](docs/operations-guide.md)。未公开漏洞请通过[安全报告政策](SECURITY.md)私下报告。
 
 ## 基准测试
 
@@ -157,7 +159,7 @@ MQTT 和 TCP 在连接时认证并绑定设备身份。非 loopback 设备 TCP �
 - MQTT over WebSocket、MQTT-SN、共享订阅、Broker bridge 和 `$SYS` 服务不在支持范围内。
 - UDP 经过认证但不加密、无会话，也不支持命令下行。
 - 恢复只覆盖成功完成的计划优雅关机；它不是通用数据库，不能让任意进程或机器崩溃变得持久。
-- Workspace 版本为 `0.2.2`，尚未到 1.0。升级前请阅读协议和迁移说明，不要默认所有 API 均稳定。
+- Workspace 版本为 `0.2.3`，尚未到 1.0。升级前请阅读协议和迁移说明，不要默认所有 API 均稳定。
 
 ## 文档
 
@@ -168,7 +170,7 @@ MQTT 和 TCP 在连接时认证并绑定设备身份。非 loopback 设备 TCP �
 - [安全](docs/security.md) · [运维](docs/operations-guide.md) · [故障排查](docs/troubleshooting.md)
 - [业务集成与客户端](docs/business-integration-guide.md) · [CLI](docs/cli.zh-CN.md) · [设备 SDK](docs/device-sdk.zh-CN.md)
 - [基准概述](docs/benchmarks.md) · [性能基线](docs/performance-baseline.md)
-- [发布模板](docs/release-template.md) · [项目介绍和发布草稿](docs/project-description.md)
+- [v0.2.3 发布说明](docs/releases/v0.2.3.md) · [发布模板](docs/release-template.md) · [项目介绍和发布草稿](docs/project-description.md)
 
 ## 构建与发布
 
@@ -184,7 +186,7 @@ GitHub Actions 会在打 tag 后为 Linux、macOS 和 Windows 构建发布包，
 
 ## 参与贡献
 
-架构和正确性约束见 [AGENTS.md](AGENTS.md)。欢迎提交问题和聚焦的 Pull Request。公开协议
+环境准备和验证要求见 [CONTRIBUTING.md](CONTRIBUTING.md)；架构和正确性约束见 [AGENTS.md](AGENTS.md)。欢迎提交问题和聚焦的 Pull Request。公开协议
 或 MQTT 行为改动需要兼容性证据和针对性测试。
 
 ## 许可证
