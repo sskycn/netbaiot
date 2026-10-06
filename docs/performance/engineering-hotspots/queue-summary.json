@@ -1,0 +1,770 @@
+{
+  "deadline_retry0/0": {
+    "before": {
+      "throughput_ops_s": 4311897.0,
+      "p50_ns": 250.0,
+      "p95_ns": 250.0,
+      "p99_ns": 250.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0,
+      "mutex_wait_ns": 31.729,
+      "mutex_hold_ns": 66.012
+    },
+    "after": {
+      "throughput_ops_s": 4477168.0,
+      "p50_ns": 209.0,
+      "p95_ns": 250.0,
+      "p99_ns": 250.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0,
+      "mutex_wait_ns": 30.894,
+      "mutex_hold_ns": 64.885
+    },
+    "delta_percent": {
+      "p99_ns": 0.0,
+      "mutex_hold_ns": -1.7072653456947195,
+      "mutex_wait_ns": -2.6316618866021657,
+      "p50_ns": -16.400000000000002,
+      "allocations_per_op": null,
+      "p95_ns": 0.0,
+      "throughput_ops_s": 3.832906954873927,
+      "allocated_bytes_per_op": null
+    }
+  },
+  "deadline_retry0/100": {
+    "before": {
+      "throughput_ops_s": 1524862.0,
+      "p50_ns": 666.0,
+      "p95_ns": 667.0,
+      "p99_ns": 750.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0,
+      "mutex_wait_ns": 27.794,
+      "mutex_hold_ns": 537.048
+    },
+    "after": {
+      "throughput_ops_s": 4027938.0,
+      "p50_ns": 250.0,
+      "p95_ns": 292.0,
+      "p99_ns": 292.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0,
+      "mutex_wait_ns": 36.011,
+      "mutex_hold_ns": 75.94
+    },
+    "delta_percent": {
+      "p99_ns": -61.06666666666667,
+      "mutex_hold_ns": -85.85973693226676,
+      "mutex_wait_ns": 29.563934662157298,
+      "p50_ns": -62.46246246246246,
+      "allocations_per_op": null,
+      "p95_ns": -56.22188905547226,
+      "throughput_ops_s": 164.1509854662258,
+      "allocated_bytes_per_op": null
+    }
+  },
+  "deadline_retry0/1000": {
+    "before": {
+      "throughput_ops_s": 328836.0,
+      "p50_ns": 3083.0,
+      "p95_ns": 3125.0,
+      "p99_ns": 3666.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0,
+      "mutex_wait_ns": 17.132,
+      "mutex_hold_ns": 2935.097
+    },
+    "after": {
+      "throughput_ops_s": 5282760.0,
+      "p50_ns": 208.0,
+      "p95_ns": 209.0,
+      "p99_ns": 209.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0,
+      "mutex_wait_ns": 26.781,
+      "mutex_hold_ns": 56.883
+    },
+    "delta_percent": {
+      "p99_ns": -94.29896344789962,
+      "mutex_hold_ns": -98.06197205748227,
+      "mutex_wait_ns": 56.321503618958644,
+      "p50_ns": -93.2533246837496,
+      "allocations_per_op": null,
+      "p95_ns": -93.312,
+      "throughput_ops_s": 1506.5029376345656,
+      "allocated_bytes_per_op": null
+    }
+  },
+  "deadline_retry0/4096": {
+    "before": {
+      "throughput_ops_s": 80965.0,
+      "p50_ns": 12375.0,
+      "p95_ns": 12458.0,
+      "p99_ns": 12709.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0,
+      "mutex_wait_ns": 18.263,
+      "mutex_hold_ns": 12201.001
+    },
+    "after": {
+      "throughput_ops_s": 6725560.0,
+      "p50_ns": 166.0,
+      "p95_ns": 167.0,
+      "p99_ns": 167.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0,
+      "mutex_wait_ns": 21.055,
+      "mutex_hold_ns": 44.084
+    },
+    "delta_percent": {
+      "p99_ns": -98.68597057203556,
+      "mutex_hold_ns": -99.63868538327306,
+      "mutex_wait_ns": 15.287740239829152,
+      "p50_ns": -98.65858585858585,
+      "allocations_per_op": null,
+      "p95_ns": -98.65949590624498,
+      "throughput_ops_s": 8206.74983017353,
+      "allocated_bytes_per_op": null
+    }
+  },
+  "deadline_retry10/0": {
+    "before": {
+      "throughput_ops_s": 5554290.0,
+      "p50_ns": 167.0,
+      "p95_ns": 209.0,
+      "p99_ns": 209.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0,
+      "mutex_wait_ns": 27.823,
+      "mutex_hold_ns": 62.905
+    },
+    "after": {
+      "throughput_ops_s": 5018707.0,
+      "p50_ns": 208.0,
+      "p95_ns": 209.0,
+      "p99_ns": 209.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0,
+      "mutex_wait_ns": 27.135,
+      "mutex_hold_ns": 57.312
+    },
+    "delta_percent": {
+      "p99_ns": 0.0,
+      "mutex_hold_ns": -8.891185120419687,
+      "mutex_wait_ns": -2.4727743234014943,
+      "p50_ns": 24.55089820359282,
+      "allocations_per_op": null,
+      "p95_ns": 0.0,
+      "throughput_ops_s": -9.642690604919801,
+      "allocated_bytes_per_op": null
+    }
+  },
+  "deadline_retry10/100": {
+    "before": {
+      "throughput_ops_s": 1849636.0,
+      "p50_ns": 542.0,
+      "p95_ns": 542.0,
+      "p99_ns": 584.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0,
+      "mutex_wait_ns": 22.844,
+      "mutex_hold_ns": 432.393
+    },
+    "after": {
+      "throughput_ops_s": 4215781.0,
+      "p50_ns": 250.0,
+      "p95_ns": 250.0,
+      "p99_ns": 250.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0,
+      "mutex_wait_ns": 33.648,
+      "mutex_hold_ns": 70.931
+    },
+    "delta_percent": {
+      "p99_ns": -57.1917808219178,
+      "mutex_hold_ns": -83.59571038384063,
+      "mutex_wait_ns": 47.29469444930836,
+      "p50_ns": -53.874538745387454,
+      "allocations_per_op": null,
+      "p95_ns": -53.874538745387454,
+      "throughput_ops_s": 127.92489981812638,
+      "allocated_bytes_per_op": null
+    }
+  },
+  "deadline_retry10/1000": {
+    "before": {
+      "throughput_ops_s": 335451.0,
+      "p50_ns": 3000.0,
+      "p95_ns": 3042.0,
+      "p99_ns": 3084.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0,
+      "mutex_wait_ns": 16.888,
+      "mutex_hold_ns": 2881.989
+    },
+    "after": {
+      "throughput_ops_s": 5781767.0,
+      "p50_ns": 167.0,
+      "p95_ns": 208.0,
+      "p99_ns": 209.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0,
+      "mutex_wait_ns": 24.975,
+      "mutex_hold_ns": 51.751
+    },
+    "delta_percent": {
+      "p99_ns": -93.2230869001297,
+      "mutex_hold_ns": -98.20433041208693,
+      "mutex_wait_ns": 47.88607295120795,
+      "p50_ns": -94.43333333333334,
+      "allocations_per_op": null,
+      "p95_ns": -93.16239316239316,
+      "throughput_ops_s": 1623.5801950210312,
+      "allocated_bytes_per_op": null
+    }
+  },
+  "deadline_retry10/4096": {
+    "before": {
+      "throughput_ops_s": 84126.0,
+      "p50_ns": 12083.0,
+      "p95_ns": 12125.0,
+      "p99_ns": 12833.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0,
+      "mutex_wait_ns": 17.529,
+      "mutex_hold_ns": 11782.504
+    },
+    "after": {
+      "throughput_ops_s": 7304842.0,
+      "p50_ns": 125.0,
+      "p95_ns": 167.0,
+      "p99_ns": 167.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0,
+      "mutex_wait_ns": 19.477,
+      "mutex_hold_ns": 40.829
+    },
+    "delta_percent": {
+      "p99_ns": -98.69866749785709,
+      "mutex_hold_ns": -99.6534777327468,
+      "mutex_wait_ns": 11.11301272177534,
+      "p50_ns": -98.96548870313664,
+      "allocations_per_op": null,
+      "p95_ns": -98.62268041237114,
+      "throughput_ops_s": 8583.21565271141,
+      "allocated_bytes_per_op": null
+    }
+  },
+  "deadline_retry50/0": {
+    "before": {
+      "throughput_ops_s": 3574908.0,
+      "p50_ns": 291.0,
+      "p95_ns": 292.0,
+      "p99_ns": 292.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0,
+      "mutex_wait_ns": 39.441,
+      "mutex_hold_ns": 82.544
+    },
+    "after": {
+      "throughput_ops_s": 3031038.0,
+      "p50_ns": 333.0,
+      "p95_ns": 334.0,
+      "p99_ns": 334.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0,
+      "mutex_wait_ns": 46.241,
+      "mutex_hold_ns": 99.15
+    },
+    "delta_percent": {
+      "p99_ns": 14.383561643835607,
+      "mutex_hold_ns": 20.11775537894942,
+      "mutex_wait_ns": 17.24094216678076,
+      "p50_ns": 14.432989690721643,
+      "allocations_per_op": null,
+      "p95_ns": 14.383561643835607,
+      "throughput_ops_s": -15.213538362385826,
+      "allocated_bytes_per_op": null
+    }
+  },
+  "deadline_retry50/100": {
+    "before": {
+      "throughput_ops_s": 2098116.0,
+      "p50_ns": 459.0,
+      "p95_ns": 500.0,
+      "p99_ns": 500.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0,
+      "mutex_wait_ns": 20.96,
+      "mutex_hold_ns": 365.329
+    },
+    "after": {
+      "throughput_ops_s": 4761701.0,
+      "p50_ns": 208.0,
+      "p95_ns": 209.0,
+      "p99_ns": 250.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0,
+      "mutex_wait_ns": 29.748,
+      "mutex_hold_ns": 62.499
+    },
+    "delta_percent": {
+      "p99_ns": -50.0,
+      "mutex_hold_ns": -82.89240657051589,
+      "mutex_wait_ns": 41.92748091603053,
+      "p50_ns": -54.68409586056645,
+      "allocations_per_op": null,
+      "p95_ns": -58.20000000000001,
+      "throughput_ops_s": 126.95127438139741,
+      "allocated_bytes_per_op": null
+    }
+  },
+  "deadline_retry50/1000": {
+    "before": {
+      "throughput_ops_s": 333811.0,
+      "p50_ns": 3083.0,
+      "p95_ns": 3125.0,
+      "p99_ns": 3167.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0,
+      "mutex_wait_ns": 16.89,
+      "mutex_hold_ns": 2892.428
+    },
+    "after": {
+      "throughput_ops_s": 6243912.0,
+      "p50_ns": 167.0,
+      "p95_ns": 167.0,
+      "p99_ns": 167.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0,
+      "mutex_wait_ns": 22.813,
+      "mutex_hold_ns": 49.783
+    },
+    "delta_percent": {
+      "p99_ns": -94.7268708556994,
+      "mutex_hold_ns": -98.27885084779983,
+      "mutex_wait_ns": 35.06808762581408,
+      "p50_ns": -94.58319818358741,
+      "allocations_per_op": null,
+      "p95_ns": -94.65599999999999,
+      "throughput_ops_s": 1770.4931832683765,
+      "allocated_bytes_per_op": null
+    }
+  },
+  "deadline_retry50/4096": {
+    "before": {
+      "throughput_ops_s": 92705.0,
+      "p50_ns": 10917.0,
+      "p95_ns": 10959.0,
+      "p99_ns": 11375.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0,
+      "mutex_wait_ns": 17.676,
+      "mutex_hold_ns": 10642.289
+    },
+    "after": {
+      "throughput_ops_s": 7817600.0,
+      "p50_ns": 125.0,
+      "p95_ns": 167.0,
+      "p99_ns": 167.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0,
+      "mutex_wait_ns": 18.159,
+      "mutex_hold_ns": 39.147
+    },
+    "delta_percent": {
+      "p99_ns": -98.53186813186812,
+      "mutex_hold_ns": -99.63215620248613,
+      "mutex_wait_ns": 2.7325186693822223,
+      "p50_ns": -98.85499679399102,
+      "allocations_per_op": null,
+      "p95_ns": -98.47613833378958,
+      "throughput_ops_s": 8332.770616471604,
+      "allocated_bytes_per_op": null
+    }
+  },
+  "dequeue_retry0/0": {
+    "before": {
+      "throughput_ops_s": 3165594.0,
+      "p50_ns": 333.0,
+      "p95_ns": 334.0,
+      "p99_ns": 334.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0,
+      "mutex_wait_ns": 32.692,
+      "mutex_hold_ns": 135.79
+    },
+    "after": {
+      "throughput_ops_s": 3158071.0,
+      "p50_ns": 333.0,
+      "p95_ns": 334.0,
+      "p99_ns": 375.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0,
+      "mutex_wait_ns": 32.923,
+      "mutex_hold_ns": 136.594
+    },
+    "delta_percent": {
+      "p99_ns": 12.27544910179641,
+      "mutex_hold_ns": 0.5920907283305077,
+      "mutex_wait_ns": 0.7065948855989213,
+      "p50_ns": 0.0,
+      "allocations_per_op": null,
+      "p95_ns": 0.0,
+      "throughput_ops_s": -0.237648921497835,
+      "allocated_bytes_per_op": null
+    }
+  },
+  "dequeue_retry0/100": {
+    "before": {
+      "throughput_ops_s": 485784.0,
+      "p50_ns": 2084.0,
+      "p95_ns": 2167.0,
+      "p99_ns": 2208.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0,
+      "mutex_wait_ns": 32.828,
+      "mutex_hold_ns": 1869.807
+    },
+    "after": {
+      "throughput_ops_s": 2667517.0,
+      "p50_ns": 375.0,
+      "p95_ns": 375.0,
+      "p99_ns": 417.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0,
+      "mutex_wait_ns": 38.927,
+      "mutex_hold_ns": 163.223
+    },
+    "delta_percent": {
+      "p99_ns": -81.11413043478261,
+      "mutex_hold_ns": -91.27059637705923,
+      "mutex_wait_ns": 18.578652369928108,
+      "p50_ns": -82.00575815738964,
+      "allocations_per_op": null,
+      "p95_ns": -82.69497000461467,
+      "throughput_ops_s": 449.11586219389693,
+      "allocated_bytes_per_op": null
+    }
+  },
+  "dequeue_retry0/1000": {
+    "before": {
+      "throughput_ops_s": 105217.0,
+      "p50_ns": 9583.0,
+      "p95_ns": 9792.0,
+      "p99_ns": 10250.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0,
+      "mutex_wait_ns": 17.618,
+      "mutex_hold_ns": 9556.012
+    },
+    "after": {
+      "throughput_ops_s": 3915151.0,
+      "p50_ns": 250.0,
+      "p95_ns": 292.0,
+      "p99_ns": 292.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0,
+      "mutex_wait_ns": 26.883,
+      "mutex_hold_ns": 112.262
+    },
+    "delta_percent": {
+      "p99_ns": -97.15121951219513,
+      "mutex_hold_ns": -98.82522123245555,
+      "mutex_wait_ns": 52.58826200476785,
+      "p50_ns": -97.39121360742983,
+      "allocations_per_op": null,
+      "p95_ns": -97.01797385620915,
+      "throughput_ops_s": 3621.025119514907,
+      "allocated_bytes_per_op": null
+    }
+  },
+  "dequeue_retry0/4096": {
+    "before": {
+      "throughput_ops_s": 27714.0,
+      "p50_ns": 35875.0,
+      "p95_ns": 36250.0,
+      "p99_ns": 42833.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0,
+      "mutex_wait_ns": 15.988,
+      "mutex_hold_ns": 36030.9
+    },
+    "after": {
+      "throughput_ops_s": 4817257.0,
+      "p50_ns": 208.0,
+      "p95_ns": 209.0,
+      "p99_ns": 250.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0,
+      "mutex_wait_ns": 21.434,
+      "mutex_hold_ns": 89.234
+    },
+    "delta_percent": {
+      "p99_ns": -99.41633787033362,
+      "mutex_hold_ns": -99.7523403523087,
+      "mutex_wait_ns": 34.0630472854641,
+      "p50_ns": -99.42020905923344,
+      "allocations_per_op": null,
+      "p95_ns": -99.42344827586207,
+      "throughput_ops_s": 17282.0343508696,
+      "allocated_bytes_per_op": null
+    }
+  },
+  "dequeue_retry10/0": {
+    "before": {
+      "throughput_ops_s": 3690582.0,
+      "p50_ns": 291.0,
+      "p95_ns": 292.0,
+      "p99_ns": 292.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0,
+      "mutex_wait_ns": 27.552,
+      "mutex_hold_ns": 113.77
+    },
+    "after": {
+      "throughput_ops_s": 3640673.0,
+      "p50_ns": 291.0,
+      "p95_ns": 292.0,
+      "p99_ns": 292.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0,
+      "mutex_wait_ns": 28.398,
+      "mutex_hold_ns": 118.175
+    },
+    "delta_percent": {
+      "p99_ns": 0.0,
+      "mutex_hold_ns": 3.871846708271076,
+      "mutex_wait_ns": 3.070557491289194,
+      "p50_ns": 0.0,
+      "allocations_per_op": null,
+      "p95_ns": 0.0,
+      "throughput_ops_s": -1.352334130497579,
+      "allocated_bytes_per_op": null
+    }
+  },
+  "dequeue_retry10/100": {
+    "before": {
+      "throughput_ops_s": 710036.0,
+      "p50_ns": 1416.0,
+      "p95_ns": 1417.0,
+      "p99_ns": 1500.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0,
+      "mutex_wait_ns": 25.089,
+      "mutex_hold_ns": 1310.553
+    },
+    "after": {
+      "throughput_ops_s": 3082044.0,
+      "p50_ns": 333.0,
+      "p95_ns": 334.0,
+      "p99_ns": 334.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0,
+      "mutex_wait_ns": 33.48,
+      "mutex_hold_ns": 140.819
+    },
+    "delta_percent": {
+      "p99_ns": -77.73333333333333,
+      "mutex_hold_ns": -89.25499388426107,
+      "mutex_wait_ns": 33.444936027741235,
+      "p50_ns": -76.48305084745762,
+      "allocations_per_op": null,
+      "p95_ns": -76.42907551164431,
+      "throughput_ops_s": 334.06869510841705,
+      "allocated_bytes_per_op": null
+    }
+  },
+  "dequeue_retry10/1000": {
+    "before": {
+      "throughput_ops_s": 122993.0,
+      "p50_ns": 8083.0,
+      "p95_ns": 8167.0,
+      "p99_ns": 11209.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0,
+      "mutex_wait_ns": 15.938,
+      "mutex_hold_ns": 8035.339
+    },
+    "after": {
+      "throughput_ops_s": 4184801.0,
+      "p50_ns": 250.0,
+      "p95_ns": 250.0,
+      "p99_ns": 250.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0,
+      "mutex_wait_ns": 24.344,
+      "mutex_hold_ns": 102.39
+    },
+    "delta_percent": {
+      "p99_ns": -97.76964938888393,
+      "mutex_hold_ns": -98.72575382320522,
+      "mutex_wait_ns": 52.74187476471326,
+      "p50_ns": -96.90708895212174,
+      "allocations_per_op": null,
+      "p95_ns": -96.93890045304273,
+      "throughput_ops_s": 3302.4708723260674,
+      "allocated_bytes_per_op": null
+    }
+  },
+  "dequeue_retry10/4096": {
+    "before": {
+      "throughput_ops_s": 30342.0,
+      "p50_ns": 32792.0,
+      "p95_ns": 33084.0,
+      "p99_ns": 38458.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0,
+      "mutex_wait_ns": 16.148,
+      "mutex_hold_ns": 32829.631
+    },
+    "after": {
+      "throughput_ops_s": 5329240.0,
+      "p50_ns": 208.0,
+      "p95_ns": 209.0,
+      "p99_ns": 209.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0,
+      "mutex_wait_ns": 19.658,
+      "mutex_hold_ns": 81.36
+    },
+    "delta_percent": {
+      "p99_ns": -99.45655000260024,
+      "mutex_hold_ns": -99.75217510059738,
+      "mutex_wait_ns": 21.73643794897202,
+      "p50_ns": -99.36569895096366,
+      "allocations_per_op": null,
+      "p95_ns": -99.36827469471648,
+      "throughput_ops_s": 17463.90481840353,
+      "allocated_bytes_per_op": null
+    }
+  },
+  "dequeue_retry50/0": {
+    "before": {
+      "throughput_ops_s": 2242042.0,
+      "p50_ns": 458.0,
+      "p95_ns": 459.0,
+      "p99_ns": 459.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0,
+      "mutex_wait_ns": 46.498,
+      "mutex_hold_ns": 195.964
+    },
+    "after": {
+      "throughput_ops_s": 3969892.0,
+      "p50_ns": 250.0,
+      "p95_ns": 250.0,
+      "p99_ns": 250.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0,
+      "mutex_wait_ns": 29.997,
+      "mutex_hold_ns": 129.394
+    },
+    "delta_percent": {
+      "p99_ns": -45.53376906318083,
+      "mutex_hold_ns": -33.97052519850584,
+      "mutex_wait_ns": -35.487547851520496,
+      "p50_ns": -45.41484716157205,
+      "allocations_per_op": null,
+      "p95_ns": -45.53376906318083,
+      "throughput_ops_s": 77.06590688310031,
+      "allocated_bytes_per_op": null
+    }
+  },
+  "dequeue_retry50/100": {
+    "before": {
+      "throughput_ops_s": 1238486.0,
+      "p50_ns": 792.0,
+      "p95_ns": 834.0,
+      "p99_ns": 834.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0,
+      "mutex_wait_ns": 21.456,
+      "mutex_hold_ns": 695.03
+    },
+    "after": {
+      "throughput_ops_s": 3464511.0,
+      "p50_ns": 292.0,
+      "p95_ns": 292.0,
+      "p99_ns": 333.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0,
+      "mutex_wait_ns": 29.936,
+      "mutex_hold_ns": 125.291
+    },
+    "delta_percent": {
+      "p99_ns": -60.07194244604317,
+      "mutex_hold_ns": -81.9732961167144,
+      "mutex_wait_ns": 39.52274422073081,
+      "p50_ns": -63.13131313131313,
+      "allocations_per_op": null,
+      "p95_ns": -64.98800959232614,
+      "throughput_ops_s": 179.73759897164766,
+      "allocated_bytes_per_op": null
+    }
+  },
+  "dequeue_retry50/1000": {
+    "before": {
+      "throughput_ops_s": 205243.0,
+      "p50_ns": 4833.0,
+      "p95_ns": 4875.0,
+      "p99_ns": 6750.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0,
+      "mutex_wait_ns": 15.819,
+      "mutex_hold_ns": 4779.661
+    },
+    "after": {
+      "throughput_ops_s": 4571376.0,
+      "p50_ns": 208.0,
+      "p95_ns": 250.0,
+      "p99_ns": 250.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0,
+      "mutex_wait_ns": 22.664,
+      "mutex_hold_ns": 94.754
+    },
+    "delta_percent": {
+      "p99_ns": -96.2962962962963,
+      "mutex_hold_ns": -98.01755814899843,
+      "mutex_wait_ns": 43.270750363486954,
+      "p50_ns": -95.69625491413201,
+      "allocations_per_op": null,
+      "p95_ns": -94.87179487179486,
+      "throughput_ops_s": 2127.2993476025977,
+      "allocated_bytes_per_op": null
+    }
+  },
+  "dequeue_retry50/4096": {
+    "before": {
+      "throughput_ops_s": 50515.0,
+      "p50_ns": 19750.0,
+      "p95_ns": 19792.0,
+      "p99_ns": 22167.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0,
+      "mutex_wait_ns": 16.079,
+      "mutex_hold_ns": 19680.972
+    },
+    "after": {
+      "throughput_ops_s": 5547712.0,
+      "p50_ns": 167.0,
+      "p95_ns": 209.0,
+      "p99_ns": 209.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0,
+      "mutex_wait_ns": 18.749,
+      "mutex_hold_ns": 77.895
+    },
+    "delta_percent": {
+      "p99_ns": -99.05715703523256,
+      "mutex_hold_ns": -99.60421162125529,
+      "mutex_wait_ns": 16.60551029292865,
+      "p50_ns": -99.15443037974684,
+      "allocations_per_op": null,
+      "p95_ns": -98.94401778496362,
+      "throughput_ops_s": 10882.306245669604,
+      "allocated_bytes_per_op": null
+    }
+  }
+}

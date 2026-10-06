@@ -1,0 +1,67 @@
+{
+  "duration_seconds": 120,
+  "rate_requested": 1000,
+  "connections": 16,
+  "qos": 2,
+  "tls": true,
+  "sink_mode": "webhook",
+  "counters": {
+    "connect_attempts": 16,
+    "connected": 16,
+    "disconnected": 16,
+    "payload_bytes": 30720000,
+    "pending_at_disconnect": 0,
+    "pubcomps": 120000,
+    "published": 120000,
+    "pubrecs": 120000,
+    "pubrels": 120000,
+    "wire_bytes_sent": 34366804
+  },
+  "latencies": {
+    "connect": {
+      "count": 16,
+      "max_ms": 4.557,
+      "mean_ms": 3.1253125,
+      "p50_ms": 3.44,
+      "p95_ms": 4.56,
+      "p99_ms": 4.56
+    },
+    "generator_schedule_lag": {
+      "count": 120000,
+      "max_ms": 4.919,
+      "mean_ms": 0.8825771250000001,
+      "p50_ms": 0.9,
+      "p95_ms": 1.53,
+      "p99_ms": 1.6
+    },
+    "pubcomp": {
+      "count": 120000,
+      "max_ms": 6.575,
+      "mean_ms": 0.22289946666666666,
+      "p50_ms": 0.22,
+      "p95_ms": 0.37,
+      "p99_ms": 0.4
+    },
+    "pubrec": {
+      "count": 120000,
+      "max_ms": 5.886,
+      "mean_ms": 0.11292504166666667,
+      "p50_ms": 0.11,
+      "p95_ms": 0.17,
+      "p99_ms": 0.19
+    },
+    "ramp_schedule_lag": {
+      "count": 16,
+      "max_ms": 3.85,
+      "mean_ms": 2.7640625,
+      "p50_ms": 2.94,
+      "p95_ms": 3.86,
+      "p99_ms": 3.86
+    }
+  },
+  "errors": [],
+  "server_exit": 0,
+  "rss_min_kib": 7536,
+  "rss_max_kib": 10608,
+  "pending_required_peak": 2
+}
