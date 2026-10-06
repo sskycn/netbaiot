@@ -52,35 +52,46 @@ flowchart LR
 
 ## Quick Start
 
-On macOS/Linux, install Python 3.9+ and Mosquitto client tools (`mosquitto_pub`).
-For a source checkout, also install Rust 1.88+. For a downloaded binary archive,
-extract it and run from its package directory; Rust is not required.
-Windows users can follow the manual commands in the [Quick Start](docs/quick-start.md#windows-manual-start).
-Mosquitto is only the client; NetbaIoT runs its own MQTT broker. The demo binds
-loopback and uses credentials from `configs/tutorial.json`; they are for local
-development only.
-
-Terminal 1 starts the gateway and a small webhook receiver:
+From a source checkout (Rust 1.88+):
 
 ```bash
-./scripts/demo/start.sh
+cargo run --locked -p netbaiot-cli -- demo
 ```
 
-Wait for the `runtime ready` log before publishing.
-
-Terminal 2 publishes one event:
+From an extracted binary archive:
 
 ```bash
-mosquitto_pub -h 127.0.0.1 -p 8080 -V mqttv311 \
-  -u demo-device -P 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f \
-  -i quickstart -t v1/t/demo/p/sensor/d/device-1/up -q 1 \
-  -m '{"schema_version":1,"source_message_id":"demo:1","kind":"heartbeat","data":{"sequence":1}}'
+./netbaiot demo
+# Run one end-to-end sample, then stop:
+./netbaiot demo --once
 ```
 
-The first terminal prints the normalized event after the webhook receives it.
-Stop the demo with Ctrl-C. MQTT 5.0 uses the same listener and topic; change
-`-V mqttv311` to `-V mqttv5`. The full [Quick Start](docs/quick-start.md) explains
-the event fields, development credentials, TCP/UDP examples, and graceful stop.
+On Windows, use `.\netbaiot.exe demo` in PowerShell. The Rust-only demo binds
+loopback on dynamic ports, authenticates the sample MQTT device, publishes a
+heartbeat, waits for the business sink ACK, and prints a standard `mosquitto_pub`
+command with the actual port. Python and Mosquitto are optional for this first
+experience. Press Ctrl-C to drain and remove the private temporary recovery files.
+The printed device credentials are for local development only.
+
+NetbaIoT implements its own MQTT broker. Ordinary MQTT clients remain first-class;
+use the demo's printed command, or follow the [manual MQTT example](docs/quick-start.md#manual-mqtt-example)
+with `mosquitto_pub -V mqttv311` (or `-V mqttv5`).
+
+Check and run your own JSON configuration:
+
+```bash
+./netbaiot config check --config configs/tutorial.json
+./netbaiot serve --config configs/tutorial.json
+```
+
+The tutorial config needs its manual webhook; use `configs/development.json` for
+ingress with the in-process development audit sink. See [CLI commands](docs/cli.md),
+[Quick Start](docs/quick-start.md), and [production operations](docs/operations-guide.md).
+
+Create your own local project with `netbaiot init my-gateway`, then run
+`netbaiot config check --config netbaiot.json` and `netbaiot doctor --config netbaiot.json`
+from its directory. [Configuration/IDE support](docs/configuration.md),
+[doctor](docs/doctor.md), and [maintenance](docs/maintenance.md) describe the full flow.
 
 ## How it works
 

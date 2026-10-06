@@ -1,0 +1,60 @@
+# Configuration and project setup
+
+```bash
+netbaiot init my-gateway
+cd my-gateway
+netbaiot config check --config netbaiot.json
+netbaiot doctor --config netbaiot.json
+netbaiot serve --config netbaiot.json
+```
+
+Init creates only netbaiot.json, .env.example, README.md and var/. The development
+config uses loopback, an example HTTP receiver on 127.0.0.1:18080/events and the
+existing development credential. Start your own receiver before serve, or use
+`netbaiot demo` for the self-contained experience. No management secret is generated
+or printed. .env.example contains variable names with empty values and is not
+loaded automatically. Supply secrets from protected sources.
+
+`netbaiot init --production my-production` creates a parser-readable skeleton with
+TLS placeholders, HTTPS provider/sink placeholders, no device credential and no
+fixed production token. It is **not ready to run**. Fill TLS/auth/sink values then
+run config check. No public plaintext gateway can start from the skeleton.
+
+Init refuses to replace any of its managed files by default. `--force` replaces
+only these three regular files; it rejects symlinks/special files and never removes
+the whole directory or unrelated files. Writes are staged, synced and atomically
+published per file. This is not a transaction across three files: a late filesystem
+failure can leave an explicitly reported partial generation. The generated recovery
+path is absolute to this project; update it after relocation. Config file paths
+otherwise retain the server's current-working-directory semantics.
+
+## IDE schema association
+
+[Generated JSON Schema](schema/netbaiot-config.schema.json) comes from the actual
+Rust Config/serde types through the optional `schema` feature. It respects
+serde defaults, enum spellings and deny_unknown_fields. Resource scalar limits
+share the runtime's positive/u32 range; secret_hex is writeOnly and 64 hex digits.
+Production server/client binaries do not enable schema generation by default.
+`netbaiot config schema` prints the committed generated artifact without a compiler.
+
+Config rejects unknown fields, including `$schema`. Do not insert `$schema` into
+your gateway JSON. For VS Code, associate it in editor settings:
+
+```json
+{
+  "json.schemas": [{
+    "fileMatch": ["netbaiot.json"],
+    "url": "./netbaiot-config.schema.json"
+  }]
+}
+```
+
+Save `netbaiot config schema` output beside your config using that filename, or use
+a suitable absolute editor schema path. The schema is also included in binary archives.
+
+Schema validation does not replace `netbaiot config check`. Cross-field listener
+security, identity uniqueness, role/permission constraints, environment secret
+sources, real PEM/key matching and runtime ownership/ports remain separate checks.
+The [generated field/default reference](configuration-fields.md) is rebuilt by
+`cargo xtask config-reference`; [operations](operations-guide.md) contains the
+handwritten security/deployment guidance.

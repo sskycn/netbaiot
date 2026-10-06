@@ -70,6 +70,43 @@ def run_demo(root):
         environment["PATH"] = f"{guard}{os.pathsep}{environment.get('PATH', '')}"
         environment["TMPDIR"] = str(working)
         environment["RUST_LOG"] = "info"
+        # The preferred first-use path invokes only the extracted Rust binary.
+        cli = root / "netbaiot"
+        for arguments in (["version"], ["config", "check", "--config", "configs/tutorial.json"], ["demo", "--once"]):
+            native_environment = environment.copy()
+            native_environment["PATH"] = ""  # no Python, Mosquitto or Cargo fallback
+            native = subprocess.run([str(cli), *arguments], cwd=root, env=native_environment,
+                check=True, capture_output=True, text=True, timeout=30)
+            if arguments[0] == "demo":
+                for stage in ("Gateway started", "Demo device authenticated", "Heartbeat EventAccepted", "Business sink acknowledged", "Shutdown completed"):
+                    if stage not in native.stdout:
+                        raise RuntimeError(f"native demo missing stage: {stage}")
+                if list(working.glob("netbaiot-demo-*")):
+                    raise RuntimeError("native demo left temporary recovery storage")
+        native_environment = environment.copy()
+        native_environment["PATH"] = ""
+        schema = subprocess.run([str(cli), "config", "schema"], cwd=root, env=native_environment,
+            check=True, capture_output=True, text=True, timeout=30)
+        if json.loads(schema.stdout) != json.loads((root / "docs/schema/netbaiot-config.schema.json").read_text()):
+            raise RuntimeError("packaged CLI schema does not match packaged schema file")
+        project = working / "native-project"
+        subprocess.run([str(cli), "init", str(project)], cwd=root, env=native_environment,
+            check=True, capture_output=True, text=True, timeout=30)
+        config_path = project / "netbaiot.json"
+        config = json.loads(config_path.read_text())
+        config["device_ingress"] = "127.0.0.1:0"
+        config["management_http"] = "127.0.0.1:0"
+        config_path.write_text(json.dumps(config))
+        for command in (["config", "check"], ["doctor"]):
+            subprocess.run([str(cli), *command, "--config", str(config_path)], cwd=root,
+                env=native_environment, check=True, capture_output=True, text=True, timeout=30)
+        production = working / "production-project"
+        subprocess.run([str(cli), "init", "--production", str(production)], cwd=root,
+            env=native_environment, check=True, capture_output=True, text=True, timeout=30)
+        production_config = json.loads((production / "netbaiot.json").read_text())
+        if production_config["credentials"] or production_config["development"]:
+            raise RuntimeError("production skeleton contains development credentials")
+        print("Archive native CLI PASS: version, config check, demo --once, init, doctor, schema, production skeleton, empty PATH")
         log = working / "demo.log"
         with log.open("w") as output:
             process = subprocess.Popen(["bash", "scripts/demo/start.sh"], cwd=root,

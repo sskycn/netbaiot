@@ -2,7 +2,16 @@
 
 ## 配置模型
 
-Server 接受一个 JSON 路径；未提供时默认 `configs/development.json`：
+统一入口可先检查配置再启动：
+
+```bash
+netbaiot config check --config /etc/netbaiot/server.json
+netbaiot serve --config /etc/netbaiot/server.json
+netbaiot config limits
+```
+
+检查默认不绑定端口、不修改恢复目录、不访问远端。相对文件路径沿用当前工作目录语义；
+成功检查不保证运行时端口可用或恢复快照有效。`netbaiot-server` 兼容入口继续接受一个 JSON 路径；未提供时默认 `configs/development.json`：
 
 ```bash
 netbaiot-server /etc/netbaiot/server.json

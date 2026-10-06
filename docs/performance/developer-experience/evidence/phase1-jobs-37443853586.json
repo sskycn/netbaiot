@@ -1,0 +1,629 @@
+{
+  "total_count": 6,
+  "jobs": [
+    {
+      "id": 112203809176,
+      "run_id": 37443853586,
+      "workflow_name": "Rust checks",
+      "head_branch": "codex/developer-experience-phase1",
+      "run_url": "https://api.github.com/repos/sskycn/netbaiot/actions/runs/37443853586",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOUgNLuc8AAAAaH95BmA",
+      "head_sha": "4cb93af56dea579c10322e379abfe950b088bc9e",
+      "url": "https://api.github.com/repos/sskycn/netbaiot/actions/jobs/112203809176",
+      "html_url": "https://github.com/sskycn/netbaiot/actions/runs/37443853586/job/112203809176",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-06T09:34:07Z",
+      "started_at": "2026-10-06T09:34:10Z",
+      "completed_at": "2026-10-06T09:36:34Z",
+      "name": "verify / audit",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-06T09:34:10Z",
+          "completed_at": "2026-10-06T09:34:11Z"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-06T09:34:11Z",
+          "completed_at": "2026-10-06T09:34:20Z"
+        },
+        {
+          "name": "Run dtolnay/rust-toolchain@stable",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-06T09:34:20Z",
+          "completed_at": "2026-10-06T09:34:29Z"
+        },
+        {
+          "name": "Run cargo install --locked cargo-audit",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-06T09:34:29Z",
+          "completed_at": "2026-10-06T09:36:20Z"
+        },
+        {
+          "name": "Run cargo audit",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-06T09:36:20Z",
+          "completed_at": "2026-10-06T09:36:33Z"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10,
+          "started_at": "2026-10-06T09:36:33Z",
+          "completed_at": "2026-10-06T09:36:33Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-10-06T09:36:33Z",
+          "completed_at": "2026-10-06T09:36:33Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/sskycn/netbaiot/check-runs/112203809176",
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "runner_id": 1000004340,
+      "runner_name": "GitHub Actions 1000004340",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 112203809486,
+      "run_id": 37443853586,
+      "workflow_name": "Rust checks",
+      "head_branch": "codex/developer-experience-phase1",
+      "run_url": "https://api.github.com/repos/sskycn/netbaiot/actions/runs/37443853586",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOUgNLuc8AAAAaH95Czg",
+      "head_sha": "4cb93af56dea579c10322e379abfe950b088bc9e",
+      "url": "https://api.github.com/repos/sskycn/netbaiot/actions/jobs/112203809486",
+      "html_url": "https://github.com/sskycn/netbaiot/actions/runs/37443853586/job/112203809486",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-06T09:34:07Z",
+      "started_at": "2026-10-06T09:34:10Z",
+      "completed_at": "2026-10-06T09:34:49Z",
+      "name": "verify / preflight",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-06T09:34:11Z",
+          "completed_at": "2026-10-06T09:34:12Z"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-06T09:34:12Z",
+          "completed_at": "2026-10-06T09:34:21Z"
+        },
+        {
+          "name": "Run dtolnay/rust-toolchain@stable",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-06T09:34:21Z",
+          "completed_at": "2026-10-06T09:34:31Z"
+        },
+        {
+          "name": "Validate version, notes, package inputs and published paths",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-06T09:34:31Z",
+          "completed_at": "2026-10-06T09:34:47Z"
+        },
+        {
+          "name": "Test release tooling failure paths",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-06T09:34:47Z",
+          "completed_at": "2026-10-06T09:34:47Z"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10,
+          "started_at": "2026-10-06T09:34:47Z",
+          "completed_at": "2026-10-06T09:34:47Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-10-06T09:34:47Z",
+          "completed_at": "2026-10-06T09:34:47Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/sskycn/netbaiot/check-runs/112203809486",
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "runner_id": 1000004341,
+      "runner_name": "GitHub Actions 1000004341",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 112203809570,
+      "run_id": 37443853586,
+      "workflow_name": "Rust checks",
+      "head_branch": "codex/developer-experience-phase1",
+      "run_url": "https://api.github.com/repos/sskycn/netbaiot/actions/runs/37443853586",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOUgNLuc8AAAAaH95DIg",
+      "head_sha": "4cb93af56dea579c10322e379abfe950b088bc9e",
+      "url": "https://api.github.com/repos/sskycn/netbaiot/actions/jobs/112203809570",
+      "html_url": "https://github.com/sskycn/netbaiot/actions/runs/37443853586/job/112203809570",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-06T09:34:07Z",
+      "started_at": "2026-10-06T09:34:10Z",
+      "completed_at": "2026-10-06T09:37:03Z",
+      "name": "verify / rust (stable)",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-06T09:34:11Z",
+          "completed_at": "2026-10-06T09:34:12Z"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-06T09:34:12Z",
+          "completed_at": "2026-10-06T09:34:24Z"
+        },
+        {
+          "name": "Run dtolnay/rust-toolchain@master",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-06T09:34:24Z",
+          "completed_at": "2026-10-06T09:34:34Z"
+        },
+        {
+          "name": "Run rustc --version --verbose",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-06T09:34:34Z",
+          "completed_at": "2026-10-06T09:34:34Z"
+        },
+        {
+          "name": "Run cargo --version --verbose",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-06T09:34:34Z",
+          "completed_at": "2026-10-06T09:34:34Z"
+        },
+        {
+          "name": "Run cargo fmt --all -- --check",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-10-06T09:34:34Z",
+          "completed_at": "2026-10-06T09:34:35Z"
+        },
+        {
+          "name": "Run cargo clippy --locked --workspace --all-targets --all-features -- -D warnings",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-10-06T09:34:35Z",
+          "completed_at": "2026-10-06T09:35:04Z"
+        },
+        {
+          "name": "Run workspace tests",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-10-06T09:35:04Z",
+          "completed_at": "2026-10-06T09:36:59Z"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 16,
+          "started_at": "2026-10-06T09:36:59Z",
+          "completed_at": "2026-10-06T09:37:00Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 17,
+          "started_at": "2026-10-06T09:37:00Z",
+          "completed_at": "2026-10-06T09:37:00Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/sskycn/netbaiot/check-runs/112203809570",
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "runner_id": 1000004342,
+      "runner_name": "GitHub Actions 1000004342",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 112203809614,
+      "run_id": 37443853586,
+      "workflow_name": "Rust checks",
+      "head_branch": "codex/developer-experience-phase1",
+      "run_url": "https://api.github.com/repos/sskycn/netbaiot/actions/runs/37443853586",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOUgNLuc8AAAAaH95DTg",
+      "head_sha": "4cb93af56dea579c10322e379abfe950b088bc9e",
+      "url": "https://api.github.com/repos/sskycn/netbaiot/actions/jobs/112203809614",
+      "html_url": "https://github.com/sskycn/netbaiot/actions/runs/37443853586/job/112203809614",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-06T09:34:07Z",
+      "started_at": "2026-10-06T09:34:10Z",
+      "completed_at": "2026-10-06T09:37:14Z",
+      "name": "verify / rust (1.88.0)",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-06T09:34:11Z",
+          "completed_at": "2026-10-06T09:34:12Z"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-06T09:34:12Z",
+          "completed_at": "2026-10-06T09:34:21Z"
+        },
+        {
+          "name": "Run dtolnay/rust-toolchain@master",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-06T09:34:21Z",
+          "completed_at": "2026-10-06T09:34:31Z"
+        },
+        {
+          "name": "Run rustc --version --verbose",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-06T09:34:31Z",
+          "completed_at": "2026-10-06T09:34:31Z"
+        },
+        {
+          "name": "Run cargo --version --verbose",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-06T09:34:31Z",
+          "completed_at": "2026-10-06T09:34:31Z"
+        },
+        {
+          "name": "Run cargo fmt --all -- --check",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-10-06T09:34:31Z",
+          "completed_at": "2026-10-06T09:34:31Z"
+        },
+        {
+          "name": "Run cargo clippy --locked --workspace --all-targets --all-features -- -D warnings",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-10-06T09:34:31Z",
+          "completed_at": "2026-10-06T09:35:04Z"
+        },
+        {
+          "name": "Run workspace tests",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-10-06T09:35:04Z",
+          "completed_at": "2026-10-06T09:37:12Z"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 16,
+          "started_at": "2026-10-06T09:37:12Z",
+          "completed_at": "2026-10-06T09:37:12Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 17,
+          "started_at": "2026-10-06T09:37:12Z",
+          "completed_at": "2026-10-06T09:37:12Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/sskycn/netbaiot/check-runs/112203809614",
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "runner_id": 1000004343,
+      "runner_name": "GitHub Actions 1000004343",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 112203809737,
+      "run_id": 37443853586,
+      "workflow_name": "Rust checks",
+      "head_branch": "codex/developer-experience-phase1",
+      "run_url": "https://api.github.com/repos/sskycn/netbaiot/actions/runs/37443853586",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOUgNLuc8AAAAaH95DyQ",
+      "head_sha": "4cb93af56dea579c10322e379abfe950b088bc9e",
+      "url": "https://api.github.com/repos/sskycn/netbaiot/actions/jobs/112203809737",
+      "html_url": "https://github.com/sskycn/netbaiot/actions/runs/37443853586/job/112203809737",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-06T09:34:07Z",
+      "started_at": "2026-10-06T09:34:09Z",
+      "completed_at": "2026-10-06T09:36:43Z",
+      "name": "verify / mqtt / release-gate",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-06T09:34:10Z",
+          "completed_at": "2026-10-06T09:34:11Z"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-06T09:34:11Z",
+          "completed_at": "2026-10-06T09:34:20Z"
+        },
+        {
+          "name": "Run dtolnay/rust-toolchain@stable",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-06T09:34:20Z",
+          "completed_at": "2026-10-06T09:34:28Z"
+        },
+        {
+          "name": "Install test-only Mosquitto tools",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-06T09:34:28Z",
+          "completed_at": "2026-10-06T09:34:40Z"
+        },
+        {
+          "name": "Show external tool versions",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-06T09:34:40Z",
+          "completed_at": "2026-10-06T09:34:40Z"
+        },
+        {
+          "name": "Build server for protocol regressions",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-10-06T09:34:40Z",
+          "completed_at": "2026-10-06T09:35:06Z"
+        },
+        {
+          "name": "Run MQTT protocol regressions",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-10-06T09:35:06Z",
+          "completed_at": "2026-10-06T09:35:12Z"
+        },
+        {
+          "name": "Retain protocol regression evidence",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-10-06T09:35:12Z",
+          "completed_at": "2026-10-06T09:35:13Z"
+        },
+        {
+          "name": "Check release evidence classification",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-10-06T09:35:13Z",
+          "completed_at": "2026-10-06T09:35:13Z"
+        },
+        {
+          "name": "Run complete MQTT release gate",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10,
+          "started_at": "2026-10-06T09:35:13Z",
+          "completed_at": "2026-10-06T09:36:05Z"
+        },
+        {
+          "name": "Retain release and reference timing evidence",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-10-06T09:36:05Z",
+          "completed_at": "2026-10-06T09:36:06Z"
+        },
+        {
+          "name": "Run MQTT 5 raw and Mosquitto client gates",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-10-06T09:36:06Z",
+          "completed_at": "2026-10-06T09:36:20Z"
+        },
+        {
+          "name": "Run Device Profile SDK against Mosquitto",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-10-06T09:36:20Z",
+          "completed_at": "2026-10-06T09:36:41Z"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 26,
+          "started_at": "2026-10-06T09:36:41Z",
+          "completed_at": "2026-10-06T09:36:41Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 27,
+          "started_at": "2026-10-06T09:36:41Z",
+          "completed_at": "2026-10-06T09:36:41Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/sskycn/netbaiot/check-runs/112203809737",
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "runner_id": 1000004344,
+      "runner_name": "GitHub Actions 1000004344",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 112205002355,
+      "run_id": 37443853586,
+      "workflow_name": "Rust checks",
+      "head_branch": "codex/developer-experience-phase1",
+      "run_url": "https://api.github.com/repos/sskycn/netbaiot/actions/runs/37443853586",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOUgNLuc8AAAAaH_B2cw",
+      "head_sha": "4cb93af56dea579c10322e379abfe950b088bc9e",
+      "url": "https://api.github.com/repos/sskycn/netbaiot/actions/jobs/112205002355",
+      "html_url": "https://github.com/sskycn/netbaiot/actions/runs/37443853586/job/112205002355",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-06T09:37:15Z",
+      "started_at": "2026-10-06T09:37:18Z",
+      "completed_at": "2026-10-06T09:39:33Z",
+      "name": "Linux binary Quick Start",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-06T09:37:19Z",
+          "completed_at": "2026-10-06T09:37:19Z"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-06T09:37:19Z",
+          "completed_at": "2026-10-06T09:37:29Z"
+        },
+        {
+          "name": "Run dtolnay/rust-toolchain@stable",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-06T09:37:29Z",
+          "completed_at": "2026-10-06T09:37:40Z"
+        },
+        {
+          "name": "Run sudo apt-get update && sudo apt-get install --yes mosquitto-clients",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-06T09:37:40Z",
+          "completed_at": "2026-10-06T09:37:55Z"
+        },
+        {
+          "name": "Run cargo build --locked --release -p netbaiot-server -p netbaiot-cli",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-06T09:37:55Z",
+          "completed_at": "2026-10-06T09:39:27Z"
+        },
+        {
+          "name": "Package and execute the extracted archive",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-10-06T09:39:27Z",
+          "completed_at": "2026-10-06T09:39:31Z"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-10-06T09:39:31Z",
+          "completed_at": "2026-10-06T09:39:31Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-10-06T09:39:31Z",
+          "completed_at": "2026-10-06T09:39:31Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/sskycn/netbaiot/check-runs/112205002355",
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "runner_id": 1000004345,
+      "runner_name": "GitHub Actions 1000004345",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    }
+  ]
+}

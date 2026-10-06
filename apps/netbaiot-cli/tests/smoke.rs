@@ -176,7 +176,7 @@ async fn cli_smoke_covers_status_device_command_events_auth_and_drain() {
 
     let removed = cli(&config, &["config", "get", "device-1"]).await;
     assert_eq!(removed.status.code(), Some(2));
-    assert!(String::from_utf8_lossy(&removed.stderr).contains("unknown command group"));
+    assert!(String::from_utf8_lossy(&removed.stderr).contains("unrecognized subcommand"));
 
     let mut monitor_command = command(&config);
     monitor_command

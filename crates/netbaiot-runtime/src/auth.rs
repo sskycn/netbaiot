@@ -15,8 +15,10 @@ use subtle::ConstantTimeEq;
 /// Provisioned high-entropy 256-bit key. Deliberately no Debug implementation.
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Credential {
     pub credential_id: String,
+    #[cfg_attr(feature = "schema", schemars(length(equal = 64), regex(pattern = "^[0-9a-fA-F]{64}$"), extend("writeOnly" = true)))]
     pub secret_hex: String,
     pub identity: AuthenticatedDevice,
 }

@@ -1,0 +1,1827 @@
+{
+  "$defs": {
+    "AdminProduct": {
+      "additionalProperties": false,
+      "properties": {
+        "product_id": {
+          "type": "string"
+        },
+        "tenant_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "tenant_id",
+        "product_id"
+      ],
+      "type": "object"
+    },
+    "AdminResourceConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "devices": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/DeviceKey"
+          },
+          "type": "array"
+        },
+        "products": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/AdminProduct"
+          },
+          "type": "array"
+        },
+        "tenants": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "ApiKeyConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "auth_generation": {
+          "default": 0,
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "enabled": {
+          "default": true,
+          "type": "boolean"
+        },
+        "expires_at": {
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "global": {
+          "default": false,
+          "type": "boolean"
+        },
+        "key_id": {
+          "type": "string"
+        },
+        "resources": {
+          "$ref": "#/$defs/AdminResourceConfig",
+          "default": {
+            "devices": [],
+            "products": [],
+            "tenants": []
+          }
+        },
+        "scopes": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "secret_env": {
+          "type": "string"
+        },
+        "subject": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "key_id",
+        "secret_env",
+        "subject",
+        "scopes"
+      ],
+      "type": "object"
+    },
+    "AuthenticatedDevice": {
+      "properties": {
+        "auth_generation": {
+          "default": 1,
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "codec_id": {
+          "type": "string"
+        },
+        "codec_version": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "credential_version": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "device_key": {
+          "$ref": "#/$defs/DeviceKey"
+        },
+        "permissions": {
+          "$ref": "#/$defs/Permissions"
+        }
+      },
+      "required": [
+        "device_key",
+        "credential_version",
+        "codec_id",
+        "codec_version",
+        "permissions"
+      ],
+      "type": "object"
+    },
+    "BusinessRole": {
+      "enum": [
+        "events",
+        "auth_control",
+        "multiplexed",
+        "commands",
+        "application"
+      ],
+      "type": "string"
+    },
+    "BusinessRpcConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "allow_v1": {
+          "default": false,
+          "type": "boolean"
+        },
+        "auth_max_inflight": {
+          "default": 128,
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "development_role": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BusinessRole"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "development_token_env": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "identities": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/BusinessRpcIdentityConfig"
+          },
+          "type": "array"
+        },
+        "max_auth_control_offline_ms": {
+          "default": 30000,
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "max_connections": {
+          "default": 8,
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "tls": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ManagementTlsFiles"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "v3": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/V3Limits"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "V3 is available on the same listener only when explicitly configured."
+        },
+        "v3_experiment_socket_send_buffer_bytes": {
+          "default": null,
+          "format": "uint",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "v3_send_ahead": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/V3SendAhead"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Local sender policy, separate from the negotiated V3 receive windows."
+        },
+        "version": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "version"
+      ],
+      "type": "object"
+    },
+    "BusinessRpcIdentityConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "call_methods": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "certificate_sha256": {
+          "type": "string"
+        },
+        "expires_at_ms": {
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "global": {
+          "default": false,
+          "type": "boolean"
+        },
+        "principal_id": {
+          "type": "string"
+        },
+        "provide_methods": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "provider_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "role": {
+          "$ref": "#/$defs/BusinessRole"
+        },
+        "sink_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tenants": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "certificate_sha256",
+        "principal_id",
+        "role",
+        "provide_methods",
+        "call_methods"
+      ],
+      "type": "object"
+    },
+    "Credential": {
+      "additionalProperties": false,
+      "description": "Provisioned high-entropy 256-bit key. Deliberately no Debug implementation.",
+      "properties": {
+        "credential_id": {
+          "type": "string"
+        },
+        "identity": {
+          "$ref": "#/$defs/AuthenticatedDevice"
+        },
+        "secret_hex": {
+          "maxLength": 64,
+          "minLength": 64,
+          "pattern": "^[0-9a-fA-F]{64}$",
+          "type": "string",
+          "writeOnly": true
+        }
+      },
+      "required": [
+        "credential_id",
+        "secret_hex",
+        "identity"
+      ],
+      "type": "object"
+    },
+    "DeviceAuthSource": {
+      "enum": [
+        "static",
+        "http",
+        "business_rpc"
+      ],
+      "type": "string"
+    },
+    "DeviceKey": {
+      "additionalProperties": false,
+      "properties": {
+        "device_id": {
+          "type": "string"
+        },
+        "product_id": {
+          "type": "string"
+        },
+        "tenant_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "tenant_id",
+        "product_id",
+        "device_id"
+      ],
+      "type": "object"
+    },
+    "EventDeliverySource": {
+      "enum": [
+        "http",
+        "business_rpc",
+        "development_audit"
+      ],
+      "type": "string"
+    },
+    "JwtConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "audience": {
+          "type": "string"
+        },
+        "global_roles": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "issuer": {
+          "type": "string"
+        },
+        "jwks_url": {
+          "type": "string"
+        },
+        "role_scopes": {
+          "additionalProperties": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "default": {},
+          "type": "object"
+        },
+        "roles_claim": {
+          "default": "roles",
+          "type": "string"
+        },
+        "scope_claim": {
+          "default": "scope",
+          "type": "string"
+        },
+        "subject_claim": {
+          "default": "sub",
+          "type": "string"
+        },
+        "tenant_claim": {
+          "default": "tenants",
+          "type": "string"
+        }
+      },
+      "required": [
+        "issuer",
+        "audience",
+        "jwks_url"
+      ],
+      "type": "object"
+    },
+    "Limits": {
+      "additionalProperties": false,
+      "description": "One validated location for every in-process resource ceiling.",
+      "properties": {
+        "auth_cache_max_bytes": {
+          "default": 4194304,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "auth_cache_max_entries": {
+          "default": 4096,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "auth_cache_max_waiters": {
+          "default": 256,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "auth_negative_ttl_ms": {
+          "default": 5000,
+          "format": "uint64",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "auth_positive_ttl_ms": {
+          "default": 300000,
+          "format": "uint64",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "authentication_timeout_ms": {
+          "default": 5000,
+          "format": "uint64",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "command_dedup_max_entries": {
+          "default": 4096,
+          "description": "Process-local accepted and in-flight CommandId reservations.",
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "command_dedup_ttl_ms": {
+          "default": 300000,
+          "format": "uint64",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "command_ttl_ms": {
+          "default": 300000,
+          "format": "uint64",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "connect_timeout_ms": {
+          "default": 10000,
+          "format": "uint64",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "connection_memory_reservation": {
+          "default": 524288,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "control_max_bytes": {
+          "default": 16777216,
+          "description": "Serialized gateway product profiles and routes (not preallocated).",
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "control_max_products": {
+          "default": 4096,
+          "description": "Gateway product/codec profiles only; no per-device business state.",
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "external_timeout_ms": {
+          "default": 5000,
+          "format": "uint64",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "global_connection_logical_bytes": {
+          "default": 134217728,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "global_event_max_bytes": {
+          "default": 67108864,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "global_event_max_count": {
+          "default": 16384,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "global_mqtt_session_bytes": {
+          "default": 134217728,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "idle_timeout_ms": {
+          "default": 120000,
+          "format": "uint64",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "ingress_wait_timeout_ms": {
+          "default": 25,
+          "format": "uint64",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "management_api_key_max_bytes": {
+          "default": 32768,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "management_api_key_max_entries": {
+          "default": 128,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "management_auth_max_resource_bytes": {
+          "default": 8192,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "management_auth_max_resource_entries": {
+          "default": 128,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "management_auth_max_scope_bytes": {
+          "default": 512,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "management_auth_max_scopes": {
+          "default": 32,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "management_auth_max_subject_bytes": {
+          "default": 128,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "management_jwks_max_bytes": {
+          "default": 65536,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "management_jwks_max_keys": {
+          "default": 32,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "management_jwks_refresh_min_interval_ms": {
+          "default": 30000,
+          "format": "uint64",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "management_jwks_ttl_ms": {
+          "default": 300000,
+          "format": "uint64",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "management_jwt_max_bytes": {
+          "default": 16384,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_client_id_bytes": {
+          "default": 64,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_command_bytes": {
+          "default": 16384,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_connections": {
+          "default": 256,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_connections_per_device": {
+          "default": 2,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_connections_per_ip": {
+          "default": 32,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_connections_per_tenant": {
+          "default": 64,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_device_connections_per_protocol": {
+          "default": 192,
+          "description": "Device ingress only. Effective ceiling is also bounded by the global maximum.\nManagement/standalone transport listeners retain their existing global accounting.",
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_devices": {
+          "default": 1024,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_devices_per_tenant": {
+          "default": 128,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_fanout_per_event": {
+          "default": 8,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_http_body_size": {
+          "default": 65536,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_http_header_bytes": {
+          "default": 8192,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_http_headers": {
+          "default": 32,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_inflight_qos1_per_connection": {
+          "default": 32,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_inflight_qos1_per_session": {
+          "default": 32,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_inflight_qos1_per_tenant": {
+          "default": 4096,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_inflight_qos2_per_session": {
+          "default": 32,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_inflight_qos2_per_tenant": {
+          "default": 4096,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_ingress": {
+          "default": 16,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_ingress_bytes": {
+          "default": 2097152,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_ingress_per_device": {
+          "default": 1,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_ingress_per_tenant": {
+          "default": 4,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_ingress_wait_bytes": {
+          "default": 2097152,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_ingress_waiters": {
+          "default": 16,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_mqtt_content_type_bytes": {
+          "default": 256,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_mqtt_correlation_data_bytes": {
+          "default": 1024,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_mqtt_packet_size": {
+          "default": 65536,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_mqtt_property_bytes": {
+          "default": 4096,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_mqtt_response_topic_bytes": {
+          "default": 256,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_mqtt_session_state_bytes": {
+          "default": 2097152,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_mqtt_session_state_bytes_per_tenant": {
+          "default": 33554432,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_mqtt_user_properties": {
+          "default": 16,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_mqtt_user_property_bytes": {
+          "default": 2048,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_offline_bytes": {
+          "default": 134217728,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_offline_bytes_per_session": {
+          "default": 1048576,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_offline_bytes_per_tenant": {
+          "default": 33554432,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_offline_messages": {
+          "default": 16384,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_offline_messages_per_session": {
+          "default": 128,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_offline_messages_per_tenant": {
+          "default": 4096,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_outbound_bytes": {
+          "default": 8388608,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_outbound_bytes_per_connection": {
+          "default": 262144,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_outbound_bytes_per_tenant": {
+          "default": 2097152,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_outbound_messages_per_connection": {
+          "default": 64,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_password_bytes": {
+          "default": 128,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_pending_commands": {
+          "default": 1024,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_pending_commands_per_device": {
+          "default": 16,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_pending_commands_per_tenant": {
+          "default": 128,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_persistent_sessions": {
+          "default": 4096,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_persistent_sessions_per_tenant": {
+          "default": 512,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_read_buffer_per_connection": {
+          "default": 65536,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_replay_entries": {
+          "default": 1024,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_replay_entries_per_device": {
+          "default": 2,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_replay_entries_per_tenant": {
+          "default": 256,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_retained_bytes": {
+          "default": 67108864,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_retained_bytes_per_tenant": {
+          "default": 8388608,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_retained_message_bytes": {
+          "default": 65536,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_retained_messages": {
+          "default": 4096,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_retained_messages_per_tenant": {
+          "default": 512,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_routing_filters": {
+          "default": 256,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_sinks": {
+          "default": 32,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_sinks_per_tenant": {
+          "default": 8,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_subscription_filters_per_packet": {
+          "default": 16,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_subscriptions": {
+          "default": 512,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_subscriptions_per_connection": {
+          "default": 2,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_subscriptions_per_device": {
+          "default": 64,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_subscriptions_per_session": {
+          "default": 32,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_subscriptions_per_tenant": {
+          "default": 128,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_tcp_frame_size": {
+          "default": 65536,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_topic_bytes": {
+          "default": 256,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_topic_depth": {
+          "default": 8,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_udp_datagram_size": {
+          "default": 1200,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_username_bytes": {
+          "default": 64,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_will_payload_bytes": {
+          "default": 65536,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_write_buffer_per_connection": {
+          "default": 65536,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "messages_per_device_second": {
+          "default": 16,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "messages_per_tenant_second": {
+          "default": 128,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "mqtt_recovery_max_bytes": {
+          "default": 202195044,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "mqtt_session_idle_ttl_ms": {
+          "default": 86400000,
+          "format": "uint64",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "packet_read_timeout_ms": {
+          "default": 30000,
+          "format": "uint64",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "presence_ttl_ms": {
+          "default": 3600000,
+          "description": "Retention window for disconnected device presence. Active sessions are never evicted.",
+          "format": "uint64",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "rate_entries": {
+          "default": 1024,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "replay_ttl_ms": {
+          "default": 120000,
+          "format": "uint64",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "request_timeout_ms": {
+          "default": 15000,
+          "format": "uint64",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "requests_per_ip_second": {
+          "default": 32,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "requests_per_second": {
+          "default": 512,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "retry_base_ms": {
+          "default": 100,
+          "format": "uint64",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "retry_max_ms": {
+          "default": 30000,
+          "format": "uint64",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "shutdown_drain_timeout_ms": {
+          "default": 20000,
+          "format": "uint64",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "shutdown_timeout_ms": {
+          "default": 30000,
+          "format": "uint64",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "sink_delivery_concurrency": {
+          "default": 8,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "sink_max_age_ms": {
+          "default": 3600000,
+          "format": "uint64",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "sink_max_attempts": {
+          "default": 5,
+          "format": "uint32",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "sink_queue_max_bytes": {
+          "default": 16777216,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "sink_queue_max_count": {
+          "default": 4096,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "sink_timeout_ms": {
+          "default": 5000,
+          "format": "uint64",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "spool_max_bytes": {
+          "default": 268435456,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "spool_max_records": {
+          "default": 100000,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "spool_record_max_bytes": {
+          "default": 1048576,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "spool_segment_max_bytes": {
+          "default": 67108864,
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "udp_clock_skew_ms": {
+          "default": 30000,
+          "format": "uint64",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "write_timeout_ms": {
+          "default": 10000,
+          "format": "uint64",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "ManagementAuthConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "api_keys": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/ApiKeyConfig"
+          },
+          "type": "array"
+        },
+        "jwt": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/JwtConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "legacy_static_token_enabled": {
+          "default": null,
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "mtls_identities": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/MtlsIdentityConfig"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "ManagementTlsFiles": {
+      "additionalProperties": false,
+      "properties": {
+        "certificate": {
+          "type": "string"
+        },
+        "client_ca": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "private_key": {
+          "type": "string"
+        },
+        "require_client_certificate": {
+          "default": false,
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "certificate",
+        "private_key"
+      ],
+      "type": "object"
+    },
+    "MtlsIdentityConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "certificate_sha256": {
+          "type": "string"
+        },
+        "global": {
+          "default": false,
+          "type": "boolean"
+        },
+        "resources": {
+          "$ref": "#/$defs/AdminResourceConfig",
+          "default": {
+            "devices": [],
+            "products": [],
+            "tenants": []
+          }
+        },
+        "scopes": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "subject": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "certificate_sha256",
+        "subject",
+        "scopes"
+      ],
+      "type": "object"
+    },
+    "Permissions": {
+      "properties": {
+        "commands": {
+          "type": "boolean"
+        },
+        "publish": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "publish",
+        "commands"
+      ],
+      "type": "object"
+    },
+    "TlsFiles": {
+      "additionalProperties": false,
+      "properties": {
+        "certificate": {
+          "type": "string"
+        },
+        "private_key": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "certificate",
+        "private_key"
+      ],
+      "type": "object"
+    },
+    "V3Limits": {
+      "additionalProperties": false,
+      "properties": {
+        "heartbeat_ms": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "initial_connection_window_bytes": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "initial_stream_window_bytes": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "max_concurrent_streams": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "max_frame_payload_bytes": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "max_frame_payload_bytes",
+        "max_concurrent_streams",
+        "initial_stream_window_bytes",
+        "initial_connection_window_bytes",
+        "heartbeat_ms"
+      ],
+      "type": "object"
+    },
+    "V3SendAhead": {
+      "additionalProperties": false,
+      "description": "Sender-local V3 scheduling limits; these are never sent in the V3 Hello.",
+      "properties": {
+        "connection_bytes": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "stream_bytes": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "stream_bytes",
+        "connection_bytes"
+      ],
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "auth_provider_url": {
+      "description": "Optional HTTP device-auth provider URL; default checks do not contact it.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "business_rpc": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/BusinessRpcConfig"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "business_tcp": {
+      "description": "Optional confirmed business listener; role/TLS constraints require config check.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "credentials": {
+      "default": [],
+      "description": "Static device credentials; secrets must not be logged or reused from development.",
+      "items": {
+        "$ref": "#/$defs/Credential"
+      },
+      "type": "array"
+    },
+    "delivery_url": {
+      "description": "Required HTTP sink URL; HTTPS or loopback HTTP, without URL credentials.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "development": {
+      "default": false,
+      "description": "Development mode requires loopback listeners; never reuse demo credentials in production.",
+      "type": "boolean"
+    },
+    "device_auth": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/DeviceAuthSource"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "device_ingress": {
+      "description": "Device MQTT/framed TCP listener; UDP uses the same actual port. Public TCP requires TLS.",
+      "type": "string"
+    },
+    "event_delivery": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/EventDeliverySource"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "limits": {
+      "$ref": "#/$defs/Limits",
+      "default": {
+        "auth_cache_max_bytes": 4194304,
+        "auth_cache_max_entries": 4096,
+        "auth_cache_max_waiters": 256,
+        "auth_negative_ttl_ms": 5000,
+        "auth_positive_ttl_ms": 300000,
+        "authentication_timeout_ms": 5000,
+        "command_dedup_max_entries": 4096,
+        "command_dedup_ttl_ms": 300000,
+        "command_ttl_ms": 300000,
+        "connect_timeout_ms": 10000,
+        "connection_memory_reservation": 524288,
+        "control_max_bytes": 16777216,
+        "control_max_products": 4096,
+        "external_timeout_ms": 5000,
+        "global_connection_logical_bytes": 134217728,
+        "global_event_max_bytes": 67108864,
+        "global_event_max_count": 16384,
+        "global_mqtt_session_bytes": 134217728,
+        "idle_timeout_ms": 120000,
+        "ingress_wait_timeout_ms": 25,
+        "management_api_key_max_bytes": 32768,
+        "management_api_key_max_entries": 128,
+        "management_auth_max_resource_bytes": 8192,
+        "management_auth_max_resource_entries": 128,
+        "management_auth_max_scope_bytes": 512,
+        "management_auth_max_scopes": 32,
+        "management_auth_max_subject_bytes": 128,
+        "management_jwks_max_bytes": 65536,
+        "management_jwks_max_keys": 32,
+        "management_jwks_refresh_min_interval_ms": 30000,
+        "management_jwks_ttl_ms": 300000,
+        "management_jwt_max_bytes": 16384,
+        "max_client_id_bytes": 64,
+        "max_command_bytes": 16384,
+        "max_connections": 256,
+        "max_connections_per_device": 2,
+        "max_connections_per_ip": 32,
+        "max_connections_per_tenant": 64,
+        "max_device_connections_per_protocol": 192,
+        "max_devices": 1024,
+        "max_devices_per_tenant": 128,
+        "max_fanout_per_event": 8,
+        "max_http_body_size": 65536,
+        "max_http_header_bytes": 8192,
+        "max_http_headers": 32,
+        "max_inflight_qos1_per_connection": 32,
+        "max_inflight_qos1_per_session": 32,
+        "max_inflight_qos1_per_tenant": 4096,
+        "max_inflight_qos2_per_session": 32,
+        "max_inflight_qos2_per_tenant": 4096,
+        "max_ingress": 16,
+        "max_ingress_bytes": 2097152,
+        "max_ingress_per_device": 1,
+        "max_ingress_per_tenant": 4,
+        "max_ingress_wait_bytes": 2097152,
+        "max_ingress_waiters": 16,
+        "max_mqtt_content_type_bytes": 256,
+        "max_mqtt_correlation_data_bytes": 1024,
+        "max_mqtt_packet_size": 65536,
+        "max_mqtt_property_bytes": 4096,
+        "max_mqtt_response_topic_bytes": 256,
+        "max_mqtt_session_state_bytes": 2097152,
+        "max_mqtt_session_state_bytes_per_tenant": 33554432,
+        "max_mqtt_user_properties": 16,
+        "max_mqtt_user_property_bytes": 2048,
+        "max_offline_bytes": 134217728,
+        "max_offline_bytes_per_session": 1048576,
+        "max_offline_bytes_per_tenant": 33554432,
+        "max_offline_messages": 16384,
+        "max_offline_messages_per_session": 128,
+        "max_offline_messages_per_tenant": 4096,
+        "max_outbound_bytes": 8388608,
+        "max_outbound_bytes_per_connection": 262144,
+        "max_outbound_bytes_per_tenant": 2097152,
+        "max_outbound_messages_per_connection": 64,
+        "max_password_bytes": 128,
+        "max_pending_commands": 1024,
+        "max_pending_commands_per_device": 16,
+        "max_pending_commands_per_tenant": 128,
+        "max_persistent_sessions": 4096,
+        "max_persistent_sessions_per_tenant": 512,
+        "max_read_buffer_per_connection": 65536,
+        "max_replay_entries": 1024,
+        "max_replay_entries_per_device": 2,
+        "max_replay_entries_per_tenant": 256,
+        "max_retained_bytes": 67108864,
+        "max_retained_bytes_per_tenant": 8388608,
+        "max_retained_message_bytes": 65536,
+        "max_retained_messages": 4096,
+        "max_retained_messages_per_tenant": 512,
+        "max_routing_filters": 256,
+        "max_sinks": 32,
+        "max_sinks_per_tenant": 8,
+        "max_subscription_filters_per_packet": 16,
+        "max_subscriptions": 512,
+        "max_subscriptions_per_connection": 2,
+        "max_subscriptions_per_device": 64,
+        "max_subscriptions_per_session": 32,
+        "max_subscriptions_per_tenant": 128,
+        "max_tcp_frame_size": 65536,
+        "max_topic_bytes": 256,
+        "max_topic_depth": 8,
+        "max_udp_datagram_size": 1200,
+        "max_username_bytes": 64,
+        "max_will_payload_bytes": 65536,
+        "max_write_buffer_per_connection": 65536,
+        "messages_per_device_second": 16,
+        "messages_per_tenant_second": 128,
+        "mqtt_recovery_max_bytes": 202195044,
+        "mqtt_session_idle_ttl_ms": 86400000,
+        "packet_read_timeout_ms": 30000,
+        "presence_ttl_ms": 3600000,
+        "rate_entries": 1024,
+        "replay_ttl_ms": 120000,
+        "request_timeout_ms": 15000,
+        "requests_per_ip_second": 32,
+        "requests_per_second": 512,
+        "retry_base_ms": 100,
+        "retry_max_ms": 30000,
+        "shutdown_drain_timeout_ms": 20000,
+        "shutdown_timeout_ms": 30000,
+        "sink_delivery_concurrency": 8,
+        "sink_max_age_ms": 3600000,
+        "sink_max_attempts": 5,
+        "sink_queue_max_bytes": 16777216,
+        "sink_queue_max_count": 4096,
+        "sink_timeout_ms": 5000,
+        "spool_max_bytes": 268435456,
+        "spool_max_records": 100000,
+        "spool_record_max_bytes": 1048576,
+        "spool_segment_max_bytes": 67108864,
+        "udp_clock_skew_ms": 30000,
+        "write_timeout_ms": 10000
+      },
+      "description": "Bounded runtime resource limits, defaulted from Limits::default()."
+    },
+    "management_auth": {
+      "$ref": "#/$defs/ManagementAuthConfig",
+      "default": {
+        "api_keys": [],
+        "jwt": null,
+        "legacy_static_token_enabled": null,
+        "mtls_identities": []
+      },
+      "description": "Management providers, scoped identities and protected secret-source names."
+    },
+    "management_http": {
+      "description": "Independent authenticated management listener. Public management requires TLS.",
+      "type": "string"
+    },
+    "management_tls": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ManagementTlsFiles"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Independent management TLS and optional mapped client certificate authentication."
+    },
+    "spool_directory": {
+      "description": "Dedicated local planned-restart recovery directory; one gateway owner only.",
+      "type": "string"
+    },
+    "tls": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/TlsFiles"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Device server PEM certificate and matching private-key paths."
+    }
+  },
+  "required": [
+    "device_ingress",
+    "management_http",
+    "spool_directory"
+  ],
+  "title": "Config",
+  "type": "object"
+}

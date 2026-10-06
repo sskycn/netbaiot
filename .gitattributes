@@ -1,0 +1,2 @@
+docs/schema/*.json text eol=lf
+docs/configuration-fields.md text eol=lf

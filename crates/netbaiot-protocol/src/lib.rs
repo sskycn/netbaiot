@@ -38,6 +38,8 @@ macro_rules! identifier {
     ($name:ident) => {
         #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
         #[serde(try_from = "String", into = "String")]
+        #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+        #[cfg_attr(feature = "schema", schemars(with = "String"))]
         pub struct $name(Arc<str>);
 
         impl $name {
@@ -117,6 +119,7 @@ pub type MessageId = EventId;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct DeviceKey {
     pub tenant_id: TenantId,
     pub product_id: ProductId,

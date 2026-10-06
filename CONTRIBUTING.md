@@ -14,7 +14,17 @@ cargo build --locked
 cargo install --locked cargo-audit
 ```
 
-The [Quick Start](docs/quick-start.md) runs a local gateway and webhook.
+Try `cargo run --locked -p netbaiot-cli -- demo --once` first. The
+[Quick Start](docs/quick-start.md) also retains the manual webhook examples.
+
+## Unified maintenance entry
+
+Use `cargo xtask check` for daily changes, `cargo xtask check mqtt` for the complete
+MQTT/SDK gates, and `cargo xtask check release` for release preparation. Add
+`--audit` to daily check when cargo-audit is installed. Regenerate configuration
+artifacts with `cargo xtask schema` / `cargo xtask config-reference`; CI checks drift.
+See [maintenance](docs/maintenance.md) for required tools, CI parts and explicit
+BLOCKED behavior. The bottom-level commands below remain available.
 
 ## Before opening a PR
 

@@ -1090,7 +1090,15 @@ async fn one_socket_authentication_progresses_while_event_ack_waits() {
         )
     });
     drop(three);
-    business.shutdown().await;
+    // Initiate cancellation, but check the grace window before waiting for
+    // the asynchronous driver join (which can itself exceed the 1500ms grace).
+    let shutdown = business.shutdown();
+    tokio::pin!(shutdown);
+    let already_joined = std::future::poll_fn(|cx| {
+        use std::future::Future;
+        std::task::Poll::Ready(shutdown.as_mut().poll(cx).is_ready())
+    })
+    .await;
     assert!(
         legacy
             .devices()
@@ -1099,6 +1107,9 @@ async fn one_socket_authentication_progresses_while_event_ack_waits() {
             .unwrap()
             .connected
     );
+    if !already_joined {
+        shutdown.await;
+    }
     tokio::time::timeout(Duration::from_secs(5), async {
         loop {
             let status = legacy

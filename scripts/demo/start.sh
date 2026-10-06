@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+# Manual integration helper. For a self-contained demo, use netbaiot demo.
 
 ROOT_DIR=$(cd "$(dirname "$0")/../.." && pwd)
 RUN_DIR=$(mktemp -d "${TMPDIR:-/tmp}/netbaiot-demo.XXXXXX")

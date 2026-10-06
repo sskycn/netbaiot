@@ -6,6 +6,7 @@ license.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+schemars = { workspace = true, optional = true }
 netbaiot-core.workspace = true
 netbaiot-runtime.workspace = true
 netbaiot-v3-mux.workspace = true
@@ -44,3 +45,6 @@ harness = false
 name = "mqtt_broker_scale"
 path = "../../benches/mqtt_broker_scale.rs"
 harness = false
+
+[features]
+schema = ["dep:schemars", "netbaiot-core/schema", "netbaiot-runtime/schema"]

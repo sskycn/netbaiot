@@ -1,5 +1,5 @@
 [workspace]
-members = ["apps/netbaiot-server", "apps/netbaiot-cli", "crates/*", "tools/netbaiot-loadgen"]
+members = ["apps/netbaiot-server", "apps/netbaiot-cli", "crates/*", "tools/netbaiot-loadgen", "tools/netbaiot-xtask"]
 exclude = ["fuzz"]
 resolver = "2"
 
@@ -10,6 +10,7 @@ license = "AGPL-3.0-or-later"
 rust-version = "1.88"
 
 [workspace.dependencies]
+schemars = { version = "1.2", default-features = false, features = ["std", "derive"] }
 url = "2"
 netbaiot-protocol = { path = "crates/netbaiot-protocol" }
 netbaiot-core = { path = "crates/netbaiot-core" }

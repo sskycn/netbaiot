@@ -4,3 +4,4 @@
 /fuzz/corpus/
 .env
 /configs/local.json
+/dist/

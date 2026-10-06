@@ -1,0 +1,38 @@
+{
+  "commit": "4cb93af56dea579c10322e379abfe950b088bc9e",
+  "platforms": [
+    {
+      "os": "macos-latest",
+      "counts": [
+        424,
+        0,
+        16
+      ],
+      "artifact_digest": "sha256:dcb83198b13024f4c73fb76f3274bf9dd648d88dc0654590e118a9a4722c7e5c",
+      "artifact_id": 11403090785,
+      "log_sha256": "da2614843acf84294b3473bee1cde9d75bfb1861339952b14609cf4bdeaaf053"
+    },
+    {
+      "os": "windows-latest",
+      "counts": [
+        421,
+        0,
+        16
+      ],
+      "artifact_digest": "sha256:b440168f306be0d0d1cc8689c709803b407c9f60df28f92368aea48bed52d23a",
+      "artifact_id": 11402916588,
+      "log_sha256": "1610b484df5be92ce2fcbc1a0e3874b141e012b25c4cc3eb23498ec058c402b9"
+    },
+    {
+      "os": "ubuntu-latest",
+      "counts": [
+        424,
+        0,
+        16
+      ],
+      "artifact_digest": "sha256:a498499c0877df6fbbe99a18a517762fdb3ad49e90cfaba51874c35a1356f8fd",
+      "artifact_id": 11402476974,
+      "log_sha256": "a206f31309fc1c12093191b876188425e6bd2b4200b4fe6a748fc3a303302871"
+    }
+  ]
+}

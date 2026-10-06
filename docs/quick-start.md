@@ -1,9 +1,49 @@
 # 5-minute Quick Start
 
-This walkthrough starts NetbaIoT and a dependency-free webhook receiver, sends a
+The one-command demo below needs only the NetbaIoT binary. The manual walkthrough starts a webhook receiver, sends a
 real MQTT publish, and shows the normalized `DeviceEvent`. It uses the checked-in
 tutorial device credential on loopback. Do not reuse that credential or the
 bootstrap management token outside local development.
+
+## One-command demo
+
+A binary archive needs no Python, Rust or external broker for this path:
+
+```bash
+./netbaiot demo
+./netbaiot demo --once
+```
+
+Windows PowerShell uses `.\netbaiot.exe demo` or `.\netbaiot.exe demo --once`.
+For source use `cargo run --locked -p netbaiot-cli -- demo --once` (Rust 1.88+).
+The demo uses dynamic loopback ports and a private temporary recovery directory.
+It proves MQTT authentication, QoS1 PUBACK/EventAccepted, normalized heartbeat
+delivery, and the configured HTTP 204 sink ACK. The receiver is development-only,
+keeps no durable business history, and prints only event metadata. The sample
+credentials must never be reused for production.
+
+Without `--once`, the demo keeps running for your own MQTT client and prints a
+`mosquitto_pub` command using its actual device port. Ctrl-C (or SIGTERM on Unix)
+uses the same drain/spool lifecycle as `netbaiot serve` and `netbaiot-server`.
+The sink stays alive through gateway drain; temporary files are removed afterward.
+
+```bash
+./netbaiot --help
+./netbaiot version
+./netbaiot config limits
+./netbaiot config check --config configs/development.json
+./netbaiot serve --config configs/development.json
+```
+
+`config check` performs local JSON, static, environment-secret-source and PEM
+checks without binding ports, reading/rewriting recovery snapshots, starting workers
+or calling remote providers/sinks. Passing it does not reserve a port or prove
+remote reachability. See [CLI diagnostics](cli.md).
+
+## Manual MQTT example
+
+The remaining walkthrough uses the preserved shell/manual integration helper. It
+requires Python and Mosquitto clients; these are optional for the one-command demo.
 
 ## Requirements
 

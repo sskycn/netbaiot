@@ -612,8 +612,22 @@ async fn v3_command_real_mqtt_dedup_http_ack_and_lost_response() {
     std::fs::create_dir_all(&root).unwrap();
     let mut config: Config =
         serde_json::from_str(include_str!("../../../configs/development.json")).unwrap();
-    let mut reservations = Vec::new();
-    for _ in 0..3 {
+    // TCP port-zero allocation does not reserve the same UDP port.
+    let mut pair = None;
+    for _ in 0..32 {
+        let tcp = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        match tokio::net::UdpSocket::bind(tcp.local_addr().unwrap()).await {
+            Ok(udp) => {
+                pair = Some((tcp, udp));
+                break;
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::AddrInUse => continue,
+            Err(error) => panic!("fixture UDP reservation failed: {error}"),
+        }
+    }
+    let (tcp, udp) = pair.expect("no available TCP/UDP fixture pair");
+    let mut reservations = vec![tcp];
+    for _ in 0..2 {
         reservations.push(TcpListener::bind("127.0.0.1:0").await.unwrap());
     }
     let addresses: Vec<_> = reservations
@@ -644,6 +658,7 @@ async fn v3_command_real_mqtt_dedup_http_ack_and_lost_response() {
     let path = root.join("config.json");
     std::fs::write(&path, serde_json::to_vec(&config).unwrap()).unwrap();
     drop(reservations);
+    drop(udp);
     let stderr = std::fs::File::create(root.join("server.log")).unwrap();
     let mut server = Command::new(env!("CARGO_BIN_EXE_netbaiot-server"))
         .arg(&path)
@@ -658,10 +673,10 @@ async fn v3_command_real_mqtt_dedup_http_ack_and_lost_response() {
         BusinessRpcV3ClientConfig::development(addresses[2], "v3-command-token".into());
     client_config.provider = false;
     let (business, mut events) = BusinessRpcV3Client::connect(client_config, None).unwrap();
-    tokio::time::timeout(Duration::from_secs(10), business.wait_ready())
-        .await
-        .unwrap()
-        .unwrap();
+    tokio::select! {
+        ready=tokio::time::timeout(Duration::from_secs(10),business.wait_ready())=>ready.unwrap().unwrap(),
+        status=server.wait()=>panic!("server exited before business readiness: {status:?}; {}",std::fs::read_to_string(root.join("server.log")).unwrap_or_default()),
+    }
     let admin = NetbaIoTClient::builder()
         .endpoint(format!("http://{}", addresses[1]))
         .token("a".repeat(64))
@@ -1023,7 +1038,14 @@ async fn v3_command_real_mqtt_dedup_http_ack_and_lost_response() {
     device.shutdown();
     // Closing the V3 client must release every command RPC stream, queued body,
     // and reassembly reservation, including the reset and lost-response paths.
-    let http = reqwest::Client::builder().no_proxy().build().unwrap();
+    // Diagnostic polling is not a rate-limit test. Stay below the configured
+    // 32/IP/s request ceiling without changing the five-second cleanup bound.
+    let http = reqwest::Client::builder()
+        .no_proxy()
+        .connect_timeout(Duration::from_millis(500))
+        .timeout(Duration::from_secs(1))
+        .build()
+        .unwrap();
     let mut observed = String::new();
     let cleanup = tokio::time::timeout(Duration::from_secs(5), async {
         loop {
@@ -1034,13 +1056,13 @@ async fn v3_command_real_mqtt_dedup_http_ack_and_lost_response() {
                 .await;
             let Ok(metrics) = request else {
                 observed = format!("request error: {:?}", request.err());
-                tokio::time::sleep(Duration::from_millis(20)).await;
+                tokio::time::sleep(Duration::from_millis(100)).await;
                 continue;
             };
             assert_eq!(metrics.status(), reqwest::StatusCode::OK);
             let Ok(body) = metrics.text().await else {
                 observed = "response body error".into();
-                tokio::time::sleep(Duration::from_millis(20)).await;
+                tokio::time::sleep(Duration::from_millis(100)).await;
                 continue;
             };
             observed = body
@@ -1059,7 +1081,7 @@ async fn v3_command_real_mqtt_dedup_http_ack_and_lost_response() {
             {
                 break;
             }
-            tokio::time::sleep(Duration::from_millis(20)).await;
+            tokio::time::sleep(Duration::from_millis(100)).await;
         }
     })
     .await;

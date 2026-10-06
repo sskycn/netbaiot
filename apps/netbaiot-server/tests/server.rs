@@ -727,8 +727,8 @@ async fn api_key_scope_and_tenant_denials_precede_management_mutations() {
         .arg(&path)
         .env("NETBAIOT_ADMIN_SECRET", &admin)
         .env("NETBAIOT_TEST_MANAGEMENT_KEY", &secret)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped())
         .kill_on_drop(true)
         .spawn()
         .unwrap();
@@ -841,7 +841,7 @@ async fn api_key_scope_and_tenant_denials_precede_management_mutations() {
     );
     let mut log = Vec::new();
     child
-        .stdout
+        .stderr
         .take()
         .unwrap()
         .read_to_end(&mut log)
