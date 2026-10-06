@@ -1,0 +1,175 @@
+{
+  "rows": [
+    {
+      "label": "after",
+      "run": "auth-expiry-udp512-r0",
+      "raw_file": "after-auth-expiry-udp512-r0-0.json",
+      "accepted_per_second": 39996.2,
+      "scheduled": 599945,
+      "attempted": 599943,
+      "accepted": 599943,
+      "client_window_full": 0,
+      "udp_no_ack": 0,
+      "acceptance_p99_ms": 5.13,
+      "server_cpu_pct": 70.43585128752613,
+      "server_rss_min_kib": 9504,
+      "server_rss_max_kib": 9888,
+      "cooldown_rss_kib": 9888,
+      "peak_event_count": 24,
+      "peak_pending_required": 24,
+      "runtime_task_counts": [
+        6,
+        7
+      ],
+      "warm_auth_entries": 512,
+      "post_warm_auth_misses": 0,
+      "server_sha256": "29420d57d349e2b2032ad92266495127aaf94119579181f032f2ae75e44565ac",
+      "loadgen_sha256": "d6fb6f19b08c9e7915a6b800d0465f39d1fbce1eaa0f2b6bfaad1aeea045e009"
+    },
+    {
+      "label": "after",
+      "run": "auth-expiry-udp512-r1",
+      "raw_file": "after-auth-expiry-udp512-r1-0.json",
+      "accepted_per_second": 40002.666666666664,
+      "scheduled": 600040,
+      "attempted": 600040,
+      "accepted": 600040,
+      "client_window_full": 0,
+      "udp_no_ack": 0,
+      "acceptance_p99_ms": 1.62,
+      "server_cpu_pct": 70.29068440916993,
+      "server_rss_min_kib": 9536,
+      "server_rss_max_kib": 9760,
+      "cooldown_rss_kib": 9760,
+      "peak_event_count": 20,
+      "peak_pending_required": 20,
+      "runtime_task_counts": [
+        6
+      ],
+      "warm_auth_entries": 512,
+      "post_warm_auth_misses": 0,
+      "server_sha256": "29420d57d349e2b2032ad92266495127aaf94119579181f032f2ae75e44565ac",
+      "loadgen_sha256": "d6fb6f19b08c9e7915a6b800d0465f39d1fbce1eaa0f2b6bfaad1aeea045e009"
+    },
+    {
+      "label": "after",
+      "run": "auth-expiry-udp512-r2",
+      "raw_file": "after-auth-expiry-udp512-r2-0.json",
+      "accepted_per_second": 39997.86666666667,
+      "scheduled": 599967,
+      "attempted": 599968,
+      "accepted": 599968,
+      "client_window_full": 0,
+      "udp_no_ack": 0,
+      "acceptance_p99_ms": 1.29,
+      "server_cpu_pct": 70.57727112284606,
+      "server_rss_min_kib": 9568,
+      "server_rss_max_kib": 9808,
+      "cooldown_rss_kib": 9808,
+      "peak_event_count": 22,
+      "peak_pending_required": 22,
+      "runtime_task_counts": [
+        6,
+        7
+      ],
+      "warm_auth_entries": 512,
+      "post_warm_auth_misses": 0,
+      "server_sha256": "29420d57d349e2b2032ad92266495127aaf94119579181f032f2ae75e44565ac",
+      "loadgen_sha256": "d6fb6f19b08c9e7915a6b800d0465f39d1fbce1eaa0f2b6bfaad1aeea045e009"
+    },
+    {
+      "label": "before",
+      "run": "auth-expiry-udp512-r0",
+      "raw_file": "before-auth-expiry-udp512-r0-0.json",
+      "accepted_per_second": 24391.733333333334,
+      "scheduled": 600000,
+      "attempted": 372865,
+      "accepted": 365876,
+      "client_window_full": 227135,
+      "udp_no_ack": 7454,
+      "acceptance_p99_ms": 64.43,
+      "server_cpu_pct": 105.64271501516467,
+      "server_rss_min_kib": 9216,
+      "server_rss_max_kib": 9456,
+      "cooldown_rss_kib": 9536,
+      "peak_event_count": 26,
+      "peak_pending_required": 26,
+      "runtime_task_counts": [
+        6
+      ],
+      "warm_auth_entries": 512,
+      "post_warm_auth_misses": 0,
+      "server_sha256": "0e07f0c70aa3fa62019690809c4757d29b4189107d6d3154ce197f55d4fc81d7",
+      "loadgen_sha256": "d6fb6f19b08c9e7915a6b800d0465f39d1fbce1eaa0f2b6bfaad1aeea045e009"
+    },
+    {
+      "label": "before",
+      "run": "auth-expiry-udp512-r1",
+      "raw_file": "before-auth-expiry-udp512-r1-0.json",
+      "accepted_per_second": 24182.0,
+      "scheduled": 600000,
+      "attempted": 369789,
+      "accepted": 362730,
+      "client_window_full": 230211,
+      "udp_no_ack": 7567,
+      "acceptance_p99_ms": 64.76,
+      "server_cpu_pct": 105.69561446379197,
+      "server_rss_min_kib": 9216,
+      "server_rss_max_kib": 9552,
+      "cooldown_rss_kib": 9552,
+      "peak_event_count": 24,
+      "peak_pending_required": 24,
+      "runtime_task_counts": [
+        6,
+        7
+      ],
+      "warm_auth_entries": 512,
+      "post_warm_auth_misses": 0,
+      "server_sha256": "0e07f0c70aa3fa62019690809c4757d29b4189107d6d3154ce197f55d4fc81d7",
+      "loadgen_sha256": "d6fb6f19b08c9e7915a6b800d0465f39d1fbce1eaa0f2b6bfaad1aeea045e009"
+    },
+    {
+      "label": "before",
+      "run": "auth-expiry-udp512-r2",
+      "raw_file": "before-auth-expiry-udp512-r2-0.json",
+      "accepted_per_second": 24149.933333333334,
+      "scheduled": 600014,
+      "attempted": 369246,
+      "accepted": 362249,
+      "client_window_full": 230768,
+      "udp_no_ack": 7505,
+      "acceptance_p99_ms": 65.67,
+      "server_cpu_pct": 105.55168085837519,
+      "server_rss_min_kib": 9440,
+      "server_rss_max_kib": 9680,
+      "cooldown_rss_kib": 9680,
+      "peak_event_count": 25,
+      "peak_pending_required": 25,
+      "runtime_task_counts": [
+        6,
+        9,
+        13
+      ],
+      "warm_auth_entries": 512,
+      "post_warm_auth_misses": 0,
+      "server_sha256": "0e07f0c70aa3fa62019690809c4757d29b4189107d6d3154ce197f55d4fc81d7",
+      "loadgen_sha256": "d6fb6f19b08c9e7915a6b800d0465f39d1fbce1eaa0f2b6bfaad1aeea045e009"
+    }
+  ],
+  "median": {
+    "before": {
+      "accepted_per_second": 24182.0,
+      "acceptance_p99_ms": 64.76,
+      "server_cpu_pct": 105.64271501516467,
+      "server_rss_max_kib": 9552,
+      "peak_pending_required": 25
+    },
+    "after": {
+      "accepted_per_second": 39997.86666666667,
+      "acceptance_p99_ms": 1.62,
+      "server_cpu_pct": 70.43585128752613,
+      "server_rss_max_kib": 9808,
+      "peak_pending_required": 22
+    }
+  }
+}

@@ -1,0 +1,1196 @@
+{
+  "raw": {
+    "before": [
+      {
+        "count": 1,
+        "repeat": 0,
+        "hit_ns": 1920,
+        "hit_locked_ns": 1768,
+        "hit_allocations": 2,
+        "hit_allocated_bytes": 260,
+        "locked_prune_ns": 237,
+        "prune_allocations": 1,
+        "command_run": 1
+      },
+      {
+        "count": 1,
+        "repeat": 1,
+        "hit_ns": 1670,
+        "hit_locked_ns": 1542,
+        "hit_allocations": 2,
+        "hit_allocated_bytes": 260,
+        "locked_prune_ns": 207,
+        "prune_allocations": 1,
+        "command_run": 1
+      },
+      {
+        "count": 1,
+        "repeat": 2,
+        "hit_ns": 1642,
+        "hit_locked_ns": 1516,
+        "hit_allocations": 2,
+        "hit_allocated_bytes": 260,
+        "locked_prune_ns": 206,
+        "prune_allocations": 1,
+        "command_run": 1
+      },
+      {
+        "count": 1,
+        "expired_prune_ns": 3458,
+        "expired_allocations": 0,
+        "command_run": 1
+      },
+      {
+        "count": 64,
+        "repeat": 0,
+        "hit_ns": 8590,
+        "hit_locked_ns": 8451,
+        "hit_allocations": 2,
+        "hit_allocated_bytes": 7328,
+        "locked_prune_ns": 6502,
+        "prune_allocations": 1,
+        "command_run": 1
+      },
+      {
+        "count": 64,
+        "repeat": 1,
+        "hit_ns": 6950,
+        "hit_locked_ns": 6836,
+        "hit_allocations": 2,
+        "hit_allocated_bytes": 7328,
+        "locked_prune_ns": 5530,
+        "prune_allocations": 1,
+        "command_run": 1
+      },
+      {
+        "count": 64,
+        "repeat": 2,
+        "hit_ns": 5948,
+        "hit_locked_ns": 5851,
+        "hit_allocations": 2,
+        "hit_allocated_bytes": 7328,
+        "locked_prune_ns": 4817,
+        "prune_allocations": 1,
+        "command_run": 1
+      },
+      {
+        "count": 64,
+        "expired_prune_ns": 2459,
+        "expired_allocations": 0,
+        "command_run": 1
+      },
+      {
+        "count": 512,
+        "repeat": 0,
+        "hit_ns": 29666,
+        "hit_locked_ns": 29594,
+        "hit_allocations": 2,
+        "hit_allocated_bytes": 58400,
+        "locked_prune_ns": 25609,
+        "prune_allocations": 1,
+        "command_run": 1
+      },
+      {
+        "count": 512,
+        "repeat": 1,
+        "hit_ns": 25267,
+        "hit_locked_ns": 25206,
+        "hit_allocations": 2,
+        "hit_allocated_bytes": 58400,
+        "locked_prune_ns": 24287,
+        "prune_allocations": 1,
+        "command_run": 1
+      },
+      {
+        "count": 512,
+        "repeat": 2,
+        "hit_ns": 24749,
+        "hit_locked_ns": 24690,
+        "hit_allocations": 2,
+        "hit_allocated_bytes": 58400,
+        "locked_prune_ns": 24454,
+        "prune_allocations": 1,
+        "command_run": 1
+      },
+      {
+        "count": 512,
+        "expired_prune_ns": 8208,
+        "expired_allocations": 0,
+        "command_run": 1
+      },
+      {
+        "count": 4096,
+        "repeat": 0,
+        "hit_ns": 211593,
+        "hit_locked_ns": 211517,
+        "hit_allocations": 2,
+        "hit_allocated_bytes": 466976,
+        "locked_prune_ns": 216780,
+        "prune_allocations": 1,
+        "command_run": 1
+      },
+      {
+        "count": 4096,
+        "repeat": 1,
+        "hit_ns": 215600,
+        "hit_locked_ns": 215524,
+        "hit_allocations": 2,
+        "hit_allocated_bytes": 466976,
+        "locked_prune_ns": 207823,
+        "prune_allocations": 1,
+        "command_run": 1
+      },
+      {
+        "count": 4096,
+        "repeat": 2,
+        "hit_ns": 212068,
+        "hit_locked_ns": 211989,
+        "hit_allocations": 2,
+        "hit_allocated_bytes": 466976,
+        "locked_prune_ns": 209559,
+        "prune_allocations": 1,
+        "command_run": 1
+      },
+      {
+        "count": 4096,
+        "expired_prune_ns": 62458,
+        "expired_allocations": 0,
+        "command_run": 1
+      },
+      {
+        "count": 1,
+        "repeat": 0,
+        "hit_ns": 603,
+        "hit_locked_ns": 544,
+        "hit_allocations": 2,
+        "hit_allocated_bytes": 260,
+        "locked_prune_ns": 76,
+        "prune_allocations": 1,
+        "command_run": 2
+      },
+      {
+        "count": 1,
+        "repeat": 1,
+        "hit_ns": 597,
+        "hit_locked_ns": 539,
+        "hit_allocations": 2,
+        "hit_allocated_bytes": 260,
+        "locked_prune_ns": 74,
+        "prune_allocations": 1,
+        "command_run": 2
+      },
+      {
+        "count": 1,
+        "repeat": 2,
+        "hit_ns": 642,
+        "hit_locked_ns": 578,
+        "hit_allocations": 2,
+        "hit_allocated_bytes": 260,
+        "locked_prune_ns": 74,
+        "prune_allocations": 1,
+        "command_run": 2
+      },
+      {
+        "count": 1,
+        "expired_prune_ns": 291,
+        "expired_allocations": 0,
+        "command_run": 2
+      },
+      {
+        "count": 64,
+        "repeat": 0,
+        "hit_ns": 3299,
+        "hit_locked_ns": 3245,
+        "hit_allocations": 2,
+        "hit_allocated_bytes": 7328,
+        "locked_prune_ns": 2817,
+        "prune_allocations": 1,
+        "command_run": 2
+      },
+      {
+        "count": 64,
+        "repeat": 1,
+        "hit_ns": 3273,
+        "hit_locked_ns": 3220,
+        "hit_allocations": 2,
+        "hit_allocated_bytes": 7328,
+        "locked_prune_ns": 2729,
+        "prune_allocations": 1,
+        "command_run": 2
+      },
+      {
+        "count": 64,
+        "repeat": 2,
+        "hit_ns": 3320,
+        "hit_locked_ns": 3265,
+        "hit_allocations": 2,
+        "hit_allocated_bytes": 7328,
+        "locked_prune_ns": 2752,
+        "prune_allocations": 1,
+        "command_run": 2
+      },
+      {
+        "count": 64,
+        "expired_prune_ns": 1166,
+        "expired_allocations": 0,
+        "command_run": 2
+      },
+      {
+        "count": 512,
+        "repeat": 0,
+        "hit_ns": 24323,
+        "hit_locked_ns": 24266,
+        "hit_allocations": 2,
+        "hit_allocated_bytes": 58400,
+        "locked_prune_ns": 24291,
+        "prune_allocations": 1,
+        "command_run": 2
+      },
+      {
+        "count": 512,
+        "repeat": 1,
+        "hit_ns": 24952,
+        "hit_locked_ns": 24884,
+        "hit_allocations": 2,
+        "hit_allocated_bytes": 58400,
+        "locked_prune_ns": 25755,
+        "prune_allocations": 1,
+        "command_run": 2
+      },
+      {
+        "count": 512,
+        "repeat": 2,
+        "hit_ns": 27294,
+        "hit_locked_ns": 27222,
+        "hit_allocations": 2,
+        "hit_allocated_bytes": 58400,
+        "locked_prune_ns": 24209,
+        "prune_allocations": 1,
+        "command_run": 2
+      },
+      {
+        "count": 512,
+        "expired_prune_ns": 12917,
+        "expired_allocations": 0,
+        "command_run": 2
+      },
+      {
+        "count": 4096,
+        "repeat": 0,
+        "hit_ns": 212546,
+        "hit_locked_ns": 212469,
+        "hit_allocations": 2,
+        "hit_allocated_bytes": 466976,
+        "locked_prune_ns": 208787,
+        "prune_allocations": 1,
+        "command_run": 2
+      },
+      {
+        "count": 4096,
+        "repeat": 1,
+        "hit_ns": 215126,
+        "hit_locked_ns": 215047,
+        "hit_allocations": 2,
+        "hit_allocated_bytes": 466976,
+        "locked_prune_ns": 210465,
+        "prune_allocations": 1,
+        "command_run": 2
+      },
+      {
+        "count": 4096,
+        "repeat": 2,
+        "hit_ns": 215826,
+        "hit_locked_ns": 215744,
+        "hit_allocations": 2,
+        "hit_allocated_bytes": 466976,
+        "locked_prune_ns": 213390,
+        "prune_allocations": 1,
+        "command_run": 2
+      },
+      {
+        "count": 4096,
+        "expired_prune_ns": 56375,
+        "expired_allocations": 0,
+        "command_run": 2
+      },
+      {
+        "count": 1,
+        "repeat": 0,
+        "hit_ns": 604,
+        "hit_locked_ns": 545,
+        "hit_allocations": 2,
+        "hit_allocated_bytes": 260,
+        "locked_prune_ns": 75,
+        "prune_allocations": 1,
+        "command_run": 3
+      },
+      {
+        "count": 1,
+        "repeat": 1,
+        "hit_ns": 618,
+        "hit_locked_ns": 559,
+        "hit_allocations": 2,
+        "hit_allocated_bytes": 260,
+        "locked_prune_ns": 83,
+        "prune_allocations": 1,
+        "command_run": 3
+      },
+      {
+        "count": 1,
+        "repeat": 2,
+        "hit_ns": 608,
+        "hit_locked_ns": 548,
+        "hit_allocations": 2,
+        "hit_allocated_bytes": 260,
+        "locked_prune_ns": 82,
+        "prune_allocations": 1,
+        "command_run": 3
+      },
+      {
+        "count": 1,
+        "expired_prune_ns": 250,
+        "expired_allocations": 0,
+        "command_run": 3
+      },
+      {
+        "count": 64,
+        "repeat": 0,
+        "hit_ns": 3407,
+        "hit_locked_ns": 3351,
+        "hit_allocations": 2,
+        "hit_allocated_bytes": 7328,
+        "locked_prune_ns": 2808,
+        "prune_allocations": 1,
+        "command_run": 3
+      },
+      {
+        "count": 64,
+        "repeat": 1,
+        "hit_ns": 3395,
+        "hit_locked_ns": 3340,
+        "hit_allocations": 2,
+        "hit_allocated_bytes": 7328,
+        "locked_prune_ns": 2804,
+        "prune_allocations": 1,
+        "command_run": 3
+      },
+      {
+        "count": 64,
+        "repeat": 2,
+        "hit_ns": 3411,
+        "hit_locked_ns": 3356,
+        "hit_allocations": 2,
+        "hit_allocated_bytes": 7328,
+        "locked_prune_ns": 2817,
+        "prune_allocations": 1,
+        "command_run": 3
+      },
+      {
+        "count": 64,
+        "expired_prune_ns": 1292,
+        "expired_allocations": 0,
+        "command_run": 3
+      },
+      {
+        "count": 512,
+        "repeat": 0,
+        "hit_ns": 24434,
+        "hit_locked_ns": 24369,
+        "hit_allocations": 2,
+        "hit_allocated_bytes": 58400,
+        "locked_prune_ns": 24439,
+        "prune_allocations": 1,
+        "command_run": 3
+      },
+      {
+        "count": 512,
+        "repeat": 1,
+        "hit_ns": 24778,
+        "hit_locked_ns": 24716,
+        "hit_allocations": 2,
+        "hit_allocated_bytes": 58400,
+        "locked_prune_ns": 26697,
+        "prune_allocations": 1,
+        "command_run": 3
+      },
+      {
+        "count": 512,
+        "repeat": 2,
+        "hit_ns": 25692,
+        "hit_locked_ns": 25612,
+        "hit_allocations": 2,
+        "hit_allocated_bytes": 58400,
+        "locked_prune_ns": 22936,
+        "prune_allocations": 1,
+        "command_run": 3
+      },
+      {
+        "count": 512,
+        "expired_prune_ns": 8542,
+        "expired_allocations": 0,
+        "command_run": 3
+      },
+      {
+        "count": 4096,
+        "repeat": 0,
+        "hit_ns": 210729,
+        "hit_locked_ns": 210653,
+        "hit_allocations": 2,
+        "hit_allocated_bytes": 466976,
+        "locked_prune_ns": 212454,
+        "prune_allocations": 1,
+        "command_run": 3
+      },
+      {
+        "count": 4096,
+        "repeat": 1,
+        "hit_ns": 213244,
+        "hit_locked_ns": 213165,
+        "hit_allocations": 2,
+        "hit_allocated_bytes": 466976,
+        "locked_prune_ns": 212246,
+        "prune_allocations": 1,
+        "command_run": 3
+      },
+      {
+        "count": 4096,
+        "repeat": 2,
+        "hit_ns": 215022,
+        "hit_locked_ns": 214937,
+        "hit_allocations": 2,
+        "hit_allocated_bytes": 466976,
+        "locked_prune_ns": 209202,
+        "prune_allocations": 1,
+        "command_run": 3
+      },
+      {
+        "count": 4096,
+        "expired_prune_ns": 60208,
+        "expired_allocations": 0,
+        "command_run": 3
+      }
+    ],
+    "after": [
+      {
+        "count": 1,
+        "repeat": 0,
+        "hit_ns": 1674,
+        "hit_locked_ns": 1515,
+        "hit_allocations": 1,
+        "hit_allocated_bytes": 24,
+        "locked_prune_ns": 27,
+        "prune_allocations": 0,
+        "command_run": 1
+      },
+      {
+        "count": 1,
+        "repeat": 1,
+        "hit_ns": 1654,
+        "hit_locked_ns": 1514,
+        "hit_allocations": 1,
+        "hit_allocated_bytes": 24,
+        "locked_prune_ns": 27,
+        "prune_allocations": 0,
+        "command_run": 1
+      },
+      {
+        "count": 1,
+        "repeat": 2,
+        "hit_ns": 1438,
+        "hit_locked_ns": 1316,
+        "hit_allocations": 1,
+        "hit_allocated_bytes": 24,
+        "locked_prune_ns": 24,
+        "prune_allocations": 0,
+        "command_run": 1
+      },
+      {
+        "count": 1,
+        "expired_prune_ns": 49208,
+        "expired_allocations": 0,
+        "command_run": 1
+      },
+      {
+        "count": 64,
+        "repeat": 0,
+        "hit_ns": 1445,
+        "hit_locked_ns": 1326,
+        "hit_allocations": 1,
+        "hit_allocated_bytes": 24,
+        "locked_prune_ns": 24,
+        "prune_allocations": 0,
+        "command_run": 1
+      },
+      {
+        "count": 64,
+        "repeat": 1,
+        "hit_ns": 1306,
+        "hit_locked_ns": 1199,
+        "hit_allocations": 1,
+        "hit_allocated_bytes": 24,
+        "locked_prune_ns": 21,
+        "prune_allocations": 0,
+        "command_run": 1
+      },
+      {
+        "count": 64,
+        "repeat": 2,
+        "hit_ns": 1429,
+        "hit_locked_ns": 1299,
+        "hit_allocations": 1,
+        "hit_allocated_bytes": 24,
+        "locked_prune_ns": 38,
+        "prune_allocations": 0,
+        "command_run": 1
+      },
+      {
+        "count": 64,
+        "expired_prune_ns": 22875,
+        "expired_allocations": 0,
+        "command_run": 1
+      },
+      {
+        "count": 512,
+        "repeat": 0,
+        "hit_ns": 1521,
+        "hit_locked_ns": 1372,
+        "hit_allocations": 1,
+        "hit_allocated_bytes": 24,
+        "locked_prune_ns": 32,
+        "prune_allocations": 0,
+        "command_run": 1
+      },
+      {
+        "count": 512,
+        "repeat": 1,
+        "hit_ns": 1282,
+        "hit_locked_ns": 1157,
+        "hit_allocations": 1,
+        "hit_allocated_bytes": 24,
+        "locked_prune_ns": 32,
+        "prune_allocations": 0,
+        "command_run": 1
+      },
+      {
+        "count": 512,
+        "repeat": 2,
+        "hit_ns": 1279,
+        "hit_locked_ns": 1153,
+        "hit_allocations": 1,
+        "hit_allocated_bytes": 24,
+        "locked_prune_ns": 32,
+        "prune_allocations": 0,
+        "command_run": 1
+      },
+      {
+        "count": 512,
+        "expired_prune_ns": 107292,
+        "expired_allocations": 0,
+        "command_run": 1
+      },
+      {
+        "count": 4096,
+        "repeat": 0,
+        "hit_ns": 1009,
+        "hit_locked_ns": 910,
+        "hit_allocations": 1,
+        "hit_allocated_bytes": 24,
+        "locked_prune_ns": 25,
+        "prune_allocations": 0,
+        "command_run": 1
+      },
+      {
+        "count": 4096,
+        "repeat": 1,
+        "hit_ns": 979,
+        "hit_locked_ns": 884,
+        "hit_allocations": 1,
+        "hit_allocated_bytes": 24,
+        "locked_prune_ns": 25,
+        "prune_allocations": 0,
+        "command_run": 1
+      },
+      {
+        "count": 4096,
+        "repeat": 2,
+        "hit_ns": 975,
+        "hit_locked_ns": 880,
+        "hit_allocations": 1,
+        "hit_allocated_bytes": 24,
+        "locked_prune_ns": 25,
+        "prune_allocations": 0,
+        "command_run": 1
+      },
+      {
+        "count": 4096,
+        "expired_prune_ns": 659042,
+        "expired_allocations": 0,
+        "command_run": 1
+      },
+      {
+        "count": 1,
+        "repeat": 0,
+        "hit_ns": 536,
+        "hit_locked_ns": 475,
+        "hit_allocations": 1,
+        "hit_allocated_bytes": 24,
+        "locked_prune_ns": 12,
+        "prune_allocations": 0,
+        "command_run": 2
+      },
+      {
+        "count": 1,
+        "repeat": 1,
+        "hit_ns": 529,
+        "hit_locked_ns": 469,
+        "hit_allocations": 1,
+        "hit_allocated_bytes": 24,
+        "locked_prune_ns": 13,
+        "prune_allocations": 0,
+        "command_run": 2
+      },
+      {
+        "count": 1,
+        "repeat": 2,
+        "hit_ns": 525,
+        "hit_locked_ns": 465,
+        "hit_allocations": 1,
+        "hit_allocated_bytes": 24,
+        "locked_prune_ns": 13,
+        "prune_allocations": 0,
+        "command_run": 2
+      },
+      {
+        "count": 1,
+        "expired_prune_ns": 2584,
+        "expired_allocations": 0,
+        "command_run": 2
+      },
+      {
+        "count": 64,
+        "repeat": 0,
+        "hit_ns": 516,
+        "hit_locked_ns": 465,
+        "hit_allocations": 1,
+        "hit_allocated_bytes": 24,
+        "locked_prune_ns": 12,
+        "prune_allocations": 0,
+        "command_run": 2
+      },
+      {
+        "count": 64,
+        "repeat": 1,
+        "hit_ns": 517,
+        "hit_locked_ns": 467,
+        "hit_allocations": 1,
+        "hit_allocated_bytes": 24,
+        "locked_prune_ns": 13,
+        "prune_allocations": 0,
+        "command_run": 2
+      },
+      {
+        "count": 64,
+        "repeat": 2,
+        "hit_ns": 516,
+        "hit_locked_ns": 466,
+        "hit_allocations": 1,
+        "hit_allocated_bytes": 24,
+        "locked_prune_ns": 13,
+        "prune_allocations": 0,
+        "command_run": 2
+      },
+      {
+        "count": 64,
+        "expired_prune_ns": 5917,
+        "expired_allocations": 0,
+        "command_run": 2
+      },
+      {
+        "count": 512,
+        "repeat": 0,
+        "hit_ns": 555,
+        "hit_locked_ns": 501,
+        "hit_allocations": 1,
+        "hit_allocated_bytes": 24,
+        "locked_prune_ns": 13,
+        "prune_allocations": 0,
+        "command_run": 2
+      },
+      {
+        "count": 512,
+        "repeat": 1,
+        "hit_ns": 516,
+        "hit_locked_ns": 466,
+        "hit_allocations": 1,
+        "hit_allocated_bytes": 24,
+        "locked_prune_ns": 12,
+        "prune_allocations": 0,
+        "command_run": 2
+      },
+      {
+        "count": 512,
+        "repeat": 2,
+        "hit_ns": 553,
+        "hit_locked_ns": 499,
+        "hit_allocations": 1,
+        "hit_allocated_bytes": 24,
+        "locked_prune_ns": 12,
+        "prune_allocations": 0,
+        "command_run": 2
+      },
+      {
+        "count": 512,
+        "expired_prune_ns": 43375,
+        "expired_allocations": 0,
+        "command_run": 2
+      },
+      {
+        "count": 4096,
+        "repeat": 0,
+        "hit_ns": 526,
+        "hit_locked_ns": 474,
+        "hit_allocations": 1,
+        "hit_allocated_bytes": 24,
+        "locked_prune_ns": 14,
+        "prune_allocations": 0,
+        "command_run": 2
+      },
+      {
+        "count": 4096,
+        "repeat": 1,
+        "hit_ns": 557,
+        "hit_locked_ns": 502,
+        "hit_allocations": 1,
+        "hit_allocated_bytes": 24,
+        "locked_prune_ns": 12,
+        "prune_allocations": 0,
+        "command_run": 2
+      },
+      {
+        "count": 4096,
+        "repeat": 2,
+        "hit_ns": 528,
+        "hit_locked_ns": 477,
+        "hit_allocations": 1,
+        "hit_allocated_bytes": 24,
+        "locked_prune_ns": 12,
+        "prune_allocations": 0,
+        "command_run": 2
+      },
+      {
+        "count": 4096,
+        "expired_prune_ns": 343417,
+        "expired_allocations": 0,
+        "command_run": 2
+      },
+      {
+        "count": 1,
+        "repeat": 0,
+        "hit_ns": 533,
+        "hit_locked_ns": 473,
+        "hit_allocations": 1,
+        "hit_allocated_bytes": 24,
+        "locked_prune_ns": 13,
+        "prune_allocations": 0,
+        "command_run": 3
+      },
+      {
+        "count": 1,
+        "repeat": 1,
+        "hit_ns": 530,
+        "hit_locked_ns": 470,
+        "hit_allocations": 1,
+        "hit_allocated_bytes": 24,
+        "locked_prune_ns": 13,
+        "prune_allocations": 0,
+        "command_run": 3
+      },
+      {
+        "count": 1,
+        "repeat": 2,
+        "hit_ns": 527,
+        "hit_locked_ns": 467,
+        "hit_allocations": 1,
+        "hit_allocated_bytes": 24,
+        "locked_prune_ns": 13,
+        "prune_allocations": 0,
+        "command_run": 3
+      },
+      {
+        "count": 1,
+        "expired_prune_ns": 2708,
+        "expired_allocations": 0,
+        "command_run": 3
+      },
+      {
+        "count": 64,
+        "repeat": 0,
+        "hit_ns": 522,
+        "hit_locked_ns": 471,
+        "hit_allocations": 1,
+        "hit_allocated_bytes": 24,
+        "locked_prune_ns": 13,
+        "prune_allocations": 0,
+        "command_run": 3
+      },
+      {
+        "count": 64,
+        "repeat": 1,
+        "hit_ns": 538,
+        "hit_locked_ns": 485,
+        "hit_allocations": 1,
+        "hit_allocated_bytes": 24,
+        "locked_prune_ns": 13,
+        "prune_allocations": 0,
+        "command_run": 3
+      },
+      {
+        "count": 64,
+        "repeat": 2,
+        "hit_ns": 522,
+        "hit_locked_ns": 471,
+        "hit_allocations": 1,
+        "hit_allocated_bytes": 24,
+        "locked_prune_ns": 13,
+        "prune_allocations": 0,
+        "command_run": 3
+      },
+      {
+        "count": 64,
+        "expired_prune_ns": 6125,
+        "expired_allocations": 0,
+        "command_run": 3
+      },
+      {
+        "count": 512,
+        "repeat": 0,
+        "hit_ns": 552,
+        "hit_locked_ns": 497,
+        "hit_allocations": 1,
+        "hit_allocated_bytes": 24,
+        "locked_prune_ns": 13,
+        "prune_allocations": 0,
+        "command_run": 3
+      },
+      {
+        "count": 512,
+        "repeat": 1,
+        "hit_ns": 553,
+        "hit_locked_ns": 500,
+        "hit_allocations": 1,
+        "hit_allocated_bytes": 24,
+        "locked_prune_ns": 13,
+        "prune_allocations": 0,
+        "command_run": 3
+      },
+      {
+        "count": 512,
+        "repeat": 2,
+        "hit_ns": 543,
+        "hit_locked_ns": 490,
+        "hit_allocations": 1,
+        "hit_allocated_bytes": 24,
+        "locked_prune_ns": 14,
+        "prune_allocations": 0,
+        "command_run": 3
+      },
+      {
+        "count": 512,
+        "expired_prune_ns": 49917,
+        "expired_allocations": 0,
+        "command_run": 3
+      },
+      {
+        "count": 4096,
+        "repeat": 0,
+        "hit_ns": 518,
+        "hit_locked_ns": 467,
+        "hit_allocations": 1,
+        "hit_allocated_bytes": 24,
+        "locked_prune_ns": 13,
+        "prune_allocations": 0,
+        "command_run": 3
+      },
+      {
+        "count": 4096,
+        "repeat": 1,
+        "hit_ns": 516,
+        "hit_locked_ns": 466,
+        "hit_allocations": 1,
+        "hit_allocated_bytes": 24,
+        "locked_prune_ns": 13,
+        "prune_allocations": 0,
+        "command_run": 3
+      },
+      {
+        "count": 4096,
+        "repeat": 2,
+        "hit_ns": 516,
+        "hit_locked_ns": 465,
+        "hit_allocations": 1,
+        "hit_allocated_bytes": 24,
+        "locked_prune_ns": 13,
+        "prune_allocations": 0,
+        "command_run": 3
+      },
+      {
+        "count": 4096,
+        "expired_prune_ns": 351459,
+        "expired_allocations": 0,
+        "command_run": 3
+      }
+    ],
+    "index-memory": [
+      {
+        "count": 1,
+        "index_tuple_bytes": 72,
+        "index_struct_bytes": 24,
+        "index_retained_bytes": 808,
+        "index_bytes_per_entry": 808,
+        "index_allocations": 1,
+        "command_run": 1
+      },
+      {
+        "count": 64,
+        "index_tuple_bytes": 72,
+        "index_struct_bytes": 24,
+        "index_retained_bytes": 7368,
+        "index_bytes_per_entry": 115.125,
+        "index_allocations": 9,
+        "command_run": 1
+      },
+      {
+        "count": 512,
+        "index_tuple_bytes": 72,
+        "index_struct_bytes": 24,
+        "index_retained_bytes": 64888,
+        "index_bytes_per_entry": 126.734375,
+        "index_allocations": 79,
+        "command_run": 1
+      },
+      {
+        "count": 4096,
+        "index_tuple_bytes": 72,
+        "index_struct_bytes": 24,
+        "index_retained_bytes": 521528,
+        "index_bytes_per_entry": 127.326171875,
+        "index_allocations": 635,
+        "command_run": 1
+      },
+      {
+        "count": 1,
+        "index_tuple_bytes": 72,
+        "index_struct_bytes": 24,
+        "index_retained_bytes": 808,
+        "index_bytes_per_entry": 808,
+        "index_allocations": 1,
+        "command_run": 2
+      },
+      {
+        "count": 64,
+        "index_tuple_bytes": 72,
+        "index_struct_bytes": 24,
+        "index_retained_bytes": 7368,
+        "index_bytes_per_entry": 115.125,
+        "index_allocations": 9,
+        "command_run": 2
+      },
+      {
+        "count": 512,
+        "index_tuple_bytes": 72,
+        "index_struct_bytes": 24,
+        "index_retained_bytes": 64888,
+        "index_bytes_per_entry": 126.734375,
+        "index_allocations": 79,
+        "command_run": 2
+      },
+      {
+        "count": 4096,
+        "index_tuple_bytes": 72,
+        "index_struct_bytes": 24,
+        "index_retained_bytes": 521528,
+        "index_bytes_per_entry": 127.326171875,
+        "index_allocations": 635,
+        "command_run": 2
+      },
+      {
+        "count": 1,
+        "index_tuple_bytes": 72,
+        "index_struct_bytes": 24,
+        "index_retained_bytes": 808,
+        "index_bytes_per_entry": 808,
+        "index_allocations": 1,
+        "command_run": 3
+      },
+      {
+        "count": 64,
+        "index_tuple_bytes": 72,
+        "index_struct_bytes": 24,
+        "index_retained_bytes": 7368,
+        "index_bytes_per_entry": 115.125,
+        "index_allocations": 9,
+        "command_run": 3
+      },
+      {
+        "count": 512,
+        "index_tuple_bytes": 72,
+        "index_struct_bytes": 24,
+        "index_retained_bytes": 64888,
+        "index_bytes_per_entry": 126.734375,
+        "index_allocations": 79,
+        "command_run": 3
+      },
+      {
+        "count": 4096,
+        "index_tuple_bytes": 72,
+        "index_struct_bytes": 24,
+        "index_retained_bytes": 521528,
+        "index_bytes_per_entry": 127.326171875,
+        "index_allocations": 635,
+        "command_run": 3
+      }
+    ]
+  },
+  "median": [
+    {
+      "count": 1,
+      "before": {
+        "hit_ns": 618,
+        "hit_locked_ns": 559,
+        "hit_allocations": 2,
+        "hit_allocated_bytes": 260,
+        "locked_prune_ns": 82,
+        "prune_allocations": 1,
+        "expired_prune_ns": 291,
+        "provider_calls_population": 1,
+        "provider_calls_measured_hits": 0
+      },
+      "after": {
+        "hit_ns": 533,
+        "hit_locked_ns": 473,
+        "hit_allocations": 1,
+        "hit_allocated_bytes": 24,
+        "locked_prune_ns": 13,
+        "prune_allocations": 0,
+        "expired_prune_ns": 2708,
+        "provider_calls_population": 1,
+        "provider_calls_measured_hits": 0
+      },
+      "hit_speedup": 1.1594746716697937,
+      "index": {
+        "count": 1,
+        "index_tuple_bytes": 72,
+        "index_struct_bytes": 24,
+        "index_retained_bytes": 808,
+        "index_bytes_per_entry": 808,
+        "index_allocations": 1,
+        "command_run": 1
+      }
+    },
+    {
+      "count": 64,
+      "before": {
+        "hit_ns": 3407,
+        "hit_locked_ns": 3351,
+        "hit_allocations": 2,
+        "hit_allocated_bytes": 7328,
+        "locked_prune_ns": 2817,
+        "prune_allocations": 1,
+        "expired_prune_ns": 1292,
+        "provider_calls_population": 64,
+        "provider_calls_measured_hits": 0
+      },
+      "after": {
+        "hit_ns": 522,
+        "hit_locked_ns": 471,
+        "hit_allocations": 1,
+        "hit_allocated_bytes": 24,
+        "locked_prune_ns": 13,
+        "prune_allocations": 0,
+        "expired_prune_ns": 6125,
+        "provider_calls_population": 64,
+        "provider_calls_measured_hits": 0
+      },
+      "hit_speedup": 6.526819923371647,
+      "index": {
+        "count": 64,
+        "index_tuple_bytes": 72,
+        "index_struct_bytes": 24,
+        "index_retained_bytes": 7368,
+        "index_bytes_per_entry": 115.125,
+        "index_allocations": 9,
+        "command_run": 1
+      }
+    },
+    {
+      "count": 512,
+      "before": {
+        "hit_ns": 24952,
+        "hit_locked_ns": 24884,
+        "hit_allocations": 2,
+        "hit_allocated_bytes": 58400,
+        "locked_prune_ns": 24439,
+        "prune_allocations": 1,
+        "expired_prune_ns": 8542,
+        "provider_calls_population": 512,
+        "provider_calls_measured_hits": 0
+      },
+      "after": {
+        "hit_ns": 553,
+        "hit_locked_ns": 500,
+        "hit_allocations": 1,
+        "hit_allocated_bytes": 24,
+        "locked_prune_ns": 13,
+        "prune_allocations": 0,
+        "expired_prune_ns": 49917,
+        "provider_calls_population": 512,
+        "provider_calls_measured_hits": 0
+      },
+      "hit_speedup": 45.12115732368897,
+      "index": {
+        "count": 512,
+        "index_tuple_bytes": 72,
+        "index_struct_bytes": 24,
+        "index_retained_bytes": 64888,
+        "index_bytes_per_entry": 126.734375,
+        "index_allocations": 79,
+        "command_run": 1
+      }
+    },
+    {
+      "count": 4096,
+      "before": {
+        "hit_ns": 213244,
+        "hit_locked_ns": 213165,
+        "hit_allocations": 2,
+        "hit_allocated_bytes": 466976,
+        "locked_prune_ns": 210465,
+        "prune_allocations": 1,
+        "expired_prune_ns": 60208,
+        "provider_calls_population": 4096,
+        "provider_calls_measured_hits": 0
+      },
+      "after": {
+        "hit_ns": 528,
+        "hit_locked_ns": 477,
+        "hit_allocations": 1,
+        "hit_allocated_bytes": 24,
+        "locked_prune_ns": 13,
+        "prune_allocations": 0,
+        "expired_prune_ns": 351459,
+        "provider_calls_population": 4096,
+        "provider_calls_measured_hits": 0
+      },
+      "hit_speedup": 403.8712121212121,
+      "index": {
+        "count": 4096,
+        "index_tuple_bytes": 72,
+        "index_struct_bytes": 24,
+        "index_retained_bytes": 521528,
+        "index_bytes_per_entry": 127.326171875,
+        "index_allocations": 635,
+        "command_run": 1
+      }
+    }
+  ]
+}

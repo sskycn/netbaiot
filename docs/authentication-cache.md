@@ -11,6 +11,16 @@ TTL is five seconds. Entries evict oldest cache order when count or bytes would 
 exceeded. Raw secrets/tags are not retained: keys use credential ID plus SHA-256
 fingerprints and are never logged or labeled.
 
+Expiry uses exactly one ordered deadline record per cache entry. A healthy lookup
+checks only the earliest deadline; it does not scan the cache or build a live-key
+set. Expiration, FIFO eviction, replacement and invalidation remove the matching
+deadline record and byte charge together. FIFO hits do not promote entries. Only
+an actual expiration triggers a single FIFO cleanup pass; no background task runs.
+The index is bounded by the entry count, adds fixed node storage, and shares credential
+ID strings through Arc. The 4 MiB estimate remains a logical entry budget, not an RSS
+bound. See the [verified expiry-index measurements](performance/auth-cache-expiry-index/README.md)
+for retained memory, hit allocations, expiry cost and real UDP comparisons.
+
 Identical simultaneous misses share one provider operation through a race-safe watch
 completion channel. A leader owns an RAII inflight lease: timeout, task cancellation,
 panic unwind, or any early return removes the inflight entry and wakes followers so

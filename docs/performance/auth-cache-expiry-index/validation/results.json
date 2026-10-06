@@ -1,0 +1,263 @@
+{
+  "source_sha256": {
+    "crates/netbaiot-runtime/src/auth.rs": "aa072bcf279cac592c8279fc378eb657a9ebd00663d031db8b9e68099cd0e3c1",
+    "crates/netbaiot-runtime/src/auth_cache_expiry_tests.rs": "85a21b21c95f3b14987c2d32ed4887e1928f00ddf57e8287f8655281751c1fc9",
+    "crates/netbaiot-transports/src/udp_tests.rs": "2d0cdc7473bd2424a23aef82238f04565e02a42e0cba939b5e00853673ebedca"
+  },
+  "runs": [
+    {
+      "name": "focused-auth-existing",
+      "command": [
+        "cargo",
+        "+stable",
+        "test",
+        "--locked",
+        "-p",
+        "netbaiot-runtime",
+        "auth::cache_tests::",
+        "--",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 3.415,
+      "log": "docs/performance/auth-cache-expiry-index/validation/focused-auth-existing.log",
+      "passed": 6,
+      "failed": 0,
+      "ignored": 1
+    },
+    {
+      "name": "focused-auth-expiry",
+      "command": [
+        "cargo",
+        "+stable",
+        "test",
+        "--locked",
+        "-p",
+        "netbaiot-runtime",
+        "auth::expiry_tests::",
+        "--",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 8.022,
+      "log": "docs/performance/auth-cache-expiry-index/validation/focused-auth-expiry.log",
+      "passed": 11,
+      "failed": 0,
+      "ignored": 1
+    },
+    {
+      "name": "focused-udp",
+      "command": [
+        "cargo",
+        "+stable",
+        "test",
+        "--locked",
+        "-p",
+        "netbaiot-transports",
+        "udp::",
+        "--",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 12.033,
+      "log": "docs/performance/auth-cache-expiry-index/validation/focused-udp.log",
+      "passed": 17,
+      "failed": 0,
+      "ignored": 1
+    },
+    {
+      "name": "focused-end-to-end",
+      "command": [
+        "cargo",
+        "+stable",
+        "test",
+        "--locked",
+        "-p",
+        "netbaiot-transports",
+        "--test",
+        "end_to_end"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 1.259,
+      "log": "docs/performance/auth-cache-expiry-index/validation/focused-end-to-end.log",
+      "passed": 24,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "name": "1.88.0-fmt",
+      "command": [
+        "cargo",
+        "+1.88.0",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.573,
+      "log": "docs/performance/auth-cache-expiry-index/validation/1.88.0-fmt.log",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "name": "1.88.0-clippy",
+      "command": [
+        "cargo",
+        "+1.88.0",
+        "clippy",
+        "--locked",
+        "--workspace",
+        "--all-targets",
+        "--all-features",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 9.619,
+      "log": "docs/performance/auth-cache-expiry-index/validation/1.88.0-clippy.log",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "name": "1.88.0-workspace-tests",
+      "command": [
+        "cargo",
+        "+1.88.0",
+        "test",
+        "--locked",
+        "--workspace",
+        "--all-features"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 89.795,
+      "log": "docs/performance/auth-cache-expiry-index/validation/1.88.0-workspace-tests.log",
+      "passed": 449,
+      "failed": 0,
+      "ignored": 17
+    },
+    {
+      "name": "stable-fmt",
+      "command": [
+        "cargo",
+        "+stable",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.484,
+      "log": "docs/performance/auth-cache-expiry-index/validation/stable-fmt.log",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "name": "stable-clippy",
+      "command": [
+        "cargo",
+        "+stable",
+        "clippy",
+        "--locked",
+        "--workspace",
+        "--all-targets",
+        "--all-features",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 5.44,
+      "log": "docs/performance/auth-cache-expiry-index/validation/stable-clippy.log",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "name": "stable-workspace-tests",
+      "command": [
+        "cargo",
+        "+stable",
+        "test",
+        "--locked",
+        "--workspace",
+        "--all-features"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 86.23,
+      "log": "docs/performance/auth-cache-expiry-index/validation/stable-workspace-tests.log",
+      "passed": 449,
+      "failed": 0,
+      "ignored": 17
+    },
+    {
+      "name": "xtask-check",
+      "command": [
+        "cargo",
+        "+stable",
+        "xtask",
+        "check"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 84.414,
+      "log": "docs/performance/auth-cache-expiry-index/validation/xtask-check.log",
+      "passed": 449,
+      "failed": 0,
+      "ignored": 17
+    },
+    {
+      "name": "xtask-check-release-rust",
+      "command": [
+        "cargo",
+        "+stable",
+        "xtask",
+        "check",
+        "release",
+        "--part",
+        "rust"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 52.904,
+      "log": "docs/performance/auth-cache-expiry-index/validation/xtask-check-release-rust.log",
+      "passed": 449,
+      "failed": 0,
+      "ignored": 17
+    },
+    {
+      "name": "udp-seed-corpus",
+      "command": [
+        "python3",
+        "fuzz/seed_corpus.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.03,
+      "log": "docs/performance/auth-cache-expiry-index/validation/udp-seed-corpus.log",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "name": "udp-fuzz-smoke",
+      "command": [
+        "cargo",
+        "+nightly",
+        "fuzz",
+        "run",
+        "udp_envelope",
+        "--",
+        "-runs=10000",
+        "-max_len=1201"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 47.397,
+      "log": "docs/performance/auth-cache-expiry-index/validation/udp-fuzz-smoke.log",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0
+    }
+  ]
+}
