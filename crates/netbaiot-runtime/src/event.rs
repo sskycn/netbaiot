@@ -319,6 +319,11 @@ impl EventBus {
         if !state.accepting {
             return Err(Error::Draining);
         }
+        // The active map owns delivery responsibility, not permanent history.
+        // Fence duplicates under the same mutex before any fanout admission.
+        if state.active.contains_key(&event.event_id) {
+            return Err(Error::Conflict);
+        }
         let mut targets = BTreeSet::new();
         for route in &state.routes {
             if route
@@ -418,46 +423,90 @@ impl EventBus {
     }
 
     pub fn restore(&self, records: Vec<SpoolRecord>) -> Result<usize> {
-        let mut restored = 0;
-        for record in records {
-            let bytes = serde_json::to_vec(&record.event)
-                .map_err(|_| Error::Invalid)?
-                .len();
-            let event = Arc::new(record.event);
-            let mut state = self.lock_state(EventBusProbe::Other)?;
-            if state.active.contains_key(&event.event_id)
-                || state.active.len() >= self.limits.global_event_max_count
-                || state.active_bytes.saturating_add(bytes) > self.limits.global_event_max_bytes
-                || record.pending_sinks.len() > self.limits.max_fanout_per_event
+        if records.len() > self.limits.global_event_max_count {
+            return Err(Error::Overloaded);
+        }
+        // Move payload ownership once; preflight retains only sizes and sink projections.
+        let prepared = records
+            .into_iter()
+            .map(|record| {
+                let bytes = serde_json::to_vec(&record.event)
+                    .map_err(|_| Error::Invalid)?
+                    .len();
+                Ok((record, bytes))
+            })
+            .collect::<Result<Vec<_>>>()?;
+        let mut state = self.lock_state(EventBusProbe::Other)?;
+        let mut ids = BTreeSet::new();
+        let mut total_bytes = state.active_bytes;
+        let total_count = state
+            .active
+            .len()
+            .checked_add(prepared.len())
+            .ok_or(Error::Overloaded)?;
+        if total_count > self.limits.global_event_max_count {
+            return Err(Error::Overloaded);
+        }
+        let mut projections = BTreeMap::<SinkId, (usize, usize)>::new();
+        for (record, bytes) in &prepared {
+            if record.pending_sinks.is_empty() || record.accepted_at < 0 {
+                return Err(Error::Invalid);
+            }
+            if record.pending_sinks.len() > self.limits.max_fanout_per_event
+                || record.attempts.len() > self.limits.max_sinks
             {
                 return Err(Error::Overloaded);
             }
+            if !ids.insert(record.event.event_id)
+                || state.active.contains_key(&record.event.event_id)
+            {
+                return Err(Error::Conflict);
+            }
+            total_bytes = total_bytes.checked_add(*bytes).ok_or(Error::Overloaded)?;
+            if total_bytes > self.limits.global_event_max_bytes {
+                return Err(Error::Overloaded);
+            }
+            let mut pending = BTreeSet::new();
             for id in &record.pending_sinks {
+                if !pending.insert(id) {
+                    return Err(Error::Invalid);
+                }
                 let sink = state.sinks.get(id).ok_or(Error::Configuration)?;
-                if sink.definition.mode != SinkDeliveryMode::ConfirmedRequired
-                    || sink.used_count >= sink.definition.max_count
-                    || sink.used_bytes.saturating_add(bytes) > sink.definition.max_bytes
+                if sink.definition.mode != SinkDeliveryMode::ConfirmedRequired {
+                    return Err(Error::Invalid);
+                }
+                let projection = projections
+                    .entry(id.clone())
+                    .or_insert((sink.used_count, sink.used_bytes));
+                projection.0 = projection.0.checked_add(1).ok_or(Error::Overloaded)?;
+                projection.1 = projection.1.checked_add(*bytes).ok_or(Error::Overloaded)?;
+                if projection.0 > sink.definition.max_count
+                    || projection.1 > sink.definition.max_bytes
                 {
                     return Err(Error::Overloaded);
                 }
             }
-            let mut pending = BTreeSet::new();
-            let mut notifies = Vec::new();
-            for id in &record.pending_sinks {
-                let sink = state.sinks.get_mut(id).ok_or(Error::Configuration)?;
-                sink.used_count += 1;
-                sink.used_bytes += bytes;
-                sink.queue.push_back(DeliveryRecord {
-                    event: event.clone(),
-                    bytes,
-                    accepted_at: record.accepted_at,
-                    attempt: *record.attempts.get(id).unwrap_or(&0),
-                    next_attempt: Instant::now(),
-                });
-                pending.insert(id.clone());
-                notifies.push(sink.notify.clone());
+            // Historical attempts may include completed/removed sinks; revision
+            // need not match the current routes. u32 attempts may be saturated.
+        }
+        let restored = prepared.len();
+        for (record, bytes) in prepared {
+            let event = Arc::new(record.event);
+            let pending = record.pending_sinks.into_iter().collect::<BTreeSet<_>>();
+            for id in &pending {
+                // All lookups and arithmetic were validated with this mutex held.
+                if let Some(sink) = state.sinks.get_mut(id) {
+                    sink.used_count += 1;
+                    sink.used_bytes += bytes;
+                    sink.queue.push_back(DeliveryRecord {
+                        event: event.clone(),
+                        bytes,
+                        accepted_at: record.accepted_at,
+                        attempt: *record.attempts.get(id).unwrap_or(&0),
+                        next_attempt: Instant::now(),
+                    });
+                }
             }
-            state.active_bytes += bytes;
             state.active.insert(
                 event.event_id,
                 ActiveEvent {
@@ -470,12 +519,16 @@ impl EventBus {
                     routing_revision: record.routing_revision,
                 },
             );
-            drop(state);
-            for notify in notifies {
-                self.metrics.event_bus_probe(EventBusProbe::NotifyWorker);
-                notify.notify_one();
-            }
-            restored += 1;
+        }
+        state.active_bytes = total_bytes;
+        let notifies = projections
+            .keys()
+            .filter_map(|id| state.sinks.get(id).map(|sink| sink.notify.clone()))
+            .collect::<Vec<_>>();
+        drop(state);
+        for notify in notifies {
+            self.metrics.event_bus_probe(EventBusProbe::NotifyWorker);
+            notify.notify_one();
         }
         Ok(restored)
     }
@@ -920,6 +973,168 @@ mod tests {
         let mut event = event(1);
         event.source_message_id = SourceMessageId::new(source).unwrap();
         event
+    }
+
+    async fn audit_bus(limits: Limits) -> Arc<EventBus> {
+        let limits = Arc::new(limits);
+        let ids = ["a", "b", "best"].map(|id| SinkId::new(id).unwrap());
+        let bus = EventBus::new(
+            limits.clone(),
+            Arc::new(Metrics::default()),
+            ids.iter()
+                .map(|id| {
+                    SinkDefinition::bounded(
+                        id.clone(),
+                        if id.as_str() == "best" {
+                            SinkDeliveryMode::BestEffort
+                        } else {
+                            SinkDeliveryMode::ConfirmedRequired
+                        },
+                        Arc::new(Ack),
+                        &limits,
+                    )
+                })
+                .collect(),
+            vec![RouteDefinition {
+                tenant: None,
+                sinks: ids[..2].to_vec(),
+            }],
+            9,
+        )
+        .unwrap();
+        bus.stop_workers().await.unwrap();
+        bus
+    }
+
+    fn audit_record() -> SpoolRecord {
+        SpoolRecord {
+            event: event(8),
+            pending_sinks: vec![SinkId::new("a").unwrap()],
+            routing_revision: 3,
+            accepted_at: 1,
+            attempts: BTreeMap::new(),
+        }
+    }
+
+    #[tokio::test]
+    async fn active_event_id_conflict_preserves_original_fanout_and_acks() {
+        let bus = audit_bus(Limits::default()).await;
+        let original = event(8);
+        bus.publish(original.clone()).unwrap();
+        let before = bus.usage().unwrap();
+        for payload in [8, 100] {
+            let mut duplicate = event(payload);
+            duplicate.event_id = original.event_id;
+            assert!(matches!(bus.publish(duplicate), Err(Error::Conflict)));
+            assert_eq!(bus.usage().unwrap(), before);
+            assert_eq!(
+                bus.spool_records().unwrap()[0].event.event_id,
+                original.event_id
+            );
+            let state = bus.state.lock().unwrap();
+            for id in ["a", "b"] {
+                let sink = &state.sinks[&SinkId::new(id).unwrap()];
+                assert_eq!((sink.used_count, sink.queue.len()), (1, 1));
+                assert_eq!(sink.used_bytes, before.bytes);
+            }
+        }
+        for (index, id) in ["a", "b"].into_iter().enumerate() {
+            let id = SinkId::new(id).unwrap();
+            let delivery = bus.take_ready(&id).unwrap().unwrap();
+            let definition = bus.state.lock().unwrap().sinks[&id].definition.clone();
+            bus.complete(&id, delivery, Ok(SinkAck), &definition)
+                .unwrap();
+            assert_eq!(bus.usage().unwrap().pending_required, 1 - index);
+            if index == 0 {
+                assert!(
+                    !bus.wait_required_drained(Duration::from_millis(1))
+                        .await
+                        .unwrap()
+                );
+                assert_eq!(
+                    bus.spool_records().unwrap()[0].pending_sinks,
+                    vec![SinkId::new("b").unwrap()]
+                );
+            }
+        }
+        assert_eq!(bus.usage().unwrap(), EventBusUsage::default());
+        // Only active responsibility is guarded: after ACK completion reuse is legal.
+        bus.publish(original).unwrap();
+    }
+
+    #[tokio::test]
+    async fn restore_validates_the_entire_batch_before_any_state_changes() {
+        let good = audit_record();
+        let mut invalid = Vec::new();
+        for pending in [vec![], vec!["a", "a"], vec!["missing"], vec!["best"]] {
+            let mut record = audit_record();
+            record.pending_sinks = pending
+                .into_iter()
+                .map(|id| SinkId::new(id).unwrap())
+                .collect();
+            invalid.push(record);
+        }
+        let mut duplicate = good.clone();
+        duplicate.accepted_at = 1;
+        invalid.push(duplicate);
+        let mut bad_time = audit_record();
+        bad_time.accepted_at = -1;
+        invalid.push(bad_time);
+        let mut accepted = Vec::new();
+        for (index, bad) in invalid.into_iter().enumerate() {
+            let bus = audit_bus(Limits::default()).await;
+            if bus.restore(vec![good.clone(), bad]).is_ok() {
+                accepted.push(index);
+            }
+            if bus.usage().unwrap() != EventBusUsage::default() {
+                accepted.push(index + 100);
+            }
+            for sink in bus.state.lock().unwrap().sinks.values() {
+                if sink.used_count != 0 || sink.used_bytes != 0 || !sink.queue.is_empty() {
+                    accepted.push(index + 200);
+                }
+            }
+        }
+        for limits in [
+            Limits {
+                global_event_max_count: 1,
+                ..Limits::default()
+            },
+            Limits {
+                global_event_max_bytes: serde_json::to_vec(&good.event).unwrap().len(),
+                ..Limits::default()
+            },
+            Limits {
+                sink_queue_max_count: 1,
+                sink_delivery_concurrency: 1,
+                ..Limits::default()
+            },
+            Limits {
+                sink_queue_max_bytes: serde_json::to_vec(&good.event).unwrap().len(),
+                ..Limits::default()
+            },
+        ] {
+            let bus = audit_bus(limits).await;
+            assert!(bus.restore(vec![good.clone(), audit_record()]).is_err());
+            if bus.usage().unwrap() != EventBusUsage::default() {
+                accepted.push(999);
+            }
+        }
+        assert!(
+            accepted.is_empty(),
+            "invalid or partially restored cases: {accepted:?}"
+        );
+        let bus = audit_bus(Limits::default()).await;
+        bus.restore(vec![good.clone()]).unwrap();
+        let before = bus.usage().unwrap();
+        assert!(matches!(bus.restore(vec![good]), Err(Error::Conflict)));
+        assert_eq!(bus.usage().unwrap(), before);
+        let mut historical = audit_record();
+        historical
+            .attempts
+            .insert(SinkId::new("removed-completed").unwrap(), u32::MAX);
+        historical.routing_revision = 0;
+        assert_eq!(bus.restore(vec![historical]).unwrap(), 1);
     }
 
     #[tokio::test]
