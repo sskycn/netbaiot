@@ -1,0 +1,33 @@
+{
+  "main_commit": "74824ba81da81740cfe7e3f1e61bf1ae10e886a2",
+  "runs": [
+    {
+      "id": 37464447709,
+      "name": "Rust checks",
+      "head_sha": "74824ba81da81740cfe7e3f1e61bf1ae10e886a2",
+      "conclusion": "success",
+      "html_url": "https://github.com/sskycn/netbaiot/actions/runs/37464447709"
+    },
+    {
+      "id": 37464446589,
+      "name": "Native recovery and lifecycle",
+      "head_sha": "74824ba81da81740cfe7e3f1e61bf1ae10e886a2",
+      "conclusion": "failure",
+      "html_url": "https://github.com/sskycn/netbaiot/actions/runs/37464446589"
+    },
+    {
+      "id": 37464446660,
+      "name": "Native developer experience",
+      "head_sha": "74824ba81da81740cfe7e3f1e61bf1ae10e886a2",
+      "conclusion": "success",
+      "html_url": "https://github.com/sskycn/netbaiot/actions/runs/37464446660"
+    }
+  ],
+  "failure_artifact": {
+    "id": 11414208071,
+    "name": "native-recovery-windows-latest-74824ba81da81740cfe7e3f1e61bf1ae10e886a2",
+    "digest": "sha256:4b235e9b8e280a57c4b5edadd939909f0504e047e414b2f44382bd602ec59dc7"
+  },
+  "raw_failure_log_sha256": "0ac9e42b05989bcfeb8762ff2c3d11af1c84fb6d2ae1d89d064506215d46ebc3",
+  "boundary": "Both failures were a five-second child-readiness timeout, before recovery assertions. The previous helper discarded child stderr; exact startup failure was not captured. TCP-only address probing and a 50/s HTTP poll were corrected without changing production behavior or the five-second deadline."
+}

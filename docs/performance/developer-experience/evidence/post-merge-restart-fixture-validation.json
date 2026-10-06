@@ -1,0 +1,82 @@
+[
+  {
+    "command": [
+      "cargo",
+      "+stable",
+      "test",
+      "--locked",
+      "-p",
+      "netbaiot-server",
+      "--test",
+      "server",
+      "subprocess_",
+      "--",
+      "--nocapture"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 14.3,
+    "totals": {
+      "passed": 5,
+      "failed": 0,
+      "ignored": 1
+    },
+    "raw_log_sha256": "2d2ea49aca2af4f40de618dc498f4c118f5b583d952fbb18730f518713172890"
+  },
+  {
+    "command": [
+      "cargo",
+      "+stable",
+      "test",
+      "--locked",
+      "-p",
+      "netbaiot-server",
+      "--test",
+      "server",
+      "subprocess_graceful_restart_sixty_second_soak",
+      "--",
+      "--ignored",
+      "--exact",
+      "--nocapture"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 65.16,
+    "totals": {
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0
+    },
+    "raw_log_sha256": "2ab583fe589f0b1c4d6e8c98fc10ce96cecd1072cd0987a092d0b06efadeb8f8"
+  },
+  {
+    "command": [
+      "cargo",
+      "+stable",
+      "xtask",
+      "check"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 83.48,
+    "totals": {
+      "passed": 435,
+      "failed": 0,
+      "ignored": 16
+    },
+    "raw_log_sha256": "186ea973365816fdca18082838d2a757856008abd940154f7475d6663375dbc0"
+  },
+  {
+    "command": [
+      "cargo",
+      "+1.88.0",
+      "xtask",
+      "check"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 69.88,
+    "totals": {
+      "passed": 435,
+      "failed": 0,
+      "ignored": 16
+    },
+    "raw_log_sha256": "8ac06d3aacdfc367cbebb5daae7cab64c8c8b931658ce926145d37dfa8544fc0"
+  }
+]

@@ -579,35 +579,92 @@ async fn audit_tls_handshake_timeout_shutdown_and_invalid_key() {
 }
 
 async fn free_address() -> std::net::SocketAddr {
-    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-    listener.local_addr().unwrap()
+    // The ingress uses this port for both TCP and UDP. A TCP-only reservation
+    // can select a port already owned by an unrelated UDP socket.
+    for _ in 0..32 {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        match tokio::net::UdpSocket::bind(address).await {
+            Ok(_udp) => return address,
+            Err(error) if error.kind() == std::io::ErrorKind::AddrInUse => continue,
+            Err(error) => panic!("fixture UDP reservation failed: {error}"),
+        }
+    }
+    panic!("no available TCP/UDP fixture pair")
 }
 
-async fn wait_ready(client: &reqwest::Client, address: std::net::SocketAddr, admin: &str) {
-    tokio::time::timeout(Duration::from_secs(5), async {
+async fn try_wait_ready(
+    client: &reqwest::Client,
+    address: std::net::SocketAddr,
+    admin: &str,
+) -> Result<(), String> {
+    let mut observed = String::new();
+    let ready = tokio::time::timeout(Duration::from_secs(5), async {
         loop {
-            if client
+            match client
                 .get(format!("http://{address}/api/v1/ready"))
                 .bearer_auth(admin)
                 .send()
                 .await
-                .is_ok_and(|response| response.status().is_success())
             {
-                break;
+                Ok(response) if response.status().is_success() => break,
+                Ok(response) => observed = format!("HTTP {}", response.status()),
+                Err(error) => observed = error.to_string(),
             }
-            tokio::time::sleep(Duration::from_millis(20)).await;
+            // Probe below the configured management request rate limit.
+            tokio::time::sleep(Duration::from_millis(100)).await;
         }
     })
-    .await
-    .unwrap();
+    .await;
+    ready.map_err(|_| format!("readiness timed out at {address}: {observed}"))
+}
+
+async fn wait_ready(client: &reqwest::Client, address: std::net::SocketAddr, admin: &str) {
+    try_wait_ready(client, address, admin).await.unwrap();
+}
+
+fn child_log_tail(path: &std::path::Path) -> String {
+    use std::io::{Read, Seek, SeekFrom};
+    let Ok(mut file) = std::fs::File::open(path.with_extension("server.log")) else {
+        return "child log unavailable".into();
+    };
+    let _ = file.seek(SeekFrom::End(-16_384));
+    let mut bytes = Vec::new();
+    let _ = file.take(16_384).read_to_end(&mut bytes);
+    String::from_utf8_lossy(&bytes).into_owned()
+}
+
+async fn wait_child_ready(
+    client: &reqwest::Client,
+    address: std::net::SocketAddr,
+    admin: &str,
+    child: &mut Child,
+    path: &std::path::Path,
+) {
+    tokio::select! {
+        ready = try_wait_ready(client, address, admin) => {
+            if let Err(error) = ready {
+                panic!("{error}; child log: {}", child_log_tail(path));
+            }
+        }
+        status = child.wait() => panic!(
+            "child exited before readiness: {status:?}; child log: {}",
+            child_log_tail(path)
+        ),
+    }
 }
 
 async fn start_child(path: &std::path::Path, admin: &str) -> Child {
+    let stderr = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(path.with_extension("server.log"))
+        .unwrap();
     Command::new(env!("CARGO_BIN_EXE_netbaiot-server"))
         .arg(path)
         .env("NETBAIOT_ADMIN_SECRET", admin)
         .stdout(Stdio::null())
-        .stderr(Stdio::null())
+        .stderr(Stdio::from(stderr))
         .kill_on_drop(true)
         .spawn()
         .unwrap()
@@ -628,7 +685,7 @@ async fn recovery_directory_is_exclusive_between_processes_and_released_on_exit(
     let admin = "d".repeat(64);
     let client = reqwest::Client::builder().no_proxy().build().unwrap();
     let mut child = start_child(&path, &admin).await;
-    wait_ready(&client, first.management_http, &admin).await;
+    wait_child_ready(&client, first.management_http, &admin, &mut child, &path).await;
     let mut second: Config = serde_json::from_value(serde_json::to_value(&first).unwrap()).unwrap();
     second.device_ingress = free_address().await;
     second.management_http = free_address().await;
@@ -668,7 +725,14 @@ async fn recovery_directory_is_exclusive_between_processes_and_released_on_exit(
     assert!(!failed.success());
     drop(occupied);
     let mut successor = start_child(&other_path, &admin).await;
-    wait_ready(&client, second.management_http, &admin).await;
+    wait_child_ready(
+        &client,
+        second.management_http,
+        &admin,
+        &mut successor,
+        &other_path,
+    )
+    .await;
     request_drain(&client, second.management_http, &admin).await;
     assert!(
         tokio::time::timeout(Duration::from_secs(5), successor.wait())
@@ -1542,7 +1606,7 @@ async fn subprocess_mqtt_session_retained_and_qos1_inflight_survive_graceful_res
     let payload = br#"{"schema_version":1,"source_message_id":"mqtt-restart","kind":"heartbeat","data":{"sequence":1}}"#;
 
     let mut first = start_child(&config_path, &admin).await;
-    wait_ready(&client, c.management_http, &admin).await;
+    wait_child_ready(&client, c.management_http, &admin, &mut first, &config_path).await;
     let mut persistent = mqtt_open(c.device_ingress, "persistent-client", false).await;
     assert_eq!(mqtt_read(&mut persistent).await, (0x20, vec![0, 0]));
     persistent
@@ -1569,7 +1633,14 @@ async fn subprocess_mqtt_session_retained_and_qos1_inflight_survive_graceful_res
     );
 
     let mut second = start_child(&config_path, &admin).await;
-    wait_ready(&client, c.management_http, &admin).await;
+    wait_child_ready(
+        &client,
+        c.management_http,
+        &admin,
+        &mut second,
+        &config_path,
+    )
+    .await;
     let mut resumed = mqtt_open(c.device_ingress, "persistent-client", false).await;
     assert_eq!(mqtt_read(&mut resumed).await, (0x20, vec![1, 0]));
     let (retry_first, retry_body) = mqtt_read(&mut resumed).await;
@@ -1624,7 +1695,14 @@ async fn subprocess_mqtt_qos2_resumes_outbound_and_inbound_restart_stages() {
     let second_payload = br#"{"schema_version":1,"source_message_id":"qos2-stage-2","kind":"heartbeat","data":{"sequence":2}}"#;
 
     let mut generation_one = start_child(&config_path, &admin).await;
-    wait_ready(&client, c.management_http, &admin).await;
+    wait_child_ready(
+        &client,
+        c.management_http,
+        &admin,
+        &mut generation_one,
+        &config_path,
+    )
+    .await;
     let mut mqtt = mqtt_open(c.device_ingress, "qos2-persistent", false).await;
     assert_eq!(mqtt_read(&mut mqtt).await, (0x20, vec![0, 0]));
     mqtt.write_all(&mqtt_subscribe(1, filter, 2)).await.unwrap();
@@ -1642,7 +1720,14 @@ async fn subprocess_mqtt_qos2_resumes_outbound_and_inbound_restart_stages() {
     assert!(generation_one.wait().await.unwrap().success());
 
     let mut generation_two = start_child(&config_path, &admin).await;
-    wait_ready(&client, c.management_http, &admin).await;
+    wait_child_ready(
+        &client,
+        c.management_http,
+        &admin,
+        &mut generation_two,
+        &config_path,
+    )
+    .await;
     let mut mqtt = mqtt_open(c.device_ingress, "qos2-persistent", false).await;
     assert_eq!(mqtt_read(&mut mqtt).await, (0x20, vec![1, 0]));
     let (retry_first, retry_body) = mqtt_read(&mut mqtt).await;
@@ -1659,7 +1744,14 @@ async fn subprocess_mqtt_qos2_resumes_outbound_and_inbound_restart_stages() {
     assert!(generation_two.wait().await.unwrap().success());
 
     let mut generation_three = start_child(&config_path, &admin).await;
-    wait_ready(&client, c.management_http, &admin).await;
+    wait_child_ready(
+        &client,
+        c.management_http,
+        &admin,
+        &mut generation_three,
+        &config_path,
+    )
+    .await;
     let mut mqtt = mqtt_open(c.device_ingress, "qos2-persistent", false).await;
     assert_eq!(mqtt_read(&mut mqtt).await, (0x20, vec![1, 0]));
     assert_eq!(
@@ -1677,7 +1769,14 @@ async fn subprocess_mqtt_qos2_resumes_outbound_and_inbound_restart_stages() {
     assert!(generation_three.wait().await.unwrap().success());
 
     let mut generation_four = start_child(&config_path, &admin).await;
-    wait_ready(&client, c.management_http, &admin).await;
+    wait_child_ready(
+        &client,
+        c.management_http,
+        &admin,
+        &mut generation_four,
+        &config_path,
+    )
+    .await;
     let mut mqtt = mqtt_open(c.device_ingress, "qos2-persistent", false).await;
     assert_eq!(mqtt_read(&mut mqtt).await, (0x20, vec![1, 0]));
     mqtt.write_all(&[0x62, 2, 0, 11]).await.unwrap();
@@ -1799,7 +1898,7 @@ async fn exercise_graceful_restart_spool_replay(healthy_cycles: u32, dwell_per_c
     let client = reqwest::Client::builder().no_proxy().build().unwrap();
 
     let mut first = start_child(&config_path, &admin).await;
-    wait_ready(&client, c.management_http, &admin).await;
+    wait_child_ready(&client, c.management_http, &admin, &mut first, &config_path).await;
     let mqtt_topic = "v1/t/demo/p/sensor/d/device-1/up";
     let mqtt_payload = br#"{"schema_version":1,"source_message_id":"combined-restart","kind":"heartbeat","data":{"sequence":99}}"#;
     let mut persistent = mqtt_open(c.device_ingress, "combined-restart", false).await;
@@ -1851,7 +1950,14 @@ async fn exercise_graceful_restart_spool_replay(healthy_cycles: u32, dwell_per_c
     // authoritative snapshot rather than appending duplicate responsibilities.
     for _ in 0..2 {
         let mut unavailable = start_child(&config_path, &admin).await;
-        wait_ready(&client, c.management_http, &admin).await;
+        wait_child_ready(
+            &client,
+            c.management_http,
+            &admin,
+            &mut unavailable,
+            &config_path,
+        )
+        .await;
         request_drain(&client, c.management_http, &admin).await;
         assert!(
             tokio::time::timeout(Duration::from_secs(5), unavailable.wait())
@@ -1872,7 +1978,14 @@ async fn exercise_graceful_restart_spool_replay(healthy_cycles: u32, dwell_per_c
 
     healthy.store(true, Ordering::Relaxed);
     let mut second = start_child(&config_path, &admin).await;
-    wait_ready(&client, c.management_http, &admin).await;
+    wait_child_ready(
+        &client,
+        c.management_http,
+        &admin,
+        &mut second,
+        &config_path,
+    )
+    .await;
     let mut persistent = mqtt_open(c.device_ingress, "combined-restart", false).await;
     assert_eq!(mqtt_read(&mut persistent).await, (0x20, vec![1, 0]));
     let (first, body) = mqtt_read(&mut persistent).await;
@@ -1941,7 +2054,7 @@ async fn exercise_graceful_restart_spool_replay(healthy_cycles: u32, dwell_per_c
     // drains it, and exits without creating a restart segment.
     for cycle in 0..healthy_cycles {
         let mut child = start_child(&config_path, &admin).await;
-        wait_ready(&client, c.management_http, &admin).await;
+        wait_child_ready(&client, c.management_http, &admin, &mut child, &config_path).await;
         let receipt = tcp_accept(c.device_ingress, format!(r#"{{"schema_version":1,"source_message_id":"cycle:{cycle}","kind":"heartbeat","data":{{"sequence":{cycle}}}}}"#).as_bytes()).await;
         let event_id = receipt.event_id;
         accepted.insert(event_id);
@@ -2014,7 +2127,7 @@ async fn subprocess_sigkill_exposes_the_documented_three_event_loss_window() {
     let admin = "b".repeat(64);
     let client = reqwest::Client::builder().no_proxy().build().unwrap();
     let mut child = start_child(&config_path, &admin).await;
-    wait_ready(&client, c.management_http, &admin).await;
+    wait_child_ready(&client, c.management_http, &admin, &mut child, &config_path).await;
     let mut accepted = HashSet::new();
     for sequence in 0..3 {
         let receipt = tcp_accept(c.device_ingress, format!(r#"{{"schema_version":1,"source_message_id":"kill:{sequence}","kind":"heartbeat","data":{{"sequence":{sequence}}}}}"#).as_bytes()).await;
@@ -2058,7 +2171,7 @@ async fn subprocess_spool_failure_stays_alive_until_repaired_then_replays_same_e
     let admin = "c".repeat(64);
     let client = reqwest::Client::builder().no_proxy().build().unwrap();
     let mut child = start_child(&config_path, &admin).await;
-    wait_ready(&client, c.management_http, &admin).await;
+    wait_child_ready(&client, c.management_http, &admin, &mut child, &config_path).await;
     let receipt = tcp_accept(c.device_ingress, r#"{"schema_version":1,"source_message_id":"spool-failure","kind":"heartbeat","data":{"sequence":1}}"#.as_bytes()).await;
     let accepted = receipt.event_id;
     // Keep the ownership inode/directory intact while making both snapshot
@@ -2147,7 +2260,14 @@ async fn subprocess_spool_failure_stays_alive_until_repaired_then_replays_same_e
     c.delivery_url = Some(format!("http://{sink_address}/events"));
     std::fs::write(&config_path, serde_json::to_vec_pretty(&c).unwrap()).unwrap();
     let mut restarted = start_child(&config_path, &admin).await;
-    wait_ready(&client, c.management_http, &admin).await;
+    wait_child_ready(
+        &client,
+        c.management_http,
+        &admin,
+        &mut restarted,
+        &config_path,
+    )
+    .await;
     tokio::time::timeout(Duration::from_secs(5), sink)
         .await
         .unwrap()
