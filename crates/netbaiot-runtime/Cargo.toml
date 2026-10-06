@@ -35,5 +35,6 @@ atomicwrites = "=0.4.4"
 workspace = true
 
 [dev-dependencies]
+stats_alloc = "=0.1.10"
 tokio-rustls.workspace = true
 rustls-pemfile.workspace = true
