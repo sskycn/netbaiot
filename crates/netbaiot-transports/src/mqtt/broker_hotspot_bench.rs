@@ -25,7 +25,7 @@ fn identity(index: usize) -> AuthenticatedDevice {
 fn message(topic: String, qos: u8, expires: bool) -> BrokerMessage {
     BrokerMessage {
         topic,
-        payload: vec![7; 64],
+        payload: vec![7; 64].into(),
         qos,
         retain: false,
         properties: PublishProperties {
@@ -405,7 +405,7 @@ fn fanout_route_scaling() {
             for qos in [0, 1] {
                 let message = BrokerMessage {
                     topic: topic.into(),
-                    payload: vec![7; bytes],
+                    payload: vec![7; bytes].into(),
                     qos,
                     retain: false,
                     properties: Default::default(),
@@ -728,5 +728,147 @@ fn concurrent_route_ack_scaling() {
             hold_sum,
             hold_count,
         );
+    }
+}
+
+// Serial-only allocation measurements share the system allocator with every
+// test. No runtime allocator or dependency is changed.
+#[global_allocator]
+static AUDIT_ALLOCATOR: &stats_alloc::StatsAlloc<std::alloc::System> =
+    &stats_alloc::INSTRUMENTED_SYSTEM;
+
+fn measure_alloc<T, R>(
+    name: &str,
+    size: usize,
+    iterations: usize,
+    mut setup: impl FnMut() -> T,
+    mut action: impl FnMut(T) -> R,
+    mut cleanup: impl FnMut(R),
+) {
+    if cfg!(debug_assertions) {
+        panic!("run in release mode");
+    }
+    for _ in 0..32 {
+        cleanup(action(setup()));
+    }
+    for run in 1..=3 {
+        let mut samples = Vec::with_capacity(iterations);
+        let mut allocations = 0;
+        let mut bytes = 0;
+        for _ in 0..iterations {
+            let input = setup();
+            let region = stats_alloc::Region::new(&stats_alloc::INSTRUMENTED_SYSTEM);
+            let started = Instant::now();
+            let result = black_box(action(input));
+            let ns = started.elapsed().as_nanos();
+            let stats = region.change();
+            allocations += stats.allocations;
+            bytes += stats.bytes_allocated;
+            cleanup(result);
+            samples.push(ns);
+        }
+        let total: u128 = samples.iter().sum();
+        samples.sort_unstable();
+        println!(
+            "MQTT_ALLOC,{name},{size},{run},{:.0},{},{},{},{:.3},{:.3}",
+            iterations as f64 * 1e9 / total as f64,
+            samples[iterations / 2],
+            samples[iterations * 95 / 100],
+            samples[iterations * 99 / 100],
+            allocations as f64 / iterations as f64,
+            bytes as f64 / iterations as f64
+        );
+    }
+}
+
+#[test]
+#[ignore = "serial release allocation benchmark"]
+fn no_subscriber_route_allocations() {
+    let auth = identity(0);
+    let broker = MqttBroker::new(Arc::new(Limits::default()));
+    let attachment = broker.attach(&auth, "source".into(), true).unwrap();
+    for bytes in [64, 1024, 16384, 65536] {
+        let message = BrokerMessage {
+            topic: "v1/t/tenant/p/product/d/device-0/up".into(),
+            payload: vec![7; bytes].into(),
+            qos: 1,
+            retain: false,
+            properties: Default::default(),
+        };
+        measure_alloc(
+            "no_subscriber",
+            bytes,
+            4000,
+            || (),
+            |_| {
+                broker
+                    .route_from_session(&attachment.key, &message)
+                    .unwrap()
+            },
+            |delivered| assert_eq!(delivered, 0),
+        );
+    }
+}
+
+#[test]
+#[ignore = "serial release allocation benchmark"]
+fn fanout_route_allocations() {
+    let auth = identity(0);
+    let topic = "v1/t/tenant/p/product/d/device-0/down";
+    for subscribers in [1, 10, 100, 1000] {
+        let metrics = Arc::new(Metrics::with_lock_timing());
+        let broker = MqttBroker::new_with_metrics(fanout_limits(subscribers), metrics.clone());
+        let mut attachments = Vec::with_capacity(subscribers);
+        for index in 0..subscribers {
+            let attachment = broker
+                .attach_v5(&auth, format!("alloc-{index}"), false, 3600, 32)
+                .unwrap();
+            broker
+                .subscribe(&attachment.key, attachment.generation, topic, 1)
+                .unwrap();
+            attachments.push(attachment);
+        }
+        for bytes in [64, 1024, 16384] {
+            for qos in [0, 1] {
+                let name = format!("fanout_{subscribers}_qos{qos}");
+                let before = metrics.render();
+                measure_alloc(
+                    &name,
+                    bytes,
+                    100,
+                    || BrokerMessage {
+                        topic: topic.into(),
+                        payload: vec![7; bytes].into(),
+                        qos,
+                        retain: false,
+                        properties: Default::default(),
+                    },
+                    |message| broker.route(&auth.device_key, message).unwrap(),
+                    |delivered| {
+                        assert_eq!(delivered, subscribers);
+                        for attachment in &mut attachments {
+                            let BrokerFrame::Publish(delivery) =
+                                attachment.receiver.try_recv().unwrap()
+                            else {
+                                panic!("publish");
+                            };
+                            if let Some(id) = delivery.packet_id {
+                                broker
+                                    .puback(&attachment.key, attachment.generation, id)
+                                    .unwrap();
+                            }
+                        }
+                    },
+                );
+                let after = metrics.render();
+                let count = metric_total(&after, "broker_lock_hold_us", "count")
+                    - metric_total(&before, "broker_lock_hold_us", "count");
+                let wait = metric_total(&after, "broker_lock_wait_us", "sum")
+                    - metric_total(&before, "broker_lock_wait_us", "sum");
+                let hold = metric_total(&after, "broker_lock_hold_us", "sum")
+                    - metric_total(&before, "broker_lock_hold_us", "sum");
+                println!("MQTT_LOCK,{name},{bytes},{count},{wait},{hold}");
+            }
+        }
     }
 }

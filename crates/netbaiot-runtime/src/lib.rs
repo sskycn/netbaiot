@@ -4,6 +4,8 @@ pub mod business_rpc;
 pub mod commands;
 pub mod control;
 pub mod event;
+#[cfg(test)]
+mod hotspot_bench;
 pub mod ingress;
 pub mod lifecycle;
 pub mod limits;

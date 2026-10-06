@@ -275,11 +275,19 @@ impl RateLimiter {
         }
     }
     pub fn take(&self, ip: IpAddr) -> Result<()> {
+        #[cfg(test)]
+        let mut clock = crate::hotspot_bench::LockClock::start();
         let mut inner = lock(&self.inner)?;
+        #[cfg(test)]
+        clock.acquired();
         inner.0.take(self.limits.requests_per_second)?;
-        inner
-            .1
-            .retain(|_, w| w.start.elapsed() < Duration::from_secs(1));
+        // Existing windows reset themselves. Scan only when a new source needs
+        // room; rejected attempts still consume the global rate above.
+        if !inner.1.contains_key(&ip) && inner.1.len() >= self.limits.rate_entries {
+            inner
+                .1
+                .retain(|_, w| w.start.elapsed() < Duration::from_secs(1));
+        }
         if !inner.1.contains_key(&ip) && inner.1.len() >= self.limits.rate_entries {
             return Err(Error::Overloaded);
         }
@@ -881,5 +889,98 @@ mod tests {
         r.take("127.0.0.1".parse().unwrap()).unwrap();
         assert!(r.take("127.0.0.2".parse().unwrap()).is_err());
         assert!(r.take("127.0.0.1".parse().unwrap()).is_err());
+    }
+    #[test]
+    fn rate_limits_charge_global_even_when_ip_or_capacity_rejects() {
+        let limiter = RateLimiter::new(Arc::new(Limits {
+            rate_entries: 1,
+            requests_per_second: 3,
+            requests_per_ip_second: 1,
+            ..Limits::default()
+        }));
+        let ip = IpAddr::from([10, 0, 0, 1]);
+        limiter.take(ip).unwrap();
+        assert!(matches!(limiter.take(ip), Err(Error::Overloaded)));
+        assert!(matches!(
+            limiter.take(IpAddr::from([10, 0, 0, 2])),
+            Err(Error::Overloaded)
+        ));
+        let mut inner = limiter.inner.lock().unwrap();
+        assert_eq!(inner.0.count, 3);
+        inner.1.get_mut(&ip).unwrap().start = Instant::now() - Duration::from_secs(2);
+        drop(inner);
+        assert!(matches!(limiter.take(ip), Err(Error::Overloaded)));
+    }
+
+    #[test]
+    fn rate_table_reclaims_expired_capacity_and_existing_windows_reset() {
+        let limiter = RateLimiter::new(Arc::new(Limits {
+            rate_entries: 1024,
+            requests_per_second: 10000,
+            requests_per_ip_second: 2,
+            ..Limits::default()
+        }));
+        let first = IpAddr::from([10, 0, 0, 0]);
+        for n in 0..1024 {
+            limiter
+                .take(IpAddr::from([10, 0, (n / 256) as u8, (n % 256) as u8]))
+                .unwrap();
+        }
+        limiter.take(first).unwrap();
+        assert!(matches!(limiter.take(first), Err(Error::Overloaded)));
+        let new = IpAddr::from([11, 0, 0, 0]);
+        assert!(matches!(limiter.take(new), Err(Error::Overloaded)));
+        {
+            let mut inner = limiter.inner.lock().unwrap();
+            inner.1.get_mut(&first).unwrap().start = Instant::now() - Duration::from_secs(2);
+        }
+        limiter.take(first).unwrap();
+        limiter.take(first).unwrap();
+        assert!(matches!(limiter.take(first), Err(Error::Overloaded)));
+        {
+            let mut inner = limiter.inner.lock().unwrap();
+            inner.1.get_mut(&first).unwrap().start = Instant::now() - Duration::from_secs(2);
+        }
+        limiter.take(new).unwrap();
+        let inner = limiter.inner.lock().unwrap();
+        assert_eq!(inner.1.len(), 1024);
+        assert!(!inner.1.contains_key(&first));
+        assert!(inner.1.contains_key(&new));
+    }
+
+    #[test]
+    #[ignore = "serial release benchmark"]
+    fn rate_table_scaling() {
+        use crate::hotspot_bench::measure;
+        for count in [1, 64, 256, 1024] {
+            let limiter = RateLimiter::new(Arc::new(Limits {
+                rate_entries: count,
+                requests_per_second: usize::MAX,
+                requests_per_ip_second: usize::MAX,
+                ..Limits::default()
+            }));
+            let target = IpAddr::from([10, 0, 0, 0]);
+            {
+                let mut inner = limiter.inner.lock().unwrap();
+                for i in 0..count {
+                    let ip = IpAddr::from([10, 0, (i / 256) as u8, (i % 256) as u8]);
+                    inner.1.insert(
+                        ip,
+                        Window {
+                            start: Instant::now(),
+                            count: 0,
+                        },
+                    );
+                }
+            }
+            measure(
+                "rate_existing",
+                count,
+                2000,
+                || (),
+                |_| limiter.take(target).unwrap(),
+                |_| {},
+            );
+        }
     }
 }

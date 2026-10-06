@@ -50,7 +50,7 @@ retained Will on `v1/t/demo/p/sensor/d/device-1/up` with Will Delay
 `0x05` (QoS1, No Local), then send a valid QoS2 PUBLISH with Packet Identifier
 7 and the `event(777)` payload from `tests/mqtt_conformance/run.py`. Confirm
 PUBREC, close the socket without DISCONNECT or PUBREL, and SIGTERM the server.
-The test in `broker.rs` checks those states after reading the fixed sample and
+The test in `broker/tests/recovery_compat.rs` checks those states after reading the fixed sample and
 after committing and reading a new v6 image. The existing v5 raw-record unit
 test separately covers an old immediate Will with no cancellation key.
 

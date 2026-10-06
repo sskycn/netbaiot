@@ -192,7 +192,7 @@ async fn process_publish(
     // Broker-side retained/routing admission is the last fallible MQTT responsibility before the
     // unified event crosses EventAccepted. A later broker error must never turn an accepted QoS1
     // DeviceEvent into a producer-visible failure and retransmission.
-    services.mqtt.route_from_session(origin, message.clone())?;
+    services.mqtt.route_from_session(origin, message)?;
     let acceptance =
         accept_iot_publish(services, auth, message, validated_at, validation_us).await?;
     Ok(acceptance)
@@ -324,7 +324,7 @@ pub async fn connection(
                 attachment.key.clone(),
                 BrokerMessage {
                     topic: will.topic,
-                    payload: will.payload.to_vec(),
+                    payload: will.payload,
                     qos: will.qos,
                     retain: will.retain,
                     properties: Default::default(),
@@ -390,7 +390,7 @@ pub async fn connection(
                     };
                     let progress = command.progress.take();
                     if services.mqtt.send_live_tracked(&attachment.key, attachment.generation, BrokerMessage {
-                        topic: down, payload: command.bytes.to_vec(), qos, retain: false,
+                        topic: down, payload: std::mem::take(&mut command.bytes).into(), qos, retain: false,
                         properties: broker::PublishProperties { expires_at_ms: Some(command.expires_at), ..Default::default() },
                     }, progress.clone()).is_err() {
                         if let Some(progress) = progress { progress.abandon_unsent(); }
@@ -538,7 +538,7 @@ pub async fn connection(
                                     broker::InboundQos2PublishState::NeedsNewMessageAdmission => {}
                                 }
                             }
-                            let message = BrokerMessage { topic, payload: payload.to_vec(), qos, retain,
+                            let message = BrokerMessage { topic, payload, qos, retain,
     properties: Default::default(),
 };
                             // QoS2 acknowledges ownership with PUBREC, so authorization must be

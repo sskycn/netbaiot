@@ -1,0 +1,19 @@
+{
+  "connections_active": 128,
+  "connections_requested": 128,
+  "fd_base": 16,
+  "fd_loaded": 144,
+  "logical_bytes_per_connection": 524288,
+  "measurement_state": "active",
+  "persistent": false,
+  "rss_base_kib": 6336,
+  "rss_delta_bytes_per_connection": 35456.0,
+  "rss_delta_kib": 4432,
+  "rss_loaded_kib": 10768,
+  "runtime_tasks_base": 6,
+  "runtime_tasks_loaded": 134,
+  "subscribed": false,
+  "tasks_delta_per_connection": 1.0,
+  "tls": false,
+  "transport": "mqtt"
+}

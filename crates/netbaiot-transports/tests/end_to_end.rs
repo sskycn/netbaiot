@@ -777,7 +777,7 @@ async fn continuously_ready_outbound_cannot_starve_ping_for_either_mqtt_version(
                     &auth().device_key,
                     BrokerMessage {
                         topic: "v1/t/t/p/p/d/a/down".into(),
-                        payload: vec![1],
+                        payload: vec![1].into(),
                         qos: self.qos,
                         retain: false,
                         properties: Default::default(),
@@ -992,7 +992,7 @@ async fn retained_delete_qos_matrix_skips_business_json_decode() {
                     &auth().device_key,
                     BrokerMessage {
                         topic: topic.into(),
-                        payload: b"old".to_vec(),
+                        payload: b"old".to_vec().into(),
                         qos: 0,
                         retain: true,
                         properties: Default::default(),
@@ -1164,7 +1164,7 @@ async fn mqtt_v5_command_metrics_distinguish_ordinary_and_negative_puback() {
             &auth().device_key,
             BrokerMessage {
                 topic: up.into(),
-                payload: b"ordinary".to_vec(),
+                payload: b"ordinary".to_vec().into(),
                 qos: 1,
                 retain: false,
                 properties: Default::default(),

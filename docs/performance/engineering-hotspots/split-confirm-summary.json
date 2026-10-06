@@ -1,0 +1,626 @@
+{
+  "fanout_1_qos0/64": {
+    "before": {
+      "throughput_ops_s": 1168497.0,
+      "p50_ns": 834.0,
+      "p95_ns": 875.0,
+      "p99_ns": 1625.0,
+      "allocations_per_op": 10.0,
+      "allocated_bytes_per_op": 1224.0
+    },
+    "after": {
+      "throughput_ops_s": 1171866.0,
+      "p50_ns": 834.0,
+      "p95_ns": 917.0,
+      "p99_ns": 1541.0,
+      "allocations_per_op": 10.0,
+      "allocated_bytes_per_op": 1224.0
+    },
+    "delta_percent": {
+      "allocated_bytes_per_op": 0.0,
+      "p99_ns": -5.16923076923077,
+      "allocations_per_op": 0.0,
+      "p50_ns": 0.0,
+      "p95_ns": 4.800000000000004,
+      "throughput_ops_s": 0.28831909709652326
+    }
+  },
+  "fanout_1_qos1/64": {
+    "before": {
+      "throughput_ops_s": 814372.0,
+      "p50_ns": 1209.0,
+      "p95_ns": 1292.0,
+      "p99_ns": 1541.0,
+      "allocations_per_op": 14.0,
+      "allocated_bytes_per_op": 1282.0
+    },
+    "after": {
+      "throughput_ops_s": 810287.0,
+      "p50_ns": 1250.0,
+      "p95_ns": 1292.0,
+      "p99_ns": 1458.0,
+      "allocations_per_op": 14.0,
+      "allocated_bytes_per_op": 1282.0
+    },
+    "delta_percent": {
+      "allocated_bytes_per_op": 0.0,
+      "p99_ns": -5.3861129136924095,
+      "allocations_per_op": 0.0,
+      "p50_ns": 3.3912324234904867,
+      "p95_ns": 0.0,
+      "throughput_ops_s": -0.5016135132347332
+    }
+  },
+  "fanout_1_qos0/1024": {
+    "before": {
+      "throughput_ops_s": 1040756.0,
+      "p50_ns": 958.0,
+      "p95_ns": 1000.0,
+      "p99_ns": 1083.0,
+      "allocations_per_op": 10.0,
+      "allocated_bytes_per_op": 1224.0
+    },
+    "after": {
+      "throughput_ops_s": 1175917.0,
+      "p50_ns": 834.0,
+      "p95_ns": 917.0,
+      "p99_ns": 959.0,
+      "allocations_per_op": 10.0,
+      "allocated_bytes_per_op": 1224.0
+    },
+    "delta_percent": {
+      "allocated_bytes_per_op": 0.0,
+      "p99_ns": -11.449676823638043,
+      "allocations_per_op": 0.0,
+      "p50_ns": -12.943632567849683,
+      "p95_ns": -8.299999999999997,
+      "throughput_ops_s": 12.986809588414584
+    }
+  },
+  "fanout_1_qos1/1024": {
+    "before": {
+      "throughput_ops_s": 802137.0,
+      "p50_ns": 1250.0,
+      "p95_ns": 1292.0,
+      "p99_ns": 1334.0,
+      "allocations_per_op": 14.0,
+      "allocated_bytes_per_op": 1282.0
+    },
+    "after": {
+      "throughput_ops_s": 757828.0,
+      "p50_ns": 1333.0,
+      "p95_ns": 1375.0,
+      "p99_ns": 1375.0,
+      "allocations_per_op": 14.0,
+      "allocated_bytes_per_op": 1282.0
+    },
+    "delta_percent": {
+      "allocated_bytes_per_op": 0.0,
+      "p99_ns": 3.073463268365817,
+      "allocations_per_op": 0.0,
+      "p50_ns": 6.6400000000000015,
+      "p95_ns": 6.424148606811153,
+      "throughput_ops_s": -5.52386936396152
+    }
+  },
+  "fanout_1_qos0/16384": {
+    "before": {
+      "throughput_ops_s": 1097912.0,
+      "p50_ns": 916.0,
+      "p95_ns": 1000.0,
+      "p99_ns": 1042.0,
+      "allocations_per_op": 10.0,
+      "allocated_bytes_per_op": 1224.0
+    },
+    "after": {
+      "throughput_ops_s": 1114740.0,
+      "p50_ns": 875.0,
+      "p95_ns": 959.0,
+      "p99_ns": 1041.0,
+      "allocations_per_op": 10.0,
+      "allocated_bytes_per_op": 1224.0
+    },
+    "delta_percent": {
+      "allocated_bytes_per_op": 0.0,
+      "p99_ns": -0.09596928982725794,
+      "allocations_per_op": 0.0,
+      "p50_ns": -4.475982532751088,
+      "p95_ns": -4.100000000000003,
+      "throughput_ops_s": 1.532727577437898
+    }
+  },
+  "fanout_1_qos1/16384": {
+    "before": {
+      "throughput_ops_s": 801346.0,
+      "p50_ns": 1250.0,
+      "p95_ns": 1292.0,
+      "p99_ns": 1417.0,
+      "allocations_per_op": 14.0,
+      "allocated_bytes_per_op": 1282.0
+    },
+    "after": {
+      "throughput_ops_s": 769479.0,
+      "p50_ns": 1333.0,
+      "p95_ns": 1375.0,
+      "p99_ns": 1459.0,
+      "allocations_per_op": 14.0,
+      "allocated_bytes_per_op": 1282.0
+    },
+    "delta_percent": {
+      "allocated_bytes_per_op": 0.0,
+      "p99_ns": 2.9640084685956136,
+      "allocations_per_op": 0.0,
+      "p50_ns": 6.6400000000000015,
+      "p95_ns": 6.424148606811153,
+      "throughput_ops_s": -3.9766842287850657
+    }
+  },
+  "fanout_10_qos0/64": {
+    "before": {
+      "throughput_ops_s": 359288.0,
+      "p50_ns": 2750.0,
+      "p95_ns": 2875.0,
+      "p99_ns": 3000.0,
+      "allocations_per_op": 48.0,
+      "allocated_bytes_per_op": 7240.0
+    },
+    "after": {
+      "throughput_ops_s": 352571.0,
+      "p50_ns": 2792.0,
+      "p95_ns": 3084.0,
+      "p99_ns": 3209.0,
+      "allocations_per_op": 48.0,
+      "allocated_bytes_per_op": 7240.0
+    },
+    "delta_percent": {
+      "allocated_bytes_per_op": 0.0,
+      "p99_ns": 6.9666666666666766,
+      "allocations_per_op": 0.0,
+      "p50_ns": 1.5272727272727327,
+      "p95_ns": 7.269565217391305,
+      "throughput_ops_s": -1.8695308499031449
+    }
+  },
+  "fanout_10_qos1/64": {
+    "before": {
+      "throughput_ops_s": 162041.0,
+      "p50_ns": 6167.0,
+      "p95_ns": 6375.0,
+      "p99_ns": 6625.0,
+      "allocations_per_op": 88.0,
+      "allocated_bytes_per_op": 7820.0
+    },
+    "after": {
+      "throughput_ops_s": 153867.0,
+      "p50_ns": 6250.0,
+      "p95_ns": 6958.0,
+      "p99_ns": 7084.0,
+      "allocations_per_op": 88.0,
+      "allocated_bytes_per_op": 7820.0
+    },
+    "delta_percent": {
+      "allocated_bytes_per_op": 0.0,
+      "p99_ns": 6.928301886792454,
+      "allocations_per_op": 0.0,
+      "p50_ns": 1.3458731960434678,
+      "p95_ns": 9.145098039215682,
+      "throughput_ops_s": -5.044402342616994
+    }
+  },
+  "fanout_10_qos0/1024": {
+    "before": {
+      "throughput_ops_s": 329257.0,
+      "p50_ns": 2834.0,
+      "p95_ns": 3292.0,
+      "p99_ns": 6333.0,
+      "allocations_per_op": 48.0,
+      "allocated_bytes_per_op": 7240.0
+    },
+    "after": {
+      "throughput_ops_s": 330498.0,
+      "p50_ns": 3000.0,
+      "p95_ns": 3209.0,
+      "p99_ns": 4333.0,
+      "allocations_per_op": 48.0,
+      "allocated_bytes_per_op": 7240.0
+    },
+    "delta_percent": {
+      "allocated_bytes_per_op": 0.0,
+      "p99_ns": -31.58060950576346,
+      "allocations_per_op": 0.0,
+      "p50_ns": 5.857445306986597,
+      "p95_ns": -2.5212636695018276,
+      "throughput_ops_s": 0.37690922288668993
+    }
+  },
+  "fanout_10_qos1/1024": {
+    "before": {
+      "throughput_ops_s": 155653.0,
+      "p50_ns": 6208.0,
+      "p95_ns": 7750.0,
+      "p99_ns": 8833.0,
+      "allocations_per_op": 88.0,
+      "allocated_bytes_per_op": 7820.0
+    },
+    "after": {
+      "throughput_ops_s": 151948.0,
+      "p50_ns": 6708.0,
+      "p95_ns": 6959.0,
+      "p99_ns": 7375.0,
+      "allocations_per_op": 88.0,
+      "allocated_bytes_per_op": 7820.0
+    },
+    "delta_percent": {
+      "allocated_bytes_per_op": 0.0,
+      "p99_ns": -16.506283255971923,
+      "allocations_per_op": 0.0,
+      "p50_ns": 8.0541237113402,
+      "p95_ns": -10.206451612903223,
+      "throughput_ops_s": -2.3802946297212357
+    }
+  },
+  "fanout_10_qos0/16384": {
+    "before": {
+      "throughput_ops_s": 350113.0,
+      "p50_ns": 2792.0,
+      "p95_ns": 3084.0,
+      "p99_ns": 3375.0,
+      "allocations_per_op": 48.0,
+      "allocated_bytes_per_op": 7240.0
+    },
+    "after": {
+      "throughput_ops_s": 339320.0,
+      "p50_ns": 2916.0,
+      "p95_ns": 3208.0,
+      "p99_ns": 3292.0,
+      "allocations_per_op": 48.0,
+      "allocated_bytes_per_op": 7240.0
+    },
+    "delta_percent": {
+      "allocated_bytes_per_op": 0.0,
+      "p99_ns": -2.459259259259261,
+      "allocations_per_op": 0.0,
+      "p50_ns": 4.441260744985676,
+      "p95_ns": 4.020752269779515,
+      "throughput_ops_s": -3.082719007863177
+    }
+  },
+  "fanout_10_qos1/16384": {
+    "before": {
+      "throughput_ops_s": 153022.0,
+      "p50_ns": 6709.0,
+      "p95_ns": 7041.0,
+      "p99_ns": 7208.0,
+      "allocations_per_op": 88.0,
+      "allocated_bytes_per_op": 7820.0
+    },
+    "after": {
+      "throughput_ops_s": 149494.0,
+      "p50_ns": 6792.0,
+      "p95_ns": 7958.0,
+      "p99_ns": 8667.0,
+      "allocations_per_op": 88.0,
+      "allocated_bytes_per_op": 7820.0
+    },
+    "delta_percent": {
+      "allocated_bytes_per_op": 0.0,
+      "p99_ns": 20.241398446170923,
+      "allocations_per_op": 0.0,
+      "p50_ns": 1.2371441347443835,
+      "p95_ns": 13.023718221843495,
+      "throughput_ops_s": -2.30555083582753
+    }
+  },
+  "fanout_100_qos0/64": {
+    "before": {
+      "throughput_ops_s": 42698.0,
+      "p50_ns": 23458.0,
+      "p95_ns": 25000.0,
+      "p99_ns": 35000.0,
+      "allocations_per_op": 411.0,
+      "allocated_bytes_per_op": 65922.0
+    },
+    "after": {
+      "throughput_ops_s": 42602.0,
+      "p50_ns": 23917.0,
+      "p95_ns": 24958.0,
+      "p99_ns": 29125.0,
+      "allocations_per_op": 411.0,
+      "allocated_bytes_per_op": 65922.0
+    },
+    "delta_percent": {
+      "allocated_bytes_per_op": 0.0,
+      "p99_ns": -16.78571428571428,
+      "allocations_per_op": 0.0,
+      "p50_ns": 1.9566885497484865,
+      "p95_ns": -0.16800000000000148,
+      "throughput_ops_s": -0.22483488687994324
+    }
+  },
+  "fanout_100_qos1/64": {
+    "before": {
+      "throughput_ops_s": 16255.0,
+      "p50_ns": 62917.0,
+      "p95_ns": 66750.0,
+      "p99_ns": 76541.0,
+      "allocations_per_op": 811.0,
+      "allocated_bytes_per_op": 71992.0
+    },
+    "after": {
+      "throughput_ops_s": 16050.0,
+      "p50_ns": 63291.0,
+      "p95_ns": 66792.0,
+      "p99_ns": 69583.0,
+      "allocations_per_op": 811.0,
+      "allocated_bytes_per_op": 71992.0
+    },
+    "delta_percent": {
+      "allocated_bytes_per_op": 0.0,
+      "p99_ns": -9.090552775636585,
+      "allocations_per_op": 0.0,
+      "p50_ns": 0.5944339367738527,
+      "p95_ns": 0.06292134831460405,
+      "throughput_ops_s": -1.2611504152568398
+    }
+  },
+  "fanout_100_qos0/1024": {
+    "before": {
+      "throughput_ops_s": 42700.0,
+      "p50_ns": 24083.0,
+      "p95_ns": 24625.0,
+      "p99_ns": 26750.0,
+      "allocations_per_op": 411.0,
+      "allocated_bytes_per_op": 65922.0
+    },
+    "after": {
+      "throughput_ops_s": 42790.0,
+      "p50_ns": 24000.0,
+      "p95_ns": 24667.0,
+      "p99_ns": 26500.0,
+      "allocations_per_op": 411.0,
+      "allocated_bytes_per_op": 65922.0
+    },
+    "delta_percent": {
+      "allocated_bytes_per_op": 0.0,
+      "p99_ns": -0.9345794392523366,
+      "allocations_per_op": 0.0,
+      "p50_ns": -0.34464144832454524,
+      "p95_ns": 0.17055837563451082,
+      "throughput_ops_s": 0.2107728337236603
+    }
+  },
+  "fanout_100_qos1/1024": {
+    "before": {
+      "throughput_ops_s": 16348.0,
+      "p50_ns": 62166.0,
+      "p95_ns": 65834.0,
+      "p99_ns": 73250.0,
+      "allocations_per_op": 811.0,
+      "allocated_bytes_per_op": 71992.0
+    },
+    "after": {
+      "throughput_ops_s": 16133.0,
+      "p50_ns": 63333.0,
+      "p95_ns": 65916.0,
+      "p99_ns": 72542.0,
+      "allocations_per_op": 811.0,
+      "allocated_bytes_per_op": 71992.0
+    },
+    "delta_percent": {
+      "allocated_bytes_per_op": 0.0,
+      "p99_ns": -0.9665529010238871,
+      "allocations_per_op": 0.0,
+      "p50_ns": 1.877231927420131,
+      "p95_ns": 0.12455570070175614,
+      "throughput_ops_s": -1.3151455835576198
+    }
+  },
+  "fanout_100_qos0/16384": {
+    "before": {
+      "throughput_ops_s": 42785.0,
+      "p50_ns": 24000.0,
+      "p95_ns": 26416.0,
+      "p99_ns": 30458.0,
+      "allocations_per_op": 411.0,
+      "allocated_bytes_per_op": 65922.0
+    },
+    "after": {
+      "throughput_ops_s": 42186.0,
+      "p50_ns": 24042.0,
+      "p95_ns": 24667.0,
+      "p99_ns": 26458.0,
+      "allocations_per_op": 411.0,
+      "allocated_bytes_per_op": 65922.0
+    },
+    "delta_percent": {
+      "allocated_bytes_per_op": 0.0,
+      "p99_ns": -13.13283866307703,
+      "allocations_per_op": 0.0,
+      "p50_ns": 0.17499999999999183,
+      "p95_ns": -6.620987280436097,
+      "throughput_ops_s": -1.4000233726773392
+    }
+  },
+  "fanout_100_qos1/16384": {
+    "before": {
+      "throughput_ops_s": 16302.0,
+      "p50_ns": 62083.0,
+      "p95_ns": 65792.0,
+      "p99_ns": 74875.0,
+      "allocations_per_op": 811.0,
+      "allocated_bytes_per_op": 71992.0
+    },
+    "after": {
+      "throughput_ops_s": 16083.0,
+      "p50_ns": 63250.0,
+      "p95_ns": 65875.0,
+      "p99_ns": 75208.0,
+      "allocations_per_op": 811.0,
+      "allocated_bytes_per_op": 71992.0
+    },
+    "delta_percent": {
+      "allocated_bytes_per_op": 0.0,
+      "p99_ns": 0.4447412353923097,
+      "allocations_per_op": 0.0,
+      "p50_ns": 1.8797416361967079,
+      "p95_ns": 0.12615515564202706,
+      "throughput_ops_s": -1.3433934486566046
+    }
+  },
+  "fanout_1000_qos0/64": {
+    "before": {
+      "throughput_ops_s": 3883.0,
+      "p50_ns": 248500.0,
+      "p95_ns": 277334.0,
+      "p99_ns": 312125.0,
+      "allocations_per_op": 4015.0,
+      "allocated_bytes_per_op": 796634.0
+    },
+    "after": {
+      "throughput_ops_s": 3812.0,
+      "p50_ns": 262917.0,
+      "p95_ns": 278667.0,
+      "p99_ns": 300875.0,
+      "allocations_per_op": 4015.0,
+      "allocated_bytes_per_op": 796634.0
+    },
+    "delta_percent": {
+      "allocated_bytes_per_op": 0.0,
+      "p99_ns": -3.6043251902282747,
+      "allocations_per_op": 0.0,
+      "p50_ns": 5.801609657947693,
+      "p95_ns": 0.4806478830579719,
+      "throughput_ops_s": -1.8284831315992789
+    }
+  },
+  "fanout_1000_qos1/64": {
+    "before": {
+      "throughput_ops_s": 1580.0,
+      "p50_ns": 632333.0,
+      "p95_ns": 660000.0,
+      "p99_ns": 682750.0,
+      "allocations_per_op": 8015.0,
+      "allocated_bytes_per_op": 860304.0
+    },
+    "after": {
+      "throughput_ops_s": 1576.0,
+      "p50_ns": 634834.0,
+      "p95_ns": 663833.0,
+      "p99_ns": 684583.0,
+      "allocations_per_op": 8015.0,
+      "allocated_bytes_per_op": 860304.0
+    },
+    "delta_percent": {
+      "allocated_bytes_per_op": 0.0,
+      "p99_ns": 0.2684730867813956,
+      "allocations_per_op": 0.0,
+      "p50_ns": 0.39551944940403594,
+      "p95_ns": 0.5807575757575734,
+      "throughput_ops_s": -0.25316455696202667
+    }
+  },
+  "fanout_1000_qos0/1024": {
+    "before": {
+      "throughput_ops_s": 3816.0,
+      "p50_ns": 262209.0,
+      "p95_ns": 276833.0,
+      "p99_ns": 292750.0,
+      "allocations_per_op": 4015.0,
+      "allocated_bytes_per_op": 796634.0
+    },
+    "after": {
+      "throughput_ops_s": 3981.0,
+      "p50_ns": 249667.0,
+      "p95_ns": 273666.0,
+      "p99_ns": 303666.0,
+      "allocations_per_op": 4015.0,
+      "allocated_bytes_per_op": 796634.0
+    },
+    "delta_percent": {
+      "allocated_bytes_per_op": 0.0,
+      "p99_ns": 3.7287788215200734,
+      "allocations_per_op": 0.0,
+      "p50_ns": -4.783207288842107,
+      "p95_ns": -1.1440110102480583,
+      "throughput_ops_s": 4.323899371069184
+    }
+  },
+  "fanout_1000_qos1/1024": {
+    "before": {
+      "throughput_ops_s": 1565.0,
+      "p50_ns": 636125.0,
+      "p95_ns": 667083.0,
+      "p99_ns": 714459.0,
+      "allocations_per_op": 8015.0,
+      "allocated_bytes_per_op": 860304.0
+    },
+    "after": {
+      "throughput_ops_s": 1590.0,
+      "p50_ns": 629000.0,
+      "p95_ns": 651250.0,
+      "p99_ns": 676791.0,
+      "allocations_per_op": 8015.0,
+      "allocated_bytes_per_op": 860304.0
+    },
+    "delta_percent": {
+      "allocated_bytes_per_op": 0.0,
+      "p99_ns": -5.2722409543444755,
+      "allocations_per_op": 0.0,
+      "p50_ns": -1.1200628807231272,
+      "p95_ns": -2.3734677693780237,
+      "throughput_ops_s": 1.5974440894568787
+    }
+  },
+  "fanout_1000_qos0/16384": {
+    "before": {
+      "throughput_ops_s": 3924.0,
+      "p50_ns": 254416.0,
+      "p95_ns": 277584.0,
+      "p99_ns": 291417.0,
+      "allocations_per_op": 4015.0,
+      "allocated_bytes_per_op": 796634.0
+    },
+    "after": {
+      "throughput_ops_s": 3939.0,
+      "p50_ns": 252500.0,
+      "p95_ns": 267834.0,
+      "p99_ns": 283750.0,
+      "allocations_per_op": 4015.0,
+      "allocated_bytes_per_op": 796634.0
+    },
+    "delta_percent": {
+      "allocated_bytes_per_op": 0.0,
+      "p99_ns": -2.6309377970399783,
+      "allocations_per_op": 0.0,
+      "p50_ns": -0.7530972894786436,
+      "p95_ns": -3.5124502853190354,
+      "throughput_ops_s": 0.3822629969419067
+    }
+  },
+  "fanout_1000_qos1/16384": {
+    "before": {
+      "throughput_ops_s": 1590.0,
+      "p50_ns": 627958.0,
+      "p95_ns": 650958.0,
+      "p99_ns": 674416.0,
+      "allocations_per_op": 8015.0,
+      "allocated_bytes_per_op": 860304.0
+    },
+    "after": {
+      "throughput_ops_s": 1583.0,
+      "p50_ns": 630625.0,
+      "p95_ns": 652125.0,
+      "p99_ns": 681708.0,
+      "allocations_per_op": 8015.0,
+      "allocated_bytes_per_op": 860304.0
+    },
+    "delta_percent": {
+      "allocated_bytes_per_op": 0.0,
+      "p99_ns": 1.0812317619985246,
+      "allocations_per_op": 0.0,
+      "p50_ns": 0.4247099328299031,
+      "p95_ns": 0.1792742388909918,
+      "throughput_ops_s": -0.4402515723270439
+    }
+  }
+}

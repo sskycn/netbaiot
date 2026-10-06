@@ -1,7 +1,7 @@
 use crate::{Error, EventBusProbe, Histogram, Limits, Metric, Metrics, Result, lock, now_ms};
 use async_trait::async_trait;
 use futures_util::FutureExt;
-use netbaiot_core::{DeviceEvent, EventAccepted, EventId, RouteDefinition, SinkId};
+use netbaiot_core::{DeviceEvent, EventAccepted, EventId, RouteDefinition, SinkId, TenantId};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap, VecDeque},
@@ -110,7 +110,8 @@ struct DeliveryRecord {
 
 struct SinkState {
     definition: SinkDefinition,
-    queue: VecDeque<DeliveryRecord>,
+    ready: VecDeque<DeliveryRecord>,
+    delayed: BTreeMap<Instant, VecDeque<DeliveryRecord>>,
     used_count: usize,
     used_bytes: usize,
     inflight: usize,
@@ -129,11 +130,24 @@ struct ActiveEvent {
 
 struct State {
     sinks: BTreeMap<SinkId, SinkState>,
-    routes: Vec<RouteDefinition>,
+    routes: CompiledRoutes,
     routing_revision: u64,
     active: HashMap<EventId, ActiveEvent>,
     active_bytes: usize,
     accepting: bool,
+}
+
+/// Immutable, sorted effective fanout. The slices also own safe snapshots across
+/// replacement; publishing never builds or deduplicates a routing set.
+struct CompiledRoutes {
+    global: Arc<[SinkId]>,
+    tenants: HashMap<TenantId, Arc<[SinkId]>>,
+}
+
+impl CompiledRoutes {
+    fn for_tenant(&self, tenant: &TenantId) -> &Arc<[SinkId]> {
+        self.tenants.get(tenant).unwrap_or(&self.global)
+    }
 }
 
 // Field drop order releases the state mutex before updating probe histograms.
@@ -270,7 +284,8 @@ impl EventBus {
                 definition.id.clone(),
                 SinkState {
                     definition,
-                    queue: VecDeque::new(),
+                    ready: VecDeque::new(),
+                    delayed: BTreeMap::new(),
                     used_count: 0,
                     used_bytes: 0,
                     inflight: 0,
@@ -278,7 +293,7 @@ impl EventBus {
                 },
             );
         }
-        validate_routes(&routes, &sinks, &limits)?;
+        let routes = compile_routes(&routes, &sinks, &limits)?;
         let bus = Arc::new(Self {
             limits,
             metrics,
@@ -325,7 +340,7 @@ impl EventBus {
 
     pub fn replace_routes(&self, revision: u64, routes: Vec<RouteDefinition>) -> Result<()> {
         let mut state = self.lock_state(EventBusProbe::Other)?;
-        validate_routes(&routes, &state.sinks, &self.limits)?;
+        let routes = compile_routes(&routes, &state.sinks, &self.limits)?;
         if revision <= state.routing_revision {
             return Err(Error::Conflict);
         }
@@ -339,7 +354,7 @@ impl EventBus {
         if revision <= state.routing_revision {
             return Err(Error::Conflict);
         }
-        validate_routes(routes, &state.sinks, &self.limits)
+        compile_routes(routes, &state.sinks, &self.limits).map(|_| ())
     }
 
     pub fn close_admission(&self) -> Result<()> {
@@ -375,30 +390,21 @@ impl EventBus {
         if state.active.contains_key(&event.event_id) {
             return Err(Error::Conflict);
         }
-        let mut targets = BTreeSet::new();
-        for route in &state.routes {
-            if route
-                .tenant
-                .as_ref()
-                .is_none_or(|tenant| tenant == &event.device.tenant_id)
-            {
-                targets.extend(route.sinks.iter().cloned());
-            }
-        }
+        // Split borrows of immutable routing and mutable sink/accounting fields.
+        // Only callers retaining a snapshot need to increment its Arc count.
+        let state_ref = &mut *state.guard;
+        let targets = state_ref.routes.for_tenant(&event.device.tenant_id);
         if targets.is_empty() {
             return Err(Error::Unavailable);
         }
-        if targets.len() > self.limits.max_fanout_per_event {
-            return Err(Error::Overloaded);
-        }
-        if state.active.len() >= self.limits.global_event_max_count
-            || state.active_bytes.saturating_add(bytes) > self.limits.global_event_max_bytes
+        if state_ref.active.len() >= self.limits.global_event_max_count
+            || state_ref.active_bytes.saturating_add(bytes) > self.limits.global_event_max_bytes
         {
             return Err(Error::Overloaded);
         }
         // Required capacity is checked for every sink before the first mutation.
-        for id in &targets {
-            let sink = state.sinks.get(id).ok_or(Error::Configuration)?;
+        for id in targets.iter() {
+            let sink = state_ref.sinks.get(id).ok_or(Error::Configuration)?;
             if sink.definition.mode == SinkDeliveryMode::ConfirmedRequired
                 && (sink.used_count >= sink.definition.max_count
                     || sink.used_bytes.saturating_add(bytes) > sink.definition.max_bytes)
@@ -410,8 +416,8 @@ impl EventBus {
         let mut remaining = BTreeSet::new();
         let mut required = BTreeSet::new();
         let mut accepted_notifies = Vec::new();
-        for id in targets {
-            let sink = state.sinks.get_mut(&id).ok_or(Error::Configuration)?;
+        for id in targets.iter() {
+            let sink = state_ref.sinks.get_mut(id).ok_or(Error::Configuration)?;
             let available = sink.used_count < sink.definition.max_count
                 && sink.used_bytes.saturating_add(bytes) <= sink.definition.max_bytes;
             if !available {
@@ -420,7 +426,7 @@ impl EventBus {
             }
             sink.used_count += 1;
             sink.used_bytes += bytes;
-            sink.queue.push_back(DeliveryRecord {
+            sink.ready.push_back(DeliveryRecord {
                 event: event.clone(),
                 bytes,
                 accepted_at: now,
@@ -429,7 +435,7 @@ impl EventBus {
             });
             remaining.insert(id.clone());
             if sink.definition.mode == SinkDeliveryMode::ConfirmedRequired {
-                required.insert(id);
+                required.insert(id.clone());
             }
             accepted_notifies.push(sink.notify.clone());
         }
@@ -439,9 +445,9 @@ impl EventBus {
             return Err(Error::Overloaded);
         }
         let event_id = event.event_id;
-        let revision = state.routing_revision;
-        state.active_bytes += bytes;
-        state.active.insert(
+        let revision = state_ref.routing_revision;
+        state_ref.active_bytes += bytes;
+        state_ref.active.insert(
             event_id,
             ActiveEvent {
                 event,
@@ -547,7 +553,7 @@ impl EventBus {
                 if let Some(sink) = state.sinks.get_mut(id) {
                     sink.used_count += 1;
                     sink.used_bytes += bytes;
-                    sink.queue.push_back(DeliveryRecord {
+                    sink.ready.push_back(DeliveryRecord {
                         event: event.clone(),
                         bytes,
                         accepted_at: record.accepted_at,
@@ -766,24 +772,26 @@ impl EventBus {
     fn take_ready(&self, id: &SinkId) -> Result<Option<DeliveryRecord>> {
         let mut state = self.lock_state(EventBusProbe::TakeReady)?;
         let sink = state.sinks.get_mut(id).ok_or(Error::Internal)?;
-        let queue_len = sink.queue.len();
+        let queue_len = sink.used_count.saturating_sub(sink.inflight);
         let now = Instant::now();
         let selection_started = self.metrics.lock_timing_enabled().then(Instant::now);
-        let position = sink
-            .queue
-            .iter()
-            .enumerate()
-            .filter(|(_, record)| record.next_attempt <= now)
-            .min_by_key(|(_, record)| record.next_attempt)
-            .map(|(position, _)| position);
-        let selection_ns = selection_started.map(|started| started.elapsed().as_nanos() as u64);
-        let record = if let Some(position) = position {
-            let record = sink.queue.remove(position).ok_or(Error::Internal)?;
+        // Ready work remains FIFO. Due retries join the tail; later admissions
+        // cannot overtake them. Both queues remain covered by the same quotas.
+        while sink
+            .delayed
+            .first_key_value()
+            .is_some_and(|(deadline, _)| *deadline <= now)
+        {
+            let Some((_, mut records)) = sink.delayed.pop_first() else {
+                break;
+            };
+            sink.ready.append(&mut records);
+        }
+        let record = sink.ready.pop_front();
+        if record.is_some() {
             sink.inflight += 1;
-            Some(record)
-        } else {
-            None
-        };
+        }
+        let selection_ns = selection_started.map(|started| started.elapsed().as_nanos() as u64);
         if let Some(selection_ns) = selection_ns {
             state._timing.dequeue = Some((queue_len, usize::from(record.is_some()), selection_ns));
         }
@@ -794,11 +802,13 @@ impl EventBus {
         let state = self.lock_state(EventBusProbe::NextDelay)?;
         let sink = state.sinks.get(id).ok_or(Error::Internal)?;
         let now = Instant::now();
+        if !sink.ready.is_empty() {
+            return Ok(Some(Duration::ZERO));
+        }
         Ok(sink
-            .queue
-            .iter()
-            .map(|record| record.next_attempt.saturating_duration_since(now))
-            .min())
+            .delayed
+            .first_key_value()
+            .map(|(deadline, _)| deadline.saturating_duration_since(now)))
     }
 
     fn complete(
@@ -831,7 +841,10 @@ impl EventBus {
             let seed = record.event.event_id.0.as_u128() as u64 ^ u64::from(record.attempt);
             record.next_attempt = Instant::now() + Duration::from_millis(1 + seed % cap.max(1));
             let sink = state.sinks.get_mut(id).ok_or(Error::Internal)?;
-            sink.queue.push_back(record);
+            sink.delayed
+                .entry(record.next_attempt)
+                .or_default()
+                .push_back(record);
             self.metrics.event_bus_probe(EventBusProbe::NotifyWorker);
             sink.notify.notify_one();
             self.metrics.inc(Metric::SinkRetries);
@@ -842,7 +855,10 @@ impl EventBus {
             record.next_attempt =
                 Instant::now() + Duration::from_millis(self.limits.retry_max_ms.max(1));
             let sink = state.sinks.get_mut(id).ok_or(Error::Internal)?;
-            sink.queue.push_back(record);
+            sink.delayed
+                .entry(record.next_attempt)
+                .or_default()
+                .push_back(record);
             self.metrics.event_bus_probe(EventBusProbe::NotifyWorker);
             sink.notify.notify_one();
             self.metrics.inc(Metric::SinkFailures);
@@ -917,15 +933,22 @@ pub(crate) fn bounded_json_bytes(event: &impl Serialize, maximum: usize) -> Resu
     Ok(size.bytes)
 }
 
-fn validate_routes(
+fn compile_routes(
     routes: &[RouteDefinition],
     sinks: &BTreeMap<SinkId, SinkState>,
     limits: &Limits,
-) -> Result<()> {
+) -> Result<CompiledRoutes> {
     if routes.is_empty() || routes.len() > limits.max_routing_filters {
         return Err(Error::Configuration);
     }
+    let mut global = BTreeSet::new();
+    let mut tenants = HashMap::<TenantId, BTreeSet<SinkId>>::new();
     for route in routes {
+        if route.sinks.len() > limits.max_fanout_per_event
+            || route.sinks.len() > limits.max_sinks_per_tenant
+        {
+            return Err(Error::Configuration);
+        }
         let unique = route.sinks.iter().collect::<BTreeSet<_>>();
         if unique.is_empty()
             || unique.len() != route.sinks.len()
@@ -935,8 +958,32 @@ fn validate_routes(
         {
             return Err(Error::Configuration);
         }
+        let target = match &route.tenant {
+            Some(tenant) => tenants.entry(tenant.clone()).or_default(),
+            None => &mut global,
+        };
+        target.extend(route.sinks.iter().cloned());
+        if target.len() > limits.max_fanout_per_event || target.len() > limits.max_sinks_per_tenant
+        {
+            return Err(Error::Configuration);
+        }
     }
-    Ok(())
+    let tenants = tenants
+        .into_iter()
+        .map(|(tenant, mut effective)| {
+            effective.extend(global.iter().cloned());
+            if effective.len() > limits.max_fanout_per_event
+                || effective.len() > limits.max_sinks_per_tenant
+            {
+                return Err(Error::Configuration);
+            }
+            Ok((tenant, Arc::from(effective.into_iter().collect::<Vec<_>>())))
+        })
+        .collect::<Result<_>>()?;
+    Ok(CompiledRoutes {
+        global: Arc::from(global.into_iter().collect::<Vec<_>>()),
+        tenants,
+    })
 }
 
 #[cfg(test)]
@@ -1068,6 +1115,203 @@ mod tests {
         event
     }
 
+    fn route(tenant: Option<&str>, sinks: &[&str]) -> RouteDefinition {
+        RouteDefinition {
+            tenant: tenant.map(|tenant| TenantId::new(tenant).unwrap()),
+            sinks: sinks
+                .iter()
+                .map(|sink| SinkId::new(*sink).unwrap())
+                .collect(),
+        }
+    }
+
+    fn route_bus(limits: Limits, routes: Vec<RouteDefinition>) -> Result<Arc<EventBus>> {
+        let limits = Arc::new(limits);
+        let definitions = ["a", "b", "c", "d", "e", "f", "g", "h", "i"]
+            .map(|id| {
+                SinkDefinition::bounded(
+                    SinkId::new(id).unwrap(),
+                    SinkDeliveryMode::ConfirmedRequired,
+                    Arc::new(Ack),
+                    &limits,
+                )
+            })
+            .into();
+        EventBus::new_paused(limits, Arc::new(Metrics::default()), definitions, routes, 7)
+    }
+
+    #[test]
+    fn effective_fanout_rejects_global_and_tenant_aggregate_overflow() {
+        for limits in [
+            Limits {
+                max_fanout_per_event: 8,
+                max_sinks_per_tenant: 9,
+                ..Limits::default()
+            },
+            Limits {
+                max_fanout_per_event: 9,
+                max_sinks_per_tenant: 8,
+                ..Limits::default()
+            },
+        ] {
+            for routes in [
+                vec![
+                    route(None, &["a", "b", "c", "d", "e", "f", "g", "h"]),
+                    route(Some("t"), &["i"]),
+                ],
+                vec![
+                    route(None, &["a", "b", "c", "d", "e", "f", "g", "h"]),
+                    route(None, &["i"]),
+                ],
+                vec![
+                    route(Some("t"), &["a", "b", "c", "d", "e", "f", "g", "h"]),
+                    route(Some("t"), &["i"]),
+                ],
+            ] {
+                assert!(matches!(
+                    route_bus(limits.clone(), routes),
+                    Err(Error::Configuration)
+                ));
+            }
+        }
+    }
+
+    #[test]
+    fn effective_routes_deduplicate_sort_and_isolate_tenants() {
+        let bus = route_bus(
+            Limits {
+                max_fanout_per_event: 4,
+                max_sinks_per_tenant: 4,
+                ..Limits::default()
+            },
+            vec![
+                route(None, &["c", "a", "b"]),
+                route(Some("t"), &["d", "c"]),
+                route(Some("other"), &["e", "b"]),
+            ],
+        )
+        .unwrap();
+        for (tenant, expected) in [
+            ("t", vec!["a", "b", "c", "d"]),
+            ("other", vec!["a", "b", "c", "e"]),
+            ("unlisted", vec!["a", "b", "c"]),
+        ] {
+            let mut event = event(8);
+            event.device.tenant_id = TenantId::new(tenant).unwrap();
+            assert_eq!(
+                bus.publish(event).unwrap().required_deliveries,
+                expected.len()
+            );
+            let state = bus.state.lock().unwrap();
+            let targets = state.routes.for_tenant(&TenantId::new(tenant).unwrap());
+            assert_eq!(
+                targets.iter().map(SinkId::as_str).collect::<Vec<_>>(),
+                expected
+            );
+        }
+    }
+
+    #[test]
+    fn rejected_route_replacement_preserves_revision_and_delivery() {
+        let bus = route_bus(Limits::default(), vec![route(None, &["a"])]).unwrap();
+        for routes in [
+            vec![
+                route(None, &["a", "b", "c", "d", "e", "f", "g", "h"]),
+                route(Some("t"), &["i"]),
+            ],
+            vec![route(None, &["missing"])],
+            vec![route(None, &["a", "a"])],
+        ] {
+            assert!(matches!(
+                bus.validate_route_update(8, &routes),
+                Err(Error::Configuration)
+            ));
+            assert!(matches!(
+                bus.replace_routes(8, routes),
+                Err(Error::Configuration)
+            ));
+            assert_eq!(bus.state.lock().unwrap().routing_revision, 7);
+            let accepted = bus.publish(event(8)).unwrap();
+            assert_eq!(accepted.required_deliveries, 1);
+            let record = bus
+                .spool_records()
+                .unwrap()
+                .into_iter()
+                .find(|record| record.event.event_id == accepted.event_id)
+                .unwrap();
+            assert_eq!(record.routing_revision, 7);
+            assert_eq!(record.pending_sinks, vec![SinkId::new("a").unwrap()]);
+        }
+        assert!(matches!(
+            bus.replace_routes(7, vec![route(None, &["b"])]),
+            Err(Error::Conflict)
+        ));
+        assert_eq!(bus.publish(event(8)).unwrap().required_deliveries, 1);
+    }
+
+    #[test]
+    fn compiled_route_snapshot_survives_replacement() {
+        let bus = route_bus(Limits::default(), vec![route(None, &["a", "b"])]).unwrap();
+        let tenant = TenantId::new("t").unwrap();
+        let old = bus.state.lock().unwrap().routes.for_tenant(&tenant).clone();
+        bus.replace_routes(8, vec![route(None, &["c"])]).unwrap();
+        assert_eq!(
+            old.iter().map(SinkId::as_str).collect::<Vec<_>>(),
+            vec!["a", "b"]
+        );
+        let new = bus.state.lock().unwrap().routes.for_tenant(&tenant).clone();
+        assert_eq!(
+            new.iter().map(SinkId::as_str).collect::<Vec<_>>(),
+            vec!["c"]
+        );
+        assert_eq!(bus.publish(event(8)).unwrap().required_deliveries, 1);
+    }
+
+    #[test]
+    #[ignore = "isolated serial release hotspot benchmark"]
+    fn route_publish_scaling() {
+        for count in [1, 64, 256, 1_024] {
+            let limits = Arc::new(Limits {
+                max_routing_filters: 1_024,
+                ..Limits::default()
+            });
+            let id = SinkId::new("route-bench").unwrap();
+            let definition = SinkDefinition::bounded(
+                id.clone(),
+                SinkDeliveryMode::ConfirmedRequired,
+                Arc::new(Ack),
+                &limits,
+            );
+            let mut routes = vec![RouteDefinition {
+                tenant: None,
+                sinks: vec![id.clone()],
+            }];
+            routes.extend((1..count).map(|index| RouteDefinition {
+                tenant: Some(TenantId::new(format!("tenant-{index}")).unwrap()),
+                sinks: vec![id.clone()],
+            }));
+            let bus = EventBus::new_paused(
+                limits,
+                Arc::new(Metrics::default()),
+                vec![definition.clone()],
+                routes,
+                1,
+            )
+            .unwrap();
+            crate::hotspot_bench::measure(
+                "route_publish",
+                count,
+                4_000,
+                || event(64),
+                |event| bus.publish(event).unwrap(),
+                |_| {
+                    let record = bus.take_ready(&id).unwrap().unwrap();
+                    bus.complete(&id, record, Ok(SinkAck), &definition).unwrap();
+                },
+            );
+        }
+    }
+
     #[tokio::test]
     async fn paused_restore_does_not_deliver_and_owned_worker_drop_cleans_up() {
         let limits = Arc::new(Limits::default());
@@ -1177,7 +1421,7 @@ mod tests {
             let state = bus.state.lock().unwrap();
             for id in ["a", "b"] {
                 let sink = &state.sinks[&SinkId::new(id).unwrap()];
-                assert_eq!((sink.used_count, sink.queue.len()), (1, 1));
+                assert_eq!((sink.used_count, sink.ready.len()), (1, 1));
                 assert_eq!(sink.used_bytes, before.bytes);
             }
         }
@@ -1265,7 +1509,11 @@ mod tests {
                 accepted.push(index + 100);
             }
             for sink in bus.state.lock().unwrap().sinks.values() {
-                if sink.used_count != 0 || sink.used_bytes != 0 || !sink.queue.is_empty() {
+                if sink.used_count != 0
+                    || sink.used_bytes != 0
+                    || !sink.ready.is_empty()
+                    || !sink.delayed.is_empty()
+                {
                     accepted.push(index + 200);
                 }
             }
@@ -1402,7 +1650,8 @@ mod tests {
             assert!(state.sinks.values().all(|sink| sink.used_count == 0
                 && sink.used_bytes == 0
                 && sink.inflight == 0
-                && sink.queue.is_empty()));
+                && sink.ready.is_empty()
+                && sink.delayed.is_empty()));
         }
     }
 
@@ -1439,8 +1688,13 @@ mod tests {
             }
             {
                 let mut state = bus.state.lock().unwrap();
-                for record in &mut state.sinks.get_mut(&id).unwrap().queue {
-                    record.next_attempt = Instant::now() + Duration::from_secs(3_600);
+                let sink = state.sinks.get_mut(&id).unwrap();
+                for mut record in sink.ready.drain(..) {
+                    record.next_attempt = Instant::now() + Duration::from_secs(3600);
+                    sink.delayed
+                        .entry(record.next_attempt)
+                        .or_default()
+                        .push_back(record);
                 }
             }
             let mut take_ns = Vec::new();
@@ -1514,7 +1768,7 @@ mod tests {
         .unwrap();
         assert!(matches!(bus.publish(event(8)), Err(Error::Overloaded)));
         let state = bus.state.lock().unwrap();
-        assert!(state.sinks.get(&second).unwrap().queue.is_empty());
+        assert!(state.sinks.get(&second).unwrap().ready.is_empty());
         assert!(state.active.is_empty());
     }
 
@@ -1648,7 +1902,7 @@ mod tests {
                                 sink.used_count,
                                 sink.used_bytes,
                                 sink.inflight,
-                                sink.queue.len(),
+                                sink.ready.len(),
                             )
                         })
                         .collect::<Vec<_>>()
@@ -2108,5 +2362,216 @@ mod tests {
         );
         assert_eq!(bus.usage().unwrap(), EventBusUsage::default());
         bus.stop_workers().await.unwrap();
+    }
+    #[test]
+    fn ready_deliveries_are_fifo_and_release_all_accounting() {
+        let bus = route_bus(Limits::default(), vec![route(None, &["a"])]).unwrap();
+        let id = SinkId::new("a").unwrap();
+        let definition = bus.state.lock().unwrap().sinks[&id].definition.clone();
+        let events = [
+            named_event("first"),
+            named_event("second"),
+            named_event("third"),
+        ];
+        let ids = events.each_ref().map(|event| event.event_id);
+        for event in events {
+            bus.publish(event).unwrap();
+        }
+        for expected in ids {
+            let record = bus.take_ready(&id).unwrap().unwrap();
+            assert_eq!(record.event.event_id, expected);
+            bus.complete(&id, record, Ok(SinkAck), &definition).unwrap();
+        }
+        assert!(bus.take_ready(&id).unwrap().is_none());
+        assert_eq!(bus.usage().unwrap(), EventBusUsage::default());
+    }
+
+    #[tokio::test]
+    async fn delayed_same_deadline_fifo_survives_shutdown_and_spooling() {
+        let bus = route_bus(Limits::default(), vec![route(None, &["a"])]).unwrap();
+        let id = SinkId::new("a").unwrap();
+        let definition = bus.state.lock().unwrap().sinks[&id].definition.clone();
+        let events = [named_event("retry-first"), named_event("retry-second")];
+        let ids = events.each_ref().map(|event| event.event_id);
+        for event in events {
+            bus.publish(event).unwrap();
+        }
+        for _ in 0..2 {
+            let record = bus.take_ready(&id).unwrap().unwrap();
+            bus.complete(&id, record, Err(SinkError::Retryable), &definition)
+                .unwrap();
+        }
+        let bytes = bus.usage().unwrap().bytes;
+        {
+            let mut state = bus.state.lock().unwrap();
+            let sink = state.sinks.get_mut(&id).unwrap();
+            let mut records = std::mem::take(&mut sink.delayed)
+                .into_values()
+                .flatten()
+                .collect::<Vec<_>>();
+            let future = Instant::now() + Duration::from_secs(60);
+            for expected in ids {
+                let position = records
+                    .iter()
+                    .position(|record| record.event.event_id == expected)
+                    .unwrap();
+                let mut record = records.remove(position);
+                record.next_attempt = future;
+                sink.delayed.entry(future).or_default().push_back(record);
+            }
+            assert!(sink.ready.is_empty());
+            assert_eq!(sink.delayed.len(), 1);
+            assert_eq!(sink.delayed[&future].len(), 2);
+            assert_eq!(sink.used_count, 2);
+            assert_eq!(
+                sink.used_bytes,
+                sink.delayed[&future].iter().map(|r| r.bytes).sum::<usize>()
+            );
+        }
+        assert!(bus.take_ready(&id).unwrap().is_none());
+        assert!(bus.next_ready_delay(&id).unwrap().unwrap() > Duration::ZERO);
+        let ready = named_event("later-ready");
+        let ready_id = ready.event_id;
+        bus.publish(ready).unwrap();
+        let record = bus.take_ready(&id).unwrap().unwrap();
+        assert_eq!(record.event.event_id, ready_id);
+        bus.complete(&id, record, Ok(SinkAck), &definition).unwrap();
+        bus.close_admission().unwrap();
+        bus.stop_workers().await.unwrap();
+        let spooled = bus.spool_records().unwrap();
+        assert_eq!(spooled.len(), 2);
+        assert!(spooled.iter().all(|record| record.pending_sinks == vec![id.clone()] && record.attempts[&id] == 1));
+        assert_eq!(bus.usage().unwrap().bytes, bytes);
+        {
+            let mut state = bus.state.lock().unwrap();
+            let sink = state.sinks.get_mut(&id).unwrap();
+            let (_, mut records) = sink.delayed.pop_first().unwrap();
+            let due = Instant::now();
+            for record in &mut records {
+                record.next_attempt = due;
+            }
+            sink.delayed.insert(due, records);
+        }
+        assert_eq!(bus.next_ready_delay(&id).unwrap(), Some(Duration::ZERO));
+        for expected in ids {
+            let record = bus.take_ready(&id).unwrap().unwrap();
+            assert_eq!(record.event.event_id, expected);
+            assert_eq!(record.attempt, 1);
+            bus.complete(&id, record, Ok(SinkAck), &definition).unwrap();
+        }
+        assert_eq!(bus.next_ready_delay(&id).unwrap(), None);
+        assert_eq!(bus.usage().unwrap(), EventBusUsage::default());
+        assert!(bus.spool_records().unwrap().is_empty());
+    }
+
+    #[test]
+    #[ignore = "serial release queue benchmark"]
+    fn ready_retry_queue_scaling() {
+        use crate::hotspot_bench::measure;
+        fn metric(text: &str, name: &str) -> f64 {
+            text.lines()
+                .find_map(|line| {
+                    line.strip_prefix(name)
+                        .and_then(|value| value.trim().parse().ok())
+                })
+                .unwrap()
+        }
+        for depth in [0, 100, 1000, 4096] {
+            for retry_percent in [0, 10, 50] {
+                let memory = stats_alloc::Region::new(&stats_alloc::INSTRUMENTED_SYSTEM);
+                let limits = Arc::new(Limits {
+                    sink_queue_max_count: 5000,
+                    ..Limits::default()
+                });
+                let id = SinkId::new("queue").unwrap();
+                let metrics = Arc::new(Metrics::with_lock_timing());
+                let definition = SinkDefinition::bounded(
+                    id.clone(),
+                    SinkDeliveryMode::ConfirmedRequired,
+                    Arc::new(Ack),
+                    &limits,
+                );
+                let bus = EventBus::new_paused(
+                    limits,
+                    metrics.clone(),
+                    vec![definition],
+                    vec![RouteDefinition {
+                        tenant: None,
+                        sinks: vec![id.clone()],
+                    }],
+                    1,
+                )
+                .unwrap();
+                for _ in 0..depth {
+                    bus.publish(event(8)).unwrap();
+                }
+                {
+                    let mut state = bus.state.lock().unwrap();
+                    let sink = state.sinks.get_mut(&id).unwrap();
+                    for _ in 0..depth * retry_percent / 100 {
+                        let mut record = sink.ready.pop_front().unwrap();
+                        record.next_attempt = Instant::now() + Duration::from_secs(3600);
+                        sink.delayed
+                            .entry(record.next_attempt)
+                            .or_default()
+                            .push_back(record);
+                    }
+                }
+                let heap = memory.change();
+                println!(
+                    "EVENT_QUEUE_MEMORY,{depth},{retry_percent},{}",
+                    heap.bytes_allocated as i128 - heap.bytes_deallocated as i128
+                );
+                let name = format!("dequeue_retry{retry_percent}");
+                let before = metrics.render();
+                measure(
+                    &name,
+                    depth,
+                    2000,
+                    || (),
+                    |_| bus.take_ready(&id).unwrap(),
+                    |record| {
+                        if let Some(mut record) = record {
+                            record.next_attempt = Instant::now();
+                            let mut state = bus.state.lock().unwrap();
+                            let sink = state.sinks.get_mut(&id).unwrap();
+                            sink.inflight -= 1;
+                            sink.ready.push_back(record);
+                        }
+                    },
+                );
+                let after = metrics.render();
+                for (site, label) in [
+                    ("take_ready", name),
+                    ("next_ready_delay", format!("deadline_retry{retry_percent}")),
+                ] {
+                    let (start, finish) = if site == "next_ready_delay" {
+                        let before = metrics.render();
+                        measure(
+                            &label,
+                            depth,
+                            2000,
+                            || (),
+                            |_| bus.next_ready_delay(&id).unwrap(),
+                            |_| {},
+                        );
+                        (before, metrics.render())
+                    } else {
+                        (before.clone(), after.clone())
+                    };
+                    let count_name = format!("netbaiot_event_bus_site_{site}_hold_ns_count");
+                    let count = metric(&finish, &count_name) - metric(&start, &count_name);
+                    let wait_name = format!("netbaiot_event_bus_site_{site}_wait_ns_sum");
+                    let hold_name = format!("netbaiot_event_bus_site_{site}_hold_ns_sum");
+                    let wait = metric(&finish, &wait_name) - metric(&start, &wait_name);
+                    let hold = metric(&finish, &hold_name) - metric(&start, &hold_name);
+                    println!(
+                        "EVENT_QUEUE_LOCK,{label},{depth},{count},{:.3},{:.3}",
+                        wait / count,
+                        hold / count
+                    );
+                }
+            }
+        }
     }
 }

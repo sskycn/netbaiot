@@ -221,7 +221,7 @@ fn main() {
         .unwrap();
     let qos1_message = BrokerMessage {
         topic: down.clone(),
-        payload: vec![7; 128],
+        payload: vec![7; 128].into(),
         qos: 1,
         retain: false,
         properties: Default::default(),
@@ -242,7 +242,7 @@ fn main() {
     let qos2_attachment = qos2.attach(&auth, "qos2-bench".into(), false).unwrap();
     let qos2_message = BrokerMessage {
         topic: up.clone(),
-        payload: vec![9; 128],
+        payload: vec![9; 128].into(),
         qos: 2,
         retain: false,
         properties: Default::default(),
@@ -461,7 +461,7 @@ fn main() {
                     &auth.device_key,
                     BrokerMessage {
                         topic: format!("bench/retained/{i}"),
-                        payload: vec![b'x'; 64],
+                        payload: vec![b'x'; 64].into(),
                         qos: 1,
                         retain: true,
                         properties: Default::default(),
@@ -502,7 +502,7 @@ fn main() {
                 &auth.device_key,
                 BrokerMessage {
                     topic: down.clone(),
-                    payload: payload.clone(),
+                    payload: payload.clone().into(),
                     qos: 1,
                     retain: false,
                     properties: Default::default(),
@@ -524,7 +524,7 @@ fn main() {
                 &auth.device_key,
                 BrokerMessage {
                     topic: down.clone(),
-                    payload: payload.clone(),
+                    payload: payload.clone().into(),
                     qos: 1,
                     retain: false,
                     properties: Default::default(),
@@ -547,7 +547,7 @@ fn main() {
                 &auth.device_key,
                 BrokerMessage {
                     topic: down.clone(),
-                    payload: payload.clone(),
+                    payload: payload.clone().into(),
                     qos: 2,
                     retain: false,
                     properties: Default::default(),
@@ -569,7 +569,7 @@ fn main() {
                 1,
                 BrokerMessage {
                     topic: up.clone(),
-                    payload,
+                    payload: payload.into(),
                     qos: 2,
                     retain: false,
                     properties: Default::default(),

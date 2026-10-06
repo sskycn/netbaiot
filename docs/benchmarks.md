@@ -5,6 +5,16 @@ experiments. They are evidence for the stated setup only. Several measurements
 belong to historical commits and must not be read as capacity for the current
 revision or a production deployment.
 
+## Engineering hotspot campaign
+
+The [engineering optimization report](performance/engineering-hotspots/report.md)
+records route correctness, presence/rate-table complexity, MQTT borrowing/shared
+payloads, EventBus ready/deadline queues, session scan evaluation, and a physical
+broker module split. It includes release A/B matrices, allocation/lock/RSS data,
+MQTT/UDP and timeout/recovery checks, and an explicit list of unrun work. The
+fixed-load measurements are regression evidence for that setup, not production
+capacity. Session usage and expiry scans remain unchanged after evaluation.
+
 ## Published baseline context
 
 The primary historical MQTT baseline identifies this setup:
