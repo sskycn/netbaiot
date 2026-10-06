@@ -2,6 +2,7 @@ use clap::{Parser, Subcommand, ValueEnum};
 use std::{
     collections::{BTreeMap, BTreeSet},
     fs,
+    io::Read,
     path::{Component, Path, PathBuf},
     process::{Command, ExitCode},
 };
@@ -161,10 +162,11 @@ fn check_evidence_files(
     excerpt_limit: u64,
 ) -> Result<(), String> {
     let allowlist_path = performance_dir.join("evidence-allowlist.json");
-    let allowlist_bytes = fs::read(&allowlist_path)
-        .map_err(|_| "missing docs/performance/evidence-allowlist.json".to_owned())?;
-    let allowlist: serde_json::Value = serde_json::from_slice(&allowlist_bytes)
-        .map_err(|error| format!("invalid evidence allowlist JSON: {error}"))?;
+    let allowlist_file =
+        read_evidence_file(&allowlist_path, "evidence-allowlist.json", file_limit)?;
+    let allowlist: serde_json::Value =
+        serde_json::from_slice(&allowlist_file.text.unwrap_or_default())
+            .map_err(|error| format!("invalid evidence allowlist JSON: {error}"))?;
     if allowlist.get("version").and_then(serde_json::Value::as_u64) != Some(1) {
         return Err("evidence allowlist must declare version 1".into());
     }
@@ -225,6 +227,7 @@ fn check_evidence_files(
     }
 
     let mut total_bytes = 0_u64;
+    let mut total_physical_bytes = 0_u64;
     let mut file_count = 0_usize;
     let mut seen_allowlist = BTreeSet::new();
     for path in paths {
@@ -248,13 +251,23 @@ fn check_evidence_files(
             ));
         }
         file_count += 1;
-        let size = metadata.len();
+        let evidence = read_evidence_file(&path, &relative, file_limit)?;
+        let size = evidence.logical_size;
+        let sizes = format!(
+            "{size} canonical logical bytes ({} physical bytes)",
+            evidence.physical_size
+        );
         total_bytes = total_bytes
             .checked_add(size)
             .ok_or_else(|| format!("performance evidence byte count overflow at {relative}"))?;
+        total_physical_bytes = total_physical_bytes
+            .checked_add(evidence.physical_size)
+            .ok_or_else(|| {
+                format!("performance evidence physical byte count overflow at {relative}")
+            })?;
         if size > file_limit {
             return Err(format!(
-                "performance evidence file {relative} is {size} bytes; limit is {file_limit}. Raw benchmark evidence belongs in GitHub Actions artifacts; commit only summary/manifest."
+                "performance evidence file {relative} is {sizes}; limit is {file_limit}. Raw benchmark evidence belongs in GitHub Actions artifacts; commit only summary/manifest."
             ));
         }
 
@@ -267,7 +280,7 @@ fn check_evidence_files(
             };
             if size > *allowed_max {
                 return Err(format!(
-                    "performance evidence excerpt {relative} is {size} bytes; allowlist limit is {allowed_max}"
+                    "performance evidence excerpt {relative} is {sizes}; allowlist limit is {allowed_max}"
                 ));
             }
             seen_allowlist.insert(relative.clone());
@@ -279,13 +292,13 @@ fn check_evidence_files(
             }
             if size <= EVIDENCE_SUMMARY_LIMIT {
                 return Err(format!(
-                    "summary allowlist entry {relative} is unnecessary at {size} bytes; limit is {EVIDENCE_SUMMARY_LIMIT}"
+                    "summary allowlist entry {relative} is unnecessary at {sizes}; limit is {EVIDENCE_SUMMARY_LIMIT}"
                 ));
             }
             let allowed_max = allowed.get(&relative).copied().unwrap_or_default();
             if size > allowed_max {
                 return Err(format!(
-                    "allowlisted summary {relative} is {size} bytes; allowlist limit is {allowed_max}"
+                    "allowlisted summary {relative} is {sizes}; allowlist limit is {allowed_max}"
                 ));
             }
             seen_allowlist.insert(relative.clone());
@@ -294,7 +307,7 @@ fn check_evidence_files(
             && size > EVIDENCE_SUMMARY_LIMIT
         {
             return Err(format!(
-                "summary JSON {relative} is {size} bytes; ordinary summary limit is {EVIDENCE_SUMMARY_LIMIT}; add a justified evidence-allowlist.json entry or compact it"
+                "summary JSON {relative} is {sizes}; ordinary summary limit is {EVIDENCE_SUMMARY_LIMIT}; add a justified evidence-allowlist.json entry or compact it"
             ));
         }
 
@@ -308,17 +321,16 @@ fn check_evidence_files(
             || lower.ends_with(".csv");
         if raw_extension || (lower.ends_with(".log") && !is_excerpt) {
             return Err(format!(
-                "raw evidence file {relative} is {size} bytes; file limit is {file_limit}. It is not permitted in docs/performance; write it under target/performance or target/evidence and upload it as a workflow artifact"
+                "raw evidence file {relative} is {sizes}; file limit is {file_limit}. It is not permitted in docs/performance; write it under target/performance or target/evidence and upload it as a workflow artifact"
             ));
         }
         if lower.ends_with(".json") {
-            let bytes = fs::read(&path)
-                .map_err(|error| format!("cannot read evidence JSON {relative}: {error}"))?;
+            let bytes = evidence.text.unwrap_or_default();
             let value: serde_json::Value = serde_json::from_slice(&bytes)
                 .map_err(|error| format!("invalid evidence JSON {relative}: {error}"))?;
             if let Some((field, count)) = raw_sample_array(&value, "$") {
                 return Err(format!(
-                    "raw sample array {field} ({count} entries) is in {relative} ({size} bytes; file limit {file_limit}); summarize it and retain raw data as a workflow artifact"
+                    "raw sample array {field} ({count} entries) is in {relative} ({sizes}; file limit {file_limit}); summarize it and retain raw data as a workflow artifact"
                 ));
             }
             if let Some((field, string_bytes)) =
@@ -332,7 +344,7 @@ fn check_evidence_files(
     }
     if total_bytes > total_limit {
         return Err(format!(
-            "docs/performance contains {total_bytes} bytes; total limit is {total_limit}. Keep methods and summaries in Git; move raw evidence to workflow artifacts."
+            "docs/performance contains {total_bytes} canonical logical bytes ({total_physical_bytes} physical bytes); total limit is {total_limit}. Keep methods and summaries in Git; move raw evidence to workflow artifacts."
         ));
     }
     if let Some(unused) = allowed.keys().find(|path| !seen_allowlist.contains(*path)) {
@@ -341,9 +353,76 @@ fn check_evidence_files(
         ));
     }
     println!(
-        "PASS performance evidence budget: {file_count} files, {total_bytes} bytes (file limit {file_limit}, total limit {total_limit})"
+        "PASS performance evidence budget: {file_count} files, {total_bytes} canonical logical bytes ({total_physical_bytes} physical bytes; file limit {file_limit}, total limit {total_limit})"
     );
     Ok(())
+}
+
+struct EvidenceFile {
+    physical_size: u64,
+    logical_size: u64,
+    text: Option<Vec<u8>>,
+}
+
+fn read_evidence_file(
+    path: &Path,
+    relative: &str,
+    file_limit: u64,
+) -> Result<EvidenceFile, String> {
+    let lower = relative.to_ascii_lowercase();
+    let textual = [".json", ".md", ".excerpt.log", ".txt"]
+        .iter()
+        .any(|extension| lower.ends_with(extension));
+    // CRLF can at most double LF text. This bounds reads independently of the
+    // logical budget, without treating unknown/binary formats as text.
+    let physical_limit = if textual {
+        file_limit
+            .checked_mul(2)
+            .ok_or("evidence physical limit overflow")?
+    } else {
+        file_limit
+    };
+    let metadata = fs::symlink_metadata(path)
+        .map_err(|error| format!("cannot inspect evidence file {relative}: {error}"))?;
+    if metadata.file_type().is_symlink() || !metadata.is_file() {
+        return Err(format!(
+            "unsupported evidence entry {relative}; only regular files are allowed"
+        ));
+    }
+    let mut physical_size = metadata.len();
+    if physical_size > physical_limit {
+        return Err(format!(
+            "performance evidence file {relative} is {physical_size} physical bytes; physical safety limit is {physical_limit} (canonical logical bytes not computed; file limit {file_limit})"
+        ));
+    }
+    if !textual {
+        return Ok(EvidenceFile {
+            physical_size,
+            logical_size: physical_size,
+            text: None,
+        });
+    }
+    let mut bytes = Vec::new();
+    fs::File::open(path)
+        .and_then(|file| {
+            file.take(physical_limit.saturating_add(1))
+                .read_to_end(&mut bytes)
+        })
+        .map_err(|error| format!("cannot read evidence text {relative}: {error}"))?;
+    physical_size = bytes.len() as u64;
+    if physical_size > physical_limit {
+        return Err(format!(
+            "evidence text {relative} grew beyond physical safety limit {physical_limit}"
+        ));
+    }
+    std::str::from_utf8(&bytes)
+        .map_err(|error| format!("invalid UTF-8 evidence text {relative}: {error}"))?;
+    let crlf_count = bytes.windows(2).filter(|pair| *pair == b"\r\n").count() as u64;
+    Ok(EvidenceFile {
+        physical_size,
+        logical_size: physical_size - crlf_count,
+        text: Some(bytes),
+    })
 }
 
 fn raw_sample_array(value: &serde_json::Value, path: &str) -> Option<(String, usize)> {
@@ -775,6 +854,200 @@ mod tests {
         std::iter::once(directory.join("evidence-allowlist.json"))
             .chain(names.iter().map(|name| directory.join(name)))
             .collect()
+    }
+
+    fn check_line_endings(
+        directory: &Path,
+        name: &str,
+        contents: &str,
+        file_limit: u64,
+        total_limit: u64,
+        expected_error: Option<&str>,
+    ) {
+        for text in [contents.to_owned(), contents.replace('\n', "\r\n")] {
+            fs::write(directory.join(name), text).unwrap();
+            let result = check_evidence_files(
+                directory,
+                evidence_paths(directory, &[name]),
+                file_limit,
+                total_limit,
+                EVIDENCE_EXCERPT_LIMIT,
+            );
+            if let Some(expected) = expected_error {
+                let error = result.unwrap_err();
+                assert!(error.contains(expected), "{error}");
+                assert!(error.contains("physical bytes"), "{error}");
+            } else {
+                assert!(result.is_ok(), "{result:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn evidence_summary_budget_is_independent_of_line_endings() {
+        let directory = evidence_test_dir("summary-line-endings");
+        check_line_endings(
+            &directory,
+            "summary.json",
+            "{\n\"median\":12.5\n}\n",
+            EVIDENCE_FILE_LIMIT,
+            EVIDENCE_TOTAL_LIMIT,
+            None,
+        );
+        let near_limit = format!(
+            "{{\n\"median\":1{}\n}}\n",
+            "\n".repeat(EVIDENCE_SUMMARY_LIMIT as usize - 128)
+        );
+        assert!(near_limit.len() < EVIDENCE_SUMMARY_LIMIT as usize);
+        assert!(near_limit.replace('\n', "\r\n").len() > EVIDENCE_SUMMARY_LIMIT as usize);
+        check_line_endings(
+            &directory,
+            "summary.json",
+            &near_limit,
+            EVIDENCE_FILE_LIMIT,
+            EVIDENCE_TOTAL_LIMIT,
+            None,
+        );
+        let too_large = format!(
+            "{{\n\"median\":1{}\n}}\n",
+            "\n".repeat(EVIDENCE_SUMMARY_LIMIT as usize)
+        );
+        check_line_endings(
+            &directory,
+            "summary.json",
+            &too_large,
+            EVIDENCE_FILE_LIMIT,
+            EVIDENCE_TOTAL_LIMIT,
+            Some("ordinary summary limit"),
+        );
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn evidence_allowlisted_summary_and_excerpt_use_canonical_bytes() {
+        for (name, contents) in [
+            (
+                "large.json",
+                format!(
+                    "{{\n\"median\":1{}\n}}\n",
+                    "\n".repeat(EVIDENCE_SUMMARY_LIMIT as usize)
+                ),
+            ),
+            ("failure.excerpt.log", "assertion failed\n".repeat(2048)),
+        ] {
+            let directory = evidence_test_dir("allowlist-line-endings");
+            fs::write(directory.join("evidence-allowlist.json"), format!(
+                "{{\n\"version\":1,\n\"allowlist\":[{{\"path\":\"{name}\",\"max_bytes\":{},\"reason\":\"bounded regression evidence\"}}]\n}}\n", contents.len()
+            )).unwrap();
+            check_line_endings(
+                &directory,
+                name,
+                &contents,
+                EVIDENCE_FILE_LIMIT,
+                EVIDENCE_TOTAL_LIMIT,
+                None,
+            );
+            check_line_endings(
+                &directory,
+                name,
+                &format!("{contents}\n"),
+                EVIDENCE_FILE_LIMIT,
+                EVIDENCE_TOTAL_LIMIT,
+                Some("allowlist limit"),
+            );
+            fs::remove_dir_all(directory).unwrap();
+        }
+    }
+
+    #[test]
+    fn evidence_file_and_total_limits_use_canonical_text_bytes() {
+        let directory = evidence_test_dir("file-total-line-endings");
+        let allowlist = "{\n\"version\":1,\n\"allowlist\":[]\n}\n";
+        let contents = "method\n".repeat(18);
+        let total = (allowlist.len() + contents.len()) as u64;
+        for text in [allowlist.to_owned(), allowlist.replace('\n', "\r\n")] {
+            fs::write(directory.join("evidence-allowlist.json"), text).unwrap();
+            check_line_endings(&directory, "method.md", &contents, 128, total, None);
+            check_line_endings(
+                &directory,
+                "method.md",
+                &contents,
+                128,
+                total - 1,
+                Some("total limit"),
+            );
+        }
+        check_line_endings(
+            &directory,
+            "method.md",
+            &format!("{}\n", "x".repeat(128)),
+            128,
+            EVIDENCE_TOTAL_LIMIT,
+            Some("limit is 128"),
+        );
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn evidence_unknown_formats_are_raw_and_text_must_be_utf8() {
+        let directory = evidence_test_dir("raw-and-utf8");
+        let path = directory.join("fixture.bin");
+        fs::write(&path, b"\r\n\xff\r\n").unwrap();
+        let evidence = read_evidence_file(&path, "fixture.bin", 128).unwrap();
+        assert_eq!(evidence.logical_size, 5);
+        let allowlist_size = fs::metadata(directory.join("evidence-allowlist.json"))
+            .unwrap()
+            .len();
+        let result = check_evidence_files(
+            &directory,
+            evidence_paths(&directory, &["fixture.bin"]),
+            128,
+            allowlist_size + 4,
+            EVIDENCE_EXCERPT_LIMIT,
+        );
+        assert!(result.unwrap_err().contains("total limit"));
+        check_line_endings(
+            &directory,
+            "raw.log",
+            "raw output\n",
+            128,
+            EVIDENCE_TOTAL_LIMIT,
+            Some("not permitted"),
+        );
+        for name in [
+            "invalid.json",
+            "invalid.md",
+            "invalid.excerpt.log",
+            "invalid.txt",
+            "evidence-allowlist.json",
+        ] {
+            fs::write(directory.join(name), b"\xff\r\n").unwrap();
+            let result = check_evidence_files(
+                &directory,
+                evidence_paths(&directory, &[name]),
+                EVIDENCE_FILE_LIMIT,
+                EVIDENCE_TOTAL_LIMIT,
+                EVIDENCE_EXCERPT_LIMIT,
+            );
+            let error = result.unwrap_err();
+            assert!(error.contains("invalid UTF-8"), "{error}");
+            assert!(error.contains(name), "{error}");
+        }
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn evidence_canonical_size_preserves_lone_cr_and_bounds_physical_reads() {
+        let directory = evidence_test_dir("physical-limit");
+        let path = directory.join("method.md");
+        fs::write(&path, b"a\rb\r\nc\n").unwrap();
+        let evidence = read_evidence_file(&path, "method.md", 128).unwrap();
+        assert_eq!(evidence.physical_size, 7);
+        assert_eq!(evidence.logical_size, 6);
+        fs::write(&path, "\n".repeat(257)).unwrap();
+        let error = read_evidence_file(&path, "method.md", 128).err().unwrap();
+        assert!(error.contains("physical safety limit is 256"), "{error}");
+        fs::remove_dir_all(directory).unwrap();
     }
 
     #[test]

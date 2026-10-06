@@ -1,2 +1,5 @@
 docs/schema/*.json text eol=lf
 docs/configuration-fields.md text eol=lf
+docs/performance/**/*.json text eol=lf
+docs/performance/**/*.md text eol=lf
+docs/performance/**/*.excerpt.log text eol=lf
