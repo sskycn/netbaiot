@@ -165,6 +165,14 @@ macOS arm64本阶段上述本地检查全部实际PASS，包含host archive。�
 
 修复后完整stable/Rust1.88检查均PASS，各435 passed、0 failed、16 ignored，包含fmt和严格clippy；[命令/耗时/原始日志摘要](performance/developer-experience/evidence/post-merge-v3-close-validation.json)和执行摘录已保存，preflight/source manifest也PASS。修复后main原生CI由最终交付记录补充；[修复后的源码指纹](performance/developer-experience/evidence/post-merge-v3-close-source-manifest.json)与原f9e1047证据分别保留。未改decoder；原main decoder fuzz smoke已实际通过。未重跑长负载、硬件I/O或Windows控制台Ctrl-C，不新增容量或硬件故障覆盖结论。
 
+## 合并后的重启夹具修正
+
+V3修复合并后的main `74824ba81da81740cfe7e3f1e61bf1ae10e886a2`通过Rust/release gate及三平台DX；原生恢复的Linux/macOS均PASS，Windows两项在5秒子进程readiness等待中Elapsed，尚未进入恢复断言。[该次CI及artifact证据](performance/developer-experience/evidence/post-merge-windows-restart-evidence.json)保留；原helper丢弃stderr，因此没有当次具体启动失败原因，不能断言是UDP冲突或生产恢复逻辑错误。
+
+该测试文件的通用free_address仍只探测TCP，但真实ingress同时绑定UDP；readiness还以20毫秒周期探测，可能超过默认管理请求率。现在最多32次配对探测TCP/UDP，探测间隔100毫秒，原5秒总期限不变。subprocess的stderr写入fixture文件；等待同时观察child退出，失败时仅读取最多16KiB日志，保留正常退出/回放event_id/QoS阶段/快照替换/失败保持存活等原断言。不增加启动重试，不修改生产逻辑或limits；端口交接仍存在外部进程抢占窗口，诊断会显式报告。
+
+本地5项subprocess专项PASS，另选中原ignored的60秒soak实际PASS，包含12个健康代及此前的恢复阶段，整条命令耗时65.16秒。完整Rust1.88/stable均PASS，各435 passed、0 failed、16 ignored，包含fmt和严格clippy；[验证记录](performance/developer-experience/evidence/post-merge-restart-fixture-validation.json)及[源码指纹](performance/developer-experience/evidence/post-merge-restart-fixture-source-manifest.json)已保存。最终main CI由最终交付记录补充；原V3修复证据和两轮main失败均保留，不能称失败run为PASS。
+
 ## git diff --stat
 
 实现提交相对9ea710d（不含庞大的脱敏执行日志）：

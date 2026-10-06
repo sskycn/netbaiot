@@ -9,3 +9,5 @@
 最终代码提交f9e1047的三平台原生与常规CI全部PASS。[最终CI证据](phase2-final-ci-verification.json)记录确切SHA、job结果、平台计数、官方artifact ZIP摘要和原始日志摘要；各ZIP均已核对官方SHA256，每个平台实际CLI及schema/reference drift检查均PASS。Linux/macOS各433 passed、Windows430 passed，均0 failed/16 ignored。历史失败保留，未用第一阶段绿色替代本阶段结果。详见两个阶段验收报告。
 
 首次合并main后的macOS恢复workflow出现V3连接清理超时，另三个workflow通过；[失败与修复证据](post-merge-v3-close-evidence.json)保留确切main SHA、CI状态、官方artifact摘要及修复前后确定性测试结果。两个取消回归修复前实际FAIL、修复后PASS，原7项真实V3测试全部PASS；不把20次本地原测试通过当成失败CI通过或精确因果证明。post-merge源码指纹单独保存，不重写f9e1047的历史证据。
+
+V3修复合并后的74824ba通过Rust/release gate与三平台DX，恢复workflow的macOS/Linux通过，Windows两项在readiness阶段失败；[证据](post-merge-windows-restart-evidence.json)保留官方artifact摘要和具体失败。重启fixture增加配对TCP/UDP探测、低于管理限流的探测周期及有界child日志诊断，原5秒期限与恢复断言不变；本地专项和实际60秒多代soak通过。未捕获原child stderr，不能虚称已证明当次失败listener。
