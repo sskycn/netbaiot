@@ -42,6 +42,11 @@ fall back to older files. NBSP v1/v2 have only record checksums: a complete-reco
 boundary truncation (or header-only prefix) cannot be detected retrospectively.
 Older releases cannot read v3. Drain and acknowledge v3 work with this version
 before rollback; preserve the entire directory before an upgrade or rollback.
+On Windows an acknowledged empty v3 successor still exists. After stopping the
+gateway, use the current reader to validate that it contains zero pending records,
+then archive that empty file outside the active directory before starting a reader
+that only supports v1/v2. Preserve the full directory backup and MQTT recovery file.
+Never move a nonempty, unreadable or unvalidated snapshot to bypass recovery.
 
 If business processed an event but its ACK was lost, the pending record is replayed
 with the same `event_id`. This can duplicate processing and is why consumers must be
