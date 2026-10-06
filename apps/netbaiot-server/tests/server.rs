@@ -42,6 +42,130 @@ fn config() -> Config {
     serde_json::from_str(include_str!("../../../configs/development.json")).unwrap()
 }
 
+#[test]
+fn startup_failures_and_dropped_run_future_release_owned_tasks() {
+    // Isolated runtime: unrelated parallel tests cannot perturb this task baseline.
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    runtime.block_on(async {
+        let root =
+            std::env::temp_dir().join(format!("netbaiot-startup-owner-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&root).unwrap();
+        let baseline = tokio::runtime::Handle::current()
+            .metrics()
+            .num_alive_tasks();
+        for failure in [
+            "tls",
+            "recovery",
+            "admin",
+            "tcp",
+            "udp",
+            "management",
+            "business",
+            "business-token",
+        ] {
+            for iteration in 0..3 {
+                let mut c = config();
+                c.device_ingress = "127.0.0.1:0".parse().unwrap();
+                c.management_http = "127.0.0.1:0".parse().unwrap();
+                c.spool_directory = root.join(format!("{failure}-{iteration}"));
+                let tcp = TcpListener::bind("127.0.0.1:0").await.unwrap();
+                let udp = tokio::net::UdpSocket::bind("127.0.0.1:0").await.unwrap();
+                let mut admin = Some("a".repeat(64));
+                match failure {
+                    "tls" => {
+                        c.tls = Some(TlsFiles {
+                            certificate: root.join("missing.pem").display().to_string(),
+                            private_key: root.join("missing-key.pem").display().to_string(),
+                        })
+                    }
+                    "recovery" => {
+                        std::fs::create_dir_all(&c.spool_directory).unwrap();
+                        std::fs::write(
+                            c.spool_directory.join("eventbus-recovery.spool"),
+                            b"corrupt",
+                        )
+                        .unwrap();
+                    }
+                    "admin" => admin = Some("too-short".into()),
+                    "tcp" => c.device_ingress = tcp.local_addr().unwrap(),
+                    "udp" => c.device_ingress = udp.local_addr().unwrap(),
+                    "management" => c.management_http = tcp.local_addr().unwrap(),
+                    "business" => c.business_tcp = Some(tcp.local_addr().unwrap()),
+                    "business-token" => c.business_tcp = Some(free_address().await),
+                    _ => unreachable!(),
+                }
+                assert!(
+                    tokio::time::timeout(
+                        Duration::from_secs(3),
+                        netbaiot_server::run_with_credentials(
+                            c,
+                            CancellationToken::new(),
+                            admin,
+                            None
+                        )
+                    )
+                    .await
+                    .unwrap()
+                    .is_err(),
+                    "{failure}"
+                );
+                tokio::time::timeout(Duration::from_secs(1), async {
+                    while tokio::runtime::Handle::current()
+                        .metrics()
+                        .num_alive_tasks()
+                        != baseline
+                    {
+                        tokio::task::yield_now().await;
+                    }
+                })
+                .await
+                .expect("startup failure leaked an owned task");
+            }
+        }
+        // Drop a successfully running composition future, then observe joined/aborted
+        // owners disappearing before listeners and directory ownership are reacquired.
+        let mut c = config();
+        c.device_ingress = free_address().await;
+        c.management_http = free_address().await;
+        c.spool_directory = root.join("cancelled");
+        let address = c.management_http;
+        let device = c.device_ingress;
+        let directory = c.spool_directory.clone();
+        let admin = "b".repeat(64);
+        let mut running = Box::pin(netbaiot_server::run_with_credentials(
+            c,
+            CancellationToken::new(),
+            Some(admin.clone()),
+            None,
+        ));
+        let client = reqwest::Client::builder().no_proxy().build().unwrap();
+        tokio::select! {
+            result = &mut running => panic!("unexpected early exit: {result:?}"),
+            _ = wait_ready(&client, address, &admin) => (),
+        }
+        drop(running);
+        tokio::time::timeout(Duration::from_secs(1), async {
+            while tokio::runtime::Handle::current()
+                .metrics()
+                .num_alive_tasks()
+                != baseline
+            {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .expect("dropped run future leaked an owned task");
+        let _device = TcpListener::bind(device).await.unwrap();
+        let _management = TcpListener::bind(address).await.unwrap();
+        let _owner = netbaiot_runtime::recovery_io::RecoveryDirectory::acquire(&directory).unwrap();
+        drop(_owner);
+        std::fs::remove_dir_all(root).unwrap();
+    });
+}
+
 #[tokio::test]
 async fn legacy_config_ack_spool_blocks_startup_and_preserves_rollback_files() {
     let root =

@@ -799,6 +799,31 @@ pub async fn run(config: Config, stop: CancellationToken) -> Result<()> {
 
 /// Composition entry point for embedded/test hosts that inject secrets without
 /// mutating process-global environment state.
+// Tokio JoinHandle detaches on Drop; run owners must abort instead.
+struct OwnedTask<T>(tokio::task::JoinHandle<T>);
+impl<T> std::future::Future for OwnedTask<T> {
+    type Output = std::result::Result<T, tokio::task::JoinError>;
+    fn poll(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Self::Output> {
+        std::pin::Pin::new(&mut self.0).poll(cx)
+    }
+}
+impl<T> Drop for OwnedTask<T> {
+    fn drop(&mut self) {
+        self.0.abort();
+    }
+}
+struct RunCancellation(Vec<CancellationToken>);
+impl Drop for RunCancellation {
+    fn drop(&mut self) {
+        for token in &self.0 {
+            token.cancel();
+        }
+    }
+}
+
 pub async fn run_with_credentials(
     config: Config,
     stop: CancellationToken,
@@ -942,7 +967,7 @@ pub async fn run_with_credentials(
     let snapshot = bootstrap_snapshot(&config, sink_id)?;
     let control = GatewayControl::empty(limits.clone());
     control.apply(snapshot.clone())?;
-    let events = EventBus::new(
+    let events = EventBus::new_paused(
         limits.clone(),
         metrics.clone(),
         vec![sink_definition],
@@ -1054,84 +1079,12 @@ pub async fn run_with_credentials(
         None
     };
 
-    lifecycle.mark_running()?;
     let work_listeners = CancellationToken::new();
-    let management_listener = CancellationToken::new();
-    let mut work_tasks = JoinSet::new();
-    let maintenance_broker = mqtt_broker.clone();
-    let maintenance_stop = work_listeners.child_token();
-    work_tasks.spawn(async move {
-        let mut interval = tokio::time::interval(Duration::from_secs(1));
-        interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
-        loop {
-            tokio::select! {
-                _ = maintenance_stop.cancelled() => return Ok(()),
-                _ = interval.tick() => maintenance_broker.tick()?,
-            }
-        }
-    });
-    if auth_source == DeviceAuthSource::BusinessRpc {
-        let authority = rpc_registry.as_ref().ok_or(Error::Internal)?.clone();
-        let ingress_for_offline = ingress.clone();
-        let mqtt_for_offline = mqtt_broker.clone();
-        let grace = Duration::from_millis(
-            config
-                .business_rpc
-                .as_ref()
-                .ok_or(Error::Internal)?
-                .max_auth_control_offline_ms,
-        );
-        let offline_stop = work_listeners.child_token();
-        work_tasks.spawn(watch_business_auth_offline(
-            authority.subscribe_status(),
-            grace,
-            offline_stop,
-            move |observed| {
-                let admission = match ingress_for_offline.lifecycle.begin_admission() {
-                    Ok(admission) => admission,
-                    Err(Error::Draining) => return Ok(()),
-                    Err(error) => return Err(error),
-                };
-                if authority
-                    .invalidate_if_offline(observed, || {
-                        let invalidate = AuthInvalidation::All;
-                        ingress_for_offline.invalidate_auth_admitted_with(
-                            &admission,
-                            &invalidate,
-                            || mqtt_for_offline.invalidate_sessions(&invalidate),
-                        )?;
-                        Ok(())
-                    })?
-                    .is_some()
-                {
-                    ingress_for_offline
-                        .metrics
-                        .inc(Metric::BusinessRpcOfflineGraceExpirations);
-                }
-                Ok(())
-            },
-        ));
-    }
-    work_tasks.spawn(serve_device_ingress(
-        device_ingress,
-        base_services.clone(),
-        tls.clone(),
-        work_listeners.child_token(),
-    ));
-    let mut management_task = tokio::spawn(serve_management_http(
-        management_http,
-        base_services.clone(),
-        management_tls,
-        management_listener.child_token(),
-    ));
-    work_tasks.spawn(udp::serve(
-        udp,
-        base_services.clone(),
-        work_listeners.child_token(),
-    ));
     let business_accept_stop = CancellationToken::new();
     let business_connection_stop = CancellationToken::new();
-    let mut business_task = None;
+    let mut business_future: Option<
+        std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>> + Send>>,
+    > = None;
     if let Some((listener, sink)) = business {
         if let Some(rpc) = &config.business_rpc {
             let identity = if let Some(tls) = &rpc.tls {
@@ -1230,7 +1183,7 @@ pub async fn run_with_credentials(
                     return Err(Error::Configuration);
                 }
                 let legacy_hash: [u8; 32] = Sha256::digest(secret.as_bytes()).into();
-                business_task = Some(tokio::spawn(serve_business_mixed(
+                business_future = Some(Box::pin(serve_business_mixed(
                     listener,
                     sink.clone(),
                     legacy_hash,
@@ -1243,7 +1196,7 @@ pub async fn run_with_credentials(
                     ),
                 )));
             } else {
-                business_task = Some(tokio::spawn(business_rpc::serve(
+                business_future = Some(Box::pin(business_rpc::serve(
                     listener,
                     transport,
                     services,
@@ -1254,15 +1207,104 @@ pub async fn run_with_credentials(
         } else {
             let secret = business_stream_token.ok_or(Error::Configuration)?;
             let hash: [u8; 32] = Sha256::digest(secret.as_bytes()).into();
-            work_tasks.spawn(serve_business_stream(
+            business_future = Some(Box::pin(serve_business_stream(
                 listener,
                 sink,
                 hash,
                 limits.clone(),
                 work_listeners.child_token(),
-            ));
+            )));
         }
     }
+    let event_workers = events.start_owned_workers()?;
+    let _run_cancellation = RunCancellation(vec![
+        shutdown.clone(),
+        work_listeners.clone(),
+        business_accept_stop.clone(),
+        business_connection_stop.clone(),
+    ]);
+    lifecycle.mark_running()?;
+    let management_listener = CancellationToken::new();
+    let mut work_tasks = JoinSet::new();
+    let maintenance_broker = mqtt_broker.clone();
+    let maintenance_stop = work_listeners.child_token();
+    work_tasks.spawn(async move {
+        let mut interval = tokio::time::interval(Duration::from_secs(1));
+        interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        loop {
+            tokio::select! {
+                _ = maintenance_stop.cancelled() => return Ok(()),
+                _ = interval.tick() => maintenance_broker.tick()?,
+            }
+        }
+    });
+    if auth_source == DeviceAuthSource::BusinessRpc {
+        let authority = rpc_registry.as_ref().ok_or(Error::Internal)?.clone();
+        let ingress_for_offline = ingress.clone();
+        let mqtt_for_offline = mqtt_broker.clone();
+        let grace = Duration::from_millis(
+            config
+                .business_rpc
+                .as_ref()
+                .ok_or(Error::Internal)?
+                .max_auth_control_offline_ms,
+        );
+        let offline_stop = work_listeners.child_token();
+        work_tasks.spawn(watch_business_auth_offline(
+            authority.subscribe_status(),
+            grace,
+            offline_stop,
+            move |observed| {
+                let admission = match ingress_for_offline.lifecycle.begin_admission() {
+                    Ok(admission) => admission,
+                    Err(Error::Draining) => return Ok(()),
+                    Err(error) => return Err(error),
+                };
+                if authority
+                    .invalidate_if_offline(observed, || {
+                        let invalidate = AuthInvalidation::All;
+                        ingress_for_offline.invalidate_auth_admitted_with(
+                            &admission,
+                            &invalidate,
+                            || mqtt_for_offline.invalidate_sessions(&invalidate),
+                        )?;
+                        Ok(())
+                    })?
+                    .is_some()
+                {
+                    ingress_for_offline
+                        .metrics
+                        .inc(Metric::BusinessRpcOfflineGraceExpirations);
+                }
+                Ok(())
+            },
+        ));
+    }
+    work_tasks.spawn(serve_device_ingress(
+        device_ingress,
+        base_services.clone(),
+        tls.clone(),
+        work_listeners.child_token(),
+    ));
+    let mut management_task = OwnedTask(tokio::spawn(serve_management_http(
+        management_http,
+        base_services.clone(),
+        management_tls,
+        management_listener.child_token(),
+    )));
+    work_tasks.spawn(udp::serve(
+        udp,
+        base_services.clone(),
+        work_listeners.child_token(),
+    ));
+    let mut business_task = if config.business_rpc.is_some() {
+        business_future.map(|future| OwnedTask(tokio::spawn(future)))
+    } else {
+        if let Some(future) = business_future {
+            work_tasks.spawn(future);
+        }
+        None
+    };
     tracing::info!(device_ingress=%device_address,management_http=%config.management_http,business_tcp=?config.business_tcp,"runtime ready");
     let mut management_running = true;
     let failure = tokio::select! {
@@ -1366,6 +1408,7 @@ pub async fn run_with_credentials(
     if management_running {
         let _ = management_task.await;
     }
+    event_workers.shutdown().await?;
     tracing::info!("shutdown complete");
     failure.map_or(Ok(()), Err)
 }

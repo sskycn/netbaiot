@@ -183,6 +183,29 @@ pub struct EventBus {
     workers: Mutex<Vec<tokio::task::JoinHandle<()>>>,
 }
 
+/// Composition owner: normal shutdown joins workers; Drop cancels and aborts as
+/// the fallback when the startup/run future itself is dropped.
+pub struct EventBusWorkers {
+    bus: Arc<EventBus>,
+}
+impl EventBusWorkers {
+    pub async fn shutdown(&self) -> Result<()> {
+        self.bus.stop_workers().await
+    }
+}
+impl Drop for EventBusWorkers {
+    fn drop(&mut self) {
+        self.bus.stop.cancel();
+        let mut workers = match self.bus.workers.lock() {
+            Ok(workers) => workers,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        for worker in workers.drain(..) {
+            worker.abort();
+        }
+    }
+}
+
 impl EventBus {
     fn lock_state(&self, operation: EventBusProbe) -> Result<ProbedState<'_>> {
         let started = self.metrics.lock_timing_enabled().then(Instant::now);
@@ -203,6 +226,19 @@ impl EventBus {
     }
 
     pub fn new(
+        limits: Arc<Limits>,
+        metrics: Arc<Metrics>,
+        definitions: Vec<SinkDefinition>,
+        routes: Vec<RouteDefinition>,
+        routing_revision: u64,
+    ) -> Result<Arc<Self>> {
+        let bus = Self::new_paused(limits, metrics, definitions, routes, routing_revision)?;
+        bus.start_workers()?;
+        Ok(bus)
+    }
+
+    /// Prepare/restore without delivering anything before startup has succeeded.
+    pub fn new_paused(
         limits: Arc<Limits>,
         metrics: Arc<Metrics>,
         definitions: Vec<SinkDefinition>,
@@ -251,8 +287,12 @@ impl EventBus {
             stop: CancellationToken::new(),
             workers: Mutex::new(Vec::new()),
         });
-        bus.start_workers()?;
         Ok(bus)
+    }
+
+    pub fn start_owned_workers(self: &Arc<Self>) -> Result<EventBusWorkers> {
+        self.start_workers()?;
+        Ok(EventBusWorkers { bus: self.clone() })
     }
 
     fn start_workers(self: &Arc<Self>) -> Result<()> {
@@ -263,6 +303,12 @@ impl EventBus {
             .cloned()
             .collect::<Vec<_>>();
         let mut workers = lock(&self.workers)?;
+        if self.stop.is_cancelled() {
+            return Err(Error::Draining);
+        }
+        if !workers.is_empty() {
+            return Err(Error::Conflict);
+        }
         for id in ids {
             let bus = self.clone();
             workers.push(tokio::spawn(async move { bus.run_sink(id).await }));
@@ -598,6 +644,11 @@ impl EventBus {
         let mut inflight = JoinSet::new();
         let mut woke = false;
         loop {
+            if self.stop.is_cancelled() {
+                inflight.abort_all();
+                while inflight.join_next().await.is_some() {}
+                break;
+            }
             let mut took_work = false;
             while inflight.len() < definition.concurrency {
                 let next = self.take_ready(&id);
@@ -973,6 +1024,56 @@ mod tests {
         let mut event = event(1);
         event.source_message_id = SourceMessageId::new(source).unwrap();
         event
+    }
+
+    #[tokio::test]
+    async fn paused_restore_does_not_deliver_and_owned_worker_drop_cleans_up() {
+        let limits = Arc::new(Limits::default());
+        let sink = Arc::new(Signal {
+            calls: AtomicUsize::new(0),
+            block: Some(Arc::new(tokio::sync::Notify::new())),
+        });
+        let id = SinkId::new("a").unwrap();
+        let bus = EventBus::new_paused(
+            limits.clone(),
+            Arc::new(Metrics::default()),
+            vec![SinkDefinition::bounded(
+                id.clone(),
+                SinkDeliveryMode::ConfirmedRequired,
+                sink.clone(),
+                &limits,
+            )],
+            vec![RouteDefinition {
+                tenant: None,
+                sinks: vec![id],
+            }],
+            1,
+        )
+        .unwrap();
+        bus.restore(vec![audit_record()]).unwrap();
+        for _ in 0..10 {
+            tokio::task::yield_now().await;
+        }
+        assert_eq!(sink.calls.load(Ordering::Relaxed), 0);
+        assert!(bus.workers.lock().unwrap().is_empty());
+        let weak = Arc::downgrade(&bus);
+        let owner = bus.start_owned_workers().unwrap();
+        tokio::time::timeout(Duration::from_secs(1), async {
+            while sink.calls.load(Ordering::Relaxed) == 0 {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        drop(owner);
+        drop(bus);
+        tokio::time::timeout(Duration::from_secs(1), async {
+            while weak.upgrade().is_some() {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
     }
 
     async fn audit_bus(limits: Limits) -> Arc<EventBus> {
