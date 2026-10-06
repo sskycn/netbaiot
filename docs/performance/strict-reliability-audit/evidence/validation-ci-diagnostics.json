@@ -1,0 +1,486 @@
+{
+  "started_at": "2026-10-06T04:38:12.815098+00:00",
+  "head": "0d69ef2da7a7bae5fee2c04feec0ee4ed7bf5c4d",
+  "tracked_diff_sha256": "396979b6de294e4f196c7cbcf18e47a3f2ebf38fcf9cce3c180cc3806e9e993b",
+  "results": [
+    {
+      "label": "stable-fmt-ci-diagnostics",
+      "command": [
+        "cargo",
+        "+stable",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.364,
+      "log": "target/strict-audit/stable-fmt-ci-diagnostics.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "stable-clippy-ci-diagnostics",
+      "command": [
+        "cargo",
+        "+stable",
+        "clippy",
+        "--locked",
+        "--workspace",
+        "--all-targets",
+        "--all-features",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.356,
+      "log": "target/strict-audit/stable-clippy-ci-diagnostics.log",
+      "sha256": "00eca589f9336af0947bd0ddd6a920ccb56270424848e5ee4983ab655eac4b68"
+    },
+    {
+      "label": "msrv-fmt-ci-diagnostics",
+      "command": [
+        "cargo",
+        "+1.88.0",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.36,
+      "log": "target/strict-audit/msrv-fmt-ci-diagnostics.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "msrv-clippy-ci-diagnostics",
+      "command": [
+        "cargo",
+        "+1.88.0",
+        "clippy",
+        "--locked",
+        "--workspace",
+        "--all-targets",
+        "--all-features",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.382,
+      "log": "target/strict-audit/msrv-clippy-ci-diagnostics.log",
+      "sha256": "b127ac83625f191c6fa49e906a00be0470daf9bba16fa3e90e22ea3891d8d542"
+    },
+    {
+      "label": "official-client-paired-ports-1",
+      "command": [
+        "cargo",
+        "+1.88.0",
+        "test",
+        "--locked",
+        "-p",
+        "netbaiot-server",
+        "--test",
+        "official_client",
+        "--",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 2.711,
+      "log": "target/strict-audit/official-client-paired-ports-1.log",
+      "sha256": "485a74912cde993667e105b32781b979c9492ed2168c3c16fec0d0bb4d28e5fa"
+    },
+    {
+      "label": "official-client-paired-ports-2",
+      "command": [
+        "cargo",
+        "+1.88.0",
+        "test",
+        "--locked",
+        "-p",
+        "netbaiot-server",
+        "--test",
+        "official_client",
+        "--",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.94,
+      "log": "target/strict-audit/official-client-paired-ports-2.log",
+      "sha256": "f4fc5161a392ddf2cd543c7a68a2c178739643d319521a4ad1d34fb3fc779073"
+    },
+    {
+      "label": "official-client-paired-ports-3",
+      "command": [
+        "cargo",
+        "+1.88.0",
+        "test",
+        "--locked",
+        "-p",
+        "netbaiot-server",
+        "--test",
+        "official_client",
+        "--",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.931,
+      "log": "target/strict-audit/official-client-paired-ports-3.log",
+      "sha256": "34785c66bf4d156179d5ca8154d43fa605cfabaa32bcd684e99676675ba2b6e9"
+    },
+    {
+      "label": "official-client-paired-ports-4",
+      "command": [
+        "cargo",
+        "+1.88.0",
+        "test",
+        "--locked",
+        "-p",
+        "netbaiot-server",
+        "--test",
+        "official_client",
+        "--",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.962,
+      "log": "target/strict-audit/official-client-paired-ports-4.log",
+      "sha256": "dbee976b9e2d47d33b3f26e9bf7e0515c3f539401e1ea21158e71728fabcb43f"
+    },
+    {
+      "label": "official-client-paired-ports-5",
+      "command": [
+        "cargo",
+        "+1.88.0",
+        "test",
+        "--locked",
+        "-p",
+        "netbaiot-server",
+        "--test",
+        "official_client",
+        "--",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.94,
+      "log": "target/strict-audit/official-client-paired-ports-5.log",
+      "sha256": "a5b8c669067dbfffcbcc2239bcffbbc78d2e3368a3f663c36b75333b0f640f69"
+    },
+    {
+      "label": "official-client-paired-ports-6",
+      "command": [
+        "cargo",
+        "+1.88.0",
+        "test",
+        "--locked",
+        "-p",
+        "netbaiot-server",
+        "--test",
+        "official_client",
+        "--",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.926,
+      "log": "target/strict-audit/official-client-paired-ports-6.log",
+      "sha256": "02a488e37f85b4dceec139234da91eca132e8d43f1d8aada5152ca4ec41144ce"
+    },
+    {
+      "label": "official-client-paired-ports-7",
+      "command": [
+        "cargo",
+        "+1.88.0",
+        "test",
+        "--locked",
+        "-p",
+        "netbaiot-server",
+        "--test",
+        "official_client",
+        "--",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.927,
+      "log": "target/strict-audit/official-client-paired-ports-7.log",
+      "sha256": "4f67b3c851a4bc7a0aef5b898bc7dc44fa1d89cd28473abd6ce9614e9aa6db47"
+    },
+    {
+      "label": "official-client-paired-ports-8",
+      "command": [
+        "cargo",
+        "+1.88.0",
+        "test",
+        "--locked",
+        "-p",
+        "netbaiot-server",
+        "--test",
+        "official_client",
+        "--",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.934,
+      "log": "target/strict-audit/official-client-paired-ports-8.log",
+      "sha256": "6330441d8694b9dd6f56f030ac2eabee79d8ce9ccc8f110e6c69212a490354a0"
+    },
+    {
+      "label": "official-client-paired-ports-9",
+      "command": [
+        "cargo",
+        "+1.88.0",
+        "test",
+        "--locked",
+        "-p",
+        "netbaiot-server",
+        "--test",
+        "official_client",
+        "--",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 1.569,
+      "log": "target/strict-audit/official-client-paired-ports-9.log",
+      "sha256": "e137fd72a3254dcb43e3f4ee73772122600441bf8ff393c4e1a68710ad66852c"
+    },
+    {
+      "label": "official-client-paired-ports-10",
+      "command": [
+        "cargo",
+        "+1.88.0",
+        "test",
+        "--locked",
+        "-p",
+        "netbaiot-server",
+        "--test",
+        "official_client",
+        "--",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.941,
+      "log": "target/strict-audit/official-client-paired-ports-10.log",
+      "sha256": "2e3ba9e619bc4637ddca1e99023d29dda879fa48945dbf92098940653908d7b8"
+    },
+    {
+      "label": "official-client-paired-ports-11",
+      "command": [
+        "cargo",
+        "+1.88.0",
+        "test",
+        "--locked",
+        "-p",
+        "netbaiot-server",
+        "--test",
+        "official_client",
+        "--",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.942,
+      "log": "target/strict-audit/official-client-paired-ports-11.log",
+      "sha256": "4ded9d87023ce99ae8a60287ca0fae0756708f344425f4bd787f1273388b1091"
+    },
+    {
+      "label": "official-client-paired-ports-12",
+      "command": [
+        "cargo",
+        "+1.88.0",
+        "test",
+        "--locked",
+        "-p",
+        "netbaiot-server",
+        "--test",
+        "official_client",
+        "--",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.979,
+      "log": "target/strict-audit/official-client-paired-ports-12.log",
+      "sha256": "4464c20c1334b37410a18d05921c7a44f2d76bc966aeafe4f6168e6cbdb863f7"
+    },
+    {
+      "label": "official-client-paired-ports-13",
+      "command": [
+        "cargo",
+        "+1.88.0",
+        "test",
+        "--locked",
+        "-p",
+        "netbaiot-server",
+        "--test",
+        "official_client",
+        "--",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.944,
+      "log": "target/strict-audit/official-client-paired-ports-13.log",
+      "sha256": "dbd151b0ba770ae8bc71556f2173fa3cb520d8742ae01aaaf9955bee36daeb6a"
+    },
+    {
+      "label": "official-client-paired-ports-14",
+      "command": [
+        "cargo",
+        "+1.88.0",
+        "test",
+        "--locked",
+        "-p",
+        "netbaiot-server",
+        "--test",
+        "official_client",
+        "--",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.946,
+      "log": "target/strict-audit/official-client-paired-ports-14.log",
+      "sha256": "b22beb610e8f4cf9ed45df840bdbd403b40c85c0c624f58b0c253ce2de3d04e9"
+    },
+    {
+      "label": "official-client-paired-ports-15",
+      "command": [
+        "cargo",
+        "+1.88.0",
+        "test",
+        "--locked",
+        "-p",
+        "netbaiot-server",
+        "--test",
+        "official_client",
+        "--",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.935,
+      "log": "target/strict-audit/official-client-paired-ports-15.log",
+      "sha256": "473bc8dd106ddf31752dda6fb3c784924cbb57533c6e640b27923adb6ca48066"
+    },
+    {
+      "label": "official-client-paired-ports-16",
+      "command": [
+        "cargo",
+        "+1.88.0",
+        "test",
+        "--locked",
+        "-p",
+        "netbaiot-server",
+        "--test",
+        "official_client",
+        "--",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.931,
+      "log": "target/strict-audit/official-client-paired-ports-16.log",
+      "sha256": "8eed6ba3779a9afba655f97d440743ca5700b8671e6f9e46eee6b7c8885c169d"
+    },
+    {
+      "label": "official-client-paired-ports-17",
+      "command": [
+        "cargo",
+        "+1.88.0",
+        "test",
+        "--locked",
+        "-p",
+        "netbaiot-server",
+        "--test",
+        "official_client",
+        "--",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 1.418,
+      "log": "target/strict-audit/official-client-paired-ports-17.log",
+      "sha256": "2a58d88dadf605ea58ca4922348305aabe9ee1e6139eeb662101dfdefc6d9c57"
+    },
+    {
+      "label": "official-client-paired-ports-18",
+      "command": [
+        "cargo",
+        "+1.88.0",
+        "test",
+        "--locked",
+        "-p",
+        "netbaiot-server",
+        "--test",
+        "official_client",
+        "--",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 1.028,
+      "log": "target/strict-audit/official-client-paired-ports-18.log",
+      "sha256": "4fa28e6c0f363516ffd3a4b874c7ec3d351d103477b3e370fcc42269063c3ba3"
+    },
+    {
+      "label": "official-client-paired-ports-19",
+      "command": [
+        "cargo",
+        "+1.88.0",
+        "test",
+        "--locked",
+        "-p",
+        "netbaiot-server",
+        "--test",
+        "official_client",
+        "--",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.936,
+      "log": "target/strict-audit/official-client-paired-ports-19.log",
+      "sha256": "08b2f16d945928f0cab0aef2b97bfc6daad661a6d88949ec86904bff5a5aea54"
+    },
+    {
+      "label": "official-client-paired-ports-20",
+      "command": [
+        "cargo",
+        "+1.88.0",
+        "test",
+        "--locked",
+        "-p",
+        "netbaiot-server",
+        "--test",
+        "official_client",
+        "--",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 1.533,
+      "log": "target/strict-audit/official-client-paired-ports-20.log",
+      "sha256": "266c5c7ab4bd6e05c6f3cff739640db51d42430a3c4685d9dc9346ab9a0a806c"
+    },
+    {
+      "label": "stable-tests-ci-diagnostics",
+      "command": [
+        "cargo",
+        "+stable",
+        "test",
+        "--locked",
+        "--workspace",
+        "--all-features"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 41.979,
+      "log": "target/strict-audit/stable-tests-ci-diagnostics.log",
+      "sha256": "09e96412f46221319b79e5c709f0e917f2a59200c23bc0cde4c6159e4ebdc409"
+    },
+    {
+      "label": "msrv-tests-ci-diagnostics",
+      "command": [
+        "cargo",
+        "+1.88.0",
+        "test",
+        "--locked",
+        "--workspace",
+        "--all-features"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 40.78,
+      "log": "target/strict-audit/msrv-tests-ci-diagnostics.log",
+      "sha256": "c65ed6f8aef304c803e140fc5faf23238ba9dbc82f38ff90b9892fa39141f1cc"
+    }
+  ],
+  "finished_at": "2026-10-06T04:39:59.446582+00:00"
+}

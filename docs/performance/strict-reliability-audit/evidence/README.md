@@ -1,11 +1,14 @@
 # 审计执行证据
 
-起点f68bfd4，最终生产修复f3a5d7c；之后仅测试模块位置和报告调整。原c235f48验证文件仍保留为阶段证据，不能当作后续stream修复的门禁。
+起点f68bfd4，最终生产修复f3a5d7c；之后仅测试模块位置、official-client端口准备/启动失败诊断和报告调整。原c235f48验证文件仍保留为阶段证据，不能当作后续stream修复的门禁。
 
 - `validation-final.json` / `*-tests-final.log`：c235f48干净提交的初次完整门禁，各418 passed、0 failed、16 ignored，以及MQTT/SDK命令和二进制/source manifest。
 - `validation-stream-final.json` / `*-tests-stream-final.log`：最终stream修复+测试位置整理的末轮本地门禁，含tracked diff hash；stable/MSRV各420/0/16。
+- `validation-ci-diagnostics.json` / `*-tests-ci-diagnostics.log`：后续fixture端口准备/启动诊断的末轮本地门禁；20轮并发official-client全部PASS，stable/MSRV各420/0/16，包含tracked diff hash。
 - `reproductions.log`：原问题red/green、相关基线、ownership、storage repair、soak、AuthCache实际输出。red是有意捕捉原问题的FAIL。
 - `native-summary.json` / `native-*-selected.log`：最终生产修复的三平台实际job/step、selected路径、完整suite计数和GitHub artifact摘要；专项重复运行不重复计入full workspace计数。
+- `native-fourth-summary.json` / `fourth-msrv-readiness-failure.log`：0d69ef2原生三平台PASS；常规MSRV的启动就绪超时FAIL。新增诊断保留原期限与业务断言；原因未定位，不能把该次常规CI称为PASS。
+- `official-client-port-collision-red.log`：诊断后本地第9轮fixture UDP bind AddrInUse；此前8轮PASS。端口准备后有限重复测试与两个完整工具链门禁另存validation-ci-diagnostics.json，不把该fixture缺陷直接等同于先前CI超时原因。
 - `windows-first-failure.log` / `windows-second-failure.log`：真实Windows失败，随后同一原断言通过。常规CI另曾因新增test模块位置clippy FAIL，已移动模块而未加allow。
 - `external-and-gates.log`、protocol/gate JSON：MQTT/SDK/格式/clippy。protocol JSON含c235f48、空tracked diff和binary SHA256；之后MQTT生产路径未改，常规CI也重跑MQTT gate。
 - `fuzz-smoke.log`：四个10,000-run ASan smoke末尾；完整原始日志在本地target/strict-audit。

@@ -1,11 +1,11 @@
 # NetbaIoT 严格可靠性审计与修复
 
-审计日期：2026-10-06。结论：**本次审查范围内没有剩余已知阻塞项。** Windows/Linux/macOS 原生恢复、退出和完整 workspace 已实际执行通过。经作者单独授权只推送审计分支验证 CI；未合并或推送 main，未创建 tag 或 Release，项目版本仍为 0.2.3。最终分支提交仍须通过同一 CI 门禁后方可合并。
+审计日期：2026-10-06。结论：**满足末尾列明条件后可发布。** Windows/Linux/macOS 原生恢复、退出和完整 workspace 已实际执行通过。经作者单独授权只推送审计分支验证 CI；未合并或推送 main，未创建 tag 或 Release，项目版本仍为 0.2.3。最终分支提交仍须通过同一 CI 门禁后方可合并。
 
 ## 审计基线
 
 - 实际起点为干净、与 origin/main 同步的 main：`f68bfd4a8f563e265673ae76e70c7c795b27ee86`。历史 `6d16bf8` 仅用于定位，不作为当前行为依据。
-- 工作分支：`codex/strict-reliability-audit`。最终生产行为修复提交：`f3a5d7c034354f45fbf3251a9903e781c5ae15ba`；随后仅调整测试模块位置与报告，不改生产行为。末轮本地验证包含这次测试位置调整，记录 tracked diff hash；后续分支提交继续经过 exact-commit CI。
+- 工作分支：`codex/strict-reliability-audit`。最终生产行为修复提交：`f3a5d7c034354f45fbf3251a9903e781c5ae15ba`；随后仅调整测试模块位置、official-client 端口准备/启动失败诊断与报告，不改生产行为。末轮本地验证包含这些测试调整，记录 tracked diff hash；后续分支提交继续经过 exact-commit CI。
 - 原生环境：macOS，Darwin 27.0.0，arm64，`aarch64-apple-darwin`。
 - stable：rustc 1.99.0 `b940084d7`，cargo 1.99.0 `5f94df478`；MSRV：rustc 1.88.0 `6b00bc388`，cargo 1.88.0 `873a06493`。
 - 实际工具：Python 3.9.6、Mosquitto 2.1.2 broker/pub/sub、cargo-fuzz/nightly、actionlint、cargo-audit 0.22.2。开始时没有 Windows/Linux 原生执行主机，也没有 GitHub API 登录凭据；作者随后授权推送审计分支，使用 GitHub hosted 三平台原生 runner。
@@ -29,6 +29,7 @@
 | 恢复目录独占 | **3**。起点没有跨进程目录锁，不同端口可共享文件 | 修复后双子进程拒绝竞争者、退出/启动失败后重新取得 PASS；没有把旧实现运行成完整双进程 red | `crates/netbaiot-runtime/src/recovery_io.rs:202`；`apps/netbaiot-server/src/lib.rs:837` |
 | 重试临时文件数量 | **2（最终自审补充）**。已有 authority 时可绕过目录遍历容量检查，删除失败后可不断新建 temp | 两套 writer 在已有 authority + 17 个遗留 temp 场景都曾继续提交；新增相同回归 red→green。未真实制造 ACL 导致 temp 删除失败 | `crates/netbaiot-runtime/src/recovery_io.rs:119`；两套 writer |
 | 原生 CI 新发现：流拒绝错误丢失 | **2**。HELLO 后客户端已 pipeline SUBSCRIBE，拒绝后立即关闭仍有未读数据 | Windows 原有 official-client 断言实际 FAIL：Unauthenticated 被 ConnectionLost 替代；修复后同一断言 PASS | `apps/netbaiot-server/src/business_stream_v1.rs:201,242,257` |
+| 原生 CI 排查：测试端口选择 | **2（本地追加复现）**。TCP自动分配的端口并不保证UDP空闲；fixture直接unwrap UDP bind | 保持三个测试并发，重复到第9轮实际AddrInUse；只在启动前有界重选TCP/UDP配对，不重启失败server。此前CI就绪超时仍无确切因果证据 | `apps/netbaiot-server/tests/official_client.rs:25,90` |
 | AuthCache hit 全表 prune | 当前风险仍存在，**测量确认**；不是本次正确性修复前提 | 1/64/512/4096 entries 的命中、锁持有、分配和过期成本实测，生产算法保留 | `crates/netbaiot-runtime/src/auth.rs:647,847` |
 
 需要缩小的历史判断：NBMQ **在起点已经有** whole-stream trailer/digest，不应声称本次为 MQTT 新增整体完整性。旧实现的 dangling authority symlink 测试也能被拒绝，不能拿该用例声称复现“所有符号链接都被当作首次启动”。这些反证不否定其余 I/O 路径需要直接分类和有界读取。
@@ -103,6 +104,8 @@ server 在读取两套 recovery 前取得 `.netbaiot.lock` 的 OS advisory exclu
 
 第三次 native [37412448455](https://github.com/sskycn/netbaiot/actions/runs/37412448455) 在 f3a5d7c 上三平台 PASS，Windows 原来的两项失败断言均实际 PASS。该提交常规 CI 的 clippy 因新 test module 放在 runtime item 前面 FAIL；未加 allow，已把测试模块移至文件尾，随后本地 stable/MSRV fmt/clippy/full tests 各420 PASS、0 failed、16 ignored。最后测试位置和报告提交继续触发原生与常规 CI；不能把 f3a5d7c 的常规 CI 称为全部通过。
 
+第四次 native [37413570450](https://github.com/sskycn/netbaiot/actions/runs/37413570450) 在 `0d69ef2da7a7bae5fee2c04feec0ee4ed7bf5c4d` 上三平台均通过，Windows418/0/16、其余420/0/16。该提交常规 CI 的 stable/MQTT/audit/preflight通过，Rust1.88 fmt/clippy通过，但 official-client 合同测试等待服务就绪15秒超时，日志未记录子进程原因；不把它归为已经修复的产品漏洞，也不把该次常规CI计为PASS。追加的测试诊断保留原15秒期限、并发与全部业务断言，继承子进程stderr，检测提前退出并报告最后查询错误。随后本地重复真实进程测试在第9轮捕获fixture的UDP bind AddrInUse（此前8轮PASS）：TCP端口0分配不保证同号UDP可用。修复仅在启动前最多32次选择TCP/UDP配对，其他绑定错误立即失败，并把无用的5个TCP reservations减少为实际需要的3个；没有重试启动、忽略server失败或放宽业务测试。修复后这三个并发official-client用例连续20轮全部PASS；stable/MSRV fmt、clippy、完整workspace各420 passed、0 failed、16 ignored。日志和diff hash见validation-ci-diagnostics.json。最终提交必须重新执行CI，启动超时原因若无法复现仍明确保留为未定位问题。
+
 原生 log artifact 通过公开下载代理取得；下载 ZIP 的 SHA256 与 GitHub API 提供的 artifact digest 一致。只读取 bounded 日志文本，不执行下载内容。完整日志、三次 run 的 job/step/commit 及 SHA256 在 target/strict-audit，脱敏摘录/摘要在 evidence。未因日志 API 缺登录返回403而伪造结果。
 
 ## 恢复格式与兼容性
@@ -155,13 +158,14 @@ raw `RestartSpool::new` / broker 公共 API 为兼容保留，**库的 compositi
 
 ## 命令与日志
 
-所有命令均实际执行；初次最终完整门禁在 `c235f48` 上重新运行（validation-final.json）；native新发现的stream修复及测试模块整理后再运行，详见 `target/strict-audit/validation-stream-final.json`（f3a5d7c + tracked diff SHA）。报告提交的 exact-commit CI 也必须核对。测试退出码0才记 PASS；ignored 不计入通过数。
+所有命令均实际执行；初次最终完整门禁在 `c235f48` 上重新运行（validation-final.json）；native新发现的stream修复及测试模块整理后再运行，详见 `target/strict-audit/validation-stream-final.json`（f3a5d7c + tracked diff SHA）。后续fixture与诊断修改见validation-ci-diagnostics.json（0d69ef2 + tracked diff SHA）。报告提交的 exact-commit CI 也必须核对。测试退出码0才记 PASS；ignored 不计入通过数。
 
 | 命令/检查 | 状态与结果 | 日志（相对仓库） |
 |---|---|---|
-| `cargo +stable fmt --all -- --check` / `+1.88.0` 同命令 | PASS，exit0 | `target/strict-audit/{stable,msrv}-fmt-stream-final.log` |
-| `cargo +stable clippy --locked --workspace --all-targets --all-features -- -D warnings` / `+1.88.0` | PASS，exit0 | `{stable,msrv}-clippy-stream-final.log` |
-| `cargo +stable test --locked --workspace --all-features` / `+1.88.0` | PASS，末轮各420 passed / 0 failed / 16 ignored，exit0 | `{stable,msrv}-tests-stream-final.log` |
+| `cargo +stable fmt --all -- --check` / `+1.88.0` 同命令 | PASS，exit0 | `target/strict-audit/{stable,msrv}-fmt-ci-diagnostics.log` |
+| `cargo +stable clippy --locked --workspace --all-targets --all-features -- -D warnings` / `+1.88.0` | PASS，exit0 | `{stable,msrv}-clippy-ci-diagnostics.log` |
+| `cargo +stable test --locked --workspace --all-features` / `+1.88.0` | PASS，末轮各420 passed / 0 failed / 16 ignored，exit0 | `{stable,msrv}-tests-ci-diagnostics.log` |
+| official-client三项并发真实进程用例，Rust1.88连续20轮 | PASS，60次case执行；没有降低断言 | `official-client-paired-ports-{1..20}.log` |
 | `cargo build --locked -p netbaiot-server`；`cargo build --locked -p netbaiot-device-sdk --example device_mqtt` | PASS，exit0 | `server-build-final.log`、`sdk-build-final.log` |
 | `python3 tests/mqtt_protocol_regressions.py --repo . --output target/strict-audit/protocol-results-final.json` | PASS，7/7，含 binary hash + source manifest | `protocol-final.log`、`protocol-results-final.json` |
 | `python3 tests/mqtt_conformance/run.py --release-gate --no-build` | PASS，76/76，规范 coverage125/125 | `release-gate-final.log`、`release-gate-results-final.json` |
@@ -197,17 +201,19 @@ Fuzz 实际命令（ASan smoke，各10,000 runs，exit0）：先 `python3 fuzz/s
 9. `6382236` — 完整报告、执行证据和Windows空图回滚说明。
 10. `7078f07` — IPv4 HTTPS fixture和恢复专项门禁。
 11. `f3a5d7c` — 拒绝流的有界半关闭及回归。
-12. 后续提交 — 测试模块位置整理、原生证据和最终报告（不改生产行为）。
+12. `0d69ef2` — 测试模块位置整理、原生证据和报告（不改生产行为）。
+13. 后续提交 — 有界TCP/UDP测试端口准备、official-client启动失败诊断、第四轮CI记录（不改生产行为）。
 
 I/O 与目录 owner 合并在同一逻辑提交，以便两个域从首次读取到最后 blocking job 共享所有权；Windows replacement 依赖同一 I/O 层。末期自审的 serialization/generation/temp 发现另立提交，便于审查回退；没有顺手重写 AuthCache 算法。
 
 最后代码提交相对基线的完整文件列表和 `git diff --stat`：
 
 ```text
-.github/workflows/recovery-platform.yml            |  40 ++
+ .github/workflows/recovery-platform.yml            |  40 ++
  Cargo.lock                                         | 110 ++++
  apps/netbaiot-server/src/business_stream_v1.rs     |  68 +++
  apps/netbaiot-server/src/lib.rs                    | 231 ++++----
+ apps/netbaiot-server/tests/official_client.rs      |  49 +-
  apps/netbaiot-server/tests/server.rs               | 246 +++++++--
  crates/netbaiot-runtime/Cargo.toml                 |   8 +
  crates/netbaiot-runtime/src/auth.rs                | 127 +++++
@@ -229,21 +235,21 @@ I/O 与目录 owner 合并在同一逻辑提交，以便两个域从首次读取
  docs/restart-spool.md                              |  80 ++-
  fuzz/Cargo.lock                                    | 103 ++++
  fuzz/seed_corpus.py                                |  10 +
- 25 files changed, 2788 insertions(+), 344 deletions(-)
+ 26 files changed, 2824 insertions(+), 357 deletions(-)
 ```
 
-以上25个文件包含代码、测试、锁文件、4份行为文档、benchmark JSON/README、原生 CI 和 fuzz seeds。本报告及脱敏 evidence 另作文档提交；没有改 release 版本、tag、历史 benchmark 或生产数据。
+以上26个文件包含代码、测试、锁文件、4份行为文档、benchmark JSON/README、原生 CI 和 fuzz seeds。本报告及脱敏 evidence 另作文档提交；没有改 release 版本、tag、历史 benchmark 或生产数据。
 
 ## 剩余风险
 
 - **已确认未修复的阻塞**：本次范围内没有剩余已知项。原生九项/完整suite实际通过；任何最终分支CI失败仍阻止合并，不能引用中间提交的绿色状态代替最终检查。原旧Windows flush故障没有取得native red，保持静态确认分类。
-- **尚未复现/定位**：独立 sync syscall 的失败行为只做传播自审，未全部动态注入；JWKS 一次超时原因未知；I/O/ownership 的所有起点风险未一一做旧实现 red。
+- **尚未复现/定位**：`0d69ef2` 的 Rust1.88 CI曾在official-client等待就绪超时，缺失子进程诊断，原因未定位；最终提交保留诊断且必须重新通过。独立 sync syscall 的失败行为只做传播自审，未全部动态注入；JWKS 一次超时原因未知；I/O/ownership 的所有起点风险未一一做旧实现 red。
 - **设计取舍**：旧 NBSP1/2 无法识别历史整记录截断；两域不是跨文件事务；突然终止可丢失非 spooled 内存流量；trusted local directory / cooperating processes 是锁和路径安全前提；bounded I/O 不意味着故障硬件 syscall 有严格墙钟 deadline。
 - **非阻塞优化**：AuthCache hit 保留全表 prune。4096 entries 的 median hit203.042µs、mutex202.971µs、每hit2次分配/466,976 bytes。明确支持后续有界过期/顺序维护优化，但不能以本次带统计开销、同时进行其他验证的测量宣称生产吞吐。详见 benchmark README。
 - **依赖维护**：rustls-pemfile 的现存 unmaintained warning 待后续迁移；本次不把 warning 称为漏洞，也不屏蔽它。
 
 ## 发布判断
 
-**本次审查范围内没有剩余已知阻塞项。** 已有 Windows/Linux/macOS 的原生 first/replace/recover/empty stop/required stop/storage failure+repair、ownership/lifecycle 和完整suite证据，以及上述功能修复前失败、修复后通过的记录。正式合并仍要求最后审计分支提交的全部CI通过；若之后有失败，应保留日志、修复并重新验证 exact final commit。此判断不外推成一般断电持久性、生产容量或全部故障分支已穷尽。
+**满足列明条件后可发布。** 最终提交的原生与常规CI须全部通过，并评估两项尚未定位的偶发启动/JWKS超时对发布验证可信性的影响。已有 Windows/Linux/macOS 的原生 first/replace/recover/empty stop/required stop/storage failure+repair、ownership/lifecycle 和完整suite证据，以及上述功能修复前失败、修复后通过的记录。正式合并仍要求最后审计分支提交的全部CI通过；若之后有失败，应保留日志、修复并重新验证 exact final commit。此判断不外推成一般断电持久性、生产容量或全部故障分支已穷尽。
 
 版本和正式发布由作者决定。本任务到此仍保留审计分支用于审查，不自动合并 main、推送 main、打 tag 或发布 Release。
