@@ -10,7 +10,10 @@ use uuid::Uuid;
 
 const MAGIC: &[u8; 4] = b"NBSP";
 const LEGACY_VERSION: u32 = 1;
-const VERSION: u32 = 2;
+const GENERATION_VERSION: u32 = 2;
+const VERSION: u32 = 3;
+const TRAILER_MAGIC: &[u8; 4] = b"SEND";
+const TRAILER_BYTES: usize = 4 + 8 + 8 + 32;
 const SNAPSHOT_NAME: &str = "eventbus-recovery.spool";
 
 #[derive(Clone, Debug)]
@@ -125,7 +128,16 @@ fn commit_sync(directory: &Path, limits: &Limits, records: &[SpoolRecord]) -> Re
             .map_err(|_| Error::Storage)?;
         file.write_all(&generation.to_be_bytes())
             .map_err(|_| Error::Storage)?;
+        let mut hash = Sha256::new();
+        hash.update(MAGIC);
+        hash.update(VERSION.to_be_bytes());
+        hash.update(generation.to_be_bytes());
         let mut total = 16usize;
+        if total + TRAILER_BYTES > limits.spool_segment_max_bytes
+            || total + TRAILER_BYTES > limits.spool_max_bytes
+        {
+            return Err(Error::Overloaded);
+        }
         for record in records {
             let payload = serde_json::to_vec(record).map_err(|_| Error::Invalid)?;
             if payload.len() > limits.spool_record_max_bytes {
@@ -135,14 +147,35 @@ fn commit_sync(directory: &Path, limits: &Limits, records: &[SpoolRecord]) -> Re
             total = total
                 .checked_add(4 + payload.len() + 32)
                 .ok_or(Error::Overloaded)?;
-            if total > limits.spool_segment_max_bytes || total > limits.spool_max_bytes {
+            if total.checked_add(TRAILER_BYTES).is_none_or(|size| {
+                size > limits.spool_segment_max_bytes || size > limits.spool_max_bytes
+            }) {
                 return Err(Error::Overloaded);
             }
+            let checksum = Sha256::digest(&payload);
+            hash.update(length.to_be_bytes());
+            hash.update(&payload);
+            hash.update(checksum);
             file.write_all(&length.to_be_bytes())
                 .and_then(|_| file.write_all(&payload))
-                .and_then(|_| file.write_all(&Sha256::digest(&payload)))
+                .and_then(|_| file.write_all(&checksum))
                 .map_err(|_| Error::Storage)?;
         }
+        let mut trailer = [0u8; TRAILER_BYTES];
+        trailer[..4].copy_from_slice(TRAILER_MAGIC);
+        trailer[4..12].copy_from_slice(
+            &u64::try_from(records.len())
+                .map_err(|_| Error::Overloaded)?
+                .to_be_bytes(),
+        );
+        trailer[12..20].copy_from_slice(
+            &u64::try_from(total)
+                .map_err(|_| Error::Overloaded)?
+                .to_be_bytes(),
+        );
+        hash.update(&trailer[..20]);
+        trailer[20..].copy_from_slice(&hash.finalize());
+        file.write_all(&trailer).map_err(|_| Error::Storage)?;
         file.sync_all().map_err(|_| Error::Storage)?;
         fs::rename(&temporary, &committed).map_err(|_| Error::Storage)?;
         sync_directory(directory)?;
@@ -265,10 +298,36 @@ fn decode_segment(input: &[u8], limits: &Limits, output: &mut Vec<SpoolRecord>) 
         return Err(Error::Invalid);
     }
     let version = u32::from_be_bytes(input[4..8].try_into().map_err(|_| Error::Invalid)?);
-    if version != VERSION && version != LEGACY_VERSION {
+    if version != VERSION && version != GENERATION_VERSION && version != LEGACY_VERSION {
         return Err(Error::Invalid);
     }
-    let mut at = if version == VERSION {
+    let (records_end, expected_count) = if version == VERSION {
+        let end = input
+            .len()
+            .checked_sub(TRAILER_BYTES)
+            .filter(|end| *end >= 16)
+            .ok_or(Error::Invalid)?;
+        let trailer = &input[end..];
+        if &trailer[..4] != TRAILER_MAGIC
+            || u64::from_be_bytes(trailer[12..20].try_into().map_err(|_| Error::Invalid)?)
+                != u64::try_from(end).map_err(|_| Error::Invalid)?
+            || Sha256::digest(&input[..end + 20]).as_slice() != &trailer[20..]
+        {
+            return Err(Error::Invalid);
+        }
+        let count = usize::try_from(u64::from_be_bytes(
+            trailer[4..12].try_into().map_err(|_| Error::Invalid)?,
+        ))
+        .map_err(|_| Error::Overloaded)?;
+        if count > limits.spool_max_records {
+            return Err(Error::Overloaded);
+        }
+        (end, Some(count))
+    } else {
+        (input.len(), None)
+    };
+    let start_count = output.len();
+    let mut at = if version >= GENERATION_VERSION {
         if input.len() < 16 {
             return Err(Error::Invalid);
         }
@@ -276,7 +335,7 @@ fn decode_segment(input: &[u8], limits: &Limits, output: &mut Vec<SpoolRecord>) 
     } else {
         8usize
     };
-    while at < input.len() {
+    while at < records_end {
         let length_end = at.checked_add(4).ok_or(Error::Invalid)?;
         let length_bytes = input.get(at..length_end).ok_or(Error::Invalid)?;
         let length = usize::try_from(u32::from_be_bytes(
@@ -288,6 +347,9 @@ fn decode_segment(input: &[u8], limits: &Limits, output: &mut Vec<SpoolRecord>) 
         }
         let payload_end = length_end.checked_add(length).ok_or(Error::Invalid)?;
         let checksum_end = payload_end.checked_add(32).ok_or(Error::Invalid)?;
+        if checksum_end > records_end {
+            return Err(Error::Invalid);
+        }
         let payload = input.get(length_end..payload_end).ok_or(Error::Invalid)?;
         let checksum = input.get(payload_end..checksum_end).ok_or(Error::Invalid)?;
         if Sha256::digest(payload).as_slice() != checksum {
@@ -304,6 +366,9 @@ fn decode_segment(input: &[u8], limits: &Limits, output: &mut Vec<SpoolRecord>) 
             }
         })?);
         at = checksum_end;
+    }
+    if expected_count.is_some_and(|count| output.len() - start_count != count) {
+        return Err(Error::Invalid);
     }
     Ok(())
 }
@@ -375,7 +440,7 @@ fn segment_generation(input: &[u8]) -> Result<u64> {
     let version = u32::from_be_bytes(input[4..8].try_into().map_err(|_| Error::Invalid)?);
     match version {
         LEGACY_VERSION => Ok(0),
-        VERSION if input.len() >= 16 => Ok(u64::from_be_bytes(
+        GENERATION_VERSION | VERSION if input.len() >= 16 => Ok(u64::from_be_bytes(
             input[8..16].try_into().map_err(|_| Error::Invalid)?,
         )),
         _ => Err(Error::Invalid),
@@ -454,6 +519,74 @@ mod tests {
             accepted_at: 1,
             attempts: BTreeMap::new(),
         }
+    }
+
+    #[tokio::test]
+    async fn whole_snapshot_integrity() {
+        let directory = std::env::temp_dir().join(format!("netbaiot-integrity-{}", Uuid::new_v4()));
+        let limits = Arc::new(Limits::default());
+        let spool = RestartSpool::new(directory.clone(), limits.clone());
+        let path = spool
+            .commit(vec![record(), record(), record()])
+            .await
+            .unwrap()
+            .unwrap();
+        let image = fs::read(&path).unwrap();
+        assert_eq!(spool.recover().await.unwrap().records.len(), 3);
+        let mut ends = vec![16];
+        for _ in 0..3 {
+            let at = *ends.last().unwrap();
+            let size = u32::from_be_bytes(image[at..at + 4].try_into().unwrap()) as usize;
+            ends.push(at + 4 + size + 32);
+        }
+        let mut changed_header = image.clone();
+        changed_header[15] ^= 1;
+        let mut deleted = image.clone();
+        deleted.drain(ends[1]..ends[2]);
+        let mut duplicated = image.clone();
+        duplicated.splice(ends[1]..ends[1], image[ends[0]..ends[1]].iter().copied());
+        let mut reordered = image.clone();
+        reordered.splice(
+            ends[0]..ends[2],
+            image[ends[1]..ends[2]]
+                .iter()
+                .chain(&image[ends[0]..ends[1]])
+                .copied(),
+        );
+        let mut garbage = image.clone();
+        garbage.push(42);
+        let cases = [
+            ("header only", image[..ends[0]].to_vec()),
+            ("first record", image[..ends[1]].to_vec()),
+            ("second record", image[..ends[2]].to_vec()),
+            ("mid record", image[..ends[1] - 2].to_vec()),
+            ("header mutation", changed_header),
+            ("record deletion", deleted),
+            ("record duplication", duplicated),
+            ("record reordering", reordered),
+            ("trailing garbage", garbage),
+        ];
+        let mut accepted = Vec::new();
+        for (name, bytes) in cases {
+            fs::write(&path, bytes).unwrap();
+            let result = spool.recover().await;
+            eprintln!(
+                "{name}: {}",
+                if result.is_ok() {
+                    "ACCEPTED"
+                } else {
+                    "REJECTED"
+                }
+            );
+            if result.is_ok() {
+                accepted.push(name);
+            }
+        }
+        fs::remove_dir_all(directory).unwrap();
+        assert!(
+            accepted.is_empty(),
+            "incomplete or mutated snapshots accepted: {accepted:?}"
+        );
     }
 
     #[tokio::test]
