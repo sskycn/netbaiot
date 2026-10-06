@@ -354,33 +354,52 @@ impl Sessions {
     }
 
     pub fn touch(&self, device: &DeviceKey, transport: Transport) -> Result<()> {
+        #[cfg(test)]
+        let mut timing = crate::hotspot_bench::LockClock::start();
         let mut state = lock(&self.state)?;
-        self.prune_presence(&mut state);
-        self.ensure_presence_slot(&mut state, device)?;
+        #[cfg(test)]
+        timing.acquired();
         let now = now_ms();
-        state
-            .presence
-            .entry(device.clone())
-            .and_modify(|presence| presence.last_seen = now)
-            .or_insert(Presence {
+        if let Some(presence) = state.presence.get_mut(device) {
+            if presence.connected || presence.last_seen >= self.presence_cutoff(now) {
+                presence.last_seen = now;
+                return Ok(());
+            }
+            // Expired offline observations are recreated, including transport,
+            // just as when the former full-table prune removed this entry.
+            state.presence.remove(device);
+        }
+        self.ensure_presence_slot(&mut state, device)?;
+        state.presence.insert(
+            device.clone(),
+            Presence {
                 connected: false,
                 connected_at: None,
                 last_seen: now,
                 transport,
                 session_generation: None,
-            });
+            },
+        );
         Ok(())
     }
 
     pub fn presence(&self, device: &DeviceKey) -> Result<Option<Presence>> {
+        #[cfg(test)]
+        let mut timing = crate::hotspot_bench::LockClock::start();
         let mut state = lock(&self.state)?;
-        self.prune_presence(&mut state);
+        #[cfg(test)]
+        timing.acquired();
+        self.prune_presence_entry(&mut state, device);
         Ok(state.presence.get(device).cloned())
     }
 
     pub fn connection(&self, device: &DeviceKey) -> Result<DeviceConnectionInfo> {
+        #[cfg(test)]
+        let mut timing = crate::hotspot_bench::LockClock::start();
         let mut state = lock(&self.state)?;
-        self.prune_presence(&mut state);
+        #[cfg(test)]
+        timing.acquired();
+        self.prune_presence_entry(&mut state, device);
         let presence = state.presence.get(device);
         Ok(DeviceConnectionInfo {
             device: device.clone(),
@@ -411,15 +430,33 @@ impl Sessions {
     }
 
     fn prune_presence(&self, state: &mut SessionState) {
-        let cutoff =
-            now_ms().saturating_sub(i64::try_from(self.limits.presence_ttl_ms).unwrap_or(i64::MAX));
+        let cutoff = self.presence_cutoff(now_ms());
         state
             .presence
             .retain(|_, presence| presence.connected || presence.last_seen >= cutoff);
     }
 
+    fn presence_cutoff(&self, now: i64) -> i64 {
+        now.saturating_sub(i64::try_from(self.limits.presence_ttl_ms).unwrap_or(i64::MAX))
+    }
+
+    fn prune_presence_entry(&self, state: &mut SessionState, device: &DeviceKey) {
+        let cutoff = self.presence_cutoff(now_ms());
+        if state
+            .presence
+            .get(device)
+            .is_some_and(|presence| !presence.connected && presence.last_seen < cutoff)
+        {
+            state.presence.remove(device);
+        }
+    }
+
     fn ensure_presence_slot(&self, state: &mut SessionState, device: &DeviceKey) -> Result<()> {
         if state.presence.contains_key(device) || state.presence.len() < self.limits.max_devices {
+            return Ok(());
+        }
+        self.prune_presence(state);
+        if state.presence.len() < self.limits.max_devices {
             return Ok(());
         }
         let oldest_offline = state
@@ -477,6 +514,181 @@ impl Drop for SessionLease {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn presence_queries_expire_only_the_target_and_keep_active_sessions() {
+        let sessions = Sessions::new(Arc::new(Limits::default()));
+        let one = auth("one").device_key.clone();
+        let two = auth("two").device_key.clone();
+        sessions.touch(&one, Transport::Udp).unwrap();
+        sessions.touch(&two, Transport::Udp).unwrap();
+        let (lease, _) = sessions.register(auth("active"), Transport::Mqtt).unwrap();
+        for presence in sessions.state.lock().unwrap().presence.values_mut() {
+            presence.last_seen = 0;
+        }
+        assert!(sessions.presence(&one).unwrap().is_none());
+        assert!(sessions.state.lock().unwrap().presence.contains_key(&two));
+        assert!(sessions.connection(&lease.device).unwrap().connected);
+        assert!(sessions.presence(&lease.device).unwrap().unwrap().connected);
+        assert!(sessions.connection(&two).unwrap().last_seen.is_none());
+        assert_eq!(sessions.registry_counts().unwrap().2, 1);
+        drop(lease);
+        assert!(
+            !sessions
+                .presence(&auth("active").device_key)
+                .unwrap()
+                .unwrap()
+                .connected
+        );
+    }
+
+    #[test]
+    fn existing_touch_is_local_and_preserves_expired_transport_reset() {
+        let sessions = Sessions::new(Arc::new(Limits::default()));
+        let one = auth("one").device_key.clone();
+        let two = auth("two").device_key.clone();
+        sessions.touch(&one, Transport::Tcp).unwrap();
+        sessions.touch(&two, Transport::Tcp).unwrap();
+        sessions
+            .state
+            .lock()
+            .unwrap()
+            .presence
+            .get_mut(&two)
+            .unwrap()
+            .last_seen = 0;
+        sessions.touch(&one, Transport::Udp).unwrap();
+        assert_eq!(
+            sessions.presence(&one).unwrap().unwrap().transport,
+            Transport::Tcp
+        );
+        assert!(sessions.state.lock().unwrap().presence.contains_key(&two));
+        sessions.touch(&two, Transport::Udp).unwrap();
+        let presence = sessions.presence(&two).unwrap().unwrap();
+        assert_eq!(presence.transport, Transport::Udp);
+        assert!(!presence.connected);
+        assert_eq!(presence.session_generation, None);
+    }
+
+    #[test]
+    fn capacity_pressure_prunes_expired_then_evicts_oldest_offline() {
+        let sessions = Sessions::new(Arc::new(Limits {
+            max_devices: 3,
+            ..Limits::default()
+        }));
+        let keys =
+            ["expired", "old", "recent", "new", "newer"].map(|name| auth(name).device_key.clone());
+        for key in &keys[..3] {
+            sessions.touch(key, Transport::Udp).unwrap();
+        }
+        {
+            let mut state = sessions.state.lock().unwrap();
+            state.presence.get_mut(&keys[0]).unwrap().last_seen = 0;
+            state.presence.get_mut(&keys[1]).unwrap().last_seen = now_ms() - 100;
+        }
+        sessions.touch(&keys[3], Transport::Udp).unwrap();
+        assert!(
+            !sessions
+                .state
+                .lock()
+                .unwrap()
+                .presence
+                .contains_key(&keys[0])
+        );
+        assert!(
+            sessions
+                .state
+                .lock()
+                .unwrap()
+                .presence
+                .contains_key(&keys[1])
+        );
+        sessions.touch(&keys[4], Transport::Udp).unwrap();
+        assert!(
+            !sessions
+                .state
+                .lock()
+                .unwrap()
+                .presence
+                .contains_key(&keys[1])
+        );
+        assert_eq!(sessions.registry_counts().unwrap().2, 3);
+    }
+
+    #[test]
+    #[ignore = "isolated serial release hotspot benchmark"]
+    fn presence_scaling() {
+        for count in [1, 64, 256, 1_024] {
+            let sessions = Sessions::new(Arc::new(Limits {
+                max_devices: count + 1,
+                ..Limits::default()
+            }));
+            let keys = (0..count)
+                .map(|index| auth(&format!("bench-{index}")).device_key.clone())
+                .collect::<Vec<_>>();
+            for key in &keys {
+                sessions.touch(key, Transport::Udp).unwrap();
+            }
+            let target = &keys[0];
+            for name in ["touch_existing", "presence_lookup", "connection_lookup"] {
+                crate::hotspot_bench::measure(
+                    name,
+                    count,
+                    4_000,
+                    || (),
+                    |_| match name {
+                        "touch_existing" => sessions.touch(target, Transport::Udp).unwrap(),
+                        "presence_lookup" => {
+                            std::hint::black_box(sessions.presence(target).unwrap());
+                        }
+                        _ => {
+                            std::hint::black_box(sessions.connection(target).unwrap());
+                        }
+                    },
+                    |_| {},
+                );
+            }
+            let new = auth("new").device_key.clone();
+            crate::hotspot_bench::measure(
+                "touch_new_free",
+                count,
+                2_000,
+                || (),
+                |_| sessions.touch(&new, Transport::Udp).unwrap(),
+                |_| {
+                    sessions.state.lock().unwrap().presence.remove(&new);
+                },
+            );
+            let full = Sessions::new(Arc::new(Limits {
+                max_devices: count,
+                ..Limits::default()
+            }));
+            for key in &keys {
+                full.touch(key, Transport::Udp).unwrap();
+            }
+            let oldest = Presence {
+                last_seen: now_ms() - 500,
+                ..full.presence(target).unwrap().unwrap()
+            };
+            full.state
+                .lock()
+                .unwrap()
+                .presence
+                .insert(target.clone(), oldest.clone());
+            crate::hotspot_bench::measure(
+                "touch_new_full",
+                count,
+                2_000,
+                || (),
+                |_| full.touch(&new, Transport::Udp).unwrap(),
+                |_| {
+                    let mut state = full.state.lock().unwrap();
+                    state.presence.remove(&new);
+                    state.presence.insert(target.clone(), oldest.clone());
+                },
+            );
+        }
+    }
 
     fn auth(device: &str) -> Arc<AuthenticatedDevice> {
         Arc::new(AuthenticatedDevice {
