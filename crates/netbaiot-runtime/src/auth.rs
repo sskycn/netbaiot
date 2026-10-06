@@ -1002,6 +1002,35 @@ mod cache_tests {
     }
 
     #[tokio::test]
+    async fn replacement_releases_old_bytes_and_fifo_ownership() {
+        let cache = AuthCache::new(
+            Arc::new(Provider {
+                calls: AtomicUsize::new(0),
+                mode: AtomicU8::new(1),
+                identity: identity(),
+            }),
+            Arc::new(Limits::default()),
+            Arc::new(Metrics::default()),
+        );
+        let key = cache_key(&request("replace")).unwrap();
+        let mut state = cache.state.lock().unwrap();
+        for bytes in [100, 200] {
+            insert_cache_entry(
+                &mut state,
+                &cache.limits,
+                &cache.metrics,
+                key.clone(),
+                CachedAuth::Negative,
+                60_000,
+                bytes,
+            );
+        }
+        assert_eq!(state.entries.len(), 1);
+        assert_eq!(state.bytes, 200);
+        assert_eq!(state.order.len(), 1);
+    }
+
+    #[tokio::test]
     async fn positive_negative_ttl_capacity_invalidation_and_fail_closed() {
         let provider = Arc::new(Provider {
             calls: AtomicUsize::new(0),

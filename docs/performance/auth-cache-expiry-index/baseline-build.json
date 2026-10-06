@@ -1,0 +1,17 @@
+{
+  "command": [
+    "cargo",
+    "+stable",
+    "build",
+    "--locked",
+    "--release",
+    "-p",
+    "netbaiot-server",
+    "-p",
+    "netbaiot-loadgen"
+  ],
+  "exit_code": 0,
+  "elapsed_seconds": 21.703315019607544,
+  "before-server_sha256": "0e07f0c70aa3fa62019690809c4757d29b4189107d6d3154ce197f55d4fc81d7",
+  "loadgen_sha256": "d6fb6f19b08c9e7915a6b800d0465f39d1fbce1eaa0f2b6bfaad1aeea045e009"
+}
