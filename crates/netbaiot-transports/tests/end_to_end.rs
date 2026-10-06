@@ -745,6 +745,195 @@ fn connect_packet_v5() -> Vec<u8> {
     frame
 }
 
+#[tokio::test]
+async fn continuously_ready_outbound_cannot_starve_ping_for_either_mqtt_version() {
+    use netbaiot_transports::mqtt::broker::{BrokerMessage, MqttBroker};
+    use std::{
+        collections::VecDeque,
+        pin::Pin,
+        task::{Context, Poll},
+    };
+    use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
+    struct FloodStream {
+        input: VecDeque<u8>,
+        qos: u8,
+        acked_id: Option<u16>,
+        command_traffic: bool,
+        router: Arc<CommandRouter>,
+        broker: Arc<MqttBroker>,
+        stop: CancellationToken,
+        publishes: Arc<AtomicUsize>,
+        ping_at: Arc<AtomicUsize>,
+    }
+    impl FloodStream {
+        fn refill(&self) {
+            if self.command_traffic {
+                self.router.send(live_command()).unwrap();
+                return;
+            }
+            let routed = self
+                .broker
+                .route(
+                    &auth().device_key,
+                    BrokerMessage {
+                        topic: "v1/t/t/p/p/d/a/down".into(),
+                        payload: vec![1],
+                        qos: self.qos,
+                        retain: false,
+                        properties: Default::default(),
+                    },
+                )
+                .unwrap();
+            assert_eq!(
+                routed, 1,
+                "flood must continuously refill a real subscription"
+            );
+        }
+    }
+    impl AsyncRead for FloodStream {
+        fn poll_read(
+            mut self: Pin<&mut Self>,
+            _: &mut Context<'_>,
+            buffer: &mut ReadBuf<'_>,
+        ) -> Poll<std::io::Result<()>> {
+            if self.input.is_empty() {
+                return Poll::Pending;
+            }
+            while buffer.remaining() > 0 {
+                match self.input.pop_front() {
+                    Some(byte) => buffer.put_slice(&[byte]),
+                    None => break,
+                }
+            }
+            Poll::Ready(Ok(()))
+        }
+    }
+    impl AsyncWrite for FloodStream {
+        fn poll_write(
+            mut self: Pin<&mut Self>,
+            _: &mut Context<'_>,
+            bytes: &[u8],
+        ) -> Poll<std::io::Result<usize>> {
+            match bytes[0] & 0xf0 {
+                0x90 => self.refill(), // SUBACK ensures the outbound channel is ready
+                0x30 => {
+                    let count = self.publishes.fetch_add(1, Ordering::Relaxed) + 1;
+                    if count == 1 && self.qos > 0 {
+                        let topic_bytes = usize::from(u16::from_be_bytes([bytes[2], bytes[3]]));
+                        let at = 4 + topic_bytes;
+                        let id = [bytes[at], bytes[at + 1]];
+                        self.acked_id = Some(u16::from_be_bytes(id));
+                        let kind = if self.qos == 1 { 0x40 } else { 0x50 };
+                        self.input.extend([kind, 2, id[0], id[1]]);
+                        if self.qos == 1 {
+                            self.input.extend([0xc0, 0]);
+                        }
+                    }
+                    if count >= 8 {
+                        self.stop.cancel();
+                    } else {
+                        self.refill();
+                    }
+                }
+                0x60 => {
+                    self.input.extend([0x70, 2, bytes[2], bytes[3], 0xc0, 0]);
+                }
+                0xd0 => {
+                    if let Some(id) = self.acked_id {
+                        let snapshot =
+                            serde_json::to_value(self.broker.snapshot().unwrap()).unwrap();
+                        assert!(
+                            snapshot["sessions"][0]["outbound"]
+                                .get(id.to_string())
+                                .is_none(),
+                            "control ACK must release the original inflight packet ID before the later PINGRESP"
+                        );
+                    }
+                    self.ping_at
+                        .store(self.publishes.load(Ordering::Relaxed), Ordering::Relaxed);
+                    self.stop.cancel();
+                }
+                _ => (),
+            }
+            Poll::Ready(Ok(bytes.len()))
+        }
+        fn poll_flush(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+            Poll::Ready(Ok(()))
+        }
+        fn poll_shutdown(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+            Poll::Ready(Ok(()))
+        }
+    }
+    let mut failures = Vec::new();
+    for (v5, qos, command_traffic) in [false, true].into_iter().flat_map(|v5| {
+        [
+            (v5, 0, false),
+            (v5, 1, false),
+            (v5, 2, false),
+            (v5, 0, true),
+        ]
+    }) {
+        let provider = Arc::new(CountingProvider {
+            calls: AtomicUsize::new(0),
+            auth: auth(),
+            delay: false,
+        });
+        let (ingress, services, stop) = runtime(Limits::default(), provider);
+        let mut input = if v5 {
+            connect_packet_v5()
+        } else {
+            connect_packet()
+        };
+        let mut body = vec![0, 1];
+        if v5 {
+            body.push(0);
+        }
+        mqtt_string(b"v1/t/t/p/p/d/a/down", &mut body);
+        body.push(qos);
+        input.extend([0x82, body.len() as u8]);
+        input.extend(body);
+        if qos == 0 {
+            input.extend([0xc0, 0]);
+        }
+        let publishes = Arc::new(AtomicUsize::new(0));
+        let ping_at = Arc::new(AtomicUsize::new(usize::MAX));
+        let stream = FloodStream {
+            input: input.into(),
+            qos,
+            acked_id: None,
+            command_traffic,
+            router: services.router.clone(),
+            broker: services.mqtt.clone(),
+            stop: stop.clone(),
+            publishes,
+            ping_at: ping_at.clone(),
+        };
+        let lease = services
+            .connections
+            .acquire("127.0.0.1".parse().unwrap(), Transport::Mqtt)
+            .unwrap();
+        tokio::time::timeout(
+            std::time::Duration::from_secs(1),
+            netbaiot_transports::mqtt::connection(Box::new(stream), services, lease, stop),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+        ingress.events.stop_workers().await.unwrap();
+        if qos == 1 {
+            assert!(ingress.metrics.get(Metric::MqttPubacks) >= 1);
+        }
+        let bound = [2, 3, 5][usize::from(qos)];
+        if ping_at.load(Ordering::Relaxed) > bound {
+            failures.push((v5, qos, command_traffic));
+        }
+    }
+    assert!(
+        failures.is_empty(),
+        "PINGREQ exceeded two ordinary work selections: MQTT5 flags {failures:?}"
+    );
+}
+
 async fn read_mqtt_packet(stream: &mut tokio::io::DuplexStream) -> Vec<u8> {
     let mut header = [0u8; 2];
     stream.read_exact(&mut header).await.unwrap();

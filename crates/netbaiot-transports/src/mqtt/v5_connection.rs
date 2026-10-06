@@ -1,3 +1,4 @@
+use super::fair::{FairWork, Work};
 use super::*;
 use broker::PublishProperties;
 use codec::v5::{self, Packet};
@@ -17,7 +18,7 @@ fn authorize_inbound_qos2_publish(
     Ok(state)
 }
 
-async fn next_v5(
+pub(super) async fn next_v5(
     reader: &mut Reader,
     stream: &mut BoxStream,
     limits: &Limits,
@@ -450,10 +451,11 @@ pub(super) async fn connection(
     let mut last = Instant::now();
     let mut suppress_will = false;
     let mut error_disconnect_sent = false;
+    let mut fair = FairWork::default();
     let result = async {
         loop {
             let idle = last + keepalive.unwrap_or(Duration::from_millis(limits.idle_timeout_ms));
-            tokio::select! {
+            let work = tokio::select! {
                 biased;
                 _ = stop.cancelled() => break,
                 _ = attachment.cancel.cancelled() => {
@@ -463,7 +465,10 @@ pub(super) async fn connection(
                 }
                 _ = live_session.cancel.cancelled() => break,
                 _ = tokio::time::sleep_until(idle) => return Err(Error::Timeout),
-                command = commands.recv() => {
+                work = fair.select(commands.recv(), attachment.receiver.recv(), next_v5(&mut reader, &mut stream, limits, idle)) => work,
+            };
+            match work {
+                Work::Command(command) => {
                     let Some(mut command) = command else { break };
                     if command.progress.as_ref().map_or_else(|| command.expires_at <= now_ms(), |progress| progress.expire(now_ms())) {
                         if command.progress.is_none() { services.router.transport_state(DeliveryState::Expired); }
@@ -487,11 +492,11 @@ pub(super) async fn connection(
                         else { services.router.transport_state(DeliveryState::Failed); }
                     }
                 }
-                frame = attachment.receiver.recv() => {
+                Work::Frame(frame) => {
                     let Some(frame) = frame else { break };
                     send_frame(&mut stream, &services, &attachment.key, attachment.generation, frame, client_maximum, &mut error_disconnect_sent).await?;
                 }
-                packet = next_v5(&mut reader, &mut stream, limits, idle) => {
+                Work::Packet(packet) => {
                     let (packet, validation_us, validated_at) = match packet {
                         Ok(packet) => packet,
                         Err((error, reason)) => {
