@@ -41,7 +41,7 @@ fuzz_target!(|data: &[u8]| {
         let qos = chunk.get(3).copied().unwrap_or(0) % 3;
         let message = BrokerMessage {
             topic: "v1/t/t/p/p/d/d/up".into(),
-            payload: chunk.to_vec(),
+            payload: chunk.to_vec().into(),
             qos,
             retain: operation == 8,
             properties: Default::default(),

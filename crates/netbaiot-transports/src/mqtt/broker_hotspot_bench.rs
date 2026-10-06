@@ -25,7 +25,7 @@ fn identity(index: usize) -> AuthenticatedDevice {
 fn message(topic: String, qos: u8, expires: bool) -> BrokerMessage {
     BrokerMessage {
         topic,
-        payload: vec![7; 64],
+        payload: vec![7; 64].into(),
         qos,
         retain: false,
         properties: PublishProperties {
@@ -405,7 +405,7 @@ fn fanout_route_scaling() {
             for qos in [0, 1] {
                 let message = BrokerMessage {
                     topic: topic.into(),
-                    payload: vec![7; bytes],
+                    payload: vec![7; bytes].into(),
                     qos,
                     retain: false,
                     properties: Default::default(),
@@ -737,27 +737,29 @@ fn concurrent_route_ack_scaling() {
 static AUDIT_ALLOCATOR: &stats_alloc::StatsAlloc<std::alloc::System> =
     &stats_alloc::INSTRUMENTED_SYSTEM;
 
-fn measure_alloc<R>(
+fn measure_alloc<T, R>(
     name: &str,
     size: usize,
     iterations: usize,
-    mut action: impl FnMut() -> R,
+    mut setup: impl FnMut() -> T,
+    mut action: impl FnMut(T) -> R,
     mut cleanup: impl FnMut(R),
 ) {
     if cfg!(debug_assertions) {
         panic!("run in release mode");
     }
     for _ in 0..32 {
-        cleanup(action());
+        cleanup(action(setup()));
     }
     for run in 1..=3 {
         let mut samples = Vec::with_capacity(iterations);
         let mut allocations = 0;
         let mut bytes = 0;
         for _ in 0..iterations {
+            let input = setup();
             let region = stats_alloc::Region::new(&stats_alloc::INSTRUMENTED_SYSTEM);
             let started = Instant::now();
-            let result = black_box(action());
+            let result = black_box(action(input));
             let ns = started.elapsed().as_nanos();
             let stats = region.change();
             allocations += stats.allocations;
@@ -788,7 +790,7 @@ fn no_subscriber_route_allocations() {
     for bytes in [64, 1024, 16384, 65536] {
         let message = BrokerMessage {
             topic: "v1/t/tenant/p/product/d/device-0/up".into(),
-            payload: vec![7; bytes],
+            payload: vec![7; bytes].into(),
             qos: 1,
             retain: false,
             properties: Default::default(),
@@ -797,7 +799,8 @@ fn no_subscriber_route_allocations() {
             "no_subscriber",
             bytes,
             4000,
-            || {
+            || (),
+            |_| {
                 broker
                     .route_from_session(&attachment.key, &message)
                     .unwrap()
@@ -827,20 +830,20 @@ fn fanout_route_allocations() {
         }
         for bytes in [64, 1024, 16384] {
             for qos in [0, 1] {
-                let message = BrokerMessage {
-                    topic: topic.into(),
-                    payload: vec![7; bytes],
-                    qos,
-                    retain: false,
-                    properties: Default::default(),
-                };
                 let name = format!("fanout_{subscribers}_qos{qos}");
                 let before = metrics.render();
                 measure_alloc(
                     &name,
                     bytes,
                     100,
-                    || broker.route(&auth.device_key, message.clone()).unwrap(),
+                    || BrokerMessage {
+                        topic: topic.into(),
+                        payload: vec![7; bytes].into(),
+                        qos,
+                        retain: false,
+                        properties: Default::default(),
+                    },
+                    |message| broker.route(&auth.device_key, message).unwrap(),
                     |delivered| {
                         assert_eq!(delivered, subscribers);
                         for attachment in &mut attachments {

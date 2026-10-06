@@ -114,7 +114,7 @@ fn attach(services: &Services, auth: &AuthenticatedDevice, v5: bool) -> broker::
 fn message(auth: &AuthenticatedDevice, expiry: Timestamp) -> BrokerMessage {
     BrokerMessage {
         topic: topic(&auth.device_key, TopicKind::Down),
-        payload: vec![1],
+        payload: vec![1].into(),
         qos: 0,
         retain: false,
         properties: broker::PublishProperties {
@@ -315,7 +315,7 @@ async fn qos0_prewrite_expiry_and_encoding_failure_for_both_mqtt_versions() {
             let progress = CommandProgress::new(expiry, services.ingress.metrics.clone());
             let mut message = message(&auth, expiry);
             if !expired {
-                message.payload = vec![0; services.ingress.limits.max_mqtt_packet_size];
+                message.payload = vec![0; services.ingress.limits.max_mqtt_packet_size].into();
             }
             services
                 .mqtt

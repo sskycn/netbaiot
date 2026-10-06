@@ -97,7 +97,7 @@ fn fixture(count: usize, distribution: &str) -> Fixture {
         .unwrap();
     let message = BrokerMessage {
         topic: topic.clone(),
-        payload: vec![7; 64],
+        payload: vec![7; 64].into(),
         qos: 1,
         retain: false,
         properties: Default::default(),
@@ -224,7 +224,7 @@ fn route_offline(case: &Fixture, index: usize, deadline: i64) {
     let identity = auth("tenant".to_owned(), format!("device-{index}"));
     let message = BrokerMessage {
         topic: topic(&identity.device_key, TopicKind::Down),
-        payload: vec![7; 64],
+        payload: vec![7; 64].into(),
         qos: 1,
         retain: false,
         properties: netbaiot_transports::mqtt::broker::PublishProperties {

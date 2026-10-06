@@ -409,7 +409,7 @@ pub(super) async fn connection(
                 attachment.key.clone(),
                 BrokerMessage {
                     topic: will.topic,
-                    payload: will.payload.to_vec(),
+                    payload: will.payload,
                     qos: will.qos,
                     retain: will.retain,
                     properties,
@@ -482,7 +482,7 @@ pub(super) async fn connection(
                     };
                     let progress = command.progress.take();
                     if services.mqtt.send_live_tracked(&attachment.key, attachment.generation, BrokerMessage {
-                        topic: down, payload: command.bytes.to_vec(), qos, retain: false,
+                        topic: down, payload: std::mem::take(&mut command.bytes).into(), qos, retain: false,
                         properties: PublishProperties {
                             expires_at_ms: Some(command.expires_at),
                             ..Default::default()
@@ -659,14 +659,14 @@ pub(super) async fn connection(
                             } else {
                                 publish_acl(&auth, &topic)?;
                             }
-                            let message = BrokerMessage { topic, payload: payload.to_vec(), qos, retain,
+                            let message = BrokerMessage { topic, payload, qos, retain,
                                 properties: PublishProperties::from_wire(&properties) };
                             if qos > 0 && !services.mqtt.inbound_receive_available(&attachment.key, attachment.generation, qos, packet_id.ok_or(Error::Invalid)?)? {
                                 fail_with_reason(&mut stream, &services, client_maximum, &mut error_disconnect_sent, v5::DisconnectReason::ReceiveMaximumExceeded, Error::Overloaded).await?;
                             }
                             if qos == 2 {
                                 let id = packet_id.ok_or(Error::Invalid)?;
-                                if properties.payload_format == Some(1) && std::str::from_utf8(&payload).is_err() {
+                                if properties.payload_format == Some(1) && std::str::from_utf8(&message.payload).is_err() {
                                     let bytes = v5::ack(v5::AckReason::Pubrec(v5::PubrecReason::PayloadFormatInvalid), id, limits.max_mqtt_packet_size)?;
                                     send_v5(&mut stream, &services, &bytes, client_maximum, Some(&mut error_disconnect_sent)).await?;
                                     continue;
@@ -768,7 +768,7 @@ mod tests {
         ));
         let original = broker::BrokerMessage {
             topic: allowed.into(),
-            payload: b"first".to_vec(),
+            payload: b"first".to_vec().into(),
             qos: 2,
             retain: false,
             properties: Default::default(),

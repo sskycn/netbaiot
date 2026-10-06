@@ -102,11 +102,28 @@ impl<'de> Deserialize<'de> for Subscription {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BrokerMessage {
     pub topic: String,
-    pub payload: Vec<u8>,
+    #[serde(with = "payload_bytes")]
+    pub payload: bytes::Bytes,
     pub qos: u8,
     pub retain: bool,
     #[serde(default)]
     pub properties: PublishProperties,
+}
+
+// Keep historical JSON recovery payloads as arrays of byte values.
+mod payload_bytes {
+    use super::*;
+    pub fn serialize<S: serde::Serializer>(
+        payload: &bytes::Bytes,
+        serializer: S,
+    ) -> std::result::Result<S::Ok, S::Error> {
+        payload.as_ref().serialize(serializer)
+    }
+    pub fn deserialize<'de, D: serde::Deserializer<'de>>(
+        deserializer: D,
+    ) -> std::result::Result<bytes::Bytes, D::Error> {
+        Vec::<u8>::deserialize(deserializer).map(bytes::Bytes::from)
+    }
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -5815,7 +5832,7 @@ fn decode_message(
     };
     Ok(BrokerMessage {
         topic,
-        payload,
+        payload: payload.into(),
         qos,
         retain,
         properties,
@@ -6197,6 +6214,151 @@ mod tests {
     use std::fmt::Debug;
     use std::time::Duration;
 
+    #[test]
+    fn shared_payload_fanout_preserves_each_logical_responsibility() {
+        let limits = Arc::new(Limits::default());
+        let broker = MqttBroker::new(limits.clone());
+        let device = auth("shared");
+        let topic = "v1/t/t/p/p/d/shared/down";
+        let mut attachments = Vec::new();
+        for client in ["one", "two"] {
+            let attachment = broker.attach(&device, client.into(), false).unwrap();
+            broker
+                .subscribe(&attachment.key, attachment.generation, topic, 1)
+                .unwrap();
+            attachments.push(attachment);
+        }
+        let before = broker.usage().unwrap();
+        let message = BrokerMessage {
+            topic: topic.into(),
+            payload: vec![7; 16384].into(),
+            qos: 1,
+            retain: true,
+            properties: Default::default(),
+        };
+        let charge = message.bytes();
+        assert_eq!(
+            broker.route(&device.device_key, message.clone()).unwrap(),
+            2
+        );
+        {
+            let state = broker.state.lock().unwrap();
+            assert_eq!(state.session_bytes, before.1 + 2 * charge);
+            assert_eq!(state.retained_bytes, charge);
+            assert_eq!(
+                state.tenant_usage[&device.device_key.tenant_id].qos1_inflight,
+                2
+            );
+            assert_eq!(
+                state.retained[topic].message.payload.as_ptr(),
+                message.payload.as_ptr()
+            );
+            for session in state.sessions.values() {
+                let OutboundState::AwaitPuback(saved) = session.outbound.values().next().unwrap()
+                else {
+                    panic!("qos1");
+                };
+                assert_eq!(saved.payload.as_ptr(), message.payload.as_ptr());
+            }
+            assert_accounting_consistent(&state);
+        }
+        assert_eq!(
+            broker.global_outbound_bytes.available(),
+            limits.max_outbound_bytes - 2 * charge
+        );
+        for attachment in &mut attachments {
+            let BrokerFrame::Publish(delivery) = attachment.receiver.try_recv().unwrap() else {
+                panic!("publish");
+            };
+            assert_eq!(delivery.message.payload.as_ptr(), message.payload.as_ptr());
+            let id = delivery.packet_id.unwrap();
+            drop(delivery);
+            broker
+                .puback(&attachment.key, attachment.generation, id)
+                .unwrap();
+        }
+        assert_eq!(broker.usage().unwrap().1, before.1);
+        assert_eq!(
+            broker.global_outbound_bytes.available(),
+            limits.max_outbound_bytes
+        );
+        assert_broker_accounting(&broker);
+    }
+
+    #[test]
+    fn shared_payload_cannot_bypass_atomic_fanout_byte_limits() {
+        let device = auth("shared-limit");
+        let topic = "v1/t/t/p/p/d/shared-limit/down";
+        let message = BrokerMessage {
+            topic: topic.into(),
+            payload: vec![7; 16384].into(),
+            qos: 1,
+            retain: true,
+            properties: Default::default(),
+        };
+        let charge = message.bytes();
+        let limits = Arc::new(Limits {
+            max_outbound_bytes: charge,
+            max_outbound_bytes_per_tenant: charge,
+            // A second responsibility cannot fall back to the bounded offline
+            // queue either. Sharing the physical buffer must not admit it.
+            max_offline_bytes_per_session: charge - 1,
+            ..Limits::default()
+        });
+        let broker = MqttBroker::new(limits);
+        let mut attachments = Vec::new();
+        for client in ["one", "two"] {
+            let attachment = broker.attach(&device, client.into(), false).unwrap();
+            broker
+                .subscribe(&attachment.key, attachment.generation, topic, 1)
+                .unwrap();
+            attachments.push(attachment);
+        }
+        let before = broker.usage().unwrap();
+        assert!(matches!(
+            broker.route(&device.device_key, message),
+            Err(Error::Overloaded)
+        ));
+        assert_eq!(broker.usage().unwrap(), before);
+        assert_eq!(broker.global_outbound_bytes.available(), charge);
+        assert!(
+            attachments
+                .iter_mut()
+                .all(|a| a.receiver.try_recv().is_err())
+        );
+        assert_broker_accounting(&broker);
+    }
+
+    #[test]
+    fn shared_payload_preserves_legacy_json_and_compact_recovery_bytes() {
+        let legacy =
+            br#"{"topic":"v1/t/t/p/p/d/shared/up","payload":[0,1,255],"qos":1,"retain":false}"#;
+        let message: BrokerMessage = serde_json::from_slice(legacy).unwrap();
+        assert_eq!(message.payload.as_ref(), &[0, 1, 255]);
+        let value = serde_json::to_value(&message).unwrap();
+        assert_eq!(value["payload"], serde_json::json!([0, 1, 255]));
+        assert_eq!(
+            serde_json::from_value::<BrokerMessage>(value).unwrap(),
+            message
+        );
+        let mut encoded = Vec::new();
+        encode_message(&mut encoded, &message).unwrap();
+        let mut expected = Vec::new();
+        expected.extend_from_slice(&(message.topic.len() as u16).to_be_bytes());
+        expected.extend_from_slice(message.topic.as_bytes());
+        expected.extend_from_slice(&3u32.to_be_bytes());
+        expected.extend_from_slice(&[0, 1, 255, 1, 0, 2]);
+        expected.extend_from_slice(&(-1i64).to_be_bytes());
+        expected.extend_from_slice(&[0, 0, 0, 0, 0]);
+        assert_eq!(encoded, expected);
+        let mut reader = RecordReader::new(&encoded);
+        assert_eq!(
+            decode_message(&mut reader, &Limits::default(), RECOVERY_VERSION).unwrap(),
+            message
+        );
+        reader.finish().unwrap();
+    }
+
     #[tokio::test]
     async fn mqtt_temporary_file_budget_blocks_commit_without_replacing_snapshot() {
         let directory = std::env::temp_dir().join(format!(
@@ -6476,7 +6638,7 @@ mod tests {
                     origin: Some(key.clone()),
                     message: BrokerMessage {
                         topic: format!("v1/t/t/p/p/d/will-{index}/up"),
-                        payload: vec![7; 32],
+                        payload: vec![7; 32].into(),
                         qos: 1,
                         retain: false,
                         properties: Default::default(),
@@ -6533,7 +6695,7 @@ mod tests {
                     &identity.device_key,
                     BrokerMessage {
                         topic: down.into(),
-                        payload: step.to_be_bytes().to_vec(),
+                        payload: step.to_be_bytes().to_vec().into(),
                         qos,
                         retain: false,
                         properties: Default::default(),
@@ -6563,7 +6725,7 @@ mod tests {
                 let inbound_id = step + 1;
                 let inbound = BrokerMessage {
                     topic: up.into(),
-                    payload: step.to_be_bytes().to_vec(),
+                    payload: step.to_be_bytes().to_vec().into(),
                     qos: 2,
                     retain: false,
                     properties: Default::default(),
@@ -6610,7 +6772,7 @@ mod tests {
                         &identity.device_key,
                         BrokerMessage {
                             topic: up.into(),
-                            payload: vec![1, 2, 3],
+                            payload: vec![1, 2, 3].into(),
                             qos: 0,
                             retain: true,
                             properties: Default::default(),
@@ -6623,7 +6785,7 @@ mod tests {
                         &identity.device_key,
                         BrokerMessage {
                             topic: up.into(),
-                            payload: Vec::new(),
+                            payload: Vec::new().into(),
                             qos: 0,
                             retain: true,
                             properties: Default::default(),
@@ -6640,7 +6802,7 @@ mod tests {
                         &identity.device_key,
                         BrokerMessage {
                             topic: down.into(),
-                            payload: vec![4, 5, 6],
+                            payload: vec![4, 5, 6].into(),
                             qos: 1,
                             retain: false,
                             properties: Default::default(),
@@ -6717,7 +6879,7 @@ mod tests {
                 &first.device_key,
                 BrokerMessage {
                     topic: down.into(),
-                    payload: b"first".to_vec(),
+                    payload: b"first".to_vec().into(),
                     qos: 1,
                     retain: false,
                     properties: Default::default(),
@@ -6743,7 +6905,7 @@ mod tests {
         assert_broker_accounting(&broker);
         let inbound = BrokerMessage {
             topic: "v1/t/t/p/p/d/shared-device/up".into(),
-            payload: b"inbound".to_vec(),
+            payload: b"inbound".to_vec().into(),
             qos: 2,
             retain: false,
             properties: Default::default(),
@@ -6806,7 +6968,7 @@ mod tests {
                     &identity.device_key,
                     BrokerMessage {
                         topic: down.into(),
-                        payload: vec![1; 64],
+                        payload: vec![1; 64].into(),
                         qos,
                         retain: false,
                         properties: Default::default(),
@@ -6839,7 +7001,7 @@ mod tests {
                 &identity.device_key,
                 BrokerMessage {
                     topic: down.into(),
-                    payload: vec![2; 64],
+                    payload: vec![2; 64].into(),
                     qos: 1,
                     retain: false,
                     properties: PublishProperties {
@@ -6865,7 +7027,7 @@ mod tests {
                 &identity.device_key,
                 BrokerMessage {
                     topic: down.into(),
-                    payload: vec![3; 64],
+                    payload: vec![3; 64].into(),
                     qos: 1,
                     retain: false,
                     properties: PublishProperties {
@@ -6900,7 +7062,7 @@ mod tests {
                     &identity.device_key,
                     BrokerMessage {
                         topic: down,
-                        payload: vec![index as u8],
+                        payload: vec![index as u8].into(),
                         qos: 1,
                         retain: false,
                         properties: PublishProperties {
@@ -6989,7 +7151,7 @@ mod tests {
                     &identity.device_key,
                     BrokerMessage {
                         topic: topic.clone(),
-                        payload: vec![1],
+                        payload: vec![1].into(),
                         qos: 1,
                         retain: true,
                         properties: PublishProperties {
@@ -7042,7 +7204,7 @@ mod tests {
                 let owner = auth(&format!("will-index-{index}")).device_key;
                 let message = BrokerMessage {
                     topic: format!("v1/t/t/p/p/d/will-index-{index}/up"),
-                    payload: vec![index as u8],
+                    payload: vec![index as u8].into(),
                     qos: 1,
                     retain: false,
                     properties: Default::default(),
@@ -7089,7 +7251,7 @@ mod tests {
         let owner = auth("future-will").device_key;
         let message = BrokerMessage {
             topic: "v1/t/t/p/p/d/future-will/up".into(),
-            payload: vec![1; 64],
+            payload: vec![1; 64].into(),
             qos: 1,
             retain: false,
             properties: Default::default(),
@@ -7156,7 +7318,7 @@ mod tests {
                 device.device_key.clone(),
                 BrokerMessage {
                     topic: topic.into(),
-                    payload: b"delayed".to_vec(),
+                    payload: b"delayed".to_vec().into(),
                     qos: 1,
                     retain: true,
                     properties: PublishProperties {
@@ -7190,7 +7352,7 @@ mod tests {
                 resumed.key.clone(),
                 BrokerMessage {
                     topic: topic.into(),
-                    payload: b"recover".to_vec(),
+                    payload: b"recover".to_vec().into(),
                     qos: 1,
                     retain: true,
                     properties: PublishProperties {
@@ -7262,7 +7424,7 @@ mod tests {
                 device.device_key.clone(),
                 BrokerMessage {
                     topic: topic.into(),
-                    payload: b"old".to_vec(),
+                    payload: b"old".to_vec().into(),
                     qos: 1,
                     retain: true,
                     properties: Default::default(),
@@ -7301,7 +7463,7 @@ mod tests {
                 device.device_key.clone(),
                 BrokerMessage {
                     topic: topic.into(),
-                    payload: b"ended".to_vec(),
+                    payload: b"ended".to_vec().into(),
                     qos: 1,
                     retain: true,
                     properties: Default::default(),
@@ -7339,7 +7501,7 @@ mod tests {
                 device.device_key.clone(),
                 BrokerMessage {
                     topic: topic.into(),
-                    payload: b"old".to_vec(),
+                    payload: b"old".to_vec().into(),
                     qos: 1,
                     retain: true,
                     properties: Default::default(),
@@ -7376,7 +7538,7 @@ mod tests {
                 device.device_key.clone(),
                 BrokerMessage {
                     topic: topic.into(),
-                    payload: b"new".to_vec(),
+                    payload: b"new".to_vec().into(),
                     qos: 1,
                     retain: true,
                     properties: Default::default(),
@@ -7415,7 +7577,7 @@ mod tests {
             .unwrap();
         let message = BrokerMessage {
             topic: topic.into(),
-            payload: b"payload".to_vec(),
+            payload: b"payload".to_vec().into(),
             qos: 2,
             retain: false,
             properties: Default::default(),
@@ -7448,7 +7610,7 @@ mod tests {
         let BrokerFrame::Publish(delivery) = attachment.receiver.try_recv().unwrap() else {
             panic!("waiting subscriber copy should advance without another packet");
         };
-        assert_eq!(delivery.message.payload, b"payload");
+        assert_eq!(delivery.message.payload.as_ref(), b"payload");
         assert_eq!(delivery.message.qos, 2);
         assert_eq!(broker.state.lock().unwrap().offline_count, 0);
         attachment.detach().unwrap();
@@ -7460,7 +7622,7 @@ mod tests {
         let topic = "v1/t/t/p/p/d/byte-budget/up";
         let message = BrokerMessage {
             topic: topic.into(),
-            payload: vec![7; 512],
+            payload: vec![7; 512].into(),
             qos: 0,
             retain: false,
             properties: Default::default(),
@@ -7514,7 +7676,7 @@ mod tests {
     fn mqtt_live_delivery_obeys_tenant_and_global_byte_budgets() {
         let message = |tenant: &str, device: &str| BrokerMessage {
             topic: format!("v1/t/{tenant}/p/p/d/{device}/up"),
-            payload: vec![3; 256],
+            payload: vec![3; 256].into(),
             qos: 0,
             retain: false,
             properties: Default::default(),
@@ -7588,7 +7750,7 @@ mod tests {
         second_device.device_key.tenant_id = TenantId::new("u").unwrap();
         let message = |tenant: &str, device: &str| BrokerMessage {
             topic: format!("v1/t/{tenant}/p/p/d/{device}/up"),
-            payload: vec![5; 256],
+            payload: vec![5; 256].into(),
             qos: 1,
             retain: false,
             properties: Default::default(),
@@ -7643,7 +7805,7 @@ mod tests {
         second_device.device_key.tenant_id = TenantId::new("u").unwrap();
         let message = |tenant: &str, device: &str| BrokerMessage {
             topic: format!("v1/t/{tenant}/p/p/d/{device}/up"),
-            payload: vec![3; 256],
+            payload: vec![3; 256].into(),
             qos: 1,
             retain: false,
             properties: Default::default(),
@@ -7709,7 +7871,7 @@ mod tests {
         let second_topic = "v1/t/t/p/p/d/retained-byte/down_ack";
         let message = |topic: &str| BrokerMessage {
             topic: topic.into(),
-            payload: vec![9; 512],
+            payload: vec![9; 512].into(),
             qos: 0,
             retain: true,
             properties: Default::default(),
@@ -7780,7 +7942,7 @@ mod tests {
                     &attachment.key,
                     &BrokerMessage {
                         topic: topic.into(),
-                        payload,
+                        payload: payload.into(),
                         qos: 1,
                         retain: false,
                         properties: Default::default(),
@@ -7791,7 +7953,7 @@ mod tests {
         let BrokerFrame::Publish(first) = attachment.receiver.try_recv().unwrap() else {
             panic!("expected first PUBLISH")
         };
-        assert_eq!(first.message.payload, b"first");
+        assert_eq!(first.message.payload.as_ref(), b"first");
         assert!(attachment.receiver.try_recv().is_err());
         assert_eq!(broker.state.lock().unwrap().offline_count, 1);
         broker
@@ -7811,7 +7973,7 @@ mod tests {
         let BrokerFrame::Publish(second) = second else {
             panic!("expected deferred PUBLISH")
         };
-        assert_eq!(second.message.payload, b"second");
+        assert_eq!(second.message.payload.as_ref(), b"second");
         assert_eq!(broker.state.lock().unwrap().offline_count, 0);
         attachment.detach().unwrap();
     }
@@ -7833,7 +7995,7 @@ mod tests {
                     &attachment.key,
                     &BrokerMessage {
                         topic: topic.into(),
-                        payload,
+                        payload: payload.into(),
                         qos: 2,
                         retain: false,
                         properties: Default::default(),
@@ -7845,7 +8007,7 @@ mod tests {
             panic!("expected first QoS2 PUBLISH")
         };
         let id = first.packet_id.unwrap();
-        assert_eq!(first.message.payload, b"first");
+        assert_eq!(first.message.payload.as_ref(), b"first");
         assert!(attachment.receiver.try_recv().is_err());
         assert!(matches!(
             broker.pubrec(&attachment.key, attachment.generation, id).unwrap(),
@@ -7880,7 +8042,7 @@ mod tests {
         let BrokerFrame::Publish(second) = second else {
             panic!("expected second QoS2 PUBLISH")
         };
-        assert_eq!(second.message.payload, b"second");
+        assert_eq!(second.message.payload.as_ref(), b"second");
         attachment.detach().unwrap();
     }
 
@@ -7901,7 +8063,7 @@ mod tests {
                     &attachment.key,
                     &BrokerMessage {
                         topic: topic.into(),
-                        payload,
+                        payload: payload.into(),
                         qos: 2,
                         retain: false,
                         properties: Default::default(),
@@ -7925,7 +8087,7 @@ mod tests {
             .or_else(|| attachment.receiver.try_recv().ok())
             .unwrap();
         assert!(
-            matches!(second, BrokerFrame::Publish(delivery) if delivery.message.payload == b"second")
+            matches!(second, BrokerFrame::Publish(delivery) if delivery.message.payload.as_ref() == b"second")
         );
         attachment.detach().unwrap();
     }
@@ -7947,7 +8109,7 @@ mod tests {
                     &old.key,
                     &BrokerMessage {
                         topic: topic.into(),
-                        payload,
+                        payload: payload.into(),
                         qos: 2,
                         retain: false,
                         properties: Default::default(),
@@ -7988,7 +8150,7 @@ mod tests {
             .unwrap();
         let message = BrokerMessage {
             topic: "v1/t/t/p/p/d/server-receive-max/up".into(),
-            payload: b"data".to_vec(),
+            payload: b"data".to_vec().into(),
             qos: 2,
             retain: false,
             properties: Default::default(),
@@ -8040,7 +8202,7 @@ mod tests {
                 7,
                 BrokerMessage {
                     topic: "v1/t/t/p/p/d/inbound-window-reconnect/up".into(),
-                    payload: b"old".to_vec(),
+                    payload: b"old".to_vec().into(),
                     qos: 2,
                     retain: false,
                     properties: Default::default(),
@@ -8080,7 +8242,7 @@ mod tests {
         let deadline = now_ms() + 5_000;
         let message = BrokerMessage {
             topic: "v1/t/t/p/p/d/qos2-expiry/up".into(),
-            payload: b"first".to_vec(),
+            payload: b"first".to_vec().into(),
             qos: 2,
             retain: false,
             properties: PublishProperties {
@@ -8111,7 +8273,7 @@ mod tests {
             .unwrap();
         assert_eq!(stored.0.properties.expires_at_ms, Some(deadline));
         let accounting = transaction_accounting(&broker, &attachment.key);
-        retransmit.payload = b"different".to_vec();
+        retransmit.payload = b"different".to_vec().into();
         assert!(
             !broker
                 .inbound_qos2(
@@ -8148,7 +8310,7 @@ mod tests {
             .unwrap();
         let message = BrokerMessage {
             topic: "v1/t/t/p/p/d/qos2-duplicate/up".into(),
-            payload: b"original".to_vec(),
+            payload: b"original".to_vec().into(),
             qos: 2,
             retain: true,
             properties: Default::default(),
@@ -8235,7 +8397,7 @@ mod tests {
         let owner = auth("legacy-will").device_key;
         let message = BrokerMessage {
             topic: "v1/t/t/p/p/d/legacy-will/up".into(),
-            payload: b"old".to_vec(),
+            payload: b"old".to_vec().into(),
             qos: 1,
             retain: false,
             properties: Default::default(),
@@ -8317,7 +8479,7 @@ mod tests {
             .unwrap();
         let message = BrokerMessage {
             topic: "v1/t/t/p/p/d/window-retransmit/up".into(),
-            payload: b"original".to_vec(),
+            payload: b"original".to_vec().into(),
             qos: 2,
             retain: false,
             properties: Default::default(),
@@ -8415,7 +8577,7 @@ mod tests {
     fn inbound_qos2_repeated_publish_does_not_change_accounting() {
         let (broker, mut attachment, mut message) = qos2_duplicate_case();
         let before = transaction_accounting(&broker, &attachment.key);
-        message.payload = b"different-and-larger".to_vec();
+        message.payload = b"different-and-larger".to_vec().into();
         message.retain = false;
         assert!(
             !broker
@@ -8431,7 +8593,9 @@ mod tests {
         let (broker, mut attachment, mut message) = qos2_duplicate_case();
         // The connection supplies identical broker state transitions for both wire DUP values.
         for _dup in [false, true] {
-            message.payload.push(b'x');
+            let mut payload = message.payload.to_vec();
+            payload.push(b'x');
+            message.payload = payload.into();
             assert!(
                 !broker
                     .inbound_qos2(&attachment.key, attachment.generation, 7, message.clone())
@@ -8449,7 +8613,7 @@ mod tests {
     fn inbound_qos2_original_message_remains_authoritative_until_pubrel() {
         let (broker, mut attachment, message) = qos2_duplicate_case();
         let mut changed = message.clone();
-        changed.payload = b"replacement".to_vec();
+        changed.payload = b"replacement".to_vec().into();
         changed.properties.content_type = Some("changed".into());
         assert!(
             !broker
@@ -8478,7 +8642,7 @@ mod tests {
             .finish_inbound_pubcomp(&attachment.key, attachment.generation, 7)
             .unwrap();
         let mut next = message;
-        next.payload = b"next".to_vec();
+        next.payload = b"next".to_vec().into();
         assert!(
             broker
                 .inbound_qos2(&attachment.key, attachment.generation, 7, next.clone())
@@ -8511,7 +8675,7 @@ mod tests {
                 &attachment.key,
                 &BrokerMessage {
                     topic: topic.into(),
-                    payload: b"data".to_vec(),
+                    payload: b"data".to_vec().into(),
                     qos: 1,
                     retain: false,
                     properties: PublishProperties {
@@ -8572,7 +8736,7 @@ mod tests {
                 &attachment.key,
                 &BrokerMessage {
                     topic: topic.into(),
-                    payload: b"data".to_vec(),
+                    payload: b"data".to_vec().into(),
                     qos: 1,
                     retain: false,
                     properties: PublishProperties {
@@ -8629,7 +8793,7 @@ mod tests {
                     &attachment.key,
                     &BrokerMessage {
                         topic: topic.clone(),
-                        payload,
+                        payload: payload.into(),
                         qos,
                         retain: false,
                         properties: Default::default(),
@@ -8669,7 +8833,7 @@ mod tests {
         let BrokerFrame::Publish(second) = next.unwrap() else {
             panic!("expected following PUBLISH")
         };
-        assert_eq!(second.message.payload, b"small");
+        assert_eq!(second.message.payload.as_ref(), b"small");
         assert_eq!(
             broker.state.lock().unwrap().sessions[&attachment.key]
                 .send_window
@@ -8684,7 +8848,7 @@ mod tests {
         let BrokerFrame::Publish(resumed_delivery) = resumed.receiver.try_recv().unwrap() else {
             panic!("expected following PUBLISH on reconnect")
         };
-        assert_eq!(resumed_delivery.message.payload, b"small");
+        assert_eq!(resumed_delivery.message.payload.as_ref(), b"small");
         assert!(resumed.receiver.try_recv().is_err());
         resumed.detach().unwrap();
     }
@@ -8717,7 +8881,7 @@ mod tests {
         let deadline = now_ms() + 10_000;
         let command = |payload: &[u8]| BrokerMessage {
             topic: "v1/t/t/p/p/d/command-expiry/down".into(),
-            payload: payload.to_vec(),
+            payload: payload.to_vec().into(),
             qos: 1,
             retain: false,
             properties: PublishProperties {
@@ -8765,7 +8929,7 @@ mod tests {
         let down = "v1/t/t/p/p/d/command-fence/down";
         let message = || BrokerMessage {
             topic: down.into(),
-            payload: b"command".to_vec(),
+            payload: b"command".to_vec().into(),
             qos: 1,
             retain: false,
             properties: Default::default(),
@@ -8796,7 +8960,7 @@ mod tests {
                 &device.device_key,
                 BrokerMessage {
                     topic: down.into(),
-                    payload: b"ordinary".to_vec(),
+                    payload: b"ordinary".to_vec().into(),
                     qos: 1,
                     retain: false,
                     properties: Default::default(),
@@ -8847,7 +9011,7 @@ mod tests {
         let worker = std::thread::spawn(move || {
             let command = BrokerMessage {
                 topic: down.into(),
-                payload: b"old-command".to_vec(),
+                payload: b"old-command".to_vec().into(),
                 qos: 1,
                 retain: false,
                 properties: Default::default(),
@@ -8888,7 +9052,7 @@ mod tests {
                 attachment.generation,
                 BrokerMessage {
                     topic: "v1/t/t/p/p/d/command-recovery/down".into(),
-                    payload: b"command".to_vec(),
+                    payload: b"command".to_vec().into(),
                     qos: 1,
                     retain: false,
                     properties: PublishProperties {
@@ -8936,7 +9100,7 @@ mod tests {
                 &attachment.key,
                 &BrokerMessage {
                     topic: topic.into(),
-                    payload: b"data".to_vec(),
+                    payload: b"data".to_vec().into(),
                     qos: 2,
                     retain: false,
                     properties: PublishProperties {
@@ -9006,7 +9170,7 @@ mod tests {
                 &attachment.key,
                 &BrokerMessage {
                     topic: topic.into(),
-                    payload: b"first".to_vec(),
+                    payload: b"first".to_vec().into(),
                     qos: 1,
                     retain: false,
                     properties: PublishProperties {
@@ -9075,7 +9239,7 @@ mod tests {
             .unwrap();
         let message = BrokerMessage {
             topic: topic.into(),
-            payload: b"data".to_vec(),
+            payload: b"data".to_vec().into(),
             qos: 1,
             retain: false,
             properties: PublishProperties {
@@ -9272,7 +9436,7 @@ mod tests {
         let mut snapshot = broker.snapshot().unwrap();
         let message = BrokerMessage {
             topic: "v1/t/t/p/p/d/v4-outbound/down".into(),
-            payload: b"legacy".to_vec(),
+            payload: b"legacy".to_vec().into(),
             qos: 1,
             retain: false,
             properties: Default::default(),
@@ -9306,7 +9470,7 @@ mod tests {
         attachment.detach().unwrap();
         let message = BrokerMessage {
             topic: topic.into(),
-            payload: b"value".to_vec(),
+            payload: b"value".to_vec().into(),
             qos: 1,
             retain: true,
             properties: PublishProperties {
@@ -9367,7 +9531,7 @@ mod tests {
                 &auth.device_key,
                 BrokerMessage {
                     topic: topic.into(),
-                    payload: b"value".to_vec(),
+                    payload: b"value".to_vec().into(),
                     qos: 1,
                     retain: true,
                     properties: PublishProperties {
@@ -9443,7 +9607,7 @@ mod tests {
                 &a.key,
                 &BrokerMessage {
                     topic: topic.into(),
-                    payload: b"value".to_vec(),
+                    payload: b"value".to_vec().into(),
                     qos: 1,
                     retain: true,
                     properties: Default::default(),
@@ -9530,7 +9694,7 @@ mod tests {
                 old.key.clone(),
                 BrokerMessage {
                     topic: topic.into(),
-                    payload: b"will".to_vec(),
+                    payload: b"will".to_vec().into(),
                     qos: 1,
                     retain: true,
                     properties: Default::default(),
@@ -9554,7 +9718,7 @@ mod tests {
         let BrokerFrame::Publish(delivery) = observer.receiver.try_recv().unwrap() else {
             panic!("other subscriber must receive the Will")
         };
-        assert_eq!(delivery.message.payload, b"will");
+        assert_eq!(delivery.message.payload.as_ref(), b"will");
         assert_eq!(
             broker
                 .state
@@ -9626,7 +9790,7 @@ mod tests {
         assert!(!other.session_present);
         let message = BrokerMessage {
             topic: "v1/t/t/p/p/d/a/up".into(),
-            payload: b"x".to_vec(),
+            payload: b"x".to_vec().into(),
             qos: 2,
             retain: false,
             properties: Default::default(),
@@ -9688,7 +9852,7 @@ mod tests {
         let first = broker.attach(&a, "a".into(), false).unwrap();
         let message = BrokerMessage {
             topic: "v1/t/t/p/p/d/a/up".into(),
-            payload: b"x".to_vec(),
+            payload: b"x".to_vec().into(),
             qos: 2,
             retain: false,
             properties: Default::default(),
@@ -9715,7 +9879,7 @@ mod tests {
         let second = broker.attach(&b, "b".into(), false).unwrap();
         let message = |device: &str| BrokerMessage {
             topic: format!("v1/t/t/p/p/d/{device}/up"),
-            payload: b"x".to_vec(),
+            payload: b"x".to_vec().into(),
             qos: 2,
             retain: false,
             properties: Default::default(),
@@ -9744,7 +9908,7 @@ mod tests {
                 &device.device_key,
                 BrokerMessage {
                     topic: "matrix/qos2".into(),
-                    payload: vec![2],
+                    payload: vec![2].into(),
                     qos: 2,
                     retain: false,
                     properties: Default::default(),
@@ -9799,7 +9963,7 @@ mod tests {
                 &device.device_key,
                 BrokerMessage {
                     topic: "matrix/qos1".into(),
-                    payload: vec![1],
+                    payload: vec![1].into(),
                     qos: 1,
                     retain: false,
                     properties: Default::default(),
@@ -9846,7 +10010,7 @@ mod tests {
                 7,
                 BrokerMessage {
                     topic: "takeover/up".into(),
-                    payload: vec![7],
+                    payload: vec![7].into(),
                     qos: 2,
                     retain: false,
                     properties: Default::default(),
@@ -9913,7 +10077,7 @@ mod tests {
                 7,
                 BrokerMessage {
                     topic: "clean/incarnation".into(),
-                    payload: b"old".to_vec(),
+                    payload: b"old".to_vec().into(),
                     qos: 2,
                     retain: false,
                     properties: Default::default(),
@@ -9939,7 +10103,7 @@ mod tests {
                 7,
                 BrokerMessage {
                     topic: "clean/incarnation".into(),
-                    payload: b"new".to_vec(),
+                    payload: b"new".to_vec().into(),
                     qos: 2,
                     retain: false,
                     properties: Default::default(),
@@ -10012,7 +10176,7 @@ mod tests {
                 &device.device_key,
                 BrokerMessage {
                     topic: "atomic/b-only".into(),
-                    payload: vec![1],
+                    payload: vec![1].into(),
                     qos,
                     retain: false,
                     properties: Default::default(),
@@ -10024,7 +10188,7 @@ mod tests {
                 &device.device_key,
                 BrokerMessage {
                     topic: "atomic/shared".into(),
-                    payload: vec![2],
+                    payload: vec![2].into(),
                     qos,
                     retain: false,
                     properties: Default::default(),
@@ -10076,7 +10240,7 @@ mod tests {
             for session in state.sessions.values_mut() {
                 let stored = BrokerMessage {
                     topic: "route/plan/stored".into(),
-                    payload: vec![0x5a; stored_payload_bytes],
+                    payload: vec![0x5a; stored_payload_bytes].into(),
                     qos: 1,
                     retain: false,
                     properties: Default::default(),
@@ -10105,7 +10269,7 @@ mod tests {
             None,
             &BrokerMessage {
                 topic: "route/plan/shared".into(),
-                payload: b"one-message".to_vec(),
+                payload: b"one-message".to_vec().into(),
                 qos: 1,
                 retain: false,
                 properties: Default::default(),
@@ -10129,7 +10293,7 @@ mod tests {
         let topic = "v1/t/t/p/p/d/route-hint/down";
         let message = BrokerMessage {
             topic: topic.into(),
-            payload: b"payload".to_vec(),
+            payload: b"payload".to_vec().into(),
             qos: 0,
             retain: false,
             properties: Default::default(),
@@ -10195,7 +10359,7 @@ mod tests {
                 None,
                 &BrokerMessage {
                     topic: "route/plan/shared".into(),
-                    payload: b"benchmark".to_vec(),
+                    payload: b"benchmark".to_vec().into(),
                     qos: 1,
                     retain: false,
                     properties: Default::default(),
@@ -10279,7 +10443,7 @@ mod tests {
                 9,
                 BrokerMessage {
                     topic: "v1/t/t/p/p/d/codec-profile/up".into(),
-                    payload: b"v1".to_vec(),
+                    payload: b"v1".to_vec().into(),
                     qos: 2,
                     retain: false,
                     properties: Default::default(),
@@ -10362,7 +10526,7 @@ mod tests {
                 &device.device_key,
                 BrokerMessage {
                     topic: topic.into(),
-                    payload: b"one".to_vec(),
+                    payload: b"one".to_vec().into(),
                     qos: 1,
                     retain: true,
                     properties: Default::default(),
@@ -10374,7 +10538,7 @@ mod tests {
                 &device.device_key,
                 BrokerMessage {
                     topic: topic.into(),
-                    payload: b"qos1-replacement".to_vec(),
+                    payload: b"qos1-replacement".to_vec().into(),
                     qos: 1,
                     retain: true,
                     properties: Default::default(),
@@ -10389,7 +10553,7 @@ mod tests {
                 9,
                 BrokerMessage {
                     topic: topic.into(),
-                    payload: b"two".to_vec(),
+                    payload: b"two".to_vec().into(),
                     qos: 2,
                     retain: true,
                     properties: Default::default(),
@@ -10423,7 +10587,7 @@ mod tests {
                 device.device_key.clone(),
                 BrokerMessage {
                     topic: topic.into(),
-                    payload: b"will".to_vec(),
+                    payload: b"will".to_vec().into(),
                     qos: 1,
                     retain: true,
                     properties: Default::default(),
@@ -10450,7 +10614,7 @@ mod tests {
         let b = "v1/t/t/p/p/d/retain-aba/down_ack";
         let retained = |topic: &str, payload: &[u8], qos| BrokerMessage {
             topic: topic.into(),
-            payload: payload.into(),
+            payload: bytes::Bytes::copy_from_slice(payload),
             qos,
             retain: true,
             properties: Default::default(),
@@ -10521,7 +10685,7 @@ mod tests {
         let b = "v1/t/t/p/p/d/retain-recover/down_ack";
         let message = |topic: &str, payload: &[u8], qos| BrokerMessage {
             topic: topic.into(),
-            payload: payload.into(),
+            payload: bytes::Bytes::copy_from_slice(payload),
             qos,
             retain: true,
             properties: Default::default(),
@@ -10624,7 +10788,7 @@ mod tests {
                     &device.device_key,
                     BrokerMessage {
                         topic: topic.into(),
-                        payload: b"stale".to_vec(),
+                        payload: b"stale".to_vec().into(),
                         qos: 1,
                         retain: false,
                         properties: Default::default(),
@@ -10655,7 +10819,7 @@ mod tests {
                     &device.device_key,
                     BrokerMessage {
                         topic: topic.into(),
-                        payload: b"fresh".to_vec(),
+                        payload: b"fresh".to_vec().into(),
                         qos: 1,
                         retain: false,
                         properties: Default::default(),
@@ -10682,7 +10846,7 @@ mod tests {
                 device.device_key.clone(),
                 BrokerMessage {
                     topic: "will/reserved".into(),
-                    payload: vec![0xff; 16],
+                    payload: vec![0xff; 16].into(),
                     qos: 1,
                     retain: true,
                     properties: Default::default(),
@@ -10700,7 +10864,7 @@ mod tests {
                     &device.device_key,
                     BrokerMessage {
                         topic: "will/competitor".into(),
-                        payload: vec![1],
+                        payload: vec![1].into(),
                         qos: 1,
                         retain: true,
                         properties: Default::default(),
@@ -10745,7 +10909,7 @@ mod tests {
                 &device.device_key,
                 BrokerMessage {
                     topic: fill_topic.into(),
-                    payload: b"fill".to_vec(),
+                    payload: b"fill".to_vec().into(),
                     qos: 1,
                     retain: false,
                     properties: Default::default(),
@@ -10757,7 +10921,7 @@ mod tests {
                 device.device_key.clone(),
                 BrokerMessage {
                     topic: will_topic.into(),
-                    payload: b"will".to_vec(),
+                    payload: b"will".to_vec().into(),
                     qos: 1,
                     retain: false,
                     properties: Default::default(),
@@ -10789,8 +10953,8 @@ mod tests {
         let BrokerFrame::Publish(b_will) = resumed_b.receiver.recv().await.unwrap() else {
             panic!("expected Will for B")
         };
-        assert_eq!(a_will.message.payload, b"will");
-        assert_eq!(b_will.message.payload, b"will");
+        assert_eq!(a_will.message.payload.as_ref(), b"will");
+        assert_eq!(b_will.message.payload.as_ref(), b"will");
         assert_eq!(broker.pending_will_count().unwrap(), 0);
     }
 
@@ -10817,7 +10981,7 @@ mod tests {
                 &device.device_key,
                 BrokerMessage {
                     topic: topic.into(),
-                    payload: b"fill".to_vec(),
+                    payload: b"fill".to_vec().into(),
                     qos: 1,
                     retain: false,
                     properties: Default::default(),
@@ -10829,7 +10993,7 @@ mod tests {
                 device.device_key.clone(),
                 BrokerMessage {
                     topic: topic.into(),
-                    payload: b"restart-will".to_vec(),
+                    payload: b"restart-will".to_vec().into(),
                     qos: 1,
                     retain: false,
                     properties: Default::default(),
@@ -10861,7 +11025,7 @@ mod tests {
         let BrokerFrame::Publish(will) = resumed.receiver.recv().await.unwrap() else {
             panic!("expected recovered pending Will")
         };
-        assert_eq!(will.message.payload, b"restart-will");
+        assert_eq!(will.message.payload.as_ref(), b"restart-will");
         assert_eq!(recovered.pending_will_count().unwrap(), 0);
         fs::remove_dir_all(directory).unwrap();
     }
@@ -10885,7 +11049,7 @@ mod tests {
                 &a.key.device,
                 BrokerMessage {
                     topic: "wake/topic".into(),
-                    payload: vec![qos],
+                    payload: vec![qos].into(),
                     qos,
                     retain: false,
                     properties: Default::default(),
@@ -10957,7 +11121,7 @@ mod tests {
             .unwrap();
         let message = BrokerMessage {
             topic: "v1/t/t/p/p/d/a/up".into(),
-            payload: b"retained".to_vec(),
+            payload: b"retained".to_vec().into(),
             qos: 2,
             retain: true,
             properties: Default::default(),
@@ -10990,7 +11154,7 @@ mod tests {
                 &a.device_key,
                 BrokerMessage {
                     topic: "v1/t/t/p/p/d/a/up".into(),
-                    payload: b"offline".to_vec(),
+                    payload: b"offline".to_vec().into(),
                     qos: 1,
                     retain: false,
                     properties: Default::default(),
@@ -11021,7 +11185,7 @@ mod tests {
                     &device.device_key,
                     BrokerMessage {
                         topic: topic.into(),
-                        payload: vec![sequence],
+                        payload: vec![sequence].into(),
                         qos: 1,
                         retain: false,
                         properties: Default::default(),
@@ -11062,7 +11226,7 @@ mod tests {
             .unwrap();
         let message = |payload: &[u8]| BrokerMessage {
             topic: topic.into(),
-            payload: payload.to_vec(),
+            payload: payload.to_vec().into(),
             qos: 1,
             retain: false,
             properties: Default::default(),
@@ -11106,13 +11270,13 @@ mod tests {
         let BrokerFrame::Publish(replayed) = resumed.receiver.try_recv().unwrap() else {
             panic!("expected replay")
         };
-        assert_eq!(replayed.message.payload, b"old");
+        assert_eq!(replayed.message.payload.as_ref(), b"old");
         assert_eq!(replayed.packet_id, packet_id);
         assert!(replayed.dup);
         let BrokerFrame::Publish(live) = resumed.receiver.try_recv().unwrap() else {
             panic!("expected new live publish")
         };
-        assert_eq!(live.message.payload, b"new");
+        assert_eq!(live.message.payload.as_ref(), b"new");
         assert!(!live.dup);
         resumed.detach().unwrap();
     }
@@ -11130,7 +11294,7 @@ mod tests {
                     &owner.device_key,
                     BrokerMessage {
                         topic: format!("v1/t/t/p/p/d/publisher/{suffix}"),
-                        payload: suffix.as_bytes().to_vec(),
+                        payload: suffix.as_bytes().to_vec().into(),
                         qos: 0,
                         retain: true,
                         properties: Default::default(),
@@ -11157,7 +11321,7 @@ mod tests {
                 &owner.device_key,
                 BrokerMessage {
                     topic: "v1/t/t/p/p/d/publisher/future".into(),
-                    payload: b"future".to_vec(),
+                    payload: b"future".to_vec().into(),
                     qos: 0,
                     retain: false,
                     properties: Default::default(),
@@ -11186,7 +11350,7 @@ mod tests {
                     &a.device_key,
                     BrokerMessage {
                         topic: "v1/t/t/p/p/d/matrix/up".into(),
-                        payload: vec![publish_qos],
+                        payload: vec![publish_qos].into(),
                         qos: publish_qos,
                         retain: true,
                         properties: Default::default(),
@@ -11212,7 +11376,7 @@ mod tests {
                 &a.device_key,
                 BrokerMessage {
                     topic: "v1/t/t/p/p/d/matrix/up".into(),
-                    payload: Vec::new(),
+                    payload: Vec::new().into(),
                     qos: 0,
                     retain: true,
                     properties: Default::default(),
@@ -11251,7 +11415,7 @@ mod tests {
                 &a.device_key,
                 BrokerMessage {
                     topic: "v1/t/t/p/p/d/recovery/up".into(),
-                    payload: b"durable".to_vec(),
+                    payload: b"durable".to_vec().into(),
                     qos: 1,
                     retain: true,
                     properties: Default::default(),
@@ -11350,7 +11514,7 @@ mod tests {
                 &device.device_key,
                 BrokerMessage {
                     topic: "v1/t/t/p/p/d/v1-large/up".into(),
-                    payload: vec![0xa5; 8 * 1024],
+                    payload: vec![0xa5; 8 * 1024].into(),
                     qos: 1,
                     retain: true,
                     properties: Default::default(),
@@ -11442,7 +11606,7 @@ mod tests {
                 5,
                 BrokerMessage {
                     topic: "semantic/invalid".into(),
-                    payload: vec![1],
+                    payload: vec![1].into(),
                     qos: 2,
                     retain: false,
                     properties: Default::default(),
@@ -11454,7 +11618,7 @@ mod tests {
             5,
             InboundQos2State::AwaitPubrel(BrokerMessage {
                 topic: "semantic/invalid".into(),
-                payload: vec![1],
+                payload: vec![1].into(),
                 qos: 1,
                 retain: false,
                 properties: Default::default(),
@@ -11480,7 +11644,7 @@ mod tests {
         let base = source.snapshot().unwrap();
         let foreign = BrokerMessage {
             topic: "v1/t/t/p/p/d/other/up".into(),
-            payload: b"foreign".to_vec(),
+            payload: b"foreign".to_vec().into(),
             qos: 1,
             retain: false,
             properties: Default::default(),
@@ -11514,7 +11678,7 @@ mod tests {
         let mut invalid = base.clone();
         let retained_message = BrokerMessage {
             topic: "v1/t/t/p/p/d/acl-owner/up".into(),
-            payload: b"retained".to_vec(),
+            payload: b"retained".to_vec().into(),
             qos: 1,
             retain: true,
             properties: Default::default(),
@@ -11535,7 +11699,7 @@ mod tests {
             origin: None,
             message: BrokerMessage {
                 topic: "v1/t/t/p/p/d/other/up".into(),
-                payload: b"foreign-will".to_vec(),
+                payload: b"foreign-will".to_vec().into(),
                 qos: 1,
                 retain: false,
                 properties: Default::default(),
@@ -11577,7 +11741,7 @@ mod tests {
                     &device.device_key,
                     BrokerMessage {
                         topic: format!("v1/t/t/p/p/d/binary-recovery-{index}/up"),
-                        payload: vec![byte; 1024],
+                        payload: vec![byte; 1024].into(),
                         qos: 1,
                         retain: true,
                         properties: Default::default(),
@@ -11737,7 +11901,7 @@ mod tests {
                 let BrokerFrame::Publish(delivery) = observer.receiver.try_recv().unwrap() else {
                     panic!("observer should receive the recovered Will")
                 };
-                assert_eq!(delivery.message.payload, b"fixed-will");
+                assert_eq!(delivery.message.payload.as_ref(), b"fixed-will");
                 assert!(
                     upgraded
                         .state
@@ -11851,7 +12015,7 @@ mod tests {
             message: BrokerMessage {
                 topic: "v1/t/t/p/p/d/wide-will/up".into(),
                 // ClientId and Will payload together fit the configured 65,536-byte packet.
-                payload: vec![0x7a; 20_000],
+                payload: vec![0x7a; 20_000].into(),
                 qos: 1,
                 retain: false,
                 properties: Default::default(),
@@ -11904,7 +12068,7 @@ mod tests {
                 &device.device_key,
                 BrokerMessage {
                     topic: topic.into(),
-                    payload: b"outbound".to_vec(),
+                    payload: b"outbound".to_vec().into(),
                     qos: 2,
                     retain: true,
                     properties: Default::default(),
@@ -11919,7 +12083,7 @@ mod tests {
                 77,
                 BrokerMessage {
                     topic: topic.into(),
-                    payload: b"inbound".to_vec(),
+                    payload: b"inbound".to_vec().into(),
                     qos: 2,
                     retain: false,
                     properties: Default::default(),
@@ -11934,7 +12098,7 @@ mod tests {
                 &device.device_key,
                 BrokerMessage {
                     topic: topic.into(),
-                    payload: b"offline".to_vec(),
+                    payload: b"offline".to_vec().into(),
                     qos: 1,
                     retain: false,
                     properties: Default::default(),
@@ -12013,7 +12177,7 @@ mod tests {
                 &a.device_key,
                 BrokerMessage {
                     topic: "v1/t/t/p/p/d/qos2-recovery/up".into(),
-                    payload: b"outbound".to_vec(),
+                    payload: b"outbound".to_vec().into(),
                     qos: 2,
                     retain: false,
                     properties: Default::default(),
@@ -12031,7 +12195,7 @@ mod tests {
                 77,
                 BrokerMessage {
                     topic: "v1/t/t/p/p/d/qos2-recovery/up".into(),
-                    payload: b"inbound".to_vec(),
+                    payload: b"inbound".to_vec().into(),
                     qos: 2,
                     retain: false,
                     properties: Default::default(),
@@ -12129,7 +12293,7 @@ mod tests {
                     &a.device_key,
                     BrokerMessage {
                         topic: "v1/t/t/p/p/d/large-recovery/up".into(),
-                        payload: vec![sequence; 60_000],
+                        payload: vec![sequence; 60_000].into(),
                         qos: 1,
                         retain: false,
                         properties: Default::default(),
@@ -12174,7 +12338,7 @@ mod tests {
                         &device.device_key,
                         BrokerMessage {
                             topic: format!("v1/t/t/p/p/d/bench-{index}/up"),
-                            payload: vec![index as u8; length],
+                            payload: vec![index as u8; length].into(),
                             qos: 0,
                             retain: true,
                             properties: Default::default(),
@@ -12225,7 +12389,7 @@ mod tests {
                         &identity.device_key,
                         BrokerMessage {
                             topic: topic.clone(),
-                            payload: vec![0x5a; 8_192],
+                            payload: vec![0x5a; 8_192].into(),
                             qos: 1,
                             retain: false,
                             properties: Default::default(),
@@ -12248,7 +12412,7 @@ mod tests {
                     origin: Some(origin.clone()),
                     message: BrokerMessage {
                         topic: format!("v1/t/t{}/p/p/d/w{index}/up", index / 32),
-                        payload: vec![0x77; 65_000],
+                        payload: vec![0x77; 65_000].into(),
                         qos: 1,
                         retain: false,
                         properties: Default::default(),
@@ -12271,7 +12435,7 @@ mod tests {
                     &owner,
                     BrokerMessage {
                         topic: format!("v1/t/t{}/p/p/d/r{index}/up", index / 128),
-                        payload: vec![0x88; 64_900],
+                        payload: vec![0x88; 64_900].into(),
                         qos: 1,
                         retain: true,
                         properties: Default::default(),
@@ -12373,7 +12537,7 @@ mod tests {
                     attachment.generation,
                     BrokerMessage {
                         topic: topic.into(),
-                        payload: vec![1],
+                        payload: vec![1].into(),
                         qos: 0,
                         retain: false,
                         properties: PublishProperties::default(),
@@ -12464,7 +12628,7 @@ mod tests {
             let progress = CommandProgress::new(expiry, metrics.clone());
             let message = BrokerMessage {
                 topic: topic.into(),
-                payload: vec![1],
+                payload: vec![1].into(),
                 qos,
                 retain: false,
                 properties: PublishProperties {
@@ -12529,7 +12693,7 @@ mod tests {
                         attachment.generation,
                         BrokerMessage {
                             topic: topic.into(),
-                            payload: vec![1],
+                            payload: vec![1].into(),
                             qos,
                             retain: false,
                             properties: PublishProperties {
@@ -12621,7 +12785,7 @@ mod tests {
                         attachment.generation,
                         BrokerMessage {
                             topic: topic.into(),
-                            payload: vec![1],
+                            payload: vec![1].into(),
                             qos: 1,
                             retain: false,
                             properties: PublishProperties {

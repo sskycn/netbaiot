@@ -91,7 +91,9 @@ pub fn decode(input: &mut BytesMut, limits: &Limits) -> Result<Option<Packet>> {
             let packet_id = if qos > 0 { Some(cursor.id()?) } else { None };
             Packet::Publish {
                 topic,
-                payload: cursor.bytes,
+                // Long-lived broker payloads must not pin the reader's
+                // backing allocation (or other packets in the same read).
+                payload: Bytes::copy_from_slice(&cursor.bytes),
                 qos,
                 packet_id,
                 retain: first & 1 != 0,
@@ -205,7 +207,7 @@ fn decode_connect(cursor: &mut Cursor, limits: &Limits) -> Result<Packet> {
         }
         Some(Will {
             topic,
-            payload: cursor.binary(limits.max_will_payload_bytes)?,
+            payload: Bytes::copy_from_slice(&cursor.binary(limits.max_will_payload_bytes)?),
             qos: will_qos,
             retain: flags & 0x20 != 0,
         })
@@ -375,6 +377,39 @@ mod tests {
                 bytes.push((seed >> 32) as u8)
             }
             let _ = decode(&mut BytesMut::from(bytes.as_slice()), &limits);
+        }
+    }
+}
+
+#[cfg(test)]
+mod payload_ownership_tests {
+    use super::*;
+
+    #[test]
+    fn publish_and_will_payloads_do_not_pin_large_read_buffers() {
+        let limits = Limits::default();
+        let mut publish_body = vec![0, 1, b'a'];
+
+        publish_body.push(7);
+        let mut connect_body = vec![0, 4, b'M', b'Q', b'T', b'T', 4, 6, 0, 0];
+        connect_body.extend_from_slice(&[0, 1, b'c']);
+
+        connect_body.extend_from_slice(&[0, 1, b'a', 0, 1, 7]);
+        for (first, body) in [(0x30, publish_body), (0x10, connect_body)] {
+            let frame =
+                super::super::common::encode(first, &body, limits.max_mqtt_packet_size).unwrap();
+            let mut input = BytesMut::with_capacity(limits.max_mqtt_packet_size);
+            input.extend_from_slice(&frame);
+            let original = input.as_ptr() as usize;
+            let end = original + input.capacity();
+            let payload = match decode(&mut input, &limits).unwrap().unwrap() {
+                Packet::Publish { payload, .. } => payload,
+                Packet::Connect(connect) => connect.will.unwrap().payload,
+                _ => panic!("expected a payload"),
+            };
+            assert_eq!(payload.as_ref(), &[7]);
+            assert!(!(original..end).contains(&(payload.as_ptr() as usize)));
+            assert_eq!(payload.try_into_mut().unwrap().capacity(), 1);
         }
     }
 }
