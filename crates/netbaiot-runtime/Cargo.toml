@@ -23,6 +23,13 @@ uuid.workspace = true
 reqwest.workspace = true
 url.workspace = true
 jsonwebtoken = "9.3.1"
+fs2 = "=0.4.3"
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[target.'cfg(windows)'.dependencies]
+atomicwrites = "=0.4.4"
 
 [lints]
 workspace = true

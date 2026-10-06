@@ -806,6 +806,14 @@ pub async fn run_with_credentials(
     business_stream_token: Option<String>,
 ) -> Result<()> {
     config.validate()?;
+    let recovery_path = config.spool_directory.clone();
+    let recovery_owner = Arc::new(
+        tokio::task::spawn_blocking(move || {
+            netbaiot_runtime::recovery_io::RecoveryDirectory::acquire(&recovery_path)
+        })
+        .await
+        .map_err(|_| Error::Internal)??,
+    );
     let limits = Arc::new(config.limits.clone());
     let metrics = Arc::new(
         if matches!(
@@ -941,8 +949,13 @@ pub async fn run_with_credentials(
         snapshot.routes,
         snapshot.revision,
     )?;
-    let spool = RestartSpool::new(config.spool_directory.clone(), limits.clone());
+    let spool = RestartSpool::with_owner(
+        config.spool_directory.clone(),
+        limits.clone(),
+        recovery_owner.clone(),
+    );
     let mqtt_broker = MqttBroker::new_with_metrics(limits.clone(), metrics.clone());
+    mqtt_broker.bind_recovery_owner(recovery_owner)?;
     mqtt_broker.recover_from(&config.spool_directory).await?;
     let recovery = spool.recover().await.inspect_err(|error| {
         // Display only our typed diagnostic, never the serialized record or serde error.

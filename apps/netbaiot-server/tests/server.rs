@@ -91,7 +91,7 @@ async fn legacy_config_ack_spool_blocks_startup_and_preserves_rollback_files() {
     assert!(!log.contains("legacy:1"));
     assert!(!log.contains("device-1"));
     assert_eq!(std::fs::read(&path).unwrap(), bytes);
-    assert_eq!(std::fs::read_dir(&c.spool_directory).unwrap().count(), 1);
+    assert_eq!(std::fs::read_dir(&c.spool_directory).unwrap().count(), 2);
     std::fs::remove_dir_all(root).unwrap();
 }
 
@@ -484,8 +484,76 @@ async fn start_child(path: &std::path::Path, admin: &str) -> Child {
         .env("NETBAIOT_ADMIN_SECRET", admin)
         .stdout(Stdio::null())
         .stderr(Stdio::null())
+        .kill_on_drop(true)
         .spawn()
         .unwrap()
+}
+
+#[tokio::test]
+async fn recovery_directory_is_exclusive_between_processes_and_released_on_exit() {
+    let _port_guard = EPHEMERAL_PORT_TEST_LOCK.lock().await;
+    let root =
+        std::env::temp_dir().join(format!("netbaiot-directory-owner-{}", uuid::Uuid::new_v4()));
+    std::fs::create_dir_all(&root).unwrap();
+    let mut first = config();
+    first.device_ingress = free_address().await;
+    first.management_http = free_address().await;
+    first.spool_directory = root.join("spool");
+    let path = root.join("first.json");
+    std::fs::write(&path, serde_json::to_vec(&first).unwrap()).unwrap();
+    let admin = "d".repeat(64);
+    let client = reqwest::Client::builder().no_proxy().build().unwrap();
+    let mut child = start_child(&path, &admin).await;
+    wait_ready(&client, first.management_http, &admin).await;
+    let mut second: Config = serde_json::from_value(serde_json::to_value(&first).unwrap()).unwrap();
+    second.device_ingress = free_address().await;
+    second.management_http = free_address().await;
+    let other_path = root.join("second.json");
+    std::fs::write(&other_path, serde_json::to_vec(&second).unwrap()).unwrap();
+    let before = std::fs::read_dir(&first.spool_directory)
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name())
+        .collect::<HashSet<_>>();
+    let status = tokio::time::timeout(
+        Duration::from_secs(5),
+        start_child(&other_path, &admin).await.wait(),
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    assert!(
+        !status.success(),
+        "different listening ports must not bypass directory ownership"
+    );
+    let after = std::fs::read_dir(&first.spool_directory)
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name())
+        .collect::<HashSet<_>>();
+    assert_eq!(before, after, "loser must not write snapshots");
+    child.kill().await.unwrap(); // kernel releases ownership even after an abnormal exit
+    child.wait().await.unwrap();
+    // A startup failure must release ownership too.
+    let occupied = TcpListener::bind(second.device_ingress).await.unwrap();
+    let failed = tokio::time::timeout(
+        Duration::from_secs(5),
+        start_child(&other_path, &admin).await.wait(),
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    assert!(!failed.success());
+    drop(occupied);
+    let mut successor = start_child(&other_path, &admin).await;
+    wait_ready(&client, second.management_http, &admin).await;
+    request_drain(&client, second.management_http, &admin).await;
+    assert!(
+        tokio::time::timeout(Duration::from_secs(5), successor.wait())
+            .await
+            .unwrap()
+            .unwrap()
+            .success()
+    );
+    std::fs::remove_dir_all(root).unwrap();
 }
 
 #[tokio::test]
@@ -1737,14 +1805,12 @@ async fn exercise_graceful_restart_spool_replay(healthy_cycles: u32, dwell_per_c
             .success()
     );
     assert!(
-        !std::fs::read_dir(&c.spool_directory).unwrap().any(|entry| {
-            entry
-                .unwrap()
-                .path()
-                .extension()
-                .and_then(|value| value.to_str())
-                == Some("spool")
-        })
+        RestartSpool::new(c.spool_directory.clone(), Arc::new(c.limits.clone()))
+            .recover()
+            .await
+            .unwrap()
+            .records
+            .is_empty()
     );
 
     // Exercise multiple healthy generations after recovery. Each generation accepts new work,
@@ -1780,13 +1846,12 @@ async fn exercise_graceful_restart_spool_replay(healthy_cycles: u32, dwell_per_c
                 .success()
         );
         assert!(
-            !std::fs::read_dir(&c.spool_directory)
+            RestartSpool::new(c.spool_directory.clone(), Arc::new(c.limits.clone()))
+                .recover()
+                .await
                 .unwrap()
-                .any(|entry| entry
-                    .unwrap()
-                    .path()
-                    .extension()
-                    .is_some_and(|value| value == "spool"))
+                .records
+                .is_empty()
         );
     }
     assert!(accepted.is_subset(&observed.lock().unwrap().iter().copied().collect()));
@@ -1832,23 +1897,17 @@ async fn subprocess_sigkill_exposes_the_documented_three_event_loss_window() {
         accepted.insert(receipt.event_id);
     }
     assert_eq!(accepted.len(), 3);
-    std::fs::create_dir_all(&c.spool_directory).unwrap();
-    std::fs::remove_dir(&c.spool_directory).unwrap();
-    std::fs::write(&c.spool_directory, b"not a directory").unwrap();
+    // Keep the ownership inode/directory intact while making both snapshot
+    // destinations unusable. Replacing the owned directory would defeat the lock.
+    std::fs::create_dir(c.spool_directory.join("mqtt-runtime.state")).unwrap();
+    std::fs::create_dir(c.spool_directory.join("eventbus-recovery.spool")).unwrap();
     request_drain(&client, c.management_http, &admin).await;
     tokio::time::sleep(Duration::from_millis(150)).await;
     assert!(child.try_wait().unwrap().is_none());
     child.kill().await.unwrap();
     let status = child.wait().await.unwrap();
     assert!(!status.success());
-    let committed = c.spool_directory.is_dir()
-        && std::fs::read_dir(&c.spool_directory).unwrap().any(|entry| {
-            entry
-                .unwrap()
-                .path()
-                .extension()
-                .is_some_and(|value| value == "spool")
-        });
+    let committed = c.spool_directory.join("eventbus-recovery.spool").is_file();
     assert!(
         !committed,
         "SIGKILL must not be misrepresented as graceful spooling"
@@ -1878,9 +1937,10 @@ async fn subprocess_spool_failure_stays_alive_until_repaired_then_replays_same_e
     wait_ready(&client, c.management_http, &admin).await;
     let receipt = tcp_accept(c.device_ingress, r#"{"schema_version":1,"source_message_id":"spool-failure","kind":"heartbeat","data":{"sequence":1}}"#.as_bytes()).await;
     let accepted = receipt.event_id;
-    std::fs::create_dir_all(&c.spool_directory).unwrap();
-    std::fs::remove_dir(&c.spool_directory).unwrap();
-    std::fs::write(&c.spool_directory, b"not a directory").unwrap();
+    // Keep the ownership inode/directory intact while making both snapshot
+    // destinations unusable. Replacing the owned directory would defeat the lock.
+    std::fs::create_dir(c.spool_directory.join("mqtt-runtime.state")).unwrap();
+    std::fs::create_dir(c.spool_directory.join("eventbus-recovery.spool")).unwrap();
     client
         .post(format!("http://{}/api/v1/drain", c.management_http))
         .bearer_auth(&admin)
@@ -1905,8 +1965,8 @@ async fn subprocess_spool_failure_stays_alive_until_repaired_then_replays_same_e
     let stopped_udp = tokio::net::UdpSocket::bind(c.device_ingress).await.unwrap();
     drop((stopped_tcp, stopped_udp));
 
-    std::fs::remove_file(&c.spool_directory).unwrap();
-    std::fs::create_dir_all(&c.spool_directory).unwrap();
+    std::fs::remove_dir(c.spool_directory.join("mqtt-runtime.state")).unwrap();
+    std::fs::remove_dir(c.spool_directory.join("eventbus-recovery.spool")).unwrap();
     let status = tokio::time::timeout(Duration::from_secs(5), child.wait())
         .await
         .unwrap()

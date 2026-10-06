@@ -53,7 +53,7 @@ QoS state, retained data and pending Wills are encoded from one coherent view wi
 a whole-state clone. Readers accept v1–v5 for migration under version-specific bounds.
 The independent `mqtt_recovery_max_bytes` ceiling covers configured broker state;
 it does not inherit the EventBus record limit. Both formats retain private-directory,
-file fsync, atomic rename and directory-fsync rules. See
+file synchronization and platform replacement rules. See
 [mqtt-session-recovery.md](mqtt-session-recovery.md) for compatibility and rollback.
 
 The two files do not claim a cross-domain database transaction. Each responsibility
@@ -107,3 +107,40 @@ cannot acknowledge it, resolve that responsibility with the previous release bef
 upgrading. Do not delete committed records to bypass the check. See the
 [configuration ownership migration](remove-device-config.md) and
 [connection event compatibility review](connection-events-spool-upgrade-cleanup.md).
+
+## Directory ownership and platform I/O
+
+The gateway acquires `.netbaiot.lock` before reading either recovery domain. An OS
+advisory exclusive lock is held by shared owners, including blocking I/O jobs, until
+all owners exit. Another cooperating gateway fails with `Conflict` even on different
+ports. The inode is never unlinked on release; process termination releases its lock.
+Use a dedicated, trusted local filesystem directory (APFS/ext4/NTFS); network filesystems
+and adversarial replacement of parent/directory components are outside this contract.
+Library composition roots using raw broker/spool APIs must bind the same directory
+owner; standalone decoder calls require no lock. File links, reparse points and special
+files are rejected; Unix reads also use no-follow/nonblocking opens. Missing files
+are accepted only in an accessible directory. I/O failures block startup, and actual
+read lengths and directory enumeration are capped, including ignored temporary entries.
+
+On Unix the commit sequence is private temporary creation, bounded streaming write,
+`sync_all`, close, same-directory rename and directory `sync_all`. On Windows the
+synced, closed file is replaced through `atomicwrites` 0.4.4 using
+`MoveFileExW(REPLACE_EXISTING | WRITE_THROUGH)`. This removes the invalid read-only
+directory flush. The wrapper propagates replacement failures, including sharing/ACL
+errors. It does not add a separately proven NTFS directory flush or power-loss
+transaction. ACK cleanup retains a synced empty NBSP v3 successor on Windows;
+this is distinct from `commit([])`, which is a no-op and preserves old work. Unix
+cleanup unlinks after checking identity/generation and validating all stale files.
+Unknown/unreadable stale files block cleanup before authoritative deletion.
+
+`fs2` 0.4.3 supplies safe Rust 1.88-compatible `flock`/Windows `LockFileEx` ownership;
+its unsafe platform internals and atomicwrites' small Win32 wrapper were reviewed.
+NetbaIoT adds no unsafe code. Native recovery/lifecycle CI is in
+`.github/workflows/recovery-platform.yml`; configuration or compilation alone is
+not native execution evidence. See the audit report for actual platform results.
+
+Platform references: [Rust 1.88 Windows filesystem implementation](https://github.com/rust-lang/rust/blob/1.88.0/library/std/src/sys/fs/windows.rs),
+[MoveFileExW](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-movefileexw),
+[FlushFileBuffers](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-flushfilebuffers),
+[atomicwrites implementation](https://docs.rs/crate/atomicwrites/0.4.4/source/src/lib.rs),
+[fs2 lock contract](https://docs.rs/fs2/0.4.3/fs2/trait.FileExt.html).

@@ -1,8 +1,8 @@
-use crate::{Error, Limits, Result, SpoolRecord};
+use crate::{Error, Limits, Result, SpoolRecord, recovery_io};
 use sha2::{Digest, Sha256};
 use std::{
     fs,
-    io::{Read, Write},
+    io::Write,
     path::{Path, PathBuf},
     sync::Arc,
 };
@@ -33,6 +33,7 @@ pub struct RecoveryBatch {
 pub struct RestartSpool {
     directory: Arc<PathBuf>,
     limits: Arc<Limits>,
+    owner: Option<Arc<recovery_io::RecoveryDirectory>>,
 }
 
 impl RestartSpool {
@@ -40,6 +41,20 @@ impl RestartSpool {
         Self {
             directory: Arc::new(directory),
             limits,
+            owner: None,
+        }
+    }
+
+    /// Composition roots must acquire one directory owner before any recovery I/O.
+    pub fn with_owner(
+        directory: PathBuf,
+        limits: Arc<Limits>,
+        owner: Arc<recovery_io::RecoveryDirectory>,
+    ) -> Self {
+        Self {
+            directory: Arc::new(directory),
+            limits,
+            owner: Some(owner),
         }
     }
 
@@ -49,23 +64,34 @@ impl RestartSpool {
         }
         let directory = self.directory.clone();
         let limits = self.limits.clone();
-        tokio::task::spawn_blocking(move || commit_sync(&directory, &limits, &records))
-            .await
-            .map_err(|_| Error::Internal)?
-            .map(Some)
+        let owner = self.owner.clone();
+        tokio::task::spawn_blocking(move || {
+            let _owner = owner;
+            commit_sync(&directory, &limits, &records)
+        })
+        .await
+        .map_err(|_| Error::Internal)?
+        .map(Some)
     }
 
     pub async fn recover(&self) -> Result<RecoveryBatch> {
         let directory = self.directory.clone();
         let limits = self.limits.clone();
-        tokio::task::spawn_blocking(move || recover_sync(&directory, &limits))
-            .await
-            .map_err(|_| Error::Internal)?
+        let owner = self.owner.clone();
+        tokio::task::spawn_blocking(move || {
+            let _owner = owner;
+            recover_sync(&directory, &limits)
+        })
+        .await
+        .map_err(|_| Error::Internal)?
     }
 
     pub async fn remove_committed(&self, files: Vec<CommittedSpool>) -> Result<()> {
         let directory = self.directory.clone();
+        let limits = self.limits.clone();
+        let owner = self.owner.clone();
         tokio::task::spawn_blocking(move || {
+            let _owner = owner;
             for committed in files {
                 let path = committed.path;
                 if path.parent() != Some(directory.as_path())
@@ -73,7 +99,15 @@ impl RestartSpool {
                 {
                     return Err(Error::Invalid);
                 }
-                let bytes = fs::read(&path).map_err(|_| Error::Storage)?;
+                if !recovery_io::directory_present(&directory)? {
+                    return Err(Error::Storage);
+                }
+                let file = recovery_io::open_snapshot(&path)?.ok_or(Error::Storage)?;
+                let bytes = recovery_io::read_bounded(
+                    file,
+                    limits.spool_segment_max_bytes.min(limits.spool_max_bytes),
+                )?;
+                decode_spool_records(&bytes, &limits)?;
                 let generation = segment_generation(&bytes)?;
                 // Never let cleanup for an older recovery batch delete a newer
                 // atomically replaced snapshot at the same path.
@@ -81,22 +115,43 @@ impl RestartSpool {
                     if path.file_name().and_then(|value| value.to_str()) == Some(SNAPSHOT_NAME) {
                         // Remove ignored legacy generations first. If cleanup
                         // fails, the authoritative snapshot remains intact.
-                        for entry in
-                            fs::read_dir(directory.as_path()).map_err(|_| Error::Storage)?
-                        {
-                            let stale = entry.map_err(|_| Error::Storage)?.path();
-                            if stale != path
-                                && stale.extension().and_then(|value| value.to_str())
-                                    == Some("spool")
-                            {
-                                fs::remove_file(stale).map_err(|_| Error::Storage)?;
+                        let stale =
+                            recovery_io::spool_paths(&directory, directory_entry_limit(&limits)?)?;
+                        // Validate the complete cleanup set before removing anything. Unknown
+                        // or unreadable responsibility is never silently unlinked.
+                        for candidate in &stale {
+                            if candidate != &path {
+                                let file =
+                                    recovery_io::open_snapshot(candidate)?.ok_or(Error::Storage)?;
+                                let bytes = recovery_io::read_bounded(
+                                    file,
+                                    limits.spool_segment_max_bytes.min(limits.spool_max_bytes),
+                                )?;
+                                decode_spool_records(&bytes, &limits)?;
+                            }
+                        }
+                        for candidate in stale {
+                            if candidate != path {
+                                fs::remove_file(candidate).map_err(|_| Error::Storage)?;
                             }
                         }
                     }
+                    #[cfg(not(windows))]
                     fs::remove_file(path).map_err(|_| Error::Storage)?;
+                    #[cfg(windows)]
+                    {
+                        // A synced empty successor is the cleanup commit on Windows;
+                        // it avoids pretending that unlink has a directory-fsync guarantee.
+                        commit_sync(&directory, &limits, &[])?;
+                        if path.file_name().and_then(|v| v.to_str()) != Some(SNAPSHOT_NAME) {
+                            fs::remove_file(path).map_err(|_| Error::Storage)?;
+                        }
+                    }
                 }
             }
-            sync_directory(&directory)
+            #[cfg(not(windows))]
+            recovery_io::sync_directory(&directory)?;
+            Ok(())
         })
         .await
         .map_err(|_| Error::Internal)?
@@ -111,8 +166,7 @@ fn commit_sync(directory: &Path, limits: &Limits, records: &[SpoolRecord]) -> Re
     if records.len() > limits.spool_max_records {
         return Err(Error::Overloaded);
     }
-    fs::create_dir_all(directory).map_err(|_| Error::Storage)?;
-    set_directory_permissions(directory)?;
+    recovery_io::prepare_directory(directory)?;
     let existing = recover_sync(directory, limits)?;
     let generation = existing
         .generation
@@ -122,7 +176,7 @@ fn commit_sync(directory: &Path, limits: &Limits, records: &[SpoolRecord]) -> Re
     let temporary = directory.join(format!(".{id}.tmp"));
     let committed = directory.join(SNAPSHOT_NAME);
     let result = (|| {
-        let mut file = open_private(&temporary)?;
+        let mut file = recovery_io::create_private(&temporary)?;
         file.write_all(MAGIC).map_err(|_| Error::Storage)?;
         file.write_all(&VERSION.to_be_bytes())
             .map_err(|_| Error::Storage)?;
@@ -177,8 +231,8 @@ fn commit_sync(directory: &Path, limits: &Limits, records: &[SpoolRecord]) -> Re
         trailer[20..].copy_from_slice(&hash.finalize());
         file.write_all(&trailer).map_err(|_| Error::Storage)?;
         file.sync_all().map_err(|_| Error::Storage)?;
-        fs::rename(&temporary, &committed).map_err(|_| Error::Storage)?;
-        sync_directory(directory)?;
+        drop(file);
+        recovery_io::replace_synced(&temporary, &committed)?;
         Ok(committed)
     })();
     if result.is_err() {
@@ -190,7 +244,7 @@ fn commit_sync(directory: &Path, limits: &Limits, records: &[SpoolRecord]) -> Re
 }
 
 fn recover_sync(directory: &Path, limits: &Limits) -> Result<RecoveryBatch> {
-    if !directory.exists() {
+    if !recovery_io::directory_present(directory)? {
         return Ok(RecoveryBatch {
             records: Vec::new(),
             committed_files: Vec::new(),
@@ -198,20 +252,11 @@ fn recover_sync(directory: &Path, limits: &Limits) -> Result<RecoveryBatch> {
         });
     }
     let authoritative = directory.join(SNAPSHOT_NAME);
-    if authoritative.exists() {
-        let size = usize::try_from(
-            fs::metadata(&authoritative)
-                .map_err(|_| Error::Storage)?
-                .len(),
-        )
-        .map_err(|_| Error::Overloaded)?;
-        if size > limits.spool_segment_max_bytes || size > limits.spool_max_bytes {
-            return Err(Error::Overloaded);
-        }
-        let bytes = fs::read(&authoritative).map_err(|_| Error::Storage)?;
-        if bytes.len() != size {
-            return Err(Error::Storage);
-        }
+    if let Some(file) = recovery_io::open_snapshot(&authoritative)? {
+        let bytes = recovery_io::read_bounded(
+            file,
+            limits.spool_segment_max_bytes.min(limits.spool_max_bytes),
+        )?;
         let generation = segment_generation(&bytes)?;
         let mut records = Vec::new();
         decode_segment(&bytes, limits, &mut records)?;
@@ -224,31 +269,18 @@ fn recover_sync(directory: &Path, limits: &Limits) -> Result<RecoveryBatch> {
             generation,
         });
     }
-    let mut files = fs::read_dir(directory)
-        .map_err(|_| Error::Storage)?
-        .filter_map(|entry| entry.ok().map(|entry| entry.path()))
-        .filter(|path| path.extension().and_then(|value| value.to_str()) == Some("spool"))
-        .collect::<Vec<_>>();
-    files.sort();
+    let files = recovery_io::spool_paths(directory, directory_entry_limit(limits)?)?;
     let mut records = Vec::new();
     let mut total = 0usize;
     for path in &files {
-        let metadata = fs::metadata(path).map_err(|_| Error::Storage)?;
-        let size = usize::try_from(metadata.len()).map_err(|_| Error::Overloaded)?;
-        if size > limits.spool_segment_max_bytes {
-            return Err(Error::Invalid);
-        }
-        total = total.checked_add(size).ok_or(Error::Overloaded)?;
-        if total > limits.spool_max_bytes {
-            return Err(Error::Overloaded);
-        }
-        let mut bytes = Vec::with_capacity(size);
-        fs::File::open(path)
-            .and_then(|mut file| file.read_to_end(&mut bytes))
-            .map_err(|_| Error::Storage)?;
-        if bytes.len() != size {
-            return Err(Error::Storage);
-        }
+        let file = recovery_io::open_snapshot(path)?.ok_or(Error::Storage)?;
+        let bytes = recovery_io::read_bounded(
+            file,
+            limits
+                .spool_segment_max_bytes
+                .min(limits.spool_max_bytes.saturating_sub(total)),
+        )?;
+        total = total.checked_add(bytes.len()).ok_or(Error::Overloaded)?;
         decode_segment(&bytes, limits, &mut records)?;
     }
     if records.len() > limits.spool_max_records {
@@ -457,41 +489,11 @@ pub fn decode_spool_records(input: &[u8], limits: &Limits) -> Result<Vec<SpoolRe
     Ok(records)
 }
 
-#[cfg(unix)]
-fn open_private(path: &Path) -> Result<fs::File> {
-    use std::os::unix::fs::OpenOptionsExt;
-    fs::OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .mode(0o600)
-        .open(path)
-        .map_err(|_| Error::Storage)
-}
-
-#[cfg(not(unix))]
-fn open_private(path: &Path) -> Result<fs::File> {
-    fs::OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(path)
-        .map_err(|_| Error::Storage)
-}
-
-#[cfg(unix)]
-fn set_directory_permissions(path: &Path) -> Result<()> {
-    use std::os::unix::fs::PermissionsExt;
-    fs::set_permissions(path, fs::Permissions::from_mode(0o700)).map_err(|_| Error::Storage)
-}
-
-#[cfg(not(unix))]
-fn set_directory_permissions(_: &Path) -> Result<()> {
-    Ok(())
-}
-
-fn sync_directory(path: &Path) -> Result<()> {
-    fs::File::open(path)
-        .and_then(|file| file.sync_all())
-        .map_err(|_| Error::Storage)
+fn directory_entry_limit(limits: &Limits) -> Result<usize> {
+    limits
+        .spool_max_records
+        .checked_add(16)
+        .ok_or(Error::Overloaded)
 }
 
 #[cfg(test)]
@@ -761,6 +763,112 @@ mod tests {
         fs::write(directory.join("empty.spool"), b"NBSP\0\0\0\x01").unwrap();
         assert!(spool.recover().await.unwrap().records.is_empty());
         fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn dangling_authoritative_symlink_is_not_first_start() {
+        let directory = std::env::temp_dir().join(format!("netbaiot-symlink-{}", Uuid::new_v4()));
+        fs::create_dir(&directory).unwrap();
+        std::os::unix::fs::symlink(directory.join("missing"), directory.join(SNAPSHOT_NAME))
+            .unwrap();
+        let spool = RestartSpool::new(directory.clone(), Arc::new(Limits::default()));
+        let result = spool.recover().await;
+        fs::remove_dir_all(directory).unwrap();
+        assert!(matches!(result, Err(Error::Storage)));
+    }
+
+    #[tokio::test]
+    async fn authority_and_cleanup_fail_closed_and_retry_preserves_latest() {
+        let directory = std::env::temp_dir().join(format!("netbaiot-storage-{}", Uuid::new_v4()));
+        let limits = Arc::new(Limits::default());
+        let spool = RestartSpool::new(directory.clone(), limits.clone());
+        let original = record();
+        let path = spool.commit(vec![original.clone()]).await.unwrap().unwrap();
+        let image = fs::read(&path).unwrap();
+        let recovery = spool.recover().await.unwrap();
+        // An unknown legacy entry blocks cleanup before the authority is removed.
+        let stale = directory.join("unknown.spool");
+        fs::write(&stale, b"unknown responsibility").unwrap();
+        assert!(
+            spool
+                .remove_committed(recovery.committed_files.clone())
+                .await
+                .is_err()
+        );
+        assert_eq!(fs::read(&path).unwrap(), image);
+        fs::remove_file(&stale).unwrap();
+        // A corrupt authority cannot fall back to a good legacy file or be overwritten.
+        fs::write(&stale, SUPPORTED_V1).unwrap();
+        fs::write(&path, b"broken").unwrap();
+        assert!(spool.recover().await.is_err());
+        assert!(spool.commit(vec![record()]).await.is_err());
+        assert_eq!(fs::read(&path).unwrap(), b"broken");
+        fs::write(&path, &image).unwrap();
+        spool.commit(vec![original.clone()]).await.unwrap();
+        assert_eq!(spool.recover().await.unwrap().generation, 2);
+        let small = RestartSpool::new(
+            directory.clone(),
+            Arc::new(Limits {
+                spool_segment_max_bytes: image.len() - 1,
+                ..(*limits).clone()
+            }),
+        );
+        assert!(matches!(small.recover().await, Err(Error::Overloaded)));
+        assert!(matches!(
+            small.commit(vec![record()]).await,
+            Err(Error::Overloaded)
+        ));
+        assert_eq!(
+            spool.recover().await.unwrap().records[0].event.event_id,
+            original.event.event_id
+        );
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn unreadable_file_parent_and_special_paths_are_storage_errors() {
+        use std::os::unix::fs::{PermissionsExt, symlink};
+        assert_ne!(
+            effective_uid_from_owned_file(),
+            0,
+            "run permissions test as an unprivileged user"
+        );
+        let directory =
+            std::env::temp_dir().join(format!("netbaiot-permissions-{}", Uuid::new_v4()));
+        let spool = RestartSpool::new(directory.clone(), Arc::new(Limits::default()));
+        let path = spool.commit(vec![record()]).await.unwrap().unwrap();
+        fs::set_permissions(&path, fs::Permissions::from_mode(0)).unwrap();
+        let unreadable = spool.recover().await;
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
+        fs::set_permissions(&directory, fs::Permissions::from_mode(0)).unwrap();
+        let parent = spool.recover().await;
+        fs::set_permissions(&directory, fs::Permissions::from_mode(0o700)).unwrap();
+        assert!(matches!(unreadable, Err(Error::Storage)));
+        assert!(matches!(parent, Err(Error::Storage)));
+        let alias = directory.with_extension("alias");
+        symlink(directory.join("missing"), &alias).unwrap();
+        assert!(matches!(
+            RestartSpool::new(alias.clone(), Arc::new(Limits::default()))
+                .recover()
+                .await,
+            Err(Error::Storage)
+        ));
+        fs::remove_file(alias).unwrap();
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[cfg(unix)]
+    fn effective_uid_from_owned_file() -> u32 {
+        // The test does not call libc: ownership of the newly created file is the
+        // effective uid. This also detects privileged CI without weakening assertions.
+        use std::os::unix::fs::MetadataExt;
+        let path = std::env::temp_dir().join(format!("netbaiot-uid-{}", Uuid::new_v4()));
+        fs::write(&path, b"").unwrap();
+        let uid = fs::metadata(&path).unwrap().uid();
+        fs::remove_file(path).unwrap();
+        uid
     }
 
     #[tokio::test]

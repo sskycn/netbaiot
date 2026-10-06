@@ -1,0 +1,30 @@
+name: Native recovery and lifecycle
+on:
+  pull_request:
+  push:
+    branches: [main, codex/strict-reliability-audit]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  recovery:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.88.0
+      - name: Native workspace regressions including subprocess recovery
+        timeout-minutes: 20
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo test --locked --workspace --all-features 2>&1 | tee native-recovery.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: native-recovery-${{ matrix.os }}-${{ github.sha }}
+          path: native-recovery.log
