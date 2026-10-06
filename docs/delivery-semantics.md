@@ -54,3 +54,18 @@ keeps the accepted ID/status until retention ends; no automatic retry is introdu
 Late updates from an evicted dispatch cannot change a newer dispatch with the same ID.
 No command progress or dedup history is written to recovery. Business applications
 retain durable history, idempotency and offline retry decisions.
+
+The public `EventBus::publish` API rejects an EventId already carrying active
+responsibility with `Conflict` before fanout or accounting changes. It does not
+keep a permanent history: reuse after all owned deliveries finish is permitted.
+Custom `DeviceCodec` implementations must generate stable, distinct IDs for their
+accepted events; the default JSON codec generates IDs in the gateway, so this
+boundary does not imply that ordinary remote devices choose arbitrary EventIds.
+
+Recovery batches are preflighted under the EventBus state mutex before any enqueue.
+Every record must have nonempty, unique, existing required sinks; batch/active IDs
+must be unique and cumulative global/per-sink count and byte limits must fit.
+Accepted times are nonnegative Unix milliseconds. Routing revision is retained as
+historical u64 metadata and need not match current routes. Attempt values retain
+u32 history (including saturation), with at most `max_sinks` entries; completed or
+removed historical sink keys are allowed. Invalid batches leave live state unchanged.

@@ -6,6 +6,7 @@ use netbaiot_core::{
     AuthInvalidation, AuthenticatedDevice, CodecId, DeviceId, DeviceKey, Permissions, ProductId,
     TenantId,
 };
+use netbaiot_runtime::recovery_io;
 use netbaiot_runtime::{
     ByteBudget, BytesPermit, Error, Histogram, Limits, Metrics, Result, WeakByteBudget, lock,
     now_ms,
@@ -1193,6 +1194,7 @@ pub struct MqttBroker {
     /// hint only lets a non-retained route with no possible target linearize without the mutex.
     subscription_count: AtomicUsize,
     state: Mutex<BrokerState>,
+    recovery_owner: Mutex<Option<Arc<recovery_io::RecoveryDirectory>>>,
     #[cfg(test)]
     replay_hook: Mutex<Option<Arc<dyn Fn() + Send + Sync>>>,
 }
@@ -1214,6 +1216,7 @@ impl MqttBroker {
             limits,
             metrics,
             subscription_count: AtomicUsize::new(0),
+            recovery_owner: Mutex::new(None),
             #[cfg(test)]
             replay_hook: Mutex::new(None),
             state: Mutex::new(BrokerState {
@@ -2722,12 +2725,25 @@ impl MqttBroker {
         })
     }
 
+    pub fn bind_recovery_owner(&self, owner: Arc<recovery_io::RecoveryDirectory>) -> Result<()> {
+        let mut slot = lock(&self.recovery_owner)?;
+        if slot.is_some() {
+            return Err(Error::Conflict);
+        }
+        *slot = Some(owner);
+        Ok(())
+    }
+
     pub async fn recover_from(&self, directory: &Path) -> Result<bool> {
         let directory = directory.to_path_buf();
         let limits = self.limits.clone();
-        let snapshot = tokio::task::spawn_blocking(move || read_recovery(&directory, &limits))
-            .await
-            .map_err(|_| Error::Internal)??;
+        let owner = lock(&self.recovery_owner)?.clone();
+        let snapshot = tokio::task::spawn_blocking(move || {
+            let _owner = owner;
+            read_recovery(&directory, &limits)
+        })
+        .await
+        .map_err(|_| Error::Internal)??;
         if let Some(snapshot) = snapshot {
             self.restore(snapshot)?;
             Ok(true)
@@ -5090,11 +5106,12 @@ struct RecoveryWriteState {
 }
 
 fn write_recovery(directory: &Path, limits: &Limits, broker: &MqttBroker) -> Result<PathBuf> {
-    fs::create_dir_all(directory).map_err(|_| Error::Storage)?;
-    set_directory_permissions(directory)?;
-    let temporary = directory.join(format!(".{RECOVERY_FILE}.tmp"));
+    recovery_io::prepare_directory(directory)?;
+    recovery_io::ensure_temporary_capacity(directory, limits.spool_max_records)?;
+    let temporary = directory.join(format!(".{RECOVERY_FILE}.{}.tmp", uuid::Uuid::new_v4()));
     let committed = directory.join(RECOVERY_FILE);
-    let mut file = open_private_replace(&temporary)?;
+    let mut file = recovery_io::create_private(&temporary)?;
+    let _temporary_cleanup = TemporaryRecovery(temporary.clone());
     // Shutdown has fenced control mutations and joined device/maintenance owners.
     // Keep one coherent view while streaming bounded records: cloning payload state
     // would increase peak memory by up to the entire admitted broker state. This
@@ -5270,23 +5287,57 @@ fn write_recovery(directory: &Path, limits: &Limits, broker: &MqttBroker) -> Res
     trailer[20..].copy_from_slice(&recovery.stream_hash.finalize());
     file.write_all(&trailer).map_err(|_| Error::Storage)?;
     file.sync_all().map_err(|_| Error::Storage)?;
-    fs::rename(&temporary, &committed).map_err(|_| Error::Storage)?;
-    sync_directory(directory)?;
+    drop(file);
+    recovery_io::replace_synced(&temporary, &committed)?;
     Ok(committed)
 }
 
 fn read_recovery(directory: &Path, limits: &Limits) -> Result<Option<MqttRecoverySnapshot>> {
     let path = directory.join(RECOVERY_FILE);
-    if !path.exists() {
+    if !recovery_io::directory_present(directory)? {
         return Ok(None);
     }
-    let size = usize::try_from(fs::metadata(&path).map_err(|_| Error::Storage)?.len())
+    let Some(file) = recovery_io::open_snapshot(&path)? else {
+        return Ok(None);
+    };
+    let size = usize::try_from(file.metadata().map_err(|_| Error::Storage)?.len())
         .map_err(|_| Error::Overloaded)?;
     if size < RECOVERY_PREFIX_BYTES {
         return Err(Error::Invalid);
     }
-    let file = fs::File::open(path).map_err(|_| Error::Storage)?;
-    decode_recovery_reader(BufReader::new(file), size, limits).map(Some)
+    // The decoder allocates one checked record at a time; actual reads are also
+    // capped, even if the open file grows after metadata. Probe exact EOF below.
+    let ceiling = limits
+        .mqtt_recovery_max_bytes
+        .max(LEGACY_V1_RECOVERY_READ_MAX)
+        .checked_add(1)
+        .ok_or(Error::Overloaded)?;
+    read_storage_snapshot(file, size, ceiling, limits)
+}
+
+fn read_storage_snapshot(
+    reader: impl Read,
+    size: usize,
+    ceiling: usize,
+    limits: &Limits,
+) -> Result<Option<MqttRecoverySnapshot>> {
+    let mut source = recovery_io::StorageReader::new(
+        reader.take(u64::try_from(ceiling).map_err(|_| Error::Overloaded)?),
+    );
+    let result = (|| {
+        let mut reader = BufReader::new(&mut source);
+        let snapshot = decode_recovery_reader(&mut reader, size, limits)?;
+        let mut extra = [0];
+        if reader.read(&mut extra).map_err(|_| Error::Storage)? != 0 {
+            return Err(Error::Invalid);
+        }
+        Ok(Some(snapshot))
+    })();
+    if source.failed {
+        Err(Error::Storage)
+    } else {
+        result
+    }
 }
 
 /// Pure, bounded decoder used by fuzzing. Production uses the same decoder over a buffered file.
@@ -6133,43 +6184,11 @@ fn decode_record(
     Ok(())
 }
 
-#[cfg(unix)]
-fn open_private_replace(path: &Path) -> Result<fs::File> {
-    use std::os::unix::fs::OpenOptionsExt;
-    let _ = fs::remove_file(path);
-    fs::OpenOptions::new()
-        .create_new(true)
-        .write(true)
-        .mode(0o600)
-        .open(path)
-        .map_err(|_| Error::Storage)
-}
-
-#[cfg(not(unix))]
-fn open_private_replace(path: &Path) -> Result<fs::File> {
-    let _ = fs::remove_file(path);
-    fs::OpenOptions::new()
-        .create_new(true)
-        .write(true)
-        .open(path)
-        .map_err(|_| Error::Storage)
-}
-
-#[cfg(unix)]
-fn set_directory_permissions(path: &Path) -> Result<()> {
-    use std::os::unix::fs::PermissionsExt;
-    fs::set_permissions(path, fs::Permissions::from_mode(0o700)).map_err(|_| Error::Storage)
-}
-
-#[cfg(not(unix))]
-fn set_directory_permissions(_: &Path) -> Result<()> {
-    Ok(())
-}
-
-fn sync_directory(path: &Path) -> Result<()> {
-    fs::File::open(path)
-        .and_then(|file| file.sync_all())
-        .map_err(|_| Error::Storage)
+struct TemporaryRecovery(PathBuf);
+impl Drop for TemporaryRecovery {
+    fn drop(&mut self) {
+        let _ = fs::remove_file(&self.0);
+    }
 }
 
 #[cfg(test)]
@@ -6177,6 +6196,81 @@ mod tests {
     use super::*;
     use std::fmt::Debug;
     use std::time::Duration;
+
+    #[tokio::test]
+    async fn mqtt_temporary_file_budget_blocks_commit_without_replacing_snapshot() {
+        let directory = std::env::temp_dir().join(format!(
+            "netbaiot-mqtt-temp-budget-{}",
+            uuid::Uuid::new_v4()
+        ));
+        let broker = MqttBroker::new(Arc::new(Limits {
+            spool_max_records: 1,
+            ..Limits::default()
+        }));
+        let path = broker.commit_to(&directory).await.unwrap();
+        let image = fs::read(&path).unwrap();
+        for index in 0..17 {
+            fs::write(directory.join(format!("abandoned-{index}.tmp")), b"").unwrap();
+        }
+        let result = broker.commit_to(&directory).await;
+        assert!(matches!(result, Err(Error::Overloaded)));
+        assert_eq!(fs::read(&path).unwrap(), image);
+        assert_eq!(fs::read_dir(&directory).unwrap().count(), 18);
+        for index in 0..17 {
+            fs::remove_file(directory.join(format!("abandoned-{index}.tmp"))).unwrap();
+        }
+        broker.commit_to(&directory).await.unwrap();
+        assert!(broker.recover_from(&directory).await.unwrap());
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[tokio::test]
+    async fn mqtt_recovery_storage_commit_replace_retry_and_io_errors() {
+        let directory =
+            std::env::temp_dir().join(format!("netbaiot-mqtt-storage-{}", uuid::Uuid::new_v4()));
+        let limits = Arc::new(Limits::default());
+        let broker = MqttBroker::new(limits.clone());
+        assert!(!broker.recover_from(&directory).await.unwrap());
+        let path = broker.commit_to(&directory).await.unwrap();
+        let first = fs::read(&path).unwrap();
+        broker.commit_to(&directory).await.unwrap();
+        assert!(broker.recover_from(&directory).await.unwrap());
+        // The old committed bytes survive any failure before replacement.
+        let small = MqttBroker::new(Arc::new(Limits {
+            mqtt_recovery_max_bytes: 1,
+            ..(*limits).clone()
+        }));
+        assert!(small.commit_to(&directory).await.is_err());
+        assert_eq!(fs::read(&path).unwrap(), first);
+        assert_eq!(fs::read_dir(&directory).unwrap().count(), 1);
+        broker.commit_to(&directory).await.unwrap();
+        struct Broken;
+        impl Read for Broken {
+            fn read(&mut self, _: &mut [u8]) -> std::io::Result<usize> {
+                Err(std::io::ErrorKind::PermissionDenied.into())
+            }
+        }
+        assert!(matches!(
+            read_storage_snapshot(Broken, first.len(), first.len() + 1, &limits),
+            Err(Error::Storage)
+        ));
+        let mut extra = first.clone();
+        extra.push(42);
+        assert!(matches!(
+            read_storage_snapshot(Cursor::new(extra), first.len(), first.len() + 1, &limits),
+            Err(Error::Invalid)
+        ));
+        #[cfg(unix)]
+        {
+            fs::remove_file(&path).unwrap();
+            std::os::unix::fs::symlink(directory.join("missing"), &path).unwrap();
+            assert!(matches!(
+                broker.recover_from(&directory).await,
+                Err(Error::Storage)
+            ));
+        }
+        fs::remove_dir_all(directory).unwrap();
+    }
 
     fn assert_deadline_index<K: Clone + Debug + Eq + Hash>(
         index: &DeadlineIndex<K>,

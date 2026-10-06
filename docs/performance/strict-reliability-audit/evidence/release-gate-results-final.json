@@ -1,0 +1,696 @@
+{
+  "schema_version": 2,
+  "suite": "NetbaIoT MQTT 3.1.1 raw conformance",
+  "results": [
+    {
+      "test_id": "CONNECT-001",
+      "category": "CONNECT",
+      "spec_requirement": "MQTT-3.1.4-4; MQTT-3.2.0-1",
+      "implementation": "NetbaIoT",
+      "result": "PASS",
+      "duration_ms": 0.541,
+      "details": "accepted; Session Present=0"
+    },
+    {
+      "test_id": "CONNECT-002",
+      "category": "CONNECT",
+      "spec_requirement": "MQTT-3.1.2-2",
+      "implementation": "NetbaIoT",
+      "result": "PASS",
+      "duration_ms": 0.218,
+      "details": "CONNACK=1 then close"
+    },
+    {
+      "test_id": "CONNECT-003",
+      "category": "CONNECT",
+      "spec_requirement": "MQTT-3.1.2-3; MQTT-3.1.2-14; MQTT-3.1.2-22; MQTT-3.1.4-1",
+      "implementation": "NetbaIoT",
+      "result": "PASS",
+      "duration_ms": 0.543,
+      "details": "reserved/password-without-username/WillQoS=3 closed"
+    },
+    {
+      "test_id": "CONNACK-001",
+      "category": "CONNACK",
+      "spec_requirement": "MQTT-3.2.2-4; MQTT-3.2.2-5",
+      "implementation": "NetbaIoT",
+      "result": "PASS",
+      "duration_ms": 0.198,
+      "details": "bad password CONNACK=4, Session Present=0"
+    },
+    {
+      "test_id": "CONNECT-004",
+      "category": "CONNECT",
+      "spec_requirement": "MQTT-3.1.3-6; MQTT-3.1.3-8; MQTT-3.1.3-9",
+      "implementation": "NetbaIoT",
+      "result": "PASS",
+      "duration_ms": 0.528,
+      "details": "zero ClientId rejected for CleanSession=0 and generated for CleanSession=1"
+    },
+    {
+      "test_id": "CONNECT-005",
+      "category": "CONNECT",
+      "spec_requirement": "MQTT-3.1.0-2",
+      "implementation": "NetbaIoT",
+      "result": "PASS",
+      "duration_ms": 0.3,
+      "details": "second CONNECT closed"
+    },
+    {
+      "test_id": "SEQUENCE-001",
+      "category": "sequence",
+      "spec_requirement": "MQTT-3.1.0-1",
+      "implementation": "NetbaIoT",
+      "result": "PASS",
+      "duration_ms": 0.697,
+      "details": "PINGREQ/PUBLISH/SUBSCRIBE/DISCONNECT before CONNECT closed"
+    },
+    {
+      "test_id": "HEADER-001",
+      "category": "fixed-header",
+      "spec_requirement": "MQTT-2.2.2-1; MQTT-2.2.2-2",
+      "implementation": "NetbaIoT",
+      "result": "PASS",
+      "duration_ms": 2.215,
+      "details": "all client-sendable packet flag families rejected invalid fixed flags"
+    },
+    {
+      "test_id": "FRAMING-001",
+      "category": "framing",
+      "spec_requirement": "MQTT-7.1.1-1",
+      "implementation": "NetbaIoT",
+      "result": "PASS",
+      "duration_ms": 0.611,
+      "details": "bytewise CONNECT and two coalesced PINGREQ packets"
+    },
+    {
+      "test_id": "REMAINING-001",
+      "category": "remaining-length",
+      "spec_requirement": "MQTT-4.8.0-1",
+      "implementation": "NetbaIoT",
+      "result": "PASS",
+      "duration_ms": 0.498,
+      "details": "unterminated/fifth/over-product-limit Remaining Length closed"
+    },
+    {
+      "test_id": "UTF8-001",
+      "category": "UTF-8",
+      "spec_requirement": "MQTT-1.5.3-1; MQTT-1.5.3-2",
+      "implementation": "NetbaIoT",
+      "result": "PASS",
+      "duration_ms": 0.344,
+      "details": "NUL and surrogate encoding closed"
+    },
+    {
+      "test_id": "SESSION-001",
+      "category": "session",
+      "spec_requirement": "MQTT-3.1.2-4; MQTT-3.1.2-6; MQTT-3.2.2-1; MQTT-3.2.2-2; MQTT-3.2.2-3",
+      "implementation": "NetbaIoT",
+      "result": "PASS",
+      "duration_ms": 1.205,
+      "details": "0,new; 1,resume; 0,CleanSession=1; 0,post-reset"
+    },
+    {
+      "test_id": "SUB-001",
+      "category": "subscription",
+      "spec_requirement": "MQTT-3.8.4-1; MQTT-3.8.4-2; MQTT-3.8.4-4; MQTT-3.8.4-5; MQTT-3.9.3-1",
+      "implementation": "NetbaIoT",
+      "result": "PASS",
+      "duration_ms": 0.552,
+      "details": "SUBACK order 0/1/2 and per-filter ACL failure 0x80"
+    },
+    {
+      "test_id": "SUB-002",
+      "category": "subscription",
+      "spec_requirement": "MQTT-2.3.1-1; MQTT-3.8.3-3; MQTT-3-8.3-4",
+      "implementation": "NetbaIoT",
+      "result": "PASS",
+      "duration_ms": 0.922,
+      "details": "packet ID 0, invalid filter, and empty payload closed"
+    },
+    {
+      "test_id": "UNSUB-001",
+      "category": "unsubscribe",
+      "spec_requirement": "MQTT-3.10.4-1; MQTT-3.10.4-4; MQTT-3.10.4-5; MQTT-3.10.4-6",
+      "implementation": "NetbaIoT",
+      "result": "PASS",
+      "duration_ms": 0.619,
+      "details": "existing/non-existing/multiple filters acknowledged with same ID"
+    },
+    {
+      "test_id": "PERSISTENT-UNSUB-RECONNECT-001",
+      "category": "unsubscribe/session",
+      "spec_requirement": "MQTT-3.10.4-4; MQTT-4.1.0-1; MQTT-4.5.0-1",
+      "implementation": "NetbaIoT",
+      "result": "PASS",
+      "duration_ms": 408.431,
+      "details": "Session Present=1; UNSUBACK committed; no stale offline delivery; resubscribe delivered only fresh publication"
+    },
+    {
+      "test_id": "QOS0-001",
+      "category": "QoS0",
+      "spec_requirement": "MQTT-3.3.4-1; MQTT-4.3.1-1",
+      "implementation": "NetbaIoT",
+      "result": "PASS",
+      "duration_ms": 2.85,
+      "details": "no PUBACK; subscriber received QoS0"
+    },
+    {
+      "test_id": "QOS1-001",
+      "category": "QoS1",
+      "spec_requirement": "MQTT-2.3.1-6; MQTT-4.3.2-2",
+      "implementation": "NetbaIoT",
+      "result": "PASS",
+      "duration_ms": 2.099,
+      "details": "PUBACK preserved id=42; outgoing QoS=min(1,2)"
+    },
+    {
+      "test_id": "QOS1-DUP-001",
+      "category": "QoS1",
+      "spec_requirement": "MQTT-4.3.2-2",
+      "implementation": "NetbaIoT",
+      "result": "PASS",
+      "duration_ms": 1.758,
+      "details": "same incoming id after PUBACK treated as a new publication"
+    },
+    {
+      "test_id": "QOS2-IN-001",
+      "category": "QoS2",
+      "spec_requirement": "MQTT-4.3.3-2",
+      "implementation": "NetbaIoT",
+      "result": "PASS",
+      "duration_ms": 203.48,
+      "details": "duplicate PUBLISH=>PUBREC; duplicate PUBREL=>PUBCOMP; one routed delivery"
+    },
+    {
+      "test_id": "RETAIN-001",
+      "category": "retained",
+      "spec_requirement": "MQTT-3.3.1-5; MQTT-3.3.1-6; MQTT-3.3.1-8; MQTT-3.3.1-9; MQTT-3.3.1-10; MQTT-3.3.1-11",
+      "implementation": "NetbaIoT",
+      "result": "PASS",
+      "duration_ms": 206.994,
+      "details": "create/replay(RETAIN=1), replace/live(RETAIN=0), zero-delete/no future replay"
+    },
+    {
+      "test_id": "SUB-RESUB-001",
+      "category": "subscription",
+      "spec_requirement": "MQTT-3.8.4-3",
+      "implementation": "NetbaIoT",
+      "result": "PASS",
+      "duration_ms": 3.538,
+      "details": "identical filter replacement re-sent retained message and changed max QoS"
+    },
+    {
+      "test_id": "SESSION-OFFLINE-001",
+      "category": "session",
+      "spec_requirement": "MQTT-3.1.2-5; MQTT-4.4.0-1; MQTT-4.6.0-1",
+      "implementation": "NetbaIoT",
+      "result": "PASS",
+      "duration_ms": 3.307,
+      "details": "ordered offline QoS1/QoS2 and Session Present=1"
+    },
+    {
+      "test_id": "WILL-001",
+      "category": "Will",
+      "spec_requirement": "MQTT-3.1.2-8; MQTT-3.1.2-10; MQTT-3.1.2-17; MQTT-3.14.4-3",
+      "implementation": "NetbaIoT",
+      "result": "PASS",
+      "duration_ms": 261.231,
+      "details": "EOF published retained Will; DISCONNECT removed Will without publication"
+    },
+    {
+      "test_id": "WILL-TAKEOVER-001",
+      "category": "Will",
+      "spec_requirement": "MQTT-3.1.4-2; MQTT-3.1.2-8",
+      "implementation": "NetbaIoT",
+      "result": "PASS",
+      "duration_ms": 3.11,
+      "details": "old connection closed and its Will delivered once to replacement session"
+    },
+    {
+      "test_id": "KEEPALIVE-001",
+      "category": "Keep Alive",
+      "spec_requirement": "MQTT-3.1.2-24; MQTT-3.12.4-1",
+      "implementation": "NetbaIoT",
+      "result": "PASS",
+      "duration_ms": 1503.75,
+      "details": "PINGRESP and KeepAlive close at 1.502s"
+    },
+    {
+      "test_id": "SLOWLORIS-001",
+      "category": "resource",
+      "spec_requirement": "MQTT-4.8.0-2",
+      "implementation": "NetbaIoT",
+      "result": "PASS",
+      "duration_ms": 1003.115,
+      "details": "incomplete packet closed at 1.002s by whole-packet deadline"
+    },
+    {
+      "test_id": "SEQUENCE-002",
+      "category": "sequence",
+      "spec_requirement": "MQTT-4.8.0-1",
+      "implementation": "NetbaIoT",
+      "result": "PASS",
+      "duration_ms": 6.485,
+      "details": "unknown PUBREL received PUBCOMP; other unknown/server-only packets closed"
+    },
+    {
+      "test_id": "SECURITY-ACL-001",
+      "category": "security",
+      "spec_requirement": "NetbaIoT product profile",
+      "implementation": "NetbaIoT",
+      "result": "PASS",
+      "duration_ms": 204.286,
+      "details": "cross-device/tenant publish closed before retained effect; subscriptions 0x80"
+    },
+    {
+      "test_id": "SECURITY-SESSION-001",
+      "category": "security",
+      "spec_requirement": "NetbaIoT product profile",
+      "implementation": "NetbaIoT",
+      "result": "PASS",
+      "duration_ms": 2.587,
+      "details": "same ClientId under different authenticated DeviceKey did not resume or clear state"
+    },
+    {
+      "test_id": "WILL-SHUTDOWN-001",
+      "category": "Will",
+      "spec_requirement": "MQTT-3.1.2-8",
+      "implementation": "NetbaIoT",
+      "result": "PASS",
+      "duration_ms": 79.524,
+      "details": "server shutdown published retained Will before snapshot; restart replayed it"
+    },
+    {
+      "test_id": "DIFF-CONNECT-001",
+      "category": "differential/CONNECT",
+      "spec_requirement": "observable MQTT 3.1.1 behavior",
+      "implementation": "NetbaIoT vs Mosquitto",
+      "result": "PASS",
+      "duration_ms": 0.967,
+      "details": "NetbaIoT=(32, b'\\x00\\x00'); Mosquitto=(32, b'\\x00\\x00')"
+    },
+    {
+      "test_id": "DIFF-PING-001",
+      "category": "differential/PING",
+      "spec_requirement": "observable MQTT 3.1.1 behavior",
+      "implementation": "NetbaIoT vs Mosquitto",
+      "result": "PASS",
+      "duration_ms": 0.584,
+      "details": "NetbaIoT=(208, b''); Mosquitto=(208, b'')"
+    },
+    {
+      "test_id": "DIFF-FLAGS-001",
+      "category": "differential/malformed-flags",
+      "spec_requirement": "observable MQTT 3.1.1 behavior",
+      "implementation": "NetbaIoT vs Mosquitto",
+      "result": "PASS",
+      "duration_ms": 0.731,
+      "details": "NetbaIoT='CLOSED'; Mosquitto='CLOSED'"
+    },
+    {
+      "test_id": "DIFF-UNKNOWN-PUBACK-001",
+      "category": "differential/unknown-id",
+      "spec_requirement": "observable MQTT 3.1.1 behavior",
+      "implementation": "NetbaIoT vs Mosquitto",
+      "result": "PASS",
+      "duration_ms": 2001.85,
+      "details": "NetbaIoT='CLOSED'; Mosquitto='NO_RESPONSE'; IMPLEMENTATION_DEFINED_ALLOWED"
+    },
+    {
+      "test_id": "DIFF-SESSION-001",
+      "category": "differential/session",
+      "spec_requirement": "observable MQTT 3.1.1 behavior",
+      "implementation": "NetbaIoT vs Mosquitto",
+      "result": "PASS",
+      "duration_ms": 5.326,
+      "details": "NetbaIoT=(0, 1, 0, 0); Mosquitto=(0, 1, 0, 0)"
+    },
+    {
+      "test_id": "DIFF-SUB-001",
+      "category": "differential/subscribe-resubscribe-unsubscribe",
+      "spec_requirement": "observable MQTT 3.1.1 behavior",
+      "implementation": "NetbaIoT vs Mosquitto",
+      "result": "PASS",
+      "duration_ms": 2.197,
+      "details": "NetbaIoT=((144, b'\\x00\\x01\\x00\\x01\\x02'), (144, b'\\x00\\x02\\x02'), (176, b'\\x00\\x03')); Mosquitto=((144, b'\\x00\\x01\\x00\\x01\\x02'), (144, b'\\x00\\x02\\x02'), (176, b'\\x00\\x03'))"
+    },
+    {
+      "test_id": "DIFF-QOS-001",
+      "category": "differential/qos0-qos1-qos2",
+      "spec_requirement": "observable MQTT 3.1.1 behavior",
+      "implementation": "NetbaIoT vs Mosquitto",
+      "result": "PASS",
+      "duration_ms": 4.17,
+      "details": "NetbaIoT=[(b'{\"schema_version\":1,\"source_message_id\":\"conformance-200\",\"kind\":\"heartbeat\",\"data\":{\"sequence\":200}}', 0), (b'{\"schema_version\":1,\"source_message_id\":\"conformance-201\",\"kind\":\"heartbeat\",\"data\":{\"sequence\":201}}', 1), (b'{\"schema_version\":1,\"source_message_id\":\"conformance-202\",\"kind\":\"heartbeat\",\"data\":{\"sequence\":202}}', 2)]; Mosquitto=[(b'{\"schema_version\":1,\"source_message_id\":\"conformance-200\",\"kind\":\"heartbeat\",\"data\":{\"sequence\":200}}', 0), (b'{\"schema_version\":1,\"source_message_id\":\"conformance-201\",\"kind\":\"heartbeat\",\"data\":{\"sequence\":201}}', 1), (b'{\"schema_version\":1,\"source_message_id\":\"conformance-202\",\"kind\":\"heartbeat\",\"data\":{\"sequence\":202}}', 2)]"
+    },
+    {
+      "test_id": "DIFF-RETAIN-001",
+      "category": "differential/retained",
+      "spec_requirement": "observable MQTT 3.1.1 behavior",
+      "implementation": "NetbaIoT vs Mosquitto",
+      "result": "PASS",
+      "duration_ms": 5.382,
+      "details": "NetbaIoT=(True, 1, True); Mosquitto=(True, 1, True)"
+    },
+    {
+      "test_id": "DIFF-WILL-001",
+      "category": "differential/will",
+      "spec_requirement": "observable MQTT 3.1.1 behavior",
+      "implementation": "NetbaIoT vs Mosquitto",
+      "result": "PASS",
+      "duration_ms": 114.889,
+      "details": "NetbaIoT=(True, 1, True); Mosquitto=(True, 1, True)"
+    },
+    {
+      "test_id": "DIFF-DUPLICATE-CLIENT-001",
+      "category": "differential/duplicate-client",
+      "spec_requirement": "observable MQTT 3.1.1 behavior",
+      "implementation": "NetbaIoT vs Mosquitto",
+      "result": "PASS",
+      "duration_ms": 2.54,
+      "details": "NetbaIoT=(1, 'old-closed'); Mosquitto=(1, 'old-closed')"
+    },
+    {
+      "test_id": "DIFF-KEEPALIVE-001",
+      "category": "differential/keepalive",
+      "spec_requirement": "NetbaIoT keepalive bound plus reference-only timing observation",
+      "implementation": "NetbaIoT vs Mosquitto",
+      "result": "PASS",
+      "duration_ms": 2815.081,
+      "details": "NetbaIoT met differential keepalive bound (closed at 1.502s); Mosquitto closed at 1.311s within reference timing window"
+    },
+    {
+      "test_id": "MOSQUITTO-CLIENT-001",
+      "category": "external-client",
+      "spec_requirement": "MQTT 3.1.1 client interoperability",
+      "implementation": "NetbaIoT",
+      "result": "PASS",
+      "duration_ms": 10621.764,
+      "details": "MOSQUITTO-PERSISTENT-UNSUB-001: PASS \u2014 mosquitto_sub version 2.1.2 running on libmosquitto 2.1.0.; target unsubscribe persisted without stale delivery"
+    },
+    {
+      "test_id": "MOSQUITTO-PERSISTENT-UNSUB-001",
+      "category": "external-client",
+      "spec_requirement": "MQTT 3.10.4-4 persistent unsubscribe interoperability",
+      "implementation": "NetbaIoT",
+      "result": "PASS",
+      "duration_ms": 0.002,
+      "details": "MOSQUITTO-PERSISTENT-UNSUB-001: PASS \u2014 mosquitto_sub version 2.1.2 running on libmosquitto 2.1.0.; target unsubscribe persisted without stale delivery"
+    },
+    {
+      "test_id": "TLS-001",
+      "category": "tls",
+      "spec_requirement": "verified MQTT TLS transport",
+      "implementation": "NetbaIoT",
+      "result": "PASS",
+      "duration_ms": 829.02,
+      "details": "    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.05s"
+    },
+    {
+      "test_id": "QOS2-OUT-WRONG-PUBACK-001",
+      "category": "rust-release-invariant",
+      "spec_requirement": "named deterministic Rust evidence",
+      "implementation": "NetbaIoT",
+      "result": "PASS",
+      "duration_ms": 248.445,
+      "details": "     Running unittests src/lib.rs (target/debug/deps/netbaiot_v3_mux-d287c23fa09bb2db)"
+    },
+    {
+      "test_id": "QOS2-OUT-WRONG-PUBCOMP-001",
+      "category": "rust-release-invariant",
+      "spec_requirement": "named deterministic Rust evidence",
+      "implementation": "NetbaIoT",
+      "result": "PASS",
+      "duration_ms": 123.917,
+      "details": "     Running unittests src/lib.rs (target/debug/deps/netbaiot_v3_mux-d287c23fa09bb2db)"
+    },
+    {
+      "test_id": "QOS2-IN-SESSION-TAKEOVER-001",
+      "category": "rust-release-invariant",
+      "spec_requirement": "named deterministic Rust evidence",
+      "implementation": "NetbaIoT",
+      "result": "PASS",
+      "duration_ms": 124.756,
+      "details": "     Running unittests src/lib.rs (target/debug/deps/netbaiot_v3_mux-d287c23fa09bb2db)"
+    },
+    {
+      "test_id": "AUTH-REGISTER-REVOKE-RACE-001",
+      "category": "rust-release-invariant",
+      "spec_requirement": "named deterministic Rust evidence",
+      "implementation": "NetbaIoT",
+      "result": "PASS",
+      "duration_ms": 140.849,
+      "details": "     Running unittests src/lib.rs (target/debug/deps/netbaiot_v3_mux-d287c23fa09bb2db)"
+    },
+    {
+      "test_id": "MQTT-CONNACK-WRITE-FAIL-CLEANUP-001",
+      "category": "rust-release-invariant",
+      "spec_requirement": "named deterministic Rust evidence",
+      "implementation": "NetbaIoT",
+      "result": "PASS",
+      "duration_ms": 121.644,
+      "details": "     Running unittests src/lib.rs (target/debug/deps/netbaiot_v3_mux-d287c23fa09bb2db)"
+    },
+    {
+      "test_id": "MQTT-TENANT-INFLIGHT-WAKE-QOS1-001",
+      "category": "rust-release-invariant",
+      "spec_requirement": "named deterministic Rust evidence",
+      "implementation": "NetbaIoT",
+      "result": "PASS",
+      "duration_ms": 122.83,
+      "details": "     Running unittests src/lib.rs (target/debug/deps/netbaiot_v3_mux-d287c23fa09bb2db)"
+    },
+    {
+      "test_id": "MQTT-TENANT-INFLIGHT-WAKE-QOS2-001",
+      "category": "rust-release-invariant",
+      "spec_requirement": "named deterministic Rust evidence",
+      "implementation": "NetbaIoT",
+      "result": "PASS",
+      "duration_ms": 122.028,
+      "details": "     Running unittests src/lib.rs (target/debug/deps/netbaiot_v3_mux-d287c23fa09bb2db)"
+    },
+    {
+      "test_id": "MQTT-RECOVERY-BINARY-WORSTCASE-001",
+      "category": "rust-release-invariant",
+      "spec_requirement": "named deterministic Rust evidence",
+      "implementation": "NetbaIoT",
+      "result": "PASS",
+      "duration_ms": 133.888,
+      "details": "     Running unittests src/lib.rs (target/debug/deps/netbaiot_v3_mux-d287c23fa09bb2db)"
+    },
+    {
+      "test_id": "WILL-RESOURCE-FAILURE-001",
+      "category": "rust-release-invariant",
+      "spec_requirement": "named deterministic Rust evidence",
+      "implementation": "NetbaIoT",
+      "result": "PASS",
+      "duration_ms": 137.678,
+      "details": "     Running unittests src/lib.rs (target/debug/deps/netbaiot_v3_mux-d287c23fa09bb2db)"
+    },
+    {
+      "test_id": "EVENTBUS-CONCURRENCY-NOSPIN-001",
+      "category": "rust-release-invariant",
+      "spec_requirement": "named deterministic Rust evidence",
+      "implementation": "NetbaIoT",
+      "result": "PASS",
+      "duration_ms": 148.435,
+      "details": "     Running unittests src/lib.rs (target/debug/deps/netbaiot_v3_mux-d287c23fa09bb2db)"
+    },
+    {
+      "test_id": "MQTT-PERSISTENT-OVERLOAD-QOS1-001",
+      "category": "rust-release-invariant",
+      "spec_requirement": "named deterministic Rust evidence",
+      "implementation": "NetbaIoT",
+      "result": "PASS",
+      "duration_ms": 123.757,
+      "details": "     Running unittests src/lib.rs (target/debug/deps/netbaiot_v3_mux-d287c23fa09bb2db)"
+    },
+    {
+      "test_id": "MQTT-PERSISTENT-OVERLOAD-QOS2-001",
+      "category": "rust-release-invariant",
+      "spec_requirement": "named deterministic Rust evidence",
+      "implementation": "NetbaIoT",
+      "result": "PASS",
+      "duration_ms": 122.302,
+      "details": "     Running unittests src/lib.rs (target/debug/deps/netbaiot_v3_mux-d287c23fa09bb2db)"
+    },
+    {
+      "test_id": "QOS2-CLEAN-SESSION-INCARNATION-001",
+      "category": "rust-release-invariant",
+      "spec_requirement": "named deterministic Rust evidence",
+      "implementation": "NetbaIoT",
+      "result": "PASS",
+      "duration_ms": 122.503,
+      "details": "     Running unittests src/lib.rs (target/debug/deps/netbaiot_v3_mux-d287c23fa09bb2db)"
+    },
+    {
+      "test_id": "MQTT-AUTHZ-PERSISTENT-RESET-001",
+      "category": "rust-release-invariant",
+      "spec_requirement": "named deterministic Rust evidence",
+      "implementation": "NetbaIoT",
+      "result": "PASS",
+      "duration_ms": 125.162,
+      "details": "     Running unittests src/lib.rs (target/debug/deps/netbaiot_v3_mux-d287c23fa09bb2db)"
+    },
+    {
+      "test_id": "MQTT-RECOVERY-STRUCTURAL-EVENTBUS-SAFETY-001",
+      "category": "rust-release-invariant",
+      "spec_requirement": "named deterministic Rust evidence",
+      "implementation": "NetbaIoT",
+      "result": "PASS",
+      "duration_ms": 124.374,
+      "details": "     Running unittests src/lib.rs (target/debug/deps/netbaiot_v3_mux-d287c23fa09bb2db)"
+    },
+    {
+      "test_id": "MQTT-RECOVERY-V2-ROUNDTRIP-001",
+      "category": "rust-release-invariant",
+      "spec_requirement": "named deterministic Rust evidence",
+      "implementation": "NetbaIoT",
+      "result": "PASS",
+      "duration_ms": 122.405,
+      "details": "     Running unittests src/lib.rs (target/debug/deps/netbaiot_v3_mux-d287c23fa09bb2db)"
+    },
+    {
+      "test_id": "MQTT-RECOVERY-V3-ROUNDTRIP-001",
+      "category": "rust-release-invariant",
+      "spec_requirement": "named deterministic Rust evidence",
+      "implementation": "NetbaIoT",
+      "result": "PASS",
+      "duration_ms": 130.584,
+      "details": "     Running unittests src/lib.rs (target/debug/deps/netbaiot_v3_mux-d287c23fa09bb2db)"
+    },
+    {
+      "test_id": "MQTT-RECOVERY-V1-COMPAT-001",
+      "category": "rust-release-invariant",
+      "spec_requirement": "named deterministic Rust evidence",
+      "implementation": "NetbaIoT",
+      "result": "PASS",
+      "duration_ms": 133.665,
+      "details": "     Running unittests src/lib.rs (target/debug/deps/netbaiot_v3_mux-d287c23fa09bb2db)"
+    },
+    {
+      "test_id": "MQTT-RECOVERY-SEMANTIC-INVALID-001",
+      "category": "rust-release-invariant",
+      "spec_requirement": "named deterministic Rust evidence",
+      "implementation": "NetbaIoT",
+      "result": "PASS",
+      "duration_ms": 129.182,
+      "details": "     Running unittests src/lib.rs (target/debug/deps/netbaiot_v3_mux-d287c23fa09bb2db)"
+    },
+    {
+      "test_id": "RETAIN-REPLACEMENT-RESERVATION-001",
+      "category": "rust-release-invariant",
+      "spec_requirement": "named deterministic Rust evidence",
+      "implementation": "NetbaIoT",
+      "result": "PASS",
+      "duration_ms": 124.096,
+      "details": "     Running unittests src/lib.rs (target/debug/deps/netbaiot_v3_mux-d287c23fa09bb2db)"
+    },
+    {
+      "test_id": "EVENTBUS-SINK-PANIC-RECOVERY-001",
+      "category": "rust-release-invariant",
+      "spec_requirement": "named deterministic Rust evidence",
+      "implementation": "NetbaIoT",
+      "result": "PASS",
+      "duration_ms": 129.707,
+      "details": "     Running unittests src/lib.rs (target/debug/deps/netbaiot_v3_mux-d287c23fa09bb2db)"
+    },
+    {
+      "test_id": "WILL-SUBSCRIBER-PRESSURE-001",
+      "category": "rust-release-invariant",
+      "spec_requirement": "named deterministic Rust evidence",
+      "implementation": "NetbaIoT",
+      "result": "PASS",
+      "duration_ms": 124.24,
+      "details": "     Running unittests src/lib.rs (target/debug/deps/netbaiot_v3_mux-d287c23fa09bb2db)"
+    },
+    {
+      "test_id": "AUTH-MQTT-ATTACH-REVOKE-RACE-001",
+      "category": "rust-release-invariant",
+      "spec_requirement": "named deterministic Rust evidence",
+      "implementation": "NetbaIoT",
+      "result": "PASS",
+      "duration_ms": 256.975,
+      "details": "     Running unittests src/lib.rs (target/debug/deps/netbaiot_v3_mux-d287c23fa09bb2db)"
+    },
+    {
+      "test_id": "MQTT-RECOVERY-V1-LARGE-COMPAT-001",
+      "category": "rust-release-invariant",
+      "spec_requirement": "named deterministic Rust evidence",
+      "implementation": "NetbaIoT",
+      "result": "PASS",
+      "duration_ms": 137.933,
+      "details": "     Running unittests src/lib.rs (target/debug/deps/netbaiot_v3_mux-d287c23fa09bb2db)"
+    },
+    {
+      "test_id": "MQTT-RECOVERY-WHOLE-IMAGE-INTEGRITY-001",
+      "category": "rust-release-invariant",
+      "spec_requirement": "named deterministic Rust evidence",
+      "implementation": "NetbaIoT",
+      "result": "PASS",
+      "duration_ms": 134.742,
+      "details": "     Running unittests src/lib.rs (target/debug/deps/netbaiot_v3_mux-d287c23fa09bb2db)"
+    },
+    {
+      "test_id": "MQTT-PERSISTENT-CODEC-PROVENANCE-001",
+      "category": "rust-release-invariant",
+      "spec_requirement": "named deterministic Rust evidence",
+      "implementation": "NetbaIoT",
+      "result": "PASS",
+      "duration_ms": 126.776,
+      "details": "     Running unittests src/lib.rs (target/debug/deps/netbaiot_v3_mux-d287c23fa09bb2db)"
+    },
+    {
+      "test_id": "MQTT-ROUTE-PREFLIGHT-BOUNDED-MEMORY-001",
+      "category": "rust-release-invariant",
+      "spec_requirement": "named deterministic Rust evidence",
+      "implementation": "NetbaIoT",
+      "result": "PASS",
+      "duration_ms": 157.551,
+      "details": "     Running unittests src/lib.rs (target/debug/deps/netbaiot_v3_mux-d287c23fa09bb2db)"
+    },
+    {
+      "test_id": "MQTT-RECOVERY-ACL-OWNERSHIP-001",
+      "category": "rust-release-invariant",
+      "spec_requirement": "named deterministic Rust evidence",
+      "implementation": "NetbaIoT",
+      "result": "PASS",
+      "duration_ms": 121.963,
+      "details": "     Running unittests src/lib.rs (target/debug/deps/netbaiot_v3_mux-d287c23fa09bb2db)"
+    },
+    {
+      "test_id": "AUTH-INVALIDATION-COUNTING-001",
+      "category": "rust-release-invariant",
+      "spec_requirement": "named deterministic Rust evidence",
+      "implementation": "NetbaIoT",
+      "result": "PASS",
+      "duration_ms": 120.673,
+      "details": "     Running unittests src/lib.rs (target/debug/deps/netbaiot_v3_mux-d287c23fa09bb2db)"
+    },
+    {
+      "test_id": "RESTART-001",
+      "category": "restart-recovery",
+      "spec_requirement": "planned MQTT restart recovery",
+      "implementation": "NetbaIoT",
+      "result": "PASS",
+      "duration_ms": 122.999,
+      "details": "     Running unittests src/lib.rs (target/debug/deps/netbaiot_v3_mux-d287c23fa09bb2db)"
+    },
+    {
+      "test_id": "NORMATIVE-COVERAGE-001",
+      "category": "traceability",
+      "spec_requirement": "all applicable MQTT 3.1.1 requirements",
+      "implementation": "NetbaIoT",
+      "result": "PASS",
+      "duration_ms": 0.04,
+      "details": "125/125 requirements have current PASS evidence"
+    }
+  ],
+  "summary": {
+    "total": 76,
+    "pass": 76,
+    "reference_observations": 0,
+    "fail": 0
+  }
+}

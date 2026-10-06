@@ -1,8 +1,10 @@
 pub mod broker;
 pub mod codec;
+mod fair;
 pub mod packet;
 pub mod topics;
 mod v5_connection;
+use fair::{FairWork, Work};
 
 use crate::common::*;
 use broker::{BrokerFrame, BrokerMessage, InboundQos2Action, subscribe_acl};
@@ -358,10 +360,11 @@ pub async fn connection(
     };
     let mut last = Instant::now();
     let mut normal_disconnect = false;
+    let mut fair = FairWork::default();
     let result = async {
         loop {
             let idle = last + keepalive.unwrap_or(Duration::from_millis(limits.idle_timeout_ms));
-            tokio::select! {
+            let work = tokio::select! {
                 biased;
                 _ = stop.cancelled() => break,
                 _ = live_session.cancel.cancelled() => break,
@@ -370,7 +373,10 @@ pub async fn connection(
                     if keepalive.is_some() { services.ingress.metrics.inc(Metric::MqttKeepaliveDisconnects); }
                     return Err(Error::Timeout);
                 }
-                command = commands.recv() => {
+                work = fair.select(commands.recv(), attachment.receiver.recv(), next(&mut reader, &mut stream, limits, idle)) => work,
+            };
+            match work {
+                Work::Command(command) => {
                     let Some(mut command) = command else { break };
                     if command.progress.as_ref().map_or_else(|| command.expires_at <= now_ms(), |progress| progress.expire(now_ms())) {
                         if command.progress.is_none() { services.router.transport_state(DeliveryState::Expired); }
@@ -391,11 +397,11 @@ pub async fn connection(
                         else { services.router.transport_state(DeliveryState::Failed); }
                     }
                 }
-                frame = attachment.receiver.recv() => {
+                Work::Frame(frame) => {
                     let Some(frame) = frame else { break };
                     send_broker_frame(&mut stream, &services, &attachment.key, attachment.generation, frame).await?;
                 }
-                packet = next(&mut reader, &mut stream, limits, idle) => {
+                Work::Packet(packet) => {
                     let (packet, validation_us, validated_at) = packet?;
                     let control = matches!(&packet, Packet::Puback(_) | Packet::Pubrec(_)
                         | Packet::Pubrel(_) | Packet::Pubcomp(_) | Packet::Pingreq | Packet::Disconnect);
@@ -583,6 +589,59 @@ pub async fn connection(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[tokio::test(start_paused = true)]
+    async fn rotating_work_preserves_partial_packet_bytes_and_original_deadline() {
+        use tokio::io::AsyncWriteExt;
+        for v5 in [false, true] {
+            for expired in [false, true] {
+                let limits = Limits::default();
+                let (mut peer, stream) = tokio::io::duplex(64);
+                let mut stream: BoxStream = Box::new(stream);
+                let mut reader = Reader::new(64, 30);
+                let idle = Instant::now() + Duration::from_secs(10);
+                let mut fair = FairWork::default();
+                peer.write_all(&[0xc0]).await.unwrap();
+                for _ in 0..3 {
+                    if v5 {
+                        let work = fair
+                            .select(
+                                std::future::ready(()),
+                                std::future::ready(()),
+                                v5_connection::next_v5(&mut reader, &mut stream, &limits, idle),
+                            )
+                            .await;
+                        assert!(!matches!(work, Work::Packet(_)));
+                    } else {
+                        let work = fair
+                            .select(
+                                std::future::ready(()),
+                                std::future::ready(()),
+                                next(&mut reader, &mut stream, &limits, idle),
+                            )
+                            .await;
+                        assert!(!matches!(work, Work::Packet(_)));
+                    }
+                }
+                assert_eq!(&reader.buffer[..], &[0xc0]);
+                tokio::time::advance(Duration::from_millis(if expired { 31 } else { 20 })).await;
+                peer.write_all(&[0]).await.unwrap();
+                if v5 {
+                    let result =
+                        v5_connection::next_v5(&mut reader, &mut stream, &limits, idle).await;
+                    assert_eq!(result.is_err(), expired);
+                    if !expired {
+                        assert!(matches!(result, Ok((codec::v5::Packet::Pingreq, _, _))));
+                    }
+                } else {
+                    let result = next(&mut reader, &mut stream, &limits, idle).await;
+                    assert_eq!(result.is_err(), expired);
+                    if !expired {
+                        assert!(matches!(result, Ok((Packet::Pingreq, _, _))));
+                    }
+                }
+            }
+        }
+    }
     #[test]
     fn state_rejects_double_connect() {
         let mut state = StateMachine {

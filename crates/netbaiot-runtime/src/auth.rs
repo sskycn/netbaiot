@@ -394,7 +394,10 @@ impl AuthCache {
         let key = verifier_cache_key(credential_id)?;
         loop {
             let follower = {
+                #[cfg(not(test))]
                 let mut state = lock(&self.state)?;
+                #[cfg(test)]
+                let mut state = cache_tests::probe_verifier_lock(lock(&self.state)?);
                 prune_expired(&mut state);
                 if let Some(entry) = state.entries.get(&key) {
                     match &entry.value {
@@ -794,6 +797,130 @@ impl AdminAccess {
 mod cache_tests {
     use super::*;
     use std::sync::atomic::{AtomicU8, AtomicUsize, Ordering};
+
+    // Unit-test binary only. No production allocator or hot-path changes.
+    #[global_allocator]
+    static AUDIT_ALLOCATOR: &stats_alloc::StatsAlloc<std::alloc::System> =
+        &stats_alloc::INSTRUMENTED_SYSTEM;
+
+    static AUDIT_HOLD_ENABLED: std::sync::atomic::AtomicBool =
+        std::sync::atomic::AtomicBool::new(false);
+    static AUDIT_HOLD_NS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    pub(super) struct VerifierGuard<'a> {
+        // Drop the actual mutex before recording the full held interval.
+        guard: std::sync::MutexGuard<'a, AuthCacheState>,
+        _clock: HoldClock,
+    }
+    impl std::ops::Deref for VerifierGuard<'_> {
+        type Target = AuthCacheState;
+        fn deref(&self) -> &AuthCacheState {
+            &self.guard
+        }
+    }
+    impl std::ops::DerefMut for VerifierGuard<'_> {
+        fn deref_mut(&mut self) -> &mut AuthCacheState {
+            &mut self.guard
+        }
+    }
+    struct HoldClock(Option<std::time::Instant>);
+    impl Drop for HoldClock {
+        fn drop(&mut self) {
+            if let Some(start) = self.0 {
+                AUDIT_HOLD_NS.fetch_add(start.elapsed().as_nanos() as u64, Ordering::Relaxed);
+            }
+        }
+    }
+    pub(super) fn probe_verifier_lock(
+        guard: std::sync::MutexGuard<'_, AuthCacheState>,
+    ) -> VerifierGuard<'_> {
+        let started = AUDIT_HOLD_ENABLED
+            .load(Ordering::Relaxed)
+            .then(std::time::Instant::now);
+        VerifierGuard {
+            guard,
+            _clock: HoldClock(started),
+        }
+    }
+
+    #[tokio::test]
+    #[ignore = "manual isolated release AuthCache allocation/critical-section measurement"]
+    async fn verifier_cache_hit_scaling_audit() {
+        use stats_alloc::Region;
+        for count in [1, 64, 512, 4096] {
+            let provider = Arc::new(Provider {
+                calls: AtomicUsize::new(0),
+                mode: AtomicU8::new(0),
+                identity: identity(),
+            });
+            let cache = AuthCache::new(
+                provider.clone(),
+                Arc::new(Limits {
+                    auth_cache_max_entries: count,
+                    auth_positive_ttl_ms: 600_000,
+                    ..Limits::default()
+                }),
+                Arc::new(Metrics::default()),
+            );
+            let message = [1u8; 16];
+            let mut mac = Hmac::<Sha256>::new_from_slice(&[7; 32]).unwrap();
+            mac.update(&message);
+            let tag = mac.finalize().into_bytes();
+            for index in 0..count {
+                cache
+                    .verify_signed(&format!("audit-{index}"), &message, &tag)
+                    .await
+                    .unwrap();
+            }
+            assert_eq!(cache.usage().unwrap().0, count);
+            for repeat in 0..3 {
+                AUDIT_HOLD_NS.store(0, Ordering::Relaxed);
+                AUDIT_HOLD_ENABLED.store(true, Ordering::Relaxed);
+                let region = Region::new(AUDIT_ALLOCATOR);
+                let start = std::time::Instant::now();
+                for _ in 0..1000 {
+                    std::hint::black_box(
+                        cache
+                            .verify_signed("audit-0", &message, &tag)
+                            .await
+                            .unwrap(),
+                    );
+                }
+                let hit_ns = start.elapsed().as_nanos() / 1000;
+                AUDIT_HOLD_ENABLED.store(false, Ordering::Relaxed);
+                let hit_locked_ns = AUDIT_HOLD_NS.load(Ordering::Relaxed) / 1000;
+                let hits = region.change();
+                let mut state = cache.state.lock().unwrap();
+                let region = Region::new(AUDIT_ALLOCATOR);
+                let start = std::time::Instant::now();
+                for _ in 0..100 {
+                    prune_expired(&mut state);
+                }
+                let locked_prune_ns = start.elapsed().as_nanos() / 100;
+                let prune = region.change();
+                drop(state);
+                eprintln!(
+                    "{{\"count\":{count},\"repeat\":{repeat},\"hit_ns\":{hit_ns},\"hit_locked_ns\":{hit_locked_ns},\"hit_allocations\":{},\"hit_allocated_bytes\":{},\"locked_prune_ns\":{locked_prune_ns},\"prune_allocations\":{}}}",
+                    hits.allocations / 1000,
+                    hits.bytes_allocated / 1000,
+                    prune.allocations / 100
+                );
+            }
+            assert_eq!(provider.calls.load(Ordering::Relaxed), count);
+            let mut state = cache.state.lock().unwrap();
+            for entry in state.entries.values_mut() {
+                entry.expires = Instant::now() - Duration::from_secs(1);
+            }
+            let region = Region::new(AUDIT_ALLOCATOR);
+            let start = std::time::Instant::now();
+            prune_expired(&mut state);
+            let expired_ns = start.elapsed().as_nanos();
+            let allocations = region.change().allocations;
+            assert!(state.entries.is_empty() && state.order.is_empty() && state.bytes == 0);
+            eprintln!(
+                "{{\"count\":{count},\"expired_prune_ns\":{expired_ns},\"expired_allocations\":{allocations}}}"
+            );
+        }
+    }
 
     struct Provider {
         calls: AtomicUsize,

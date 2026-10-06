@@ -52,3 +52,14 @@ recovery starts. New mutations return HTTP 503 `draining` / RPC `unavailable`;
 command retries also obey this fence. Diagnostic reads remain available and repeated
 drain requests remain idempotent. Admission closes before stopping MQTT owners;
 existing QoS/Will cleanup finishes before their tasks are joined and snapshot begins.
+
+Startup constructs a paused EventBus and validates both recovery domains, management
+credentials, TLS (including business TLS), and all listener bindings before starting
+sink workers or publishing Running. Restored events cannot deliver during that
+preparation. Existing `EventBus::new` continues to start workers for library callers,
+who must call `stop_workers`; composition roots should use `new_paused` followed by
+`start_owned_workers`. Its owner joins on normal shutdown and cancels/aborts on Drop.
+The gateway also owns detached Tokio handles through abort-on-drop guards and listener
+JoinSets. Dropping a startup/run future releases prepared sockets, cancels listeners,
+aborts owned workers and releases the directory lock after blocking I/O owners finish.
+This emergency cancellation path does not promise graceful drain or spool commit.

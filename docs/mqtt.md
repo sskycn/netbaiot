@@ -197,3 +197,12 @@ broker.
 See [mqtt-3.1.1-conformance.md](mqtt-3.1.1-conformance.md) and
 [mqtt-session-recovery.md](mqtt-session-recovery.md) for evidence and recovery
 details.
+
+Connected MQTT 3.1.1 and MQTT 5 loops rotate between command, broker frame and
+incoming packet sources. A continuously ready source waits at most two ordinary
+selections; cancellation and inbound idle deadlines retain priority. This is a work
+bound, not a universal wall-clock latency claim: writes still have their configured
+finite timeout and bounded expired-frame cleanup. The incremental Reader retains
+partial bytes and the original packet deadline when an ordinary selection cancels
+its read future. Outbound activity never refreshes inbound Keep Alive. No additional
+reader task or queue is created.

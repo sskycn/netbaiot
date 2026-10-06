@@ -1,0 +1,243 @@
+{
+  "production_commit": "f3a5d7c034354f45fbf3251a9903e781c5ae15ba",
+  "run_url": "https://github.com/sskycn/netbaiot/actions/runs/37412448455",
+  "platforms": [
+    {
+      "os": "windows",
+      "job_url": "https://github.com/sskycn/netbaiot/actions/runs/37412448455/job/112103672651",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-06T04:10:42Z",
+          "completed_at": "2026-10-06T04:10:45Z"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-06T04:10:45Z",
+          "completed_at": "2026-10-06T04:11:03Z"
+        },
+        {
+          "name": "Run dtolnay/rust-toolchain@1.88.0",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-06T04:11:03Z",
+          "completed_at": "2026-10-06T04:11:14Z"
+        },
+        {
+          "name": "Native recovery and shutdown paths before unrelated workspace tests",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-06T04:11:14Z",
+          "completed_at": "2026-10-06T04:14:33Z"
+        },
+        {
+          "name": "Native workspace regressions including subprocess recovery",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-06T04:14:33Z",
+          "completed_at": "2026-10-06T04:16:48Z"
+        },
+        {
+          "name": "Run actions/upload-artifact@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-10-06T04:16:48Z",
+          "completed_at": "2026-10-06T04:16:49Z"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-10-06T04:16:49Z",
+          "completed_at": "2026-10-06T04:16:51Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-10-06T04:16:51Z",
+          "completed_at": "2026-10-06T04:16:51Z"
+        }
+      ],
+      "full_workspace": {
+        "passed": 418,
+        "failed": 0,
+        "ignored": 16
+      },
+      "artifact_id": 11390100934,
+      "artifact_digest": "sha256:5bfdafebb7619a7ffba5b58eb0179c584cd9430e81282a6faaface9dc199f4da",
+      "raw_log_sha256": "ae236cbf791c30d3827e9fa85ad6417a3c8274e9dfed66e88a1dacae40cf7e10"
+    },
+    {
+      "os": "linux",
+      "job_url": "https://github.com/sskycn/netbaiot/actions/runs/37412448455/job/112103672665",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-06T04:11:16Z",
+          "completed_at": "2026-10-06T04:11:17Z"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-06T04:11:17Z",
+          "completed_at": "2026-10-06T04:11:19Z"
+        },
+        {
+          "name": "Run dtolnay/rust-toolchain@1.88.0",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-06T04:11:19Z",
+          "completed_at": "2026-10-06T04:11:27Z"
+        },
+        {
+          "name": "Native recovery and shutdown paths before unrelated workspace tests",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-06T04:11:27Z",
+          "completed_at": "2026-10-06T04:12:42Z"
+        },
+        {
+          "name": "Native workspace regressions including subprocess recovery",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-06T04:12:42Z",
+          "completed_at": "2026-10-06T04:14:06Z"
+        },
+        {
+          "name": "Run actions/upload-artifact@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-10-06T04:14:06Z",
+          "completed_at": "2026-10-06T04:14:07Z"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-10-06T04:14:07Z",
+          "completed_at": "2026-10-06T04:14:07Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-10-06T04:14:07Z",
+          "completed_at": "2026-10-06T04:14:07Z"
+        }
+      ],
+      "full_workspace": {
+        "passed": 420,
+        "failed": 0,
+        "ignored": 16
+      },
+      "artifact_id": 11389688198,
+      "artifact_digest": "sha256:cdd15cb89ee87a4e1a43f1fd4c8e5fa181741adeb361039bc6c30da56b5a748f",
+      "raw_log_sha256": "b670b03b37ee24961a47d236180fc6648fff24c15e9ff9cef32ae77a159efa5b"
+    },
+    {
+      "os": "macos",
+      "job_url": "https://github.com/sskycn/netbaiot/actions/runs/37412448455/job/112103672543",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-06T04:10:47Z",
+          "completed_at": "2026-10-06T04:10:48Z"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-06T04:10:48Z",
+          "completed_at": "2026-10-06T04:10:53Z"
+        },
+        {
+          "name": "Run dtolnay/rust-toolchain@1.88.0",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-06T04:10:53Z",
+          "completed_at": "2026-10-06T04:11:04Z"
+        },
+        {
+          "name": "Native recovery and shutdown paths before unrelated workspace tests",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-06T04:11:04Z",
+          "completed_at": "2026-10-06T04:12:42Z"
+        },
+        {
+          "name": "Native workspace regressions including subprocess recovery",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-06T04:12:42Z",
+          "completed_at": "2026-10-06T04:14:16Z"
+        },
+        {
+          "name": "Run actions/upload-artifact@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-10-06T04:14:16Z",
+          "completed_at": "2026-10-06T04:14:17Z"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-10-06T04:14:17Z",
+          "completed_at": "2026-10-06T04:14:18Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-10-06T04:14:18Z",
+          "completed_at": "2026-10-06T04:14:18Z"
+        }
+      ],
+      "full_workspace": {
+        "passed": 420,
+        "failed": 0,
+        "ignored": 16
+      },
+      "artifact_id": 11389713209,
+      "artifact_digest": "sha256:ddc5f39ab1efb2eda463121afdb7381cca1ae3aa93b859120b2f30e46afd4a2c",
+      "raw_log_sha256": "d41505554618b5f191f25fa49489ec2460a56db4518d9b719f4f41825455a389"
+    }
+  ]
+}

@@ -1,0 +1,155 @@
+{
+  "baseline": "f68bfd4a8f563e265673ae76e70c7c795b27ee86",
+  "production_source_commit": "af76e37",
+  "auth_source_sha256": "b373e13c30e66c75342193243d425dcb1a4a98ee1aeacce0299139662fbb9b0d",
+  "platform": "macOS arm64 Darwin 27.0.0",
+  "rust": "stable 1.99.0",
+  "mode": "release, isolated current-thread test runtime, stats_alloc System allocator; host also ran other validation",
+  "message_bytes": 16,
+  "repeats": 3,
+  "hits_per_repeat": 1000,
+  "prunes_per_repeat": 100,
+  "command": "cargo test --release -p netbaiot-runtime verifier_cache_hit_scaling_audit -- --ignored --nocapture --test-threads=1",
+  "measurements": [
+    {
+      "count": 1,
+      "repeat": 0,
+      "hit_ns": 1921,
+      "hit_locked_ns": 1776,
+      "hit_allocations": 2,
+      "hit_allocated_bytes": 260,
+      "locked_prune_ns": 237,
+      "prune_allocations": 1
+    },
+    {
+      "count": 1,
+      "repeat": 1,
+      "hit_ns": 1648,
+      "hit_locked_ns": 1521,
+      "hit_allocations": 2,
+      "hit_allocated_bytes": 260,
+      "locked_prune_ns": 205,
+      "prune_allocations": 1
+    },
+    {
+      "count": 1,
+      "repeat": 2,
+      "hit_ns": 1635,
+      "hit_locked_ns": 1511,
+      "hit_allocations": 2,
+      "hit_allocated_bytes": 260,
+      "locked_prune_ns": 206,
+      "prune_allocations": 1
+    },
+    {
+      "count": 1,
+      "expired_prune_ns": 1834,
+      "expired_allocations": 0
+    },
+    {
+      "count": 64,
+      "repeat": 0,
+      "hit_ns": 8651,
+      "hit_locked_ns": 8517,
+      "hit_allocations": 2,
+      "hit_allocated_bytes": 7328,
+      "locked_prune_ns": 6360,
+      "prune_allocations": 1
+    },
+    {
+      "count": 64,
+      "repeat": 1,
+      "hit_ns": 6863,
+      "hit_locked_ns": 6751,
+      "hit_allocations": 2,
+      "hit_allocated_bytes": 7328,
+      "locked_prune_ns": 5485,
+      "prune_allocations": 1
+    },
+    {
+      "count": 64,
+      "repeat": 2,
+      "hit_ns": 6005,
+      "hit_locked_ns": 5906,
+      "hit_allocations": 2,
+      "hit_allocated_bytes": 7328,
+      "locked_prune_ns": 4883,
+      "prune_allocations": 1
+    },
+    {
+      "count": 64,
+      "expired_prune_ns": 2833,
+      "expired_allocations": 0
+    },
+    {
+      "count": 512,
+      "repeat": 0,
+      "hit_ns": 30561,
+      "hit_locked_ns": 30489,
+      "hit_allocations": 2,
+      "hit_allocated_bytes": 58400,
+      "locked_prune_ns": 26531,
+      "prune_allocations": 1
+    },
+    {
+      "count": 512,
+      "repeat": 1,
+      "hit_ns": 25272,
+      "hit_locked_ns": 25213,
+      "hit_allocations": 2,
+      "hit_allocated_bytes": 58400,
+      "locked_prune_ns": 23082,
+      "prune_allocations": 1
+    },
+    {
+      "count": 512,
+      "repeat": 2,
+      "hit_ns": 23915,
+      "hit_locked_ns": 23856,
+      "hit_allocations": 2,
+      "hit_allocated_bytes": 58400,
+      "locked_prune_ns": 23292,
+      "prune_allocations": 1
+    },
+    {
+      "count": 512,
+      "expired_prune_ns": 7459,
+      "expired_allocations": 0
+    },
+    {
+      "count": 4096,
+      "repeat": 0,
+      "hit_ns": 206438,
+      "hit_locked_ns": 206366,
+      "hit_allocations": 2,
+      "hit_allocated_bytes": 466976,
+      "locked_prune_ns": 209982,
+      "prune_allocations": 1
+    },
+    {
+      "count": 4096,
+      "repeat": 1,
+      "hit_ns": 203042,
+      "hit_locked_ns": 202971,
+      "hit_allocations": 2,
+      "hit_allocated_bytes": 466976,
+      "locked_prune_ns": 203302,
+      "prune_allocations": 1
+    },
+    {
+      "count": 4096,
+      "repeat": 2,
+      "hit_ns": 202308,
+      "hit_locked_ns": 202237,
+      "hit_allocations": 2,
+      "hit_allocated_bytes": 466976,
+      "locked_prune_ns": 201053,
+      "prune_allocations": 1
+    },
+    {
+      "count": 4096,
+      "expired_prune_ns": 62250,
+      "expired_allocations": 0
+    }
+  ]
+}

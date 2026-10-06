@@ -195,6 +195,36 @@ async fn business_handshake(
     Ok((subscription_id, filter))
 }
 
+/// Keep a rejected peer's pipelined input from turning an already-written error
+/// into a reset. This uses the existing connection task, no payload allocation,
+/// and bounded discard/time; overload, cancellation and network failure may still close early.
+async fn finish_rejected_stream<S>(stream: &mut S, limits: &Limits, stop: &CancellationToken)
+where
+    S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
+{
+    tokio::select! {
+        biased;
+        _ = stop.cancelled() => (),
+        _ = tokio::time::timeout(
+            Duration::from_millis(limits.write_timeout_ms.min(250)),
+            async {
+                stream.shutdown().await?;
+                let mut remaining = 16 * 1024;
+                let mut bytes = [0u8; 1024];
+                while remaining != 0 {
+                    let maximum = remaining.min(bytes.len());
+                    let read = stream.read(&mut bytes[..maximum]).await?;
+                    if read == 0 {
+                        break;
+                    }
+                    remaining -= read;
+                }
+                Ok::<(), std::io::Error>(())
+            },
+        ) => (),
+    }
+}
+
 pub(crate) async fn serve_business_connection(
     mut stream: TcpStream,
     sink: Arc<TcpStreamSink>,
@@ -209,6 +239,7 @@ pub(crate) async fn serve_business_connection(
     let Ok((subscription_id, filter)) =
         business_handshake(&mut stream, &framer, &token_hash, &limits, first_frame).await
     else {
+        finish_rejected_stream(&mut stream, &limits, &stop).await;
         return Ok(());
     };
     let (sender, mut receiver) = mpsc::channel(limits.sink_delivery_concurrency);
@@ -223,6 +254,7 @@ pub(crate) async fn serve_business_connection(
                 "an active business subscriber already owns the required sink",
             )
             .await;
+            finish_rejected_stream(&mut stream, &limits, &stop).await;
             return Ok(());
         }
         Err(error) => return Err(error),
@@ -346,4 +378,40 @@ pub(crate) async fn serve_business_stream(
     }
     while tasks.join_next().await.is_some() {}
     Ok(())
+}
+
+#[cfg(test)]
+mod rejected_stream_tests {
+    use super::*;
+
+    #[tokio::test(start_paused = true)]
+    async fn rejected_close_discards_only_a_fixed_byte_budget() {
+        let (mut server, mut peer) = tokio::io::duplex(32 * 1024);
+        peer.write_all(&vec![7; 16 * 1024 + 1]).await.unwrap();
+        finish_rejected_stream(&mut server, &Limits::default(), &CancellationToken::new()).await;
+        assert_eq!(
+            server.read_u8().await.unwrap(),
+            7,
+            "discard exceeded its byte ceiling"
+        );
+        assert_eq!(
+            peer.read(&mut [0u8; 1]).await.unwrap(),
+            0,
+            "write half was not closed"
+        );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn rejected_close_has_a_deadline_and_cancellation_priority() {
+        let (mut server, mut peer) = tokio::io::duplex(64);
+        let start = tokio::time::Instant::now();
+        finish_rejected_stream(&mut server, &Limits::default(), &CancellationToken::new()).await;
+        assert_eq!(start.elapsed(), Duration::from_millis(250));
+        assert_eq!(peer.read(&mut [0u8; 1]).await.unwrap(), 0);
+        let stop = CancellationToken::new();
+        stop.cancel();
+        let start = tokio::time::Instant::now();
+        finish_rejected_stream(&mut server, &Limits::default(), &stop).await;
+        assert_eq!(start.elapsed(), Duration::ZERO);
+    }
 }

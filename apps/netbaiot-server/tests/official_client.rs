@@ -20,18 +20,32 @@ const DEVICE_SECRET: &str = "000102030405060708090a0b0c0d0e0f1011121314151617181
 async fn test_config(root: &Path) -> Config {
     let mut config: Config =
         serde_json::from_str(include_str!("../../../configs/development.json")).unwrap();
-    let mut reservations = Vec::new();
-    for _ in 0..5 {
+    // A port assigned by TCP can already be owned by an unrelated UDP socket.
+    // Retry only fixture port selection, before any server or client is started.
+    let mut ingress = None;
+    for _ in 0..32 {
+        let tcp = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        match UdpSocket::bind(tcp.local_addr().unwrap()).await {
+            Ok(udp) => {
+                ingress = Some((tcp, udp));
+                break;
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::AddrInUse => continue,
+            Err(error) => panic!("reserve UDP ingress port: {error}"),
+        }
+    }
+    let (tcp, udp) = ingress.expect("no free TCP/UDP ingress pair in 32 attempts");
+    let mut reservations = vec![tcp];
+    for _ in 0..2 {
         reservations.push(TcpListener::bind("127.0.0.1:0").await.unwrap());
     }
     let addresses = reservations
         .iter()
         .map(|listener| listener.local_addr().unwrap())
         .collect::<Vec<_>>();
-    let udp = UdpSocket::bind(addresses[0]).await.unwrap();
     config.device_ingress = addresses[0];
     config.management_http = addresses[1];
-    config.business_tcp = Some(addresses[4]);
+    config.business_tcp = Some(addresses[2]);
     drop(reservations);
     drop(udp);
     config.delivery_url = None;
@@ -55,7 +69,7 @@ fn start_server(path: &Path, admin: &str, stream_token: &str) -> Child {
         .env("NETBAIOT_ADMIN_SECRET", admin)
         .env("NETBAIOT_BUSINESS_STREAM_TOKEN", stream_token)
         .stdout(Stdio::null())
-        .stderr(Stdio::null())
+        .stderr(Stdio::inherit())
         .kill_on_drop(true);
     command.spawn().unwrap()
 }
@@ -72,18 +86,27 @@ async fn business_client(config: &Config, admin: &str, stream_token: &str) -> Ne
         .unwrap()
 }
 
-async fn wait_ready(client: &NetbaIoTClient) {
+async fn wait_ready(client: &NetbaIoTClient, server: &mut Child) {
     // CI runs three real server processes in this test binary concurrently.
+    let mut last_error = None;
     let result = tokio::time::timeout(Duration::from_secs(15), async {
         loop {
-            if client.runtime().status().await.is_ok() {
-                break;
+            if let Some(status) = server.try_wait().unwrap() {
+                panic!("server exited before readiness: {status}; last query: {last_error:?}");
+            }
+            match client.runtime().status().await {
+                Ok(_) => break,
+                Err(error) => last_error = Some(error),
             }
             tokio::time::sleep(Duration::from_millis(20)).await;
         }
     })
     .await;
-    assert!(result.is_ok(), "server did not become ready");
+    assert!(
+        result.is_ok(),
+        "server did not become ready; process: {:?}; last query: {last_error:?}",
+        server.try_wait().unwrap()
+    );
 }
 
 async fn publish_heartbeat(device: &DeviceClient, sequence: u64) -> SourceMessageId {
@@ -159,7 +182,7 @@ async fn official_clients_cover_mqtt_tcp_command_ack_status_and_offline_contract
     let stream_token = "business-e2e-secret";
     let mut server = start_server(&path, &admin, stream_token);
     let business = business_client(&config, &admin, stream_token).await;
-    wait_ready(&business).await;
+    wait_ready(&business, &mut server).await;
 
     let mut malformed = TcpStream::connect(config.business_tcp.unwrap())
         .await
@@ -421,7 +444,7 @@ async fn official_client_reconnects_and_replays_unacked_event_with_same_id() {
     let stream_token = "business-replay-secret";
     let mut first = start_server(&path, &admin, stream_token);
     let business = business_client(&config, &admin, stream_token).await;
-    wait_ready(&business).await;
+    wait_ready(&business, &mut first).await;
     let mut events = business
         .events()
         .subscribe(EventFilter::default())
@@ -442,7 +465,7 @@ async fn official_client_reconnects_and_replays_unacked_event_with_same_id() {
             .success()
     );
     let mut second = start_server(&path, &admin, stream_token);
-    wait_ready(&business).await;
+    wait_ready(&business, &mut second).await;
     let replay = next_event(&mut events).await;
     assert_eq!(replay.event_id(), first_delivery.event_id());
     assert_ne!(replay.delivery_id(), first_delivery.delivery_id());
@@ -539,7 +562,7 @@ async fn official_client_throughput_latency_and_idle_memory_measurement() {
     let mut server = start_server(&path, &admin, stream_token);
     let process_before_client = rss_kib(std::process::id());
     let business = business_client(&config, &admin, stream_token).await;
-    wait_ready(&business).await;
+    wait_ready(&business, &mut server).await;
     let process_with_client = rss_kib(std::process::id());
     let mut events = business
         .events()

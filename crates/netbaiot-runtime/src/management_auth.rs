@@ -1368,6 +1368,9 @@ mod tests {
         let mut provider = JwtProvider::new(config, limits()).unwrap();
         provider.client = reqwest::Client::builder()
             .no_proxy()
+            // The fixture listens only on IPv4. Preserve HTTPS hostname checks and
+            // the 200ms deadline without depending on OS localhost IPv6 fallback.
+            .resolve("localhost", address)
             .add_root_certificate(
                 reqwest::Certificate::from_pem(include_bytes!(
                     "../../../tests/fixtures/localhost-cert.pem"
@@ -1387,7 +1390,12 @@ mod tests {
             EncodingKey::from_rsa_pem(include_bytes!("../../../tests/fixtures/localhost-key.pem"))
                 .unwrap();
         let token = encode(&header, &claims, &private).unwrap();
-        assert!(provider.authenticate(&token).await.is_ok());
+        let authentication = provider.authenticate(&token).await;
+        assert!(
+            authentication.is_ok(),
+            "initial fixture authentication: {authentication:?}, HTTP requests={}",
+            requests.load(Ordering::SeqCst)
+        );
         assert_eq!(requests.load(Ordering::SeqCst), 1);
         *body.lock().await = Some(vec![b'x'; limits().management_jwks_max_bytes + 1]);
         assert!(provider.authenticate(&token).await.is_ok());
