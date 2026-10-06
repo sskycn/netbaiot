@@ -33,6 +33,7 @@ socket2.workspace = true
 workspace = true
 
 [dev-dependencies]
+stats_alloc = "=0.1.10"
 netbaiot-codecs.workspace = true
 uuid.workspace = true
 

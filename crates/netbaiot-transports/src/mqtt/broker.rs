@@ -1760,10 +1760,10 @@ impl MqttBroker {
     }
 
     pub fn route(&self, owner: &DeviceKey, message: BrokerMessage) -> Result<usize> {
-        self.route_with_origin(owner, None, message)
+        self.route_with_origin(owner, None, &message)
     }
 
-    pub fn route_from_session(&self, key: &SessionKey, message: BrokerMessage) -> Result<usize> {
+    pub fn route_from_session(&self, key: &SessionKey, message: &BrokerMessage) -> Result<usize> {
         self.route_with_origin(&key.device, Some(key), message)
     }
 
@@ -1771,9 +1771,9 @@ impl MqttBroker {
         &self,
         owner: &DeviceKey,
         origin: Option<&SessionKey>,
-        message: BrokerMessage,
+        message: &BrokerMessage,
     ) -> Result<usize> {
-        if !valid_broker_message(&message, &self.limits) {
+        if !valid_broker_message(message, &self.limits) {
             return Err(Error::Invalid);
         }
         if message.expired(now_ms()) {
@@ -1794,7 +1794,7 @@ impl MqttBroker {
         prune_expired_messages(&mut state, now_ms(), HOT_MAINTENANCE_BUDGET)?;
         let lock_wait_us = lock_started.map(|started| started.elapsed().as_micros() as u64);
         let hold_started = lock_started.map(|_| Instant::now());
-        let result = route_locked(&mut state, owner, origin, &message, &self.limits);
+        let result = route_locked(&mut state, owner, origin, message, &self.limits);
         if let Err(error) = drive_capacity_wakes(&mut state, &self.limits) {
             tracing::error!(%error, "failed to promote MQTT work after capacity release");
         }
@@ -7778,7 +7778,7 @@ mod tests {
             broker
                 .route_from_session(
                     &attachment.key,
-                    BrokerMessage {
+                    &BrokerMessage {
                         topic: topic.into(),
                         payload,
                         qos: 1,
@@ -7831,7 +7831,7 @@ mod tests {
             broker
                 .route_from_session(
                     &attachment.key,
-                    BrokerMessage {
+                    &BrokerMessage {
                         topic: topic.into(),
                         payload,
                         qos: 2,
@@ -7899,7 +7899,7 @@ mod tests {
             broker
                 .route_from_session(
                     &attachment.key,
-                    BrokerMessage {
+                    &BrokerMessage {
                         topic: topic.into(),
                         payload,
                         qos: 2,
@@ -7945,7 +7945,7 @@ mod tests {
             broker
                 .route_from_session(
                     &old.key,
-                    BrokerMessage {
+                    &BrokerMessage {
                         topic: topic.into(),
                         payload,
                         qos: 2,
@@ -8509,7 +8509,7 @@ mod tests {
         broker
             .route_from_session(
                 &attachment.key,
-                BrokerMessage {
+                &BrokerMessage {
                     topic: topic.into(),
                     payload: b"data".to_vec(),
                     qos: 1,
@@ -8570,7 +8570,7 @@ mod tests {
         broker
             .route_from_session(
                 &attachment.key,
-                BrokerMessage {
+                &BrokerMessage {
                     topic: topic.into(),
                     payload: b"data".to_vec(),
                     qos: 1,
@@ -8627,7 +8627,7 @@ mod tests {
             broker
                 .route_from_session(
                     &attachment.key,
-                    BrokerMessage {
+                    &BrokerMessage {
                         topic: topic.clone(),
                         payload,
                         qos,
@@ -8934,7 +8934,7 @@ mod tests {
         broker
             .route_from_session(
                 &attachment.key,
-                BrokerMessage {
+                &BrokerMessage {
                     topic: topic.into(),
                     payload: b"data".to_vec(),
                     qos: 2,
@@ -9004,7 +9004,7 @@ mod tests {
         broker
             .route_from_session(
                 &attachment.key,
-                BrokerMessage {
+                &BrokerMessage {
                     topic: topic.into(),
                     payload: b"first".to_vec(),
                     qos: 1,
@@ -9084,7 +9084,7 @@ mod tests {
             },
         };
         broker
-            .route_from_session(&attachment.key, message.clone())
+            .route_from_session(&attachment.key, &message)
             .unwrap();
         let BrokerFrame::Publish(first) = attachment.receiver.try_recv().unwrap() else {
             panic!("expected first PUBLISH")
@@ -9104,7 +9104,9 @@ mod tests {
             stored.properties.expires_at_ms = Some(now_ms() - 1);
         }
         broker.tick().unwrap();
-        broker.route_from_session(&attachment.key, message).unwrap();
+        broker
+            .route_from_session(&attachment.key, &message)
+            .unwrap();
         let BrokerFrame::Publish(second) = attachment.receiver.try_recv().unwrap() else {
             panic!("expected second PUBLISH")
         };
@@ -9439,7 +9441,7 @@ mod tests {
         broker
             .route_from_session(
                 &a.key,
-                BrokerMessage {
+                &BrokerMessage {
                     topic: topic.into(),
                     payload: b"value".to_vec(),
                     qos: 1,

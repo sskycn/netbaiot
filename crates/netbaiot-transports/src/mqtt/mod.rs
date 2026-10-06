@@ -192,7 +192,7 @@ async fn process_publish(
     // Broker-side retained/routing admission is the last fallible MQTT responsibility before the
     // unified event crosses EventAccepted. A later broker error must never turn an accepted QoS1
     // DeviceEvent into a producer-visible failure and retransmission.
-    services.mqtt.route_from_session(origin, message.clone())?;
+    services.mqtt.route_from_session(origin, message)?;
     let acceptance =
         accept_iot_publish(services, auth, message, validated_at, validation_us).await?;
     Ok(acceptance)
