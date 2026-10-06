@@ -1,14 +1,14 @@
 # NetbaIoT 严格可靠性审计与修复
 
-审计日期：2026-10-06。结论：**满足列明条件后可发布；Windows 原生恢复/正常停止尚未运行，当前不能关闭此阻塞项。** 本次只在独立本地分支修改和提交，未合并或推送 main，未创建 tag 或 Release，项目版本仍为 0.2.3。
+审计日期：2026-10-06。结论：**本次审查范围内没有剩余已知阻塞项。** Windows/Linux/macOS 原生恢复、退出和完整 workspace 已实际执行通过。经作者单独授权只推送审计分支验证 CI；未合并或推送 main，未创建 tag 或 Release，项目版本仍为 0.2.3。最终分支提交仍须通过同一 CI 门禁后方可合并。
 
 ## 审计基线
 
 - 实际起点为干净、与 origin/main 同步的 main：`f68bfd4a8f563e265673ae76e70c7c795b27ee86`。历史 `6d16bf8` 仅用于定位，不作为当前行为依据。
-- 工作分支：`codex/strict-reliability-audit`。最后代码提交：`c235f48e95071596d0caeb526406e9e477dcd7df`；后续报告提交不改变 Rust 源码。
+- 工作分支：`codex/strict-reliability-audit`。最终生产行为修复提交：`f3a5d7c034354f45fbf3251a9903e781c5ae15ba`；随后仅调整测试模块位置与报告，不改生产行为。末轮本地验证包含这次测试位置调整，记录 tracked diff hash；后续分支提交继续经过 exact-commit CI。
 - 原生环境：macOS，Darwin 27.0.0，arm64，`aarch64-apple-darwin`。
 - stable：rustc 1.99.0 `b940084d7`，cargo 1.99.0 `5f94df478`；MSRV：rustc 1.88.0 `6b00bc388`，cargo 1.88.0 `873a06493`。
-- 实际工具：Python 3.9.6、Mosquitto 2.1.2 broker/pub/sub、cargo-fuzz/nightly、actionlint、cargo-audit 0.22.2。没有 Windows/Linux 原生执行主机，也没有 GitHub API 登录凭据。
+- 实际工具：Python 3.9.6、Mosquitto 2.1.2 broker/pub/sub、cargo-fuzz/nightly、actionlint、cargo-audit 0.22.2。开始时没有 Windows/Linux 原生执行主机，也没有 GitHub API 登录凭据；作者随后授权推送审计分支，使用 GitHub hosted 三平台原生 runner。
 - 起点 writer：NBSP v2、NBMQ v6。起点相关基线：spool 9 PASS；MQTT recovery 单元测试 10 PASS、2 ignored，相关 lifecycle integration 1 PASS。通过的旧测试没有覆盖整记录边界截断。
 - 已阅读根 AGENTS.md、架构、交付/生命周期、恢复格式、MQTT 支持边界及相关测试。没有提供 `netbaiot_strict_audit_tests.zip`，使用仓库 API 自行编写回归。
 - 实际审查范围：两套恢复读写/清理、EventBus publish/restore/worker ownership、server composition/startup/drop、两个 MQTT connection loop/Reader、AuthCache UDP verifier hit。未改公开 wire schema、SDK API、业务配置所有权或离线命令行为。
@@ -21,13 +21,14 @@
 |---|---|---|---|
 | NBSP 整体完整性 | **2**。v2 只有记录 checksum；截断/删除完整尾记录、改变 generation、重复/调换完整记录仍可被接受 | 真实 Rust writer 写三条，再由真实 recover 路径读取变体；7 种非法变体被接受，造成待恢复责任缺失/重复/错误代际 | `crates/netbaiot-runtime/src/spool.rs:165,244,328` |
 | 恢复 I/O 分类及读取边界 | **3**。存在 `exists()`、忽略目录项错误及 metadata 后全量读取的路径；并非每个权限问题都被忽略 | 新增实际权限/超限/损坏、注入 Read/目录项错误测试 PASS。没有对所有旧路径逐项取得 red；不可将它们都称为已复现漏洞 | `crates/netbaiot-runtime/src/recovery_io.rs:10,32,64,108`；`crates/netbaiot-transports/src/mqtt/broker.rs:5295` |
-| Windows directory flush/replace | **3**。原读模式打开目录并 `sync_all` 没有证明有效；正常停止可能被存储错误永久阻塞 | 核实 Rust 1.88/Win32/安全封装源码；**原生 Windows NOT RUN**，修复正确性仍待实机门禁 | `crates/netbaiot-runtime/src/recovery_io.rs:179`；两套 writer |
+| Windows directory flush/replace | **3**。原读模式打开目录并 `sync_all` 没有证明有效；正常停止可能被存储错误永久阻塞 | 核实 Rust 1.88/Win32/安全封装源码；初始没有 native red；修复后九项原生恢复/退出及完整 workspace **PASS**，保留旧 Windows 问题只做静态确认的边界 | `crates/netbaiot-runtime/src/recovery_io.rs:179`；两套 writer |
 | active EventId 覆盖 | **2**。公共 EventBus/custom Codec 提交已有 active ID，无冲突检查 | 相同/不同 payload 的重复 publish 原先成功；可能让旧 ACK 结算被覆盖责任。并非默认远程设备可自选 ID | `crates/netbaiot-runtime/src/event.rs:363` |
 | restore 语义/整批原子性 | **2**。空/重复 pending sink、累计容量及后半批错误未完整预检 | 原测试失败，出现非法接纳或前半批已修改状态；多 sink 队列/计数/required 责任受影响 | `crates/netbaiot-runtime/src/event.rs:476` |
 | 启动失败 worker 所有权 | **2**。构造立即 spawn，后续 TLS/认证/绑定错误提前返回 | 隔离 runtime 中 task 数不回基线，实际 red 失败；泄漏任务/引用/句柄 | `apps/netbaiot-server/src/lib.rs:970,1219`；`crates/netbaiot-runtime/src/event.rs:195,248,300` |
 | MQTT 控制包饥饿 | **2**。biased 普通工作固定优先级，持续 outbound/command ready | 实际 connection mock 持续补充真实 broker 帧，两个版本均超过 PINGREQ 的选择次数界限；ACK/QoS/KeepAlive 进度受影响 | `crates/netbaiot-transports/src/mqtt/fair.rs:16`；`mod.rs:363`；`v5_connection.rs:454` |
 | 恢复目录独占 | **3**。起点没有跨进程目录锁，不同端口可共享文件 | 修复后双子进程拒绝竞争者、退出/启动失败后重新取得 PASS；没有把旧实现运行成完整双进程 red | `crates/netbaiot-runtime/src/recovery_io.rs:202`；`apps/netbaiot-server/src/lib.rs:837` |
 | 重试临时文件数量 | **2（最终自审补充）**。已有 authority 时可绕过目录遍历容量检查，删除失败后可不断新建 temp | 两套 writer 在已有 authority + 17 个遗留 temp 场景都曾继续提交；新增相同回归 red→green。未真实制造 ACL 导致 temp 删除失败 | `crates/netbaiot-runtime/src/recovery_io.rs:119`；两套 writer |
+| 原生 CI 新发现：流拒绝错误丢失 | **2**。HELLO 后客户端已 pipeline SUBSCRIBE，拒绝后立即关闭仍有未读数据 | Windows 原有 official-client 断言实际 FAIL：Unauthenticated 被 ConnectionLost 替代；修复后同一断言 PASS | `apps/netbaiot-server/src/business_stream_v1.rs:201,242,257` |
 | AuthCache hit 全表 prune | 当前风险仍存在，**测量确认**；不是本次正确性修复前提 | 1/64/512/4096 entries 的命中、锁持有、分配和过期成本实测，生产算法保留 | `crates/netbaiot-runtime/src/auth.rs:647,847` |
 
 需要缩小的历史判断：NBMQ **在起点已经有** whole-stream trailer/digest，不应声称本次为 MQTT 新增整体完整性。旧实现的 dangling authority symlink 测试也能被拒绝，不能拿该用例声称复现“所有符号链接都被当作首次启动”。这些反证不否定其余 I/O 路径需要直接分类和有界读取。
@@ -92,6 +93,18 @@ server 在读取两套 recovery 前取得 `.netbaiot.lock` 的 OS advisory exclu
 
 临时恢复旧实现的复现实验结束后恢复最终文件，未把 red 源码提交或用于最终门禁。原始日志在 `target/strict-audit/`；可审查的脱敏摘录与运行清单在 [evidence](performance/strict-reliability-audit/evidence/README.md)。
 
+### 原生 CI 故障发现与修复
+
+首次 native run [37411015860](https://github.com/sskycn/netbaiot/actions/runs/37411015860) 的 Windows runtime suite 在已有 JWKS HTTPS fixture 的首次认证失败；spool 回归实际通过。fixture 只监听 IPv4，但原客户端依赖系统 localhost 地址选择，且总期限200ms。测试客户端显式 resolve 到该 listener，保留 localhost TLS 主机名、CA、200ms connect/request timeout、outage/oversize/rate-limit 断言；生产 JwtProvider 未改。这消除地址选择变量，不声称已捕获原失败的 DNS/网络时间线。
+
+第二次 [37411658708](https://github.com/sskycn/netbaiot/actions/runs/37411658708) Windows 专项恢复/退出门禁通过，JWKS 也通过，但原 official-client integration 在错误 token 订阅时实际 FAIL（`ConnectionLost`）。源码显示客户端连续写 HELLO/SUBSCRIBE，而服务端认证拒绝后立即 drop TCP stream，未读 pipeline 数据可能让已写 error 被 reset 丢弃。这是依据源码与 [RFC1122 4.2.2.13](https://www.rfc-editor.org/rfc/rfc1122.html#section-4.2.2.13) 的根因推断，未抓包直接确认 RST。
+
+修复只在 legacy business-stream 拒绝/冲突关闭路径：先关闭写半边，再在已有连接任务中有界读至 EOF。最多16KiB discard、1KiB栈缓冲、min(write_timeout,250ms)总期限、取消优先；不创建新 task/queue、不解析/接纳拒绝后的业务数据，不把错误帧写出称为 ACK。恶意超限、网络故障或关机取消仍可提前关闭。新增虚拟时钟/duplex 测试核对 byte ceiling、FIN、deadline 和 cancellation；保持原 SDK 的 Unauthenticated 断言。
+
+第三次 native [37412448455](https://github.com/sskycn/netbaiot/actions/runs/37412448455) 在 f3a5d7c 上三平台 PASS，Windows 原来的两项失败断言均实际 PASS。该提交常规 CI 的 clippy 因新 test module 放在 runtime item 前面 FAIL；未加 allow，已把测试模块移至文件尾，随后本地 stable/MSRV fmt/clippy/full tests 各420 PASS、0 failed、16 ignored。最后测试位置和报告提交继续触发原生与常规 CI；不能把 f3a5d7c 的常规 CI 称为全部通过。
+
+原生 log artifact 通过公开下载代理取得；下载 ZIP 的 SHA256 与 GitHub API 提供的 artifact digest 一致。只读取 bounded 日志文本，不执行下载内容。完整日志、三次 run 的 job/step/commit 及 SHA256 在 target/strict-audit，脱敏摘录/摘要在 evidence。未因日志 API 缺登录返回403而伪造结果。
+
 ## 恢复格式与兼容性
 
 NBSP 新 writer=3；新 reader=1/2/3，JSON DeviceEvent schema 不变。v3 header 16 bytes、trailer 52 bytes；大端 u32/u64。digest 覆盖从 magic 到 trailer protected-byte-count，包括 framing/checksums/order；protected count 不含 trailer，自身受 digest 保护。SHA-256 是损坏检测，不是对有权重写文件并重算 digest 的操作者提供认证。
@@ -108,15 +121,15 @@ NBMQ writer 仍为6，reader 仍兼容1–5，没有因本次修复删除 MQTT 3
 
 | 平台 | 结果 | 实际范围 |
 |---|---|---|
-| macOS arm64 / APFS | **PASS** | stable/MSRV 全 workspace、两套 first/replace/recover、空网关 drain、required work spool/replay、故障保活/修复、双进程 ownership、MQTT/SDK/fuzz/soak |
-| Linux 原生 | **NOT RUN** | 本次无 Linux 执行主机；未引用之前 release 的绿色 CI。新增 ubuntu-latest 原生矩阵，尚未触发 |
-| Windows 原生 / NTFS | **NOT RUN；验证 BLOCKED** | 无 Windows 主机，GitHub CI 尚未授权推送此分支；未把配置、交叉编译或代码审查计为通过 |
+| macOS 本地 arm64 / hosted macos-latest | **PASS** | 本地 stable/MSRV 各420 passed、0 failed、16 ignored；hosted MSRV完整420/0/16，另先执行恢复/退出专项；本地 MQTT/SDK/fuzz/soak |
+| Linux hosted ubuntu-latest 原生 | **PASS** | 本次 MSRV完整420/0/16及恢复/退出专项；常规 CI 另有 stable/MSRV/MQTT/audit。未引用旧 release CI |
+| Windows hosted windows-latest 原生 | **PASS** | 首两次 FAIL 保留；第三次 MSRV完整418/0/16及恢复/退出专项。两个 Unix-only权限/符号链接测试不编译，因此少2个，不能计作Windows通过 |
 
 Windows 实现选择 synced+closed temp，然后由 atomicwrites 0.4.4 调用 MoveFileExW(REPLACE_EXISTING|WRITE_THROUGH)，传播 ACL/sharing/replace 错误。没有把 directory sync 改为假成功。ACK cleanup 使用 synced empty v3 successor，与公共空 commit 区分。Unix 仍是 file sync + rename + directory sync。原子可见性、文件同步、rename/write-through 和一般断电持久性不是同一保证；不声称等同一个独立 NTFS directory flush。
 
 依据：[Rust 1.88 Windows fs](https://github.com/rust-lang/rust/blob/1.88.0/library/std/src/sys/fs/windows.rs)、[MoveFileExW](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-movefileexw)、[FlushFileBuffers](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-flushfilebuffers)、[atomicwrites 0.4.4](https://docs.rs/crate/atomicwrites/0.4.4/source/src/lib.rs)、[fs2 锁契约](https://docs.rs/fs2/0.4.3/fs2/trait.FileExt.html)。这些是实现依据，不能替代 Windows 执行证据。
 
-新增 `.github/workflows/recovery-platform.yml` 使用 Rust1.88，Windows/Ubuntu/macOS native full workspace，job 25 分钟、test step 20 分钟，always 上传包含 exact github.sha 的日志。子进程 kill_on_drop，关键等待3/5秒 timeout。所需九项分别由 spool roundtrip/generation/storage、MQTT storage、server empty drain/required work/storage-repair 用例覆盖；必须看最终 commit 的 Windows 测试执行日志，不能只看 CI 总图标。
+新增 `.github/workflows/recovery-platform.yml` 使用 Rust1.88，Windows/Ubuntu/macOS native full workspace，job 25 分钟、每个 test step 20 分钟，always 上传包含 exact github.sha 的日志。子进程 kill_on_drop，关键等待3/5秒 timeout。所需九项分别由 spool roundtrip/generation/storage、MQTT storage、server empty drain/required work/storage-repair 用例覆盖；必须看最终 commit 的 Windows 测试执行日志，不能只看 CI 总图标。先单独选中 spool、MQTT recovery、subprocess、ownership、startup，再执行完整 workspace；这些专项与全套都会真实执行，日志中重复出现的同一测试不重复计入完整suite总数。
 
 ## 资源安全与最终异常路径自审
 
@@ -131,10 +144,10 @@ Windows 实现选择 synced+closed temp，然后由 atomicwrites 0.4.4 调用 Mo
 | temp unlink 失败 | best-effort 删除之外还有创建前目录预算；超预算拒绝且可修复测试 PASS。没有真实 ACL unlink 故障实测 |
 | snapshot 整记录截断 | v3 全图校验拒绝，v1/v2 历史限制明确 |
 | 两实例共目录 | server 一份锁贯穿两域；双进程 PASS。仅保证 cooperating local APFS/ext4/NTFS；网络 FS 不承诺 |
-| Windows 正常停止 | **NOT RUN**，列为发布前必须补齐的条件 |
+| Windows 正常停止 | **PASS**，native专项及完整suite均实际执行空网关和required-work正常停止、失败修复后重试 |
 | 持续 outbound 控制包延迟 | 两个版本 fair selector/control/Reader PASS；有限写超时仍决定一次普通工作墙钟耗时 |
 
-每个 sink 的 count/byte/concurrency/timeout/retry 上限保持。restore projections 和 ID 集合受 batch/sink/fanout 硬限约束，不复制 payload；writer 仅额外持有一个有界 record，reader 的 bytes/decoded ownership 峰值受 configured segment/record/count 上限约束。blocking I/O 不放 Tokio worker；job 在正常 server lifecycle 顺序执行并持有目录 Arc。drop/abort 不保证已开始 blocking syscall 可立即取消，锁会保留至 job 完成。
+每个 sink 的 count/byte/concurrency/timeout/retry 上限保持。restore projections 和 ID 集合受 batch/sink/fanout 硬限约束，不复制 payload；writer 逐条序列化，不新增整批 serialized payload 副本；校验旧 authority 时仍暂存有界的旧恢复批次，峰值需计入该批次、调用方新批次和单条序列化缓冲。reader 的 bytes/decoded ownership 峰值受 configured segment/record/count 上限约束，未进行新的近容量 RSS 实测。blocking I/O 不放 Tokio worker；job 在正常 server lifecycle 顺序执行并持有目录 Arc。drop/abort 不保证已开始 blocking syscall 可立即取消，锁会保留至 job 完成。
 
 raw `RestartSpool::new` / broker 公共 API 为兼容保留，**库的 composition root 必须绑定同一个 owner 并串行安排写/清理**；server 已这样实现。`EventBus::new` 旧公开行为仍需调用 stop_workers；推荐 paused + owned guard，不能声称任意外部调用者只 drop Arc 就安全。文件系统父组件需可信，恶意 live path replacement 不在本次支持范围。
 
@@ -142,13 +155,13 @@ raw `RestartSpool::new` / broker 公共 API 为兼容保留，**库的 compositi
 
 ## 命令与日志
 
-所有命令均实际执行；最终完整门禁在 `c235f48` 上重新运行，详见 `target/strict-audit/validation-final.json`。测试退出码0才记 PASS；ignored 不计入通过数。
+所有命令均实际执行；初次最终完整门禁在 `c235f48` 上重新运行（validation-final.json）；native新发现的stream修复及测试模块整理后再运行，详见 `target/strict-audit/validation-stream-final.json`（f3a5d7c + tracked diff SHA）。报告提交的 exact-commit CI 也必须核对。测试退出码0才记 PASS；ignored 不计入通过数。
 
 | 命令/检查 | 状态与结果 | 日志（相对仓库） |
 |---|---|---|
-| `cargo +stable fmt --all -- --check` / `+1.88.0` 同命令 | PASS，exit0 | `target/strict-audit/{stable,msrv}-fmt-final.log` |
-| `cargo +stable clippy --locked --workspace --all-targets --all-features -- -D warnings` / `+1.88.0` | PASS，exit0 | `{stable,msrv}-clippy-final.log` |
-| `cargo +stable test --locked --workspace --all-features` / `+1.88.0` | PASS，各418 passed / 0 failed / 16 ignored，exit0 | `{stable,msrv}-tests-final.log` |
+| `cargo +stable fmt --all -- --check` / `+1.88.0` 同命令 | PASS，exit0 | `target/strict-audit/{stable,msrv}-fmt-stream-final.log` |
+| `cargo +stable clippy --locked --workspace --all-targets --all-features -- -D warnings` / `+1.88.0` | PASS，exit0 | `{stable,msrv}-clippy-stream-final.log` |
+| `cargo +stable test --locked --workspace --all-features` / `+1.88.0` | PASS，末轮各420 passed / 0 failed / 16 ignored，exit0 | `{stable,msrv}-tests-stream-final.log` |
 | `cargo build --locked -p netbaiot-server`；`cargo build --locked -p netbaiot-device-sdk --example device_mqtt` | PASS，exit0 | `server-build-final.log`、`sdk-build-final.log` |
 | `python3 tests/mqtt_protocol_regressions.py --repo . --output target/strict-audit/protocol-results-final.json` | PASS，7/7，含 binary hash + source manifest | `protocol-final.log`、`protocol-results-final.json` |
 | `python3 tests/mqtt_conformance/run.py --release-gate --no-build` | PASS，76/76，规范 coverage125/125 | `release-gate-final.log`、`release-gate-results-final.json` |
@@ -159,7 +172,7 @@ raw `RestartSpool::new` / broker 公共 API 为兼容保留，**库的 compositi
 | `cargo test --release -p netbaiot-runtime verifier_cache_hit_scaling_audit -- --ignored --nocapture --test-threads=1` | PASS，1 selected，非 production 性能门槛 | `auth-cache-measurement.log`；[JSON](performance/strict-reliability-audit/auth-cache.json) |
 | cargo-audit 0.22.2 `audit --json` | PASS，exit0，210 dependencies，0 known vulnerabilities；另有 unmaintained warning | `cargo-audit.json` |
 | actionlint（当前 workflows） | PASS，exit0 | `actionlint.log` |
-| Windows / Linux native workflow | NOT RUN；Windows BLOCKED 缺主机/CI分支推送授权 | `.github/workflows/recovery-platform.yml` 尚无本次 run |
+| Windows / Linux / macOS native workflow | PASS；第三次run在f3a5d7c，Windows418/0/16，其余420/0/16；含全部最终生产修复 | native第三次原始log及 [run 37412448455](https://github.com/sskycn/netbaiot/actions/runs/37412448455) |
 
 这里缩写的日志文件均位于 `target/strict-audit/`。RustSec database commit=`ef6173cbc5c50ec8166f9a5b28f07834144373ee`，更新时间2026-10-03；`rustls-pemfile 2.2.0` 的 RUSTSEC-2025-0134 unmaintained 提示保留，没有 ignore advisory。
 
@@ -181,20 +194,26 @@ Fuzz 实际命令（ASan smoke，各10,000 runs，exit0）：先 `python3 fuzz/s
 6. `af76e37` — bounded serialization / legacy generation cleanup。
 7. `fb585fa` — test-only AuthCache 测量。
 8. `c235f48` — 临时文件目录预算。
+9. `6382236` — 完整报告、执行证据和Windows空图回滚说明。
+10. `7078f07` — IPv4 HTTPS fixture和恢复专项门禁。
+11. `f3a5d7c` — 拒绝流的有界半关闭及回归。
+12. 后续提交 — 测试模块位置整理、原生证据和最终报告（不改生产行为）。
 
 I/O 与目录 owner 合并在同一逻辑提交，以便两个域从首次读取到最后 blocking job 共享所有权；Windows replacement 依赖同一 I/O 层。末期自审的 serialization/generation/temp 发现另立提交，便于审查回退；没有顺手重写 AuthCache 算法。
 
 最后代码提交相对基线的完整文件列表和 `git diff --stat`：
 
 ```text
-.github/workflows/recovery-platform.yml            |  30 ++
+.github/workflows/recovery-platform.yml            |  40 ++
  Cargo.lock                                         | 110 ++++
+ apps/netbaiot-server/src/business_stream_v1.rs     |  68 +++
  apps/netbaiot-server/src/lib.rs                    | 231 ++++----
  apps/netbaiot-server/tests/server.rs               | 246 +++++++--
  crates/netbaiot-runtime/Cargo.toml                 |   8 +
  crates/netbaiot-runtime/src/auth.rs                | 127 +++++
  crates/netbaiot-runtime/src/event.rs               | 470 +++++++++++++++--
  crates/netbaiot-runtime/src/lib.rs                 |   1 +
+ crates/netbaiot-runtime/src/management_auth.rs     |  10 +-
  crates/netbaiot-runtime/src/recovery_io.rs         | 267 ++++++++++
  crates/netbaiot-runtime/src/spool.rs               | 584 +++++++++++++++++----
  crates/netbaiot-transports/src/mqtt/broker.rs      | 194 +++++--
@@ -207,17 +226,17 @@ I/O 与目录 owner 合并在同一逻辑提交，以便两个域从首次读取
  docs/mqtt.md                                       |   9 +
  .../performance/strict-reliability-audit/README.md |  31 ++
  .../strict-reliability-audit/auth-cache.json       | 155 ++++++
- docs/restart-spool.md                              |  75 ++-
+ docs/restart-spool.md                              |  80 ++-
  fuzz/Cargo.lock                                    | 103 ++++
  fuzz/seed_corpus.py                                |  10 +
- 23 files changed, 2696 insertions(+), 343 deletions(-)
+ 25 files changed, 2788 insertions(+), 344 deletions(-)
 ```
 
-以上23个文件包含代码、测试、锁文件、4份行为文档、benchmark JSON/README、原生 CI 和 fuzz seeds。本报告及脱敏 evidence 另作文档提交；没有改 release 版本、tag、历史 benchmark 或生产数据。
+以上25个文件包含代码、测试、锁文件、4份行为文档、benchmark JSON/README、原生 CI 和 fuzz seeds。本报告及脱敏 evidence 另作文档提交；没有改 release 版本、tag、历史 benchmark 或生产数据。
 
 ## 剩余风险
 
-- **已确认仍待关闭的验证阻塞**：Windows 原生9项恢复/停止路径未执行；原旧 Windows 故障也尚未 native red。需要最终分支提交的 Windows CI/实机日志，无此证据不建议正式发布。
+- **已确认未修复的阻塞**：本次范围内没有剩余已知项。原生九项/完整suite实际通过；任何最终分支CI失败仍阻止合并，不能引用中间提交的绿色状态代替最终检查。原旧Windows flush故障没有取得native red，保持静态确认分类。
 - **尚未复现/定位**：独立 sync syscall 的失败行为只做传播自审，未全部动态注入；JWKS 一次超时原因未知；I/O/ownership 的所有起点风险未一一做旧实现 red。
 - **设计取舍**：旧 NBSP1/2 无法识别历史整记录截断；两域不是跨文件事务；突然终止可丢失非 spooled 内存流量；trusted local directory / cooperating processes 是锁和路径安全前提；bounded I/O 不意味着故障硬件 syscall 有严格墙钟 deadline。
 - **非阻塞优化**：AuthCache hit 保留全表 prune。4096 entries 的 median hit203.042µs、mutex202.971µs、每hit2次分配/466,976 bytes。明确支持后续有界过期/顺序维护优化，但不能以本次带统计开销、同时进行其他验证的测量宣称生产吞吐。详见 benchmark README。
@@ -225,6 +244,6 @@ I/O 与目录 owner 合并在同一逻辑提交，以便两个域从首次读取
 
 ## 发布判断
 
-**满足列明条件后可发布。** 条件是最终包含本次修复的提交上，Windows 原生 first/replace/recover/empty stop/required stop/storage failure+repair 以及 ownership/lifecycle 回归实际 PASS；Linux 原生门禁也需补齐。任何失败都应保留日志、修复并重新验证 exact final commit。当前 macOS 执行证据支持本次已复现问题的修复，但不足以宣称全部受支持平台风险关闭。
+**本次审查范围内没有剩余已知阻塞项。** 已有 Windows/Linux/macOS 的原生 first/replace/recover/empty stop/required stop/storage failure+repair、ownership/lifecycle 和完整suite证据，以及上述功能修复前失败、修复后通过的记录。正式合并仍要求最后审计分支提交的全部CI通过；若之后有失败，应保留日志、修复并重新验证 exact final commit。此判断不外推成一般断电持久性、生产容量或全部故障分支已穷尽。
 
 版本和正式发布由作者决定。本任务到此仍保留审计分支用于审查，不自动合并 main、推送 main、打 tag 或发布 Release。

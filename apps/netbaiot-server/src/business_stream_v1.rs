@@ -345,6 +345,41 @@ pub(crate) async fn serve_business_connection(
     Ok(())
 }
 
+pub(crate) async fn serve_business_stream(
+    listener: TcpListener,
+    sink: Arc<TcpStreamSink>,
+    token_hash: [u8; 32],
+    limits: Arc<Limits>,
+    stop: CancellationToken,
+) -> Result<()> {
+    let mut tasks = JoinSet::new();
+    loop {
+        let accepted = tokio::select! {
+            _ = stop.cancelled() => break,
+            completed = tasks.join_next(), if !tasks.is_empty() => {
+                if let Some(Err(error)) = completed {
+                    tracing::warn!(error=%error, "business stream task failed");
+                }
+                continue;
+            }
+            accepted = listener.accept() => accepted.map_err(|_| Error::Unavailable)?,
+        };
+        if tasks.len() >= limits.max_ingress {
+            drop(accepted.0);
+            continue;
+        }
+        let (stream, _) = accepted;
+        let sink = sink.clone();
+        let limits = limits.clone();
+        let stop = stop.child_token();
+        tasks.spawn(async move {
+            serve_business_connection(stream, sink, token_hash, limits, stop, None).await
+        });
+    }
+    while tasks.join_next().await.is_some() {}
+    Ok(())
+}
+
 #[cfg(test)]
 mod rejected_stream_tests {
     use super::*;
@@ -379,39 +414,4 @@ mod rejected_stream_tests {
         finish_rejected_stream(&mut server, &Limits::default(), &stop).await;
         assert_eq!(start.elapsed(), Duration::ZERO);
     }
-}
-
-pub(crate) async fn serve_business_stream(
-    listener: TcpListener,
-    sink: Arc<TcpStreamSink>,
-    token_hash: [u8; 32],
-    limits: Arc<Limits>,
-    stop: CancellationToken,
-) -> Result<()> {
-    let mut tasks = JoinSet::new();
-    loop {
-        let accepted = tokio::select! {
-            _ = stop.cancelled() => break,
-            completed = tasks.join_next(), if !tasks.is_empty() => {
-                if let Some(Err(error)) = completed {
-                    tracing::warn!(error=%error, "business stream task failed");
-                }
-                continue;
-            }
-            accepted = listener.accept() => accepted.map_err(|_| Error::Unavailable)?,
-        };
-        if tasks.len() >= limits.max_ingress {
-            drop(accepted.0);
-            continue;
-        }
-        let (stream, _) = accepted;
-        let sink = sink.clone();
-        let limits = limits.clone();
-        let stop = stop.child_token();
-        tasks.spawn(async move {
-            serve_business_connection(stream, sink, token_hash, limits, stop, None).await
-        });
-    }
-    while tasks.join_next().await.is_some() {}
-    Ok(())
 }
