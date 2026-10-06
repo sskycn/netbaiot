@@ -1054,6 +1054,7 @@ mod cache_tests {
         assert_eq!(state.entries.len(), 1);
         assert_eq!(state.bytes, 200);
         assert_eq!(state.order.len(), 1);
+        super::expiry_tests::assert_cache_consistent(&state, &cache.limits);
     }
 
     #[tokio::test]
@@ -1261,3 +1262,7 @@ mod cache_tests {
         assert_eq!(provider.calls.load(Ordering::Relaxed), 2);
     }
 }
+
+#[cfg(test)]
+#[path = "auth_cache_expiry_tests.rs"]
+mod expiry_tests;
