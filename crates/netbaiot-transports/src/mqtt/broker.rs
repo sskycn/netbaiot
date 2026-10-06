@@ -5107,6 +5107,7 @@ struct RecoveryWriteState {
 
 fn write_recovery(directory: &Path, limits: &Limits, broker: &MqttBroker) -> Result<PathBuf> {
     recovery_io::prepare_directory(directory)?;
+    recovery_io::ensure_temporary_capacity(directory, limits.spool_max_records)?;
     let temporary = directory.join(format!(".{RECOVERY_FILE}.{}.tmp", uuid::Uuid::new_v4()));
     let committed = directory.join(RECOVERY_FILE);
     let mut file = recovery_io::create_private(&temporary)?;
@@ -6195,6 +6196,33 @@ mod tests {
     use super::*;
     use std::fmt::Debug;
     use std::time::Duration;
+
+    #[tokio::test]
+    async fn mqtt_temporary_file_budget_blocks_commit_without_replacing_snapshot() {
+        let directory = std::env::temp_dir().join(format!(
+            "netbaiot-mqtt-temp-budget-{}",
+            uuid::Uuid::new_v4()
+        ));
+        let broker = MqttBroker::new(Arc::new(Limits {
+            spool_max_records: 1,
+            ..Limits::default()
+        }));
+        let path = broker.commit_to(&directory).await.unwrap();
+        let image = fs::read(&path).unwrap();
+        for index in 0..17 {
+            fs::write(directory.join(format!("abandoned-{index}.tmp")), b"").unwrap();
+        }
+        let result = broker.commit_to(&directory).await;
+        assert!(matches!(result, Err(Error::Overloaded)));
+        assert_eq!(fs::read(&path).unwrap(), image);
+        assert_eq!(fs::read_dir(&directory).unwrap().count(), 18);
+        for index in 0..17 {
+            fs::remove_file(directory.join(format!("abandoned-{index}.tmp"))).unwrap();
+        }
+        broker.commit_to(&directory).await.unwrap();
+        assert!(broker.recover_from(&directory).await.unwrap());
+        fs::remove_dir_all(directory).unwrap();
+    }
 
     #[tokio::test]
     async fn mqtt_recovery_storage_commit_replace_retry_and_io_errors() {

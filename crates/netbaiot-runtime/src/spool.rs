@@ -167,6 +167,7 @@ fn commit_sync(directory: &Path, limits: &Limits, records: &[SpoolRecord]) -> Re
         return Err(Error::Overloaded);
     }
     recovery_io::prepare_directory(directory)?;
+    recovery_io::ensure_temporary_capacity(directory, limits.spool_max_records)?;
     let existing = recover_sync(directory, limits)?;
     let generation = existing
         .generation
@@ -992,6 +993,34 @@ mod tests {
             .await
             .unwrap();
         let _ = fs::remove_dir(directory);
+    }
+
+    #[tokio::test]
+    async fn temporary_file_budget_blocks_commit_without_replacing_authority() {
+        let directory =
+            std::env::temp_dir().join(format!("netbaiot-temp-budget-{}", Uuid::new_v4()));
+        let spool = RestartSpool::new(
+            directory.clone(),
+            Arc::new(Limits {
+                spool_max_records: 1,
+                ..Limits::default()
+            }),
+        );
+        let path = spool.commit(vec![record()]).await.unwrap().unwrap();
+        let image = fs::read(&path).unwrap();
+        for index in 0..17 {
+            fs::write(directory.join(format!("abandoned-{index}.tmp")), b"").unwrap();
+        }
+        let result = spool.commit(vec![record()]).await;
+        assert!(matches!(result, Err(Error::Overloaded)));
+        assert_eq!(fs::read(&path).unwrap(), image);
+        assert_eq!(fs::read_dir(&directory).unwrap().count(), 18);
+        for index in 0..17 {
+            fs::remove_file(directory.join(format!("abandoned-{index}.tmp"))).unwrap();
+        }
+        spool.commit(vec![record()]).await.unwrap();
+        assert_eq!(spool.recover().await.unwrap().generation, 2);
+        fs::remove_dir_all(directory).unwrap();
     }
 
     #[tokio::test]

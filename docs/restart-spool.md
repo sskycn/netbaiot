@@ -28,9 +28,10 @@ and record lengths are checked against configured record, segment, total-byte, a
 record-count limits before allocation/decoding. Unknown version, partial tail,
 checksum mismatch, random bytes, and oversized length fail loudly.
 
-Commit writes a private `0600` temporary file inside a `0700` directory, syncs the
-file, atomically replaces `eventbus-recovery.spool`, then syncs the directory. Only
-after those steps may planned shutdown succeed. The generation increases on every
+Commit writes a private temporary file (`0600` inside a `0700` directory on Unix),
+syncs and closes the file, then atomically replaces `eventbus-recovery.spool` and
+completes the platform commit steps described below. Only after those steps may
+planned shutdown succeed. The generation increases on every
 replacement. A crash after the new rename but before old cleanup therefore selects
 only the new generation. Cleanup checks the generation before unlinking, so a stale
 cleanup handle cannot delete a newer image at the same path. Abandoned `.tmp` files
@@ -121,6 +122,11 @@ owner; standalone decoder calls require no lock. File links, reparse points and 
 files are rejected; Unix reads also use no-follow/nonblocking opens. Missing files
 are accepted only in an accessible directory. I/O failures block startup, and actual
 read lengths and directory enumeration are capped, including ignored temporary entries.
+Before either writer creates a temporary file, it reserves room within the shared
+`spool_max_records + 16` directory-entry budget. Failed unlink attempts therefore
+cannot accumulate temporary files indefinitely through normal sequential shutdown
+retries. Excess entries block further commits until the directory is repaired;
+committed responsibility is preserved.
 
 On Unix the commit sequence is private temporary creation, bounded streaming write,
 `sync_all`, close, same-directory rename and directory `sync_all`. On Windows the

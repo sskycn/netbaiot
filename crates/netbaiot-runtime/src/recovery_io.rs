@@ -114,6 +114,20 @@ pub fn spool_paths(directory: &Path, maximum: usize) -> Result<Vec<PathBuf>> {
     )
 }
 
+/// Reserve room for one temporary file. Count every entry even when an authoritative
+/// snapshot bypasses legacy enumeration, so failed cleanup cannot accumulate retries.
+pub fn ensure_temporary_capacity(directory: &Path, maximum_records: usize) -> Result<()> {
+    let existing_limit = maximum_records.checked_add(15).ok_or(Error::Overloaded)?;
+    let entries = fs::read_dir(directory).map_err(|_| Error::Storage)?;
+    for (index, entry) in entries.enumerate() {
+        if index >= existing_limit {
+            return Err(Error::Overloaded);
+        }
+        entry.map_err(|_| Error::Storage)?;
+    }
+    Ok(())
+}
+
 fn collect_spool_paths(
     entries: impl Iterator<Item = io::Result<PathBuf>>,
     maximum: usize,
