@@ -8,6 +8,7 @@ on:
       - "crates/netbaiot-mqtt-wire/**"
       - "fuzz/**"
       - "Cargo.lock"
+      - "docs/releases/**"
   push:
     branches: [main]
     paths:
@@ -15,6 +16,7 @@ on:
       - "crates/netbaiot-mqtt-wire/**"
       - "fuzz/**"
       - "Cargo.lock"
+      - "docs/releases/**"
 
 jobs:
   decoder:

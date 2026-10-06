@@ -22,7 +22,10 @@ def scrub_text(text, repo_root=ROOT, home=None, temp_root=None):
             replacements.add((str(path), label))
             replacements.add((str(path.resolve()), label))
     for path, label in sorted(replacements, key=lambda item: (-len(item[0]), item)):
-        text = re.sub(re.escape(path) + r"(?=$|[/\s\"'():,])", lambda _: label, text)
+        # An absolute root must start a path, not match inside /private/tmp or
+        # another longer path. macOS resolves /tmp to /private/tmp; Linux does
+        # not, so correctness must not depend on that platform alias.
+        text = re.sub(r"(?<![\w/<>])" + re.escape(path) + r"(?=$|[/\s\"'():,])", lambda _: label, text)
     # Historical evidence may have been produced on another user's checkout.
     # Match the repository directory, never a particular username.
     text = re.sub(r"/(?:Users|home)/[^/\s\"'<>]+/(?:[^/\s\"'<>]+/)*?netbaiot(?=/|[\s\"'():,]|$)",

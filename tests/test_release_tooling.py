@@ -123,6 +123,14 @@ class ReleaseTests(unittest.TestCase):
 
 
 class ScrubTests(unittest.TestCase):
+    def test_linux_temp_root_does_not_match_inside_macos_alias(self):
+        # Make macOS run the same root comparison as a Linux runner.
+        with patch("scrub_paths.Path.resolve", lambda path: path):
+            self.assertEqual(scrub_text("/private/tmp/netbaiot-run/spool", repo_root="/checkout/netbaiot",
+                home="/home/runner", temp_root="/tmp"), "<tmp>/netbaiot-run/spool")
+            self.assertEqual(scrub_text("/else/checkout/netbaiot/file", repo_root="/checkout/netbaiot",
+                home="/home/runner", temp_root="/tmp"), "/else/checkout/netbaiot/file")
+
     def test_dynamic_and_historical_paths_preserve_json_and_values(self):
         source = json.dumps({"count": 42, "repo": "/home/researcher/work/netbaiot/tests/fixtures/localhost-key.pem",
             "temporary": "/private/tmp/netbaiot-run/spool", "other_home": "/Users/different/private/log",
