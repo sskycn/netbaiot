@@ -1038,7 +1038,14 @@ async fn v3_command_real_mqtt_dedup_http_ack_and_lost_response() {
     device.shutdown();
     // Closing the V3 client must release every command RPC stream, queued body,
     // and reassembly reservation, including the reset and lost-response paths.
-    let http = reqwest::Client::builder().no_proxy().build().unwrap();
+    // Diagnostic polling is not a rate-limit test. Stay below the configured
+    // 32/IP/s request ceiling without changing the five-second cleanup bound.
+    let http = reqwest::Client::builder()
+        .no_proxy()
+        .connect_timeout(Duration::from_millis(500))
+        .timeout(Duration::from_secs(1))
+        .build()
+        .unwrap();
     let mut observed = String::new();
     let cleanup = tokio::time::timeout(Duration::from_secs(5), async {
         loop {
@@ -1049,13 +1056,13 @@ async fn v3_command_real_mqtt_dedup_http_ack_and_lost_response() {
                 .await;
             let Ok(metrics) = request else {
                 observed = format!("request error: {:?}", request.err());
-                tokio::time::sleep(Duration::from_millis(20)).await;
+                tokio::time::sleep(Duration::from_millis(100)).await;
                 continue;
             };
             assert_eq!(metrics.status(), reqwest::StatusCode::OK);
             let Ok(body) = metrics.text().await else {
                 observed = "response body error".into();
-                tokio::time::sleep(Duration::from_millis(20)).await;
+                tokio::time::sleep(Duration::from_millis(100)).await;
                 continue;
             };
             observed = body
@@ -1074,7 +1081,7 @@ async fn v3_command_real_mqtt_dedup_http_ack_and_lost_response() {
             {
                 break;
             }
-            tokio::time::sleep(Duration::from_millis(20)).await;
+            tokio::time::sleep(Duration::from_millis(100)).await;
         }
     })
     .await;

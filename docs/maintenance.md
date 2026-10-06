@@ -22,7 +22,7 @@ cargo xtask package --target x86_64-unknown-linux-gnu
 | check | fmt --check, locked workspace all-targets/all-features clippy -D warnings, locked all-features tests |
 | check mqtt | server build, protocol regressions, Python conformance units, 3.1.1 release gate, MQTT5 raw/Mosquitto, SDK build/interop/measurement |
 | check release | MSRV from Cargo + stable check, cargo audit, MQTT suite, schema/reference drift, release preflight/tooling tests, host package/archive smoke |
-| schema/reference | Feature-gated Rust Config generator, deterministic committed JSON/field tables; --check fails on drift |
+| schema/reference | Feature-gated Rust Config generator, deterministic committed JSON/field tables; --check normalizes CRLF/LF only and fails on content drift |
 | package | Locked release build for host or specified target, existing archive layout validator/packager; no tag or publishing |
 
 Required missing Mosquitto/Python/OpenSSL/cargo-audit tools report BLOCKED and exit

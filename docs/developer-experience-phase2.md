@@ -147,6 +147,10 @@ source指纹含新模块，actual CLI、full logs、manifest在[证据目录](pe
 
 过程中两个真实FAIL：依赖audit已升级修复；一次旧V3wait_ready超时的子进程只记录Unavailable。原单项复跑PASS；发现fixture只保留TCP，已同时配对预留UDP，保持原10秒/全部业务断言，加listener/error-kind日志。未抓到当次具体失败listener，因果边界保留；随后原七项与完整gate PASS。没有通过放宽时间、删除assertions或skip取得绿色。
 
+本阶段首次最终CI在62d0fc8上，常规Rust/audit/MQTT/preflight通过，native Linux通过，macOS在旧V3 cleanup轮询失败；另中间纯文档9ea710d的Windows旧V2 grace测试失败。原始artifact已校验摘要并保留failure摘录，未称这些run整体PASS。V3在默认32/IP/s下20ms轮询可能自触发限流，现改100ms并增加单请求期限，保留原5秒及全部四个零usage断言；V2把即时connected断言放在发起cancel后、等待driver join前，保留1500ms grace和5秒最终撤销断言。join完成并不代表仍在grace窗口，未改生产策略或延长规范期限。修正后必须核对新的最终提交CI，不能用62d0fc8的局部绿色替代。
+
+62d0fc8的Windows完整workspace与实际demo/init/check/doctor均PASS，但schema --check出现文件drift。生成文件已用gitattributes固定LF，xtask比对仅归一化CRLF/LF（不忽略其他内容）；新增行尾等价与内容变化仍不等价断言，并由新的Windows最终CI核实是否仅为行尾差异。不能将该次native总任务称为PASS。
+
 ## Cross-platform
 
 macOS arm64本阶段上述全部实际PASS，包含host archive。Linux/Windows尚待最后提交原生CI；已经写好矩阵但不会称执行完成。第一阶段原生结果单独记录，不用于替代本阶段。最终native job/step/SHA/digest作为补充执行记录。

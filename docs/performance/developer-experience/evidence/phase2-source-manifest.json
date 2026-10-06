@@ -35,8 +35,8 @@
   "apps/netbaiot-server/src/main.rs": "8f325d4083bfd25900f5533ab594dee462ccce56539aa2b806bdb4b98d6cec93",
   "apps/netbaiot-server/src/server.rs": "4b06ead3436df260b2d4b107431180d93ecb0cd8731d482a3b2f05bf783fbc9a",
   "apps/netbaiot-server/src/tls.rs": "ea1a8554dd307606c2c822bd92881a0d2b792145a69cbfe91fc35d38922742db",
-  "apps/netbaiot-server/tests/business_rpc_v2.rs": "86273ec062b8165f117308feeafec424a666543eaafbd3fac5e517d09aeb1807",
-  "apps/netbaiot-server/tests/business_rpc_v3.rs": "40da9eb4820341e222970d1d4334140e55f32cb18e607cbcc1a84fb958621137",
+  "apps/netbaiot-server/tests/business_rpc_v2.rs": "d602ccd1af8764d3e95722f8ae88bbc4fdf70e4ee35623722be88fdd168d7186",
+  "apps/netbaiot-server/tests/business_rpc_v3.rs": "76cbe1003f79196375f409d34702bb8e87695b8c404ea5b894addd3ff2a23bf9",
   "apps/netbaiot-server/tests/official_client.rs": "df36c420bfa67f99d1e1485542d7e458f7dcd6ba02904bdd33210d6057ee8a60",
   "apps/netbaiot-server/tests/server.rs": "63cf51ece7eee58d79a7eea4e8b92a1c08826f2b6a7a89882f1f2e9244de8e6a",
   "crates/netbaiot-client/Cargo.toml": "b120827c4e6fcff15b782304a84cad66322d0091ee73a8cf37a51a1f45222368",
@@ -117,5 +117,5 @@
   "scripts/release_preflight.py": "f0f55339b7ed7ac12ec0b6eb773dc9379c467f384e234f323b9850f1ecb4c7de",
   "tests/release_archive_smoke.py": "afd4ed1eef516c8249fda4c4416e7311c0b1f2c6cb89cfb46ea7f2240c3fa7bf",
   "tools/netbaiot-xtask/Cargo.toml": "0a6201a882a0a0779f312ae1d0638d532e8b370961f511a8c6a1a785031b463b",
-  "tools/netbaiot-xtask/src/main.rs": "a33352cab6101281df006da3c084738994275ad50fd686da13d23b57a862af37"
+  "tools/netbaiot-xtask/src/main.rs": "4d633700bd4483e06d8228df84dac53db8e7cf994fa36d1665dc91ceabb54fff"
 }

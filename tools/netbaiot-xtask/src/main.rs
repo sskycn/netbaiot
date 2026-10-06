@@ -178,12 +178,24 @@ fn schema_bytes() -> Result<Vec<u8>, String> {
     }
     Ok(output.stdout)
 }
+fn normalize_lines(bytes: &[u8]) -> Vec<u8> {
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut at = 0;
+    while at < bytes.len() {
+        if bytes[at] == b'\r' && bytes.get(at + 1) == Some(&b'\n') {
+            at += 1;
+        }
+        out.push(bytes[at]);
+        at += 1;
+    }
+    out
+}
 fn write_generated(path: &str, bytes: &[u8], check: bool) -> Result<(), String> {
     let path = root().join(path);
     if check {
         let old = std::fs::read(&path)
             .map_err(|_| format!("generated file missing: {}", path.display()))?;
-        if old != bytes {
+        if normalize_lines(&old) != normalize_lines(bytes) {
             return Err(format!("generated file drift: {}", path.display()));
         }
     } else {
@@ -430,6 +442,14 @@ mod tests {
                 .contains("drift")
         );
         assert!(write_generated(&name, b"old", true).is_ok());
+        assert_eq!(
+            normalize_lines(b"{\r\n  \"value\": 1\r\n}\r\n"),
+            normalize_lines(b"{\n  \"value\": 1\n}\n")
+        );
+        assert_ne!(
+            normalize_lines(b"value=1\r\n"),
+            normalize_lines(b"value=2\n")
+        );
         std::fs::remove_file(root().join(name)).unwrap();
     }
 }

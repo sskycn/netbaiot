@@ -1,0 +1,49 @@
+{
+  "checks": [
+    {
+      "label": "stable-line-ending-final",
+      "counts": [
+        433,
+        0,
+        16
+      ],
+      "raw_sha256": "ddada675b8bc5b8551288d91b2243d4f5e1c178ce39aa0072c61214c9631ad64"
+    },
+    {
+      "label": "msrv-line-ending-final",
+      "counts": [
+        433,
+        0,
+        16
+      ],
+      "raw_sha256": "0049f4701065eb9847a62873d63ea418f42aab543d45b7162f8d899f7fa03244"
+    },
+    {
+      "label": "v2-grace-regressions",
+      "counts": [
+        7,
+        0,
+        0
+      ],
+      "raw_sha256": "dddd54b47b3bd4bbf0c357ba66889da1b5bd627769c6f274aaaf253bb914a2bb"
+    },
+    {
+      "label": "v3-cleanup-regressions",
+      "counts": [
+        7,
+        0,
+        0
+      ],
+      "raw_sha256": "7b16f75ec02c2150b980996433613057483a736826d44702df0716ee235e237a"
+    },
+    {
+      "label": "xtask-line-endings",
+      "counts": [
+        1,
+        0,
+        0
+      ],
+      "raw_sha256": "7b013b813578f77445bcdf2da04422bc0ce81cbc6eff61f6d0a69567b5604eb8"
+    }
+  ]
+}
