@@ -1,0 +1,167 @@
+{
+  "integration_revision": "0c804f0fcfc3d9fdea6a343a6f61617767e20d47",
+  "timestamp": "2026-09-23T07:17:16.856429+00:00",
+  "environment": {
+    "RUSTUP_TOOLCHAIN": "1.88.0"
+  },
+  "checks": [
+    {
+      "command": "cargo +1.88.0 fmt --all -- --check",
+      "exit_code": 0,
+      "result": "PASS",
+      "seconds": 0.375663625,
+      "tail": []
+    },
+    {
+      "command": "cargo +1.88.0 check --workspace --all-targets",
+      "exit_code": 0,
+      "result": "PASS",
+      "seconds": 2.964283709,
+      "tail": [
+        "    Checking netbaiot-runtime v0.1.0 (<repo>/crates/netbaiot-runtime)",
+        "    Checking netbaiot-transports v0.1.0 (<repo>/crates/netbaiot-transports)",
+        "    Checking netbaiot-loadgen v0.1.0 (<repo>/tools/netbaiot-loadgen)",
+        "    Checking netbaiot-server v0.1.0 (<repo>/apps/netbaiot-server)",
+        "    Checking netbaiot-cli v0.1.0 (<repo>/apps/netbaiot-cli)",
+        "    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.89s"
+      ]
+    },
+    {
+      "command": "cargo +1.88.0 clippy --workspace --all-targets --all-features -- -D warnings",
+      "exit_code": 0,
+      "result": "PASS",
+      "seconds": 2.621922792,
+      "tail": [
+        "    Checking netbaiot-runtime v0.1.0 (<repo>/crates/netbaiot-runtime)",
+        "    Checking netbaiot-transports v0.1.0 (<repo>/crates/netbaiot-transports)",
+        "    Checking netbaiot-loadgen v0.1.0 (<repo>/tools/netbaiot-loadgen)",
+        "    Checking netbaiot-server v0.1.0 (<repo>/apps/netbaiot-server)",
+        "    Checking netbaiot-cli v0.1.0 (<repo>/apps/netbaiot-cli)",
+        "    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.54s"
+      ]
+    },
+    {
+      "command": "cargo +1.88.0 test --workspace --all-targets --all-features",
+      "exit_code": 0,
+      "result": "PASS",
+      "seconds": 73.932395625,
+      "tail": [
+        "retained_store_1000: logical_bytes=145890 bytes/message=145.9",
+        "retained_exact_1000: 10000 iterations, 3362946 ops/s, p50=250 ns p95=292 ns p99=333 ns",
+        "retained_wildcard_1000: 1000 iterations, 2363 ops/s, p50=423167 ns p95=439250 ns p99=468500 ns",
+        "retained_store_4000: logical_bytes=586890 bytes/message=146.7",
+        "retained_exact_4000: 10000 iterations, 2984184 ops/s, p50=292 ns p95=334 ns p99=375 ns",
+        "retained_wildcard_4000: 1000 iterations, 590 ops/s, p50=1698916 ns p95=1745792 ns p99=1777333 ns",
+        "mqtt_state_payload_64: offline_messages=1 offline_bytes=147 outbound_qos1_bytes=147 outbound_qos2_bytes=147 inbound_qos2_bytes=145",
+        "mqtt_state_payload_256: offline_messages=1 offline_bytes=339 outbound_qos1_bytes=339 outbound_qos2_bytes=339 inbound_qos2_bytes=337",
+        "mqtt_state_payload_1024: offline_messages=1 offline_bytes=1107 outbound_qos1_bytes=1107 outbound_qos2_bytes=1107 inbound_qos2_bytes=1105",
+        "mqtt_state_payload_8192: offline_messages=1 offline_bytes=8275 outbound_qos1_bytes=8275 outbound_qos2_bytes=8275 inbound_qos2_bytes=8273",
+        "mqtt_state_payload_32768: offline_messages=1 offline_bytes=32851 outbound_qos1_bytes=32851 outbound_qos2_bytes=32851 inbound_qos2_bytes=32849",
+        "layout_bytes: session_endpoint=96 queued_command=104 device_event=152"
+      ],
+      "test_totals": {
+        "passed": 170,
+        "failed": 0,
+        "ignored": 4
+      }
+    },
+    {
+      "command": "cargo +1.88.0 test --workspace --all-features",
+      "exit_code": 0,
+      "result": "PASS",
+      "seconds": 15.278949417000007,
+      "tail": [
+        "   Doc-tests netbaiot_server",
+        "",
+        "running 0 tests",
+        "",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "",
+        "   Doc-tests netbaiot_transports",
+        "",
+        "running 0 tests",
+        "",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        ""
+      ],
+      "test_totals": {
+        "passed": 170,
+        "failed": 0,
+        "ignored": 4
+      }
+    },
+    {
+      "command": "python3 tests/mqtt_conformance/run.py --release-gate --no-build",
+      "exit_code": 0,
+      "result": "PASS",
+      "seconds": 27.49440349999999,
+      "tail": [
+        "RETAIN-REPLACEMENT-RESERVATION-001: PASS —      Running tests/end_to_end.rs (target/debug/deps/end_to_end-4f0c6ac88ef340f4)",
+        "EVENTBUS-SINK-PANIC-RECOVERY-001: PASS —      Running tests/end_to_end.rs (target/debug/deps/end_to_end-4f0c6ac88ef340f4)",
+        "WILL-SUBSCRIBER-PRESSURE-001: PASS —      Running tests/end_to_end.rs (target/debug/deps/end_to_end-4f0c6ac88ef340f4)",
+        "AUTH-MQTT-ATTACH-REVOKE-RACE-001: PASS —      Running tests/end_to_end.rs (target/debug/deps/end_to_end-4f0c6ac88ef340f4)",
+        "MQTT-RECOVERY-V1-LARGE-COMPAT-001: PASS —      Running tests/end_to_end.rs (target/debug/deps/end_to_end-4f0c6ac88ef340f4)",
+        "MQTT-RECOVERY-WHOLE-IMAGE-INTEGRITY-001: PASS —      Running tests/end_to_end.rs (target/debug/deps/end_to_end-4f0c6ac88ef340f4)",
+        "MQTT-PERSISTENT-CODEC-PROVENANCE-001: PASS —      Running tests/end_to_end.rs (target/debug/deps/end_to_end-4f0c6ac88ef340f4)",
+        "MQTT-ROUTE-PREFLIGHT-BOUNDED-MEMORY-001: PASS —      Running tests/end_to_end.rs (target/debug/deps/end_to_end-4f0c6ac88ef340f4)",
+        "MQTT-RECOVERY-ACL-OWNERSHIP-001: PASS —      Running tests/end_to_end.rs (target/debug/deps/end_to_end-4f0c6ac88ef340f4)",
+        "AUTH-INVALIDATION-COUNTING-001: PASS —      Running tests/end_to_end.rs (target/debug/deps/end_to_end-4f0c6ac88ef340f4)",
+        "RESTART-001: PASS —      Running tests/end_to_end.rs (target/debug/deps/end_to_end-4f0c6ac88ef340f4)",
+        "NORMATIVE-COVERAGE-001: PASS — 125/125 requirements have current PASS evidence"
+      ]
+    },
+    {
+      "command": "bash scripts/tutorial_smoke.sh",
+      "exit_code": 0,
+      "result": "PASS",
+      "seconds": 14.282152707999984,
+      "tail": [
+        "acceptance: {'event_id': '9960ccae-9926-4e34-a4c7-e4f57d1f6324', 'accepted_at': 1790147970671, 'required_deliveries': 1, 'best_effort_deliveries': 0}",
+        "EventAccepted: signed NBA1 sequence=11; business completion is separate",
+        "{\"command_id\":\"00000000-0000-0000-0000-000000000123\",\"state\":\"queued\"}",
+        "{\"command_id\":\"00000000-0000-0000-0000-000000000123\",\"device\":{\"tenant_id\":\"demo\",\"product_id\":\"sensor\",\"device_id\":\"device-1\"},\"expires_at\":1790148270924,\"payload\":{\"name\":\"smoke\",\"arguments\":{}}}",
+        "{\"invalidated\":1,\"disconnected\":0,\"invalidated_cache_entries\":1,\"disconnected_connections\":0,\"invalidated_mqtt_sessions\":2}",
+        "{\"draining\":true}",
+        "2026-09-23T07:19:30.966127Z  INFO netbaiot_server: shutdown complete",
+        "accepted event 679574aa-c245-4fa3-b067-386bd88cd701",
+        "apply revision 1: {\"sample_interval_seconds\":30}",
+        "{\"draining\":true}",
+        "2026-09-23T07:19:33.759665Z  INFO netbaiot_server: shutdown complete",
+        "tutorial smoke: PASS"
+      ]
+    },
+    {
+      "command": "cargo +1.88.0 test -p netbaiot-server --test server subprocess_graceful_restart_sixty_second_soak -- --ignored --nocapture",
+      "exit_code": 0,
+      "result": "PASS",
+      "seconds": 61.919101541,
+      "tail": [
+        "    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.06s",
+        "     Running tests/server.rs (target/debug/deps/server-5225dda76e17a9eb)",
+        "",
+        "running 1 test",
+        "test subprocess_graceful_restart_sixty_second_soak has been running for over 60 seconds",
+        "test subprocess_graceful_restart_sixty_second_soak ... ok",
+        "",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 19 filtered out; finished in 61.78s",
+        ""
+      ],
+      "test_totals": {
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "command": "python3 scripts/perf/mixed_ingress_semantics.py --server target/debug/netbaiot-server --output docs/performance/mixed-ingress/integration-semantics.json",
+      "exit_code": 0,
+      "result": "PASS",
+      "seconds": 2.400417874999988,
+      "tail": [],
+      "structured_result_path": "docs/performance/mixed-ingress/integration-semantics.json",
+      "duplicate_stdout_fragment_sha256": "a8deddc597625f79b89cce32d3718abd925e0a6cfc7e057e7b1048b2f4af6b0c",
+      "duplicate_stdout_fragment_bytes": 5590,
+      "duplicate_stdout_fragment_removed": true
+    }
+  ]
+}
