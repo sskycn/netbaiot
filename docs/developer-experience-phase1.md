@@ -1,11 +1,11 @@
 # NetbaIoT Developer Experience 第一阶段验收
 
-日期：2026-10-06。第一阶段本地实现和验收完成；Linux/Windows 原生执行仍为 NOT RUN，等待本分支 CI 的单独推送授权。第二阶段尚未开始。
+日期：2026-10-06。第一阶段实现、本地及三平台原生验收完成。经作者单独授权只推送DX任务分支验证CI；未合并或推送main、未打tag或发布Release。第二阶段在完成本阶段验收后开始。
 
 ## 1. Current baseline
 
 - 起点：干净的审计分支 `codex/strict-reliability-audit`，`e7d8bfed81b31c7a5895b52e1a72fe4f67844117`，上一轮最终原生/常规 CI 已核验通过。当前 main/origin/main 仍为 `f68bfd4a8f563e265673ae76e70c7c795b27ee86`；没有把历史 main 当作最新实现。
-- 新分支：`codex/developer-experience-phase1`。第一阶段生产/测试实现提交：`9cf9018801a4705206fffdb5d93529727378cb92`；报告另作提交，不改变生产行为。最终报告提交与 CI SHA 在交付消息及 `target/dx-phase1` 的执行记录中核对。
+- 新分支：`codex/developer-experience-phase1`。第一阶段生产/测试实现提交：`9cf9018801a4705206fffdb5d93529727378cb92`；报告另作提交，不改变生产行为。包含全部本阶段生产修改的 `4cb93af56dea579c10322e379abfe950b088bc9e` 已通过 [原生 CI](https://github.com/sskycn/netbaiot/actions/runs/37443851778) 和 [常规 CI](https://github.com/sskycn/netbaiot/actions/runs/37443853586)。后续本次提交仅补充平台证据，不改生产行为。
 - workspace version：0.2.3；未改 SemVer、tag 或 Release。
 - 本机 macOS arm64 / Darwin 27；stable rustc/cargo 1.99.0，另实际执行 Rust/Cargo 1.88.0。详见 `target/dx-phase1/baseline.json`。
 - 已阅读当前 Cargo/lock、CLI/server/client/runtime/transports、configs/demo/examples、两份 README、CLI/Quick Start/tutorial/operations/CONTRIBUTING/AGENTS 和 release/CI 入口。
@@ -119,7 +119,7 @@ sink 单连接、header数量/缓冲和2秒总期限、body64KiB、16条通知/1
 - server config/diagnostics/tls/auth_provider/delivery/bootstrap/entry/server 模块：移动既有职责、共享入口与准备/就绪边界；runtime核心与transport协议实现保持。
 - README/CLI/Quick Start/tutorial/operations/CONTRIBUTING：首选单命令；保留普通 MQTT 与手动脚本。
 - release preflight/archive smoke：打包 development.json，两个 binary 保留；新增空 PATH native CLI smoke，旧 Bash MQTT/TCP/UDP smoke 保留。
-- dx-platform.yml：三平台 Rust1.88 全 workspace + 实际version/limits/check/demo，带有限超时与 exact-SHA artifact。未运行则不计 PASS。
+- dx-platform.yml：三平台 Rust1.88 全 workspace + 实际version/limits/check/demo，带有限超时与 exact-SHA artifact。未运行则不计 PASS；本轮矩阵已实际执行并核对原始artifact摘要。
 
 ## 8. Dependencies
 
@@ -145,7 +145,7 @@ sink 单连接、header数量/缓冲和2秒总期限、body64KiB、16条通知/1
 | cargo audit | PASS，0漏洞；unmaintained警告保留 | cargo-audit.json |
 | actionlint / release tooling / preflight | PASS | actionlint.log / release-tooling.log / release-preflight.log |
 | macOS arm64 release build +实际archive smoke | PASS，新CLI空PATH +旧Bash/MQTT/TCP/UDP | release-build.log / package.log / archive-smoke.log |
-| Linux/Windows本轮native CI | NOT RUN，尚未授权推送本DX分支 | workflow已配置；不引用审计分支旧绿色 |
+| 本轮Linux/Windows/macOS native CI | PASS；Linux/macOS424/0/16，Windows421/0/16，真实version/limits/check/once也通过 | native-ci-verification.json / native-*-latest.log |
 | fuzz/新生产容量/长时负载 | NOT RUN；没有修改纯协议/recovery decoder，不作新容量声明 | — |
 
 16 ignored 中仅 restart soak 在本阶段另行选择并实际执行；其余手工 benchmark 不计通过。完整命令/退出码/摘要在 validation.json；包含新未跟踪模块的源文件指纹在 validated-source-manifest.json。
@@ -154,7 +154,9 @@ sink 单连接、header数量/缓冲和2秒总期限、body64KiB、16条通知/1
 
 ## 10. Cross-platform
 
-macOS arm64：上述全套实际 PASS，包括 once/交互SIGINT/SIGTERM/cleanup和提取archive。Linux、Windows：源码使用平台API/cfg设计且加入native矩阵，本轮尚 NOT RUN。Windows真实Ctrl-C控制台行为仍需执行证据，不能用macOS的signal测试替代。
+macOS arm64及hosted macos-latest：上述全套实际 PASS。Linux hosted ubuntu-latest：完整424/0/16及实际命令PASS，提取archive Quick Start也实际PASS。Windows hosted windows-latest：完整421/0/16及实际version/limits/check/once PASS；少的3项为Unix-only权限/符号链接及SIGINT/SIGTERM测试，不计作Windows通过。Windows真实Ctrl-C控制台行为仍为NOT RUN，不能用Unix signal测试替代。
+
+ZIP均通过公开下载代理取得，SHA256与GitHub官方artifact digest一致；仅读取有界日志，不执行下载内容。完整job/step/SHA和摘要见target/dx-phase1/native-ci-verification.json。
 
 ## 11. git diff --stat
 
@@ -198,7 +200,7 @@ macOS arm64：上述全套实际 PASS，包括 once/交互SIGINT/SIGTERM/cleanup
 
 ## 12. Remaining issues
 
-- Linux/Windows本阶段原生证据尚缺，只有推送当前DX分支并核对包含最终修改的CI后才能声称通过。
+- 三平台原生本阶段门禁已通过；Windows真实控制台Ctrl-C仍未实测，已明确区分它与CancellationToken/once清理测试。
 - 配置检查只是local preflight；端口占用/证书期限/remote probes不在第一阶段验证范围，也不保证recovery内容合法。
 - token-file属于可选项，未扩大本轮范围；仍建议生产secret使用保护的环境来源。
-- 没有已知未修复的第一阶段本地验收失败。下一阶段依用户顺序，在第一阶段验收完成后实施init/doctor/Schema/xtask，尚未开始代码改造。
+- 没有已知未修复的第一阶段本地验收失败。下一阶段依用户顺序，在第一阶段验收完成后实施init/doctor/Schema/xtask，在本阶段完成后继续代码改造。
