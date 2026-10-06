@@ -1,12 +1,12 @@
 # NetbaIoT Developer Experience 第二阶段验收
 
-日期：2026-10-06。按用户指定顺序，第一阶段通过本地与三平台原生CI后，再实施本阶段。第二阶段本地完整gate PASS；本报告提交后推送同一已授权DX分支，核对最终原生/常规CI。未合并或推送main，未创建tag/Release，未操作生产数据。
+日期：2026-10-06。按用户指定顺序，第一阶段通过本地与三平台原生CI后，再实施本阶段。第二阶段本地完整gate与最终代码提交f9e1047的三平台原生/常规CI全部PASS。用户随后授权将审计与DX分支合并并推送main、清理分支；合并结果由交付记录补充。未创建tag/Release，未操作生产数据。
 
 ## Baseline
 
 - 第二阶段起点：干净的 `9ea710dbbe1fd0d4fe5d7d9bc954d54b4af35e8e`，分支 `codex/developer-experience-phase1`。名称沿用已授权DX任务分支，两个阶段独立提交。
-- 本阶段实现提交：`bd08ca785e814b2408085dae49760505a2115a32`，报告单独提交；最后分支SHA/CI由交付消息和最终执行记录补充。
-- main/origin/main仍为f68bfd4；workspace0.2.3；macOS arm64 / stable1.99.0 +实际Rust1.88.0。
+- 本阶段实现提交：`bd08ca785e814b2408085dae49760505a2115a32`；最终代码提交：`f9e10475afea2d8709dc41489997b411d9061abf`。报告与执行证据单独提交，不改变已验证源码。
+- 合并前main/origin/main基线为f68bfd4；workspace0.2.3；macOS arm64 / stable1.99.0 +实际Rust1.88.0。
 - 起点已经实际具备serve/demo/check/limits/version、共享server入口与诊断、兼容server；没有只依照“第一阶段应已完成”的假设。检查了当前tools/scripts/config/docs/workflows/fuzz及依赖图。
 
 ## Init
@@ -140,20 +140,20 @@ Schema不替代config check：cross-field TLS/loopback、role/identity、secret 
 | default无远端、local DNS/TLS timeout、expired/missing certificate、path非目录/corrupt spool byte-preserved | PASS，定向unit/E2E |
 | Schema示例/unknown/type/required/limits/defaults | PASS，实际jsonschema validator |
 | actionlint / release-tooling / archivelayout | PASS；empty PATH archive包含新CLI操作链和旧Bash/MQTT/TCP/UDP |
-| Linux/Windows本阶段native | 尚NOT RUN，最后branch commit推送后核验；不借用第一阶段green |
+| 最终f9e1047原生Linux/macOS/Windows | PASS，Linux/macOS各433/0/16，Windows430/0/16；实际CLI及schema/reference drift checks均PASS |
 | Windows真实Ctrl-C、near-expiry30天WARN fixture、kernel-fsync硬件故障、长负载/fuzz | NOT RUN；不宣称覆盖或容量 |
 
 source指纹含新模块，actual CLI、full logs、manifest在[证据目录](performance/developer-experience/evidence/README.md)，未修改结果。16ignored不计PASS，本阶段未选择这些manual benchmark；第一阶段单独soak已经执行。
 
 过程中两个真实FAIL：依赖audit已升级修复；一次旧V3wait_ready超时的子进程只记录Unavailable。原单项复跑PASS；发现fixture只保留TCP，已同时配对预留UDP，保持原10秒/全部业务断言，加listener/error-kind日志。未抓到当次具体失败listener，因果边界保留；随后原七项与完整gate PASS。没有通过放宽时间、删除assertions或skip取得绿色。
 
-本阶段首次最终CI在62d0fc8上，常规Rust/audit/MQTT/preflight通过，native Linux通过，macOS在旧V3 cleanup轮询失败；另中间纯文档9ea710d的Windows旧V2 grace测试失败。原始artifact已校验摘要并保留failure摘录，未称这些run整体PASS。V3在默认32/IP/s下20ms轮询可能自触发限流，现改100ms并增加单请求期限，保留原5秒及全部四个零usage断言；V2把即时connected断言放在发起cancel后、等待driver join前，保留1500ms grace和5秒最终撤销断言。join完成并不代表仍在grace窗口，未改生产策略或延长规范期限。修正后必须核对新的最终提交CI，不能用62d0fc8的局部绿色替代。
+本阶段首次最终CI在62d0fc8上，常规Rust/audit/MQTT/preflight通过，native Linux通过，macOS在旧V3 cleanup轮询失败；另中间纯文档9ea710d的Windows旧V2 grace测试失败。原始artifact已校验摘要并保留failure摘录，未称这些run整体PASS。V3在默认32/IP/s下20ms轮询可能自触发限流，现改100ms并增加单请求期限，保留原5秒及全部四个零usage断言；V2把即时connected断言放在发起cancel后、等待driver join前，保留1500ms grace和5秒最终撤销断言。join完成并不代表仍在grace窗口，未改生产策略或延长规范期限。最终f9e1047的三平台完整回归均PASS。
 
-62d0fc8的Windows完整workspace与实际demo/init/check/doctor均PASS，但schema --check出现文件drift。生成文件已用gitattributes固定LF，xtask比对仅归一化CRLF/LF（不忽略其他内容）；新增行尾等价与内容变化仍不等价断言，并由新的Windows最终CI核实是否仅为行尾差异。不能将该次native总任务称为PASS。
+62d0fc8的Windows完整workspace与实际demo/init/check/doctor均PASS，但schema --check出现文件drift。生成文件已用gitattributes固定LF，xtask比对仅归一化CRLF/LF（不忽略其他内容）；新增行尾等价与内容变化仍不等价断言。最终f9e1047的Windows schema/reference检查均PASS；这证明修复有效，不把旧run的失败改写为成功。
 
 ## Cross-platform
 
-macOS arm64本阶段上述全部实际PASS，包含host archive。Linux/Windows尚待最后提交原生CI；已经写好矩阵但不会称执行完成。第一阶段原生结果单独记录，不用于替代本阶段。最终native job/step/SHA/digest作为补充执行记录。
+macOS arm64本阶段上述本地检查全部实际PASS，包含host archive。最终f9e1047的[三平台原生CI](https://github.com/sskycn/netbaiot/actions/runs/37457928928)和[常规Rust/release gate](https://github.com/sskycn/netbaiot/actions/runs/37457929637)均PASS。原生平台完整workspace计数为Linux/macOS各433 passed、Windows430 passed，均0 failed/16 ignored；Windows少3项为Unix限定测试，不计为PASS。每个平台均实际执行demo/init/check/doctor/schema与两个drift检查。官方artifact ZIP SHA256校验及原始日志摘要已保存于[最终CI证据](performance/developer-experience/evidence/phase2-final-ci-verification.json)。第一阶段结果仍单独记录。
 
 ## git diff --stat
 
@@ -215,11 +215,11 @@ macOS arm64本阶段上述全部实际PASS，包含host archive。Linux/Windows�
  52 files changed, 4769 insertions(+), 67 deletions(-)
 ```
 
-详细文件职责见configuration/doctor/maintenance；schema/reference均generated。task分支保留审查，main/auditbranch和版本/tag/Release未改动。
+详细文件职责见configuration/doctor/maintenance；schema/reference均generated。审查完成后按用户授权合并审计与DX分支；版本/tag/Release不变。
 
 ## Remaining work / limits
 
-- 仍需当前最终commit三平台/常规CI核验；硬件I/O/Windows控制台Ctrl-C/近30天WARN现场证据不虚称覆盖。
+- 最终代码提交三平台/常规CI已核验；硬件I/O/Windows控制台Ctrl-C/近30天WARN现场证据仍未覆盖。
 - Init per-file原子而非跨3文件事务；目录移位需修正绝对recovery path，env example不自动装载。
 - Doctor只证明当下local preflight和显式network reachability；不证明业务ACK、真实时钟同步、运行中的gateway健康或未来端口可用。
 - 下一阶段可考虑support-bundle、shell completion、interactive wizard；本轮不实现，也不建议重写runtime。

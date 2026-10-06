@@ -1,0 +1,112 @@
+{
+  "commit": "f9e10475afea2d8709dc41489997b411d9061abf",
+  "verified_at": "2026-10-06T11:51:17.478713+00:00",
+  "platforms": [
+    {
+      "os": "windows-latest",
+      "full_workspace": {
+        "passed": 430,
+        "failed": 0,
+        "ignored": 16
+      },
+      "artifact_id": 11411555055,
+      "artifact_digest": "sha256:2e37c02f06dede392175ddcb7964ffe915a5fb24e7e1701d75cc040ff71d3a26",
+      "raw_log_sha256": "e3731189bc91e0b26532afc24df7d2479275e69b009207c09d6bd32ef84184be",
+      "actual_cli_and_drift_checks": "PASS"
+    },
+    {
+      "os": "macos-latest",
+      "full_workspace": {
+        "passed": 433,
+        "failed": 0,
+        "ignored": 16
+      },
+      "artifact_id": 11410692182,
+      "artifact_digest": "sha256:073bf04fdd6a6d0ecfcea9e44495496b3049eb594826a8f12699589e24287f2a",
+      "raw_log_sha256": "697c2b5f6033aa921521674ed2427f2282a739b368fa55b309bb1a739a0c8dc5",
+      "actual_cli_and_drift_checks": "PASS"
+    },
+    {
+      "os": "ubuntu-latest",
+      "full_workspace": {
+        "passed": 433,
+        "failed": 0,
+        "ignored": 16
+      },
+      "artifact_id": 11410427189,
+      "artifact_digest": "sha256:e06795d9738b39088c48a092baf047ef2ef18770a07067e3e9036b4976764c03",
+      "raw_log_sha256": "1c311019bbb602950e2f373804acfa36d3d4bee35013d9aabf3296788d88bfdf",
+      "actual_cli_and_drift_checks": "PASS"
+    }
+  ],
+  "jobs": {
+    "37457929637": [
+      {
+        "id": 112250009791,
+        "name": "verify / rust (stable)",
+        "head_sha": "f9e10475afea2d8709dc41489997b411d9061abf",
+        "conclusion": "success",
+        "html_url": "https://github.com/sskycn/netbaiot/actions/runs/37457929637/job/112250009791"
+      },
+      {
+        "id": 112250010028,
+        "name": "verify / audit",
+        "head_sha": "f9e10475afea2d8709dc41489997b411d9061abf",
+        "conclusion": "success",
+        "html_url": "https://github.com/sskycn/netbaiot/actions/runs/37457929637/job/112250010028"
+      },
+      {
+        "id": 112250010055,
+        "name": "verify / rust (1.88.0)",
+        "head_sha": "f9e10475afea2d8709dc41489997b411d9061abf",
+        "conclusion": "success",
+        "html_url": "https://github.com/sskycn/netbaiot/actions/runs/37457929637/job/112250010055"
+      },
+      {
+        "id": 112250010132,
+        "name": "verify / preflight",
+        "head_sha": "f9e10475afea2d8709dc41489997b411d9061abf",
+        "conclusion": "success",
+        "html_url": "https://github.com/sskycn/netbaiot/actions/runs/37457929637/job/112250010132"
+      },
+      {
+        "id": 112250010159,
+        "name": "verify / mqtt / release-gate",
+        "head_sha": "f9e10475afea2d8709dc41489997b411d9061abf",
+        "conclusion": "success",
+        "html_url": "https://github.com/sskycn/netbaiot/actions/runs/37457929637/job/112250010159"
+      },
+      {
+        "id": 112251460043,
+        "name": "Linux binary Quick Start",
+        "head_sha": "f9e10475afea2d8709dc41489997b411d9061abf",
+        "conclusion": "success",
+        "html_url": "https://github.com/sskycn/netbaiot/actions/runs/37457929637/job/112251460043"
+      }
+    ],
+    "37457928928": [
+      {
+        "id": 112250007229,
+        "name": "dx (macos-latest)",
+        "head_sha": "f9e10475afea2d8709dc41489997b411d9061abf",
+        "conclusion": "success",
+        "html_url": "https://github.com/sskycn/netbaiot/actions/runs/37457928928/job/112250007229"
+      },
+      {
+        "id": 112250007482,
+        "name": "dx (windows-latest)",
+        "head_sha": "f9e10475afea2d8709dc41489997b411d9061abf",
+        "conclusion": "success",
+        "html_url": "https://github.com/sskycn/netbaiot/actions/runs/37457928928/job/112250007482"
+      },
+      {
+        "id": 112250007539,
+        "name": "dx (ubuntu-latest)",
+        "head_sha": "f9e10475afea2d8709dc41489997b411d9061abf",
+        "conclusion": "success",
+        "html_url": "https://github.com/sskycn/netbaiot/actions/runs/37457928928/job/112250007539"
+      }
+    ]
+  },
+  "verification": "Downloaded each bounded native artifact ZIP and matched its SHA256 to the GitHub API digest; parsed the contained log to verify workspace totals and successful actual CLI and schema/reference checks."
+}

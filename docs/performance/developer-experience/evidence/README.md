@@ -6,4 +6,4 @@
 
 审计失败与V3超时日志保留；DNS依赖升级至修复版后audit和完整gate通过，V3fixture配对TCP/UDP端口并保留原超时/业务断言。没有通过忽略公告或跳过测试取得绿色结果。ignored、SKIP和未运行项按报告说明，不算PASS。
 
-最终任务分支CI必须核对最后修改SHA；平台结果不能借用先前审计分支或第一阶段的绿色状态。详见两个阶段验收报告。
+最终代码提交f9e1047的三平台原生与常规CI全部PASS。[最终CI证据](phase2-final-ci-verification.json)记录确切SHA、job结果、平台计数、官方artifact ZIP摘要和原始日志摘要；各ZIP均已核对官方SHA256，每个平台实际CLI及schema/reference drift检查均PASS。Linux/macOS各433 passed、Windows430 passed，均0 failed/16 ignored。历史失败保留，未用第一阶段绿色替代本阶段结果。详见两个阶段验收报告。
