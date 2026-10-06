@@ -33,6 +33,8 @@ use tokio::{
 use tokio_rustls::{TlsConnector, rustls};
 use tokio_util::sync::CancellationToken;
 
+mod common;
+
 // These integration tests close ephemeral-port reservations before a subprocess or composition
 // root binds the configured addresses. Serializing only those tests prevents the Rust test
 // harness from handing a just-released port to a sibling test in that narrow handoff window.
@@ -579,18 +581,8 @@ async fn audit_tls_handshake_timeout_shutdown_and_invalid_key() {
 }
 
 async fn free_address() -> std::net::SocketAddr {
-    // The ingress uses this port for both TCP and UDP. A TCP-only reservation
-    // can select a port already owned by an unrelated UDP socket.
-    for _ in 0..32 {
-        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let address = listener.local_addr().unwrap();
-        match tokio::net::UdpSocket::bind(address).await {
-            Ok(_udp) => return address,
-            Err(error) if error.kind() == std::io::ErrorKind::AddrInUse => continue,
-            Err(error) => panic!("fixture UDP reservation failed: {error}"),
-        }
-    }
-    panic!("no available TCP/UDP fixture pair")
+    let (tcp, _udp) = common::reserve_tcp_udp_pair().await;
+    tcp.local_addr().unwrap()
 }
 
 async fn try_wait_ready(

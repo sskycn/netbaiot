@@ -33,6 +33,8 @@ use tokio::{
     process::Command,
 };
 
+mod common;
+
 const SECRET: &str = "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f";
 struct Handler {
     calls: AtomicUsize,
@@ -612,20 +614,7 @@ async fn v3_command_real_mqtt_dedup_http_ack_and_lost_response() {
     std::fs::create_dir_all(&root).unwrap();
     let mut config: Config =
         serde_json::from_str(include_str!("../../../configs/development.json")).unwrap();
-    // TCP port-zero allocation does not reserve the same UDP port.
-    let mut pair = None;
-    for _ in 0..32 {
-        let tcp = TcpListener::bind("127.0.0.1:0").await.unwrap();
-        match tokio::net::UdpSocket::bind(tcp.local_addr().unwrap()).await {
-            Ok(udp) => {
-                pair = Some((tcp, udp));
-                break;
-            }
-            Err(error) if error.kind() == std::io::ErrorKind::AddrInUse => continue,
-            Err(error) => panic!("fixture UDP reservation failed: {error}"),
-        }
-    }
-    let (tcp, udp) = pair.expect("no available TCP/UDP fixture pair");
+    let (tcp, udp) = common::reserve_tcp_udp_pair().await;
     let mut reservations = vec![tcp];
     for _ in 0..2 {
         reservations.push(TcpListener::bind("127.0.0.1:0").await.unwrap());
