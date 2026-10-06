@@ -35,6 +35,20 @@ use tokio::{
 
 mod common;
 
+fn lifecycle_log_tail(path: &std::path::Path) -> String {
+    use std::io::{Read, Seek, SeekFrom};
+    // Failure diagnostics are bounded even if a child unexpectedly logs forever.
+    let read = || -> std::io::Result<String> {
+        let mut file = std::fs::File::open(path)?;
+        let size = file.metadata()?.len();
+        file.seek(SeekFrom::Start(size.saturating_sub(64 * 1024)))?;
+        let mut bytes = Vec::new();
+        file.take(64 * 1024).read_to_end(&mut bytes)?;
+        Ok(String::from_utf8_lossy(&bytes).into_owned())
+    };
+    read().unwrap_or_else(|error| format!("cannot read lifecycle log: {error}"))
+}
+
 const SECRET: &str = "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f";
 struct Handler {
     calls: AtomicUsize,
@@ -653,6 +667,7 @@ async fn v3_command_real_mqtt_dedup_http_ack_and_lost_response() {
         .arg(&path)
         .env("NETBAIOT_ADMIN_SECRET", "a".repeat(64))
         .env("NETBAIOT_BUSINESS_RPC_TOKEN", "v3-command-token")
+        .env("RUST_LOG", "netbaiot_transports::business_rpc::v3=debug")
         .stdout(Stdio::null())
         .stderr(Stdio::from(stderr))
         .kill_on_drop(true)
@@ -1023,6 +1038,7 @@ async fn v3_command_real_mqtt_dedup_http_ack_and_lost_response() {
             .is_err()
     );
 
+    let cleanup_started = std::time::Instant::now();
     business.shutdown().await;
     device.shutdown();
     // Closing the V3 client must release every command RPC stream, queued body,
@@ -1074,7 +1090,14 @@ async fn v3_command_real_mqtt_dedup_http_ack_and_lost_response() {
         }
     })
     .await;
-    assert!(cleanup.is_ok(), "V3 cleanup timed out: {observed}");
+    assert!(
+        cleanup.is_ok(),
+        "V3 cleanup timed out: {observed}; elapsed since client shutdown: {:?}; lifecycle log {}:\n{}",
+        cleanup_started.elapsed(),
+        root.join("server.log").display(),
+        lifecycle_log_tail(&root.join("server.log")),
+    );
+    eprintln!("V3 cleanup completed in {:?}", cleanup_started.elapsed());
     server.start_kill().unwrap();
     let _ = server.wait().await;
     let _ = std::fs::remove_dir_all(root);

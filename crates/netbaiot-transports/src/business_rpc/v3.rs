@@ -16,10 +16,17 @@ const CONNECTION_REASSEMBLY_BYTES: usize = 16 * 1024 * 1024;
 const GLOBAL_REASSEMBLY_BYTES: usize = 128 * 1024 * 1024;
 const OUTBOUND_BYTES: usize = 16 * 1024 * 1024;
 static REASSEMBLY: OnceLock<Arc<ReassemblyBudget>> = OnceLock::new();
-struct ActiveV3(Arc<Metrics>);
+struct ActiveV3 {
+    metrics: Arc<Metrics>,
+    epoch: u64,
+}
 impl Drop for ActiveV3 {
     fn drop(&mut self) {
-        self.0.business_rpc_v3_connection_finished();
+        self.metrics.business_rpc_v3_connection_finished();
+        tracing::debug!(
+            connection_epoch = self.epoch,
+            "business RPC V3 ActiveV3 dropped"
+        );
     }
 }
 struct StreamGauges {
@@ -445,6 +452,10 @@ pub(super) async fn connection(
         .negotiate(&requested)
         .map_err(|_| Error::Invalid)?;
     let epoch = (Uuid::new_v4().as_u128() as u64).max(1);
+    tracing::debug!(
+        connection_epoch = epoch,
+        "business RPC V3 connection accepted"
+    );
     bootstrap_write(
         &mut io,
         &V3Bootstrap::Ready {
@@ -455,9 +466,13 @@ pub(super) async fn connection(
         config.write_timeout,
     )
     .await?;
+    tracing::debug!(connection_epoch = epoch, "business RPC V3 bootstrap ready");
     let metrics = services.ingress.metrics.clone();
     metrics.business_rpc_v3_connection_started();
-    let _active = ActiveV3(metrics.clone());
+    let _active = ActiveV3 {
+        metrics: metrics.clone(),
+        epoch,
+    };
     let (reader, writer) = tokio::io::split(io);
     let (tx, rx) = mpsc::channel(256);
     let (credit_tx, credit_rx) = mpsc::channel(256);
@@ -473,6 +488,10 @@ pub(super) async fn connection(
         let timeout = config.write_timeout;
         let send_ahead = config.v3_send_ahead;
         async move {
+            tracing::debug!(
+                connection_epoch = epoch,
+                "business RPC V3 writer loop entered"
+            );
             let result = writer_loop(
                 writer,
                 rx,
@@ -486,13 +505,23 @@ pub(super) async fn connection(
                 },
             )
             .await;
+            tracing::debug!(
+                connection_epoch = epoch,
+                ?result,
+                "business RPC V3 writer loop exited"
+            );
             writer_closed.cancel();
             result
         }
     });
+    tracing::debug!(
+        connection_epoch = epoch,
+        "business RPC V3 reader loop entered"
+    );
     let result = reader_loop(
         reader,
         ReaderContext {
+            epoch,
             tx,
             credit_rx,
             outbound: Arc::new(Semaphore::new(OUTBOUND_BYTES)),
@@ -505,8 +534,22 @@ pub(super) async fn connection(
         },
     )
     .await;
+    tracing::debug!(
+        connection_epoch = epoch,
+        ?result,
+        "business RPC V3 reader returned"
+    );
     writer_stop.cancel();
-    let _ = writer_task.await;
+    tracing::debug!(
+        connection_epoch = epoch,
+        "business RPC V3 writer_stop cancelled"
+    );
+    let joined = writer_task.await;
+    tracing::debug!(
+        connection_epoch = epoch,
+        ?joined,
+        "business RPC V3 writer task joined"
+    );
     if let Err(error) = &result {
         tracing::warn!(%error, "business RPC V3 connection closed abnormally");
         metrics.inc(Metric::BusinessRpcV3AbnormalClosures);
@@ -516,6 +559,11 @@ pub(super) async fn connection(
         Err(Error::Overloaded) => metrics.inc(Metric::BusinessRpcV3Overloads),
         _ => {}
     }
+    tracing::debug!(
+        connection_epoch = epoch,
+        ?result,
+        "business RPC V3 connection returning"
+    );
     result
 }
 
@@ -671,6 +719,7 @@ fn complete_response(
 }
 
 struct ReaderContext {
+    epoch: u64,
     tx: mpsc::Sender<WriterMessage>,
     credit_rx: mpsc::Receiver<(u32, u32)>,
     outbound: Arc<Semaphore>,
@@ -686,6 +735,7 @@ async fn reader_loop<R: AsyncRead + Unpin + Send + 'static>(
     context: ReaderContext,
 ) -> Result<()> {
     let ReaderContext {
+        epoch,
         tx,
         mut credit_rx,
         outbound,
@@ -1206,6 +1256,17 @@ async fn reader_loop<R: AsyncRead + Unpin + Send + 'static>(
         }
     }
     .await;
+    tracing::debug!(
+        connection_epoch = epoch,
+        ?result,
+        server_stop = stop.is_cancelled(),
+        writer_closed = writer_closed.is_cancelled(),
+        active_streams = streams.active(),
+        pending_command_jobs = command_jobs.len(),
+        pending_commands = incoming_rpc.len(),
+        pending_event = pending_event.is_some(),
+        "business RPC V3 reader loop exited"
+    );
     let last_stream_id = streams.goaway();
     let code = match &result {
         Ok(()) if stop.is_cancelled() => netbaiot_core::business_rpc_v3::V3GoAwayCode::Shutdown,
@@ -1232,7 +1293,15 @@ async fn reader_loop<R: AsyncRead + Unpin + Send + 'static>(
     {
         let (done, written) = oneshot::channel();
         if tx.try_send(WriterMessage::GoAway { frame, done }).is_ok() {
+            tracing::debug!(
+                connection_epoch = epoch,
+                "business RPC V3 GOAWAY write waiting"
+            );
             let _ = tokio::time::timeout(config.write_timeout, written).await;
+            tracing::debug!(
+                connection_epoch = epoch,
+                "business RPC V3 GOAWAY write wait finished"
+            );
         }
     }
     if let Some((_, _, generation)) = subscription {
