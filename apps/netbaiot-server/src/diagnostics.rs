@@ -49,7 +49,7 @@ impl ConfigReport {
     }
 }
 
-pub(crate) fn safe_http_url(url: &reqwest::Url) -> bool {
+pub fn safe_http_url(url: &reqwest::Url) -> bool {
     url.username().is_empty()
         && url.password().is_none()
         && url.host_str().is_some()
@@ -426,6 +426,32 @@ pub async fn check_config(
         _ => (),
     }
     ConfigReport::from_diagnostics(out)
+}
+
+/// Non-destructive local recovery decoder check, serialized with the gateway owner.
+pub async fn inspect_recovery(directory: PathBuf, limits: Limits) -> Result<usize> {
+    let path = directory.clone();
+    let owner = Arc::new(
+        tokio::task::spawn_blocking(move || {
+            netbaiot_runtime::recovery_io::RecoveryDirectory::acquire_for_inspection(&path)
+        })
+        .await
+        .map_err(|_| Error::Internal)??,
+    );
+    inspect_recovery_owned(directory, limits, owner).await
+}
+pub async fn inspect_recovery_owned(
+    directory: PathBuf,
+    limits: Limits,
+    owner: Arc<netbaiot_runtime::recovery_io::RecoveryDirectory>,
+) -> Result<usize> {
+    limits.validate()?;
+    let limits = Arc::new(limits);
+    let broker = MqttBroker::new(limits.clone());
+    broker.bind_recovery_owner(owner.clone())?;
+    broker.recover_from(&directory).await?;
+    let spool = RestartSpool::with_owner(directory, limits, owner);
+    Ok(spool.recover().await?.records.len())
 }
 
 #[cfg(test)]

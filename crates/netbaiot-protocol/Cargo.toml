@@ -6,6 +6,7 @@ license.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+schemars = { workspace = true, optional = true }
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
@@ -16,3 +17,6 @@ serde_json.workspace = true
 
 [lints]
 workspace = true
+
+[features]
+schema = ["dep:schemars"]

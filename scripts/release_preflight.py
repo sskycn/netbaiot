@@ -17,7 +17,7 @@ TARGETS = (
 )
 REQUIRED = (
     "README.md", "README.zh-CN.md", "LICENSE", "NOTICE", "SECURITY.md",
-    "CONTRIBUTING.md", "AGENTS.md", "configs/tutorial.json", "configs/development.json", "scripts/demo/start.sh",
+    "CONTRIBUTING.md", "AGENTS.md", "docs/schema/netbaiot-config.schema.json", "configs/tutorial.json", "configs/development.json", "scripts/demo/start.sh",
     "examples/business_http_sink.py", "examples/device_tcp.py", "examples/device_udp.py",
     "docs/quick-start.md", "docs/protocol-support.md", "docs/delivery-semantics.md",
     "docs/security.md", "docs/operations-guide.md",

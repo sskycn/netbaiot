@@ -6,6 +6,7 @@ license.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+schemars = { workspace = true, optional = true }
 netbaiot-protocol.workspace = true
 serde.workspace = true
 thiserror.workspace = true
@@ -13,3 +14,6 @@ uuid.workspace = true
 
 [lints]
 workspace = true
+
+[features]
+schema = ["dep:schemars", "netbaiot-protocol/schema"]

@@ -102,6 +102,7 @@ impl ScopeSet {
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct AdminResourceConfig {
     pub tenants: Vec<TenantId>,
     pub products: Vec<AdminProduct>,
@@ -109,6 +110,7 @@ pub struct AdminResourceConfig {
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct AdminProduct {
     pub tenant_id: TenantId,
     pub product_id: ProductId,
@@ -255,6 +257,7 @@ fn valid_name(value: &str, max: usize) -> bool {
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ManagementAuthConfig {
     pub legacy_static_token_enabled: Option<bool>,
     pub api_keys: Vec<ApiKeyConfig>,
@@ -263,6 +266,7 @@ pub struct ManagementAuthConfig {
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ApiKeyConfig {
     pub key_id: String,
     pub secret_env: String,
@@ -283,6 +287,7 @@ fn enabled_default() -> bool {
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct MtlsIdentityConfig {
     pub certificate_sha256: String,
     pub subject: String,
@@ -294,6 +299,7 @@ pub struct MtlsIdentityConfig {
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct JwtConfig {
     pub issuer: String,
     pub audience: String,

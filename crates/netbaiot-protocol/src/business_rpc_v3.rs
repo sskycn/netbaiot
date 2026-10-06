@@ -137,6 +137,7 @@ impl V3FrameHeader {
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct V3Limits {
     pub max_frame_payload_bytes: u32,
     pub max_concurrent_streams: u32,

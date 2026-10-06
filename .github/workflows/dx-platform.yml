@@ -16,13 +16,16 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
       - uses: dtolnay/rust-toolchain@1.88.0
       - name: CLI, startup, cancellation and recovery regressions
         timeout-minutes: 20
         shell: bash
         run: |
           set -o pipefail
-          cargo test --locked --workspace --all-features 2>&1 | tee dx-platform.log
+          cargo xtask check 2>&1 | tee dx-platform.log
       - name: Actual first-use commands
         timeout-minutes: 5
         shell: bash
@@ -32,6 +35,14 @@ jobs:
           cargo run --locked -p netbaiot-cli -- config limits 2>&1 | tee -a dx-platform.log
           cargo run --locked -p netbaiot-cli -- config check --config configs/tutorial.json 2>&1 | tee -a dx-platform.log
           cargo run --locked -p netbaiot-cli -- demo --once 2>&1 | tee -a dx-platform.log
+          project="$RUNNER_TEMP/netbaiot-dx-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-$RUNNER_OS"
+          cargo run --locked -p netbaiot-cli -- init "$project" 2>&1 | tee -a dx-platform.log
+          python -c 'import json,sys,pathlib; p=pathlib.Path(sys.argv[1])/"netbaiot.json"; c=json.loads(p.read_text()); c["device_ingress"]="127.0.0.1:0"; c["management_http"]="127.0.0.1:0"; p.write_text(json.dumps(c))' "$project"
+          cargo run --locked -p netbaiot-cli -- config check --config "$project/netbaiot.json" 2>&1 | tee -a dx-platform.log
+          cargo run --locked -p netbaiot-cli -- doctor --config "$project/netbaiot.json" 2>&1 | tee -a dx-platform.log
+          cargo run --locked -p netbaiot-cli -- config schema > "$project/schema.json"
+          cargo xtask schema --check 2>&1 | tee -a dx-platform.log
+          cargo xtask config-reference --check 2>&1 | tee -a dx-platform.log
       - uses: actions/upload-artifact@v4
         if: always()
         with:

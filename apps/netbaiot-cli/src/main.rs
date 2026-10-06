@@ -1,5 +1,7 @@
 mod args;
 mod demo;
+mod doctor;
+mod init;
 use args::*;
 use clap::Parser;
 use futures_util::StreamExt;
@@ -17,6 +19,7 @@ enum CliError {
     Serve(netbaiot_server::ServeError),
     Demo(demo::DemoError),
     Configuration,
+    Boundary(String),
 }
 impl From<ClientError> for CliError {
     fn from(e: ClientError) -> Self {
@@ -36,6 +39,10 @@ async fn main() -> std::process::ExitCode {
                     2
                 }
                 CliError::Configuration => 2,
+                CliError::Boundary(message) => {
+                    eprintln!("{message}");
+                    6
+                }
                 CliError::Serve(netbaiot_server::ServeError::Configuration(r)) => {
                     eprint!("{}", r.human());
                     2
@@ -79,11 +86,56 @@ async fn run(cli: Cli) -> Result<(), CliError> {
             netbaiot_server::init_logging();
             demo::run(once).await.map_err(CliError::Demo)
         }
+        RootCommand::Init {
+            directory,
+            production,
+            force,
+        } => {
+            let result = init::create(directory, production, force)
+                .await
+                .map_err(CliError::Boundary)?;
+            let message = format!(
+                "Created {}: netbaiot.json, .env.example, README.md\n{}\nNext: netbaiot config check --config netbaiot.json",
+                result.directory.display(),
+                if production {
+                    "Production skeleton is NOT ready to run until TLS/auth/sink values are supplied."
+                } else {
+                    "Development credentials only; do not reuse in production. Configure your example HTTP sink before serve."
+                }
+            );
+            print_json_line(&result, output, &message).await
+        }
+        RootCommand::Doctor { config, network } => {
+            let report = doctor::inspect(&config, network).await;
+            print_json_line(&report, output, report.human().trim_end()).await?;
+            if report.ok {
+                Ok(())
+            } else if !report.configuration.valid {
+                Err(CliError::Configuration)
+            } else {
+                Err(CliError::Boundary(
+                    "Doctor found blocking environment problems".into(),
+                ))
+            }
+        }
+        RootCommand::Config {
+            command: ConfigCommand::Schema,
+        } => {
+            let mut out = stdout();
+            out.write_all(include_bytes!(
+                "../../../docs/schema/netbaiot-config.schema.json"
+            ))
+            .await
+            .map_err(|_| CliError::Io("Cannot write schema"))?;
+            out.flush()
+                .await
+                .map_err(|_| CliError::Io("Cannot flush schema"))
+        }
         RootCommand::Version => {
             return print_json_line(
-                &serde_json::json!({"version":env!("CARGO_PKG_VERSION"),"rust_msrv":"1.88"}),
+                &serde_json::json!({"version":env!("CARGO_PKG_VERSION"),"rust_msrv":env!("CARGO_PKG_RUST_VERSION")}),
                 output,
-                &format!("NetbaIoT {}\nrust-msrv 1.88", env!("CARGO_PKG_VERSION")),
+                &format!("NetbaIoT {}\nrust-msrv {}", env!("CARGO_PKG_VERSION"), env!("CARGO_PKG_RUST_VERSION")),
             )
             .await;
         }

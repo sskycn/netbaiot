@@ -1,10 +1,12 @@
 [package]
 name = "netbaiot-server"
+default-run = "netbaiot-server"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 
 [dependencies]
+schemars = { workspace = true, optional = true }
 serde_path_to_error = "0.1"
 netbaiot-core.workspace = true
 netbaiot-runtime.workspace = true
@@ -35,3 +37,11 @@ netbaiot-protocol.workspace = true
 futures-util.workspace = true
 jsonwebtoken = "9.3.1"
 reqwest = { workspace = true, features = ["rustls-tls-native-roots"] }
+
+[features]
+schema = ["dep:schemars", "netbaiot-runtime/schema", "netbaiot-transports/schema"]
+
+[[bin]]
+name = "netbaiot-schema"
+path = "src/bin/schema.rs"
+required-features = ["schema"]

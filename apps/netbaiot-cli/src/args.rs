@@ -43,6 +43,22 @@ pub enum RootCommand {
         #[command(subcommand)]
         command: ConfigCommand,
     },
+    /// Create a local development project or production skeleton
+    Init {
+        #[arg(default_value = ".")]
+        directory: PathBuf,
+        #[arg(long)]
+        production: bool,
+        #[arg(long)]
+        force: bool,
+    },
+    /// Check local configuration and environment
+    Doctor {
+        #[arg(long, default_value = "netbaiot.json")]
+        config: PathBuf,
+        #[arg(long)]
+        network: bool,
+    },
     /// Print version information
     Version,
     /// Inspect or drain a running gateway
@@ -80,6 +96,7 @@ pub struct ConfigPath {
 pub enum ConfigCommand {
     Check(ConfigPath),
     Limits,
+    Schema,
 }
 #[derive(Subcommand)]
 pub enum ServerCommand {

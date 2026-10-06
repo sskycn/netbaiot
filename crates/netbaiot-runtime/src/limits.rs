@@ -1,9 +1,13 @@
 use crate::{Error, Result};
 use serde::{Deserialize, Serialize};
 
+pub const LIMIT_SCALAR_MIN: u64 = 1;
+pub const LIMIT_SCALAR_MAX: u64 = u32::MAX as u64;
+
 /// One validated location for every in-process resource ceiling.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Limits {
     pub max_connections: usize,
     /// Device ingress only. Effective ceiling is also bounded by the global maximum.
@@ -334,7 +338,7 @@ impl Limits {
             .values()
             .any(|v| {
                 v.as_u64()
-                    .is_none_or(|number| number == 0 || number > u64::from(u32::MAX))
+                    .is_none_or(|number| !(LIMIT_SCALAR_MIN..=LIMIT_SCALAR_MAX).contains(&number))
             })
         {
             return Err(Error::Configuration);

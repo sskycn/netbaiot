@@ -270,9 +270,9 @@ pub async fn run_with_credentials_ready(
     let device_address = device_ingress
         .local_addr()
         .map_err(|_| Error::Unavailable)?;
-    let management_http = TcpListener::bind(config.management_http)
-        .await
-        .map_err(|_| Error::Unavailable)?;
+    let management_http = TcpListener::bind(config.management_http).await.map_err(|error| {
+        tracing::error!(listener="management_tcp",address=%config.management_http,error_kind=?error.kind(),"listener bind failed"); Error::Unavailable
+    })?;
     let management_address = management_http
         .local_addr()
         .map_err(|_| Error::Unavailable)?;
@@ -280,7 +280,7 @@ pub async fn run_with_credentials_ready(
         Some((
             TcpListener::bind(address)
                 .await
-                .map_err(|_| Error::Unavailable)?,
+                .map_err(|error| { tracing::error!(listener="business_tcp",%address,error_kind=?error.kind(),"listener bind failed"); Error::Unavailable })?,
             business_sink.ok_or(Error::Internal)?,
         ))
     } else {
@@ -749,16 +749,19 @@ pub(crate) fn shutdown_can_finish(
 // any listeners/workers; explicit configured ports still fail immediately.
 async fn bind_device_pair(address: SocketAddr) -> Result<(TcpListener, UdpSocket)> {
     for _ in 0..32 {
-        let tcp = TcpListener::bind(address)
-            .await
-            .map_err(|_| Error::Unavailable)?;
+        let tcp = TcpListener::bind(address).await.map_err(|error| {
+            tracing::error!(listener="device_tcp",%address,error_kind=?error.kind(),"listener bind failed"); Error::Unavailable
+        })?;
         let bound = tcp.local_addr().map_err(|_| Error::Unavailable)?;
         match UdpSocket::bind(bound).await {
             Ok(udp) => return Ok((tcp, udp)),
             Err(error) if address.port() == 0 && error.kind() == std::io::ErrorKind::AddrInUse => {
                 continue;
             }
-            Err(_) => return Err(Error::Unavailable),
+            Err(error) => {
+                tracing::error!(listener="device_udp",address=%bound,error_kind=?error.kind(),"listener bind failed");
+                return Err(Error::Unavailable);
+            }
         }
     }
     Err(Error::Unavailable)

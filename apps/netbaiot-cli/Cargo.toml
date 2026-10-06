@@ -10,6 +10,13 @@ name = "netbaiot"
 path = "src/main.rs"
 
 [dependencies]
+hickory-resolver = { version = "0.26.3", default-features = false, features = ["tokio", "system-config"] }
+x509-parser = { version = "0.18", default-features = false }
+reqwest.workspace = true
+tokio-rustls.workspace = true
+webpki-roots.workspace = true
+rustls-pemfile.workspace = true
+
 clap = { version = "4.6", default-features = false, features = ["std", "derive", "help", "usage", "error-context"] }
 netbaiot-server = { path = "../netbaiot-server" }
 netbaiot-device-sdk.workspace = true
@@ -32,3 +39,6 @@ tokio.workspace = true
 
 [lints]
 workspace = true
+
+[dev-dependencies]
+jsonschema = { version = "0.33", default-features = false }

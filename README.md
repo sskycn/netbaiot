@@ -88,6 +88,11 @@ The tutorial config needs its manual webhook; use `configs/development.json` for
 ingress with the in-process development audit sink. See [CLI commands](docs/cli.md),
 [Quick Start](docs/quick-start.md), and [production operations](docs/operations-guide.md).
 
+Create your own local project with `netbaiot init my-gateway`, then run
+`netbaiot config check --config netbaiot.json` and `netbaiot doctor --config netbaiot.json`
+from its directory. [Configuration/IDE support](docs/configuration.md),
+[doctor](docs/doctor.md), and [maintenance](docs/maintenance.md) describe the full flow.
+
 ## How it works
 
 ```text

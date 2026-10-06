@@ -204,3 +204,5 @@ ZIP均通过公开下载代理取得，SHA256与GitHub官方artifact digest一�
 - 配置检查只是local preflight；端口占用/证书期限/remote probes不在第一阶段验证范围，也不保证recovery内容合法。
 - token-file属于可选项，未扩大本轮范围；仍建议生产secret使用保护的环境来源。
 - 没有已知未修复的第一阶段本地验收失败。下一阶段依用户顺序，在第一阶段验收完成后实施init/doctor/Schema/xtask，在本阶段完成后继续代码改造。
+
+本地target构建/日志目录在第二阶段期间消失，原因未确定；原本本地日志不再可用，不重造原始记录。第一阶段GitHub原生日志重新下载并对照官方SHA256核验，摘要/执行摘录已保存在[证据目录](performance/developer-experience/evidence/)。完整重新取得的原生日志保留在独立临时证据目录，后续阶段另行记录执行结果。

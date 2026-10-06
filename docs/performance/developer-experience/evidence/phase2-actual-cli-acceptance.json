@@ -1,0 +1,68 @@
+[
+  {
+    "title": "development init",
+    "exit_code": 0,
+    "stdout": "Created <temporary>/dev: netbaiot.json, .env.example, README.md\nDevelopment credentials only; do not reuse in production. Configure your example HTTP sink before serve.\nNext: netbaiot config check --config netbaiot.json\n",
+    "stderr": ""
+  },
+  {
+    "title": "development config check",
+    "exit_code": 0,
+    "stdout": "Configuration valid\n",
+    "stderr": ""
+  },
+  {
+    "title": "healthy local doctor",
+    "exit_code": 0,
+    "stdout": "NetbaIoT doctor\nconfiguration            PASS NBI-CFG Configuration valid\ndevice_port              PASS NBI-DOC-002 127.0.0.1:0 available now; sockets immediately released; not reserved for serve\nmanagement_port          PASS NBI-DOC-002 127.0.0.1:0 available now; sockets immediately released; not reserved for serve\nbusiness_port            SKIP NBI-DOC-002 Listener not configured\nrecovery                 PASS NBI-DOC-001 Local probe created/synced/deleted; snapshots checked without mutation; 0 pending spool records\ndevice_tls               SKIP NBI-DOC-005 TLS not configured; configuration policy was checked separately\nmanagement_tls           SKIP NBI-DOC-005 TLS not configured; configuration policy was checked separately\nmanagement_client_ca     SKIP NBI-DOC-005 TLS not configured; configuration policy was checked separately\nbusiness_client_ca       SKIP NBI-DOC-005 TLS not configured; configuration policy was checked separately\nbusiness_tls             SKIP NBI-DOC-005 TLS not configured; configuration policy was checked separately\nauth_provider_network    SKIP NBI-DOC-003 Use --network for bounded DNS/TCP/TLS reachability; no HTTP/business messages are sent\nbusiness_sink_network    SKIP NBI-DOC-003 Use --network for bounded DNS/TCP/TLS reachability; no HTTP/business messages are sent\nbusiness_acknowledgement SKIP NBI-DOC-003 Business acknowledgement semantics NOT TESTED; no synthetic events or commands are submitted\nauthentication_configuration PASS NBI-CFG Uses the same local provider/secret-source validation; device authentication semantics are not probed\nsystem_time              SKIP NBI-DOC-004 Current UTC Unix seconds: 1791284686; synchronization with a trusted clock is NOT CHECKED\nNo blocking problems found. Binding probes are available-now checks; serve rechecks ownership and ports.\n",
+    "stderr": ""
+  },
+  {
+    "title": "healthy JSON doctor",
+    "exit_code": 0,
+    "stdout": "{\"ok\":true,\"checks\":[{\"id\":\"configuration\",\"status\":\"pass\",\"code\":\"NBI-CFG\",\"message\":\"Configuration valid\"},{\"id\":\"device_port\",\"status\":\"pass\",\"code\":\"NBI-DOC-002\",\"message\":\"127.0.0.1:0 available now; sockets immediately released; not reserved for serve\"},{\"id\":\"management_port\",\"status\":\"pass\",\"code\":\"NBI-DOC-002\",\"message\":\"127.0.0.1:0 available now; sockets immediately released; not reserved for serve\"},{\"id\":\"business_port\",\"status\":\"skip\",\"code\":\"NBI-DOC-002\",\"message\":\"Listener not configured\"},{\"id\":\"recovery\",\"status\":\"pass\",\"code\":\"NBI-DOC-001\",\"message\":\"Local probe created/synced/deleted; snapshots checked without mutation; 0 pending spool records\"},{\"id\":\"device_tls\",\"status\":\"skip\",\"code\":\"NBI-DOC-005\",\"message\":\"TLS not configured; configuration policy was checked separately\"},{\"id\":\"management_tls\",\"status\":\"skip\",\"code\":\"NBI-DOC-005\",\"message\":\"TLS not configured; configuration policy was checked separately\"},{\"id\":\"management_client_ca\",\"status\":\"skip\",\"code\":\"NBI-DOC-005\",\"message\":\"TLS not configured; configuration policy was checked separately\"},{\"id\":\"business_client_ca\",\"status\":\"skip\",\"code\":\"NBI-DOC-005\",\"message\":\"TLS not configured; configuration policy was checked separately\"},{\"id\":\"business_tls\",\"status\":\"skip\",\"code\":\"NBI-DOC-005\",\"message\":\"TLS not configured; configuration policy was checked separately\"},{\"id\":\"auth_provider_network\",\"status\":\"skip\",\"code\":\"NBI-DOC-003\",\"message\":\"Use --network for bounded DNS/TCP/TLS reachability; no HTTP/business messages are sent\"},{\"id\":\"business_sink_network\",\"status\":\"skip\",\"code\":\"NBI-DOC-003\",\"message\":\"Use --network for bounded DNS/TCP/TLS reachability; no HTTP/business messages are sent\"},{\"id\":\"business_acknowledgement\",\"status\":\"skip\",\"code\":\"NBI-DOC-003\",\"message\":\"Business acknowledgement semantics NOT TESTED; no synthetic events or commands are submitted\"},{\"id\":\"authentication_configuration\",\"status\":\"pass\",\"code\":\"NBI-CFG\",\"message\":\"Uses the same local provider/secret-source validation; device authentication semantics are not probed\"},{\"id\":\"system_time\",\"status\":\"skip\",\"code\":\"NBI-DOC-004\",\"message\":\"Current UTC Unix seconds: 1791284686; synchronization with a trusted clock is NOT CHECKED\"}],\"configuration\":{\"valid\":true,\"diagnostics\":[]}}\n",
+    "stderr": ""
+  },
+  {
+    "title": "overwrite refused",
+    "exit_code": 6,
+    "stdout": "",
+    "stderr": "Refusing to overwrite existing netbaiot.json; --force only replaces regular managed files.\n"
+  },
+  {
+    "title": "force managed development files",
+    "exit_code": 0,
+    "stdout": "Created <temporary>/dev: netbaiot.json, .env.example, README.md\nDevelopment credentials only; do not reuse in production. Configure your example HTTP sink before serve.\nNext: netbaiot config check --config netbaiot.json\n",
+    "stderr": ""
+  },
+  {
+    "title": "production skeleton",
+    "exit_code": 0,
+    "stdout": "Created <temporary>/prod: netbaiot.json, .env.example, README.md\nProduction skeleton is NOT ready to run until TLS/auth/sink values are supplied.\nNext: netbaiot config check --config netbaiot.json\n",
+    "stderr": ""
+  },
+  {
+    "title": "production incomplete check",
+    "exit_code": 2,
+    "stdout": "Configuration invalid: 1 problem(s)\n\nNBI-CFG-006 tls\nTLS files cannot be loaded, parsed or matched.\nHelp: Check bounded PEM certificate, private key and client CA files and their permissions.\n",
+    "stderr": ""
+  },
+  {
+    "title": "occupied port doctor",
+    "exit_code": 6,
+    "stdout": "NetbaIoT doctor\nconfiguration            PASS NBI-CFG Configuration valid\ndevice_port              FAIL NBI-DOC-002 127.0.0.1:59425 cannot bind now or deadline exceeded\nmanagement_port          PASS NBI-DOC-002 127.0.0.1:0 available now; sockets immediately released; not reserved for serve\nbusiness_port            SKIP NBI-DOC-002 Listener not configured\nrecovery                 PASS NBI-DOC-001 Local probe created/synced/deleted; snapshots checked without mutation; 0 pending spool records\ndevice_tls               SKIP NBI-DOC-005 TLS not configured; configuration policy was checked separately\nmanagement_tls           SKIP NBI-DOC-005 TLS not configured; configuration policy was checked separately\nmanagement_client_ca     SKIP NBI-DOC-005 TLS not configured; configuration policy was checked separately\nbusiness_client_ca       SKIP NBI-DOC-005 TLS not configured; configuration policy was checked separately\nbusiness_tls             SKIP NBI-DOC-005 TLS not configured; configuration policy was checked separately\nauth_provider_network    SKIP NBI-DOC-003 Use --network for bounded DNS/TCP/TLS reachability; no HTTP/business messages are sent\nbusiness_sink_network    SKIP NBI-DOC-003 Use --network for bounded DNS/TCP/TLS reachability; no HTTP/business messages are sent\nbusiness_acknowledgement SKIP NBI-DOC-003 Business acknowledgement semantics NOT TESTED; no synthetic events or commands are submitted\nauthentication_configuration PASS NBI-CFG Uses the same local provider/secret-source validation; device authentication semantics are not probed\nsystem_time              SKIP NBI-DOC-004 Current UTC Unix seconds: 1791284686; synchronization with a trusted clock is NOT CHECKED\nBlocking problems found.\n",
+    "stderr": "Doctor found blocking environment problems\n"
+  },
+  {
+    "title": "unreachable network doctor",
+    "exit_code": 6,
+    "stdout": "NetbaIoT doctor\nconfiguration            PASS NBI-CFG Configuration valid\ndevice_port              PASS NBI-DOC-002 127.0.0.1:0 available now; sockets immediately released; not reserved for serve\nmanagement_port          PASS NBI-DOC-002 127.0.0.1:0 available now; sockets immediately released; not reserved for serve\nbusiness_port            SKIP NBI-DOC-002 Listener not configured\nrecovery                 PASS NBI-DOC-001 Local probe created/synced/deleted; snapshots checked without mutation; 0 pending spool records\ndevice_tls               SKIP NBI-DOC-005 TLS not configured; configuration policy was checked separately\nmanagement_tls           SKIP NBI-DOC-005 TLS not configured; configuration policy was checked separately\nmanagement_client_ca     SKIP NBI-DOC-005 TLS not configured; configuration policy was checked separately\nbusiness_client_ca       SKIP NBI-DOC-005 TLS not configured; configuration policy was checked separately\nbusiness_tls             SKIP NBI-DOC-005 TLS not configured; configuration policy was checked separately\nauth_provider_network    SKIP NBI-DOC-003 Endpoint not configured\nbusiness_sink_network    FAIL NBI-DOC-003 Network probe exceeded the three-second overall deadline\nbusiness_acknowledgement SKIP NBI-DOC-003 Business acknowledgement semantics NOT TESTED; no synthetic events or commands are submitted\nauthentication_configuration PASS NBI-CFG Uses the same local provider/secret-source validation; device authentication semantics are not probed\nsystem_time              SKIP NBI-DOC-004 Current UTC Unix seconds: 1791284689; synchronization with a trusted clock is NOT CHECKED\nBlocking problems found.\n",
+    "stderr": "Doctor found blocking environment problems\n"
+  },
+  {
+    "title": "schema stdout",
+    "exit_code": 0,
+    "stdout": "JSON Schema SHA256 c0a95062dde9bab342e49c1bfaf9e36bc0568c778d1061e8780e3fc57fdbb157",
+    "stderr": ""
+  }
+]

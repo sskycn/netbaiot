@@ -1,0 +1,98 @@
+{
+  "started_at": "2026-10-06T10:59:36.606316+00:00",
+  "head": "9ea710dbbe1fd0d4fe5d7d9bc954d54b4af35e8e",
+  "results": [
+    {
+      "label": "schema-generate",
+      "command": [
+        "cargo",
+        "+1.88.0",
+        "xtask",
+        "schema"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 3.116,
+      "log": "<evidence>/schema-generate.log",
+      "sha256": "d35b02b88a3d448d3da30a452069a6f39af03e60e88005769effed0d935fdebe"
+    },
+    {
+      "label": "reference-generate",
+      "command": [
+        "cargo",
+        "+1.88.0",
+        "xtask",
+        "config-reference"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.75,
+      "log": "<evidence>/reference-generate.log",
+      "sha256": "ab1eebeb5af0d8627a863abb8f6bacd414bf3d973d7e2d38895a21469b610a33"
+    },
+    {
+      "label": "schema-check",
+      "command": [
+        "cargo",
+        "+1.88.0",
+        "xtask",
+        "schema",
+        "--check"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.762,
+      "log": "<evidence>/schema-check.log",
+      "sha256": "e76bb36127b61f3f3c96390db8ade7a70327461ccf94c8ad39cb46f08efcd0f7"
+    },
+    {
+      "label": "reference-check",
+      "command": [
+        "cargo",
+        "+1.88.0",
+        "xtask",
+        "config-reference",
+        "--check"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.75,
+      "log": "<evidence>/reference-check.log",
+      "sha256": "471a9b63fbaa9f6db8117a1b868032b2b576b85df02daa5496dc25481767b051"
+    },
+    {
+      "label": "daily-check",
+      "command": [
+        "cargo",
+        "+stable",
+        "xtask",
+        "check"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 71.133,
+      "log": "<evidence>/daily-check.log",
+      "sha256": "5213b2f5a4bd978185fc3f31917a46ce32d068b1703ed433eee8710172c63e95"
+    },
+    {
+      "label": "release-check",
+      "command": [
+        "cargo",
+        "+stable",
+        "xtask",
+        "check",
+        "release"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 301.7,
+      "log": "<evidence>/release-check.log",
+      "sha256": "6158c79feb78fc995fd9cca1ca8961e0a57d9ab54ed8f48caf643f585c5d8eb4"
+    },
+    {
+      "label": "actionlint",
+      "command": [
+        "<tmp>/netbaiot-release-tools/actionlint"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.029,
+      "log": "<evidence>/actionlint.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "finished_at": "2026-10-06T11:05:54.861033+00:00"
+}

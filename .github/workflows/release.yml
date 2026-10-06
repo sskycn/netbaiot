@@ -72,9 +72,8 @@ jobs:
       - name: Package release archive
         shell: bash
         run: >-
-          python3 scripts/release_package.py package
-          --tag "$RELEASE_TAG" --target "${{ matrix.target }}"
-          --build-dir "target/${{ matrix.target }}/release" --dist dist
+          cargo xtask package --no-build
+          --target "${{ matrix.target }}"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -118,8 +117,8 @@ jobs:
         run: sudo apt-get update && sudo apt-get install --yes mosquitto-clients
       - name: Extract and run the actual archive
         run: >-
-          python3 tests/release_archive_smoke.py
-          "dist/netbaiot-${RELEASE_TAG}-x86_64-unknown-linux-gnu.tar.gz"
+          cargo xtask check release --part archive
+          --archive "dist/netbaiot-${RELEASE_TAG}-x86_64-unknown-linux-gnu.tar.gz"
 
   publish:
     name: Publish GitHub Release

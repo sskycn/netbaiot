@@ -21,13 +21,11 @@ jobs:
           mosquitto -h 2>&1 | head -1
           mosquitto_pub --help 2>&1 | head -2
           mosquitto_sub --help 2>&1 | head -2
-      - name: Build server for protocol regressions
-        run: cargo build --locked -p netbaiot-server
-      - name: Run MQTT protocol regressions
+      - name: Run complete MQTT and Device SDK gates
         run: >-
-          python3 tests/mqtt_protocol_regressions.py
-          --repo .
-          --output target/mqtt-audit/ci.json
+          python3 scripts/ci_annotate.py
+          --title "MQTT release gate failed"
+          -- cargo xtask check release --part mqtt
       - name: Retain protocol regression evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -35,13 +33,6 @@ jobs:
           name: mqtt-protocol-regressions
           path: target/mqtt-audit/ci.json
           if-no-files-found: warn
-      - name: Check release evidence classification
-        run: python3 -m unittest discover -s tests/mqtt_conformance -p 'test_*.py' -v
-      - name: Run complete MQTT release gate
-        run: >-
-          python3 scripts/ci_annotate.py
-          --title "MQTT release gate failed"
-          -- python3 tests/mqtt_conformance/run.py --release-gate
       - name: Retain release and reference timing evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -49,12 +40,3 @@ jobs:
           name: mqtt-release-gate
           path: target/mqtt-conformance/results.json
           if-no-files-found: warn
-      - name: Run MQTT 5 raw and Mosquitto client gates
-        run: |
-          python3 tests/mqtt_conformance/v5_smoke.py
-          python3 tests/mqtt_conformance/v5_mosquitto.py
-      - name: Run Device Profile SDK against Mosquitto
-        run: |
-          cargo build --locked -p netbaiot-device-sdk --example device_mqtt
-          python3 tests/run_device_profile_mosquitto.py
-          python3 tests/measure_device_profile.py

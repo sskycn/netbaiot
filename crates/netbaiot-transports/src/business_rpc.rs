@@ -184,6 +184,7 @@ pub struct BusinessRpcTransportConfig {
 /// Sender-local V3 scheduling limits; these are never sent in the V3 Hello.
 #[derive(Clone, Copy, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct V3SendAhead {
     pub stream_bytes: u32,
     pub connection_bytes: u32,

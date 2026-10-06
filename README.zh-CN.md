@@ -82,6 +82,10 @@ NetbaIoT 自己实现 MQTT broker，普通 MQTT 客户端仍是一等使用方�
 `configs/development.json`。详见 [CLI](docs/cli.md)、[Quick Start](docs/quick-start.md)
 和[运维指南](docs/operations-guide.md)。
 
+可用 `netbaiot init my-gateway` 创建开发项目，进入目录后执行
+`netbaiot config check --config netbaiot.json`、`netbaiot doctor --config netbaiot.json`。
+详见[配置与 IDE](docs/configuration.md)、[环境诊断](docs/doctor.md)及[维护命令](docs/maintenance.md)。
+
 ## 工作方式
 
 ```text

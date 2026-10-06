@@ -18,12 +18,14 @@ pub struct Presence {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Permissions {
     pub publish: bool,
     pub commands: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct AuthenticatedDevice {
     pub device_key: DeviceKey,
     pub credential_version: u32,

@@ -15,6 +15,7 @@ pub const BUSINESS_RPC_EVENT_WINDOW: u16 = 1;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum BusinessRole {
     Events,
     AuthControl,

@@ -205,6 +205,13 @@ pub struct RecoveryDirectory {
 impl RecoveryDirectory {
     pub fn acquire(directory: &Path) -> Result<Self> {
         prepare_directory(directory)?;
+        Self::acquire_for_inspection(directory)
+    }
+    /// Inspection never chmods an existing directory or changes recovery snapshots.
+    pub fn acquire_for_inspection(directory: &Path) -> Result<Self> {
+        if !directory_present(directory)? {
+            return Err(Error::Storage);
+        }
         let path = directory.join(".netbaiot.lock");
         match fs::symlink_metadata(&path) {
             Ok(meta) if regular(&meta) => (),

@@ -2,9 +2,13 @@ use super::*;
 
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Config {
+    /// Device MQTT/framed TCP listener; UDP uses the same actual port. Public TCP requires TLS.
     pub device_ingress: SocketAddr,
+    /// Independent authenticated management listener. Public management requires TLS.
     pub management_http: SocketAddr,
+    /// Optional confirmed business listener; role/TLS constraints require config check.
     pub business_tcp: Option<SocketAddr>,
     #[serde(default)]
     pub business_rpc: Option<BusinessRpcConfig>,
@@ -13,23 +17,33 @@ pub struct Config {
     #[serde(default)]
     pub event_delivery: Option<EventDeliverySource>,
     #[serde(default)]
+    /// Development mode requires loopback listeners; never reuse demo credentials in production.
     pub development: bool,
     #[serde(default)]
+    /// Bounded runtime resource limits, defaulted from Limits::default().
     pub limits: Limits,
     #[serde(default)]
+    /// Static device credentials; secrets must not be logged or reused from development.
     pub credentials: Vec<Credential>,
+    /// Device server PEM certificate and matching private-key paths.
     pub tls: Option<TlsFiles>,
     #[serde(default)]
+    /// Independent management TLS and optional mapped client certificate authentication.
     pub management_tls: Option<ManagementTlsFiles>,
     #[serde(default)]
+    /// Management providers, scoped identities and protected secret-source names.
     pub management_auth: ManagementAuthConfig,
+    /// Required HTTP sink URL; HTTPS or loopback HTTP, without URL credentials.
     pub delivery_url: Option<String>,
+    /// Optional HTTP device-auth provider URL; default checks do not contact it.
     pub auth_provider_url: Option<String>,
+    /// Dedicated local planned-restart recovery directory; one gateway owner only.
     pub spool_directory: PathBuf,
 }
 
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct TlsFiles {
     pub certificate: String,
     pub private_key: String,
@@ -37,6 +51,7 @@ pub struct TlsFiles {
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ManagementTlsFiles {
     pub certificate: String,
     pub private_key: String,
@@ -47,6 +62,7 @@ pub struct ManagementTlsFiles {
 
 #[derive(Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum DeviceAuthSource {
     Static,
     Http,
@@ -54,6 +70,7 @@ pub enum DeviceAuthSource {
 }
 #[derive(Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum EventDeliverySource {
     Http,
     BusinessRpc,
@@ -61,6 +78,7 @@ pub enum EventDeliverySource {
 }
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct BusinessRpcConfig {
     pub version: u16,
     /// V3 is available on the same listener only when explicitly configured.
@@ -97,6 +115,7 @@ fn default_business_offline_ms() -> u64 {
 }
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct BusinessRpcIdentityConfig {
     pub certificate_sha256: String,
     pub principal_id: String,

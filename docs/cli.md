@@ -17,6 +17,10 @@ netbaiot config check --config configs/tutorial.json
 netbaiot --output json config check --config configs/tutorial.json
 netbaiot config limits
 netbaiot version
+netbaiot init my-gateway
+netbaiot init --production my-production
+netbaiot doctor --config netbaiot.json
+netbaiot config schema
 netbaiot --version
 ```
 
@@ -107,3 +111,7 @@ Exit codes remain 0 success, 2 usage/configuration, 3 authentication, 4 forbidde
 5 device offline and 6 unavailable/runtime/I/O. The compatibility server keeps its
 original nonzero failure convention and accepts its existing default/positional
 path and `--print-default-limits` forms.
+
+Project setup, non-destructive doctor checks and IDE schema support are documented
+in [configuration](configuration.md) and [doctor](doctor.md). Maintenance is separate
+from the operator CLI: see [cargo xtask](maintenance.md).
