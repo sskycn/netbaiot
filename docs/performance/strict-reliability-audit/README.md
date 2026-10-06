@@ -1,5 +1,9 @@
 # AuthCache verifier hit measurement
 
+This is the historical pre-optimization measurement. The later
+[bounded expiry-index A/B report](../auth-cache-expiry-index/README.md) records the
+new algorithm, current-baseline measurements, correctness gates and memory cost.
+
 This measures the existing hot path; no cache optimization is included. The test-only
 allocator and lock clock do not enter production builds. The lock clock starts after
 acquisition and records after mutex release. The host was also doing validation, so

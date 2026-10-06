@@ -1,0 +1,14 @@
+{
+  "baseline": "76b28a1f401687c455dbc464f509be5e3fe74510",
+  "baseline_archive_sha256": "3831155f5e015e9bbe88fe15612fe0e537b4a1ae8b04e685025ccebb1e8359bb",
+  "auth_source_sha256": "fda1d01ee5f253d12edb7f4cdb794a10c6238435059448c93597410eea7160da",
+  "platform": "macOS-27.0.1-arm64-arm-64bit",
+  "architecture": "arm64",
+  "logical_cpu_count": 10,
+  "profile": "Cargo default release: opt-level=3, debug=false, no custom profile",
+  "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+  "cargo": "cargo 1.99.0 (5f94df478 2026-08-27)\n",
+  "msrv_rustc": "rustc 1.88.0 (6b00bc388 2025-06-23)\nbinary: rustc\ncommit-hash: 6b00bc3880198600130e1cf62b8f8a93494488cc\ncommit-date: 2025-06-23\nhost: aarch64-apple-darwin\nrelease: 1.88.0\nLLVM version: 20.1.5\n",
+  "msrv_cargo": "cargo 1.88.0 (873a06493 2025-05-10)\n",
+  "measurement": "serialized, current-thread runtime; 3 command invocations, each 3x1000 hits and 100 live prunes per size; 16-byte HMAC; stats_alloc System allocator and test-only held-mutex clock; no concurrent builds/tests during timed samples"
+}

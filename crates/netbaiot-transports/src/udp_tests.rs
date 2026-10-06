@@ -523,3 +523,97 @@ async fn real_socket_admission_rejection_does_not_consume_sequence() {
     task.await.unwrap().unwrap();
     ingress.events.stop_workers().await.unwrap();
 }
+
+#[tokio::test]
+async fn invalidation_during_ingest_suppresses_ack_after_irrevocable_acceptance() {
+    let identity = auth();
+    for invalidation in [
+        AuthInvalidation::Device {
+            device: identity.device_key.clone(),
+        },
+        AuthInvalidation::Product {
+            tenant_id: identity.device_key.tenant_id.clone(),
+            product_id: identity.device_key.product_id.clone(),
+        },
+        AuthInvalidation::Tenant {
+            tenant_id: identity.device_key.tenant_id.clone(),
+        },
+        AuthInvalidation::CredentialVersion { version: 1 },
+        AuthInvalidation::AuthGeneration { generation: 1 },
+        AuthInvalidation::All,
+    ] {
+        let (ingress, provider) = fixture(Limits {
+            ingress_wait_timeout_ms: 1_000,
+            ..Limits::default()
+        });
+        let held = ingress
+            .admission
+            .acquire(&identity.device_key, 100)
+            .unwrap();
+        let owner = ingress.clone();
+        let packet = packet("a", 1, 42, now_ms(), PAYLOAD);
+        let pending = tokio::spawn(async move {
+            let mut replay = ReplayWindow::new(owner.limits.clone());
+            accept_and_ack(&packet, &owner, &mut replay, |_| {
+                panic!("invalidated ACK emitted")
+            })
+            .await
+            .unwrap();
+            replay
+        });
+        tokio::time::timeout(Duration::from_secs(1), async {
+            while ingress.admission.waiting().0 != 1 {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        assert_eq!(provider.calls.load(Ordering::Relaxed), 1);
+        ingress.invalidate_auth(&invalidation).unwrap();
+        drop(held);
+        let replay = pending.await.unwrap();
+        assert_eq!(replay.entries.len(), 1);
+        assert_eq!(ingress.metrics.get(Metric::EventsAccepted), 1);
+        assert_eq!(ingress.metrics.get(Metric::UdpAccepted), 1);
+        assert_eq!(ingress.metrics.get(Metric::UdpAcksSent), 0);
+        assert_eq!(ingress.metrics.get(Metric::UdpAckSendFailures), 1);
+        assert_eq!(ingress.events.usage().unwrap().pending_required, 1);
+        ingress.events.stop_workers().await.unwrap();
+    }
+}
+
+#[tokio::test]
+async fn real_socket_duplicate_receipts_with_4096_cache_entries_use_one_verifier() {
+    let (ingress, provider) = fixture(Limits {
+        requests_per_second: 2_048,
+        requests_per_ip_second: 2_048,
+        ..Limits::default()
+    });
+    for i in 0..4095 {
+        assert!(matches!(
+            ingress
+                .auth_cache
+                .authenticate(AuthenticationRequest::Secret {
+                    credential_id: &format!("negative-{i}"),
+                    secret: b"invalid",
+                })
+                .await,
+            Err(Error::Authentication)
+        ));
+    }
+    let (client, stop, task) = sockets(ingress.clone()).await;
+    let bytes = packet("a", 1, 42, now_ms(), PAYLOAD);
+    for _ in 0..128 {
+        client.send(&bytes).await.unwrap();
+        assert_ack(&receive(&client).await, 1, 42);
+    }
+    assert_eq!(ingress.auth_cache.usage().unwrap().0, 4096);
+    assert_eq!(provider.calls.load(Ordering::Relaxed), 1);
+    assert_eq!(ingress.metrics.get(Metric::EventsAccepted), 1);
+    assert_eq!(ingress.metrics.get(Metric::UdpAcceptedDuplicates), 127);
+    assert_eq!(ingress.metrics.get(Metric::UdpAcksSent), 128);
+    assert_eq!(ingress.events.usage().unwrap().pending_required, 1);
+    stop.cancel();
+    task.await.unwrap().unwrap();
+    ingress.events.stop_workers().await.unwrap();
+}

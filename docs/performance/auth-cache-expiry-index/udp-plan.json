@@ -1,0 +1,146 @@
+[
+  {
+    "name": "auth-expiry-udp512-r0",
+    "seconds": 15,
+    "repeats": 1,
+    "tls": false,
+    "variant": "before",
+    "binary": "baseline",
+    "production_revision": "76b28a1f401687c455dbc464f509be5e3fe74510",
+    "warmup": 3,
+    "ramp": 1,
+    "groups": [
+      {
+        "label": "udp",
+        "protocol": "udp",
+        "rate": 40000,
+        "workers": 512,
+        "offset": 0,
+        "window": 4
+      }
+    ],
+    "limits": {
+      "max_replay_entries_per_tenant": 1024
+    }
+  },
+  {
+    "name": "auth-expiry-udp512-r0",
+    "seconds": 15,
+    "repeats": 1,
+    "tls": false,
+    "variant": "after",
+    "binary": "candidate",
+    "production_revision": "85f1e31",
+    "warmup": 3,
+    "ramp": 1,
+    "groups": [
+      {
+        "label": "udp",
+        "protocol": "udp",
+        "rate": 40000,
+        "workers": 512,
+        "offset": 0,
+        "window": 4
+      }
+    ],
+    "limits": {
+      "max_replay_entries_per_tenant": 1024
+    }
+  },
+  {
+    "name": "auth-expiry-udp512-r1",
+    "seconds": 15,
+    "repeats": 1,
+    "tls": false,
+    "variant": "after",
+    "binary": "candidate",
+    "production_revision": "85f1e31",
+    "warmup": 3,
+    "ramp": 1,
+    "groups": [
+      {
+        "label": "udp",
+        "protocol": "udp",
+        "rate": 40000,
+        "workers": 512,
+        "offset": 0,
+        "window": 4
+      }
+    ],
+    "limits": {
+      "max_replay_entries_per_tenant": 1024
+    }
+  },
+  {
+    "name": "auth-expiry-udp512-r1",
+    "seconds": 15,
+    "repeats": 1,
+    "tls": false,
+    "variant": "before",
+    "binary": "baseline",
+    "production_revision": "76b28a1f401687c455dbc464f509be5e3fe74510",
+    "warmup": 3,
+    "ramp": 1,
+    "groups": [
+      {
+        "label": "udp",
+        "protocol": "udp",
+        "rate": 40000,
+        "workers": 512,
+        "offset": 0,
+        "window": 4
+      }
+    ],
+    "limits": {
+      "max_replay_entries_per_tenant": 1024
+    }
+  },
+  {
+    "name": "auth-expiry-udp512-r2",
+    "seconds": 15,
+    "repeats": 1,
+    "tls": false,
+    "variant": "before",
+    "binary": "baseline",
+    "production_revision": "76b28a1f401687c455dbc464f509be5e3fe74510",
+    "warmup": 3,
+    "ramp": 1,
+    "groups": [
+      {
+        "label": "udp",
+        "protocol": "udp",
+        "rate": 40000,
+        "workers": 512,
+        "offset": 0,
+        "window": 4
+      }
+    ],
+    "limits": {
+      "max_replay_entries_per_tenant": 1024
+    }
+  },
+  {
+    "name": "auth-expiry-udp512-r2",
+    "seconds": 15,
+    "repeats": 1,
+    "tls": false,
+    "variant": "after",
+    "binary": "candidate",
+    "production_revision": "85f1e31",
+    "warmup": 3,
+    "ramp": 1,
+    "groups": [
+      {
+        "label": "udp",
+        "protocol": "udp",
+        "rate": 40000,
+        "workers": 512,
+        "offset": 0,
+        "window": 4
+      }
+    ],
+    "limits": {
+      "max_replay_entries_per_tenant": 1024
+    }
+  }
+]

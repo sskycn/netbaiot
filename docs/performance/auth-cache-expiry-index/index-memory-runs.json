@@ -1,0 +1,59 @@
+[
+  {
+    "run": 1,
+    "command": [
+      "cargo",
+      "+stable",
+      "test",
+      "--release",
+      "-p",
+      "netbaiot-runtime",
+      "expiry_index_memory_audit",
+      "--",
+      "--ignored",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 6.865,
+    "log": "docs/performance/auth-cache-expiry-index/index-memory-1.log"
+  },
+  {
+    "run": 2,
+    "command": [
+      "cargo",
+      "+stable",
+      "test",
+      "--release",
+      "-p",
+      "netbaiot-runtime",
+      "expiry_index_memory_audit",
+      "--",
+      "--ignored",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.096,
+    "log": "docs/performance/auth-cache-expiry-index/index-memory-2.log"
+  },
+  {
+    "run": 3,
+    "command": [
+      "cargo",
+      "+stable",
+      "test",
+      "--release",
+      "-p",
+      "netbaiot-runtime",
+      "expiry_index_memory_audit",
+      "--",
+      "--ignored",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.076,
+    "log": "docs/performance/auth-cache-expiry-index/index-memory-3.log"
+  }
+]
