@@ -1365,22 +1365,19 @@ pub async fn run_with_credentials(
             }
             let encoded_bytes = pending.iter().try_fold(0usize, |total, record| {
                 total
-                    .checked_add(
-                        serde_json::to_vec(record)
-                            .map_err(|_| Error::Internal)?
-                            .len(),
-                    )
+                    .checked_add(record.encoded_len()?)
                     .ok_or(Error::Overloaded)
             })?;
-            match spool.commit(pending.clone()).await {
+            let pending_count = pending.len();
+            match spool.commit(pending).await {
                 Ok(_) => {
                     events.stop_workers().await?;
-                    metrics.add(Metric::SpoolRecords, pending.len() as u64);
+                    metrics.add(Metric::SpoolRecords, pending_count as u64);
                     metrics.add(Metric::SpoolBytes, encoded_bytes as u64);
                     break;
                 }
                 Err(error) => {
-                    tracing::error!(error=%error, pending=pending.len(), "event spool commit failed; shutdown remains blocked");
+                    tracing::error!(error=%error, pending=pending_count, "event spool commit failed; shutdown remains blocked");
                     if events.wait_required_drained(retry_delay).await? {
                         events.stop_workers().await?;
                         if !recovered_files.is_empty() {

@@ -2,6 +2,7 @@
 """Seed the production parser with valid deep paths before mutation fuzzing."""
 from pathlib import Path
 import struct
+import hashlib
 
 root = Path(__file__).parent / 'corpus'
 def text(b):
@@ -39,3 +40,12 @@ for i, body in enumerate([b'{"schema_version":1,"source_message_id":"1","kind":"
 for i, data in enumerate([b'\x7f', b'\x80\x01', b'\xff\xff\xff\x7f', b'\xff\xff\xff\xff']):
     seed('mqtt_remaining_length', str(i), data)
     seed('mqtt_fixed_header', str(i), b'\x30'+data)
+
+# Recovery inputs include authoritative integrity and read-only legacy images.
+header = b'NBSP' + struct.pack('!IQ', 3, 1)
+trailer = b'SEND' + struct.pack('!QQ', 0, len(header))
+seed('restart_spool', 'v3-empty', header + trailer + hashlib.sha256(header + trailer).digest())
+for fixture in (Path(__file__).parents[1] / 'tests/fixtures/restart-spool').glob('*.spool'):
+    seed('restart_spool', fixture.stem, fixture.read_bytes())
+for fixture in (Path(__file__).parents[1] / 'tests/mqtt_conformance/fixtures/mqtt_recovery').glob('*.nbmq'):
+    seed('mqtt_recovery', fixture.stem, fixture.read_bytes())

@@ -193,10 +193,7 @@ fn commit_sync(directory: &Path, limits: &Limits, records: &[SpoolRecord]) -> Re
             return Err(Error::Overloaded);
         }
         for record in records {
-            let payload = serde_json::to_vec(record).map_err(|_| Error::Invalid)?;
-            if payload.len() > limits.spool_record_max_bytes {
-                return Err(Error::Overloaded);
-            }
+            let payload = encode_record(record, limits.spool_record_max_bytes)?;
             let length = u32::try_from(payload.len()).map_err(|_| Error::Overloaded)?;
             total = total
                 .checked_add(4 + payload.len() + 32)
@@ -271,6 +268,8 @@ fn recover_sync(directory: &Path, limits: &Limits) -> Result<RecoveryBatch> {
     }
     let files = recovery_io::spool_paths(directory, directory_entry_limit(limits)?)?;
     let mut records = Vec::new();
+    let mut committed_files = Vec::new();
+    let mut generation = 0;
     let mut total = 0usize;
     for path in &files {
         let file = recovery_io::open_snapshot(path)?.ok_or(Error::Storage)?;
@@ -282,6 +281,12 @@ fn recover_sync(directory: &Path, limits: &Limits) -> Result<RecoveryBatch> {
         )?;
         total = total.checked_add(bytes.len()).ok_or(Error::Overloaded)?;
         decode_segment(&bytes, limits, &mut records)?;
+        let file_generation = segment_generation(&bytes)?;
+        generation = generation.max(file_generation);
+        committed_files.push(CommittedSpool {
+            path: path.clone(),
+            generation: file_generation,
+        });
     }
     if records.len() > limits.spool_max_records {
         return Err(Error::Overloaded);
@@ -314,14 +319,8 @@ fn recover_sync(directory: &Path, limits: &Limits) -> Result<RecoveryBatch> {
     }
     Ok(RecoveryBatch {
         records: unique.into_values().collect(),
-        committed_files: files
-            .into_iter()
-            .map(|path| CommittedSpool {
-                path,
-                generation: 0,
-            })
-            .collect(),
-        generation: 0,
+        committed_files,
+        generation,
     })
 }
 
@@ -494,6 +493,54 @@ fn directory_entry_limit(limits: &Limits) -> Result<usize> {
         .spool_max_records
         .checked_add(16)
         .ok_or(Error::Overloaded)
+}
+
+fn encode_record(record: &SpoolRecord, maximum: usize) -> Result<Vec<u8>> {
+    struct Bounded {
+        bytes: Vec<u8>,
+        maximum: usize,
+        overloaded: bool,
+    }
+    impl Write for Bounded {
+        fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+            let Some(size) = self
+                .bytes
+                .len()
+                .checked_add(bytes.len())
+                .filter(|size| *size <= self.maximum)
+            else {
+                self.overloaded = true;
+                return Err(std::io::ErrorKind::OutOfMemory.into());
+            };
+            if size > self.bytes.capacity() {
+                let capacity = self
+                    .bytes
+                    .capacity()
+                    .saturating_mul(2)
+                    .max(size)
+                    .min(self.maximum);
+                self.bytes.reserve_exact(capacity - self.bytes.len());
+            }
+            self.bytes.extend_from_slice(bytes);
+            Ok(bytes.len())
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+    let mut output = Bounded {
+        bytes: Vec::new(),
+        maximum,
+        overloaded: false,
+    };
+    serde_json::to_writer(&mut output, record).map_err(|_| {
+        if output.overloaded {
+            Error::Overloaded
+        } else {
+            Error::Invalid
+        }
+    })?;
+    Ok(output.bytes)
 }
 
 #[cfg(test)]
@@ -692,6 +739,27 @@ mod tests {
         }
     }
 
+    #[tokio::test]
+    async fn legacy_named_v2_preserves_generation_for_cleanup_and_migration() {
+        let directory =
+            std::env::temp_dir().join(format!("netbaiot-v2-generation-{}", Uuid::new_v4()));
+        fs::create_dir(&directory).unwrap();
+        fs::write(directory.join("legacy-v2.spool"), SUPPORTED_V2).unwrap();
+        let spool = RestartSpool::new(directory.clone(), Arc::new(Limits::default()));
+        let recovered = spool.recover().await.unwrap();
+        assert_eq!(recovered.generation, 7);
+        assert_eq!(recovered.committed_files[0].generation, 7);
+        spool.commit(recovered.records).await.unwrap();
+        let recovered = spool.recover().await.unwrap();
+        assert_eq!(recovered.generation, 8);
+        spool
+            .remove_committed(recovered.committed_files)
+            .await
+            .unwrap();
+        assert!(spool.recover().await.unwrap().records.is_empty());
+        fs::remove_dir_all(directory).unwrap();
+    }
+
     #[test]
     fn legacy_diagnostic_requires_exact_path_valid_json_and_intact_framing() {
         let limits = Limits::default();
@@ -787,6 +855,12 @@ mod tests {
         let path = spool.commit(vec![original.clone()]).await.unwrap().unwrap();
         let image = fs::read(&path).unwrap();
         let recovery = spool.recover().await.unwrap();
+        assert!(spool.commit(vec![]).await.unwrap().is_none());
+        assert_eq!(
+            fs::read(&path).unwrap(),
+            image,
+            "empty commit must preserve old responsibility"
+        );
         // An unknown legacy entry blocks cleanup before the authority is removed.
         let stale = directory.join("unknown.spool");
         fs::write(&stale, b"unknown responsibility").unwrap();
@@ -839,10 +913,10 @@ mod tests {
             std::env::temp_dir().join(format!("netbaiot-permissions-{}", Uuid::new_v4()));
         let spool = RestartSpool::new(directory.clone(), Arc::new(Limits::default()));
         let path = spool.commit(vec![record()]).await.unwrap().unwrap();
-        fs::set_permissions(&path, fs::Permissions::from_mode(0)).unwrap();
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o0)).unwrap();
         let unreadable = spool.recover().await;
         fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
-        fs::set_permissions(&directory, fs::Permissions::from_mode(0)).unwrap();
+        fs::set_permissions(&directory, fs::Permissions::from_mode(0o0)).unwrap();
         let parent = spool.recover().await;
         fs::set_permissions(&directory, fs::Permissions::from_mode(0o700)).unwrap();
         assert!(matches!(unreadable, Err(Error::Storage)));
@@ -956,5 +1030,17 @@ mod tests {
         let mut oversized = b"NBSP\0\0\0\x01".to_vec();
         oversized.extend_from_slice(&u32::MAX.to_be_bytes());
         assert!(decode_segment(&oversized, &limits, &mut Vec::new()).is_err());
+    }
+
+    #[test]
+    fn serialization_has_a_hard_record_limit_before_allocation_growth() {
+        let record = record();
+        let bytes = serde_json::to_vec(&record).unwrap();
+        assert_eq!(encode_record(&record, bytes.len()).unwrap(), bytes);
+        assert!(matches!(
+            encode_record(&record, bytes.len() - 1),
+            Err(Error::Overloaded)
+        ));
+        assert!(matches!(encode_record(&record, 0), Err(Error::Overloaded)));
     }
 }

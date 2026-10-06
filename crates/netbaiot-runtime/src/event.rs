@@ -83,6 +83,13 @@ pub struct SpoolRecord {
     pub attempts: BTreeMap<SinkId, u32>,
 }
 
+impl SpoolRecord {
+    /// JSON payload size without another payload-sized allocation.
+    pub fn encoded_len(&self) -> Result<usize> {
+        bounded_json_bytes(self, usize::MAX)
+    }
+}
+
 pub type EventAcceptance = EventAccepted;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -354,9 +361,7 @@ impl EventBus {
     }
 
     pub fn publish(&self, event: DeviceEvent) -> Result<EventAcceptance> {
-        let bytes = serde_json::to_vec(&event)
-            .map_err(|_| Error::Invalid)?
-            .len();
+        let bytes = bounded_json_bytes(&event, self.limits.global_event_max_bytes)?;
         let event = Arc::new(event);
         let lock_started = self.metrics.lock_timing_enabled().then(Instant::now);
         let mut state = self.lock_state(EventBusProbe::Publish)?;
@@ -476,9 +481,7 @@ impl EventBus {
         let prepared = records
             .into_iter()
             .map(|record| {
-                let bytes = serde_json::to_vec(&record.event)
-                    .map_err(|_| Error::Invalid)?
-                    .len();
+                let bytes = bounded_json_bytes(&record.event, self.limits.global_event_max_bytes)?;
                 Ok((record, bytes))
             })
             .collect::<Result<Vec<_>>>()?;
@@ -875,6 +878,45 @@ impl EventBus {
     }
 }
 
+pub(crate) fn bounded_json_bytes(event: &impl Serialize, maximum: usize) -> Result<usize> {
+    // Count JSON without allocating another event-sized buffer just to admit it.
+    struct Size {
+        bytes: usize,
+        maximum: usize,
+        overloaded: bool,
+    }
+    impl std::io::Write for Size {
+        fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+            let Some(size) = self
+                .bytes
+                .checked_add(bytes.len())
+                .filter(|size| *size <= self.maximum)
+            else {
+                self.overloaded = true;
+                return Err(std::io::ErrorKind::OutOfMemory.into());
+            };
+            self.bytes = size;
+            Ok(bytes.len())
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+    let mut size = Size {
+        bytes: 0,
+        maximum,
+        overloaded: false,
+    };
+    serde_json::to_writer(&mut size, event).map_err(|_| {
+        if size.overloaded {
+            Error::Overloaded
+        } else {
+            Error::Invalid
+        }
+    })?;
+    Ok(size.bytes)
+}
+
 fn validate_routes(
     routes: &[RouteDefinition],
     sinks: &BTreeMap<SinkId, SinkState>,
@@ -1161,6 +1203,38 @@ mod tests {
         assert_eq!(bus.usage().unwrap(), EventBusUsage::default());
         // Only active responsibility is guarded: after ACK completion reuse is legal.
         bus.publish(original).unwrap();
+    }
+
+    #[tokio::test]
+    async fn simultaneous_active_ids_have_one_owner_and_one_conflict() {
+        let bus = audit_bus(Limits::default()).await;
+        let original = event(8);
+        let barrier = Arc::new(std::sync::Barrier::new(3));
+        let handles = (0..2)
+            .map(|_| {
+                let bus = bus.clone();
+                let barrier = barrier.clone();
+                let event = original.clone();
+                std::thread::spawn(move || {
+                    barrier.wait();
+                    bus.publish(event)
+                })
+            })
+            .collect::<Vec<_>>();
+        barrier.wait();
+        let mut accepted = 0;
+        let mut conflicts = 0;
+        for handle in handles {
+            match handle.join().unwrap() {
+                Ok(_) => accepted += 1,
+                Err(Error::Conflict) => conflicts += 1,
+                other => panic!("unexpected admission: {other:?}"),
+            }
+        }
+        assert_eq!((accepted, conflicts), (1, 1));
+        assert_eq!(bus.usage().unwrap().events, 1);
+        assert_eq!(bus.usage().unwrap().pending_required, 2);
+        assert_eq!(bus.spool_records().unwrap().len(), 1);
     }
 
     #[tokio::test]
