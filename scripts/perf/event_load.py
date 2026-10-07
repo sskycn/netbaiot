@@ -108,6 +108,10 @@ def main():
     parser.add_argument("--sample-output")
     parser.add_argument("--sample-seconds", type=int, default=10)
     parser.add_argument("--tls", action="store_true")
+    parser.add_argument("--subscribe-uplink", action="store_true")
+    parser.add_argument("--mqtt-v5", action="store_true")
+    parser.add_argument("--mqtt-metadata", action="store_true")
+    parser.add_argument("--audit-open-loop", action="store_true")
     parser.add_argument(
         "--server-bin", default=os.path.join(ROOT, "target/release/netbaiot-server")
     )
@@ -119,12 +123,15 @@ def main():
     maximum = max(128, args.connections + 16)
     limits = {
         "max_connections": maximum,
+        "max_device_connections_per_protocol": maximum,
         "max_connections_per_ip": maximum,
         "max_connections_per_tenant": maximum,
         "max_devices": maximum,
         "max_devices_per_tenant": maximum,
         "max_persistent_sessions": maximum,
         "max_persistent_sessions_per_tenant": maximum,
+        "max_subscriptions_per_tenant": maximum * 2,
+        "max_subscriptions": max(512, maximum * 2),
         "auth_cache_max_entries": maximum,
         "auth_cache_max_bytes": 64 * 1024 * 1024,
         "rate_entries": maximum,
@@ -194,9 +201,17 @@ def main():
                 "publish_rate": args.rate,
                 "payload_bytes": args.payload_bytes,
                 "qos": args.qos,
-                "subscribe": False,
+                "subscribe": args.subscribe_uplink,
                 "report_every_secs": 5,
             }
+            if args.subscribe_uplink:
+                workload["subscribe_uplink"] = True
+            if args.mqtt_v5:
+                workload["mqtt_version"] = 5
+            if args.mqtt_metadata:
+                workload["mqtt_metadata"] = True
+            if args.audit_open_loop:
+                workload["audit_open_loop"] = True
             if args.tls:
                 workload["tls_ca"] = os.path.join(ROOT, "tests/fixtures/localhost-cert.pem")
             json.dump(workload, output)
@@ -304,8 +319,14 @@ def main():
                 "cooldown_seconds": args.cooldown,
                 "sink_mode": args.sink_mode,
                 "tls": args.tls,
+                "subscribe_uplink": args.subscribe_uplink,
+                "mqtt_v5": args.mqtt_v5,
+                "mqtt_metadata": args.mqtt_metadata,
+                "audit_open_loop": args.audit_open_loop,
                 "sink_delay_ms": args.sink_delay_ms,
                 "load": last_json(load_out, "final"),
+                "setup_failure": last_json(load_out, "setup_failed"),
+                "load_exit": load.returncode,
                 "sink": last_json(sink_out),
                 "metrics": metrics,
                 "samples": samples,

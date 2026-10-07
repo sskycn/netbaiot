@@ -93,3 +93,11 @@ pub(crate) fn measure<T, R>(
     }
     TIMING_ENABLED.set(false);
 }
+
+pub(crate) fn enable_clock(enabled: bool) {
+    TIMING_ENABLED.set(enabled);
+    LAST_LOCK_NS.set((0, 0));
+}
+pub(crate) fn last_lock() -> (u128, u128) {
+    LAST_LOCK_NS.get()
+}

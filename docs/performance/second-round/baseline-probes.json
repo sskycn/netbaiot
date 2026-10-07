@@ -1,0 +1,13 @@
+{
+  "netbaiot_runtime": {
+    "sha256": "85e4485544366252846d4c73ea1399b698b92a1899017ac5abbf3fa74cfe9f0e",
+    "bytes": 9468144
+  },
+  "netbaiot_transports": {
+    "sha256": "eee3d1f523873321589d6e56fa8907c7c2dbf1decc716a567cd70d2b93cab520",
+    "bytes": 6410640
+  },
+  "subscriber-loadgen": {
+    "sha256": "7aa0bc55e099131a752491d315dc03211bf748abe89f5b25897c527d89097c1e"
+  }
+}

@@ -772,7 +772,11 @@ impl EventBus {
     }
 
     fn take_ready(&self, id: &SinkId) -> Result<Option<DeliveryRecord>> {
+        #[cfg(test)]
+        let mut clock = crate::hotspot_bench::LockClock::start();
         let mut state = self.lock_state(EventBusProbe::TakeReady)?;
+        #[cfg(test)]
+        clock.acquired();
         let sink = state.sinks.get_mut(id).ok_or(Error::Internal)?;
         let queue_len = sink.used_count.saturating_sub(sink.inflight);
         let now = Instant::now();
@@ -2773,4 +2777,5 @@ mod tests {
             }
         }
     }
+    include!("second_round_event_bench.rs");
 }

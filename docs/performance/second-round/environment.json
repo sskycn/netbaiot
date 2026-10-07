@@ -1,0 +1,41 @@
+{
+  "baseline_sha": "c359a868a38bfd83816e855795456bbdf097893a",
+  "machine": "Mac mini",
+  "cpu": "Apple M4",
+  "ram_bytes": 17179869184,
+  "cpu_cores": 10,
+  "os": "macOS-27.0.1-arm64-arm-64bit",
+  "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+  "cargo": "cargo 1.99.0 (5f94df478 2026-08-27)",
+  "recorded_at": "2026-10-07T03:42:28.699817+00:00",
+  "ci": [
+    {
+      "id": 37566826224,
+      "name": "MQTT Device Profile decoder fuzz smoke",
+      "head_sha": "c359a868a38bfd83816e855795456bbdf097893a",
+      "conclusion": "success",
+      "html_url": "https://github.com/sskycn/netbaiot/actions/runs/37566826224"
+    },
+    {
+      "id": 37566826585,
+      "name": "Rust checks",
+      "head_sha": "c359a868a38bfd83816e855795456bbdf097893a",
+      "conclusion": "success",
+      "html_url": "https://github.com/sskycn/netbaiot/actions/runs/37566826585"
+    },
+    {
+      "id": 37566826294,
+      "name": "Native recovery and lifecycle",
+      "head_sha": "c359a868a38bfd83816e855795456bbdf097893a",
+      "conclusion": "success",
+      "html_url": "https://github.com/sskycn/netbaiot/actions/runs/37566826294"
+    },
+    {
+      "id": 37566826295,
+      "name": "Native developer experience",
+      "head_sha": "c359a868a38bfd83816e855795456bbdf097893a",
+      "conclusion": "success",
+      "html_url": "https://github.com/sskycn/netbaiot/actions/runs/37566826295"
+    }
+  ]
+}

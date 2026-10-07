@@ -1,0 +1,27 @@
+{
+  "netbaiot-loadgen": {
+    "sha256": "d6fb6f19b08c9e7915a6b800d0465f39d1fbce1eaa0f2b6bfaad1aeea045e009",
+    "bytes": 5274352,
+    "source_sha": "c359a868a38bfd83816e855795456bbdf097893a"
+  },
+  "admission_auth": {
+    "sha256": "6671116eab029bdf8d0ded87f4d0c23c2b0a0eef741f52bf26de4340903d0fe1",
+    "bytes": 1076672,
+    "source_sha": "c359a868a38bfd83816e855795456bbdf097893a"
+  },
+  "netbaiot-server": {
+    "sha256": "497a6166c771c23da1ad59dba5c2775f188fef74afe7fe7197ed14090d175046",
+    "bytes": 12169200,
+    "source_sha": "c359a868a38bfd83816e855795456bbdf097893a"
+  },
+  "udp_ack": {
+    "sha256": "ca4fdadce930f240bcf8a38d9d227cec34abc8efd9e1a67b2fafa91f374d5433",
+    "bytes": 595424,
+    "source_sha": "c359a868a38bfd83816e855795456bbdf097893a"
+  },
+  "business_rpc": {
+    "sha256": "915e7611917eefaf2a9ddad066c1749e1ae93ac89226dd696a70ff813104bdd3",
+    "bytes": 7927776,
+    "source_sha": "c359a868a38bfd83816e855795456bbdf097893a"
+  }
+}

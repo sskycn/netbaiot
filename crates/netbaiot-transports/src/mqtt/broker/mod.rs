@@ -784,3 +784,6 @@ pub use routing::{subscribe_acl, topic_matches};
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod second_round_bench;

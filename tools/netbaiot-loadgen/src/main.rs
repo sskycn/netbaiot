@@ -45,6 +45,10 @@ struct Config {
     payload_bytes: usize,
     qos: u8,
     subscribe: bool,
+    /// Measurement mode: subscribe to the same device's legal uplink topic.
+    subscribe_uplink: bool,
+    mqtt_version: u8,
+    mqtt_metadata: bool,
     mqtt_clean_session: bool,
     slow_fraction: f64,
     reconnect_every_secs: f64,
@@ -89,6 +93,9 @@ impl Default for Config {
             payload_bytes: 256,
             qos: 1,
             subscribe: true,
+            subscribe_uplink: false,
+            mqtt_version: 4,
+            mqtt_metadata: false,
             mqtt_clean_session: true,
             slow_fraction: 0.0,
             reconnect_every_secs: 0.0,
@@ -117,6 +124,9 @@ impl Config {
             || self.tenant_width == 0
             || self.payload_bytes > 65000
             || self.qos > 2
+            || ![4, 5].contains(&self.mqtt_version)
+            || (self.mqtt_metadata && self.mqtt_version != 5)
+            || (self.subscribe_uplink && (!self.subscribe || self.transport != "mqtt"))
             || self.window == 0
             || self.window > 32
             || self.command_padding > 256
@@ -246,10 +256,13 @@ impl Histogram {
         self.sum_us += u128::from(us);
     }
     fn percentile(&self, p: u64) -> f64 {
+        self.percentile_bps(p * 100)
+    }
+    fn percentile_bps(&self, p: u64) -> f64 {
         if self.count == 0 {
             return 0.0;
         }
-        let target = (self.count * p).div_ceil(100);
+        let target = (self.count * p).div_ceil(10000);
         let mut n = 0;
         for (i, v) in self.bins.iter().enumerate() {
             n += v;
@@ -264,7 +277,7 @@ impl Histogram {
         60000.0
     }
     fn value(&self) -> Value {
-        json!({"count":self.count,"p50_ms":self.percentile(50),"p95_ms":self.percentile(95),"p99_ms":self.percentile(99),"max_ms":self.max_us as f64/1000.0,"mean_ms":if self.count>0{self.sum_us as f64/self.count as f64/1000.0}else{0.0}})
+        json!({"count":self.count,"p50_ms":self.percentile(50),"p95_ms":self.percentile(95),"p99_ms":self.percentile(99),"p999_ms":self.percentile_bps(9990),"max_ms":self.max_us as f64/1000.0,"mean_ms":if self.count>0{self.sum_us as f64/self.count as f64/1000.0}else{0.0}})
     }
 }
 #[derive(Default)]
@@ -394,6 +407,43 @@ fn frame(body: &[u8]) -> Vec<u8> {
     v.extend_from_slice(body);
     v
 }
+fn property_end(body: &[u8], offset: usize) -> Result<usize> {
+    let (mut value, mut multiplier) = (0usize, 1usize);
+    for index in 0..4 {
+        let byte = *body.get(offset + index).ok_or("short MQTT properties")?;
+        value += usize::from(byte & 127) * multiplier;
+        if byte & 128 == 0 {
+            return (offset + index + 1)
+                .checked_add(value)
+                .filter(|end| *end <= body.len())
+                .ok_or_else(|| "short MQTT properties".into());
+        }
+        multiplier *= 128;
+    }
+    Err("invalid MQTT property length".into())
+}
+fn measured_properties(config: &Config, prefix: &str) -> Vec<u8> {
+    if config.mqtt_version != 5 {
+        return Vec::new();
+    }
+    let mut properties = Vec::new();
+    if config.mqtt_metadata {
+        properties.push(3);
+        text(&mut properties, "application/json");
+        properties.push(8);
+        text(&mut properties, &(prefix.to_owned() + "down"));
+        properties.push(9);
+        properties.extend_from_slice(&64u16.to_be_bytes());
+        properties.extend_from_slice(&[7; 64]);
+        for index in 0..8 {
+            properties.push(0x26);
+            text(&mut properties, &format!("key-{index:02}"));
+            text(&mut properties, "value-0123456789");
+        }
+    }
+    // A packet's Remaining Length is the same bounded variable integer encoding.
+    packet(0, &properties)[1..].to_vec()
+}
 fn parse(buffer: &mut BytesMut, mqtt: bool) -> Result<Option<(u8, Vec<u8>)>> {
     let (first, len, header) = if mqtt {
         if buffer.len() < 2 {
@@ -516,7 +566,19 @@ async fn mqtt_or_tcp(
     if mqtt {
         let mut b = Vec::new();
         text(&mut b, "MQTT");
-        b.extend_from_slice(&[4, 0xc0 | (u8::from(c.mqtt_clean_session) << 1), 0, 30]);
+        b.extend_from_slice(&[
+            c.mqtt_version,
+            0xc0 | (u8::from(c.mqtt_clean_session) << 1),
+            0,
+            30,
+        ]);
+        if c.mqtt_version == 5 {
+            if c.mqtt_clean_session {
+                b.extend_from_slice(&[3, 0x21, 0, 32]);
+            } else {
+                b.extend_from_slice(&[8, 0x21, 0, 32, 0x11, 0, 0, 14, 16]);
+            }
+        }
         text(&mut b, &format!("a{id}"));
         text(&mut b, &format!("a{id}"));
         text(&mut b, auth);
@@ -526,7 +588,17 @@ async fn mqtt_or_tcp(
             next(&mut stream, &mut buffer, true),
         )
         .await??;
-        if !connack_accepted(&ack, c.mqtt_clean_session) {
+        let accepted = if c.mqtt_version == 5 {
+            ack.0 == 0x20
+                && ack.1.len() >= 3
+                && ack.1[0] <= 1
+                && ack.1[1] == 0
+                && (!c.mqtt_clean_session || ack.1[0] == 0)
+                && property_end(&ack.1, 2)? == ack.1.len()
+        } else {
+            connack_accepted(&ack, c.mqtt_clean_session)
+        };
+        if !accepted {
             count(s, "connect_rejected", 1);
             return Err("CONNACK rejection".into());
         }
@@ -565,19 +637,37 @@ async fn mqtt_or_tcp(
         return Ok(());
     }
     let topics = prefix(c, id);
+    let publish_properties = measured_properties(c, &topics);
     if mqtt && c.subscribe {
         let mut b = vec![0, 1];
-        text(&mut b, &(topics.clone() + "down"));
-        b.push(1);
-        text(&mut b, &(topics.clone() + "up_ack"));
-        b.push(0);
+        if c.mqtt_version == 5 {
+            b.push(0);
+        }
+        if c.subscribe_uplink {
+            text(&mut b, &(topics.clone() + "up"));
+            b.push(c.qos);
+        } else {
+            text(&mut b, &(topics.clone() + "down"));
+            b.push(1);
+            text(&mut b, &(topics.clone() + "up_ack"));
+            b.push(0);
+        }
         write(&mut stream, &packet(0x82, &b), s).await?;
         let sub = timeout(
             Duration::from_secs_f64(c.timeout_secs),
             next(&mut stream, &mut buffer, true),
         )
         .await??;
-        if sub != (0x90, vec![0, 1, 1, 0]) {
+        let mut expected = vec![0, 1];
+        if c.mqtt_version == 5 {
+            expected.push(0);
+        }
+        if c.subscribe_uplink {
+            expected.push(c.qos);
+        } else {
+            expected.extend_from_slice(&[1, 0]);
+        }
+        if sub != (0x90, expected) {
             return Err("SUBACK rejected".into());
         }
     }
@@ -605,6 +695,7 @@ async fn mqtt_or_tcp(
     }
     let mut pending = HashMap::<String, Pending>::new();
     let mut ids = HashMap::<u16, Pending>::new();
+    let mut received_qos2 = std::collections::HashSet::<u16>::new();
     let mut seq = 0u64;
     let mut pid = 1u16;
     let mut ping = if mqtt {
@@ -638,7 +729,13 @@ async fn mqtt_or_tcp(
                 let header = 2 + usize::from(b.len() >= 128) + usize::from(b.len() >= 16384);
                 count(s, "wire_bytes_received", (header + b.len()) as u64);
             }
-            if first == 0x40 && b.len() == 2 {
+            if c.mqtt_version == 5
+                && [0x40, 0x50, 0x70].contains(&first)
+                && b.get(2).is_some_and(|reason| *reason >= 0x80)
+            {
+                return Err("MQTT acknowledgement rejected".into());
+            }
+            if first == 0x40 && (b.len() == 2 || (c.mqtt_version == 5 && b.len() >= 3)) {
                 let id = u16::from_be_bytes([b[0], b[1]]);
                 if let Some(p) = ids.remove(&id) {
                     if c.audit_open_loop && p.at >= measure {
@@ -657,17 +754,17 @@ async fn mqtt_or_tcp(
                     }
                     count(s, "pubacks", 1);
                 }
-            } else if first == 0x50 && b.len() == 2 {
+            } else if first == 0x50 && (b.len() == 2 || (c.mqtt_version == 5 && b.len() >= 3)) {
                 let id = u16::from_be_bytes([b[0], b[1]]);
                 if let Some(p) = ids.get(&id) {
                     if !c.audit_open_loop || p.at >= measure {
                         observe(s, "pubrec", p.at.elapsed());
                     }
                     count(s, "pubrecs", 1);
-                    write(&mut stream, &packet(0x62, &b), s).await?;
+                    write(&mut stream, &packet(0x62, &b[..2]), s).await?;
                     count(s, "pubrels", 1);
                 }
-            } else if first == 0x70 && b.len() == 2 {
+            } else if first == 0x70 && (b.len() == 2 || (c.mqtt_version == 5 && b.len() >= 3)) {
                 let id = u16::from_be_bytes([b[0], b[1]]);
                 if let Some(p) = ids.remove(&id) {
                     if c.audit_open_loop && p.at >= measure {
@@ -678,21 +775,48 @@ async fn mqtt_or_tcp(
                     }
                     count(s, "pubcomps", 1);
                 }
+            } else if matches!(first, 0x62 | 0x6a) && b.len() >= 2 {
+                received_qos2.remove(&u16::from_be_bytes([b[0], b[1]]));
+                write(&mut stream, &packet(0x70, &b[..2]), s).await?;
             } else if !mqtt || first >> 4 == 3 {
+                if mqtt && c.subscribe_uplink {
+                    count(s, "subscriber_publishes", 1);
+                    if c.audit_open_loop
+                        && Instant::now() >= measure
+                        && Instant::now() < traffic_end
+                    {
+                        count(s, "measurement_subscriber_publishes", 1);
+                    }
+                }
                 let payload = if mqtt {
                     if b.len() < 2 {
                         return Err("short publish".into());
                     }
                     let n = usize::from(u16::from_be_bytes([b[0], b[1]]));
                     let mut at = 2 + n;
-                    if first & 6 == 2 {
+                    if first & 6 != 0 {
                         if b.len() < at + 2 {
                             return Err("short packet id".into());
                         }
                         let ack_start = Instant::now();
-                        write(&mut stream, &packet(0x40, &b[at..at + 2]), s).await?;
+                        let packet_id = u16::from_be_bytes([b[at], b[at + 1]]);
+                        if first & 6 == 4 {
+                            if received_qos2.len() >= 32 && !received_qos2.contains(&packet_id) {
+                                return Err("bounded subscriber window exceeded".into());
+                            }
+                            received_qos2.insert(packet_id);
+                        }
+                        write(
+                            &mut stream,
+                            &packet(if first & 6 == 4 { 0x50 } else { 0x40 }, &b[at..at + 2]),
+                            s,
+                        )
+                        .await?;
                         observe(s, "downlink_puback_write", ack_start.elapsed());
                         at += 2;
+                    }
+                    if c.mqtt_version == 5 {
+                        at = property_end(&b, at)?;
                     }
                     b.get(at..).ok_or("short topic")?
                 } else {
@@ -773,6 +897,7 @@ async fn mqtt_or_tcp(
                         let mut b = Vec::new();
                         text(&mut b, &(topics.clone() + "down_ack"));
                         b.extend_from_slice(&pid.to_be_bytes());
+                        b.extend_from_slice(&publish_properties);
                         b.extend_from_slice(a.as_bytes());
                         write(&mut stream, &packet(0x32, &b), s).await?;
                     } else {
@@ -862,6 +987,7 @@ async fn mqtt_or_tcp(
                                 },
                             );
                         }
+                        b.extend_from_slice(&publish_properties);
                         b.extend_from_slice(&payload);
                         write(&mut stream, &packet(0x30 | (c.qos << 1), &b), s).await?;
                     } else {
