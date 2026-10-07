@@ -1072,4 +1072,46 @@ mod tests {
         ));
         assert!(matches!(encode_record(&record, 0), Err(Error::Overloaded)));
     }
+    #[tokio::test]
+    #[ignore = "serial cleanup recovery measurement"]
+    async fn legacy_cleanup_recovery_measurement() {
+        if std::env::var_os("NETBAIOT_LEGACY_BENCH").is_none() {
+            return;
+        }
+        if cfg!(debug_assertions) {
+            panic!("release measurements only");
+        }
+        for count in [1, 128, 512] {
+            let directory =
+                std::env::temp_dir().join(format!("netbaiot-cleanup-spool-{}", Uuid::new_v4()));
+            let spool = RestartSpool::new(directory.clone(), Arc::new(Limits::default()));
+            let records: Vec<_> = (0..count).map(|_| record()).collect();
+            let mut saves = Vec::new();
+            let mut loads = Vec::new();
+            let mut bytes = 0;
+            for iteration in 0..23 {
+                let input = records.clone();
+                let started = std::time::Instant::now();
+                let path = spool.commit(input).await.unwrap().unwrap();
+                let save = started.elapsed().as_nanos();
+                bytes = fs::metadata(path).unwrap().len();
+                let started = std::time::Instant::now();
+                let recovered = spool.recover().await.unwrap();
+                let load = started.elapsed().as_nanos();
+                assert_eq!(recovered.records.len(), count);
+                if iteration >= 3 {
+                    saves.push(save);
+                    loads.push(load);
+                }
+            }
+            for (operation, mut samples) in [("save", saves), ("load", loads)] {
+                samples.sort_unstable();
+                println!(
+                    "CLEANUP_RECOVERY,spool,{count},{operation},{},{},{},{},{bytes}",
+                    samples[10], samples[18], samples[19], samples[19]
+                );
+            }
+            fs::remove_dir_all(directory).unwrap();
+        }
+    }
 }
