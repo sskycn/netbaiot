@@ -55,11 +55,12 @@ fn second_round_json() {
                                     check_members(input, codec.limits.fields.saturating_add(8))
                                         .is_ok()
                                 }
-                                "guards" => check_json_depth(input, codec.limits.nesting_depth)
-                                    .and_then(|()| {
-                                        check_members(input, codec.limits.fields.saturating_add(8))
-                                    })
-                                    .is_ok(),
+                                "guards" => check_payload_bounds(
+                                    input,
+                                    codec.limits.nesting_depth,
+                                    codec.limits.fields.saturating_add(8),
+                                )
+                                .is_ok(),
                                 "serde" => serde_json::from_slice::<WireMessage<'_>>(input).is_ok(),
                                 _ => codec.parse_payload(input).is_ok(),
                             });

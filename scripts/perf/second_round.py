@@ -58,6 +58,7 @@ def network(args):
     output = Path(args.output)
     output.mkdir(parents=True, exist_ok=True)
     cases = {
+        "small": ["--connections", "256", "--qos", "1", "--payload-bytes", "256"],
         "plain": ["--connections", "256", "--qos", "1", "--payload-bytes", "1024"],
         "q1": ["--connections", "256", "--qos", "1", "--payload-bytes", "1024"],
         "large": ["--connections", "64", "--qos", "1", "--payload-bytes", "16384"],

@@ -60,6 +60,7 @@ impl<'de> Deserialize<'de> for UniqueFields {
     }
 }
 // Count members before allocation; JSON punctuation inside strings does not count.
+#[cfg(test)]
 fn check_members(input: &[u8], maximum: usize) -> Result<(), CodecError> {
     let (mut quoted, mut escaped, mut members) = (false, false, 0usize);
     for byte in input {
@@ -82,6 +83,52 @@ fn check_members(input: &[u8], maximum: usize) -> Result<(), CodecError> {
                 return Err(CodecError);
             }
         }
+    }
+    Ok(())
+}
+
+// JsonV1 rejects arrays and bounds both nesting and members before serde allocates.
+// Keep the public depth-only helper independent for its other callers.
+fn check_payload_bounds(
+    input: &[u8],
+    maximum_depth: usize,
+    maximum_members: usize,
+) -> Result<(), CodecError> {
+    let (mut depth, mut members, mut quoted, mut escaped) = (0usize, 0usize, false, false);
+    for byte in input {
+        if quoted {
+            if escaped {
+                escaped = false;
+            } else if *byte == b'\\' {
+                escaped = true;
+            } else if *byte == b'"' {
+                quoted = false;
+            }
+        } else {
+            match byte {
+                b'"' => quoted = true,
+                b'[' => return Err(CodecError),
+                b'{' => {
+                    depth = depth.checked_add(1).ok_or(CodecError)?;
+                    if depth > maximum_depth {
+                        return Err(CodecError);
+                    }
+                }
+                b'}' | b']' => {
+                    depth = depth.checked_sub(1).ok_or(CodecError)?;
+                }
+                b':' => {
+                    members = members.checked_add(1).ok_or(CodecError)?;
+                    if members > maximum_members {
+                        return Err(CodecError);
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+    if depth != 0 || quoted {
+        return Err(CodecError);
     }
     Ok(())
 }
@@ -159,8 +206,11 @@ impl JsonV1 {
         {
             return Err(CodecError);
         }
-        check_json_depth(payload, self.limits.nesting_depth)?;
-        check_members(payload, self.limits.fields.saturating_add(8))?;
+        check_payload_bounds(
+            payload,
+            self.limits.nesting_depth,
+            self.limits.fields.saturating_add(8),
+        )?;
         let wire: WireMessage<'_> = serde_json::from_slice(payload).map_err(|_| CodecError)?;
         let decoded = match wire.kind {
             Kind::Telemetry => DeviceEventKind::Telemetry(
@@ -325,3 +375,35 @@ mod hostile {
 
 #[cfg(test)]
 mod second_round_bench;
+
+#[cfg(test)]
+mod combined_bounds_tests {
+    use super::*;
+    #[test]
+    fn combined_guard_matches_original_guards_for_arbitrary_bytes_and_limits() {
+        let mut seed = 0x6b38_082c_295a_178du64;
+        let alphabet = b"{}[]:\"\\ abc0123\xff";
+        for length in 0..=256 {
+            for _ in 0..32 {
+                let mut input = Vec::with_capacity(length);
+                for _ in 0..length {
+                    seed ^= seed << 13;
+                    seed ^= seed >> 7;
+                    seed ^= seed << 17;
+                    input.push(alphabet[seed as usize % alphabet.len()]);
+                }
+                for depth in [0, 1, 2, 8] {
+                    for members in [0, 1, 8, 72] {
+                        let expected = check_json_depth(&input, depth)
+                            .and_then(|()| check_members(&input, members));
+                        assert_eq!(
+                            check_payload_bounds(&input, depth, members).is_ok(),
+                            expected.is_ok(),
+                            "{input:?},depth={depth},members={members}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
