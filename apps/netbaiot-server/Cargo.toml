@@ -23,7 +23,6 @@ tokio-rustls.workspace = true
 rustls-pemfile.workspace = true
 reqwest.workspace = true
 sha2.workspace = true
-subtle.workspace = true
 
 [lints]
 workspace = true

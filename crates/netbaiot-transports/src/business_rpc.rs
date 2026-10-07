@@ -13,7 +13,7 @@ use netbaiot_runtime::{
     BusinessEventRequest, BusinessProviderScope, BusinessRpcCall, BusinessRpcEventSink,
     BusinessRpcOutbound, BusinessRpcRegistry, CommandService, Error, Ingress, ProviderLease,
     Result, SinkAck, SinkError,
-    metrics::{BusinessRpcQueueClass, Histogram, Metric, Metrics},
+    metrics::{Histogram, Metric, Metrics},
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -282,16 +282,15 @@ struct RpcReply {
 struct Queued {
     frame: RpcReply,
     _bytes: OwnedSemaphorePermit,
-    _tracking: Option<QueueTrack>,
+    _tracking: QueueTrack,
 }
 struct QueueTrack {
     metrics: Arc<Metrics>,
-    class: BusinessRpcQueueClass,
     bytes: u64,
 }
 impl Drop for QueueTrack {
     fn drop(&mut self) {
-        self.metrics.business_rpc_queue_sub(self.class, self.bytes);
+        self.metrics.business_rpc_queue_sub(self.bytes);
     }
 }
 fn response<T: Serialize>(
@@ -321,7 +320,6 @@ fn queue(
     tx: &mpsc::Sender<Queued>,
     budget: &Arc<Semaphore>,
     metrics: &Arc<Metrics>,
-    class: BusinessRpcQueueClass,
     frame: RpcReply,
 ) -> Result<()> {
     let size = serde_json::to_vec(&frame)
@@ -335,15 +333,14 @@ fn queue(
             metrics.inc(Metric::BusinessRpcOverloads);
             Error::Overloaded
         })?;
-    metrics.business_rpc_queue_add(class, size as u64);
+    metrics.business_rpc_queue_add(size as u64);
     tx.try_send(Queued {
         frame,
         _bytes: bytes,
-        _tracking: Some(QueueTrack {
+        _tracking: QueueTrack {
             metrics: metrics.clone(),
-            class,
             bytes: size as u64,
-        }),
+        },
     })
     .map_err(|_| {
         metrics.inc(Metric::BusinessRpcOverloads);
@@ -671,15 +668,7 @@ async fn control_loop(
         if let Some(metric) = metric {
             services.ingress.metrics.inc(metric);
         }
-        if queue(
-            &writer,
-            &budget,
-            &services.ingress.metrics,
-            BusinessRpcQueueClass::Control,
-            reply,
-        )
-        .is_err()
-        {
+        if queue(&writer, &budget, &services.ingress.metrics, reply).is_err() {
             stop.cancel();
             break;
         }
@@ -701,50 +690,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn command_response_pressure_preserves_control_queue_capacity() {
-        let (command_tx, _command_rx) = mpsc::channel(1);
-        let (control_tx, mut control_rx) = mpsc::channel(1);
-        let command_bytes = Arc::new(Semaphore::new(256));
-        let control_bytes = Arc::new(Semaphore::new(256));
-        let metrics = Arc::new(Metrics::default());
-        queue(
-            &command_tx,
-            &command_bytes,
-            &metrics,
-            BusinessRpcQueueClass::Command,
-            response(Uuid::new_v4(), "probe", Ok(true)),
-        )
-        .unwrap();
-        assert!(matches!(
-            queue(
-                &command_tx,
-                &command_bytes,
-                &metrics,
-                BusinessRpcQueueClass::Command,
-                response(Uuid::new_v4(), "probe", Ok(true))
-            ),
-            Err(Error::Overloaded)
-        ));
-        let id = Uuid::new_v4();
-        queue(
-            &control_tx,
-            &control_bytes,
-            &metrics,
-            BusinessRpcQueueClass::Control,
-            error(
-                id,
-                "auth.invalidate",
-                RpcErrorCode::Forbidden,
-                "revision denied",
-            ),
-        )
-        .unwrap();
-        assert!(matches!(control_rx.recv().await.map(|item| item.frame),
-            Some(RpcReply { request_id, .. }) if request_id == id));
-    }
-
-    #[tokio::test]
-    async fn command_response_byte_limit_rejects_and_releases_permits() {
+    async fn control_response_byte_limit_rejects_and_releases_permits() {
         let (tx, mut rx) = mpsc::channel(2);
         let budget = Arc::new(Semaphore::new(128));
         let metrics = Arc::new(Metrics::default());
@@ -752,7 +698,6 @@ mod tests {
             &tx,
             &budget,
             &metrics,
-            BusinessRpcQueueClass::Command,
             response(Uuid::new_v4(), "probe", Ok(true)),
         )
         .unwrap();
@@ -761,18 +706,27 @@ mod tests {
                 &tx,
                 &budget,
                 &metrics,
-                BusinessRpcQueueClass::Command,
                 response(Uuid::new_v4(), "probe", Ok(true))
             ),
             Err(Error::Overloaded)
         ));
+        assert!(
+            metrics
+                .render()
+                .contains("netbaiot_business_rpc_queue_count{class=\"control\"} 1\n")
+        );
         drop(rx.recv().await);
+        assert_eq!(budget.available_permits(), 128);
+        let released = metrics.render();
+        assert!(released.contains("netbaiot_business_rpc_queue_count{class=\"control\"} 0\n"));
+        assert!(released.contains("netbaiot_business_rpc_queue_bytes{class=\"control\"} 0\n"));
+        assert!(!released.contains("{class=\"event\"}"));
+        assert!(!released.contains("{class=\"command\"}"));
         assert!(
             queue(
                 &tx,
                 &budget,
                 &metrics,
-                BusinessRpcQueueClass::Command,
                 response(Uuid::new_v4(), "probe", Ok(true))
             )
             .is_ok()
@@ -788,7 +742,6 @@ mod tests {
             &send,
             &budget,
             &metrics,
-            BusinessRpcQueueClass::Control,
             response(Uuid::new_v4(), "probe", Ok(true)),
         )
         .unwrap();
@@ -797,7 +750,6 @@ mod tests {
                 &send,
                 &budget,
                 &metrics,
-                BusinessRpcQueueClass::Control,
                 response(Uuid::new_v4(), "probe", Ok(true))
             ),
             Err(Error::Overloaded)
