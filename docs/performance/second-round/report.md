@@ -67,6 +67,8 @@ E 全部带 expiry 的 256 项扫描约 1458→1531ns（+73ns/+5.01%），已作
 
 ## E2E
 
+Producer PUBACK/PUBCOMP 只表示 EventAccepted 与对应 MQTT responsibility 被接受，不表示业务持久化或执行。CPU 是 process 采样平均值（100%=1 core，含启动/收尾样本），不是整机稳定窗口利用率。
+
 下表为各阶段 immediate-before / candidate 的每侧轮次中位数，不能把它们串乘为整体收益。所有列出的有效轮次均为 0 error、0 overload、0 unexpected disconnect、0 producer pending-at-disconnect。P99.9 有充足事件样本，但只有少数独立 host runs，调度暂停对其影响大；不据此承诺尾延迟或容量。
 
 | 阶段 / workload | ACK/s A→B | P50 ms A→B | P95 ms A→B | P99 ms A→B | P99.9 ms A→B | RSS KiB A→B | CPU % A→B |
@@ -148,7 +150,13 @@ Idle memory ABBA：128 个明文、非 persistent、无订阅 MQTT 连接，hold
 
 G 是 server-side Rust 表示变化：`BrokerMessage.topic` 和 `properties` 构造方需 `.into()`。Public protocol/client/device SDK wire types未改；historical JSON、NBMQ v1–v6 的现有 fixture 全部通过，新增 compact-message digest/JSON golden 和 COW/isolation/quota 测试。Spool/EventId、ACK 后回收及 duplicate replay 语义保留。QoS2 仍不是业务 exactly-once；planned spool 不提供未落盘流量的 abrupt-crash durability。
 
-VALIDATION_RESULTS
+每个保留阶段运行 `cargo xtask check`（fmt check、locked clippy all-targets/all-features `-D warnings`、locked workspace all-features tests、evidence gate）；MQTT 修改额外运行 release MQTT/raw-state-machine/Mosquitto gate。G 额外运行请求的 spool 与 mqtt_recovery filters。最终完整 xtask、release Rust、release MQTT、spool（16 tests）、mqtt_recovery filter、60 秒 ignored restart soak 全部 **PASS**，命令/日志见 [validation-results.json](validation-results.json)。Soak 为 12 代 planned restart，实际 68.45s，验证 accepted EventId 在 restart/spool/replay 后被观察到；默认 workspace suite 的 SIGKILL bounded-loss regression 也 PASS。
+
+相关 8 个 fuzz target 各 **10,000 runs PASS**：mqtt_packet、mqtt_state、mqtt_recovery、mqtt_v5_packet、mqtt_v5_publish、mqtt_v5_subscribe、json_codec、restart_spool。使用 cargo-fuzz 默认 ASan/nightly，见 [fuzz-results.json](fuzz-results.json)；smoke 不等于安全审计或任意输入的完整证明。
+
+未运行小时级/跨机器生产 soak、目标公网/TLS容量 campaign、真实跨设备 live fanout（授权模型不允许），或持续 maximum practical network inflight 的容量测试。高 inflight 1..256/1024 是实际 broker state-machine 子系统矩阵；网络 generator 默认 window 为 4。未测 codec allocation，未以未知指标写成 0。性能测试是短期本机实验；部署容量仍需目标环境测量。
+
+基线三平台 Actions PASS 见 environment.json；优化合并 commit 的最终 Actions/checks 是该 source 的 CI 证据，随后清理任务从独立、全绿的 main 开始。
 
 ## Remaining hotspots 与第三轮门槛
 

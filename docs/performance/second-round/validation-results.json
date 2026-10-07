@@ -1,0 +1,39 @@
+{
+  "source_head_before_report": "665ac9e3a74fa7f85b86c8195523795ec512fc0c",
+  "source_note": "Exact source commit is available in git log: test(perf): measure persistent MQTT replay and idle connection memory. Later changes are documentation only.",
+  "results": [
+    {
+      "command": "cargo xtask check",
+      "status": "PASS",
+      "raw_log": "target/second-round/final-validation/xtask.log"
+    },
+    {
+      "command": "cargo xtask check release --part rust",
+      "status": "PASS",
+      "raw_log": "target/second-round/final-validation/release-rust.log"
+    },
+    {
+      "command": "PATH=/usr/local/sbin:$PATH cargo xtask check release --part mqtt",
+      "status": "PASS",
+      "raw_log": "target/second-round/final-validation/release-mqtt.log"
+    },
+    {
+      "command": "cargo test --locked -p netbaiot-runtime spool::",
+      "status": "PASS",
+      "raw_log": "target/second-round/final-validation/spool.log"
+    },
+    {
+      "command": "cargo test --locked -p netbaiot-transports mqtt_recovery",
+      "status": "PASS",
+      "raw_log": "target/second-round/final-validation/mqtt-recovery.log"
+    },
+    {
+      "command": "cargo test --locked -p netbaiot-server --test server subprocess_graceful_restart_sixty_second_soak -- --ignored --exact --nocapture",
+      "status": "PASS",
+      "raw_log": "target/second-round/final-validation/soak.log"
+    }
+  ],
+  "soak_seconds": 68.45,
+  "fuzz_results": "fuzz-results.json",
+  "interpretation": "xtask includes fmt check, locked clippy all-targets/all-features -D warnings and locked workspace all-features tests. Serial validation pipeline exited0."
+}
