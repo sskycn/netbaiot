@@ -96,7 +96,7 @@ fn fixture(count: usize, distribution: &str) -> Fixture {
         .subscribe(&attachment.key, attachment.generation, &topic, 1)
         .unwrap();
     let message = BrokerMessage {
-        topic: topic.clone(),
+        topic: topic.clone().into(),
         payload: vec![7; 64].into(),
         qos: 1,
         retain: false,
@@ -223,14 +223,15 @@ fn now_ms() -> i64 {
 fn route_offline(case: &Fixture, index: usize, deadline: i64) {
     let identity = auth("tenant".to_owned(), format!("device-{index}"));
     let message = BrokerMessage {
-        topic: topic(&identity.device_key, TopicKind::Down),
+        topic: (topic(&identity.device_key, TopicKind::Down)).into(),
         payload: vec![7; 64].into(),
         qos: 1,
         retain: false,
-        properties: netbaiot_transports::mqtt::broker::PublishProperties {
+        properties: (netbaiot_transports::mqtt::broker::PublishProperties {
             expires_at_ms: Some(deadline),
             ..Default::default()
-        },
+        })
+        .into(),
     };
     case.broker.route(&identity.device_key, message).unwrap();
 }

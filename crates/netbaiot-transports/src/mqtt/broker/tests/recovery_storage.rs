@@ -123,14 +123,15 @@ async fn v4_recovery_keeps_publish_properties_and_byte_accounting() {
         payload: b"value".to_vec().into(),
         qos: 1,
         retain: true,
-        properties: PublishProperties {
+        properties: (PublishProperties {
             payload_format: Some(1),
             expires_at_ms: Some(now_ms() + 30_000),
             content_type: Some("text/plain".into()),
             response_topic: Some(topic.into()),
             correlation_data: Some(vec![0, 1, 2]),
             user_properties: vec![("key".into(), "value".into())],
-        },
+        })
+        .into(),
     };
     broker.route(&auth.device_key, message.clone()).unwrap();
     let original = broker.usage().unwrap();
@@ -184,10 +185,11 @@ async fn v5_message_expiry_cleans_offline_retained_and_recovery_state() {
                 payload: b"value".to_vec().into(),
                 qos: 1,
                 retain: true,
-                properties: PublishProperties {
+                properties: (PublishProperties {
                     expires_at_ms: Some(now_ms() + 30_000),
                     ..Default::default()
-                },
+                })
+                .into(),
             },
         )
         .unwrap();
@@ -745,7 +747,7 @@ async fn mqtt_recovery_streaming_benchmark_manual() {
                 .route(
                     &device.device_key,
                     BrokerMessage {
-                        topic: format!("v1/t/t/p/p/d/bench-{index}/up"),
+                        topic: (format!("v1/t/t/p/p/d/bench-{index}/up")).into(),
                         payload: vec![index as u8; length].into(),
                         qos: 0,
                         retain: true,
@@ -796,7 +798,7 @@ async fn mqtt_recovery_v6_near_default_capacity_manual() {
                 .route(
                     &identity.device_key,
                     BrokerMessage {
-                        topic: topic.clone(),
+                        topic: topic.clone().into(),
                         payload: vec![0x5a; 8_192].into(),
                         qos: 1,
                         retain: false,
@@ -819,7 +821,7 @@ async fn mqtt_recovery_v6_near_default_capacity_manual() {
                 owner: owner.clone(),
                 origin: Some(origin.clone()),
                 message: BrokerMessage {
-                    topic: format!("v1/t/t{}/p/p/d/w{index}/up", index / 32),
+                    topic: (format!("v1/t/t{}/p/p/d/w{index}/up", index / 32)).into(),
                     payload: vec![0x77; 65_000].into(),
                     qos: 1,
                     retain: false,
@@ -841,7 +843,7 @@ async fn mqtt_recovery_v6_near_default_capacity_manual() {
             .route(
                 &owner,
                 BrokerMessage {
-                    topic: format!("v1/t/t{}/p/p/d/r{index}/up", index / 128),
+                    topic: (format!("v1/t/t{}/p/p/d/r{index}/up", index / 128)).into(),
                     payload: vec![0x88; 64_900].into(),
                     qos: 1,
                     retain: true,
@@ -936,10 +938,11 @@ fn command_progress_follows_started_qos_recovery_after_write_failure() {
                         payload: vec![1].into(),
                         qos,
                         retain: false,
-                        properties: PublishProperties {
+                        properties: (PublishProperties {
                             expires_at_ms: Some(expiry),
                             ..Default::default()
-                        },
+                        })
+                        .into(),
                     },
                     Some(progress.clone()),
                 )

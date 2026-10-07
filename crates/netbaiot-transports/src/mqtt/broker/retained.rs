@@ -196,7 +196,7 @@ pub(super) fn check_retained_update(
     if message.payload.len() > limits.max_retained_message_bytes {
         return Err(Error::Overloaded);
     }
-    let existing = state.retained.get(&message.topic);
+    let existing = state.retained.get(message.topic.as_ref());
     let old_bytes = existing.map_or(0, RetainedMessage::bytes);
     let old_same_tenant = existing.is_some_and(|old| old.tenant_id == owner.tenant_id);
     let (tenant_count, tenant_bytes) = state
@@ -244,15 +244,17 @@ pub(super) fn update_retained(
     limits: &Limits,
 ) -> Result<()> {
     if message.payload.is_empty() {
-        if let Some(old) = state.retained.remove(&message.topic) {
+        if let Some(old) = state.retained.remove(message.topic.as_ref()) {
             state.retained_bytes = state.retained_bytes.saturating_sub(old.bytes());
             retained_usage_remove(state, &old)?;
         }
-        state.retained_expiry.update(message.topic.clone(), None);
+        state
+            .retained_expiry
+            .update(message.topic.to_string(), None);
         return Ok(());
     }
     check_retained_update(state, owner, origin, message, limits)?;
-    let old = state.retained.remove(&message.topic);
+    let old = state.retained.remove(message.topic.as_ref());
     let old_bytes = old.as_ref().map_or(0, RetainedMessage::bytes);
     if let Some(old) = &old {
         retained_usage_remove(state, old)?;
@@ -268,10 +270,10 @@ pub(super) fn update_retained(
         origin: origin.cloned(),
     };
     retained_usage_add(state, &retained)?;
-    state.retained.insert(message.topic.clone(), retained);
+    state.retained.insert(message.topic.to_string(), retained);
     state
         .retained_expiry
-        .update(message.topic.clone(), message.properties.expires_at_ms);
+        .update(message.topic.to_string(), message.properties.expires_at_ms);
     Ok(())
 }
 

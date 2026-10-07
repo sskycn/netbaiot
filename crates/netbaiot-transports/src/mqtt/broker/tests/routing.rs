@@ -126,14 +126,15 @@ fn expired_retained_is_not_replayed_while_maintenance_is_budgeted() {
             .route(
                 &identity.device_key,
                 BrokerMessage {
-                    topic: topic.clone(),
+                    topic: topic.clone().into(),
                     payload: vec![1].into(),
                     qos: 1,
                     retain: true,
-                    properties: PublishProperties {
+                    properties: (PublishProperties {
                         expires_at_ms: Some(now_ms() + 10_000),
                         ..Default::default()
-                    },
+                    })
+                    .into(),
                 },
             )
             .unwrap();
@@ -563,7 +564,7 @@ fn retained_replay_capacity_failure_does_not_commit_subscription_or_trie() {
             .route(
                 &owner.device_key,
                 BrokerMessage {
-                    topic: format!("v1/t/t/p/p/d/publisher/{suffix}"),
+                    topic: (format!("v1/t/t/p/p/d/publisher/{suffix}")).into(),
                     payload: suffix.as_bytes().to_vec().into(),
                     qos: 0,
                     retain: true,

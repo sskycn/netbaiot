@@ -245,7 +245,7 @@ fn oversized_delivery_is_settled_locally(qos: u8) {
             .route_from_session(
                 &attachment.key,
                 &BrokerMessage {
-                    topic: topic.clone(),
+                    topic: topic.clone().into(),
                     payload: payload.into(),
                     qos,
                     retain: false,
@@ -525,3 +525,5 @@ mod recovery_storage;
 mod routing;
 mod sessions;
 mod will;
+
+mod shared_metadata;

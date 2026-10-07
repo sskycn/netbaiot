@@ -59,7 +59,7 @@ fn mqtt_qos0_live_delivery_obeys_byte_budget() {
 #[test]
 fn mqtt_live_delivery_obeys_tenant_and_global_byte_budgets() {
     let message = |tenant: &str, device: &str| BrokerMessage {
-        topic: format!("v1/t/{tenant}/p/p/d/{device}/up"),
+        topic: (format!("v1/t/{tenant}/p/p/d/{device}/up")).into(),
         payload: vec![3; 256].into(),
         qos: 0,
         retain: false,
@@ -133,7 +133,7 @@ fn released_global_outbound_bytes_wake_another_tenant() {
     let mut second_device = auth("bb");
     second_device.device_key.tenant_id = TenantId::new("u").unwrap();
     let message = |tenant: &str, device: &str| BrokerMessage {
-        topic: format!("v1/t/{tenant}/p/p/d/{device}/up"),
+        topic: (format!("v1/t/{tenant}/p/p/d/{device}/up")).into(),
         payload: vec![5; 256].into(),
         qos: 1,
         retain: false,
@@ -188,7 +188,7 @@ fn released_global_bytes_wake_deferred_reconnect_replay() {
     let mut second_device = auth("bb");
     second_device.device_key.tenant_id = TenantId::new("u").unwrap();
     let message = |tenant: &str, device: &str| BrokerMessage {
-        topic: format!("v1/t/{tenant}/p/p/d/{device}/up"),
+        topic: (format!("v1/t/{tenant}/p/p/d/{device}/up")).into(),
         payload: vec![3; 256].into(),
         qos: 1,
         retain: false,
@@ -269,10 +269,11 @@ fn command_is_rejected_when_send_quota_is_full() {
         payload: payload.to_vec().into(),
         qos: 1,
         retain: false,
-        properties: PublishProperties {
+        properties: (PublishProperties {
             expires_at_ms: Some(deadline),
             ..Default::default()
-        },
+        })
+        .into(),
     };
     broker
         .send_live(&attachment.key, attachment.generation, command(b"first"))
@@ -440,10 +441,11 @@ async fn command_expiry_survives_snapshot_restore() {
                 payload: b"command".to_vec().into(),
                 qos: 1,
                 retain: false,
-                properties: PublishProperties {
+                properties: (PublishProperties {
                     expires_at_ms: Some(deadline),
                     ..Default::default()
-                },
+                })
+                .into(),
             },
         )
         .unwrap();
@@ -513,7 +515,7 @@ fn qos0_drop_and_closed_receiver_release_all_command_resources() {
                     payload: vec![1].into(),
                     qos: 0,
                     retain: false,
-                    properties: PublishProperties::default(),
+                    properties: (PublishProperties::default()).into(),
                 },
                 Some(progress.clone()),
             );
@@ -575,10 +577,11 @@ fn expired_command_at_broker_handoff_releases_all_responsibility() {
             payload: vec![1].into(),
             qos,
             retain: false,
-            properties: PublishProperties {
+            properties: (PublishProperties {
                 expires_at_ms: Some(expiry),
                 ..Default::default()
-            },
+            })
+            .into(),
         };
         broker
             .send_live_tracked(
@@ -639,10 +642,11 @@ fn command_progress_expiry_and_exact_ack_transitions_for_both_mqtt_versions() {
                         payload: vec![1].into(),
                         qos: 1,
                         retain: false,
-                        properties: PublishProperties {
+                        properties: (PublishProperties {
                             expires_at_ms: Some(expiry),
                             ..Default::default()
-                        },
+                        })
+                        .into(),
                     },
                     Some(progress.clone()),
                 )

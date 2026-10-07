@@ -152,7 +152,7 @@ pub(super) fn prune_session_messages(
         {
             let before = message.bytes();
             message.payload.clear();
-            message.properties = PublishProperties::default();
+            message.properties = PublishProperties::default().into();
             session_bytes = session_bytes.saturating_add(before.saturating_sub(message.bytes()));
         }
     }

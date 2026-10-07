@@ -77,10 +77,11 @@ fn packet_identifier_not_reused_before_qos_exchange_finishes() {
         payload: b"data".to_vec().into(),
         qos: 1,
         retain: false,
-        properties: PublishProperties {
+        properties: (PublishProperties {
             expires_at_ms: Some(now_ms() + 10_000),
             ..Default::default()
-        },
+        })
+        .into(),
     };
     broker
         .route_from_session(&attachment.key, &message)

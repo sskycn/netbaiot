@@ -408,11 +408,11 @@ pub(super) async fn connection(
             let mut guard = services.mqtt.reserve_will_for_session(
                 attachment.key.clone(),
                 BrokerMessage {
-                    topic: will.topic,
+                    topic: will.topic.into(),
                     payload: will.payload,
                     qos: will.qos,
                     retain: will.retain,
-                    properties,
+                    properties: properties.into(),
                 },
             )?;
             guard.arm_v5(
@@ -482,11 +482,11 @@ pub(super) async fn connection(
                     };
                     let progress = command.progress.take();
                     if services.mqtt.send_live_tracked(&attachment.key, attachment.generation, BrokerMessage {
-                        topic: down, payload: std::mem::take(&mut command.bytes).into(), qos, retain: false,
-                        properties: PublishProperties {
+                        topic: down.into(), payload: std::mem::take(&mut command.bytes).into(), qos, retain: false,
+                        properties: (PublishProperties {
                             expires_at_ms: Some(command.expires_at),
                             ..Default::default()
-                        },
+                        }).into(),
                     }, progress.clone()).is_err() {
                         if let Some(progress) = progress { progress.abandon_unsent(); }
                         else { services.router.transport_state(DeliveryState::Failed); }
@@ -659,8 +659,8 @@ pub(super) async fn connection(
                             } else {
                                 publish_acl(&auth, &topic)?;
                             }
-                            let message = BrokerMessage { topic, payload, qos, retain,
-                                properties: PublishProperties::from_wire(&properties) };
+                            let message = BrokerMessage { topic: topic.into(), payload, qos, retain,
+                                properties: (PublishProperties::from_wire(&properties)).into()};
                             if qos > 0 && !services.mqtt.inbound_receive_available(&attachment.key, attachment.generation, qos, packet_id.ok_or(Error::Invalid)?)? {
                                 fail_with_reason(&mut stream, &services, client_maximum, &mut error_disconnect_sent, v5::DisconnectReason::ReceiveMaximumExceeded, Error::Overloaded).await?;
                             }

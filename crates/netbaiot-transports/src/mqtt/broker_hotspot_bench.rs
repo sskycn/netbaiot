@@ -24,14 +24,15 @@ fn identity(index: usize) -> AuthenticatedDevice {
 
 fn message(topic: String, qos: u8, expires: bool) -> BrokerMessage {
     BrokerMessage {
-        topic,
+        topic: topic.into(),
         payload: vec![7; 64].into(),
         qos,
         retain: false,
-        properties: PublishProperties {
+        properties: (PublishProperties {
             expires_at_ms: expires.then(|| now_ms() + 3_600_000),
             ..Default::default()
-        },
+        })
+        .into(),
     }
 }
 

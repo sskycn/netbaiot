@@ -75,10 +75,11 @@ fn publish(topic: &str, qos: u8, expiry: Option<i64>) -> BrokerMessage {
         payload: vec![7; 1024].into(),
         qos,
         retain: false,
-        properties: PublishProperties {
+        properties: (PublishProperties {
             expires_at_ms: expiry,
             ..Default::default()
-        },
+        })
+        .into(),
     }
 }
 
@@ -541,7 +542,8 @@ fn second_round_metadata() {
                         })
                         .collect(),
                     ..Default::default()
-                };
+                }
+                .into();
             }
             assert!(message.properties.valid(&broker.limits));
             let source = attachments[0].key.clone();

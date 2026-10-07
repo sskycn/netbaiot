@@ -18,7 +18,7 @@ fn future_will_owner_index_handles_shared_deadline_and_due_promotion() {
                 owner: owner.clone(),
                 origin: Some(key.clone()),
                 message: BrokerMessage {
-                    topic: format!("v1/t/t/p/p/d/will-{index}/up"),
+                    topic: (format!("v1/t/t/p/p/d/will-{index}/up")).into(),
                     payload: vec![7; 32].into(),
                     qos: 1,
                     retain: false,
@@ -64,7 +64,7 @@ fn delayed_will_deadlines_have_bounded_due_work() {
         for index in 0..5 {
             let owner = auth(&format!("will-index-{index}")).device_key;
             let message = BrokerMessage {
-                topic: format!("v1/t/t/p/p/d/will-index-{index}/up"),
+                topic: (format!("v1/t/t/p/p/d/will-index-{index}/up")).into(),
                 payload: vec![index as u8].into(),
                 qos: 1,
                 retain: false,
@@ -163,10 +163,11 @@ async fn v5_delayed_will_is_bounded_cancelled_on_resume_and_recovers() {
                 payload: b"delayed".to_vec().into(),
                 qos: 1,
                 retain: true,
-                properties: PublishProperties {
+                properties: (PublishProperties {
                     expires_at_ms: Some(i64::MAX),
                     ..Default::default()
-                },
+                })
+                .into(),
             },
         )
         .unwrap();
@@ -197,10 +198,11 @@ async fn v5_delayed_will_is_bounded_cancelled_on_resume_and_recovers() {
                 payload: b"recover".to_vec().into(),
                 qos: 1,
                 retain: true,
-                properties: PublishProperties {
+                properties: (PublishProperties {
                     expires_at_ms: Some(i64::MAX),
                     ..Default::default()
-                },
+                })
+                .into(),
             },
         )
         .unwrap();
