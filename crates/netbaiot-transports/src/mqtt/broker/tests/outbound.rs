@@ -460,7 +460,7 @@ fn tenant_session_bytes_and_qos2_inflight_are_hard_bounded() {
     let b = auth("b");
     let second = broker.attach(&b, "b".into(), false).unwrap();
     let message = |device: &str| BrokerMessage {
-        topic: format!("v1/t/t/p/p/d/{device}/up"),
+        topic: (format!("v1/t/t/p/p/d/{device}/up")).into(),
         payload: b"x".to_vec().into(),
         qos: 2,
         retain: false,

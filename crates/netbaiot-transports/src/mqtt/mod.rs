@@ -323,7 +323,7 @@ pub async fn connection(
             services.mqtt.reserve_will_for_session(
                 attachment.key.clone(),
                 BrokerMessage {
-                    topic: will.topic,
+                    topic: will.topic.into(),
                     payload: will.payload,
                     qos: will.qos,
                     retain: will.retain,
@@ -390,8 +390,8 @@ pub async fn connection(
                     };
                     let progress = command.progress.take();
                     if services.mqtt.send_live_tracked(&attachment.key, attachment.generation, BrokerMessage {
-                        topic: down, payload: std::mem::take(&mut command.bytes).into(), qos, retain: false,
-                        properties: broker::PublishProperties { expires_at_ms: Some(command.expires_at), ..Default::default() },
+                        topic: down.into(), payload: std::mem::take(&mut command.bytes).into(), qos, retain: false,
+                        properties: (broker::PublishProperties { expires_at_ms: Some(command.expires_at), ..Default::default() }).into(),
                     }, progress.clone()).is_err() {
                         if let Some(progress) = progress { progress.abandon_unsent(); }
                         else { services.router.transport_state(DeliveryState::Failed); }
@@ -538,7 +538,7 @@ pub async fn connection(
                                     broker::InboundQos2PublishState::NeedsNewMessageAdmission => {}
                                 }
                             }
-                            let message = BrokerMessage { topic, payload, qos, retain,
+                            let message = BrokerMessage { topic: topic.into(), payload, qos, retain,
     properties: Default::default(),
 };
                             // QoS2 acknowledges ownership with PUBREC, so authorization must be

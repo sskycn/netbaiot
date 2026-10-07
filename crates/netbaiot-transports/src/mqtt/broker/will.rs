@@ -387,7 +387,7 @@ impl MqttBroker {
             return Err(Error::Invalid);
         }
         let charge = will_charge(&message, origin.as_ref());
-        let mut state = lock(&self.state)?;
+        let mut state = self.lock_state(BrokerProbe::Will)?;
         reserve_will_capacity(&mut state, &owner.tenant_id, charge, &self.limits)?;
         let reservation = if message.retain && !message.payload.is_empty() {
             match reserve_retained(
@@ -426,7 +426,7 @@ impl MqttBroker {
         bytes: usize,
         reservation: RetainedReservation,
     ) -> Result<()> {
-        let mut state = lock(&self.state)?;
+        let mut state = self.lock_state(BrokerProbe::Will)?;
         if reservation != RetainedReservation::default() {
             release_retained_reservation(&mut state, tenant, reservation);
         }
@@ -444,7 +444,7 @@ impl MqttBroker {
         reservation: RetainedReservation,
         message_expiry_interval: Option<u32>,
     ) -> Result<Option<usize>> {
-        let mut state = lock(&self.state)?;
+        let mut state = self.lock_state(BrokerProbe::Will)?;
         // Only a Will in the delayed cancellation window may be suppressed by a
         // resumed Session. An immediate Will belongs to the closing connection.
         if reservation != RetainedReservation::default() {
@@ -480,7 +480,7 @@ impl MqttBroker {
         pending: PendingWill,
         old_generation: u64,
     ) -> Result<WillSchedule> {
-        let mut state = lock(&self.state)?;
+        let mut state = self.lock_state(BrokerProbe::Will)?;
         if let Some((key, incarnation)) = &pending.cancel_on_resume {
             if state
                 .sessions
@@ -509,7 +509,7 @@ impl MqttBroker {
     }
 
     pub fn pending_will_count(&self) -> Result<usize> {
-        let state = lock(&self.state)?;
+        let state = self.lock_state(BrokerProbe::Will)?;
         Ok(pending_will_count(&state))
     }
 }

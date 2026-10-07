@@ -620,11 +620,11 @@ pub(super) fn decode_message(
         PublishProperties::default()
     };
     Ok(BrokerMessage {
-        topic,
+        topic: topic.into(),
         payload: payload.into(),
         qos,
         retain,
-        properties,
+        properties: properties.into(),
     })
 }
 
@@ -968,7 +968,7 @@ pub(super) fn decode_record(
             if !message.retain || message.payload.is_empty() {
                 return Err(Error::Invalid);
             }
-            let topic = message.topic.clone();
+            let topic = message.topic.to_string();
             if snapshot
                 .retained
                 .iter()
@@ -1100,7 +1100,7 @@ pub(super) struct TemporaryRecovery(PathBuf);
 
 impl MqttBroker {
     pub fn snapshot(&self) -> Result<MqttRecoverySnapshot> {
-        let state = lock(&self.state)?;
+        let state = self.lock_state(BrokerProbe::Recovery)?;
         Ok(MqttRecoverySnapshot {
             format_version: RECOVERY_VERSION,
             snapshot_generation: state.generation,
@@ -1488,7 +1488,7 @@ impl MqttBroker {
             sync_session_usage(&mut replacement, &key)?;
         }
         for (topic, retained) in snapshot.retained {
-            if topic != retained.message.topic
+            if topic.as_str() != retained.message.topic.as_ref()
                 || !valid_broker_message(&retained.message, &self.limits)
                 || !retained_topic_owner_acl(&retained.tenant_id, &topic)
                 || retained.origin.as_ref().is_some_and(|origin| {
@@ -1609,7 +1609,7 @@ impl MqttBroker {
             return Err(Error::Overloaded);
         }
         retry_pending_wills(&mut replacement, &self.limits);
-        let mut state = lock(&self.state)?;
+        let mut state = self.lock_state(BrokerProbe::Recovery)?;
         *state = replacement;
         self.publish_subscription_count(&state);
         Ok(())

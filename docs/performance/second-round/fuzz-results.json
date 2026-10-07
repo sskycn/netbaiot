@@ -1,0 +1,127 @@
+{
+  "toolchain": "rustc 1.101.0-nightly (282215592 2026-10-04)",
+  "sanitizer": "cargo-fuzz default address sanitizer",
+  "targets": [
+    {
+      "target": "mqtt_packet",
+      "runs": 10000,
+      "command": [
+        "cargo",
+        "+nightly",
+        "fuzz",
+        "run",
+        "mqtt_packet",
+        "--",
+        "-runs=10000",
+        "-max_len=65540"
+      ],
+      "status": "PASS"
+    },
+    {
+      "target": "mqtt_state",
+      "runs": 10000,
+      "command": [
+        "cargo",
+        "+nightly",
+        "fuzz",
+        "run",
+        "mqtt_state",
+        "--",
+        "-runs=10000",
+        "-max_len=1024"
+      ],
+      "status": "PASS"
+    },
+    {
+      "target": "mqtt_recovery",
+      "runs": 10000,
+      "command": [
+        "cargo",
+        "+nightly",
+        "fuzz",
+        "run",
+        "mqtt_recovery",
+        "--",
+        "-runs=10000",
+        "-max_len=1048576"
+      ],
+      "status": "PASS"
+    },
+    {
+      "target": "mqtt_v5_packet",
+      "runs": 10000,
+      "command": [
+        "cargo",
+        "+nightly",
+        "fuzz",
+        "run",
+        "mqtt_v5_packet",
+        "--",
+        "-runs=10000",
+        "-max_len=65540"
+      ],
+      "status": "PASS"
+    },
+    {
+      "target": "mqtt_v5_publish",
+      "runs": 10000,
+      "command": [
+        "cargo",
+        "+nightly",
+        "fuzz",
+        "run",
+        "mqtt_v5_publish",
+        "--",
+        "-runs=10000",
+        "-max_len=4096"
+      ],
+      "status": "PASS"
+    },
+    {
+      "target": "mqtt_v5_subscribe",
+      "runs": 10000,
+      "command": [
+        "cargo",
+        "+nightly",
+        "fuzz",
+        "run",
+        "mqtt_v5_subscribe",
+        "--",
+        "-runs=10000",
+        "-max_len=1024"
+      ],
+      "status": "PASS"
+    },
+    {
+      "target": "json_codec",
+      "runs": 10000,
+      "command": [
+        "cargo",
+        "+nightly",
+        "fuzz",
+        "run",
+        "json_codec",
+        "--",
+        "-runs=10000",
+        "-max_len=65537"
+      ],
+      "status": "PASS"
+    },
+    {
+      "target": "restart_spool",
+      "runs": 10000,
+      "command": [
+        "cargo",
+        "+nightly",
+        "fuzz",
+        "run",
+        "restart_spool",
+        "--",
+        "-runs=10000",
+        "-max_len=1048576"
+      ],
+      "status": "PASS"
+    }
+  ],
+  "interpretation": "10000 iterations per target is smoke evidence, not an exhaustive security or resource proof."
+}

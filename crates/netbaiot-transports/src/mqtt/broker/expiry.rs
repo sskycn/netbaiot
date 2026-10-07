@@ -11,13 +11,15 @@ pub(super) fn next_message_expiry(session: &StoredSession) -> Option<i64> {
                 .outbound
                 .iter()
                 .filter_map(|(id, outbound)| match outbound {
-                    OutboundState::AwaitPuback(message) | OutboundState::AwaitPubrec(message)
-                        if !session.started_outbound.contains(id) =>
-                    {
-                        message.properties.expires_at_ms
+                    OutboundState::AwaitPuback(message) | OutboundState::AwaitPubrec(message) => {
+                        // Most publishes have no expiry. Only consult transfer
+                        // ownership when a deadline actually needs exclusion.
+                        message
+                            .properties
+                            .expires_at_ms
+                            .filter(|_| !session.started_outbound.contains(id))
                     }
                     OutboundState::AwaitPubcomp(message) => message.properties.expires_at_ms,
-                    _ => None,
                 }),
         )
         .min()
@@ -150,7 +152,7 @@ pub(super) fn prune_session_messages(
         {
             let before = message.bytes();
             message.payload.clear();
-            message.properties = PublishProperties::default();
+            message.properties = PublishProperties::default().into();
             session_bytes = session_bytes.saturating_add(before.saturating_sub(message.bytes()));
         }
     }

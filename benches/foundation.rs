@@ -220,7 +220,7 @@ fn main() {
     qos1.subscribe(&qos1_attachment.key, qos1_attachment.generation, &down, 1)
         .unwrap();
     let qos1_message = BrokerMessage {
-        topic: down.clone(),
+        topic: down.clone().into(),
         payload: vec![7; 128].into(),
         qos: 1,
         retain: false,
@@ -241,7 +241,7 @@ fn main() {
     let qos2 = MqttBroker::new(Arc::new(Limits::default()));
     let qos2_attachment = qos2.attach(&auth, "qos2-bench".into(), false).unwrap();
     let qos2_message = BrokerMessage {
-        topic: up.clone(),
+        topic: up.clone().into(),
         payload: vec![9; 128].into(),
         qos: 2,
         retain: false,
@@ -460,7 +460,7 @@ fn main() {
                 .route(
                     &auth.device_key,
                     BrokerMessage {
-                        topic: format!("bench/retained/{i}"),
+                        topic: (format!("bench/retained/{i}")).into(),
                         payload: vec![b'x'; 64].into(),
                         qos: 1,
                         retain: true,
@@ -501,7 +501,7 @@ fn main() {
             .route(
                 &auth.device_key,
                 BrokerMessage {
-                    topic: down.clone(),
+                    topic: down.clone().into(),
                     payload: payload.clone().into(),
                     qos: 1,
                     retain: false,
@@ -523,7 +523,7 @@ fn main() {
             .route(
                 &auth.device_key,
                 BrokerMessage {
-                    topic: down.clone(),
+                    topic: down.clone().into(),
                     payload: payload.clone().into(),
                     qos: 1,
                     retain: false,
@@ -546,7 +546,7 @@ fn main() {
             .route(
                 &auth.device_key,
                 BrokerMessage {
-                    topic: down.clone(),
+                    topic: down.clone().into(),
                     payload: payload.clone().into(),
                     qos: 2,
                     retain: false,
@@ -568,7 +568,7 @@ fn main() {
                 inbound_attachment.generation,
                 1,
                 BrokerMessage {
-                    topic: up.clone(),
+                    topic: up.clone().into(),
                     payload: payload.into(),
                     qos: 2,
                     retain: false,

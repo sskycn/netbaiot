@@ -8,8 +8,8 @@ use netbaiot_core::{
 };
 use netbaiot_runtime::recovery_io;
 use netbaiot_runtime::{
-    ByteBudget, BytesPermit, Error, Histogram, Limits, Metrics, Result, WeakByteBudget, lock,
-    now_ms,
+    BrokerProbe, ByteBudget, BytesPermit, Error, Histogram, Limits, Metrics, Result,
+    WeakByteBudget, lock, now_ms,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -101,13 +101,13 @@ impl<'de> Deserialize<'de> for Subscription {
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BrokerMessage {
-    pub topic: String,
+    pub topic: Arc<str>,
     #[serde(with = "payload_bytes")]
     pub payload: bytes::Bytes,
     pub qos: u8,
     pub retain: bool,
     #[serde(default)]
-    pub properties: PublishProperties,
+    pub properties: SharedPublishProperties,
 }
 
 // Keep historical JSON recovery payloads as arrays of byte values.
@@ -134,6 +134,69 @@ pub struct PublishProperties {
     pub response_topic: Option<String>,
     pub correlation_data: Option<Vec<u8>>,
     pub user_properties: Vec<(String, String)>,
+}
+
+/// Cloneable broker metadata with copy-on-write mutation. Empty MQTT 3.1.1
+/// properties need no allocation or shared global reference counter. Recovery
+/// serialization remains exactly the historical PublishProperties object.
+#[derive(Clone, Default)]
+pub struct SharedPublishProperties(Option<Arc<PublishProperties>>);
+static EMPTY_PUBLISH_PROPERTIES: PublishProperties = PublishProperties {
+    payload_format: None,
+    expires_at_ms: None,
+    content_type: None,
+    response_topic: None,
+    correlation_data: None,
+    user_properties: Vec::new(),
+};
+impl From<PublishProperties> for SharedPublishProperties {
+    fn from(value: PublishProperties) -> Self {
+        if value == PublishProperties::default() {
+            Self(None)
+        } else {
+            Self(Some(Arc::new(value)))
+        }
+    }
+}
+impl std::ops::Deref for SharedPublishProperties {
+    type Target = PublishProperties;
+    fn deref(&self) -> &Self::Target {
+        self.0.as_deref().unwrap_or(&EMPTY_PUBLISH_PROPERTIES)
+    }
+}
+impl std::ops::DerefMut for SharedPublishProperties {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        Arc::make_mut(
+            self.0
+                .get_or_insert_with(|| Arc::new(PublishProperties::default())),
+        )
+    }
+}
+impl std::fmt::Debug for SharedPublishProperties {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Debug::fmt(&**self, f)
+    }
+}
+impl PartialEq for SharedPublishProperties {
+    fn eq(&self, other: &Self) -> bool {
+        **self == **other
+    }
+}
+impl Eq for SharedPublishProperties {}
+impl Serialize for SharedPublishProperties {
+    fn serialize<S: serde::Serializer>(
+        &self,
+        serializer: S,
+    ) -> std::result::Result<S::Ok, S::Error> {
+        (**self).serialize(serializer)
+    }
+}
+impl<'de> Deserialize<'de> for SharedPublishProperties {
+    fn deserialize<D: serde::Deserializer<'de>>(
+        deserializer: D,
+    ) -> std::result::Result<Self, D::Error> {
+        PublishProperties::deserialize(deserializer).map(Self::from)
+    }
 }
 
 impl PublishProperties {
@@ -784,3 +847,8 @@ pub use routing::{subscribe_acl, topic_matches};
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod second_round_bench;
+
+mod profiling;

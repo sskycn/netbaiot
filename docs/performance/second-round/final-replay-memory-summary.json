@@ -1,0 +1,362 @@
+{
+  "scope": "original c359 baseline vs optimized db3ea12 candidate; serial ABBA, no simultaneous build/test",
+  "offline": {
+    "A": {
+      "runs": [
+        {
+          "server_sha256": "497a6166c771c23da1ad59dba5c2775f188fef74afe7fe7197ed14090d175046",
+          "sessions": 128,
+          "messages": 32,
+          "replayed": 4096,
+          "expected_replayed": 4096,
+          "producer_ack": {
+            "count": 32,
+            "mean_ms": 0.38183853125001166,
+            "p50_ms": 0.32941700000010954,
+            "p95_ms": 0.7447080000000383,
+            "p99_ms": 1.0127500000001177,
+            "max_ms": 1.0127500000001177
+          },
+          "session_connect_and_replay": {
+            "count": 128,
+            "mean_ms": 0.6080227734375082,
+            "p50_ms": 0.5133339999998654,
+            "p95_ms": 1.0918339999999027,
+            "p99_ms": 1.2107919999997385,
+            "max_ms": 1.5430000000002941
+          },
+          "rss_with_backlog_kib": 9344,
+          "limits_overlay": {
+            "max_subscriptions_per_device": 144,
+            "max_subscriptions_per_tenant": 144,
+            "max_subscriptions": 512,
+            "mqtt_recovery_max_bytes": 536870912,
+            "requests_per_second": 1000000,
+            "requests_per_ip_second": 1000000,
+            "messages_per_device_second": 1000000,
+            "messages_per_tenant_second": 1000000
+          },
+          "errors": 0,
+          "server_exit": 0
+        },
+        {
+          "server_sha256": "497a6166c771c23da1ad59dba5c2775f188fef74afe7fe7197ed14090d175046",
+          "sessions": 128,
+          "messages": 32,
+          "replayed": 4096,
+          "expected_replayed": 4096,
+          "producer_ack": {
+            "count": 32,
+            "mean_ms": 0.4145143125000028,
+            "p50_ms": 0.3376659999999587,
+            "p95_ms": 1.101125000000036,
+            "p99_ms": 1.6496670000000213,
+            "max_ms": 1.6496670000000213
+          },
+          "session_connect_and_replay": {
+            "count": 128,
+            "mean_ms": 0.6078284375000045,
+            "p50_ms": 0.5126250000000443,
+            "p95_ms": 1.0902919999999927,
+            "p99_ms": 1.256166000000003,
+            "max_ms": 1.535499999999912
+          },
+          "rss_with_backlog_kib": 9312,
+          "limits_overlay": {
+            "max_subscriptions_per_device": 144,
+            "max_subscriptions_per_tenant": 144,
+            "max_subscriptions": 512,
+            "mqtt_recovery_max_bytes": 536870912,
+            "requests_per_second": 1000000,
+            "requests_per_ip_second": 1000000,
+            "messages_per_device_second": 1000000,
+            "messages_per_tenant_second": 1000000
+          },
+          "errors": 0,
+          "server_exit": 0
+        }
+      ],
+      "median": {
+        "server_sha256": "497a6166c771c23da1ad59dba5c2775f188fef74afe7fe7197ed14090d175046",
+        "sessions": 128.0,
+        "messages": 32.0,
+        "replayed": 4096.0,
+        "expected_replayed": 4096.0,
+        "producer_ack": {
+          "count": 32.0,
+          "mean_ms": 0.39817642187500724,
+          "p50_ms": 0.33354150000003413,
+          "p95_ms": 0.9229165000000372,
+          "p99_ms": 1.3312085000000695,
+          "max_ms": 1.3312085000000695
+        },
+        "session_connect_and_replay": {
+          "count": 128.0,
+          "mean_ms": 0.6079256054687563,
+          "p50_ms": 0.5129794999999548,
+          "p95_ms": 1.0910629999999477,
+          "p99_ms": 1.2334789999998708,
+          "max_ms": 1.539250000000103
+        },
+        "rss_with_backlog_kib": 9328.0,
+        "limits_overlay": {
+          "max_subscriptions_per_device": 144.0,
+          "max_subscriptions_per_tenant": 144.0,
+          "max_subscriptions": 512.0,
+          "mqtt_recovery_max_bytes": 536870912.0,
+          "requests_per_second": 1000000.0,
+          "requests_per_ip_second": 1000000.0,
+          "messages_per_device_second": 1000000.0,
+          "messages_per_tenant_second": 1000000.0
+        },
+        "errors": 0.0,
+        "server_exit": 0.0
+      }
+    },
+    "B": {
+      "runs": [
+        {
+          "server_sha256": "db3ea12cbd2d4e3fe2458e95ab8458e30996d46ee8f36fa96d89943a97b294f4",
+          "sessions": 128,
+          "messages": 32,
+          "replayed": 4096,
+          "expected_replayed": 4096,
+          "producer_ack": {
+            "count": 32,
+            "mean_ms": 0.335834749999972,
+            "p50_ms": 0.29483399999996607,
+            "p95_ms": 0.3970419999999031,
+            "p99_ms": 0.9226249999998437,
+            "max_ms": 0.9226249999998437
+          },
+          "session_connect_and_replay": {
+            "count": 128,
+            "mean_ms": 0.6039700390625056,
+            "p50_ms": 0.5085000000000228,
+            "p95_ms": 1.084958999999941,
+            "p99_ms": 1.2366249999997692,
+            "max_ms": 1.6416669999999023
+          },
+          "rss_with_backlog_kib": 8112,
+          "limits_overlay": {
+            "max_subscriptions_per_device": 144,
+            "max_subscriptions_per_tenant": 144,
+            "max_subscriptions": 512,
+            "mqtt_recovery_max_bytes": 536870912,
+            "requests_per_second": 1000000,
+            "requests_per_ip_second": 1000000,
+            "messages_per_device_second": 1000000,
+            "messages_per_tenant_second": 1000000
+          },
+          "errors": 0,
+          "server_exit": 0
+        },
+        {
+          "server_sha256": "db3ea12cbd2d4e3fe2458e95ab8458e30996d46ee8f36fa96d89943a97b294f4",
+          "sessions": 128,
+          "messages": 32,
+          "replayed": 4096,
+          "expected_replayed": 4096,
+          "producer_ack": {
+            "count": 32,
+            "mean_ms": 0.3236861250000139,
+            "p50_ms": 0.29125000000007617,
+            "p95_ms": 0.3719999999998169,
+            "p99_ms": 1.4473749999999175,
+            "max_ms": 1.4473749999999175
+          },
+          "session_connect_and_replay": {
+            "count": 128,
+            "mean_ms": 0.598843093750006,
+            "p50_ms": 0.5145829999999574,
+            "p95_ms": 1.0828750000000387,
+            "p99_ms": 1.2038749999998544,
+            "max_ms": 1.5076670000000458
+          },
+          "rss_with_backlog_kib": 8128,
+          "limits_overlay": {
+            "max_subscriptions_per_device": 144,
+            "max_subscriptions_per_tenant": 144,
+            "max_subscriptions": 512,
+            "mqtt_recovery_max_bytes": 536870912,
+            "requests_per_second": 1000000,
+            "requests_per_ip_second": 1000000,
+            "messages_per_device_second": 1000000,
+            "messages_per_tenant_second": 1000000
+          },
+          "errors": 0,
+          "server_exit": 0
+        }
+      ],
+      "median": {
+        "server_sha256": "db3ea12cbd2d4e3fe2458e95ab8458e30996d46ee8f36fa96d89943a97b294f4",
+        "sessions": 128.0,
+        "messages": 32.0,
+        "replayed": 4096.0,
+        "expected_replayed": 4096.0,
+        "producer_ack": {
+          "count": 32.0,
+          "mean_ms": 0.32976043749999295,
+          "p50_ms": 0.2930420000000211,
+          "p95_ms": 0.38452099999986,
+          "p99_ms": 1.1849999999998806,
+          "max_ms": 1.1849999999998806
+        },
+        "session_connect_and_replay": {
+          "count": 128.0,
+          "mean_ms": 0.6014065664062558,
+          "p50_ms": 0.5115414999999901,
+          "p95_ms": 1.0839169999999898,
+          "p99_ms": 1.2202499999998118,
+          "max_ms": 1.574666999999974
+        },
+        "rss_with_backlog_kib": 8120.0,
+        "limits_overlay": {
+          "max_subscriptions_per_device": 144.0,
+          "max_subscriptions_per_tenant": 144.0,
+          "max_subscriptions": 512.0,
+          "mqtt_recovery_max_bytes": 536870912.0,
+          "requests_per_second": 1000000.0,
+          "requests_per_ip_second": 1000000.0,
+          "messages_per_device_second": 1000000.0,
+          "messages_per_tenant_second": 1000000.0
+        },
+        "errors": 0.0,
+        "server_exit": 0.0
+      }
+    }
+  },
+  "idle_memory": {
+    "A": {
+      "runs": [
+        {
+          "connections_active": 128,
+          "connections_requested": 128,
+          "fd_base": 16,
+          "fd_loaded": 144,
+          "logical_bytes_per_connection": 524288,
+          "measurement_state": "active",
+          "persistent": false,
+          "rss_base_kib": 6384,
+          "rss_delta_bytes_per_connection": 37120.0,
+          "rss_delta_kib": 4640,
+          "rss_loaded_kib": 11024,
+          "runtime_tasks_base": 6,
+          "runtime_tasks_loaded": 134,
+          "subscribed": false,
+          "tasks_delta_per_connection": 1.0,
+          "tls": false,
+          "transport": "mqtt"
+        },
+        {
+          "connections_active": 128,
+          "connections_requested": 128,
+          "fd_base": 16,
+          "fd_loaded": 144,
+          "logical_bytes_per_connection": 524288,
+          "measurement_state": "active",
+          "persistent": false,
+          "rss_base_kib": 6384,
+          "rss_delta_bytes_per_connection": 36864.0,
+          "rss_delta_kib": 4608,
+          "rss_loaded_kib": 10992,
+          "runtime_tasks_base": 6,
+          "runtime_tasks_loaded": 134,
+          "subscribed": false,
+          "tasks_delta_per_connection": 1.0,
+          "tls": false,
+          "transport": "mqtt"
+        }
+      ],
+      "median": {
+        "connections_active": 128.0,
+        "connections_requested": 128.0,
+        "fd_base": 16.0,
+        "fd_loaded": 144.0,
+        "logical_bytes_per_connection": 524288.0,
+        "measurement_state": "active",
+        "persistent": 0.0,
+        "rss_base_kib": 6384.0,
+        "rss_delta_bytes_per_connection": 36992.0,
+        "rss_delta_kib": 4624.0,
+        "rss_loaded_kib": 11008.0,
+        "runtime_tasks_base": 6.0,
+        "runtime_tasks_loaded": 134.0,
+        "subscribed": 0.0,
+        "tasks_delta_per_connection": 1.0,
+        "tls": 0.0,
+        "transport": "mqtt"
+      }
+    },
+    "B": {
+      "runs": [
+        {
+          "connections_active": 128,
+          "connections_requested": 128,
+          "fd_base": 16,
+          "fd_loaded": 144,
+          "logical_bytes_per_connection": 524288,
+          "measurement_state": "active",
+          "persistent": false,
+          "rss_base_kib": 6384,
+          "rss_delta_bytes_per_connection": 35712.0,
+          "rss_delta_kib": 4464,
+          "rss_loaded_kib": 10848,
+          "runtime_tasks_base": 6,
+          "runtime_tasks_loaded": 134,
+          "subscribed": false,
+          "tasks_delta_per_connection": 1.0,
+          "tls": false,
+          "transport": "mqtt"
+        },
+        {
+          "connections_active": 128,
+          "connections_requested": 128,
+          "fd_base": 16,
+          "fd_loaded": 144,
+          "logical_bytes_per_connection": 524288,
+          "measurement_state": "active",
+          "persistent": false,
+          "rss_base_kib": 6432,
+          "rss_delta_bytes_per_connection": 35840.0,
+          "rss_delta_kib": 4480,
+          "rss_loaded_kib": 10912,
+          "runtime_tasks_base": 6,
+          "runtime_tasks_loaded": 134,
+          "subscribed": false,
+          "tasks_delta_per_connection": 1.0,
+          "tls": false,
+          "transport": "mqtt"
+        }
+      ],
+      "median": {
+        "connections_active": 128.0,
+        "connections_requested": 128.0,
+        "fd_base": 16.0,
+        "fd_loaded": 144.0,
+        "logical_bytes_per_connection": 524288.0,
+        "measurement_state": "active",
+        "persistent": 0.0,
+        "rss_base_kib": 6408.0,
+        "rss_delta_bytes_per_connection": 35776.0,
+        "rss_delta_kib": 4472.0,
+        "rss_loaded_kib": 10880.0,
+        "runtime_tasks_base": 6.0,
+        "runtime_tasks_loaded": 134.0,
+        "subscribed": 0.0,
+        "tasks_delta_per_connection": 1.0,
+        "tls": 0.0,
+        "transport": "mqtt"
+      }
+    }
+  },
+  "fixture_failure": {
+    "failure": "initial fixture used a 900-byte scalar but CodecLimits.field_bytes is 256; first publish was rejected and socket closed",
+    "correction": "four 225-byte scalar fields; same production codec bounds; both A/B use corrected fixture"
+  },
+  "interpretation": [
+    "All4offline runs4096/4096 replays, stable SourceMessageId/payload and session-present verified, planned exit0. This is MQTT protocol replay, not business EventId/spool evidence.",
+    "Producer32samples/run and128session cycles/run are a bounded replay scenario, not capacity or a reliable P999 claim.",
+    "Idle128plain nonpersistent nonsubscribed MQTT connections,6s hold; aggregate RSS delta includes cache/runtime overhead and is not per-connection object size. Configured logical reservation524288 is not measured allocation."
+  ]
+}

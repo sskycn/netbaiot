@@ -288,6 +288,73 @@ const BOUNDS: [u64; 16] = [
 
 // Fixed, opt-in experiment series: no identity or sink labels. Nanosecond
 // buckets retain sub-microsecond work that the legacy histograms truncate.
+/// Closed broker operation vocabulary, enabled only with lock timing.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(usize)]
+pub enum BrokerProbe {
+    Route,
+    Subscribe,
+    Unsubscribe,
+    Puback,
+    Pubrec,
+    Pubrel,
+    Pubcomp,
+    Attach,
+    Detach,
+    RetainedReplay,
+    Maintenance,
+    Recovery,
+    Outbound,
+    Will,
+    Invalidation,
+    Read,
+    Inbound,
+}
+impl BrokerProbe {
+    pub const ALL: [Self; 17] = [
+        Self::Route,
+        Self::Subscribe,
+        Self::Unsubscribe,
+        Self::Puback,
+        Self::Pubrec,
+        Self::Pubrel,
+        Self::Pubcomp,
+        Self::Attach,
+        Self::Detach,
+        Self::RetainedReplay,
+        Self::Maintenance,
+        Self::Recovery,
+        Self::Outbound,
+        Self::Will,
+        Self::Invalidation,
+        Self::Read,
+        Self::Inbound,
+    ];
+}
+const BROKER_SITES: [&str; 17] = [
+    "route",
+    "subscribe",
+    "unsubscribe",
+    "puback",
+    "pubrec",
+    "pubrel",
+    "pubcomp",
+    "attach",
+    "detach",
+    "retained_replay",
+    "maintenance",
+    "recovery",
+    "outbound",
+    "will",
+    "invalidation",
+    "read",
+    "inbound",
+];
+#[derive(Default)]
+struct BrokerTiming {
+    wait: [HistogramState; 17],
+    hold: [HistogramState; 17],
+}
 const EVENT_BUS_SITES: [&str; 5] = [
     "publish",
     "take_ready",
@@ -399,6 +466,7 @@ pub struct Metrics {
     lock_timing_enabled: bool,
     event_bus_probes: [AtomicU64; EVENT_BUS_PROBES.len()],
     event_bus_timing: Option<Box<EventBusTiming>>,
+    broker_timing: Option<Box<BrokerTiming>>,
 }
 
 impl Default for Metrics {
@@ -428,6 +496,7 @@ impl Default for Metrics {
             lock_timing_enabled: false,
             event_bus_probes: std::array::from_fn(|_| AtomicU64::new(0)),
             event_bus_timing: None,
+            broker_timing: None,
         }
     }
 }
@@ -531,6 +600,7 @@ impl Metrics {
         Self {
             lock_timing_enabled: true,
             event_bus_timing: Some(Box::default()),
+            broker_timing: Some(Box::default()),
             ..Self::default()
         }
     }
@@ -543,6 +613,12 @@ impl Metrics {
         }
     }
 
+    pub fn broker_state_timing(&self, site: BrokerProbe, wait_ns: u64, hold_ns: u64) {
+        if let Some(timing) = &self.broker_timing {
+            timing.wait[site as usize].observe_value(wait_ns, &TIMING_NS_BOUNDS);
+            timing.hold[site as usize].observe_value(hold_ns, &TIMING_NS_BOUNDS);
+        }
+    }
     pub(crate) fn event_bus_state_timing(&self, site: EventBusProbe, wait_ns: u64, hold_ns: u64) {
         let Some(timing) = &self.event_bus_timing else {
             return;
@@ -734,6 +810,20 @@ impl Metrics {
                 "event_bus_dequeue_selection_ns",
                 &TIMING_NS_BOUNDS,
             );
+        }
+        if let Some(timing) = &self.broker_timing {
+            for (index, site) in BROKER_SITES.iter().enumerate() {
+                timing.wait[index].render_experiment(
+                    &mut output,
+                    &format!("broker_site_{site}_wait_ns"),
+                    &TIMING_NS_BOUNDS,
+                );
+                timing.hold[index].render_experiment(
+                    &mut output,
+                    &format!("broker_site_{site}_hold_ns"),
+                    &TIMING_NS_BOUNDS,
+                );
+            }
         }
         for (name, state) in HISTOGRAM_NAMES.iter().zip(&self.histograms) {
             let mut cumulative = 0;

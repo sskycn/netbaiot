@@ -11,7 +11,7 @@ import subprocess
 import tempfile
 import time
 
-from connection_memory import SECRET, fd_count, free_port, rss_kib, status
+from connection_memory import SECRET, fd_count, free_ports, rss_kib, status
 
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
@@ -100,6 +100,7 @@ def main():
     parser.add_argument("--duration", type=float, default=30)
     parser.add_argument("--connections", type=int, default=32)
     parser.add_argument("--sink-delay-ms", type=float, default=0)
+    parser.add_argument("--sink-outage-seconds", type=float, default=0)
     parser.add_argument("--sink-mode", choices=("none", "webhook"), default="webhook")
     parser.add_argument("--qos", type=int, choices=(0, 1, 2), default=1)
     parser.add_argument("--payload-bytes", type=int, default=256)
@@ -108,6 +109,11 @@ def main():
     parser.add_argument("--sample-output")
     parser.add_argument("--sample-seconds", type=int, default=10)
     parser.add_argument("--tls", action="store_true")
+    parser.add_argument("--subscribe-uplink", action="store_true")
+    parser.add_argument("--mqtt-v5", action="store_true")
+    parser.add_argument("--mqtt-metadata", action="store_true")
+    parser.add_argument("--audit-open-loop", action="store_true")
+    parser.add_argument("--lock-metrics", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument(
         "--server-bin", default=os.path.join(ROOT, "target/release/netbaiot-server")
     )
@@ -115,16 +121,23 @@ def main():
         "--loadgen-bin", default=os.path.join(ROOT, "target/release/netbaiot-loadgen")
     )
     args = parser.parse_args()
-    device_ingress, management, sink_port = [free_port() for _ in range(3)]
+    if not 0 <= args.sink_outage_seconds <= args.duration / 2:
+        raise SystemExit("sink outage must be between 0 and half the measured duration")
+    if args.sink_outage_seconds and args.sink_mode != "webhook":
+        raise SystemExit("sink outage requires webhook mode")
+    device_ingress, management, sink_port = free_ports(3)
     maximum = max(128, args.connections + 16)
     limits = {
         "max_connections": maximum,
+        "max_device_connections_per_protocol": maximum,
         "max_connections_per_ip": maximum,
         "max_connections_per_tenant": maximum,
         "max_devices": maximum,
         "max_devices_per_tenant": maximum,
         "max_persistent_sessions": maximum,
         "max_persistent_sessions_per_tenant": maximum,
+        "max_subscriptions_per_tenant": maximum * 2,
+        "max_subscriptions": max(512, maximum * 2),
         "auth_cache_max_entries": maximum,
         "auth_cache_max_bytes": 64 * 1024 * 1024,
         "rate_entries": maximum,
@@ -194,15 +207,23 @@ def main():
                 "publish_rate": args.rate,
                 "payload_bytes": args.payload_bytes,
                 "qos": args.qos,
-                "subscribe": False,
+                "subscribe": args.subscribe_uplink,
                 "report_every_secs": 5,
             }
+            if args.subscribe_uplink:
+                workload["subscribe_uplink"] = True
+            if args.mqtt_v5:
+                workload["mqtt_version"] = 5
+            if args.mqtt_metadata:
+                workload["mqtt_metadata"] = True
+            if args.audit_open_loop:
+                workload["audit_open_loop"] = True
             if args.tls:
                 workload["tls_ca"] = os.path.join(ROOT, "tests/fixtures/localhost-cert.pem")
             json.dump(workload, output)
         environment = os.environ.copy()
         environment["NETBAIOT_ADMIN_SECRET"] = "ab" * 32
-        environment["NETBAIOT_PERF_LOCK_METRICS"] = "1"
+        environment["NETBAIOT_PERF_LOCK_METRICS"] = "1" if args.lock_metrics else "0"
         environment["NO_PROXY"] = "127.0.0.1,localhost"
         environment["no_proxy"] = "127.0.0.1,localhost"
         sink = subprocess.Popen(
@@ -229,8 +250,11 @@ def main():
                     status(management, args.tls)
                     break
                 except Exception:
-                    if server.poll() is not None or time.time() > deadline:
-                        raise RuntimeError("server did not start")
+                    if server.poll() is not None:
+                        detail = server.stderr.read(4096)
+                        raise RuntimeError(f"server did not start (exit {server.returncode}): {detail}")
+                    if time.time() > deadline:
+                        raise RuntimeError("server startup deadline elapsed while process remained alive")
                     time.sleep(.05)
             server_cpu_before = process_cpu_seconds(server.pid)
             load = subprocess.Popen(
@@ -240,9 +264,22 @@ def main():
                 text=True,
             )
             samples = []
+            outage_start = time.monotonic() + args.warmup + 1
+            outage_end = outage_start + args.sink_outage_seconds
+            outage_phases = []
+            outage_state = None
             profiler = None
             profile_at = time.time() + args.warmup + 1
             while load.poll() is None:
+                if args.sink_outage_seconds:
+                    now = time.monotonic()
+                    desired = 500 if outage_start <= now < outage_end else 204
+                    if desired != outage_state:
+                        with open(control + ".next", "w", encoding="utf-8") as output:
+                            json.dump({"delay": args.sink_delay_ms / 1000, "status": desired}, output)
+                        os.replace(control + ".next", control)
+                        outage_state = desired
+                        outage_phases.append({"status": desired, "relative_to_outage_start_seconds": now - outage_start})
                 if args.sample_output and profiler is None and time.time() >= profile_at:
                     profiler = subprocess.Popen(
                         [
@@ -304,8 +341,17 @@ def main():
                 "cooldown_seconds": args.cooldown,
                 "sink_mode": args.sink_mode,
                 "tls": args.tls,
+                "subscribe_uplink": args.subscribe_uplink,
+                "mqtt_v5": args.mqtt_v5,
+                "mqtt_metadata": args.mqtt_metadata,
+                "audit_open_loop": args.audit_open_loop,
+                "lock_metrics": args.lock_metrics,
                 "sink_delay_ms": args.sink_delay_ms,
+                "sink_outage_seconds": args.sink_outage_seconds,
+                "sink_outage_phases": outage_phases,
                 "load": last_json(load_out, "final"),
+                "setup_failure": last_json(load_out, "setup_failed"),
+                "load_exit": load.returncode,
                 "sink": last_json(sink_out),
                 "metrics": metrics,
                 "samples": samples,
@@ -316,6 +362,9 @@ def main():
                 "profile_stderr": profile_stderr[-512:],
             }
             print(json.dumps(result, sort_keys=True))
+        except Exception as error:
+            print(json.dumps({"setup_failure": str(error), "ports": [device_ingress, management, sink_port]}))
+            raise
         finally:
             for process in (load, server, sink):
                 if process is not None and process.poll() is None:

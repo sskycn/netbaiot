@@ -17,7 +17,9 @@ pub(super) fn route_locked(
             prune_expired_messages_for_session(state, &key, now)?;
         }
     }
-    let plan = preflight_route(state, owner, origin, message, limits)?;
+    // QoS and retain differ per delivery, but neither changes the logical charge.
+    let charge = message.bytes();
+    let plan = preflight_route(state, owner, origin, message, limits, charge)?;
     if message.retain {
         update_retained(state, owner, origin, message, limits)?;
     }
@@ -49,7 +51,6 @@ pub(super) fn route_locked(
                 }
             }
             PlannedRouteMode::Live { packet_id } => {
-                let charge = routed.bytes();
                 let session = state.sessions.get_mut(&target.key).ok_or(Error::Internal)?;
                 session.next_packet_id = if packet_id == u16::MAX {
                     1
@@ -86,7 +87,6 @@ pub(super) fn route_locked(
                 delivered += 1;
             }
             PlannedRouteMode::Offline => {
-                let charge = routed.bytes();
                 let session = state.sessions.get_mut(&target.key).ok_or(Error::Internal)?;
                 session.offline.push_back(routed);
                 session.offline_bytes += charge;
@@ -109,36 +109,14 @@ pub(super) fn preflight_route(
     origin: Option<&SessionKey>,
     message: &BrokerMessage,
     limits: &Limits,
+    charge: usize,
 ) -> Result<RoutePlan> {
     if message.retain {
         check_retained_update(state, owner, origin, message, limits)?;
     }
     let matches = state.trie.matching(&message.topic);
-    let relevant_tenants = matches
-        .keys()
-        .map(|key| key.device.tenant_id.clone())
-        .collect::<HashSet<_>>();
-    let mut tenant_usage = relevant_tenants
-        .into_iter()
-        .map(|tenant| {
-            let stored = state.tenant_usage.get(&tenant).copied().unwrap_or_default();
-            (
-                tenant,
-                TenantRouteUsage {
-                    session_bytes: stored.session_bytes,
-                    offline_count: stored.offline_count,
-                    offline_bytes: stored.offline_bytes,
-                    qos1_inflight: stored.qos1_inflight,
-                    qos2_inflight: stored.qos2_inflight,
-                },
-            )
-        })
-        .collect::<HashMap<_, _>>();
-    for (tenant, usage) in &state.will_responsibility_tenants {
-        if let Some(projected) = tenant_usage.get_mut(tenant) {
-            projected.session_bytes = projected.session_bytes.saturating_add(usage.1);
-        }
-    }
+    let tenant_capacity_hint = matches.len().min(state.tenant_usage.len());
+    let mut tenant_usage = HashMap::<TenantId, TenantRouteUsage>::new();
     let mut global_state_bytes = total_session_bytes(state);
     let mut global_offline_count = state.offline_count;
     let mut global_offline_bytes = state.offline_bytes;
@@ -151,7 +129,6 @@ pub(super) fn preflight_route(
             continue;
         }
         let qos = message.qos.min(subscription.qos);
-        let charge = message.bytes();
         let active = state
             .active
             .get(&key)
@@ -173,8 +150,27 @@ pub(super) fn preflight_route(
             return Err(Error::Overloaded);
         }
         let session = state.sessions.get(&key).ok_or(Error::Internal)?;
-        let tenant = key.device.tenant_id.clone();
-        let usage = tenant_usage.get_mut(&tenant).ok_or(Error::Internal)?;
+        let tenant = &key.device.tenant_id;
+        if tenant_usage.is_empty() {
+            // Allocate only for required work. This O(1) hint avoids repeated
+            // map growth without allocating an intermediate distinct-tenant set.
+            tenant_usage.reserve(tenant_capacity_hint);
+        }
+        let usage = tenant_usage.entry(tenant.clone()).or_insert_with(|| {
+            let stored = state.tenant_usage.get(tenant).copied().unwrap_or_default();
+            TenantRouteUsage {
+                session_bytes: stored.session_bytes.saturating_add(
+                    state
+                        .will_responsibility_tenants
+                        .get(tenant)
+                        .map_or(0, |usage| usage.1),
+                ),
+                offline_count: stored.offline_count,
+                offline_bytes: stored.offline_bytes,
+                qos1_inflight: stored.qos1_inflight,
+                qos2_inflight: stored.qos2_inflight,
+            }
+        });
         let live_budget = active.and_then(|active| active.reserve_frame(charge).ok());
         let inflight = if qos == 1 {
             usage.qos1_inflight
@@ -258,19 +254,17 @@ pub fn topic_matches(filter: &str, topic: &str) -> bool {
     if topic.starts_with('$') && (filter == "#" || filter == "+" || filter.starts_with("+/")) {
         return false;
     }
-    let filters = filter.split('/').collect::<Vec<_>>();
-    let topics = topic.split('/').collect::<Vec<_>>();
-    let mut at = 0usize;
-    while at < filters.len() {
-        match filters[at] {
-            "#" => return at + 1 == filters.len(),
-            "+" if at < topics.len() => {}
-            level if at < topics.len() && level == topics[at] => {}
+    let mut filters = filter.split('/');
+    let mut topics = topic.split('/');
+    while let Some(filter) = filters.next() {
+        match filter {
+            "#" => return filters.next().is_none(),
+            "+" if topics.next().is_some() => {}
+            level if topics.next() == Some(level) => {}
             _ => return false,
         }
-        at += 1;
     }
-    at == topics.len()
+    topics.next().is_none()
 }
 
 pub(super) fn valid_broker_message(message: &BrokerMessage, limits: &Limits) -> bool {
@@ -385,25 +379,11 @@ impl MqttBroker {
         if !message.retain && self.subscription_count.load(Ordering::Acquire) == 0 {
             return Ok(0);
         }
-        let lock_started = self
-            .metrics
-            .as_ref()
-            .filter(|metrics| metrics.lock_timing_enabled())
-            .map(|_| Instant::now());
-        let mut state = lock(&self.state)?;
+        let mut state = self.lock_state(BrokerProbe::Route)?;
         prune_expired_messages(&mut state, now_ms(), HOT_MAINTENANCE_BUDGET)?;
-        let lock_wait_us = lock_started.map(|started| started.elapsed().as_micros() as u64);
-        let hold_started = lock_started.map(|_| Instant::now());
         let result = route_locked(&mut state, owner, origin, message, &self.limits);
         if let Err(error) = drive_capacity_wakes(&mut state, &self.limits) {
             tracing::error!(%error, "failed to promote MQTT work after capacity release");
-        }
-        let lock_hold_us = hold_started.map(|started| started.elapsed().as_micros() as u64);
-        drop(state);
-        if let (Some(metrics), Some(wait), Some(hold)) = (&self.metrics, lock_wait_us, lock_hold_us)
-        {
-            metrics.observe(Histogram::BrokerLockWait, wait);
-            metrics.observe(Histogram::BrokerLockHold, hold);
         }
         result
     }

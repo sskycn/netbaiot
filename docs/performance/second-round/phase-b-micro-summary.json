@@ -1,0 +1,1202 @@
+{
+  "retained_broad/10": {
+    "before": {
+      "mean_ns": 1037.9215,
+      "p50_ns": 1042.0,
+      "p95_ns": 1084.0,
+      "p99_ns": 1146.0,
+      "max_ns": 10250.0,
+      "allocations_per_op": 30.0,
+      "allocated_bytes_per_op": 1920.0
+    },
+    "after": {
+      "mean_ns": 24.176000000000002,
+      "p50_ns": 41.0,
+      "p95_ns": 42.0,
+      "p99_ns": 42.0,
+      "max_ns": 84.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0
+    }
+  },
+  "retained_broad/100": {
+    "before": {
+      "mean_ns": 10220.141,
+      "p50_ns": 10333.5,
+      "p95_ns": 10500.0,
+      "p99_ns": 11042.0,
+      "max_ns": 20500.0,
+      "allocations_per_op": 300.0,
+      "allocated_bytes_per_op": 19200.0
+    },
+    "after": {
+      "mean_ns": 254.54899999999998,
+      "p50_ns": 250.0,
+      "p95_ns": 250.0,
+      "p99_ns": 271.0,
+      "max_ns": 4791.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0
+    }
+  },
+  "retained_broad/1000": {
+    "before": {
+      "mean_ns": 101284.252,
+      "p50_ns": 101687.0,
+      "p95_ns": 110187.5,
+      "p99_ns": 118354.0,
+      "max_ns": 142750.0,
+      "allocations_per_op": 3000.0,
+      "allocated_bytes_per_op": 192000.0
+    },
+    "after": {
+      "mean_ns": 2991.7165,
+      "p50_ns": 3021.0,
+      "p95_ns": 3167.0,
+      "p99_ns": 3188.0,
+      "max_ns": 8167.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0
+    }
+  },
+  "retained_broad/10000": {
+    "before": {
+      "mean_ns": 1023440.994,
+      "p50_ns": 1029124.5,
+      "p95_ns": 1052042.0,
+      "p99_ns": 1072188.0,
+      "max_ns": 5085458.0,
+      "allocations_per_op": 30000.0,
+      "allocated_bytes_per_op": 1920000.0
+    },
+    "after": {
+      "mean_ns": 32964.9625,
+      "p50_ns": 32833.5,
+      "p95_ns": 33979.0,
+      "p99_ns": 38167.0,
+      "max_ns": 50292.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0
+    }
+  },
+  "retained_broad/4000": {
+    "before": {
+      "mean_ns": 420170.2485,
+      "p50_ns": 414771.0,
+      "p95_ns": 468729.0,
+      "p99_ns": 542604.5,
+      "max_ns": 1617042.0,
+      "allocations_per_op": 12000.0,
+      "allocated_bytes_per_op": 768000.0
+    },
+    "after": {
+      "mean_ns": 13578.754,
+      "p50_ns": 13604.0,
+      "p95_ns": 14062.5,
+      "p99_ns": 16500.0,
+      "max_ns": 23167.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0
+    }
+  },
+  "retained_exact/10": {
+    "before": {
+      "mean_ns": 29.703,
+      "p50_ns": 41.0,
+      "p95_ns": 42.0,
+      "p99_ns": 42.0,
+      "max_ns": 167.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0
+    },
+    "after": {
+      "mean_ns": 27.82,
+      "p50_ns": 41.0,
+      "p95_ns": 42.0,
+      "p99_ns": 42.0,
+      "max_ns": 208.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0
+    }
+  },
+  "retained_exact/100": {
+    "before": {
+      "mean_ns": 32.5625,
+      "p50_ns": 42.0,
+      "p95_ns": 42.0,
+      "p99_ns": 42.0,
+      "max_ns": 166.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0
+    },
+    "after": {
+      "mean_ns": 27.914,
+      "p50_ns": 41.0,
+      "p95_ns": 42.0,
+      "p99_ns": 42.0,
+      "max_ns": 167.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0
+    }
+  },
+  "retained_exact/1000": {
+    "before": {
+      "mean_ns": 29.7715,
+      "p50_ns": 41.0,
+      "p95_ns": 42.0,
+      "p99_ns": 42.0,
+      "max_ns": 84.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0
+    },
+    "after": {
+      "mean_ns": 28.08,
+      "p50_ns": 41.0,
+      "p95_ns": 42.0,
+      "p99_ns": 42.0,
+      "max_ns": 84.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0
+    }
+  },
+  "retained_exact/10000": {
+    "before": {
+      "mean_ns": 30.6075,
+      "p50_ns": 41.0,
+      "p95_ns": 42.0,
+      "p99_ns": 42.0,
+      "max_ns": 167.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0
+    },
+    "after": {
+      "mean_ns": 27.348,
+      "p50_ns": 41.0,
+      "p95_ns": 42.0,
+      "p99_ns": 42.0,
+      "max_ns": 167.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0
+    }
+  },
+  "retained_exact/4000": {
+    "before": {
+      "mean_ns": 31.900000000000002,
+      "p50_ns": 42.0,
+      "p95_ns": 42.0,
+      "p99_ns": 42.0,
+      "max_ns": 167.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0
+    },
+    "after": {
+      "mean_ns": 27.9065,
+      "p50_ns": 41.0,
+      "p95_ns": 42.0,
+      "p99_ns": 42.0,
+      "max_ns": 84.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0
+    }
+  },
+  "retained_none/10": {
+    "before": {
+      "mean_ns": 1262.297,
+      "p50_ns": 1250.0,
+      "p95_ns": 1292.0,
+      "p99_ns": 1313.0,
+      "max_ns": 2750.0,
+      "allocations_per_op": 30.0,
+      "allocated_bytes_per_op": 1920.0
+    },
+    "after": {
+      "mean_ns": 224.1055,
+      "p50_ns": 229.0,
+      "p95_ns": 250.0,
+      "p99_ns": 250.0,
+      "max_ns": 333.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0
+    }
+  },
+  "retained_none/100": {
+    "before": {
+      "mean_ns": 11719.011999999999,
+      "p50_ns": 12083.5,
+      "p95_ns": 12271.0,
+      "p99_ns": 12458.5,
+      "max_ns": 21583.0,
+      "allocations_per_op": 300.0,
+      "allocated_bytes_per_op": 19200.0
+    },
+    "after": {
+      "mean_ns": 2154.453,
+      "p50_ns": 2125.0,
+      "p95_ns": 2167.0,
+      "p99_ns": 2229.0,
+      "max_ns": 9250.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0
+    }
+  },
+  "retained_none/1000": {
+    "before": {
+      "mean_ns": 119038.6585,
+      "p50_ns": 119687.5,
+      "p95_ns": 127021.0,
+      "p99_ns": 136062.5,
+      "max_ns": 150750.0,
+      "allocations_per_op": 3000.0,
+      "allocated_bytes_per_op": 192000.0
+    },
+    "after": {
+      "mean_ns": 22052.2575,
+      "p50_ns": 21416.5,
+      "p95_ns": 24187.5,
+      "p99_ns": 28917.0,
+      "max_ns": 34125.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0
+    }
+  },
+  "retained_none/10000": {
+    "before": {
+      "mean_ns": 1204646.7400000002,
+      "p50_ns": 1210208.5,
+      "p95_ns": 1253437.0,
+      "p99_ns": 1275312.5,
+      "max_ns": 1412208.0,
+      "allocations_per_op": 30000.0,
+      "allocated_bytes_per_op": 1920000.0
+    },
+    "after": {
+      "mean_ns": 222620.8455,
+      "p50_ns": 222479.5,
+      "p95_ns": 241000.0,
+      "p99_ns": 253542.0,
+      "max_ns": 339208.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0
+    }
+  },
+  "retained_none/4000": {
+    "before": {
+      "mean_ns": 484061.85750000004,
+      "p50_ns": 483937.5,
+      "p95_ns": 514000.0,
+      "p99_ns": 548813.0,
+      "max_ns": 966541.0,
+      "allocations_per_op": 12000.0,
+      "allocated_bytes_per_op": 768000.0
+    },
+    "after": {
+      "mean_ns": 90880.844,
+      "p50_ns": 90874.5,
+      "p95_ns": 100229.5,
+      "p99_ns": 107979.5,
+      "max_ns": 130125.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0
+    }
+  },
+  "retained_plus/10": {
+    "before": {
+      "mean_ns": 1871.1775,
+      "p50_ns": 1854.0,
+      "p95_ns": 1958.5,
+      "p99_ns": 2000.0,
+      "max_ns": 2042.0,
+      "allocations_per_op": 40.0,
+      "allocated_bytes_per_op": 2560.0
+    },
+    "after": {
+      "mean_ns": 577.2305,
+      "p50_ns": 583.0,
+      "p95_ns": 604.5,
+      "p99_ns": 625.0,
+      "max_ns": 833.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0
+    }
+  },
+  "retained_plus/100": {
+    "before": {
+      "mean_ns": 18143.160499999998,
+      "p50_ns": 18270.5,
+      "p95_ns": 19062.5,
+      "p99_ns": 22000.0,
+      "max_ns": 24708.0,
+      "allocations_per_op": 400.0,
+      "allocated_bytes_per_op": 25600.0
+    },
+    "after": {
+      "mean_ns": 5297.6775,
+      "p50_ns": 5271.0,
+      "p95_ns": 5333.5,
+      "p99_ns": 5417.0,
+      "max_ns": 16459.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0
+    }
+  },
+  "retained_plus/1000": {
+    "before": {
+      "mean_ns": 175710.0465,
+      "p50_ns": 176146.0,
+      "p95_ns": 188666.5,
+      "p99_ns": 200062.5,
+      "max_ns": 212375.0,
+      "allocations_per_op": 4000.0,
+      "allocated_bytes_per_op": 256000.0
+    },
+    "after": {
+      "mean_ns": 54716.789000000004,
+      "p50_ns": 53813.0,
+      "p95_ns": 59146.0,
+      "p99_ns": 65208.5,
+      "max_ns": 97542.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0
+    }
+  },
+  "retained_plus/10000": {
+    "before": {
+      "mean_ns": 1775571.3595,
+      "p50_ns": 1771396.0,
+      "p95_ns": 1834541.5,
+      "p99_ns": 2091771.0,
+      "max_ns": 5933792.0,
+      "allocations_per_op": 40000.0,
+      "allocated_bytes_per_op": 2560000.0
+    },
+    "after": {
+      "mean_ns": 575391.289,
+      "p50_ns": 571646.0,
+      "p95_ns": 609104.5,
+      "p99_ns": 647167.0,
+      "max_ns": 707208.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0
+    }
+  },
+  "retained_plus/4000": {
+    "before": {
+      "mean_ns": 703579.164,
+      "p50_ns": 705541.5,
+      "p95_ns": 742229.0,
+      "p99_ns": 763146.0,
+      "max_ns": 1066125.0,
+      "allocations_per_op": 16000.0,
+      "allocated_bytes_per_op": 1024000.0
+    },
+    "after": {
+      "mean_ns": 231435.211,
+      "p50_ns": 231062.5,
+      "p95_ns": 249666.5,
+      "p99_ns": 263625.0,
+      "max_ns": 297875.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0
+    }
+  },
+  "retained_selective/10": {
+    "before": {
+      "mean_ns": 1669.3455,
+      "p50_ns": 1687.5,
+      "p95_ns": 1729.0,
+      "p99_ns": 1750.5,
+      "max_ns": 1917.0,
+      "allocations_per_op": 40.0,
+      "allocated_bytes_per_op": 2560.0
+    },
+    "after": {
+      "mean_ns": 468.58799999999997,
+      "p50_ns": 458.5,
+      "p95_ns": 479.5,
+      "p99_ns": 500.0,
+      "max_ns": 625.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0
+    }
+  },
+  "retained_selective/100": {
+    "before": {
+      "mean_ns": 16968.254,
+      "p50_ns": 17146.0,
+      "p95_ns": 17625.0,
+      "p99_ns": 21479.5,
+      "max_ns": 27333.0,
+      "allocations_per_op": 400.0,
+      "allocated_bytes_per_op": 25600.0
+    },
+    "after": {
+      "mean_ns": 4213.619500000001,
+      "p50_ns": 4083.5,
+      "p95_ns": 4479.5,
+      "p99_ns": 6583.5,
+      "max_ns": 13333.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0
+    }
+  },
+  "retained_selective/1000": {
+    "before": {
+      "mean_ns": 165173.75,
+      "p50_ns": 165583.5,
+      "p95_ns": 177895.5,
+      "p99_ns": 186937.5,
+      "max_ns": 213708.0,
+      "allocations_per_op": 4000.0,
+      "allocated_bytes_per_op": 256000.0
+    },
+    "after": {
+      "mean_ns": 43067.627,
+      "p50_ns": 42124.5,
+      "p95_ns": 47166.5,
+      "p99_ns": 52750.0,
+      "max_ns": 62625.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0
+    }
+  },
+  "retained_selective/10000": {
+    "before": {
+      "mean_ns": 1713797.4275,
+      "p50_ns": 1680187.5,
+      "p95_ns": 1998541.0,
+      "p99_ns": 2361145.5,
+      "max_ns": 4810042.0,
+      "allocations_per_op": 40000.0,
+      "allocated_bytes_per_op": 2560000.0
+    },
+    "after": {
+      "mean_ns": 439815.3085,
+      "p50_ns": 438166.5,
+      "p95_ns": 470229.0,
+      "p99_ns": 488750.0,
+      "max_ns": 554875.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0
+    }
+  },
+  "retained_selective/4000": {
+    "before": {
+      "mean_ns": 653896.1605,
+      "p50_ns": 657021.0,
+      "p95_ns": 685104.0,
+      "p99_ns": 723146.0,
+      "max_ns": 847791.0,
+      "allocations_per_op": 16000.0,
+      "allocated_bytes_per_op": 1024000.0
+    },
+    "after": {
+      "mean_ns": 173633.3865,
+      "p50_ns": 172291.5,
+      "p95_ns": 188291.5,
+      "p99_ns": 202667.0,
+      "max_ns": 225500.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0
+    }
+  },
+  "retained_v1/10": {
+    "before": {
+      "mean_ns": 1069.1815,
+      "p50_ns": 1083.5,
+      "p95_ns": 1104.5,
+      "p99_ns": 1146.0,
+      "max_ns": 1292.0,
+      "allocations_per_op": 30.0,
+      "allocated_bytes_per_op": 1920.0
+    },
+    "after": {
+      "mean_ns": 88.463,
+      "p50_ns": 83.0,
+      "p95_ns": 125.0,
+      "p99_ns": 125.0,
+      "max_ns": 125.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0
+    }
+  },
+  "retained_v1/100": {
+    "before": {
+      "mean_ns": 10884.922,
+      "p50_ns": 11062.5,
+      "p95_ns": 11229.5,
+      "p99_ns": 12708.0,
+      "max_ns": 20917.0,
+      "allocations_per_op": 300.0,
+      "allocated_bytes_per_op": 19200.0
+    },
+    "after": {
+      "mean_ns": 913.166,
+      "p50_ns": 916.5,
+      "p95_ns": 938.0,
+      "p99_ns": 979.5,
+      "max_ns": 7083.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0
+    }
+  },
+  "retained_v1/1000": {
+    "before": {
+      "mean_ns": 109496.89050000001,
+      "p50_ns": 110208.0,
+      "p95_ns": 116333.0,
+      "p99_ns": 122979.0,
+      "max_ns": 147292.0,
+      "allocations_per_op": 3000.0,
+      "allocated_bytes_per_op": 192000.0
+    },
+    "after": {
+      "mean_ns": 10513.021499999999,
+      "p50_ns": 10416.5,
+      "p95_ns": 11083.0,
+      "p99_ns": 11104.5,
+      "max_ns": 18292.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0
+    }
+  },
+  "retained_v1/10000": {
+    "before": {
+      "mean_ns": 1136971.131,
+      "p50_ns": 1109625.0,
+      "p95_ns": 1217916.5,
+      "p99_ns": 1684416.5,
+      "max_ns": 4468250.0,
+      "allocations_per_op": 30000.0,
+      "allocated_bytes_per_op": 1920000.0
+    },
+    "after": {
+      "mean_ns": 105181.484,
+      "p50_ns": 105166.5,
+      "p95_ns": 111375.0,
+      "p99_ns": 121042.0,
+      "max_ns": 158833.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0
+    }
+  },
+  "retained_v1/4000": {
+    "before": {
+      "mean_ns": 438630.404,
+      "p50_ns": 440791.5,
+      "p95_ns": 460416.5,
+      "p99_ns": 473167.0,
+      "max_ns": 1465042.0,
+      "allocations_per_op": 12000.0,
+      "allocated_bytes_per_op": 768000.0
+    },
+    "after": {
+      "mean_ns": 44270.5055,
+      "p50_ns": 44229.0,
+      "p95_ns": 46562.5,
+      "p99_ns": 52604.0,
+      "max_ns": 59042.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0
+    }
+  },
+  "topic_early_mismatch/1": {
+    "before": {
+      "mean_ns": 34.4105,
+      "p50_ns": 34.0,
+      "p95_ns": 35.5,
+      "p99_ns": 43.0,
+      "max_ns": 106.0,
+      "allocations_per_op": 2.0,
+      "allocated_bytes_per_op": 128.0
+    },
+    "after": {
+      "mean_ns": 10.05,
+      "p50_ns": 10.0,
+      "p95_ns": 11.0,
+      "p99_ns": 11.0,
+      "max_ns": 64.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0
+    }
+  },
+  "topic_early_mismatch/16": {
+    "before": {
+      "mean_ns": 332.702,
+      "p50_ns": 325.5,
+      "p95_ns": 357.0,
+      "p99_ns": 441.0,
+      "max_ns": 654.0,
+      "allocations_per_op": 6.0,
+      "allocated_bytes_per_op": 512.0
+    },
+    "after": {
+      "mean_ns": 9.506499999999999,
+      "p50_ns": 9.0,
+      "p95_ns": 10.5,
+      "p99_ns": 11.0,
+      "max_ns": 102.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0
+    }
+  },
+  "topic_early_mismatch/32": {
+    "before": {
+      "mean_ns": 594.1255,
+      "p50_ns": 576.5,
+      "p95_ns": 634.0,
+      "p99_ns": 752.5,
+      "max_ns": 1815.0,
+      "allocations_per_op": 8.0,
+      "allocated_bytes_per_op": 1024.0
+    },
+    "after": {
+      "mean_ns": 9.280999999999999,
+      "p50_ns": 9.0,
+      "p95_ns": 10.0,
+      "p99_ns": 10.0,
+      "max_ns": 26.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0
+    }
+  },
+  "topic_early_mismatch/4": {
+    "before": {
+      "mean_ns": 65.24950000000001,
+      "p50_ns": 67.0,
+      "p95_ns": 69.0,
+      "p99_ns": 69.5,
+      "max_ns": 211.0,
+      "allocations_per_op": 2.0,
+      "allocated_bytes_per_op": 128.0
+    },
+    "after": {
+      "mean_ns": 10.556999999999999,
+      "p50_ns": 10.5,
+      "p95_ns": 12.0,
+      "p99_ns": 12.0,
+      "max_ns": 87.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0
+    }
+  },
+  "topic_early_mismatch/8": {
+    "before": {
+      "mean_ns": 169.25650000000002,
+      "p50_ns": 170.0,
+      "p95_ns": 178.5,
+      "p99_ns": 192.5,
+      "max_ns": 375.0,
+      "allocations_per_op": 4.0,
+      "allocated_bytes_per_op": 256.0
+    },
+    "after": {
+      "mean_ns": 9.092500000000001,
+      "p50_ns": 9.0,
+      "p95_ns": 10.0,
+      "p99_ns": 10.0,
+      "max_ns": 13.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0
+    }
+  },
+  "topic_exact/1": {
+    "before": {
+      "mean_ns": 37.913,
+      "p50_ns": 37.5,
+      "p95_ns": 44.0,
+      "p99_ns": 45.5,
+      "max_ns": 65.0,
+      "allocations_per_op": 2.0,
+      "allocated_bytes_per_op": 128.0
+    },
+    "after": {
+      "mean_ns": 10.948,
+      "p50_ns": 10.5,
+      "p95_ns": 11.5,
+      "p99_ns": 13.0,
+      "max_ns": 288.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0
+    }
+  },
+  "topic_exact/16": {
+    "before": {
+      "mean_ns": 374.4855,
+      "p50_ns": 367.5,
+      "p95_ns": 401.5,
+      "p99_ns": 457.0,
+      "max_ns": 1128.0,
+      "allocations_per_op": 6.0,
+      "allocated_bytes_per_op": 512.0
+    },
+    "after": {
+      "mean_ns": 160.572,
+      "p50_ns": 158.5,
+      "p95_ns": 173.0,
+      "p99_ns": 195.5,
+      "max_ns": 374.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0
+    }
+  },
+  "topic_exact/32": {
+    "before": {
+      "mean_ns": 667.9315,
+      "p50_ns": 656.5,
+      "p95_ns": 722.0,
+      "p99_ns": 816.0,
+      "max_ns": 3379.0,
+      "allocations_per_op": 8.0,
+      "allocated_bytes_per_op": 1024.0
+    },
+    "after": {
+      "mean_ns": 304.697,
+      "p50_ns": 301.0,
+      "p95_ns": 325.5,
+      "p99_ns": 393.0,
+      "max_ns": 533.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0
+    }
+  },
+  "topic_exact/4": {
+    "before": {
+      "mean_ns": 72.13749999999999,
+      "p50_ns": 71.5,
+      "p95_ns": 76.0,
+      "p99_ns": 85.0,
+      "max_ns": 205.0,
+      "allocations_per_op": 2.0,
+      "allocated_bytes_per_op": 128.0
+    },
+    "after": {
+      "mean_ns": 46.385,
+      "p50_ns": 46.0,
+      "p95_ns": 48.0,
+      "p99_ns": 53.0,
+      "max_ns": 412.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0
+    }
+  },
+  "topic_exact/8": {
+    "before": {
+      "mean_ns": 186.0785,
+      "p50_ns": 186.5,
+      "p95_ns": 198.0,
+      "p99_ns": 236.5,
+      "max_ns": 339.0,
+      "allocations_per_op": 4.0,
+      "allocated_bytes_per_op": 256.0
+    },
+    "after": {
+      "mean_ns": 75.793,
+      "p50_ns": 76.0,
+      "p95_ns": 81.0,
+      "p99_ns": 83.5,
+      "max_ns": 287.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0
+    }
+  },
+  "topic_hash/1": {
+    "before": {
+      "mean_ns": 32.926,
+      "p50_ns": 33.0,
+      "p95_ns": 34.5,
+      "p99_ns": 39.0,
+      "max_ns": 156.0,
+      "allocations_per_op": 2.0,
+      "allocated_bytes_per_op": 128.0
+    },
+    "after": {
+      "mean_ns": 3.7335,
+      "p50_ns": 4.0,
+      "p95_ns": 4.0,
+      "p99_ns": 4.0,
+      "max_ns": 8.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0
+    }
+  },
+  "topic_hash/16": {
+    "before": {
+      "mean_ns": 372.8035,
+      "p50_ns": 362.0,
+      "p95_ns": 397.5,
+      "p99_ns": 473.5,
+      "max_ns": 974.0,
+      "allocations_per_op": 6.0,
+      "allocated_bytes_per_op": 512.0
+    },
+    "after": {
+      "mean_ns": 148.0575,
+      "p50_ns": 144.5,
+      "p95_ns": 157.0,
+      "p99_ns": 198.5,
+      "max_ns": 653.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0
+    }
+  },
+  "topic_hash/32": {
+    "before": {
+      "mean_ns": 682.6145,
+      "p50_ns": 646.5,
+      "p95_ns": 1028.5,
+      "p99_ns": 1120.5,
+      "max_ns": 20149.0,
+      "allocations_per_op": 8.0,
+      "allocated_bytes_per_op": 1024.0
+    },
+    "after": {
+      "mean_ns": 291.375,
+      "p50_ns": 285.0,
+      "p95_ns": 316.0,
+      "p99_ns": 356.5,
+      "max_ns": 500.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0
+    }
+  },
+  "topic_hash/4": {
+    "before": {
+      "mean_ns": 70.0035,
+      "p50_ns": 68.5,
+      "p95_ns": 76.0,
+      "p99_ns": 81.0,
+      "max_ns": 285.0,
+      "allocations_per_op": 2.0,
+      "allocated_bytes_per_op": 128.0
+    },
+    "after": {
+      "mean_ns": 32.68,
+      "p50_ns": 31.5,
+      "p95_ns": 35.5,
+      "p99_ns": 41.0,
+      "max_ns": 221.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0
+    }
+  },
+  "topic_hash/8": {
+    "before": {
+      "mean_ns": 187.8385,
+      "p50_ns": 182.5,
+      "p95_ns": 202.0,
+      "p99_ns": 242.5,
+      "max_ns": 393.0,
+      "allocations_per_op": 4.0,
+      "allocated_bytes_per_op": 256.0
+    },
+    "after": {
+      "mean_ns": 69.795,
+      "p50_ns": 69.5,
+      "p95_ns": 72.5,
+      "p99_ns": 75.0,
+      "max_ns": 214.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0
+    }
+  },
+  "topic_late_mismatch/1": {
+    "before": {
+      "mean_ns": 34.6915,
+      "p50_ns": 35.0,
+      "p95_ns": 35.0,
+      "p99_ns": 36.0,
+      "max_ns": 147.0,
+      "allocations_per_op": 2.0,
+      "allocated_bytes_per_op": 128.0
+    },
+    "after": {
+      "mean_ns": 10.099,
+      "p50_ns": 10.0,
+      "p95_ns": 11.0,
+      "p99_ns": 11.5,
+      "max_ns": 17.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0
+    }
+  },
+  "topic_late_mismatch/16": {
+    "before": {
+      "mean_ns": 372.04499999999996,
+      "p50_ns": 360.5,
+      "p95_ns": 397.0,
+      "p99_ns": 455.5,
+      "max_ns": 575.0,
+      "allocations_per_op": 6.0,
+      "allocated_bytes_per_op": 512.0
+    },
+    "after": {
+      "mean_ns": 155.36,
+      "p50_ns": 154.5,
+      "p95_ns": 170.0,
+      "p99_ns": 216.0,
+      "max_ns": 315.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0
+    }
+  },
+  "topic_late_mismatch/32": {
+    "before": {
+      "mean_ns": 660.582,
+      "p50_ns": 660.0,
+      "p95_ns": 709.5,
+      "p99_ns": 797.5,
+      "max_ns": 1442.0,
+      "allocations_per_op": 8.0,
+      "allocated_bytes_per_op": 1024.0
+    },
+    "after": {
+      "mean_ns": 306.3345,
+      "p50_ns": 301.0,
+      "p95_ns": 332.5,
+      "p99_ns": 407.0,
+      "max_ns": 589.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0
+    }
+  },
+  "topic_late_mismatch/4": {
+    "before": {
+      "mean_ns": 72.045,
+      "p50_ns": 71.5,
+      "p95_ns": 75.0,
+      "p99_ns": 77.0,
+      "max_ns": 205.0,
+      "allocations_per_op": 2.0,
+      "allocated_bytes_per_op": 128.0
+    },
+    "after": {
+      "mean_ns": 34.0775,
+      "p50_ns": 34.5,
+      "p95_ns": 35.0,
+      "p99_ns": 39.0,
+      "max_ns": 247.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0
+    }
+  },
+  "topic_late_mismatch/8": {
+    "before": {
+      "mean_ns": 182.7885,
+      "p50_ns": 179.0,
+      "p95_ns": 197.5,
+      "p99_ns": 238.0,
+      "max_ns": 348.0,
+      "allocations_per_op": 4.0,
+      "allocated_bytes_per_op": 256.0
+    },
+    "after": {
+      "mean_ns": 69.899,
+      "p50_ns": 69.5,
+      "p95_ns": 72.5,
+      "p99_ns": 75.5,
+      "max_ns": 190.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0
+    }
+  },
+  "topic_mixed/1": {
+    "before": {
+      "mean_ns": 32.838,
+      "p50_ns": 33.0,
+      "p95_ns": 33.0,
+      "p99_ns": 34.5,
+      "max_ns": 169.0,
+      "allocations_per_op": 2.0,
+      "allocated_bytes_per_op": 128.0
+    },
+    "after": {
+      "mean_ns": 6.1485,
+      "p50_ns": 6.0,
+      "p95_ns": 6.5,
+      "p99_ns": 6.5,
+      "max_ns": 431.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0
+    }
+  },
+  "topic_mixed/16": {
+    "before": {
+      "mean_ns": 349.058,
+      "p50_ns": 347.5,
+      "p95_ns": 382.0,
+      "p99_ns": 423.5,
+      "max_ns": 541.0,
+      "allocations_per_op": 6.0,
+      "allocated_bytes_per_op": 512.0
+    },
+    "after": {
+      "mean_ns": 125.922,
+      "p50_ns": 123.0,
+      "p95_ns": 133.5,
+      "p99_ns": 169.5,
+      "max_ns": 358.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0
+    }
+  },
+  "topic_mixed/32": {
+    "before": {
+      "mean_ns": 623.371,
+      "p50_ns": 617.0,
+      "p95_ns": 696.5,
+      "p99_ns": 839.5,
+      "max_ns": 4348.0,
+      "allocations_per_op": 8.0,
+      "allocated_bytes_per_op": 1024.0
+    },
+    "after": {
+      "mean_ns": 253.1055,
+      "p50_ns": 247.5,
+      "p95_ns": 274.0,
+      "p99_ns": 328.5,
+      "max_ns": 465.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0
+    }
+  },
+  "topic_mixed/4": {
+    "before": {
+      "mean_ns": 66.5685,
+      "p50_ns": 64.0,
+      "p95_ns": 70.0,
+      "p99_ns": 73.0,
+      "max_ns": 212.0,
+      "allocations_per_op": 2.0,
+      "allocated_bytes_per_op": 128.0
+    },
+    "after": {
+      "mean_ns": 24.9555,
+      "p50_ns": 25.0,
+      "p95_ns": 27.5,
+      "p99_ns": 30.0,
+      "max_ns": 128.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0
+    }
+  },
+  "topic_mixed/8": {
+    "before": {
+      "mean_ns": 177.5375,
+      "p50_ns": 181.0,
+      "p95_ns": 185.0,
+      "p99_ns": 216.5,
+      "max_ns": 358.0,
+      "allocations_per_op": 4.0,
+      "allocated_bytes_per_op": 256.0
+    },
+    "after": {
+      "mean_ns": 53.6695,
+      "p50_ns": 53.0,
+      "p95_ns": 56.5,
+      "p99_ns": 59.0,
+      "max_ns": 197.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0
+    }
+  },
+  "topic_plus/1": {
+    "before": {
+      "mean_ns": 36.254000000000005,
+      "p50_ns": 36.5,
+      "p95_ns": 37.5,
+      "p99_ns": 41.5,
+      "max_ns": 169.0,
+      "allocations_per_op": 2.0,
+      "allocated_bytes_per_op": 128.0
+    },
+    "after": {
+      "mean_ns": 6.614,
+      "p50_ns": 6.5,
+      "p95_ns": 7.5,
+      "p99_ns": 7.5,
+      "max_ns": 12.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0
+    }
+  },
+  "topic_plus/16": {
+    "before": {
+      "mean_ns": 314.1835,
+      "p50_ns": 307.0,
+      "p95_ns": 334.0,
+      "p99_ns": 376.0,
+      "max_ns": 1201.0,
+      "allocations_per_op": 6.0,
+      "allocated_bytes_per_op": 512.0
+    },
+    "after": {
+      "mean_ns": 87.03550000000001,
+      "p50_ns": 86.0,
+      "p95_ns": 90.5,
+      "p99_ns": 100.5,
+      "max_ns": 460.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0
+    }
+  },
+  "topic_plus/32": {
+    "before": {
+      "mean_ns": 587.096,
+      "p50_ns": 596.0,
+      "p95_ns": 624.5,
+      "p99_ns": 912.0,
+      "max_ns": 28983.0,
+      "allocations_per_op": 8.0,
+      "allocated_bytes_per_op": 1024.0
+    },
+    "after": {
+      "mean_ns": 180.06900000000002,
+      "p50_ns": 177.5,
+      "p95_ns": 194.0,
+      "p99_ns": 222.5,
+      "max_ns": 436.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0
+    }
+  },
+  "topic_plus/4": {
+    "before": {
+      "mean_ns": 59.673,
+      "p50_ns": 58.0,
+      "p95_ns": 64.5,
+      "p99_ns": 66.0,
+      "max_ns": 163.0,
+      "allocations_per_op": 2.0,
+      "allocated_bytes_per_op": 128.0
+    },
+    "after": {
+      "mean_ns": 20.2325,
+      "p50_ns": 20.0,
+      "p95_ns": 20.5,
+      "p99_ns": 21.0,
+      "max_ns": 140.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0
+    }
+  },
+  "topic_plus/8": {
+    "before": {
+      "mean_ns": 160.881,
+      "p50_ns": 156.0,
+      "p95_ns": 173.0,
+      "p99_ns": 180.0,
+      "max_ns": 317.0,
+      "allocations_per_op": 4.0,
+      "allocated_bytes_per_op": 256.0
+    },
+    "after": {
+      "mean_ns": 40.982,
+      "p50_ns": 40.5,
+      "p95_ns": 43.5,
+      "p99_ns": 48.0,
+      "max_ns": 1612.0,
+      "allocations_per_op": 0.0,
+      "allocated_bytes_per_op": 0.0
+    }
+  }
+}

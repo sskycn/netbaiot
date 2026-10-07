@@ -113,14 +113,15 @@ fn attach(services: &Services, auth: &AuthenticatedDevice, v5: bool) -> broker::
 
 fn message(auth: &AuthenticatedDevice, expiry: Timestamp) -> BrokerMessage {
     BrokerMessage {
-        topic: topic(&auth.device_key, TopicKind::Down),
+        topic: (topic(&auth.device_key, TopicKind::Down)).into(),
         payload: vec![1].into(),
         qos: 0,
         retain: false,
-        properties: broker::PublishProperties {
+        properties: (broker::PublishProperties {
             expires_at_ms: Some(expiry),
             ..Default::default()
-        },
+        })
+        .into(),
     }
 }
 

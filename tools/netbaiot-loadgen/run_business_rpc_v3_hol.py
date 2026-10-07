@@ -86,6 +86,15 @@ def run_mode(mode, args):
                 "development_token_env": "NETBAIOT_BUSINESS_RPC_TOKEN",
             },
         })
+        if getattr(args, "capacity_fixture", False):
+            # Explicit experiment overlay: a 2k/s publisher must not measure the
+            # production default 16 messages/device/s rejection policy.
+            gateway_config["limits"].update({
+                "requests_per_second": 1_000_000,
+                "requests_per_ip_second": 1_000_000,
+                "messages_per_device_second": 1_000_000,
+                "messages_per_tenant_second": 1_000_000,
+            })
         if args.auth_unique_devices:
             # The SDK keeps a bounded persistent MQTT subscription per identity.
             # Raise those experiment capacities equally for all compared modes so
@@ -202,6 +211,7 @@ def main():
     parser.add_argument("--event-payload-bytes", type=int, default=16384)
     parser.add_argument("--event-rate", type=int, default=1)
     parser.add_argument("--auth-concurrency", type=int, default=4)
+    parser.add_argument("--capacity-fixture", action="store_true", help="raise only test rate ceilings equally for compared modes")
     parser.add_argument("--auth-unique-devices", action="store_true")
     parser.add_argument("--delay-ms", type=float, default=25)
     parser.add_argument("--bytes-per-second", type=int, default=32768)

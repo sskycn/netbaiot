@@ -1,0 +1,19 @@
+{
+  "session_counters": {
+    "status": "NOT IMPLEMENTED",
+    "reason": "Usage/capacity scans are linear but only ~25/22ns at32 and142/136ns at256. Full started-transfer route+ACK is2.60us/7.02us (Q1) and3.06us/9.29us (Q2). Separate scan/control timings do not prove a dominant mutex critical share in a real high-inflight workload; no counters or drift authority added."
+  },
+  "expiry_index": {
+    "status": "NOT IMPLEMENTED",
+    "reason": "Started-outbound hash lookups are avoidable for the common no-expiry case. Evaluate that small change before adding a per-session multiset and ownership bookkeeping."
+  },
+  "order_index": {
+    "status": "NOT IMPLEMENTED",
+    "reason": "Removal32/256 costs83/292ns, including other cleanup. ACK32/256 costs625/2229ns Q1 and Q2 ACK256980ns. No sustained high-inflight network evidence warrants additional replay-order state; gate remains insufficient."
+  },
+  "measurement": {
+    "raw": "target/second-round/ownership/micro-{0,1}",
+    "repetitions": 6,
+    "timing": "Release single-thread wall time; full operations bound uncontended hold from above, not concurrent lock wait; do not subtract independent controls as precise profiling."
+  }
+}

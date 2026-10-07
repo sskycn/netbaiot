@@ -18,14 +18,15 @@ fn message_deadline_budget_cleans_only_due_sessions_and_reindexes() {
             .route(
                 &identity.device_key,
                 BrokerMessage {
-                    topic: down,
+                    topic: down.into(),
                     payload: vec![index as u8].into(),
                     qos: 1,
                     retain: false,
-                    properties: PublishProperties {
+                    properties: (PublishProperties {
                         expires_at_ms: Some(now_ms() + 10_000),
                         ..Default::default()
-                    },
+                    })
+                    .into(),
                 },
             )
             .unwrap();
@@ -109,10 +110,11 @@ fn v5_qos2_retransmission_keeps_first_message_expiry_deadline() {
         payload: b"first".to_vec().into(),
         qos: 2,
         retain: false,
-        properties: PublishProperties {
+        properties: (PublishProperties {
             expires_at_ms: Some(deadline),
             ..Default::default()
-        },
+        })
+        .into(),
     };
     assert!(
         broker
@@ -185,10 +187,11 @@ fn qos1_started_publish_survives_message_expiry_until_puback() {
                 payload: b"data".to_vec().into(),
                 qos: 1,
                 retain: false,
-                properties: PublishProperties {
+                properties: (PublishProperties {
                     expires_at_ms: Some(now_ms() + 10_000),
                     ..Default::default()
-                },
+                })
+                .into(),
             },
         )
         .unwrap();
@@ -246,10 +249,11 @@ fn unsent_expired_message_is_dropped() {
                 payload: b"data".to_vec().into(),
                 qos: 1,
                 retain: false,
-                properties: PublishProperties {
+                properties: (PublishProperties {
                     expires_at_ms: Some(now_ms() + 10_000),
                     ..Default::default()
-                },
+                })
+                .into(),
             },
         )
         .unwrap();
@@ -309,10 +313,11 @@ fn qos2_started_publish_survives_message_expiry_until_pubcomp() {
                 payload: b"data".to_vec().into(),
                 qos: 2,
                 retain: false,
-                properties: PublishProperties {
+                properties: (PublishProperties {
                     expires_at_ms: Some(now_ms() + 10_000),
                     ..Default::default()
-                },
+                })
+                .into(),
             },
         )
         .unwrap();
@@ -379,10 +384,11 @@ async fn reconnect_preserves_started_qos_state_after_message_expiry() {
                 payload: b"first".to_vec().into(),
                 qos: 1,
                 retain: false,
-                properties: PublishProperties {
+                properties: (PublishProperties {
                     expires_at_ms: Some(now_ms() + 10_000),
                     ..Default::default()
-                },
+                })
+                .into(),
             },
         )
         .unwrap();

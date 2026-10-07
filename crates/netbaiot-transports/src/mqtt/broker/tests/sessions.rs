@@ -77,10 +77,11 @@ fn packet_identifier_not_reused_before_qos_exchange_finishes() {
         payload: b"data".to_vec().into(),
         qos: 1,
         retain: false,
-        properties: PublishProperties {
+        properties: (PublishProperties {
             expires_at_ms: Some(now_ms() + 10_000),
             ..Default::default()
-        },
+        })
+        .into(),
     };
     broker
         .route_from_session(&attachment.key, &message)
@@ -175,6 +176,80 @@ fn wildcard_trie_and_dollar_rules() {
     assert!(subscribe_acl(&authorized, "v1/t/t/p/p/d/a/up", &limits));
     for escaped in ["#", "v1/t/t/p/p/d/+/up", "v1/t/t/p/p/d/b/#"] {
         assert!(!subscribe_acl(&authorized, escaped, &limits));
+    }
+}
+
+#[test]
+fn topic_matcher_preserves_empty_levels_and_terminal_wildcards() {
+    for (filter, topic, expected) in [
+        ("#", "a", true),
+        ("+", "a", true),
+        ("+", "a/b", false),
+        ("+/x", "/x", true),
+        ("a/+", "a/", true),
+        ("a/+", "a", false),
+        ("a/#", "a", true),
+        ("a/#", "a/", true),
+        ("a/#", "ab", false),
+        ("a/+/c", "a//c", true),
+        ("a/+/c", "a/b/c", true),
+        ("a/+/c", "a/b/d", false),
+        ("a//b", "a//b", true),
+        ("a//b", "a/b", false),
+        ("/a", "/a", true),
+        ("/a", "a", false),
+        ("a/", "a/", true),
+        ("a/", "a", false),
+        ("/", "/", true),
+        ("+/+", "/", true),
+        ("#", "$SYS", false),
+        ("+", "$SYS", false),
+        ("+/x", "$device/x", false),
+        ("$SYS/#", "$SYS", true),
+        ("$SYS/+", "$SYS/", true),
+        ("a/#/b", "a/b", false),
+        ("#/x", "a/x", false),
+        ("a+", "a", false),
+    ] {
+        assert_eq!(
+            topic_matches(filter, topic),
+            expected,
+            "{filter:?} / {topic:?}"
+        );
+    }
+}
+
+#[test]
+fn topic_matcher_agrees_with_subscription_trie_for_valid_filters() {
+    let key = SessionKey {
+        device: auth("matcher").device_key,
+        client_id: "matcher".into(),
+    };
+    let levels = ["", "a", "b", "$SYS"];
+    let mut topics = Vec::new();
+    for first in levels {
+        topics.push(first.to_owned());
+        for second in levels {
+            topics.push(format!("{first}/{second}"));
+            for third in levels {
+                topics.push(format!("{first}/{second}/{third}"));
+            }
+        }
+    }
+    let filters = [
+        "#", "+", "+/+", "+/#", "a/+", "a/#", "a/+/b", "a//b", "/a", "a/", "/", "$SYS/#", "$SYS/+",
+        "+/a", "+/+/+", "a/b/#",
+    ];
+    for filter in filters {
+        let mut trie = SubscriptionTrie::default();
+        trie.insert(filter, key.clone(), Subscription::v311(1));
+        for topic in &topics {
+            assert_eq!(
+                topic_matches(filter, topic),
+                trie.matching(topic).contains_key(&key),
+                "{filter:?} / {topic:?}"
+            );
+        }
     }
 }
 

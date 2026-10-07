@@ -245,7 +245,7 @@ fn mqtt_recovery_acl_ownership_001() {
         properties: Default::default(),
     };
     invalid.retained.push((
-        retained_message.topic.clone(),
+        retained_message.topic.to_string(),
         RetainedMessage {
             tenant_id: TenantId::new("other-tenant").unwrap(),
             message: retained_message,
@@ -301,7 +301,7 @@ async fn mqtt_recovery_v3_raw_binary_round_trip_bound() {
             .route(
                 &device.device_key,
                 BrokerMessage {
-                    topic: format!("v1/t/t/p/p/d/binary-recovery-{index}/up"),
+                    topic: (format!("v1/t/t/p/p/d/binary-recovery-{index}/up")).into(),
                     payload: vec![byte; 1024].into(),
                     qos: 1,
                     retain: true,

@@ -329,10 +329,11 @@ fn derived_accounting_survives_local_discard_expiry_and_limit_rejection() {
                 payload: vec![2; 64].into(),
                 qos: 1,
                 retain: false,
-                properties: PublishProperties {
+                properties: (PublishProperties {
                     expires_at_ms: Some(now_ms() + 10),
                     ..Default::default()
-                },
+                })
+                .into(),
             },
         )
         .unwrap();
@@ -355,10 +356,11 @@ fn derived_accounting_survives_local_discard_expiry_and_limit_rejection() {
                 payload: vec![3; 64].into(),
                 qos: 1,
                 retain: false,
-                properties: PublishProperties {
+                properties: (PublishProperties {
                     expires_at_ms: Some(now_ms() + 10),
                     ..Default::default()
-                },
+                })
+                .into(),
             },
         )
         .unwrap();

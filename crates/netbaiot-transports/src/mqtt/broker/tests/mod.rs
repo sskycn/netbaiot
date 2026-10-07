@@ -245,7 +245,7 @@ fn oversized_delivery_is_settled_locally(qos: u8) {
             .route_from_session(
                 &attachment.key,
                 &BrokerMessage {
-                    topic: topic.clone(),
+                    topic: topic.clone().into(),
                     payload: payload.into(),
                     qos,
                     retain: false,
@@ -525,3 +525,38 @@ mod recovery_storage;
 mod routing;
 mod sessions;
 mod will;
+
+mod shared_metadata;
+
+#[test]
+fn broker_operation_probes_are_optional_and_cover_early_returns() {
+    for enabled in [false, true] {
+        let metrics = Arc::new(if enabled {
+            Metrics::with_lock_timing()
+        } else {
+            Metrics::default()
+        });
+        let broker = MqttBroker::new_with_metrics(Arc::new(Limits::default()), metrics.clone());
+        for site in BrokerProbe::ALL {
+            drop(broker.lock_state(site).unwrap());
+        }
+        let fail = || -> Result<()> {
+            let _guard = broker.lock_state(BrokerProbe::Read)?;
+            Err(Error::Invalid)
+        };
+        assert!(fail().is_err());
+        {
+            let mut guard = broker.lock_state(BrokerProbe::Subscribe).unwrap();
+            guard.classify(BrokerProbe::RetainedReplay);
+        }
+        assert!(broker.state.try_lock().is_ok());
+        let rendered = metrics.render();
+        if enabled {
+            assert!(rendered.contains("netbaiot_broker_site_read_hold_ns_count 2\n"));
+            assert!(rendered.contains("netbaiot_broker_site_retained_replay_hold_ns_count 2\n"));
+            assert!(rendered.contains("netbaiot_broker_site_subscribe_hold_ns_count 1\n"));
+        } else {
+            assert!(!rendered.contains("netbaiot_broker_site_"));
+        }
+    }
+}

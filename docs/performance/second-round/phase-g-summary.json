@@ -1,0 +1,1576 @@
+{
+  "network": {
+    "metadata": {
+      "A": {
+        "runs": [
+          {
+            "file": "metadata-0-A.json",
+            "cohort": "network",
+            "samples": 300000,
+            "throughput_ops_s": 20000.0,
+            "rss_peak_kib": 12496,
+            "cpu_mean_percent": 216.78,
+            "errors": 0,
+            "unexpected_disconnects": 0,
+            "pending_at_disconnect": 0,
+            "queue_peak_count": 10,
+            "queue_peak_bytes": 11930,
+            "overload": 0.0,
+            "p50_ms": 0.38,
+            "p95_ms": 0.84,
+            "p99_ms": 1.02,
+            "p999_ms": 1.19,
+            "broker_lock_wait_mean_us": 20.071619451867573,
+            "broker_lock_hold_mean_us": 6.441231047874084,
+            "event_bus_state_wait_mean_us": 0.3410165546052563,
+            "event_bus_state_hold_mean_us": 0.12707919814605048
+          },
+          {
+            "file": "metadata-1-A.json",
+            "cohort": "network-resume",
+            "samples": 300020,
+            "throughput_ops_s": 20001.333333333332,
+            "rss_peak_kib": 12256,
+            "cpu_mean_percent": 221.82500000000002,
+            "errors": 0,
+            "unexpected_disconnects": 0,
+            "pending_at_disconnect": 0,
+            "queue_peak_count": 20,
+            "queue_peak_bytes": 23860,
+            "overload": 0.0,
+            "p50_ms": 0.38,
+            "p95_ms": 0.85,
+            "p99_ms": 1.02,
+            "p999_ms": 1.19,
+            "broker_lock_wait_mean_us": 20.68934568535674,
+            "broker_lock_hold_mean_us": 6.595466603702829,
+            "event_bus_state_wait_mean_us": 0.3399627061937224,
+            "event_bus_state_hold_mean_us": 0.1269871306654239
+          }
+        ],
+        "median": {
+          "samples": 300010.0,
+          "throughput_ops_s": 20000.666666666664,
+          "rss_peak_kib": 12376.0,
+          "cpu_mean_percent": 219.3025,
+          "errors": 0.0,
+          "unexpected_disconnects": 0.0,
+          "pending_at_disconnect": 0.0,
+          "queue_peak_count": 15.0,
+          "queue_peak_bytes": 17895.0,
+          "overload": 0.0,
+          "p50_ms": 0.38,
+          "p95_ms": 0.845,
+          "p99_ms": 1.02,
+          "p999_ms": 1.19,
+          "broker_lock_wait_mean_us": 20.38048256861216,
+          "broker_lock_hold_mean_us": 6.518348825788457,
+          "event_bus_state_wait_mean_us": 0.3404896303994893,
+          "event_bus_state_hold_mean_us": 0.1270331644057372
+        }
+      },
+      "B": {
+        "runs": [
+          {
+            "file": "metadata-1-B.json",
+            "cohort": "network",
+            "samples": 300020,
+            "throughput_ops_s": 20001.333333333332,
+            "rss_peak_kib": 12272,
+            "cpu_mean_percent": 236.425,
+            "errors": 0,
+            "unexpected_disconnects": 0,
+            "pending_at_disconnect": 0,
+            "queue_peak_count": 12,
+            "queue_peak_bytes": 14304,
+            "overload": 0.0,
+            "p50_ms": 0.36,
+            "p95_ms": 0.77,
+            "p99_ms": 0.98,
+            "p999_ms": 1.24,
+            "broker_lock_wait_mean_us": 17.245263678385705,
+            "broker_lock_hold_mean_us": 4.818200253344593,
+            "event_bus_state_wait_mean_us": 0.5652034732915572,
+            "event_bus_state_hold_mean_us": 0.17969374017012377
+          },
+          {
+            "file": "metadata-0-B.json",
+            "cohort": "network-resume",
+            "samples": 299980,
+            "throughput_ops_s": 19998.666666666668,
+            "rss_peak_kib": 12336,
+            "cpu_mean_percent": 245.125,
+            "errors": 0,
+            "unexpected_disconnects": 0,
+            "pending_at_disconnect": 0,
+            "queue_peak_count": 4,
+            "queue_peak_bytes": 4768,
+            "overload": 0.0,
+            "p50_ms": 0.35,
+            "p95_ms": 0.77,
+            "p99_ms": 0.97,
+            "p999_ms": 1.21,
+            "broker_lock_wait_mean_us": 16.845745685679677,
+            "broker_lock_hold_mean_us": 4.785050727294951,
+            "event_bus_state_wait_mean_us": 0.5882195653988309,
+            "event_bus_state_hold_mean_us": 0.18843605196914165
+          }
+        ],
+        "median": {
+          "samples": 300000.0,
+          "throughput_ops_s": 20000.0,
+          "rss_peak_kib": 12304.0,
+          "cpu_mean_percent": 240.775,
+          "errors": 0.0,
+          "unexpected_disconnects": 0.0,
+          "pending_at_disconnect": 0.0,
+          "queue_peak_count": 8.0,
+          "queue_peak_bytes": 9536.0,
+          "overload": 0.0,
+          "p50_ms": 0.355,
+          "p95_ms": 0.77,
+          "p99_ms": 0.975,
+          "p999_ms": 1.225,
+          "broker_lock_wait_mean_us": 17.045504682032693,
+          "broker_lock_hold_mean_us": 4.801625490319772,
+          "event_bus_state_wait_mean_us": 0.576711519345194,
+          "event_bus_state_hold_mean_us": 0.18406489606963272
+        }
+      },
+      "delta_percent": {
+        "samples": -0.0033332222259208066,
+        "throughput_ops_s": -0.0033332222259097044,
+        "rss_peak_kib": -0.5817711700064621,
+        "cpu_mean_percent": 9.791270049361046,
+        "errors": null,
+        "unexpected_disconnects": null,
+        "pending_at_disconnect": null,
+        "queue_peak_count": -46.666666666666664,
+        "queue_peak_bytes": -46.71137189158983,
+        "overload": null,
+        "p50_ms": -6.578947368421062,
+        "p95_ms": -8.875739644970404,
+        "p99_ms": -4.4117647058823595,
+        "p999_ms": 2.941176470588247,
+        "broker_lock_wait_mean_us": -16.363586462450318,
+        "broker_lock_hold_mean_us": -26.33678223351342,
+        "event_bus_state_wait_mean_us": 69.377116909126,
+        "event_bus_state_hold_mean_us": 44.89515153833308
+      },
+      "p99_two_sided_exact_permutation_p": 0.3333333333333333
+    },
+    "large": {
+      "B": {
+        "runs": [
+          {
+            "file": "large-2-B.json",
+            "cohort": "network-additional",
+            "samples": 300006,
+            "throughput_ops_s": 20000.4,
+            "rss_peak_kib": 16144,
+            "cpu_mean_percent": 376.675,
+            "errors": 0,
+            "unexpected_disconnects": 0,
+            "pending_at_disconnect": 0,
+            "queue_peak_count": 10,
+            "queue_peak_bytes": 166970,
+            "overload": 0.0,
+            "p50_ms": 0.65,
+            "p95_ms": 1.35,
+            "p99_ms": 1.64,
+            "p999_ms": 2.31,
+            "broker_lock_wait_mean_us": 14.828705169875267,
+            "broker_lock_hold_mean_us": 3.195266272189349,
+            "event_bus_state_wait_mean_us": 0.7814149168892583,
+            "event_bus_state_hold_mean_us": 0.08029959962970169
+          },
+          {
+            "file": "large-1-B.json",
+            "cohort": "network-additional",
+            "samples": 299998,
+            "throughput_ops_s": 19999.866666666665,
+            "rss_peak_kib": 16688,
+            "cpu_mean_percent": 347.885,
+            "errors": 0,
+            "unexpected_disconnects": 0,
+            "pending_at_disconnect": 0,
+            "queue_peak_count": 24,
+            "queue_peak_bytes": 400692,
+            "overload": 0.0,
+            "p50_ms": 0.59,
+            "p95_ms": 1.27,
+            "p99_ms": 1.53,
+            "p999_ms": 2.19,
+            "broker_lock_wait_mean_us": 15.15878792256172,
+            "broker_lock_hold_mean_us": 3.0374190573286626,
+            "event_bus_state_wait_mean_us": 0.7747373390302057,
+            "event_bus_state_hold_mean_us": 0.07188448830530102
+          }
+        ],
+        "median": {
+          "samples": 300002.0,
+          "throughput_ops_s": 20000.13333333333,
+          "rss_peak_kib": 16416.0,
+          "cpu_mean_percent": 362.28,
+          "errors": 0.0,
+          "unexpected_disconnects": 0.0,
+          "pending_at_disconnect": 0.0,
+          "queue_peak_count": 17.0,
+          "queue_peak_bytes": 283831.0,
+          "overload": 0.0,
+          "p50_ms": 0.62,
+          "p95_ms": 1.31,
+          "p99_ms": 1.585,
+          "p999_ms": 2.25,
+          "broker_lock_wait_mean_us": 14.993746546218492,
+          "broker_lock_hold_mean_us": 3.1163426647590056,
+          "event_bus_state_wait_mean_us": 0.778076127959732,
+          "event_bus_state_hold_mean_us": 0.07609204396750135
+        }
+      },
+      "A": {
+        "runs": [
+          {
+            "file": "large-3-A.json",
+            "cohort": "network-additional",
+            "samples": 299991,
+            "throughput_ops_s": 19999.4,
+            "rss_peak_kib": 19584,
+            "cpu_mean_percent": 385.84499999999997,
+            "errors": 0,
+            "unexpected_disconnects": 0,
+            "pending_at_disconnect": 0,
+            "queue_peak_count": 12,
+            "queue_peak_bytes": 200352,
+            "overload": 0.0,
+            "p50_ms": 0.69,
+            "p95_ms": 1.42,
+            "p99_ms": 1.8,
+            "p999_ms": 2.57,
+            "broker_lock_wait_mean_us": 15.934166736116898,
+            "broker_lock_hold_mean_us": 3.1441425674361754,
+            "event_bus_state_wait_mean_us": 0.7474149259586153,
+            "event_bus_state_hold_mean_us": 0.06885946847111896
+          },
+          {
+            "file": "large-0-A.json",
+            "cohort": "network-additional",
+            "samples": 299996,
+            "throughput_ops_s": 19999.733333333334,
+            "rss_peak_kib": 16864,
+            "cpu_mean_percent": 382.935,
+            "errors": 0,
+            "unexpected_disconnects": 0,
+            "pending_at_disconnect": 0,
+            "queue_peak_count": 47,
+            "queue_peak_bytes": 784694,
+            "overload": 0.0,
+            "p50_ms": 0.67,
+            "p95_ms": 1.38,
+            "p99_ms": 1.7,
+            "p999_ms": 2.47,
+            "broker_lock_wait_mean_us": 15.799612197445947,
+            "broker_lock_hold_mean_us": 3.2697644571736526,
+            "event_bus_state_wait_mean_us": 0.7351339480267244,
+            "event_bus_state_hold_mean_us": 0.06854342765179053
+          }
+        ],
+        "median": {
+          "samples": 299993.5,
+          "throughput_ops_s": 19999.566666666666,
+          "rss_peak_kib": 18224.0,
+          "cpu_mean_percent": 384.39,
+          "errors": 0.0,
+          "unexpected_disconnects": 0.0,
+          "pending_at_disconnect": 0.0,
+          "queue_peak_count": 29.5,
+          "queue_peak_bytes": 492523.0,
+          "overload": 0.0,
+          "p50_ms": 0.6799999999999999,
+          "p95_ms": 1.4,
+          "p99_ms": 1.75,
+          "p999_ms": 2.52,
+          "broker_lock_wait_mean_us": 15.866889466781423,
+          "broker_lock_hold_mean_us": 3.206953512304914,
+          "event_bus_state_wait_mean_us": 0.7412744369926698,
+          "event_bus_state_hold_mean_us": 0.06870144806145474
+        }
+      },
+      "delta_percent": {
+        "samples": 0.0028333947235559265,
+        "throughput_ops_s": 0.0028333947235559265,
+        "rss_peak_kib": -9.920983318700616,
+        "cpu_mean_percent": -5.751970654803717,
+        "errors": null,
+        "unexpected_disconnects": null,
+        "pending_at_disconnect": null,
+        "queue_peak_count": -42.3728813559322,
+        "queue_peak_bytes": -42.37203135691126,
+        "overload": null,
+        "p50_ms": -8.823529411764696,
+        "p95_ms": -6.428571428571416,
+        "p99_ms": -9.42857142857143,
+        "p999_ms": -10.71428571428571,
+        "broker_lock_wait_mean_us": -5.502924327990833,
+        "broker_lock_hold_mean_us": -2.8254493617771326,
+        "event_bus_state_wait_mean_us": 4.964651299236178,
+        "event_bus_state_hold_mean_us": 10.757554774443157
+      },
+      "p99_two_sided_exact_permutation_p": 0.3333333333333333
+    },
+    "q1": {
+      "A": {
+        "runs": [
+          {
+            "file": "q1-3-A.json",
+            "cohort": "network-additional",
+            "samples": 299980,
+            "throughput_ops_s": 19998.666666666668,
+            "rss_peak_kib": 18288,
+            "cpu_mean_percent": 203.07,
+            "errors": 0,
+            "unexpected_disconnects": 0,
+            "pending_at_disconnect": 0,
+            "queue_peak_count": 3,
+            "queue_peak_bytes": 3585,
+            "overload": 0.0,
+            "p50_ms": 0.36,
+            "p95_ms": 0.8,
+            "p99_ms": 1.08,
+            "p999_ms": 1.78,
+            "broker_lock_wait_mean_us": 25.002994752238425,
+            "broker_lock_hold_mean_us": 5.351552798482066,
+            "event_bus_state_wait_mean_us": 0.6974012337224634,
+            "event_bus_state_hold_mean_us": 0.18472214389489996
+          },
+          {
+            "file": "q1-0-A.json",
+            "cohort": "network-additional",
+            "samples": 299985,
+            "throughput_ops_s": 19999.0,
+            "rss_peak_kib": 19936,
+            "cpu_mean_percent": 212.34,
+            "errors": 0,
+            "unexpected_disconnects": 0,
+            "pending_at_disconnect": 0,
+            "queue_peak_count": 9,
+            "queue_peak_bytes": 10732,
+            "overload": 0.0,
+            "p50_ms": 0.35,
+            "p95_ms": 0.78,
+            "p99_ms": 1.11,
+            "p999_ms": 19.29,
+            "broker_lock_wait_mean_us": 25.955146262188517,
+            "broker_lock_hold_mean_us": 5.3845459343834206,
+            "event_bus_state_wait_mean_us": 0.7700310112422485,
+            "event_bus_state_hold_mean_us": 0.20545136491474872
+          }
+        ],
+        "median": {
+          "samples": 299982.5,
+          "throughput_ops_s": 19998.833333333336,
+          "rss_peak_kib": 19112.0,
+          "cpu_mean_percent": 207.70499999999998,
+          "errors": 0.0,
+          "unexpected_disconnects": 0.0,
+          "pending_at_disconnect": 0.0,
+          "queue_peak_count": 6.0,
+          "queue_peak_bytes": 7158.5,
+          "overload": 0.0,
+          "p50_ms": 0.355,
+          "p95_ms": 0.79,
+          "p99_ms": 1.0950000000000002,
+          "p999_ms": 10.535,
+          "broker_lock_wait_mean_us": 25.47907050721347,
+          "broker_lock_hold_mean_us": 5.368049366432743,
+          "event_bus_state_wait_mean_us": 0.733716122482356,
+          "event_bus_state_hold_mean_us": 0.19508675440482434
+        }
+      },
+      "B": {
+        "runs": [
+          {
+            "file": "q1-2-B.json",
+            "cohort": "network-additional",
+            "samples": 300020,
+            "throughput_ops_s": 20001.333333333332,
+            "rss_peak_kib": 18528,
+            "cpu_mean_percent": 201.48,
+            "errors": 0,
+            "unexpected_disconnects": 0,
+            "pending_at_disconnect": 0,
+            "queue_peak_count": 15,
+            "queue_peak_bytes": 17910,
+            "overload": 0.0,
+            "p50_ms": 0.35,
+            "p95_ms": 0.79,
+            "p99_ms": 1.05,
+            "p999_ms": 1.48,
+            "broker_lock_wait_mean_us": 25.498193000341676,
+            "broker_lock_hold_mean_us": 5.341841000697244,
+            "event_bus_state_wait_mean_us": 0.7218037214158383,
+            "event_bus_state_hold_mean_us": 0.17133284740191
+          },
+          {
+            "file": "q1-1-B.json",
+            "cohort": "network-additional",
+            "samples": 300000,
+            "throughput_ops_s": 20000.0,
+            "rss_peak_kib": 17888,
+            "cpu_mean_percent": 188.0,
+            "errors": 0,
+            "unexpected_disconnects": 0,
+            "pending_at_disconnect": 0,
+            "queue_peak_count": 20,
+            "queue_peak_bytes": 23900,
+            "overload": 0.0,
+            "p50_ms": 0.35,
+            "p95_ms": 0.78,
+            "p99_ms": 1.07,
+            "p999_ms": 1.7,
+            "broker_lock_wait_mean_us": 24.57684112860885,
+            "broker_lock_hold_mean_us": 5.258192747990877,
+            "event_bus_state_wait_mean_us": 0.7639311016126088,
+            "event_bus_state_hold_mean_us": 0.16747980515009975
+          }
+        ],
+        "median": {
+          "samples": 300010.0,
+          "throughput_ops_s": 20000.666666666664,
+          "rss_peak_kib": 18208.0,
+          "cpu_mean_percent": 194.74,
+          "errors": 0.0,
+          "unexpected_disconnects": 0.0,
+          "pending_at_disconnect": 0.0,
+          "queue_peak_count": 17.5,
+          "queue_peak_bytes": 20905.0,
+          "overload": 0.0,
+          "p50_ms": 0.35,
+          "p95_ms": 0.785,
+          "p99_ms": 1.06,
+          "p999_ms": 1.5899999999999999,
+          "broker_lock_wait_mean_us": 25.037517064475264,
+          "broker_lock_hold_mean_us": 5.3000168743440605,
+          "event_bus_state_wait_mean_us": 0.7428674115142235,
+          "event_bus_state_hold_mean_us": 0.16940632627600488
+        }
+      },
+      "delta_percent": {
+        "samples": 0.00916720142007943,
+        "throughput_ops_s": 0.009167201420057225,
+        "rss_peak_kib": -4.7300125575554635,
+        "cpu_mean_percent": -6.242025950265995,
+        "errors": null,
+        "unexpected_disconnects": null,
+        "pending_at_disconnect": null,
+        "queue_peak_count": 191.66666666666666,
+        "queue_peak_bytes": 192.03045330725712,
+        "overload": null,
+        "p50_ms": -1.4084507042253502,
+        "p95_ms": -0.6329113924050667,
+        "p99_ms": -3.196347031963487,
+        "p999_ms": -84.90745135263408,
+        "broker_lock_wait_mean_us": -1.7330045168374442,
+        "broker_lock_hold_mean_us": -1.2673596579439117,
+        "event_bus_state_wait_mean_us": 1.247252002710031,
+        "event_bus_state_hold_mean_us": -13.163593913469917
+      },
+      "p99_two_sided_exact_permutation_p": 0.3333333333333333
+    },
+    "plain": {
+      "B": {
+        "runs": [
+          {
+            "file": "plain-1-B.json",
+            "cohort": "network-additional",
+            "samples": 299994,
+            "throughput_ops_s": 19999.6,
+            "rss_peak_kib": 16864,
+            "cpu_mean_percent": 127.725,
+            "errors": 0,
+            "unexpected_disconnects": 0,
+            "pending_at_disconnect": 0,
+            "queue_peak_count": 18,
+            "queue_peak_bytes": 21492,
+            "overload": 0.0,
+            "p50_ms": 0.32,
+            "p95_ms": 0.95,
+            "p99_ms": 1.33,
+            "p999_ms": 1.77,
+            "broker_lock_wait_mean_us": null,
+            "broker_lock_hold_mean_us": null,
+            "event_bus_state_wait_mean_us": 2.39462212803534,
+            "event_bus_state_hold_mean_us": 0.30321519479511044
+          },
+          {
+            "file": "plain-2-B.json",
+            "cohort": "network-additional",
+            "samples": 299980,
+            "throughput_ops_s": 19998.666666666668,
+            "rss_peak_kib": 16816,
+            "cpu_mean_percent": 125.7,
+            "errors": 0,
+            "unexpected_disconnects": 0,
+            "pending_at_disconnect": 0,
+            "queue_peak_count": 46,
+            "queue_peak_bytes": 54970,
+            "overload": 0.0,
+            "p50_ms": 0.31,
+            "p95_ms": 0.92,
+            "p99_ms": 1.35,
+            "p999_ms": 3.41,
+            "broker_lock_wait_mean_us": null,
+            "broker_lock_hold_mean_us": null,
+            "event_bus_state_wait_mean_us": 2.3669129753370712,
+            "event_bus_state_hold_mean_us": 0.29972162971093624
+          }
+        ],
+        "median": {
+          "samples": 299987.0,
+          "throughput_ops_s": 19999.13333333333,
+          "rss_peak_kib": 16840.0,
+          "cpu_mean_percent": 126.7125,
+          "errors": 0.0,
+          "unexpected_disconnects": 0.0,
+          "pending_at_disconnect": 0.0,
+          "queue_peak_count": 32.0,
+          "queue_peak_bytes": 38231.0,
+          "overload": 0.0,
+          "p50_ms": 0.315,
+          "p95_ms": 0.935,
+          "p99_ms": 1.34,
+          "p999_ms": 2.59,
+          "broker_lock_wait_mean_us": null,
+          "broker_lock_hold_mean_us": null,
+          "event_bus_state_wait_mean_us": 2.3807675516862057,
+          "event_bus_state_hold_mean_us": 0.30146841225302334
+        }
+      },
+      "A": {
+        "runs": [
+          {
+            "file": "plain-0-A.json",
+            "cohort": "network-additional",
+            "samples": 299990,
+            "throughput_ops_s": 19999.333333333332,
+            "rss_peak_kib": 16944,
+            "cpu_mean_percent": 122.59,
+            "errors": 0,
+            "unexpected_disconnects": 0,
+            "pending_at_disconnect": 0,
+            "queue_peak_count": 55,
+            "queue_peak_bytes": 65670,
+            "overload": 0.0,
+            "p50_ms": 0.32,
+            "p95_ms": 0.92,
+            "p99_ms": 1.33,
+            "p999_ms": 1.9,
+            "broker_lock_wait_mean_us": null,
+            "broker_lock_hold_mean_us": null,
+            "event_bus_state_wait_mean_us": 2.4899807132059517,
+            "event_bus_state_hold_mean_us": 0.3226454762911437
+          },
+          {
+            "file": "plain-3-A.json",
+            "cohort": "network-additional",
+            "samples": 299987,
+            "throughput_ops_s": 19999.133333333335,
+            "rss_peak_kib": 16912,
+            "cpu_mean_percent": 125.975,
+            "errors": 0,
+            "unexpected_disconnects": 0,
+            "pending_at_disconnect": 0,
+            "queue_peak_count": 19,
+            "queue_peak_bytes": 22648,
+            "overload": 0.0,
+            "p50_ms": 0.32,
+            "p95_ms": 0.92,
+            "p99_ms": 1.3,
+            "p999_ms": 1.71,
+            "broker_lock_wait_mean_us": null,
+            "broker_lock_hold_mean_us": null,
+            "event_bus_state_wait_mean_us": 2.6198485211951548,
+            "event_bus_state_hold_mean_us": 0.3352615594584586
+          }
+        ],
+        "median": {
+          "samples": 299988.5,
+          "throughput_ops_s": 19999.233333333334,
+          "rss_peak_kib": 16928.0,
+          "cpu_mean_percent": 124.2825,
+          "errors": 0.0,
+          "unexpected_disconnects": 0.0,
+          "pending_at_disconnect": 0.0,
+          "queue_peak_count": 37.0,
+          "queue_peak_bytes": 44159.0,
+          "overload": 0.0,
+          "p50_ms": 0.32,
+          "p95_ms": 0.92,
+          "p99_ms": 1.315,
+          "p999_ms": 1.805,
+          "broker_lock_wait_mean_us": null,
+          "broker_lock_hold_mean_us": null,
+          "event_bus_state_wait_mean_us": 2.554914617200553,
+          "event_bus_state_hold_mean_us": 0.32895351787480115
+        }
+      },
+      "delta_percent": {
+        "samples": -0.0005000191674042753,
+        "throughput_ops_s": -0.0005000191674153776,
+        "rss_peak_kib": -0.51984877126654,
+        "cpu_mean_percent": 1.9552229799046472,
+        "errors": null,
+        "unexpected_disconnects": null,
+        "pending_at_disconnect": null,
+        "queue_peak_count": -13.513513513513509,
+        "queue_peak_bytes": -13.42421703390022,
+        "overload": null,
+        "p50_ms": -1.5625,
+        "p95_ms": 1.6304347826086918,
+        "p99_ms": 1.9011406844106515,
+        "p999_ms": 43.490304709141284,
+        "broker_lock_wait_mean_us": null,
+        "broker_lock_hold_mean_us": null,
+        "event_bus_state_wait_mean_us": -6.8161598959875285,
+        "event_bus_state_hold_mean_us": -8.355315911909035
+      },
+      "p99_two_sided_exact_permutation_p": 0.6666666666666666
+    }
+  },
+  "micro": {
+    "metadata_a/1": {
+      "before": {
+        "mean_ns": 844.91,
+        "p50_ns": 833.5,
+        "p95_ns": 896.0,
+        "p99_ns": 1125.0,
+        "max_ns": 7375.0,
+        "allocations_per_op": 13.0,
+        "allocated_bytes_per_op": 1128.0
+      },
+      "after": {
+        "mean_ns": 1414.719,
+        "p50_ns": 1334.0,
+        "p95_ns": 1417.0,
+        "p99_ns": 1688.0,
+        "max_ns": 13791.0,
+        "allocations_per_op": 11.0,
+        "allocated_bytes_per_op": 944.0
+      }
+    },
+    "metadata_a/10": {
+      "before": {
+        "mean_ns": 6054.348,
+        "p50_ns": 5999.5,
+        "p95_ns": 6791.5,
+        "p99_ns": 7583.0,
+        "max_ns": 23459.0,
+        "allocations_per_op": 87.0,
+        "allocated_bytes_per_op": 7336.0
+      },
+      "after": {
+        "mean_ns": 8672.843499999999,
+        "p50_ns": 8791.5,
+        "p95_ns": 9354.5,
+        "p99_ns": 12312.5,
+        "max_ns": 54708.0,
+        "allocations_per_op": 67.0,
+        "allocated_bytes_per_op": 5496.0
+      }
+    },
+    "metadata_a/100": {
+      "before": {
+        "mean_ns": 60342.633,
+        "p50_ns": 59833.5,
+        "p95_ns": 63416.5,
+        "p99_ns": 68250.0,
+        "max_ns": 83542.0,
+        "allocations_per_op": 810.0,
+        "allocated_bytes_per_op": 68344.0
+      },
+      "after": {
+        "mean_ns": 55964.855500000005,
+        "p50_ns": 55833.5,
+        "p95_ns": 59625.0,
+        "p99_ns": 65396.0,
+        "max_ns": 77875.0,
+        "allocations_per_op": 610.0,
+        "allocated_bytes_per_op": 49944.0
+      }
+    },
+    "metadata_a/1000": {
+      "before": {
+        "mean_ns": 625351.7185,
+        "p50_ns": 624146.0,
+        "p95_ns": 650520.5,
+        "p99_ns": 688104.0,
+        "max_ns": 756792.0,
+        "allocations_per_op": 8014.0,
+        "allocated_bytes_per_op": 811416.0
+      },
+      "after": {
+        "mean_ns": 575171.426,
+        "p50_ns": 572083.5,
+        "p95_ns": 605229.5,
+        "p99_ns": 640146.0,
+        "max_ns": 690333.0,
+        "allocations_per_op": 6014.0,
+        "allocated_bytes_per_op": 627416.0
+      }
+    },
+    "metadata_b/1": {
+      "before": {
+        "mean_ns": 1094.8125,
+        "p50_ns": 1083.0,
+        "p95_ns": 1208.5,
+        "p99_ns": 1229.5,
+        "max_ns": 1750.0,
+        "allocations_per_op": 13.0,
+        "allocated_bytes_per_op": 1576.0
+      },
+      "after": {
+        "mean_ns": 1824.504,
+        "p50_ns": 1770.5,
+        "p95_ns": 2208.0,
+        "p99_ns": 2375.0,
+        "max_ns": 11666.0,
+        "allocations_per_op": 11.0,
+        "allocated_bytes_per_op": 944.0
+      }
+    },
+    "metadata_b/10": {
+      "before": {
+        "mean_ns": 6522.7654999999995,
+        "p50_ns": 6437.5,
+        "p95_ns": 7917.0,
+        "p99_ns": 8187.5,
+        "max_ns": 12042.0,
+        "allocations_per_op": 87.0,
+        "allocated_bytes_per_op": 11816.0
+      },
+      "after": {
+        "mean_ns": 7941.242,
+        "p50_ns": 7958.5,
+        "p95_ns": 8166.5,
+        "p99_ns": 8354.0,
+        "max_ns": 12166.0,
+        "allocations_per_op": 67.0,
+        "allocated_bytes_per_op": 5496.0
+      }
+    },
+    "metadata_b/100": {
+      "before": {
+        "mean_ns": 61593.2775,
+        "p50_ns": 61562.0,
+        "p95_ns": 64354.0,
+        "p99_ns": 68541.5,
+        "max_ns": 74542.0,
+        "allocations_per_op": 810.0,
+        "allocated_bytes_per_op": 113144.0
+      },
+      "after": {
+        "mean_ns": 55448.7345,
+        "p50_ns": 55542.0,
+        "p95_ns": 58791.5,
+        "p99_ns": 63687.5,
+        "max_ns": 70416.0,
+        "allocations_per_op": 610.0,
+        "allocated_bytes_per_op": 49944.0
+      }
+    },
+    "metadata_b/1000": {
+      "before": {
+        "mean_ns": 637119.645,
+        "p50_ns": 635958.0,
+        "p95_ns": 668417.0,
+        "p99_ns": 694333.0,
+        "max_ns": 832334.0,
+        "allocations_per_op": 8014.0,
+        "allocated_bytes_per_op": 1259416.0
+      },
+      "after": {
+        "mean_ns": 575097.9885,
+        "p50_ns": 573187.5,
+        "p95_ns": 600062.0,
+        "p99_ns": 630604.0,
+        "max_ns": 701000.0,
+        "allocations_per_op": 6014.0,
+        "allocated_bytes_per_op": 627416.0
+      }
+    },
+    "metadata_c/1": {
+      "before": {
+        "mean_ns": 1608.5705,
+        "p50_ns": 1625.0,
+        "p95_ns": 1688.0,
+        "p99_ns": 1750.0,
+        "max_ns": 2000.0,
+        "allocations_per_op": 53.0,
+        "allocated_bytes_per_op": 2494.0
+      },
+      "after": {
+        "mean_ns": 1673.6329999999998,
+        "p50_ns": 1666.5,
+        "p95_ns": 1708.5,
+        "p99_ns": 1750.0,
+        "max_ns": 3042.0,
+        "allocations_per_op": 11.0,
+        "allocated_bytes_per_op": 944.0
+      }
+    },
+    "metadata_c/10": {
+      "before": {
+        "mean_ns": 10804.871,
+        "p50_ns": 10666.5,
+        "p95_ns": 12125.5,
+        "p99_ns": 14479.0,
+        "max_ns": 20458.0,
+        "allocations_per_op": 487.0,
+        "allocated_bytes_per_op": 20996.0
+      },
+      "after": {
+        "mean_ns": 7354.816,
+        "p50_ns": 7375.0,
+        "p95_ns": 7625.0,
+        "p99_ns": 9374.5,
+        "max_ns": 16042.0,
+        "allocations_per_op": 67.0,
+        "allocated_bytes_per_op": 5496.0
+      }
+    },
+    "metadata_c/100": {
+      "before": {
+        "mean_ns": 103916.8005,
+        "p50_ns": 104187.5,
+        "p95_ns": 108791.5,
+        "p99_ns": 113895.5,
+        "max_ns": 119667.0,
+        "allocations_per_op": 4810.0,
+        "allocated_bytes_per_op": 204944.0
+      },
+      "after": {
+        "mean_ns": 56066.2035,
+        "p50_ns": 56000.0,
+        "p95_ns": 58666.5,
+        "p99_ns": 62750.0,
+        "max_ns": 68083.0,
+        "allocations_per_op": 610.0,
+        "allocated_bytes_per_op": 49944.0
+      }
+    },
+    "metadata_c/1000": {
+      "before": {
+        "mean_ns": 1060741.7149999999,
+        "p50_ns": 1060437.0,
+        "p95_ns": 1103125.0,
+        "p99_ns": 1133375.0,
+        "max_ns": 1299250.0,
+        "allocations_per_op": 48014.0,
+        "allocated_bytes_per_op": 2177416.0
+      },
+      "after": {
+        "mean_ns": 571181.4724999999,
+        "p50_ns": 569250.5,
+        "p95_ns": 603937.5,
+        "p99_ns": 622749.5,
+        "max_ns": 667250.0,
+        "allocations_per_op": 6014.0,
+        "allocated_bytes_per_op": 627416.0
+      }
+    },
+    "metadata_d/1": {
+      "before": {
+        "mean_ns": 3474.934,
+        "p50_ns": 3458.5,
+        "p95_ns": 3645.5,
+        "p99_ns": 4020.5,
+        "max_ns": 4500.0,
+        "allocations_per_op": 85.0,
+        "allocated_bytes_per_op": 6302.0
+      },
+      "after": {
+        "mean_ns": 3378.254,
+        "p50_ns": 3374.5,
+        "p95_ns": 3479.0,
+        "p99_ns": 3979.0,
+        "max_ns": 16084.0,
+        "allocations_per_op": 11.0,
+        "allocated_bytes_per_op": 944.0
+      }
+    },
+    "metadata_d/10": {
+      "before": {
+        "mean_ns": 15793.621,
+        "p50_ns": 15500.0,
+        "p95_ns": 17812.5,
+        "p99_ns": 22020.5,
+        "max_ns": 23625.0,
+        "allocations_per_op": 807.0,
+        "allocated_bytes_per_op": 59076.0
+      },
+      "after": {
+        "mean_ns": 8398.9105,
+        "p50_ns": 8375.0,
+        "p95_ns": 9458.0,
+        "p99_ns": 10375.0,
+        "max_ns": 21084.0,
+        "allocations_per_op": 67.0,
+        "allocated_bytes_per_op": 5496.0
+      }
+    },
+    "metadata_d/100": {
+      "before": {
+        "mean_ns": 140055.637,
+        "p50_ns": 141521.0,
+        "p95_ns": 145188.0,
+        "p99_ns": 155146.0,
+        "max_ns": 205000.0,
+        "allocations_per_op": 8010.0,
+        "allocated_bytes_per_op": 585744.0
+      },
+      "after": {
+        "mean_ns": 56700.871,
+        "p50_ns": 56896.0,
+        "p95_ns": 59708.5,
+        "p99_ns": 66875.0,
+        "max_ns": 77625.0,
+        "allocations_per_op": 610.0,
+        "allocated_bytes_per_op": 49944.0
+      }
+    },
+    "metadata_d/1000": {
+      "before": {
+        "mean_ns": 1427163.902,
+        "p50_ns": 1415937.5,
+        "p95_ns": 1497229.0,
+        "p99_ns": 1574146.0,
+        "max_ns": 2481792.0,
+        "allocations_per_op": 80014.0,
+        "allocated_bytes_per_op": 5985416.0
+      },
+      "after": {
+        "mean_ns": 573303.1444999999,
+        "p50_ns": 572542.0,
+        "p95_ns": 603958.0,
+        "p99_ns": 635604.5,
+        "max_ns": 667458.0,
+        "allocations_per_op": 6014.0,
+        "allocated_bytes_per_op": 627416.0
+      }
+    },
+    "retained_broad/10": {
+      "before": {
+        "mean_ns": 24.415999999999997,
+        "p50_ns": 41.0,
+        "p95_ns": 42.0,
+        "p99_ns": 42.0,
+        "max_ns": 83.0,
+        "allocations_per_op": 0.0,
+        "allocated_bytes_per_op": 0.0
+      },
+      "after": {
+        "mean_ns": 24.5745,
+        "p50_ns": 41.0,
+        "p95_ns": 42.0,
+        "p99_ns": 42.0,
+        "max_ns": 5292.0,
+        "allocations_per_op": 0.0,
+        "allocated_bytes_per_op": 0.0
+      }
+    },
+    "retained_broad/100": {
+      "before": {
+        "mean_ns": 247.56650000000002,
+        "p50_ns": 250.0,
+        "p95_ns": 250.0,
+        "p99_ns": 291.5,
+        "max_ns": 417.0,
+        "allocations_per_op": 0.0,
+        "allocated_bytes_per_op": 0.0
+      },
+      "after": {
+        "mean_ns": 264.4165,
+        "p50_ns": 270.5,
+        "p95_ns": 292.0,
+        "p99_ns": 312.5,
+        "max_ns": 3833.0,
+        "allocations_per_op": 0.0,
+        "allocated_bytes_per_op": 0.0
+      }
+    },
+    "retained_broad/1000": {
+      "before": {
+        "mean_ns": 3465.406,
+        "p50_ns": 3416.5,
+        "p95_ns": 3625.0,
+        "p99_ns": 3875.0,
+        "max_ns": 99375.0,
+        "allocations_per_op": 0.0,
+        "allocated_bytes_per_op": 0.0
+      },
+      "after": {
+        "mean_ns": 3405.41,
+        "p50_ns": 3416.5,
+        "p95_ns": 3479.5,
+        "p99_ns": 3562.5,
+        "max_ns": 8584.0,
+        "allocations_per_op": 0.0,
+        "allocated_bytes_per_op": 0.0
+      }
+    },
+    "retained_broad/10000": {
+      "before": {
+        "mean_ns": 33921.16,
+        "p50_ns": 34125.0,
+        "p95_ns": 34583.0,
+        "p99_ns": 38958.5,
+        "max_ns": 45875.0,
+        "allocations_per_op": 0.0,
+        "allocated_bytes_per_op": 0.0
+      },
+      "after": {
+        "mean_ns": 34264.469,
+        "p50_ns": 34375.0,
+        "p95_ns": 35292.0,
+        "p99_ns": 40562.5,
+        "max_ns": 46917.0,
+        "allocations_per_op": 0.0,
+        "allocated_bytes_per_op": 0.0
+      }
+    },
+    "retained_broad/4000": {
+      "before": {
+        "mean_ns": 14201.168,
+        "p50_ns": 13812.5,
+        "p95_ns": 14396.5,
+        "p99_ns": 15916.5,
+        "max_ns": 22250.0,
+        "allocations_per_op": 0.0,
+        "allocated_bytes_per_op": 0.0
+      },
+      "after": {
+        "mean_ns": 14552.588,
+        "p50_ns": 14625.0,
+        "p95_ns": 14812.5,
+        "p99_ns": 15958.5,
+        "max_ns": 30292.0,
+        "allocations_per_op": 0.0,
+        "allocated_bytes_per_op": 0.0
+      }
+    },
+    "retained_exact/10": {
+      "before": {
+        "mean_ns": 29.301000000000002,
+        "p50_ns": 41.0,
+        "p95_ns": 42.0,
+        "p99_ns": 42.0,
+        "max_ns": 208.0,
+        "allocations_per_op": 0.0,
+        "allocated_bytes_per_op": 0.0
+      },
+      "after": {
+        "mean_ns": 27.508,
+        "p50_ns": 41.0,
+        "p95_ns": 42.0,
+        "p99_ns": 42.0,
+        "max_ns": 208.0,
+        "allocations_per_op": 0.0,
+        "allocated_bytes_per_op": 0.0
+      }
+    },
+    "retained_exact/100": {
+      "before": {
+        "mean_ns": 27.588,
+        "p50_ns": 41.0,
+        "p95_ns": 42.0,
+        "p99_ns": 42.0,
+        "max_ns": 125.0,
+        "allocations_per_op": 0.0,
+        "allocated_bytes_per_op": 0.0
+      },
+      "after": {
+        "mean_ns": 27.75,
+        "p50_ns": 41.0,
+        "p95_ns": 42.0,
+        "p99_ns": 42.0,
+        "max_ns": 84.0,
+        "allocations_per_op": 0.0,
+        "allocated_bytes_per_op": 0.0
+      }
+    },
+    "retained_exact/1000": {
+      "before": {
+        "mean_ns": 30.197499999999998,
+        "p50_ns": 41.5,
+        "p95_ns": 42.0,
+        "p99_ns": 42.0,
+        "max_ns": 125.0,
+        "allocations_per_op": 0.0,
+        "allocated_bytes_per_op": 0.0
+      },
+      "after": {
+        "mean_ns": 28.7305,
+        "p50_ns": 41.0,
+        "p95_ns": 42.0,
+        "p99_ns": 42.0,
+        "max_ns": 84.0,
+        "allocations_per_op": 0.0,
+        "allocated_bytes_per_op": 0.0
+      }
+    },
+    "retained_exact/10000": {
+      "before": {
+        "mean_ns": 29.378999999999998,
+        "p50_ns": 41.0,
+        "p95_ns": 42.0,
+        "p99_ns": 42.0,
+        "max_ns": 250.0,
+        "allocations_per_op": 0.0,
+        "allocated_bytes_per_op": 0.0
+      },
+      "after": {
+        "mean_ns": 27.834,
+        "p50_ns": 41.0,
+        "p95_ns": 42.0,
+        "p99_ns": 42.0,
+        "max_ns": 291.0,
+        "allocations_per_op": 0.0,
+        "allocated_bytes_per_op": 0.0
+      }
+    },
+    "retained_exact/4000": {
+      "before": {
+        "mean_ns": 30.613500000000002,
+        "p50_ns": 41.5,
+        "p95_ns": 42.0,
+        "p99_ns": 42.0,
+        "max_ns": 5542.0,
+        "allocations_per_op": 0.0,
+        "allocated_bytes_per_op": 0.0
+      },
+      "after": {
+        "mean_ns": 29.377,
+        "p50_ns": 41.0,
+        "p95_ns": 42.0,
+        "p99_ns": 42.0,
+        "max_ns": 125.0,
+        "allocations_per_op": 0.0,
+        "allocated_bytes_per_op": 0.0
+      }
+    },
+    "retained_none/10": {
+      "before": {
+        "mean_ns": 250.8925,
+        "p50_ns": 250.0,
+        "p95_ns": 250.0,
+        "p99_ns": 291.5,
+        "max_ns": 333.0,
+        "allocations_per_op": 0.0,
+        "allocated_bytes_per_op": 0.0
+      },
+      "after": {
+        "mean_ns": 238.75549999999998,
+        "p50_ns": 250.0,
+        "p95_ns": 250.0,
+        "p99_ns": 250.0,
+        "max_ns": 334.0,
+        "allocations_per_op": 0.0,
+        "allocated_bytes_per_op": 0.0
+      }
+    },
+    "retained_none/100": {
+      "before": {
+        "mean_ns": 2351.232,
+        "p50_ns": 2375.0,
+        "p95_ns": 2479.5,
+        "p99_ns": 2479.5,
+        "max_ns": 2709.0,
+        "allocations_per_op": 0.0,
+        "allocated_bytes_per_op": 0.0
+      },
+      "after": {
+        "mean_ns": 2320.992,
+        "p50_ns": 2291.5,
+        "p95_ns": 2458.5,
+        "p99_ns": 2479.5,
+        "max_ns": 3250.0,
+        "allocations_per_op": 0.0,
+        "allocated_bytes_per_op": 0.0
+      }
+    },
+    "retained_none/1000": {
+      "before": {
+        "mean_ns": 23575.264,
+        "p50_ns": 23833.0,
+        "p95_ns": 24729.5,
+        "p99_ns": 27250.0,
+        "max_ns": 134250.0,
+        "allocations_per_op": 0.0,
+        "allocated_bytes_per_op": 0.0
+      },
+      "after": {
+        "mean_ns": 24045.4865,
+        "p50_ns": 23854.0,
+        "p95_ns": 25875.5,
+        "p99_ns": 28458.5,
+        "max_ns": 33959.0,
+        "allocations_per_op": 0.0,
+        "allocated_bytes_per_op": 0.0
+      }
+    },
+    "retained_none/10000": {
+      "before": {
+        "mean_ns": 228911.3025,
+        "p50_ns": 227687.0,
+        "p95_ns": 247187.0,
+        "p99_ns": 254917.0,
+        "max_ns": 288333.0,
+        "allocations_per_op": 0.0,
+        "allocated_bytes_per_op": 0.0
+      },
+      "after": {
+        "mean_ns": 229010.8025,
+        "p50_ns": 229229.5,
+        "p95_ns": 248708.5,
+        "p99_ns": 260041.5,
+        "max_ns": 315292.0,
+        "allocations_per_op": 0.0,
+        "allocated_bytes_per_op": 0.0
+      }
+    },
+    "retained_none/4000": {
+      "before": {
+        "mean_ns": 93747.6525,
+        "p50_ns": 93833.5,
+        "p95_ns": 101146.0,
+        "p99_ns": 104833.0,
+        "max_ns": 118000.0,
+        "allocations_per_op": 0.0,
+        "allocated_bytes_per_op": 0.0
+      },
+      "after": {
+        "mean_ns": 93916.666,
+        "p50_ns": 93688.0,
+        "p95_ns": 101125.0,
+        "p99_ns": 108208.0,
+        "max_ns": 141542.0,
+        "allocations_per_op": 0.0,
+        "allocated_bytes_per_op": 0.0
+      }
+    },
+    "retained_plus/10": {
+      "before": {
+        "mean_ns": 608.5645,
+        "p50_ns": 604.0,
+        "p95_ns": 667.0,
+        "p99_ns": 708.5,
+        "max_ns": 5042.0,
+        "allocations_per_op": 0.0,
+        "allocated_bytes_per_op": 0.0
+      },
+      "after": {
+        "mean_ns": 605.795,
+        "p50_ns": 604.5,
+        "p95_ns": 625.0,
+        "p99_ns": 645.5,
+        "max_ns": 750.0,
+        "allocations_per_op": 0.0,
+        "allocated_bytes_per_op": 0.0
+      }
+    },
+    "retained_plus/100": {
+      "before": {
+        "mean_ns": 5969.168,
+        "p50_ns": 5895.5,
+        "p95_ns": 6271.0,
+        "p99_ns": 6375.0,
+        "max_ns": 14083.0,
+        "allocations_per_op": 0.0,
+        "allocated_bytes_per_op": 0.0
+      },
+      "after": {
+        "mean_ns": 5930.092000000001,
+        "p50_ns": 5729.5,
+        "p95_ns": 6333.5,
+        "p99_ns": 6375.5,
+        "max_ns": 15791.0,
+        "allocations_per_op": 0.0,
+        "allocated_bytes_per_op": 0.0
+      }
+    },
+    "retained_plus/1000": {
+      "before": {
+        "mean_ns": 56884.443499999994,
+        "p50_ns": 57750.0,
+        "p95_ns": 63604.0,
+        "p99_ns": 71375.0,
+        "max_ns": 1167167.0,
+        "allocations_per_op": 0.0,
+        "allocated_bytes_per_op": 0.0
+      },
+      "after": {
+        "mean_ns": 59665.42,
+        "p50_ns": 59041.5,
+        "p95_ns": 63812.0,
+        "p99_ns": 67249.5,
+        "max_ns": 213875.0,
+        "allocations_per_op": 0.0,
+        "allocated_bytes_per_op": 0.0
+      }
+    },
+    "retained_plus/10000": {
+      "before": {
+        "mean_ns": 566365.951,
+        "p50_ns": 566771.0,
+        "p95_ns": 599146.0,
+        "p99_ns": 625271.0,
+        "max_ns": 657042.0,
+        "allocations_per_op": 0.0,
+        "allocated_bytes_per_op": 0.0
+      },
+      "after": {
+        "mean_ns": 581321.6135,
+        "p50_ns": 580563.0,
+        "p95_ns": 614958.5,
+        "p99_ns": 637270.5,
+        "max_ns": 672250.0,
+        "allocations_per_op": 0.0,
+        "allocated_bytes_per_op": 0.0
+      }
+    },
+    "retained_plus/4000": {
+      "before": {
+        "mean_ns": 232552.9765,
+        "p50_ns": 233562.0,
+        "p95_ns": 249396.0,
+        "p99_ns": 258021.0,
+        "max_ns": 277625.0,
+        "allocations_per_op": 0.0,
+        "allocated_bytes_per_op": 0.0
+      },
+      "after": {
+        "mean_ns": 240658.12900000002,
+        "p50_ns": 240333.0,
+        "p95_ns": 255813.0,
+        "p99_ns": 266249.5,
+        "max_ns": 291458.0,
+        "allocations_per_op": 0.0,
+        "allocated_bytes_per_op": 0.0
+      }
+    },
+    "retained_selective/10": {
+      "before": {
+        "mean_ns": 509.6035,
+        "p50_ns": 500.0,
+        "p95_ns": 542.0,
+        "p99_ns": 542.0,
+        "max_ns": 584.0,
+        "allocations_per_op": 0.0,
+        "allocated_bytes_per_op": 0.0
+      },
+      "after": {
+        "mean_ns": 487.71299999999997,
+        "p50_ns": 479.0,
+        "p95_ns": 500.5,
+        "p99_ns": 542.0,
+        "max_ns": 583.0,
+        "allocations_per_op": 0.0,
+        "allocated_bytes_per_op": 0.0
+      }
+    },
+    "retained_selective/100": {
+      "before": {
+        "mean_ns": 4494.6035,
+        "p50_ns": 4437.5,
+        "p95_ns": 5041.5,
+        "p99_ns": 6208.5,
+        "max_ns": 10750.0,
+        "allocations_per_op": 0.0,
+        "allocated_bytes_per_op": 0.0
+      },
+      "after": {
+        "mean_ns": 4862.566500000001,
+        "p50_ns": 4688.0,
+        "p95_ns": 5146.0,
+        "p99_ns": 5500.5,
+        "max_ns": 20416.0,
+        "allocations_per_op": 0.0,
+        "allocated_bytes_per_op": 0.0
+      }
+    },
+    "retained_selective/1000": {
+      "before": {
+        "mean_ns": 67992.912,
+        "p50_ns": 64667.0,
+        "p95_ns": 97229.0,
+        "p99_ns": 118313.0,
+        "max_ns": 756417.0,
+        "allocations_per_op": 0.0,
+        "allocated_bytes_per_op": 0.0
+      },
+      "after": {
+        "mean_ns": 47487.217,
+        "p50_ns": 47416.5,
+        "p95_ns": 51271.0,
+        "p99_ns": 57062.0,
+        "max_ns": 68250.0,
+        "allocations_per_op": 0.0,
+        "allocated_bytes_per_op": 0.0
+      }
+    },
+    "retained_selective/10000": {
+      "before": {
+        "mean_ns": 442804.467,
+        "p50_ns": 441708.5,
+        "p95_ns": 472104.0,
+        "p99_ns": 482521.0,
+        "max_ns": 513583.0,
+        "allocations_per_op": 0.0,
+        "allocated_bytes_per_op": 0.0
+      },
+      "after": {
+        "mean_ns": 457796.135,
+        "p50_ns": 455666.5,
+        "p95_ns": 487875.0,
+        "p99_ns": 502749.5,
+        "max_ns": 577375.0,
+        "allocations_per_op": 0.0,
+        "allocated_bytes_per_op": 0.0
+      }
+    },
+    "retained_selective/4000": {
+      "before": {
+        "mean_ns": 180686.605,
+        "p50_ns": 180937.0,
+        "p95_ns": 193770.5,
+        "p99_ns": 203687.5,
+        "max_ns": 221708.0,
+        "allocations_per_op": 0.0,
+        "allocated_bytes_per_op": 0.0
+      },
+      "after": {
+        "mean_ns": 184068.617,
+        "p50_ns": 183583.0,
+        "p95_ns": 199479.5,
+        "p99_ns": 211208.5,
+        "max_ns": 237458.0,
+        "allocations_per_op": 0.0,
+        "allocated_bytes_per_op": 0.0
+      }
+    },
+    "retained_v1/10": {
+      "before": {
+        "mean_ns": 99.93549999999999,
+        "p50_ns": 84.0,
+        "p95_ns": 125.0,
+        "p99_ns": 125.0,
+        "max_ns": 167.0,
+        "allocations_per_op": 0.0,
+        "allocated_bytes_per_op": 0.0
+      },
+      "after": {
+        "mean_ns": 96.4315,
+        "p50_ns": 84.0,
+        "p95_ns": 125.0,
+        "p99_ns": 125.0,
+        "max_ns": 166.0,
+        "allocations_per_op": 0.0,
+        "allocated_bytes_per_op": 0.0
+      }
+    },
+    "retained_v1/100": {
+      "before": {
+        "mean_ns": 1018.7170000000001,
+        "p50_ns": 1020.5,
+        "p95_ns": 1084.0,
+        "p99_ns": 1084.0,
+        "max_ns": 10333.0,
+        "allocations_per_op": 0.0,
+        "allocated_bytes_per_op": 0.0
+      },
+      "after": {
+        "mean_ns": 931.5625,
+        "p50_ns": 917.0,
+        "p95_ns": 959.0,
+        "p99_ns": 959.0,
+        "max_ns": 1083.0,
+        "allocations_per_op": 0.0,
+        "allocated_bytes_per_op": 0.0
+      }
+    },
+    "retained_v1/1000": {
+      "before": {
+        "mean_ns": 10937.011999999999,
+        "p50_ns": 10750.0,
+        "p95_ns": 11771.5,
+        "p99_ns": 18958.5,
+        "max_ns": 573416.0,
+        "allocations_per_op": 0.0,
+        "allocated_bytes_per_op": 0.0
+      },
+      "after": {
+        "mean_ns": 10872.0605,
+        "p50_ns": 10875.0,
+        "p95_ns": 11354.5,
+        "p99_ns": 13104.0,
+        "max_ns": 18625.0,
+        "allocations_per_op": 0.0,
+        "allocated_bytes_per_op": 0.0
+      }
+    },
+    "retained_v1/10000": {
+      "before": {
+        "mean_ns": 108381.1795,
+        "p50_ns": 108542.0,
+        "p95_ns": 111271.0,
+        "p99_ns": 117875.5,
+        "max_ns": 126792.0,
+        "allocations_per_op": 0.0,
+        "allocated_bytes_per_op": 0.0
+      },
+      "after": {
+        "mean_ns": 106417.5665,
+        "p50_ns": 107333.5,
+        "p95_ns": 111833.5,
+        "p99_ns": 121687.5,
+        "max_ns": 132167.0,
+        "allocations_per_op": 0.0,
+        "allocated_bytes_per_op": 0.0
+      }
+    },
+    "retained_v1/4000": {
+      "before": {
+        "mean_ns": 44715.572,
+        "p50_ns": 44687.5,
+        "p95_ns": 47750.0,
+        "p99_ns": 49395.5,
+        "max_ns": 64000.0,
+        "allocations_per_op": 0.0,
+        "allocated_bytes_per_op": 0.0
+      },
+      "after": {
+        "mean_ns": 45119.535,
+        "p50_ns": 45312.5,
+        "p95_ns": 46687.5,
+        "p99_ns": 51708.5,
+        "max_ns": 61791.0,
+        "allocations_per_op": 0.0,
+        "allocated_bytes_per_op": 0.0
+      }
+    }
+  },
+  "status": "KEPT",
+  "binary_provenance": {
+    "netbaiot-server": {
+      "sha256": "0d1a6724482a70a3269ca918536e9dd81b5405e766a8de02ea3dfd069ecf3308",
+      "bytes": 12167104
+    },
+    "transports-probe": {
+      "sha256": "f5c0217ca0ab07c8bd3f0418e17a4a2b391a6889606d971a2790e74359caaae2",
+      "bytes": 6466800
+    },
+    "parent_sha": "cce617369b2b619b0fd11fd7da46aba946b5ea5d",
+    "source_delta_sha256": "803bc9dce1c38823cfa906ee98451ea32aefad625578d5e206ddfd50eb48bba9"
+  },
+  "startup_failure": "One candidate startup failed before sampling; old driver did not retain server stderr, so cause is unknown. Failed empty result preserved. Driver now holds distinct test port reservations together and preserves bounded startup diagnostics. Resumed B,A complete the original A,B,B,A cohort; subsequent12runs passed."
+}

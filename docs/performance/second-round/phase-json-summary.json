@@ -1,0 +1,2787 @@
+{
+  "status": "KEPT",
+  "micro": {
+    "flat/64/depth": {
+      "A": {
+        "mean_ns": 42.712500000000006,
+        "p50_ns": 43.5,
+        "p95_ns": 46.0,
+        "p99_ns": 49.0,
+        "max_ns": 88.0,
+        "accepted": false
+      },
+      "B": {
+        "mean_ns": 65.531,
+        "p50_ns": 64.5,
+        "p95_ns": 72.5,
+        "p99_ns": 77.5,
+        "max_ns": 140.0,
+        "accepted": false
+      },
+      "p50_delta_percent": 48.27586206896552
+    },
+    "flat/64/members": {
+      "A": {
+        "mean_ns": 41.9905,
+        "p50_ns": 43.5,
+        "p95_ns": 43.5,
+        "p99_ns": 46.0,
+        "max_ns": 635.0,
+        "accepted": false
+      },
+      "B": {
+        "mean_ns": 64.914,
+        "p50_ns": 64.5,
+        "p95_ns": 67.0,
+        "p99_ns": 75.0,
+        "max_ns": 213.0,
+        "accepted": false
+      },
+      "p50_delta_percent": 48.27586206896552
+    },
+    "flat/64/guards": {
+      "A": {
+        "mean_ns": 41.527,
+        "p50_ns": 41.0,
+        "p95_ns": 43.5,
+        "p99_ns": 46.0,
+        "max_ns": 630.0,
+        "accepted": false
+      },
+      "B": {
+        "mean_ns": 63.3985,
+        "p50_ns": 62.0,
+        "p95_ns": 67.0,
+        "p99_ns": 72.5,
+        "max_ns": 1270.0,
+        "accepted": false
+      },
+      "p50_delta_percent": 51.21951219512195
+    },
+    "flat/64/serde": {
+      "A": {
+        "mean_ns": 142.37099999999998,
+        "p50_ns": 140.5,
+        "p95_ns": 148.0,
+        "p99_ns": 163.5,
+        "max_ns": 1979.0,
+        "accepted": false
+      },
+      "B": {
+        "mean_ns": 261.461,
+        "p50_ns": 255.0,
+        "p95_ns": 278.0,
+        "p99_ns": 366.5,
+        "max_ns": 4682.0,
+        "accepted": false
+      },
+      "p50_delta_percent": 81.49466192170817
+    },
+    "flat/64/codec": {
+      "A": {
+        "mean_ns": 40.924,
+        "p50_ns": 41.0,
+        "p95_ns": 43.5,
+        "p99_ns": 46.0,
+        "max_ns": 93.0,
+        "accepted": false
+      },
+      "B": {
+        "mean_ns": 67.3555,
+        "p50_ns": 67.0,
+        "p95_ns": 72.0,
+        "p99_ns": 72.5,
+        "max_ns": 177.0,
+        "accepted": false
+      },
+      "p50_delta_percent": 63.414634146341456
+    },
+    "deep/64/depth": {
+      "A": {
+        "mean_ns": 39.9745,
+        "p50_ns": 41.0,
+        "p95_ns": 41.0,
+        "p99_ns": 46.0,
+        "max_ns": 83.0,
+        "accepted": false
+      },
+      "B": {
+        "mean_ns": 63.1135,
+        "p50_ns": 62.0,
+        "p95_ns": 70.0,
+        "p99_ns": 80.5,
+        "max_ns": 812.0,
+        "accepted": false
+      },
+      "p50_delta_percent": 51.21951219512195
+    },
+    "deep/64/members": {
+      "A": {
+        "mean_ns": 39.586,
+        "p50_ns": 38.5,
+        "p95_ns": 41.0,
+        "p99_ns": 43.5,
+        "max_ns": 52.0,
+        "accepted": false
+      },
+      "B": {
+        "mean_ns": 57.1285,
+        "p50_ns": 57.0,
+        "p95_ns": 57.0,
+        "p99_ns": 64.5,
+        "max_ns": 2489.0,
+        "accepted": false
+      },
+      "p50_delta_percent": 48.05194805194806
+    },
+    "deep/64/guards": {
+      "A": {
+        "mean_ns": 40.3575,
+        "p50_ns": 41.0,
+        "p95_ns": 43.5,
+        "p99_ns": 43.5,
+        "max_ns": 52.0,
+        "accepted": false
+      },
+      "B": {
+        "mean_ns": 59.494,
+        "p50_ns": 57.0,
+        "p95_ns": 59.5,
+        "p99_ns": 67.5,
+        "max_ns": 848.0,
+        "accepted": false
+      },
+      "p50_delta_percent": 39.02439024390243
+    },
+    "deep/64/serde": {
+      "A": {
+        "mean_ns": 143.047,
+        "p50_ns": 145.5,
+        "p95_ns": 150.5,
+        "p99_ns": 156.0,
+        "max_ns": 244.0,
+        "accepted": false
+      },
+      "B": {
+        "mean_ns": 237.35700000000003,
+        "p50_ns": 234.0,
+        "p95_ns": 244.5,
+        "p99_ns": 255.0,
+        "max_ns": 953.0,
+        "accepted": false
+      },
+      "p50_delta_percent": 60.82474226804124
+    },
+    "deep/64/codec": {
+      "A": {
+        "mean_ns": 41.3125,
+        "p50_ns": 41.0,
+        "p95_ns": 43.5,
+        "p99_ns": 43.5,
+        "max_ns": 52.0,
+        "accepted": false
+      },
+      "B": {
+        "mean_ns": 59.609,
+        "p50_ns": 59.5,
+        "p95_ns": 62.0,
+        "p99_ns": 64.5,
+        "max_ns": 135.0,
+        "accepted": false
+      },
+      "p50_delta_percent": 45.12195121951219
+    },
+    "many_members/64/depth": {
+      "A": {
+        "mean_ns": 41.1675,
+        "p50_ns": 41.0,
+        "p95_ns": 43.5,
+        "p99_ns": 46.0,
+        "max_ns": 52.0,
+        "accepted": false
+      },
+      "B": {
+        "mean_ns": 52.139,
+        "p50_ns": 51.5,
+        "p95_ns": 54.5,
+        "p99_ns": 57.0,
+        "max_ns": 630.0,
+        "accepted": false
+      },
+      "p50_delta_percent": 25.609756097560975
+    },
+    "many_members/64/members": {
+      "A": {
+        "mean_ns": 40.6195,
+        "p50_ns": 41.0,
+        "p95_ns": 43.5,
+        "p99_ns": 43.5,
+        "max_ns": 52.0,
+        "accepted": false
+      },
+      "B": {
+        "mean_ns": 52.308499999999995,
+        "p50_ns": 51.5,
+        "p95_ns": 54.5,
+        "p99_ns": 54.5,
+        "max_ns": 78.0,
+        "accepted": false
+      },
+      "p50_delta_percent": 25.609756097560975
+    },
+    "many_members/64/guards": {
+      "A": {
+        "mean_ns": 39.629000000000005,
+        "p50_ns": 38.5,
+        "p95_ns": 43.5,
+        "p99_ns": 46.0,
+        "max_ns": 57.0,
+        "accepted": false
+      },
+      "B": {
+        "mean_ns": 53.126999999999995,
+        "p50_ns": 51.5,
+        "p95_ns": 57.0,
+        "p99_ns": 62.5,
+        "max_ns": 83.0,
+        "accepted": false
+      },
+      "p50_delta_percent": 33.76623376623375
+    },
+    "many_members/64/serde": {
+      "A": {
+        "mean_ns": 144.865,
+        "p50_ns": 145.5,
+        "p95_ns": 150.5,
+        "p99_ns": 156.0,
+        "max_ns": 1130.0,
+        "accepted": false
+      },
+      "B": {
+        "mean_ns": 233.1055,
+        "p50_ns": 221.0,
+        "p95_ns": 254.5,
+        "p99_ns": 267.5,
+        "max_ns": 4958.0,
+        "accepted": false
+      },
+      "p50_delta_percent": 51.89003436426116
+    },
+    "many_members/64/codec": {
+      "A": {
+        "mean_ns": 43.275499999999994,
+        "p50_ns": 41.0,
+        "p95_ns": 46.0,
+        "p99_ns": 46.0,
+        "max_ns": 765.0,
+        "accepted": false
+      },
+      "B": {
+        "mean_ns": 74.0155,
+        "p50_ns": 72.5,
+        "p95_ns": 77.5,
+        "p99_ns": 77.5,
+        "max_ns": 218.0,
+        "accepted": false
+      },
+      "p50_delta_percent": 76.82926829268293
+    },
+    "invalid/64/depth": {
+      "A": {
+        "mean_ns": 42.1345,
+        "p50_ns": 41.0,
+        "p95_ns": 46.0,
+        "p99_ns": 46.0,
+        "max_ns": 72.0,
+        "accepted": false
+      },
+      "B": {
+        "mean_ns": 74.328,
+        "p50_ns": 75.0,
+        "p95_ns": 75.0,
+        "p99_ns": 82.5,
+        "max_ns": 1349.0,
+        "accepted": false
+      },
+      "p50_delta_percent": 82.92682926829269
+    },
+    "invalid/64/members": {
+      "A": {
+        "mean_ns": 41.1015,
+        "p50_ns": 41.0,
+        "p95_ns": 43.5,
+        "p99_ns": 46.0,
+        "max_ns": 67.0,
+        "accepted": false
+      },
+      "B": {
+        "mean_ns": 72.592,
+        "p50_ns": 72.5,
+        "p95_ns": 75.0,
+        "p99_ns": 80.0,
+        "max_ns": 1328.0,
+        "accepted": false
+      },
+      "p50_delta_percent": 76.82926829268293
+    },
+    "invalid/64/guards": {
+      "A": {
+        "mean_ns": 43.289,
+        "p50_ns": 41.0,
+        "p95_ns": 46.0,
+        "p99_ns": 49.0,
+        "max_ns": 2182.0,
+        "accepted": false
+      },
+      "B": {
+        "mean_ns": 66.5355,
+        "p50_ns": 67.0,
+        "p95_ns": 69.5,
+        "p99_ns": 69.5,
+        "max_ns": 213.0,
+        "accepted": false
+      },
+      "p50_delta_percent": 63.414634146341456
+    },
+    "invalid/64/serde": {
+      "A": {
+        "mean_ns": 24.592,
+        "p50_ns": 26.0,
+        "p95_ns": 26.0,
+        "p99_ns": 26.0,
+        "max_ns": 93.0,
+        "accepted": false
+      },
+      "B": {
+        "mean_ns": 36.807,
+        "p50_ns": 36.0,
+        "p95_ns": 41.5,
+        "p99_ns": 44.0,
+        "max_ns": 145.0,
+        "accepted": false
+      },
+      "p50_delta_percent": 38.46153846153846
+    },
+    "invalid/64/codec": {
+      "A": {
+        "mean_ns": 43.052499999999995,
+        "p50_ns": 41.0,
+        "p95_ns": 46.0,
+        "p99_ns": 46.0,
+        "max_ns": 724.0,
+        "accepted": false
+      },
+      "B": {
+        "mean_ns": 67.449,
+        "p50_ns": 67.0,
+        "p95_ns": 69.5,
+        "p99_ns": 77.5,
+        "max_ns": 114.0,
+        "accepted": false
+      },
+      "p50_delta_percent": 63.414634146341456
+    },
+    "flat/256/depth": {
+      "A": {
+        "mean_ns": 195.79500000000002,
+        "p50_ns": 192.0,
+        "p95_ns": 203.0,
+        "p99_ns": 205.5,
+        "max_ns": 250.0,
+        "accepted": true
+      },
+      "B": {
+        "mean_ns": 308.3285,
+        "p50_ns": 299.0,
+        "p95_ns": 327.5,
+        "p99_ns": 385.0,
+        "max_ns": 1823.0,
+        "accepted": true
+      },
+      "p50_delta_percent": 55.72916666666667
+    },
+    "flat/256/members": {
+      "A": {
+        "mean_ns": 166.6995,
+        "p50_ns": 168.5,
+        "p95_ns": 171.0,
+        "p99_ns": 176.5,
+        "max_ns": 619.0,
+        "accepted": true
+      },
+      "B": {
+        "mean_ns": 240.707,
+        "p50_ns": 234.0,
+        "p95_ns": 265.0,
+        "p99_ns": 280.5,
+        "max_ns": 890.0,
+        "accepted": true
+      },
+      "p50_delta_percent": 38.87240356083086
+    },
+    "flat/256/guards": {
+      "A": {
+        "mean_ns": 336.049,
+        "p50_ns": 335.5,
+        "p95_ns": 338.0,
+        "p99_ns": 340.5,
+        "max_ns": 3296.0,
+        "accepted": true
+      },
+      "B": {
+        "mean_ns": 329.8575,
+        "p50_ns": 322.5,
+        "p95_ns": 348.5,
+        "p99_ns": 374.5,
+        "max_ns": 1807.0,
+        "accepted": true
+      },
+      "p50_delta_percent": -3.874813710879288
+    },
+    "flat/256/serde": {
+      "A": {
+        "mean_ns": 206.95499999999998,
+        "p50_ns": 208.0,
+        "p95_ns": 218.0,
+        "p99_ns": 226.5,
+        "max_ns": 1072.0,
+        "accepted": true
+      },
+      "B": {
+        "mean_ns": 300.8985,
+        "p50_ns": 299.0,
+        "p95_ns": 314.5,
+        "p99_ns": 322.5,
+        "max_ns": 1005.0,
+        "accepted": true
+      },
+      "p50_delta_percent": 43.75
+    },
+    "flat/256/codec": {
+      "A": {
+        "mean_ns": 641.0855,
+        "p50_ns": 642.5,
+        "p95_ns": 656.0,
+        "p99_ns": 742.0,
+        "max_ns": 1849.0,
+        "accepted": true
+      },
+      "B": {
+        "mean_ns": 717.914,
+        "p50_ns": 716.0,
+        "p95_ns": 778.0,
+        "p99_ns": 846.0,
+        "max_ns": 4750.0,
+        "accepted": true
+      },
+      "p50_delta_percent": 11.439688715953311
+    },
+    "deep/256/depth": {
+      "A": {
+        "mean_ns": 178.4025,
+        "p50_ns": 176.5,
+        "p95_ns": 182.0,
+        "p99_ns": 187.0,
+        "max_ns": 244.0,
+        "accepted": false
+      },
+      "B": {
+        "mean_ns": 234.28300000000002,
+        "p50_ns": 234.0,
+        "p95_ns": 260.0,
+        "p99_ns": 267.5,
+        "max_ns": 354.0,
+        "accepted": false
+      },
+      "p50_delta_percent": 32.57790368271956
+    },
+    "deep/256/members": {
+      "A": {
+        "mean_ns": 157.89249999999998,
+        "p50_ns": 156.0,
+        "p95_ns": 161.0,
+        "p99_ns": 168.5,
+        "max_ns": 1197.0,
+        "accepted": false
+      },
+      "B": {
+        "mean_ns": 207.0335,
+        "p50_ns": 200.5,
+        "p95_ns": 231.5,
+        "p99_ns": 234.0,
+        "max_ns": 307.0,
+        "accepted": false
+      },
+      "p50_delta_percent": 28.525641025641036
+    },
+    "deep/256/guards": {
+      "A": {
+        "mean_ns": 346.1875,
+        "p50_ns": 340.5,
+        "p95_ns": 398.0,
+        "p99_ns": 447.5,
+        "max_ns": 1744.0,
+        "accepted": false
+      },
+      "B": {
+        "mean_ns": 276.3885,
+        "p50_ns": 273.0,
+        "p95_ns": 286.0,
+        "p99_ns": 307.0,
+        "max_ns": 932.0,
+        "accepted": false
+      },
+      "p50_delta_percent": -19.823788546255507
+    },
+    "deep/256/serde": {
+      "A": {
+        "mean_ns": 232.90449999999998,
+        "p50_ns": 236.5,
+        "p95_ns": 244.0,
+        "p99_ns": 250.0,
+        "max_ns": 567.0,
+        "accepted": false
+      },
+      "B": {
+        "mean_ns": 283.70500000000004,
+        "p50_ns": 286.0,
+        "p95_ns": 293.5,
+        "p99_ns": 302.0,
+        "max_ns": 994.0,
+        "accepted": false
+      },
+      "p50_delta_percent": 20.93023255813953
+    },
+    "deep/256/codec": {
+      "A": {
+        "mean_ns": 1142.6775,
+        "p50_ns": 1150.5,
+        "p95_ns": 1184.5,
+        "p99_ns": 1236.5,
+        "max_ns": 2255.0,
+        "accepted": false
+      },
+      "B": {
+        "mean_ns": 1191.68,
+        "p50_ns": 1166.0,
+        "p95_ns": 1296.5,
+        "p99_ns": 1517.5,
+        "max_ns": 2645.0,
+        "accepted": false
+      },
+      "p50_delta_percent": 1.3472403302911884
+    },
+    "many_members/256/depth": {
+      "A": {
+        "mean_ns": 174.1035,
+        "p50_ns": 174.0,
+        "p95_ns": 177.0,
+        "p99_ns": 187.0,
+        "max_ns": 765.0,
+        "accepted": false
+      },
+      "B": {
+        "mean_ns": 197.4845,
+        "p50_ns": 195.0,
+        "p95_ns": 205.0,
+        "p99_ns": 210.5,
+        "max_ns": 312.0,
+        "accepted": false
+      },
+      "p50_delta_percent": 12.06896551724137
+    },
+    "many_members/256/members": {
+      "A": {
+        "mean_ns": 159.70100000000002,
+        "p50_ns": 158.5,
+        "p95_ns": 161.0,
+        "p99_ns": 166.0,
+        "max_ns": 942.0,
+        "accepted": false
+      },
+      "B": {
+        "mean_ns": 182.3825,
+        "p50_ns": 182.0,
+        "p95_ns": 195.0,
+        "p99_ns": 195.0,
+        "max_ns": 1229.0,
+        "accepted": false
+      },
+      "p50_delta_percent": 14.82649842271293
+    },
+    "many_members/256/guards": {
+      "A": {
+        "mean_ns": 166.6445,
+        "p50_ns": 166.0,
+        "p95_ns": 174.0,
+        "p99_ns": 179.5,
+        "max_ns": 208.0,
+        "accepted": false
+      },
+      "B": {
+        "mean_ns": 214.053,
+        "p50_ns": 213.0,
+        "p95_ns": 221.0,
+        "p99_ns": 226.0,
+        "max_ns": 802.0,
+        "accepted": false
+      },
+      "p50_delta_percent": 28.31325301204819
+    },
+    "many_members/256/serde": {
+      "A": {
+        "mean_ns": 421.168,
+        "p50_ns": 421.0,
+        "p95_ns": 427.0,
+        "p99_ns": 432.0,
+        "max_ns": 1234.0,
+        "accepted": false
+      },
+      "B": {
+        "mean_ns": 504.277,
+        "p50_ns": 507.5,
+        "p95_ns": 520.5,
+        "p99_ns": 549.0,
+        "max_ns": 1661.0,
+        "accepted": false
+      },
+      "p50_delta_percent": 20.546318289786214
+    },
+    "many_members/256/codec": {
+      "A": {
+        "mean_ns": 163.1855,
+        "p50_ns": 163.5,
+        "p95_ns": 166.0,
+        "p99_ns": 171.5,
+        "max_ns": 244.0,
+        "accepted": false
+      },
+      "B": {
+        "mean_ns": 212.0565,
+        "p50_ns": 210.5,
+        "p95_ns": 223.5,
+        "p99_ns": 223.5,
+        "max_ns": 1380.0,
+        "accepted": false
+      },
+      "p50_delta_percent": 28.74617737003058
+    },
+    "invalid/256/depth": {
+      "A": {
+        "mean_ns": 48.75,
+        "p50_ns": 49.0,
+        "p95_ns": 52.0,
+        "p99_ns": 52.0,
+        "max_ns": 62.0,
+        "accepted": false
+      },
+      "B": {
+        "mean_ns": 58.212999999999994,
+        "p50_ns": 57.0,
+        "p95_ns": 62.0,
+        "p99_ns": 62.0,
+        "max_ns": 78.0,
+        "accepted": false
+      },
+      "p50_delta_percent": 16.326530612244895
+    },
+    "invalid/256/members": {
+      "A": {
+        "mean_ns": 149.1055,
+        "p50_ns": 148.0,
+        "p95_ns": 151.0,
+        "p99_ns": 156.0,
+        "max_ns": 166.0,
+        "accepted": false
+      },
+      "B": {
+        "mean_ns": 173.762,
+        "p50_ns": 174.0,
+        "p95_ns": 179.0,
+        "p99_ns": 187.0,
+        "max_ns": 843.0,
+        "accepted": false
+      },
+      "p50_delta_percent": 17.567567567567565
+    },
+    "invalid/256/guards": {
+      "A": {
+        "mean_ns": 49.0955,
+        "p50_ns": 52.0,
+        "p95_ns": 52.0,
+        "p99_ns": 54.5,
+        "max_ns": 62.0,
+        "accepted": false
+      },
+      "B": {
+        "mean_ns": 61.456999999999994,
+        "p50_ns": 62.0,
+        "p95_ns": 67.0,
+        "p99_ns": 67.0,
+        "max_ns": 83.0,
+        "accepted": false
+      },
+      "p50_delta_percent": 19.23076923076923
+    },
+    "invalid/256/serde": {
+      "A": {
+        "mean_ns": 20.630499999999998,
+        "p50_ns": 20.0,
+        "p95_ns": 26.0,
+        "p99_ns": 26.0,
+        "max_ns": 52.0,
+        "accepted": false
+      },
+      "B": {
+        "mean_ns": 26.8045,
+        "p50_ns": 26.0,
+        "p95_ns": 31.0,
+        "p99_ns": 33.5,
+        "max_ns": 78.0,
+        "accepted": false
+      },
+      "p50_delta_percent": 30.000000000000004
+    },
+    "invalid/256/codec": {
+      "A": {
+        "mean_ns": 52.2695,
+        "p50_ns": 52.0,
+        "p95_ns": 54.5,
+        "p99_ns": 57.0,
+        "max_ns": 67.0,
+        "accepted": false
+      },
+      "B": {
+        "mean_ns": 63.093999999999994,
+        "p50_ns": 62.0,
+        "p95_ns": 67.0,
+        "p99_ns": 67.0,
+        "max_ns": 83.0,
+        "accepted": false
+      },
+      "p50_delta_percent": 19.23076923076923
+    },
+    "flat/1024/depth": {
+      "A": {
+        "mean_ns": 686.1755,
+        "p50_ns": 682.0,
+        "p95_ns": 692.0,
+        "p99_ns": 694.5,
+        "max_ns": 1406.0,
+        "accepted": true
+      },
+      "B": {
+        "mean_ns": 767.273,
+        "p50_ns": 762.5,
+        "p95_ns": 796.5,
+        "p99_ns": 833.0,
+        "max_ns": 1489.0,
+        "accepted": true
+      },
+      "p50_delta_percent": 11.803519061583568
+    },
+    "flat/1024/members": {
+      "A": {
+        "mean_ns": 578.754,
+        "p50_ns": 578.0,
+        "p95_ns": 583.0,
+        "p99_ns": 590.5,
+        "max_ns": 823.0,
+        "accepted": true
+      },
+      "B": {
+        "mean_ns": 643.6095,
+        "p50_ns": 632.5,
+        "p95_ns": 666.0,
+        "p99_ns": 677.0,
+        "max_ns": 1531.0,
+        "accepted": true
+      },
+      "p50_delta_percent": 9.429065743944642
+    },
+    "flat/1024/guards": {
+      "A": {
+        "mean_ns": 1283.4845,
+        "p50_ns": 1260.0,
+        "p95_ns": 1460.5,
+        "p99_ns": 1598.5,
+        "max_ns": 4208.0,
+        "accepted": true
+      },
+      "B": {
+        "mean_ns": 973.9475,
+        "p50_ns": 966.0,
+        "p95_ns": 1025.5,
+        "p99_ns": 1171.5,
+        "max_ns": 2119.0,
+        "accepted": true
+      },
+      "p50_delta_percent": -23.33333333333333
+    },
+    "flat/1024/serde": {
+      "A": {
+        "mean_ns": 444.5915,
+        "p50_ns": 442.0,
+        "p95_ns": 450.5,
+        "p99_ns": 486.5,
+        "max_ns": 2661.0,
+        "accepted": true
+      },
+      "B": {
+        "mean_ns": 476.543,
+        "p50_ns": 476.0,
+        "p95_ns": 484.0,
+        "p99_ns": 497.0,
+        "max_ns": 1286.0,
+        "accepted": true
+      },
+      "p50_delta_percent": 7.692307692307687
+    },
+    "flat/1024/codec": {
+      "A": {
+        "mean_ns": 1803.666,
+        "p50_ns": 1786.0,
+        "p95_ns": 1890.5,
+        "p99_ns": 2452.5,
+        "max_ns": 8208.0,
+        "accepted": true
+      },
+      "B": {
+        "mean_ns": 1493.518,
+        "p50_ns": 1481.0,
+        "p95_ns": 1559.5,
+        "p99_ns": 1742.0,
+        "max_ns": 2692.0,
+        "accepted": true
+      },
+      "p50_delta_percent": -17.07726763717805
+    },
+    "deep/1024/depth": {
+      "A": {
+        "mean_ns": 687.7305,
+        "p50_ns": 682.0,
+        "p95_ns": 702.5,
+        "p99_ns": 778.5,
+        "max_ns": 11395.0,
+        "accepted": false
+      },
+      "B": {
+        "mean_ns": 729.8865000000001,
+        "p50_ns": 713.0,
+        "p95_ns": 755.0,
+        "p99_ns": 775.5,
+        "max_ns": 1427.0,
+        "accepted": false
+      },
+      "p50_delta_percent": 4.545454545454541
+    },
+    "deep/1024/members": {
+      "A": {
+        "mean_ns": 579.037,
+        "p50_ns": 578.0,
+        "p95_ns": 583.0,
+        "p99_ns": 590.5,
+        "max_ns": 3463.0,
+        "accepted": false
+      },
+      "B": {
+        "mean_ns": 590.865,
+        "p50_ns": 580.5,
+        "p95_ns": 611.5,
+        "p99_ns": 617.0,
+        "max_ns": 1614.0,
+        "accepted": false
+      },
+      "p50_delta_percent": 0.4325259515570945
+    },
+    "deep/1024/guards": {
+      "A": {
+        "mean_ns": 1282.6405,
+        "p50_ns": 1260.0,
+        "p95_ns": 1390.5,
+        "p99_ns": 1778.0,
+        "max_ns": 5270.0,
+        "accepted": false
+      },
+      "B": {
+        "mean_ns": 903.865,
+        "p50_ns": 898.0,
+        "p95_ns": 906.0,
+        "p99_ns": 911.0,
+        "max_ns": 2062.0,
+        "accepted": false
+      },
+      "p50_delta_percent": -28.730158730158728
+    },
+    "deep/1024/serde": {
+      "A": {
+        "mean_ns": 520.1285,
+        "p50_ns": 520.0,
+        "p95_ns": 598.5,
+        "p99_ns": 616.5,
+        "max_ns": 6453.0,
+        "accepted": false
+      },
+      "B": {
+        "mean_ns": 498.67150000000004,
+        "p50_ns": 479.0,
+        "p95_ns": 528.5,
+        "p99_ns": 541.0,
+        "max_ns": 1630.0,
+        "accepted": false
+      },
+      "p50_delta_percent": -7.88461538461539
+    },
+    "deep/1024/codec": {
+      "A": {
+        "mean_ns": 2349.16,
+        "p50_ns": 2273.0,
+        "p95_ns": 2520.5,
+        "p99_ns": 3158.5,
+        "max_ns": 12088.0,
+        "accepted": false
+      },
+      "B": {
+        "mean_ns": 1967.4765,
+        "p50_ns": 1900.5,
+        "p95_ns": 2140.0,
+        "p99_ns": 2202.5,
+        "max_ns": 3057.0,
+        "accepted": false
+      },
+      "p50_delta_percent": -16.38803343598768
+    },
+    "many_members/1024/depth": {
+      "A": {
+        "mean_ns": 666.5450000000001,
+        "p50_ns": 650.5,
+        "p95_ns": 679.5,
+        "p99_ns": 689.5,
+        "max_ns": 1479.0,
+        "accepted": true
+      },
+      "B": {
+        "mean_ns": 650.6465000000001,
+        "p50_ns": 650.5,
+        "p95_ns": 658.5,
+        "p99_ns": 664.0,
+        "max_ns": 869.0,
+        "accepted": true
+      },
+      "p50_delta_percent": 0.0
+    },
+    "many_members/1024/members": {
+      "A": {
+        "mean_ns": 592.867,
+        "p50_ns": 583.0,
+        "p95_ns": 640.0,
+        "p99_ns": 645.0,
+        "max_ns": 1645.0,
+        "accepted": true
+      },
+      "B": {
+        "mean_ns": 584.412,
+        "p50_ns": 583.0,
+        "p95_ns": 593.0,
+        "p99_ns": 598.5,
+        "max_ns": 1599.0,
+        "accepted": true
+      },
+      "p50_delta_percent": 0.0
+    },
+    "many_members/1024/guards": {
+      "A": {
+        "mean_ns": 1277.0819999999999,
+        "p50_ns": 1270.5,
+        "p95_ns": 1278.5,
+        "p99_ns": 1463.5,
+        "max_ns": 7270.0,
+        "accepted": true
+      },
+      "B": {
+        "mean_ns": 782.096,
+        "p50_ns": 781.0,
+        "p95_ns": 791.0,
+        "p99_ns": 796.0,
+        "max_ns": 1432.0,
+        "accepted": true
+      },
+      "p50_delta_percent": -38.528138528138534
+    },
+    "many_members/1024/serde": {
+      "A": {
+        "mean_ns": 1083.6779999999999,
+        "p50_ns": 1038.5,
+        "p95_ns": 1215.5,
+        "p99_ns": 1330.0,
+        "max_ns": 6239.0,
+        "accepted": true
+      },
+      "B": {
+        "mean_ns": 1051.7359999999999,
+        "p50_ns": 1036.0,
+        "p95_ns": 1093.0,
+        "p99_ns": 1140.5,
+        "max_ns": 2140.0,
+        "accepted": true
+      },
+      "p50_delta_percent": -0.2407318247472312
+    },
+    "many_members/1024/codec": {
+      "A": {
+        "mean_ns": 7432.7125,
+        "p50_ns": 7249.5,
+        "p95_ns": 8137.5,
+        "p99_ns": 9218.5,
+        "max_ns": 20651.0,
+        "accepted": true
+      },
+      "B": {
+        "mean_ns": 6988.281,
+        "p50_ns": 6924.0,
+        "p95_ns": 7452.5,
+        "p99_ns": 8304.5,
+        "max_ns": 9859.0,
+        "accepted": true
+      },
+      "p50_delta_percent": -4.489964825160353
+    },
+    "invalid/1024/depth": {
+      "A": {
+        "mean_ns": 49.3045,
+        "p50_ns": 46.0,
+        "p95_ns": 52.0,
+        "p99_ns": 54.5,
+        "max_ns": 984.0,
+        "accepted": false
+      },
+      "B": {
+        "mean_ns": 48.6095,
+        "p50_ns": 46.0,
+        "p95_ns": 52.0,
+        "p99_ns": 54.5,
+        "max_ns": 104.0,
+        "accepted": false
+      },
+      "p50_delta_percent": 0.0
+    },
+    "invalid/1024/members": {
+      "A": {
+        "mean_ns": 593.0605,
+        "p50_ns": 580.5,
+        "p95_ns": 614.0,
+        "p99_ns": 619.0,
+        "max_ns": 1468.0,
+        "accepted": false
+      },
+      "B": {
+        "mean_ns": 583.0975,
+        "p50_ns": 578.0,
+        "p95_ns": 596.0,
+        "p99_ns": 619.5,
+        "max_ns": 817.0,
+        "accepted": false
+      },
+      "p50_delta_percent": -0.4306632213608941
+    },
+    "invalid/1024/guards": {
+      "A": {
+        "mean_ns": 58.730500000000006,
+        "p50_ns": 54.5,
+        "p95_ns": 57.0,
+        "p99_ns": 304.0,
+        "max_ns": 5593.0,
+        "accepted": false
+      },
+      "B": {
+        "mean_ns": 50.5975,
+        "p50_ns": 52.0,
+        "p95_ns": 52.0,
+        "p99_ns": 52.0,
+        "max_ns": 93.0,
+        "accepted": false
+      },
+      "p50_delta_percent": -4.587155963302747
+    },
+    "invalid/1024/serde": {
+      "A": {
+        "mean_ns": 23.2265,
+        "p50_ns": 23.0,
+        "p95_ns": 26.0,
+        "p99_ns": 28.5,
+        "max_ns": 2198.0,
+        "accepted": false
+      },
+      "B": {
+        "mean_ns": 20.308500000000002,
+        "p50_ns": 20.0,
+        "p95_ns": 23.0,
+        "p99_ns": 26.0,
+        "max_ns": 57.0,
+        "accepted": false
+      },
+      "p50_delta_percent": -13.043478260869568
+    },
+    "invalid/1024/codec": {
+      "A": {
+        "mean_ns": 63.918000000000006,
+        "p50_ns": 57.0,
+        "p95_ns": 83.0,
+        "p99_ns": 249.5,
+        "max_ns": 2552.0,
+        "accepted": false
+      },
+      "B": {
+        "mean_ns": 53.82599999999999,
+        "p50_ns": 54.5,
+        "p95_ns": 54.5,
+        "p99_ns": 57.0,
+        "max_ns": 78.0,
+        "accepted": false
+      },
+      "p50_delta_percent": -4.385964912280704
+    },
+    "flat/4096/depth": {
+      "A": {
+        "mean_ns": 2771.623,
+        "p50_ns": 2750.0,
+        "p95_ns": 2773.0,
+        "p99_ns": 3642.5,
+        "max_ns": 4223.0,
+        "accepted": true
+      },
+      "B": {
+        "mean_ns": 2761.1695,
+        "p50_ns": 2744.0,
+        "p95_ns": 2760.0,
+        "p99_ns": 3343.0,
+        "max_ns": 4145.0,
+        "accepted": true
+      },
+      "p50_delta_percent": -0.21818181818181737
+    },
+    "flat/4096/members": {
+      "A": {
+        "mean_ns": 2310.2145,
+        "p50_ns": 2302.0,
+        "p95_ns": 2312.0,
+        "p99_ns": 2926.5,
+        "max_ns": 3848.0,
+        "accepted": true
+      },
+      "B": {
+        "mean_ns": 2321.408,
+        "p50_ns": 2296.0,
+        "p95_ns": 2426.5,
+        "p99_ns": 2437.0,
+        "max_ns": 6786.0,
+        "accepted": true
+      },
+      "p50_delta_percent": -0.26064291920069316
+    },
+    "flat/4096/guards": {
+      "A": {
+        "mean_ns": 5108.6895,
+        "p50_ns": 5046.0,
+        "p95_ns": 5479.0,
+        "p99_ns": 6343.0,
+        "max_ns": 7260.0,
+        "accepted": true
+      },
+      "B": {
+        "mean_ns": 3670.1465,
+        "p50_ns": 3645.0,
+        "p95_ns": 3668.5,
+        "p99_ns": 4515.0,
+        "max_ns": 5875.0,
+        "accepted": true
+      },
+      "p50_delta_percent": -27.76456599286563
+    },
+    "flat/4096/serde": {
+      "A": {
+        "mean_ns": 1551.9099999999999,
+        "p50_ns": 1552.0,
+        "p95_ns": 1637.5,
+        "p99_ns": 1656.0,
+        "max_ns": 2729.0,
+        "accepted": true
+      },
+      "B": {
+        "mean_ns": 1523.502,
+        "p50_ns": 1479.0,
+        "p95_ns": 1635.0,
+        "p99_ns": 1648.0,
+        "max_ns": 3411.0,
+        "accepted": true
+      },
+      "p50_delta_percent": -4.703608247422686
+    },
+    "flat/4096/codec": {
+      "A": {
+        "mean_ns": 6665.43,
+        "p50_ns": 6604.0,
+        "p95_ns": 6937.5,
+        "p99_ns": 8216.0,
+        "max_ns": 9099.0,
+        "accepted": true
+      },
+      "B": {
+        "mean_ns": 5228.2655,
+        "p50_ns": 5205.5,
+        "p95_ns": 5244.5,
+        "p99_ns": 6000.0,
+        "max_ns": 7739.0,
+        "accepted": true
+      },
+      "p50_delta_percent": -21.176559660811634
+    },
+    "deep/4096/depth": {
+      "A": {
+        "mean_ns": 2767.441,
+        "p50_ns": 2750.0,
+        "p95_ns": 2765.0,
+        "p99_ns": 3437.0,
+        "max_ns": 4114.0,
+        "accepted": false
+      },
+      "B": {
+        "mean_ns": 2756.6855,
+        "p50_ns": 2750.0,
+        "p95_ns": 2760.0,
+        "p99_ns": 3004.5,
+        "max_ns": 4562.0,
+        "accepted": false
+      },
+      "p50_delta_percent": 0.0
+    },
+    "deep/4096/members": {
+      "A": {
+        "mean_ns": 2319.16,
+        "p50_ns": 2302.0,
+        "p95_ns": 2322.5,
+        "p99_ns": 3111.5,
+        "max_ns": 3817.0,
+        "accepted": false
+      },
+      "B": {
+        "mean_ns": 2308.9629999999997,
+        "p50_ns": 2296.0,
+        "p95_ns": 2312.0,
+        "p99_ns": 2705.5,
+        "max_ns": 3604.0,
+        "accepted": false
+      },
+      "p50_delta_percent": -0.26064291920069316
+    },
+    "deep/4096/guards": {
+      "A": {
+        "mean_ns": 5096.343999999999,
+        "p50_ns": 5046.0,
+        "p95_ns": 5385.0,
+        "p99_ns": 6244.0,
+        "max_ns": 7083.0,
+        "accepted": false
+      },
+      "B": {
+        "mean_ns": 3678.6014999999998,
+        "p50_ns": 3645.0,
+        "p95_ns": 3825.0,
+        "p99_ns": 4650.5,
+        "max_ns": 5625.0,
+        "accepted": false
+      },
+      "p50_delta_percent": -27.76456599286563
+    },
+    "deep/4096/serde": {
+      "A": {
+        "mean_ns": 1585.7869999999998,
+        "p50_ns": 1523.0,
+        "p95_ns": 1671.0,
+        "p99_ns": 1903.5,
+        "max_ns": 2682.0,
+        "accepted": false
+      },
+      "B": {
+        "mean_ns": 1551.4295000000002,
+        "p50_ns": 1507.5,
+        "p95_ns": 1674.0,
+        "p99_ns": 1901.0,
+        "max_ns": 2578.0,
+        "accepted": false
+      },
+      "p50_delta_percent": -1.0177281680892936
+    },
+    "deep/4096/codec": {
+      "A": {
+        "mean_ns": 7176.2855,
+        "p50_ns": 7090.5,
+        "p95_ns": 7489.0,
+        "p99_ns": 8731.0,
+        "max_ns": 10020.0,
+        "accepted": false
+      },
+      "B": {
+        "mean_ns": 5725.467,
+        "p50_ns": 5689.5,
+        "p95_ns": 5752.5,
+        "p99_ns": 6486.5,
+        "max_ns": 8776.0,
+        "accepted": false
+      },
+      "p50_delta_percent": -19.758832240321556
+    },
+    "many_members/4096/depth": {
+      "A": {
+        "mean_ns": 2723.008,
+        "p50_ns": 2705.5,
+        "p95_ns": 2721.0,
+        "p99_ns": 3627.0,
+        "max_ns": 3880.0,
+        "accepted": true
+      },
+      "B": {
+        "mean_ns": 2736.1155,
+        "p50_ns": 2703.0,
+        "p95_ns": 2736.5,
+        "p99_ns": 3796.5,
+        "max_ns": 4401.0,
+        "accepted": true
+      },
+      "p50_delta_percent": -0.09240436148586495
+    },
+    "many_members/4096/members": {
+      "A": {
+        "mean_ns": 2329.6035,
+        "p50_ns": 2309.5,
+        "p95_ns": 2332.5,
+        "p99_ns": 2911.0,
+        "max_ns": 3760.0,
+        "accepted": true
+      },
+      "B": {
+        "mean_ns": 2323.1755000000003,
+        "p50_ns": 2304.5,
+        "p95_ns": 2429.0,
+        "p99_ns": 2601.0,
+        "max_ns": 3656.0,
+        "accepted": true
+      },
+      "p50_delta_percent": -0.216497077289457
+    },
+    "many_members/4096/guards": {
+      "A": {
+        "mean_ns": 5098.996,
+        "p50_ns": 5046.0,
+        "p95_ns": 5364.5,
+        "p99_ns": 6518.0,
+        "max_ns": 7697.0,
+        "accepted": true
+      },
+      "B": {
+        "mean_ns": 3562.7749999999996,
+        "p50_ns": 3528.5,
+        "p95_ns": 3559.5,
+        "p99_ns": 4604.0,
+        "max_ns": 5265.0,
+        "accepted": true
+      },
+      "p50_delta_percent": -30.073325406262384
+    },
+    "many_members/4096/serde": {
+      "A": {
+        "mean_ns": 2154.639,
+        "p50_ns": 2064.5,
+        "p95_ns": 2283.5,
+        "p99_ns": 2395.5,
+        "max_ns": 3437.0,
+        "accepted": true
+      },
+      "B": {
+        "mean_ns": 2102.6895,
+        "p50_ns": 2059.5,
+        "p95_ns": 2270.5,
+        "p99_ns": 2400.5,
+        "max_ns": 3640.0,
+        "accepted": true
+      },
+      "p50_delta_percent": -0.2421893921046303
+    },
+    "many_members/4096/codec": {
+      "A": {
+        "mean_ns": 12361.096000000001,
+        "p50_ns": 12018.0,
+        "p95_ns": 13181.5,
+        "p99_ns": 14471.0,
+        "max_ns": 17255.0,
+        "accepted": true
+      },
+      "B": {
+        "mean_ns": 10773.414,
+        "p50_ns": 10504.5,
+        "p95_ns": 11557.0,
+        "p99_ns": 12575.5,
+        "max_ns": 15380.0,
+        "accepted": true
+      },
+      "p50_delta_percent": -12.593609585621568
+    },
+    "invalid/4096/depth": {
+      "A": {
+        "mean_ns": 48.662000000000006,
+        "p50_ns": 46.0,
+        "p95_ns": 52.0,
+        "p99_ns": 52.0,
+        "max_ns": 62.0,
+        "accepted": false
+      },
+      "B": {
+        "mean_ns": 53.5995,
+        "p50_ns": 52.0,
+        "p95_ns": 57.0,
+        "p99_ns": 57.0,
+        "max_ns": 625.0,
+        "accepted": false
+      },
+      "p50_delta_percent": 13.043478260869556
+    },
+    "invalid/4096/members": {
+      "A": {
+        "mean_ns": 2322.1425,
+        "p50_ns": 2302.0,
+        "p95_ns": 2424.0,
+        "p99_ns": 3098.5,
+        "max_ns": 3989.0,
+        "accepted": false
+      },
+      "B": {
+        "mean_ns": 2311.7595,
+        "p50_ns": 2296.0,
+        "p95_ns": 2320.0,
+        "p99_ns": 2812.0,
+        "max_ns": 3354.0,
+        "accepted": false
+      },
+      "p50_delta_percent": -0.26064291920069316
+    },
+    "invalid/4096/guards": {
+      "A": {
+        "mean_ns": 48.6015,
+        "p50_ns": 46.0,
+        "p95_ns": 52.0,
+        "p99_ns": 52.0,
+        "max_ns": 72.0,
+        "accepted": false
+      },
+      "B": {
+        "mean_ns": 50.441500000000005,
+        "p50_ns": 52.0,
+        "p95_ns": 52.0,
+        "p99_ns": 52.0,
+        "max_ns": 890.0,
+        "accepted": false
+      },
+      "p50_delta_percent": 13.043478260869556
+    },
+    "invalid/4096/serde": {
+      "A": {
+        "mean_ns": 20.6,
+        "p50_ns": 20.0,
+        "p95_ns": 26.0,
+        "p99_ns": 26.0,
+        "max_ns": 78.0,
+        "accepted": false
+      },
+      "B": {
+        "mean_ns": 20.566499999999998,
+        "p50_ns": 20.0,
+        "p95_ns": 26.0,
+        "p99_ns": 26.0,
+        "max_ns": 62.0,
+        "accepted": false
+      },
+      "p50_delta_percent": 0.0
+    },
+    "invalid/4096/codec": {
+      "A": {
+        "mean_ns": 49.2775,
+        "p50_ns": 52.0,
+        "p95_ns": 52.0,
+        "p99_ns": 57.0,
+        "max_ns": 72.0,
+        "accepted": false
+      },
+      "B": {
+        "mean_ns": 52.232,
+        "p50_ns": 52.0,
+        "p95_ns": 54.5,
+        "p99_ns": 57.0,
+        "max_ns": 73.0,
+        "accepted": false
+      },
+      "p50_delta_percent": 0.0
+    },
+    "flat/16384/depth": {
+      "A": {
+        "mean_ns": 11141.033,
+        "p50_ns": 11005.0,
+        "p95_ns": 12085.5,
+        "p99_ns": 14132.5,
+        "max_ns": 36963.0,
+        "accepted": true
+      },
+      "B": {
+        "mean_ns": 11098.457,
+        "p50_ns": 11005.0,
+        "p95_ns": 11349.0,
+        "p99_ns": 13408.5,
+        "max_ns": 14822.0,
+        "accepted": true
+      },
+      "p50_delta_percent": 0.0
+    },
+    "flat/16384/members": {
+      "A": {
+        "mean_ns": 9294.021499999999,
+        "p50_ns": 9184.5,
+        "p95_ns": 10046.5,
+        "p99_ns": 10968.0,
+        "max_ns": 12510.0,
+        "accepted": true
+      },
+      "B": {
+        "mean_ns": 9281.129,
+        "p50_ns": 9182.0,
+        "p95_ns": 9939.5,
+        "p99_ns": 11082.5,
+        "max_ns": 12599.0,
+        "accepted": true
+      },
+      "p50_delta_percent": -0.02721977244269924
+    },
+    "flat/16384/guards": {
+      "A": {
+        "mean_ns": 20375.5705,
+        "p50_ns": 20187.0,
+        "p95_ns": 21294.0,
+        "p99_ns": 23562.5,
+        "max_ns": 25968.0,
+        "accepted": true
+      },
+      "B": {
+        "mean_ns": 14789.332,
+        "p50_ns": 14661.0,
+        "p95_ns": 15335.5,
+        "p99_ns": 17580.0,
+        "max_ns": 19599.0,
+        "accepted": true
+      },
+      "p50_delta_percent": -27.37405260811413
+    },
+    "flat/16384/serde": {
+      "A": {
+        "mean_ns": 5891.707,
+        "p50_ns": 5744.5,
+        "p95_ns": 6239.0,
+        "p99_ns": 7416.0,
+        "max_ns": 8635.0,
+        "accepted": true
+      },
+      "B": {
+        "mean_ns": 5870.514,
+        "p50_ns": 5658.0,
+        "p95_ns": 6226.5,
+        "p99_ns": 6965.5,
+        "max_ns": 7901.0,
+        "accepted": true
+      },
+      "p50_delta_percent": -1.5057881451823518
+    },
+    "flat/16384/codec": {
+      "A": {
+        "mean_ns": 26165.3615,
+        "p50_ns": 25875.0,
+        "p95_ns": 27908.5,
+        "p99_ns": 30583.0,
+        "max_ns": 36937.0,
+        "accepted": true
+      },
+      "B": {
+        "mean_ns": 20833.242,
+        "p50_ns": 20463.0,
+        "p95_ns": 22609.0,
+        "p99_ns": 25486.5,
+        "max_ns": 97323.0,
+        "accepted": true
+      },
+      "p50_delta_percent": -20.915942028985512
+    },
+    "deep/16384/depth": {
+      "A": {
+        "mean_ns": 11106.627,
+        "p50_ns": 11010.0,
+        "p95_ns": 11439.5,
+        "p99_ns": 13564.5,
+        "max_ns": 19369.0,
+        "accepted": false
+      },
+      "B": {
+        "mean_ns": 11111.853500000001,
+        "p50_ns": 11007.5,
+        "p95_ns": 11557.0,
+        "p99_ns": 13533.5,
+        "max_ns": 17192.0,
+        "accepted": false
+      },
+      "p50_delta_percent": -0.02270663033605569
+    },
+    "deep/16384/members": {
+      "A": {
+        "mean_ns": 9261.291000000001,
+        "p50_ns": 9182.0,
+        "p95_ns": 9728.5,
+        "p99_ns": 11239.0,
+        "max_ns": 13171.0,
+        "accepted": false
+      },
+      "B": {
+        "mean_ns": 9349.781500000001,
+        "p50_ns": 9182.0,
+        "p95_ns": 10140.0,
+        "p99_ns": 11262.5,
+        "max_ns": 14927.0,
+        "accepted": false
+      },
+      "p50_delta_percent": 0.0
+    },
+    "deep/16384/guards": {
+      "A": {
+        "mean_ns": 20357.474499999997,
+        "p50_ns": 20189.5,
+        "p95_ns": 21205.5,
+        "p99_ns": 23669.0,
+        "max_ns": 25968.0,
+        "accepted": false
+      },
+      "B": {
+        "mean_ns": 14798.083999999999,
+        "p50_ns": 14658.5,
+        "p95_ns": 15366.5,
+        "p99_ns": 17445.0,
+        "max_ns": 254119.0,
+        "accepted": false
+      },
+      "p50_delta_percent": -27.395428316699277
+    },
+    "deep/16384/serde": {
+      "A": {
+        "mean_ns": 5855.5154999999995,
+        "p50_ns": 5642.5,
+        "p95_ns": 6244.5,
+        "p99_ns": 6796.5,
+        "max_ns": 8500.0,
+        "accepted": false
+      },
+      "B": {
+        "mean_ns": 6001.154,
+        "p50_ns": 5918.5,
+        "p95_ns": 6763.0,
+        "p99_ns": 7796.5,
+        "max_ns": 16765.0,
+        "accepted": false
+      },
+      "p50_delta_percent": 4.891448825875044
+    },
+    "deep/16384/codec": {
+      "A": {
+        "mean_ns": 26631.4725,
+        "p50_ns": 26359.0,
+        "p95_ns": 28130.0,
+        "p99_ns": 30533.0,
+        "max_ns": 33265.0,
+        "accepted": false
+      },
+      "B": {
+        "mean_ns": 21268.5605,
+        "p50_ns": 20828.0,
+        "p95_ns": 23819.5,
+        "p99_ns": 27999.5,
+        "max_ns": 37823.0,
+        "accepted": false
+      },
+      "p50_delta_percent": -20.983345346940318
+    },
+    "many_members/16384/depth": {
+      "A": {
+        "mean_ns": 11067.785,
+        "p50_ns": 10978.5,
+        "p95_ns": 11343.0,
+        "p99_ns": 13218.5,
+        "max_ns": 15265.0,
+        "accepted": true
+      },
+      "B": {
+        "mean_ns": 11131.3985,
+        "p50_ns": 10991.5,
+        "p95_ns": 11981.5,
+        "p99_ns": 13825.0,
+        "max_ns": 26156.0,
+        "accepted": true
+      },
+      "p50_delta_percent": 0.1184132622853662
+    },
+    "many_members/16384/members": {
+      "A": {
+        "mean_ns": 9268.402,
+        "p50_ns": 9184.5,
+        "p95_ns": 9541.5,
+        "p99_ns": 11458.0,
+        "max_ns": 14000.0,
+        "accepted": true
+      },
+      "B": {
+        "mean_ns": 9321.621,
+        "p50_ns": 9187.0,
+        "p95_ns": 10145.0,
+        "p99_ns": 11247.0,
+        "max_ns": 12921.0,
+        "accepted": true
+      },
+      "p50_delta_percent": 0.027219772442710344
+    },
+    "many_members/16384/guards": {
+      "A": {
+        "mean_ns": 20369.758,
+        "p50_ns": 20164.0,
+        "p95_ns": 21143.0,
+        "p99_ns": 23966.0,
+        "max_ns": 28744.0,
+        "accepted": true
+      },
+      "B": {
+        "mean_ns": 14708.486499999999,
+        "p50_ns": 14593.5,
+        "p95_ns": 15335.5,
+        "p99_ns": 17255.0,
+        "max_ns": 19598.0,
+        "accepted": true
+      },
+      "p50_delta_percent": -27.62596707002579
+    },
+    "many_members/16384/serde": {
+      "A": {
+        "mean_ns": 6424.9745,
+        "p50_ns": 6211.0,
+        "p95_ns": 6908.5,
+        "p99_ns": 8182.0,
+        "max_ns": 20901.0,
+        "accepted": true
+      },
+      "B": {
+        "mean_ns": 6375.486,
+        "p50_ns": 6195.0,
+        "p95_ns": 6872.0,
+        "p99_ns": 7770.5,
+        "max_ns": 9140.0,
+        "accepted": true
+      },
+      "p50_delta_percent": -0.2576074706166498
+    },
+    "many_members/16384/codec": {
+      "A": {
+        "mean_ns": 32058.038999999997,
+        "p50_ns": 31343.5,
+        "p95_ns": 35176.5,
+        "p99_ns": 36530.5,
+        "max_ns": 56901.0,
+        "accepted": true
+      },
+      "B": {
+        "mean_ns": 25959.0585,
+        "p50_ns": 25572.5,
+        "p95_ns": 28117.0,
+        "p99_ns": 29627.5,
+        "max_ns": 42500.0,
+        "accepted": true
+      },
+      "p50_delta_percent": -18.41211096399572
+    },
+    "invalid/16384/depth": {
+      "A": {
+        "mean_ns": 48.4295,
+        "p50_ns": 46.0,
+        "p95_ns": 52.0,
+        "p99_ns": 52.0,
+        "max_ns": 99.0,
+        "accepted": false
+      },
+      "B": {
+        "mean_ns": 48.632999999999996,
+        "p50_ns": 46.0,
+        "p95_ns": 52.0,
+        "p99_ns": 59.5,
+        "max_ns": 1062.0,
+        "accepted": false
+      },
+      "p50_delta_percent": 0.0
+    },
+    "invalid/16384/members": {
+      "A": {
+        "mean_ns": 9330.139,
+        "p50_ns": 9182.0,
+        "p95_ns": 10140.0,
+        "p99_ns": 11098.5,
+        "max_ns": 12916.0,
+        "accepted": false
+      },
+      "B": {
+        "mean_ns": 9261.09,
+        "p50_ns": 9182.0,
+        "p95_ns": 9731.5,
+        "p99_ns": 11177.0,
+        "max_ns": 12338.0,
+        "accepted": false
+      },
+      "p50_delta_percent": 0.0
+    },
+    "invalid/16384/guards": {
+      "A": {
+        "mean_ns": 48.7325,
+        "p50_ns": 46.0,
+        "p95_ns": 52.0,
+        "p99_ns": 59.5,
+        "max_ns": 755.0,
+        "accepted": false
+      },
+      "B": {
+        "mean_ns": 51.105500000000006,
+        "p50_ns": 52.0,
+        "p95_ns": 52.0,
+        "p99_ns": 62.0,
+        "max_ns": 99.0,
+        "accepted": false
+      },
+      "p50_delta_percent": 13.043478260869556
+    },
+    "invalid/16384/serde": {
+      "A": {
+        "mean_ns": 23.326,
+        "p50_ns": 20.0,
+        "p95_ns": 26.0,
+        "p99_ns": 31.0,
+        "max_ns": 614.0,
+        "accepted": false
+      },
+      "B": {
+        "mean_ns": 21.3985,
+        "p50_ns": 20.0,
+        "p95_ns": 26.0,
+        "p99_ns": 26.0,
+        "max_ns": 145.0,
+        "accepted": false
+      },
+      "p50_delta_percent": 0.0
+    },
+    "invalid/16384/codec": {
+      "A": {
+        "mean_ns": 53.8845,
+        "p50_ns": 54.5,
+        "p95_ns": 57.0,
+        "p99_ns": 62.0,
+        "max_ns": 807.0,
+        "accepted": false
+      },
+      "B": {
+        "mean_ns": 56.66,
+        "p50_ns": 57.0,
+        "p95_ns": 57.0,
+        "p99_ns": 57.0,
+        "max_ns": 83.0,
+        "accepted": false
+      },
+      "p50_delta_percent": 4.587155963302747
+    },
+    "flat/65536/depth": {
+      "A": {
+        "mean_ns": 44588.447,
+        "p50_ns": 44046.0,
+        "p95_ns": 47265.0,
+        "p99_ns": 53015.0,
+        "max_ns": 68630.0,
+        "accepted": true
+      },
+      "B": {
+        "mean_ns": 44456.074,
+        "p50_ns": 44049.0,
+        "p95_ns": 46468.5,
+        "p99_ns": 50205.0,
+        "max_ns": 86354.0,
+        "accepted": true
+      },
+      "p50_delta_percent": 0.006811061163336518
+    },
+    "flat/65536/members": {
+      "A": {
+        "mean_ns": 37232.293,
+        "p50_ns": 36718.5,
+        "p95_ns": 39812.0,
+        "p99_ns": 44255.0,
+        "max_ns": 64562.0,
+        "accepted": true
+      },
+      "B": {
+        "mean_ns": 37419.827999999994,
+        "p50_ns": 36874.5,
+        "p95_ns": 40054.0,
+        "p99_ns": 43174.0,
+        "max_ns": 62963.0,
+        "accepted": true
+      },
+      "p50_delta_percent": 0.4248539564524645
+    },
+    "flat/65536/guards": {
+      "A": {
+        "mean_ns": 81548.3885,
+        "p50_ns": 81083.0,
+        "p95_ns": 85481.0,
+        "p99_ns": 89119.5,
+        "max_ns": 165198.0,
+        "accepted": true
+      },
+      "B": {
+        "mean_ns": 59574.668000000005,
+        "p50_ns": 58723.5,
+        "p95_ns": 63416.0,
+        "p99_ns": 69091.0,
+        "max_ns": 79380.0,
+        "accepted": true
+      },
+      "p50_delta_percent": -27.576064033151216
+    },
+    "flat/65536/serde": {
+      "A": {
+        "mean_ns": 23309.1345,
+        "p50_ns": 23231.0,
+        "p95_ns": 24814.5,
+        "p99_ns": 26043.5,
+        "max_ns": 28265.0,
+        "accepted": true
+      },
+      "B": {
+        "mean_ns": 23053.860999999997,
+        "p50_ns": 22504.5,
+        "p95_ns": 24617.0,
+        "p99_ns": 26562.5,
+        "max_ns": 33286.0,
+        "accepted": true
+      },
+      "p50_delta_percent": -3.127286815031638
+    },
+    "flat/65536/codec": {
+      "A": {
+        "mean_ns": 104468.775,
+        "p50_ns": 103340.5,
+        "p95_ns": 108380.0,
+        "p99_ns": 112723.5,
+        "max_ns": 116192.0,
+        "accepted": true
+      },
+      "B": {
+        "mean_ns": 81666.648,
+        "p50_ns": 81052.0,
+        "p95_ns": 84903.0,
+        "p99_ns": 89215.5,
+        "max_ns": 99807.0,
+        "accepted": true
+      },
+      "p50_delta_percent": -21.568020282464285
+    },
+    "deep/65536/depth": {
+      "A": {
+        "mean_ns": 44483.57399999999,
+        "p50_ns": 44046.0,
+        "p95_ns": 46463.5,
+        "p99_ns": 51637.5,
+        "max_ns": 56062.0,
+        "accepted": false
+      },
+      "B": {
+        "mean_ns": 44621.0665,
+        "p50_ns": 44054.5,
+        "p95_ns": 47663.5,
+        "p99_ns": 51356.5,
+        "max_ns": 113796.0,
+        "accepted": false
+      },
+      "p50_delta_percent": 0.019298006629431264
+    },
+    "deep/65536/members": {
+      "A": {
+        "mean_ns": 37181.016,
+        "p50_ns": 36715.5,
+        "p95_ns": 39064.5,
+        "p99_ns": 42432.0,
+        "max_ns": 45812.0,
+        "accepted": false
+      },
+      "B": {
+        "mean_ns": 39316.0585,
+        "p50_ns": 38552.0,
+        "p95_ns": 43046.5,
+        "p99_ns": 50437.0,
+        "max_ns": 176364.0,
+        "accepted": false
+      },
+      "p50_delta_percent": 5.001974642862006
+    },
+    "deep/65536/guards": {
+      "A": {
+        "mean_ns": 81798.3065,
+        "p50_ns": 81078.0,
+        "p95_ns": 86221.0,
+        "p99_ns": 90023.0,
+        "max_ns": 239994.0,
+        "accepted": false
+      },
+      "B": {
+        "mean_ns": 59760.634999999995,
+        "p50_ns": 58874.5,
+        "p95_ns": 64166.5,
+        "p99_ns": 73351.0,
+        "max_ns": 242166.0,
+        "accepted": false
+      },
+      "p50_delta_percent": -27.38535731024445
+    },
+    "deep/65536/serde": {
+      "A": {
+        "mean_ns": 23781.7675,
+        "p50_ns": 23609.0,
+        "p95_ns": 25684.5,
+        "p99_ns": 29934.5,
+        "max_ns": 69583.0,
+        "accepted": false
+      },
+      "B": {
+        "mean_ns": 24244.177499999998,
+        "p50_ns": 24111.5,
+        "p95_ns": 27135.0,
+        "p99_ns": 30703.0,
+        "max_ns": 527963.0,
+        "accepted": false
+      },
+      "p50_delta_percent": 2.128425600406625
+    },
+    "deep/65536/codec": {
+      "A": {
+        "mean_ns": 106234.707,
+        "p50_ns": 105697.5,
+        "p95_ns": 111611.5,
+        "p99_ns": 123721.0,
+        "max_ns": 186526.0,
+        "accepted": false
+      },
+      "B": {
+        "mean_ns": 82450.42749999999,
+        "p50_ns": 81739.5,
+        "p95_ns": 86140.0,
+        "p99_ns": 90661.0,
+        "max_ns": 228703.0,
+        "accepted": false
+      },
+      "p50_delta_percent": -22.666572057049596
+    },
+    "many_members/65536/depth": {
+      "A": {
+        "mean_ns": 44706.2575,
+        "p50_ns": 44049.0,
+        "p95_ns": 47767.5,
+        "p99_ns": 53418.5,
+        "max_ns": 338609.0,
+        "accepted": true
+      },
+      "B": {
+        "mean_ns": 44378.383,
+        "p50_ns": 44010.0,
+        "p95_ns": 46135.0,
+        "p99_ns": 49655.5,
+        "max_ns": 55031.0,
+        "accepted": true
+      },
+      "p50_delta_percent": -0.08853776476196451
+    },
+    "many_members/65536/members": {
+      "A": {
+        "mean_ns": 37324.6075,
+        "p50_ns": 36724.0,
+        "p95_ns": 39682.0,
+        "p99_ns": 42913.5,
+        "max_ns": 45687.0,
+        "accepted": true
+      },
+      "B": {
+        "mean_ns": 37175.281,
+        "p50_ns": 36733.5,
+        "p95_ns": 39744.0,
+        "p99_ns": 43010.0,
+        "max_ns": 56302.0,
+        "accepted": true
+      },
+      "p50_delta_percent": 0.02586864176015169
+    },
+    "many_members/65536/guards": {
+      "A": {
+        "mean_ns": 81717.06450000001,
+        "p50_ns": 81054.5,
+        "p95_ns": 85762.5,
+        "p99_ns": 91000.0,
+        "max_ns": 96651.0,
+        "accepted": true
+      },
+      "B": {
+        "mean_ns": 59452.25,
+        "p50_ns": 58802.0,
+        "p95_ns": 63119.5,
+        "p99_ns": 72728.5,
+        "max_ns": 212552.0,
+        "accepted": true
+      },
+      "p50_delta_percent": -27.45375025445842
+    },
+    "many_members/65536/serde": {
+      "A": {
+        "mean_ns": 24053.129,
+        "p50_ns": 24080.0,
+        "p95_ns": 25666.0,
+        "p99_ns": 27567.5,
+        "max_ns": 47052.0,
+        "accepted": true
+      },
+      "B": {
+        "mean_ns": 23938.1405,
+        "p50_ns": 23210.5,
+        "p95_ns": 26122.0,
+        "p99_ns": 32489.0,
+        "max_ns": 323411.0,
+        "accepted": true
+      },
+      "p50_delta_percent": -3.6108803986711013
+    },
+    "many_members/65536/codec": {
+      "A": {
+        "mean_ns": 110276.1835,
+        "p50_ns": 109567.0,
+        "p95_ns": 114942.0,
+        "p99_ns": 117804.0,
+        "max_ns": 243197.0,
+        "accepted": true
+      },
+      "B": {
+        "mean_ns": 88740.174,
+        "p50_ns": 86898.0,
+        "p95_ns": 98627.0,
+        "p99_ns": 109437.0,
+        "max_ns": 155187.0,
+        "accepted": true
+      },
+      "p50_delta_percent": -20.689623700566774
+    },
+    "invalid/65536/depth": {
+      "A": {
+        "mean_ns": 54.9005,
+        "p50_ns": 54.5,
+        "p95_ns": 57.0,
+        "p99_ns": 62.0,
+        "max_ns": 1171.0,
+        "accepted": false
+      },
+      "B": {
+        "mean_ns": 48.5055,
+        "p50_ns": 46.0,
+        "p95_ns": 52.0,
+        "p99_ns": 52.0,
+        "max_ns": 88.0,
+        "accepted": false
+      },
+      "p50_delta_percent": -15.596330275229352
+    },
+    "invalid/65536/members": {
+      "A": {
+        "mean_ns": 37140.7365,
+        "p50_ns": 36713.0,
+        "p95_ns": 39072.5,
+        "p99_ns": 41570.0,
+        "max_ns": 49958.0,
+        "accepted": false
+      },
+      "B": {
+        "mean_ns": 37594.7795,
+        "p50_ns": 36721.0,
+        "p95_ns": 40520.0,
+        "p99_ns": 44617.0,
+        "max_ns": 73687.0,
+        "accepted": false
+      },
+      "p50_delta_percent": 0.021790646365049682
+    },
+    "invalid/65536/guards": {
+      "A": {
+        "mean_ns": 52.6445,
+        "p50_ns": 52.0,
+        "p95_ns": 62.0,
+        "p99_ns": 65.0,
+        "max_ns": 598.0,
+        "accepted": false
+      },
+      "B": {
+        "mean_ns": 50.9475,
+        "p50_ns": 52.0,
+        "p95_ns": 52.0,
+        "p99_ns": 67.0,
+        "max_ns": 140.0,
+        "accepted": false
+      },
+      "p50_delta_percent": 0.0
+    },
+    "invalid/65536/serde": {
+      "A": {
+        "mean_ns": 22.176000000000002,
+        "p50_ns": 23.0,
+        "p95_ns": 26.0,
+        "p99_ns": 26.0,
+        "max_ns": 218.0,
+        "accepted": false
+      },
+      "B": {
+        "mean_ns": 22.4555,
+        "p50_ns": 20.0,
+        "p95_ns": 26.0,
+        "p99_ns": 26.0,
+        "max_ns": 270.0,
+        "accepted": false
+      },
+      "p50_delta_percent": -13.043478260869568
+    },
+    "invalid/65536/codec": {
+      "A": {
+        "mean_ns": 51.769499999999994,
+        "p50_ns": 52.0,
+        "p95_ns": 54.5,
+        "p99_ns": 59.5,
+        "max_ns": 1942.0,
+        "accepted": false
+      },
+      "B": {
+        "mean_ns": 52.66,
+        "p50_ns": 52.0,
+        "p95_ns": 57.0,
+        "p99_ns": 57.0,
+        "max_ns": 83.0,
+        "accepted": false
+      },
+      "p50_delta_percent": 0.0
+    }
+  },
+  "network": {
+    "large": {
+      "B": {
+        "runs": [
+          {
+            "file": "large-2-B.json",
+            "cohort": "network",
+            "samples": 299370,
+            "throughput_ops_s": 19958.0,
+            "rss_peak_kib": 22720,
+            "cpu_mean_percent": 353.12,
+            "errors": 0,
+            "unexpected_disconnects": 0,
+            "pending_at_disconnect": 0,
+            "queue_peak_count": 11,
+            "queue_peak_bytes": 183665,
+            "overload": 0.0,
+            "p50_ms": 0.63,
+            "p95_ms": 1.46,
+            "p99_ms": 2.14,
+            "p999_ms": 5.13,
+            "broker_lock_wait_mean_us": null,
+            "broker_lock_hold_mean_us": null,
+            "event_bus_state_wait_mean_us": null,
+            "event_bus_state_hold_mean_us": null
+          },
+          {
+            "file": "large-1-B.json",
+            "cohort": "network",
+            "samples": 299517,
+            "throughput_ops_s": 19967.8,
+            "rss_peak_kib": 20832,
+            "cpu_mean_percent": 348.635,
+            "errors": 0,
+            "unexpected_disconnects": 0,
+            "pending_at_disconnect": 0,
+            "queue_peak_count": 8,
+            "queue_peak_bytes": 133568,
+            "overload": 0.0,
+            "p50_ms": 0.6,
+            "p95_ms": 1.39,
+            "p99_ms": 2.01,
+            "p999_ms": 5.36,
+            "broker_lock_wait_mean_us": null,
+            "broker_lock_hold_mean_us": null,
+            "event_bus_state_wait_mean_us": null,
+            "event_bus_state_hold_mean_us": null
+          }
+        ],
+        "median": {
+          "samples": 299443.5,
+          "throughput_ops_s": 19962.9,
+          "rss_peak_kib": 21776.0,
+          "cpu_mean_percent": 350.8775,
+          "errors": 0.0,
+          "unexpected_disconnects": 0.0,
+          "pending_at_disconnect": 0.0,
+          "queue_peak_count": 9.5,
+          "queue_peak_bytes": 158616.5,
+          "overload": 0.0,
+          "p50_ms": 0.615,
+          "p95_ms": 1.4249999999999998,
+          "p99_ms": 2.075,
+          "p999_ms": 5.245,
+          "broker_lock_wait_mean_us": null,
+          "broker_lock_hold_mean_us": null,
+          "event_bus_state_wait_mean_us": null,
+          "event_bus_state_hold_mean_us": null
+        }
+      },
+      "A": {
+        "runs": [
+          {
+            "file": "large-3-A.json",
+            "cohort": "network",
+            "samples": 297879,
+            "throughput_ops_s": 19858.6,
+            "rss_peak_kib": 29792,
+            "cpu_mean_percent": 382.85,
+            "errors": 0,
+            "unexpected_disconnects": 0,
+            "pending_at_disconnect": 0,
+            "queue_peak_count": 37,
+            "queue_peak_bytes": 617746,
+            "overload": 0.0,
+            "p50_ms": 0.69,
+            "p95_ms": 1.55,
+            "p99_ms": 2.68,
+            "p999_ms": 21.9,
+            "broker_lock_wait_mean_us": null,
+            "broker_lock_hold_mean_us": null,
+            "event_bus_state_wait_mean_us": null,
+            "event_bus_state_hold_mean_us": null
+          },
+          {
+            "file": "large-0-A.json",
+            "cohort": "network",
+            "samples": 299285,
+            "throughput_ops_s": 19952.333333333332,
+            "rss_peak_kib": 25792,
+            "cpu_mean_percent": 402.48,
+            "errors": 0,
+            "unexpected_disconnects": 0,
+            "pending_at_disconnect": 0,
+            "queue_peak_count": 8,
+            "queue_peak_bytes": 133568,
+            "overload": 0.0,
+            "p50_ms": 0.69,
+            "p95_ms": 1.51,
+            "p99_ms": 2.32,
+            "p999_ms": 10.6,
+            "broker_lock_wait_mean_us": null,
+            "broker_lock_hold_mean_us": null,
+            "event_bus_state_wait_mean_us": null,
+            "event_bus_state_hold_mean_us": null
+          }
+        ],
+        "median": {
+          "samples": 298582.0,
+          "throughput_ops_s": 19905.466666666667,
+          "rss_peak_kib": 27792.0,
+          "cpu_mean_percent": 392.665,
+          "errors": 0.0,
+          "unexpected_disconnects": 0.0,
+          "pending_at_disconnect": 0.0,
+          "queue_peak_count": 22.5,
+          "queue_peak_bytes": 375657.0,
+          "overload": 0.0,
+          "p50_ms": 0.69,
+          "p95_ms": 1.53,
+          "p99_ms": 2.5,
+          "p999_ms": 16.25,
+          "broker_lock_wait_mean_us": null,
+          "broker_lock_hold_mean_us": null,
+          "event_bus_state_wait_mean_us": null,
+          "event_bus_state_hold_mean_us": null
+        }
+      },
+      "delta_percent": {
+        "samples": 0.2885304539456568,
+        "throughput_ops_s": 0.2885304539456568,
+        "rss_peak_kib": -21.646516983304554,
+        "cpu_mean_percent": -10.64202309857003,
+        "errors": null,
+        "unexpected_disconnects": null,
+        "pending_at_disconnect": null,
+        "queue_peak_count": -57.77777777777777,
+        "queue_peak_bytes": -57.7762426894747,
+        "overload": null,
+        "p50_ms": -10.869565217391298,
+        "p95_ms": -6.862745098039225,
+        "p99_ms": -16.999999999999993,
+        "p999_ms": -67.72307692307693,
+        "broker_lock_wait_mean_us": null,
+        "broker_lock_hold_mean_us": null,
+        "event_bus_state_wait_mean_us": null,
+        "event_bus_state_hold_mean_us": null
+      },
+      "p99_two_sided_exact_permutation_p": 0.3333333333333333
+    },
+    "q1": {
+      "A": {
+        "runs": [
+          {
+            "file": "q1-3-A.json",
+            "cohort": "network",
+            "samples": 300000,
+            "throughput_ops_s": 20000.0,
+            "rss_peak_kib": 19312,
+            "cpu_mean_percent": 230.73499999999999,
+            "errors": 0,
+            "unexpected_disconnects": 0,
+            "pending_at_disconnect": 0,
+            "queue_peak_count": 78,
+            "queue_peak_bytes": 93114,
+            "overload": 0.0,
+            "p50_ms": 0.33,
+            "p95_ms": 0.69,
+            "p99_ms": 1.05,
+            "p999_ms": 9.1,
+            "broker_lock_wait_mean_us": null,
+            "broker_lock_hold_mean_us": null,
+            "event_bus_state_wait_mean_us": null,
+            "event_bus_state_hold_mean_us": null
+          },
+          {
+            "file": "q1-0-A.json",
+            "cohort": "network",
+            "samples": 299860,
+            "throughput_ops_s": 19990.666666666668,
+            "rss_peak_kib": 18304,
+            "cpu_mean_percent": 209.755,
+            "errors": 0,
+            "unexpected_disconnects": 0,
+            "pending_at_disconnect": 0,
+            "queue_peak_count": 24,
+            "queue_peak_bytes": 28656,
+            "overload": 0.0,
+            "p50_ms": 0.31,
+            "p95_ms": 0.66,
+            "p99_ms": 1.02,
+            "p999_ms": 7.28,
+            "broker_lock_wait_mean_us": null,
+            "broker_lock_hold_mean_us": null,
+            "event_bus_state_wait_mean_us": null,
+            "event_bus_state_hold_mean_us": null
+          }
+        ],
+        "median": {
+          "samples": 299930.0,
+          "throughput_ops_s": 19995.333333333336,
+          "rss_peak_kib": 18808.0,
+          "cpu_mean_percent": 220.245,
+          "errors": 0.0,
+          "unexpected_disconnects": 0.0,
+          "pending_at_disconnect": 0.0,
+          "queue_peak_count": 51.0,
+          "queue_peak_bytes": 60885.0,
+          "overload": 0.0,
+          "p50_ms": 0.32,
+          "p95_ms": 0.675,
+          "p99_ms": 1.0350000000000001,
+          "p999_ms": 8.19,
+          "broker_lock_wait_mean_us": null,
+          "broker_lock_hold_mean_us": null,
+          "event_bus_state_wait_mean_us": null,
+          "event_bus_state_hold_mean_us": null
+        }
+      },
+      "B": {
+        "runs": [
+          {
+            "file": "q1-2-B.json",
+            "cohort": "network",
+            "samples": 299999,
+            "throughput_ops_s": 19999.933333333334,
+            "rss_peak_kib": 19792,
+            "cpu_mean_percent": 213.5095238095238,
+            "errors": 0,
+            "unexpected_disconnects": 0,
+            "pending_at_disconnect": 0,
+            "queue_peak_count": 32,
+            "queue_peak_bytes": 38144,
+            "overload": 0.0,
+            "p50_ms": 0.32,
+            "p95_ms": 0.65,
+            "p99_ms": 0.95,
+            "p999_ms": 11.22,
+            "broker_lock_wait_mean_us": null,
+            "broker_lock_hold_mean_us": null,
+            "event_bus_state_wait_mean_us": null,
+            "event_bus_state_hold_mean_us": null
+          },
+          {
+            "file": "q1-1-B.json",
+            "cohort": "network",
+            "samples": 299980,
+            "throughput_ops_s": 19998.666666666668,
+            "rss_peak_kib": 17440,
+            "cpu_mean_percent": 219.13333333333333,
+            "errors": 0,
+            "unexpected_disconnects": 0,
+            "pending_at_disconnect": 0,
+            "queue_peak_count": 8,
+            "queue_peak_bytes": 9552,
+            "overload": 0.0,
+            "p50_ms": 0.34,
+            "p95_ms": 0.67,
+            "p99_ms": 0.93,
+            "p999_ms": 1.16,
+            "broker_lock_wait_mean_us": null,
+            "broker_lock_hold_mean_us": null,
+            "event_bus_state_wait_mean_us": null,
+            "event_bus_state_hold_mean_us": null
+          }
+        ],
+        "median": {
+          "samples": 299989.5,
+          "throughput_ops_s": 19999.300000000003,
+          "rss_peak_kib": 18616.0,
+          "cpu_mean_percent": 216.32142857142856,
+          "errors": 0.0,
+          "unexpected_disconnects": 0.0,
+          "pending_at_disconnect": 0.0,
+          "queue_peak_count": 20.0,
+          "queue_peak_bytes": 23848.0,
+          "overload": 0.0,
+          "p50_ms": 0.33,
+          "p95_ms": 0.66,
+          "p99_ms": 0.94,
+          "p999_ms": 6.19,
+          "broker_lock_wait_mean_us": null,
+          "broker_lock_hold_mean_us": null,
+          "event_bus_state_wait_mean_us": null,
+          "event_bus_state_hold_mean_us": null
+        }
+      },
+      "delta_percent": {
+        "samples": 0.019837962191182612,
+        "throughput_ops_s": 0.019837962191182612,
+        "rss_peak_kib": -1.0208421948107227,
+        "cpu_mean_percent": -1.7814576624084366,
+        "errors": null,
+        "unexpected_disconnects": null,
+        "pending_at_disconnect": null,
+        "queue_peak_count": -60.7843137254902,
+        "queue_peak_bytes": -60.83107497741644,
+        "overload": null,
+        "p50_ms": 3.125,
+        "p95_ms": -2.2222222222222254,
+        "p99_ms": -9.178743961352676,
+        "p999_ms": -24.42002442002441,
+        "broker_lock_wait_mean_us": null,
+        "broker_lock_hold_mean_us": null,
+        "event_bus_state_wait_mean_us": null,
+        "event_bus_state_hold_mean_us": null
+      },
+      "p99_two_sided_exact_permutation_p": 0.3333333333333333
+    },
+    "small": {
+      "B": {
+        "runs": [
+          {
+            "file": "small-1-B.json",
+            "cohort": "small-network",
+            "samples": 299996,
+            "throughput_ops_s": 19999.733333333334,
+            "rss_peak_kib": 17488,
+            "cpu_mean_percent": 202.85,
+            "errors": 0,
+            "unexpected_disconnects": 0,
+            "pending_at_disconnect": 0,
+            "queue_peak_count": 12,
+            "queue_peak_bytes": 4824,
+            "overload": 0.0,
+            "p50_ms": 0.32,
+            "p95_ms": 0.66,
+            "p99_ms": 0.91,
+            "p999_ms": 1.15,
+            "broker_lock_wait_mean_us": null,
+            "broker_lock_hold_mean_us": null,
+            "event_bus_state_wait_mean_us": null,
+            "event_bus_state_hold_mean_us": null
+          },
+          {
+            "file": "small-2-B.json",
+            "cohort": "small-network",
+            "samples": 299980,
+            "throughput_ops_s": 19998.666666666668,
+            "rss_peak_kib": 17744,
+            "cpu_mean_percent": 194.975,
+            "errors": 0,
+            "unexpected_disconnects": 0,
+            "pending_at_disconnect": 0,
+            "queue_peak_count": 8,
+            "queue_peak_bytes": 3208,
+            "overload": 0.0,
+            "p50_ms": 0.32,
+            "p95_ms": 0.69,
+            "p99_ms": 0.97,
+            "p999_ms": 1.67,
+            "broker_lock_wait_mean_us": null,
+            "broker_lock_hold_mean_us": null,
+            "event_bus_state_wait_mean_us": null,
+            "event_bus_state_hold_mean_us": null
+          }
+        ],
+        "median": {
+          "samples": 299988.0,
+          "throughput_ops_s": 19999.2,
+          "rss_peak_kib": 17616.0,
+          "cpu_mean_percent": 198.9125,
+          "errors": 0.0,
+          "unexpected_disconnects": 0.0,
+          "pending_at_disconnect": 0.0,
+          "queue_peak_count": 10.0,
+          "queue_peak_bytes": 4016.0,
+          "overload": 0.0,
+          "p50_ms": 0.32,
+          "p95_ms": 0.675,
+          "p99_ms": 0.94,
+          "p999_ms": 1.41,
+          "broker_lock_wait_mean_us": null,
+          "broker_lock_hold_mean_us": null,
+          "event_bus_state_wait_mean_us": null,
+          "event_bus_state_hold_mean_us": null
+        }
+      },
+      "A": {
+        "runs": [
+          {
+            "file": "small-0-A.json",
+            "cohort": "small-network",
+            "samples": 300000,
+            "throughput_ops_s": 20000.0,
+            "rss_peak_kib": 17568,
+            "cpu_mean_percent": 199.81,
+            "errors": 0,
+            "unexpected_disconnects": 0,
+            "pending_at_disconnect": 0,
+            "queue_peak_count": 10,
+            "queue_peak_bytes": 4004,
+            "overload": 0.0,
+            "p50_ms": 0.32,
+            "p95_ms": 0.68,
+            "p99_ms": 0.94,
+            "p999_ms": 1.29,
+            "broker_lock_wait_mean_us": null,
+            "broker_lock_hold_mean_us": null,
+            "event_bus_state_wait_mean_us": null,
+            "event_bus_state_hold_mean_us": null
+          },
+          {
+            "file": "small-3-A.json",
+            "cohort": "small-network",
+            "samples": 300000,
+            "throughput_ops_s": 20000.0,
+            "rss_peak_kib": 17568,
+            "cpu_mean_percent": 199.365,
+            "errors": 0,
+            "unexpected_disconnects": 0,
+            "pending_at_disconnect": 0,
+            "queue_peak_count": 14,
+            "queue_peak_bytes": 5628,
+            "overload": 0.0,
+            "p50_ms": 0.31,
+            "p95_ms": 0.65,
+            "p99_ms": 0.91,
+            "p999_ms": 1.29,
+            "broker_lock_wait_mean_us": null,
+            "broker_lock_hold_mean_us": null,
+            "event_bus_state_wait_mean_us": null,
+            "event_bus_state_hold_mean_us": null
+          }
+        ],
+        "median": {
+          "samples": 300000.0,
+          "throughput_ops_s": 20000.0,
+          "rss_peak_kib": 17568.0,
+          "cpu_mean_percent": 199.5875,
+          "errors": 0.0,
+          "unexpected_disconnects": 0.0,
+          "pending_at_disconnect": 0.0,
+          "queue_peak_count": 12.0,
+          "queue_peak_bytes": 4816.0,
+          "overload": 0.0,
+          "p50_ms": 0.315,
+          "p95_ms": 0.665,
+          "p99_ms": 0.925,
+          "p999_ms": 1.29,
+          "broker_lock_wait_mean_us": null,
+          "broker_lock_hold_mean_us": null,
+          "event_bus_state_wait_mean_us": null,
+          "event_bus_state_hold_mean_us": null
+        }
+      },
+      "delta_percent": {
+        "samples": -0.004000000000004,
+        "throughput_ops_s": -0.003999999999992898,
+        "rss_peak_kib": 0.2732240437158362,
+        "cpu_mean_percent": -0.33819753241060013,
+        "errors": null,
+        "unexpected_disconnects": null,
+        "pending_at_disconnect": null,
+        "queue_peak_count": -16.666666666666664,
+        "queue_peak_bytes": -16.61129568106312,
+        "overload": null,
+        "p50_ms": 1.5873015873015817,
+        "p95_ms": 1.5037593984962516,
+        "p99_ms": 1.621621621621605,
+        "p999_ms": 9.302325581395344,
+        "broker_lock_wait_mean_us": null,
+        "broker_lock_hold_mean_us": null,
+        "event_bus_state_wait_mean_us": null,
+        "event_bus_state_hold_mean_us": null
+      },
+      "p99_two_sided_exact_permutation_p": 1.0
+    }
+  },
+  "binary_provenance": {
+    "netbaiot-server": {
+      "sha256": "db3ea12cbd2d4e3fe2458e95ab8458e30996d46ee8f36fa96d89943a97b294f4",
+      "bytes": 12167312
+    },
+    "transports-probe": {
+      "sha256": "2d545e9b57c1afa3662a6994df311e6dcd87fbbdc9cd3d1fd5c764499fda5175",
+      "bytes": 6479328
+    },
+    "parent_sha": "4f16c1ccc165dd2d92f630dab427f1451ed3635a",
+    "source_delta_sha256": "5d7fd5e79043a491adfc96c170758b54b51316951877e969282f7404e193dc2f",
+    "codec-probe": {
+      "sha256": "03bddc2c3ccbd522763425a53d7c462b224a2064e1adfd1db261f0ddf3d9df73",
+      "bytes": 1150896
+    }
+  },
+  "interpretation": [
+    "A/B release codec overlay uses identical source apart from combined guard and no other codec production changes between baseline probe and J.",
+    "Allocation counts were not collected for codec. Safety scan allocates nothing; original serde decoding remains.",
+    "White-space padding reaches legal input ceiling. Deep shape is invalid telemetry scalar schema; 64B envelopes are truncated. accepted reports actual full codec validity.",
+    "Public depth helper remains unchanged. Combined guard matches original two guards in randomized differential tests; full serde validation remains."
+  ],
+  "small_input_reassessment": "256B flat micro codec +73.5ns/+11.4%; unchanged depth/member/serde controls also moved +39..56%, so small-operation compiled overlay effects are not separated. Extra real 256B MQTT ABBA assesses the production path; large/1KB/256B P99 and RSS meet the gate. No limits relaxed or hybrid threshold added."
+}
