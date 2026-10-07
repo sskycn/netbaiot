@@ -2,7 +2,7 @@ name: Native recovery and lifecycle
 on:
   pull_request:
   push:
-    branches: [main, codex/strict-reliability-audit]
+    branches: [main, codex/strict-reliability-audit, codex/windows-recovery-regression]
   workflow_dispatch:
 permissions:
   contents: read
