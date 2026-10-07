@@ -1,0 +1,37 @@
+name: Windows recovery regression stage sweep
+on:
+  push:
+    branches: [codex/windows-recovery-regression]
+    paths:
+      - .github/workflows/windows-regression-bisect.yml
+      - scripts/windows_regression_probe.py
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  stage:
+    strategy:
+      fail-fast: false
+      matrix:
+        commit: [a91a910, 5d612af, 41eb71f, 6b559ac, 4ac37d7, 355b974, 7b4e3c4, 302912c, 1bd5cf8]
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: probe
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ matrix.commit }}
+          path: source
+      - uses: dtolnay/rust-toolchain@1.88.0
+      - name: Repeat original tests and compare serial and parallel execution
+        working-directory: source
+        shell: pwsh
+        run: python ../probe/scripts/windows_regression_probe.py --commit ${{ matrix.commit }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-regression-${{ matrix.commit }}
+          path: source/target/evidence/windows-regression/
+          retention-days: 14
