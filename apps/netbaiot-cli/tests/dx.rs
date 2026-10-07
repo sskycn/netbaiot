@@ -13,7 +13,7 @@ fn cli() -> Command {
         "NETBAIOT_API_KEY",
         "NETBAIOT_EVENT_ADDRESS",
         "NETBAIOT_ADMIN_SECRET",
-        "NETBAIOT_BUSINESS_STREAM_TOKEN",
+        "NETBAIOT_BUSINESS_RPC_TOKEN",
     ] {
         c.env_remove(name);
     }

@@ -13,7 +13,6 @@ use std::{
     io::{self, Write},
     path::PathBuf,
     sync::Arc,
-    time::{Duration, Instant},
 };
 use thiserror::Error;
 use tokio::{
@@ -85,13 +84,11 @@ pub trait BusinessAuthHandler: Send + Sync + 'static {
 
 async fn connect_io(
     config: &BusinessRpcV3ClientConfig,
-) -> Result<(Box<dyn Io>, Duration, Option<Duration>), BusinessRpcClientError> {
-    let tcp_started = Instant::now();
+) -> Result<Box<dyn Io>, BusinessRpcClientError> {
     let socket = tokio::time::timeout(config.connect_timeout, TcpStream::connect(config.address))
         .await
         .map_err(|_| BusinessRpcClientError::Timeout)?
         .map_err(|_| BusinessRpcClientError::Unavailable)?;
-    let tcp_connect = tcp_started.elapsed();
     if let Some(tls) = &config.tls {
         let ca = std::fs::read(&tls.ca_pem).map_err(|_| BusinessRpcClientError::InvalidConfig)?;
         let cert = std::fs::read(&tls.certificate_pem)
@@ -126,7 +123,6 @@ async fn connect_io(
         .map_err(|_| BusinessRpcClientError::InvalidConfig)?;
         let name = rustls::pki_types::ServerName::try_from(tls.server_name.clone())
             .map_err(|_| BusinessRpcClientError::InvalidConfig)?;
-        let tls_started = Instant::now();
         let stream = tokio::time::timeout(
             config.connect_timeout,
             TlsConnector::from(Arc::new(rustls_config)).connect(name, socket),
@@ -134,8 +130,8 @@ async fn connect_io(
         .await
         .map_err(|_| BusinessRpcClientError::Timeout)?
         .map_err(|_| BusinessRpcClientError::Unauthorized)?;
-        Ok((Box::new(stream), tcp_connect, Some(tls_started.elapsed())))
+        Ok(Box::new(stream))
     } else {
-        Ok((Box::new(socket), tcp_connect, None))
+        Ok(Box::new(socket))
     }
 }

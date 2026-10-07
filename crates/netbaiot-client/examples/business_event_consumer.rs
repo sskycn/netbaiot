@@ -7,6 +7,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let client = NetbaIoTClient::builder()
         .endpoint(std::env::var("NETBAIOT_ENDPOINT")?)
         .token(std::env::var("NETBAIOT_TOKEN")?)
+        .event_token(std::env::var("NETBAIOT_EVENT_TOKEN")?)
         .event_address(std::env::var("NETBAIOT_EVENT_ADDRESS")?.parse()?)
         .connect()
         .await?;

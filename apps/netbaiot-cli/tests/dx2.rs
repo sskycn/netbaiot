@@ -6,7 +6,7 @@ async fn cli(args: &[&str]) -> std::process::Output {
         Command::new(env!("CARGO_BIN_EXE_netbaiot"))
             .args(args)
             .env_remove("NETBAIOT_ADMIN_SECRET")
-            .env_remove("NETBAIOT_BUSINESS_STREAM_TOKEN")
+            .env_remove("NETBAIOT_BUSINESS_RPC_TOKEN")
             .kill_on_drop(true)
             .output(),
     )

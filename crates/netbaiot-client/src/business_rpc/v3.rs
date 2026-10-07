@@ -609,7 +609,7 @@ async fn driver(mut context: DriverContext) {
             break;
         }
         let result = async {
-            let (mut io, _, _) = connect_io(&context.config).await?;
+            let mut io = connect_io(&context.config).await?;
             let (epoch, limits) = bootstrap(&mut io, &context.config).await?;
             context.epoch.store(epoch, Ordering::Release);
             connected(io, epoch, limits, &mut context).await

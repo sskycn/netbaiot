@@ -88,7 +88,7 @@ struct Pending {
     _slot: OwnedSemaphorePermit,
     _bytes: OwnedSemaphorePermit,
 }
-/// Transport-neutral outbound call. V2 and V3 adapters choose their own framing.
+/// Transport-neutral outbound auth call; the current RPC transport owns framing.
 pub enum BusinessRpcCall {
     Request {
         request_id: Uuid,
@@ -559,7 +559,7 @@ impl BusinessRpcRegistry {
             deadline_ms: remaining.as_millis().min(u32::MAX as u128) as u32,
             body: value,
         };
-        // Keep the V2 registry's bounded queue charge. Each transport separately bounds
+        // Keep the registry's conservative bounded queue charge. The transport separately bounds
         // encoded metadata, queued body bytes, and its writer before using the call.
         let wire_size = size.checked_add(160).ok_or(Error::Overloaded)?;
         let wire_count = u32::try_from(wire_size).map_err(|_| Error::Overloaded)?;
