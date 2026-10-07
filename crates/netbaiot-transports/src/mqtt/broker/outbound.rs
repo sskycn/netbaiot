@@ -618,7 +618,7 @@ impl MqttBroker {
         message: BrokerMessage,
         progress: Option<Arc<netbaiot_runtime::CommandProgress>>,
     ) -> Result<()> {
-        let mut state = lock(&self.state)?;
+        let mut state = self.lock_state(BrokerProbe::Outbound)?;
         check_owner(&state, key, generation).map_err(|_| Error::Unavailable)?;
         let subscribed = state.sessions.get(key).is_some_and(|session| {
             session
@@ -670,7 +670,7 @@ impl MqttBroker {
     }
 
     pub fn next_offline(&self, key: &SessionKey, generation: u64) -> Result<Option<BrokerFrame>> {
-        let mut state = lock(&self.state)?;
+        let mut state = self.lock_state(BrokerProbe::Outbound)?;
         check_owner(&state, key, generation)?;
         if message_expiry_due(&state, key, now_ms()) {
             prune_expired_messages_for_session(&mut state, key, now_ms())?;
@@ -712,7 +712,7 @@ impl MqttBroker {
     }
 
     pub fn outbound_bytes_released(&self) -> Result<()> {
-        let mut state = lock(&self.state)?;
+        let mut state = self.lock_state(BrokerProbe::Outbound)?;
         wake_global_byte_pending(&mut state, &self.limits)
     }
 
@@ -739,7 +739,7 @@ impl MqttBroker {
         delivery: &BrokerDelivery,
     ) -> Result<bool> {
         let packet_id = delivery.packet_id.ok_or(Error::Invalid)?;
-        let mut state = lock(&self.state)?;
+        let mut state = self.lock_state(BrokerProbe::Outbound)?;
         check_owner(&state, key, generation)?;
         let session = state.sessions.get_mut(key).ok_or(Error::Internal)?;
         let matching = matches!(
@@ -779,7 +779,7 @@ impl MqttBroker {
         delivery: &BrokerDelivery,
     ) -> Result<bool> {
         let packet_id = delivery.packet_id.ok_or(Error::Invalid)?;
-        let mut state = lock(&self.state)?;
+        let mut state = self.lock_state(BrokerProbe::Outbound)?;
         check_owner(&state, key, generation)?;
         let session = state.sessions.get_mut(key).ok_or(Error::Internal)?;
         let matching = matches!(
@@ -801,7 +801,7 @@ impl MqttBroker {
     }
 
     pub fn pubrec(&self, key: &SessionKey, generation: u64, packet_id: u16) -> Result<BrokerFrame> {
-        let mut state = lock(&self.state)?;
+        let mut state = self.lock_state(BrokerProbe::Pubrec)?;
         check_owner(&state, key, generation)?;
         let session = state.sessions.get_mut(key).ok_or(Error::Internal)?;
         let frame = match session.outbound.get_mut(&packet_id) {
@@ -833,7 +833,7 @@ impl MqttBroker {
         generation: u64,
         packet_id: u16,
     ) -> Result<bool> {
-        let mut state = lock(&self.state)?;
+        let mut state = self.lock_state(BrokerProbe::Pubrec)?;
         check_owner(&state, key, generation)?;
         let session = state.sessions.get_mut(key).ok_or(Error::Internal)?;
         match session.outbound.get(&packet_id) {
@@ -876,7 +876,10 @@ impl MqttBroker {
         ack: OutboundAck,
         success: bool,
     ) -> Result<bool> {
-        let mut state = lock(&self.state)?;
+        let mut state = self.lock_state(match ack {
+            OutboundAck::Puback => BrokerProbe::Puback,
+            OutboundAck::Pubcomp => BrokerProbe::Pubcomp,
+        })?;
         check_owner(&state, key, generation)?;
         let session = state.sessions.get_mut(key).ok_or(Error::Internal)?;
         let Some(outbound) = session.outbound.get(&packet_id) else {

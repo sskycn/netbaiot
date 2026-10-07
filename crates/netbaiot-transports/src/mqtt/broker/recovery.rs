@@ -1100,7 +1100,7 @@ pub(super) struct TemporaryRecovery(PathBuf);
 
 impl MqttBroker {
     pub fn snapshot(&self) -> Result<MqttRecoverySnapshot> {
-        let state = lock(&self.state)?;
+        let state = self.lock_state(BrokerProbe::Recovery)?;
         Ok(MqttRecoverySnapshot {
             format_version: RECOVERY_VERSION,
             snapshot_generation: state.generation,
@@ -1609,7 +1609,7 @@ impl MqttBroker {
             return Err(Error::Overloaded);
         }
         retry_pending_wills(&mut replacement, &self.limits);
-        let mut state = lock(&self.state)?;
+        let mut state = self.lock_state(BrokerProbe::Recovery)?;
         *state = replacement;
         self.publish_subscription_count(&state);
         Ok(())

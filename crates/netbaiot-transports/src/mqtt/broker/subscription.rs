@@ -131,7 +131,7 @@ impl MqttBroker {
         {
             return Err(Error::Invalid);
         }
-        let mut state = lock(&self.state)?;
+        let mut state = self.lock_state(BrokerProbe::Subscribe)?;
         prune_expired_messages(&mut state, now_ms(), HOT_MAINTENANCE_BUDGET)?;
         drive_capacity_wakes(&mut state, &self.limits)?;
         check_owner(&state, key, generation)?;
@@ -142,6 +142,9 @@ impl MqttBroker {
             .sessions
             .get(key)
             .is_some_and(|session| session.subscriptions.contains_key(filter));
+        if !state.retained.is_empty() {
+            state.classify(BrokerProbe::RetainedReplay);
+        }
         let now = now_ms();
         let retained_allowed = |retained: &RetainedMessage| {
             !(retained.message.expired(now)
@@ -282,7 +285,7 @@ impl MqttBroker {
     }
 
     pub fn unsubscribe(&self, key: &SessionKey, generation: u64, filter: &str) -> Result<bool> {
-        let mut state = lock(&self.state)?;
+        let mut state = self.lock_state(BrokerProbe::Unsubscribe)?;
         check_owner(&state, key, generation)?;
         let removed = state
             .sessions
@@ -304,7 +307,7 @@ impl MqttBroker {
     }
 
     pub fn subscription_qos(&self, key: &SessionKey, topic: &str) -> Result<Option<u8>> {
-        let state = lock(&self.state)?;
+        let state = self.lock_state(BrokerProbe::Read)?;
         Ok(state.sessions.get(key).and_then(|session| {
             session
                 .subscriptions

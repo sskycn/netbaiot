@@ -379,25 +379,11 @@ impl MqttBroker {
         if !message.retain && self.subscription_count.load(Ordering::Acquire) == 0 {
             return Ok(0);
         }
-        let lock_started = self
-            .metrics
-            .as_ref()
-            .filter(|metrics| metrics.lock_timing_enabled())
-            .map(|_| Instant::now());
-        let mut state = lock(&self.state)?;
+        let mut state = self.lock_state(BrokerProbe::Route)?;
         prune_expired_messages(&mut state, now_ms(), HOT_MAINTENANCE_BUDGET)?;
-        let lock_wait_us = lock_started.map(|started| started.elapsed().as_micros() as u64);
-        let hold_started = lock_started.map(|_| Instant::now());
         let result = route_locked(&mut state, owner, origin, message, &self.limits);
         if let Err(error) = drive_capacity_wakes(&mut state, &self.limits) {
             tracing::error!(%error, "failed to promote MQTT work after capacity release");
-        }
-        let lock_hold_us = hold_started.map(|started| started.elapsed().as_micros() as u64);
-        drop(state);
-        if let (Some(metrics), Some(wait), Some(hold)) = (&self.metrics, lock_wait_us, lock_hold_us)
-        {
-            metrics.observe(Histogram::BrokerLockWait, wait);
-            metrics.observe(Histogram::BrokerLockHold, hold);
         }
         result
     }

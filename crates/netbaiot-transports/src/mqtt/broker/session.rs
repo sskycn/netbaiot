@@ -237,7 +237,7 @@ impl MqttBroker {
         if receive_maximum == 0 {
             return Err(Error::Invalid);
         }
-        let mut state = lock(&self.state)?;
+        let mut state = self.lock_state(BrokerProbe::Attach)?;
         self.prune_expired(&mut state, HOT_MAINTENANCE_BUDGET)?;
         prune_expired_messages(&mut state, now_ms(), HOT_MAINTENANCE_BUDGET)?;
         let client_id = if let Some(client_id) = client_id {
@@ -395,7 +395,7 @@ impl MqttBroker {
     }
 
     pub fn detach(&self, key: &SessionKey, generation: u64, clean_session: bool) -> Result<()> {
-        let mut state = lock(&self.state)?;
+        let mut state = self.lock_state(BrokerProbe::Detach)?;
         if state
             .active
             .get(key)
@@ -438,7 +438,7 @@ impl MqttBroker {
         generation: u64,
         interval: u32,
     ) -> Result<()> {
-        let mut state = lock(&self.state)?;
+        let mut state = self.lock_state(BrokerProbe::Read)?;
         check_owner(&state, key, generation)?;
         let session = state.sessions.get_mut(key).ok_or(Error::Internal)?;
         if session.version != MqttVersion::V5

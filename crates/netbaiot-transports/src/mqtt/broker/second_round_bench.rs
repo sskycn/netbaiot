@@ -98,6 +98,9 @@ fn limits(count: usize) -> Arc<Limits> {
         max_inflight_qos2_per_tenant: (count + 16) * (count + 16),
         max_outbound_messages_per_connection: count + 16,
         max_offline_messages_per_session: count + 16,
+        max_retained_messages: count + 16,
+        max_retained_messages_per_tenant: count + 16,
+        max_retained_bytes_per_tenant: 64 * 1024 * 1024,
         max_mqtt_session_state_bytes: 16 * 1024 * 1024,
         max_mqtt_session_state_bytes_per_tenant: 512 * 1024 * 1024,
         global_mqtt_session_bytes: 1024 * 1024 * 1024,
@@ -679,6 +682,71 @@ fn second_round_ownership() {
                     );
                 }
             }
+        }
+    }
+}
+
+#[test]
+#[ignore = "serial second-round release measurement"]
+fn second_round_retained_subscribe() {
+    if !enabled() {
+        return;
+    }
+    for count in [10, 100, 1000, 4000, 10000] {
+        for (name, filter) in [
+            ("exact", "v1/t/tenant-0/p/product-1/d/device-1/up"),
+            ("plus", "v1/t/tenant-0/p/+/d/device-1/up"),
+            ("selective", "v1/t/tenant-0/p/product-1/#"),
+            ("v1", "v1/#"),
+            ("broad", "#"),
+            ("none", "v1/t/missing/#"),
+        ] {
+            let metrics = Arc::new(Metrics::with_lock_timing());
+            let broker = MqttBroker::new_with_metrics(limits(count), metrics.clone());
+            let owner = auth(0, 1);
+            let mut attachment = broker
+                .attach_v5(&owner, "retained-probe".into(), false, 3600, u16::MAX)
+                .unwrap();
+            {
+                let mut state = lock(&broker.state).unwrap();
+                for index in 0..count {
+                    let topic = format!(
+                        "v1/t/tenant-0/p/product-{}/d/device-{index}/up",
+                        index % 100
+                    );
+                    let retained = RetainedMessage {
+                        message: publish(&topic, 1, None),
+                        tenant_id: owner.device_key.tenant_id.clone(),
+                        origin: None,
+                    };
+                    state.retained_bytes += retained.bytes();
+                    retained_usage_add(&mut state, &retained).unwrap();
+                    state.retained.insert(topic, retained);
+                }
+            }
+            // QoS0 replay isolates retained lookup/preflight/enqueue from artificially
+            // raising persistent inflight above normal transport admission limits.
+            probe(
+                &format!("subscribe_retained_{name}"),
+                count,
+                128,
+                1,
+                || (),
+                |_| {
+                    broker
+                        .subscribe(&attachment.key, attachment.generation, filter, 0)
+                        .unwrap()
+                },
+                |_| {
+                    while attachment.receiver.try_recv().is_ok() {}
+                    broker
+                        .unsubscribe(&attachment.key, attachment.generation, filter)
+                        .unwrap();
+                },
+            );
+            println!("RETAINED_METRICS_BEGIN,{name},{count}");
+            print!("{}", metrics.render());
+            println!("RETAINED_METRICS_END");
         }
     }
 }

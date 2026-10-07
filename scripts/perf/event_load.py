@@ -113,6 +113,7 @@ def main():
     parser.add_argument("--mqtt-v5", action="store_true")
     parser.add_argument("--mqtt-metadata", action="store_true")
     parser.add_argument("--audit-open-loop", action="store_true")
+    parser.add_argument("--lock-metrics", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument(
         "--server-bin", default=os.path.join(ROOT, "target/release/netbaiot-server")
     )
@@ -222,7 +223,7 @@ def main():
             json.dump(workload, output)
         environment = os.environ.copy()
         environment["NETBAIOT_ADMIN_SECRET"] = "ab" * 32
-        environment["NETBAIOT_PERF_LOCK_METRICS"] = "1"
+        environment["NETBAIOT_PERF_LOCK_METRICS"] = "1" if args.lock_metrics else "0"
         environment["NO_PROXY"] = "127.0.0.1,localhost"
         environment["no_proxy"] = "127.0.0.1,localhost"
         sink = subprocess.Popen(
@@ -344,6 +345,7 @@ def main():
                 "mqtt_v5": args.mqtt_v5,
                 "mqtt_metadata": args.mqtt_metadata,
                 "audit_open_loop": args.audit_open_loop,
+                "lock_metrics": args.lock_metrics,
                 "sink_delay_ms": args.sink_delay_ms,
                 "sink_outage_seconds": args.sink_outage_seconds,
                 "sink_outage_phases": outage_phases,

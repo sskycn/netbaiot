@@ -11,7 +11,7 @@ impl MqttBroker {
         qos: u8,
         packet_id: u16,
     ) -> Result<bool> {
-        let state = lock(&self.state)?;
+        let state = self.lock_state(BrokerProbe::Inbound)?;
         check_owner(&state, key, generation)?;
         let session = state.sessions.get(key).ok_or(Error::Internal)?;
         if qos == 2 && session.inbound_qos2.contains_key(&packet_id) {
@@ -32,7 +32,7 @@ impl MqttBroker {
         generation: u64,
         packet_id: u16,
     ) -> Result<bool> {
-        let mut state = lock(&self.state)?;
+        let mut state = self.lock_state(BrokerProbe::Inbound)?;
         check_owner(&state, key, generation)?;
         let session = state.sessions.get_mut(key).ok_or(Error::Internal)?;
         if !matches!(
@@ -68,7 +68,7 @@ impl MqttBroker {
         if packet_id == 0 {
             return Err(Error::Invalid);
         }
-        let state = lock(&self.state)?;
+        let state = self.lock_state(BrokerProbe::Inbound)?;
         check_owner(&state, key, generation)?;
         let session = state.sessions.get(key).ok_or(Error::Internal)?;
         Ok(match session.inbound_qos2.get(&packet_id) {
@@ -88,7 +88,7 @@ impl MqttBroker {
         if message.qos != 2 {
             return Err(Error::Invalid);
         }
-        let mut state = lock(&self.state)?;
+        let mut state = self.lock_state(BrokerProbe::Inbound)?;
         check_owner(&state, key, generation)?;
         let session_state_bytes = {
             let session = state.sessions.get(key).ok_or(Error::Internal)?;
@@ -178,7 +178,7 @@ impl MqttBroker {
         generation: u64,
         packet_id: u16,
     ) -> Result<()> {
-        let mut state = lock(&self.state)?;
+        let mut state = self.lock_state(BrokerProbe::Pubcomp)?;
         check_owner(&state, key, generation)?;
         state
             .sessions
@@ -195,7 +195,7 @@ impl MqttBroker {
         generation: u64,
         packet_id: u16,
     ) -> Result<InboundQos2Action> {
-        let mut state = lock(&self.state)?;
+        let mut state = self.lock_state(BrokerProbe::Pubrel)?;
         check_owner(&state, key, generation)?;
         state.operation_id = state.operation_id.wrapping_add(1).max(1);
         let operation_id = state.operation_id;
@@ -238,7 +238,7 @@ impl MqttBroker {
         generation: u64,
         packet_id: u16,
     ) -> Result<Option<(BrokerMessage, bool)>> {
-        let state = lock(&self.state)?;
+        let state = self.lock_state(BrokerProbe::Inbound)?;
         check_owner(&state, key, generation)?;
         Ok(state
             .sessions
@@ -258,7 +258,7 @@ impl MqttBroker {
         packet_id: u16,
         operation_id: u64,
     ) -> Result<()> {
-        let mut state = lock(&self.state)?;
+        let mut state = self.lock_state(BrokerProbe::Pubrel)?;
         let session = state.sessions.get_mut(key).ok_or(Error::Internal)?;
         if session.incarnation != session_incarnation {
             return Err(Error::Conflict);
@@ -292,7 +292,7 @@ impl MqttBroker {
         packet_id: u16,
         operation_id: u64,
     ) -> Result<()> {
-        let mut state = lock(&self.state)?;
+        let mut state = self.lock_state(BrokerProbe::Pubrel)?;
         let session = state.sessions.get_mut(key).ok_or(Error::Internal)?;
         if session.incarnation != session_incarnation {
             return Err(Error::Conflict);
@@ -319,7 +319,7 @@ impl MqttBroker {
         generation: u64,
         packet_id: u16,
     ) -> Result<()> {
-        let mut state = lock(&self.state)?;
+        let mut state = self.lock_state(BrokerProbe::Pubrel)?;
         check_owner(&state, key, generation)?;
         let message = state
             .sessions
@@ -361,7 +361,7 @@ impl MqttBroker {
         operation_id: u64,
         owner: &DeviceKey,
     ) -> Result<usize> {
-        let mut state = lock(&self.state)?;
+        let mut state = self.lock_state(BrokerProbe::Pubrel)?;
         let message = match state
             .sessions
             .get(key)

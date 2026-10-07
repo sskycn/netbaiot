@@ -72,6 +72,8 @@ def network(args):
         for index, label in enumerate(args.order):
             binary = args.before if label == "A" else args.after
             command = [sys.executable, str(ROOT / "scripts/perf/event_load.py"), "--server-bin", binary, "--loadgen-bin", args.loadgen, "--rate", str(args.rate), "--duration", str(args.duration), "--warmup", str(args.warmup), "--sink-mode", "none", "--subscribe-uplink", "--audit-open-loop"] + cases[case]
+            if not args.lock_metrics:
+                command.append("--no-lock-metrics")
             if case == "plain":
                 command.remove("--subscribe-uplink")
             print("NETWORK", case, index, label, flush=True)
@@ -198,6 +200,7 @@ def main():
     p.add_argument("--duration", type=float, default=10)
     p.add_argument("--warmup", type=float, default=3)
     p.add_argument("--rate", type=float, default=20000)
+    p.add_argument("--lock-metrics", action=argparse.BooleanOptionalAction, default=True)
     p.set_defaults(run=network)
     p = sub.add_parser("summary")
     p.add_argument("--network", nargs="+")

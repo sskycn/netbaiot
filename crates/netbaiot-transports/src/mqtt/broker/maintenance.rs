@@ -3,7 +3,7 @@ use super::*;
 
 impl MqttBroker {
     pub fn usage(&self) -> Result<(usize, usize, usize, usize, usize)> {
-        let state = lock(&self.state)?;
+        let state = self.lock_state(BrokerProbe::Read)?;
         Ok((
             state.sessions.len(),
             state.session_bytes,
@@ -15,7 +15,7 @@ impl MqttBroker {
 
     /// One bounded maintenance pass. The server owns a single periodic task for this broker.
     pub fn tick(&self) -> Result<()> {
-        let mut state = lock(&self.state)?;
+        let mut state = self.lock_state(BrokerProbe::Maintenance)?;
         self.prune_expired(&mut state, TICK_MAINTENANCE_BUDGET)?;
         prune_expired_messages(&mut state, now_ms(), TICK_MAINTENANCE_BUDGET)?;
         wake_global_byte_pending(&mut state, &self.limits)?;
@@ -27,7 +27,7 @@ impl MqttBroker {
     /// Invalidates bounded persistent MQTT state together with the authentication cache/session
     /// boundary. No credentials are retained; only authorization provenance is matched.
     pub fn invalidate_sessions(&self, invalidation: &AuthInvalidation) -> Result<usize> {
-        let mut state = lock(&self.state)?;
+        let mut state = self.lock_state(BrokerProbe::Invalidation)?;
         let keys = state
             .sessions
             .values()
@@ -66,12 +66,12 @@ impl MqttBroker {
 
     /// Read-only diagnostics used by benchmarks and operational capacity probes.
     pub fn matching_subscription_count(&self, topic: &str) -> Result<usize> {
-        let state = lock(&self.state)?;
+        let state = self.lock_state(BrokerProbe::Read)?;
         Ok(state.trie.matching(topic).len())
     }
 
     pub fn matching_retained_count(&self, filter: &str) -> Result<usize> {
-        let state = lock(&self.state)?;
+        let state = self.lock_state(BrokerProbe::Read)?;
         let now = now_ms();
         Ok(state
             .retained
@@ -83,7 +83,8 @@ impl MqttBroker {
     }
 
     pub fn has_retained_topic(&self, topic: &str) -> Result<bool> {
-        Ok(lock(&self.state)?
+        Ok(self
+            .lock_state(BrokerProbe::Read)?
             .retained
             .get(topic)
             .is_some_and(|entry| !entry.message.expired(now_ms())))

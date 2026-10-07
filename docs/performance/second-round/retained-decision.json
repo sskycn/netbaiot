@@ -2,5 +2,6 @@
   "status": "NOT IMPLEMENTED",
   "candidate": "retained topic trie/index",
   "reason": "Lookup matrix10..10000 remains linear for wildcard but topic matcher already removes all allocation. No real ingress retained-replay frequency/lock profile proves a meaningful bottleneck. Direct map lookup/control times are not full subscription/replay or network lock wait; do not introduce index synchronization without that gate. Public ingress self-device ACL further limits matching responsibilities; no security bypass or index added.",
-  "source": "phase-g-summary.json micro retained_*; phase-b matcher retained controls"
+  "source": "phase-g-summary.json micro retained_*; phase-b matcher retained controls",
+  "additional_evidence": "phase-j-summary.json full retained subscribe/replay and lock timing. 10k broad replay is itself 10k deliveries; selective scan has measurable linear cost, but real public-ingress replay frequency and dominant request-path impact remain unproved. No index added."
 }
