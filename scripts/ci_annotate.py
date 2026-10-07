@@ -46,11 +46,16 @@ def main() -> int:
         return 127
 
     assert process.stdout is not None
+    panic_context = False
     for line in process.stdout:
         print(line, end="", flush=True)
         tail.append(line)
-        if ": FAIL" in line:
-            failures.append(line)
+        is_panic = "panicked at" in line
+        if ": FAIL" in line or "... FAILED" in line or is_panic or panic_context:
+            # A panic payload can contain a full metrics/log dump. Keep the
+            # failure location and first payload line visible within the budget.
+            failures.append(line[:600].rstrip() + "\n")
+        panic_context = is_panic
     return_code = process.wait()
     if return_code == 0:
         return 0

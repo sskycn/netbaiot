@@ -1027,7 +1027,10 @@ async fn v3_command_real_mqtt_dedup_http_ack_and_lost_response() {
         lost.command_id
     );
     write_v3_frame(&mut raw, 7, V3FrameType::ResetStream, 0, &cancel).await;
-    drop(raw);
+    // Signal EOF explicitly while keeping the read half owned. Dropping a socket
+    // with unread replies does not establish that the peer observed its closure.
+    // The application still never processes the lost command response.
+    raw.shutdown().await.unwrap();
     assert_eq!(
         business.send_command(&lost).await.unwrap().command_id,
         lost.command_id
@@ -1053,6 +1056,15 @@ async fn v3_command_real_mqtt_dedup_http_ack_and_lost_response() {
         .unwrap();
     let mut observed = String::new();
     let cleanup = tokio::time::timeout(Duration::from_secs(5), async {
+        // Discard unread transport bytes until the half-close is observed by the
+        // server. Keep this barrier inside the existing cleanup deadline.
+        let mut discarded = [0; 4096];
+        loop {
+            match raw.read(&mut discarded).await {
+                Ok(0) | Err(_) => break,
+                Ok(_) => {}
+            }
+        }
         loop {
             let request = http
                 .get(format!("http://{}/api/v1/metrics", addresses[1]))
@@ -1098,6 +1110,7 @@ async fn v3_command_real_mqtt_dedup_http_ack_and_lost_response() {
         lifecycle_log_tail(&root.join("server.log")),
     );
     eprintln!("V3 cleanup completed in {:?}", cleanup_started.elapsed());
+    drop(raw);
     server.start_kill().unwrap();
     let _ = server.wait().await;
     let _ = std::fs::remove_dir_all(root);

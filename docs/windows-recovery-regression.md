@@ -70,6 +70,41 @@ The V2 fixtures now use the repository's existing UDP-first TCP/UDP pair
 reservation helper. This addresses first-subscription startup failures; those
 failures must not be counted as the original post-restart replay timeout.
 
+### Follow-up native port and V3 lifecycle failures
+
+The first merge `a1768c1` exposed an independent Windows subprocess fixture
+failure before workspace tests: UDP automatic allocation returned all 32
+consecutive candidates 49859 through 49890. TCP rejected every one with
+PermissionDenied / WSAEACCES 10013. Repeating UDP :0 allocation therefore did
+not escape the unavailable TCP interval. The fixture now derives separated
+explicit candidates across the dynamic range, retaining the original 32-attempt
+bound and both socket reservations. This is candidate selection, not an
+increase in retries or deadlines.
+[Main native failure](https://github.com/sskycn/netbaiot/actions/runs/37562915617).
+
+The same main revision's Windows developer-experience run failed `demo --once`
+at gateway startup: TCP automatic allocation selected 55903, then UDP binding
+that port returned PermissionDenied. Automatic pair allocation must verify
+both transports and choose another candidate for this Windows-specific bind
+error; an explicitly configured port must still report its failure immediately.
+The original automatic pair binder is byte-identical in baseline `a91a910` and
+original main `1bd5cf8`, so this startup defect also predates the optimization
+range.
+[Main developer-experience failure](https://github.com/sskycn/netbaiot/actions/runs/37562915516).
+
+The output-only follow-up `a17abbc` passed native Windows/Ubuntu but captured a
+macOS V3 cleanup assertion: two connections had started, active connections
+remained one, and stream/queued/reassembly gauges were all zero. The SDK
+connection received GOAWAY, joined its writer, and dropped ActiveV3. The second
+raw socket used for the lost-response scenario had no observed EOF/exit in
+that trace. It is not evidence of an SDK shutdown or stream-accounting leak.
+The trace does not identify why that raw socket's drop had not produced an
+observed peer closure. The fixture now explicitly half-closes its write side
+without processing the command response, then discards transport bytes until
+EOF inside the existing five-second cleanup deadline. This supplies the
+missing close barrier while preserving the lost application response.
+[Follow-up native failure](https://github.com/sskycn/netbaiot/actions/runs/37563890908).
+
 ## First Bad Commit
 
 No deterministic bad optimization commit was established. In particular,
@@ -133,7 +168,13 @@ Ten default parallel suites passed. Forty all-features parallel suites produced
   Restore the normal 5,000ms delivery budget for the V2 restart phase instead
   of inheriting the V1 fixture's 300ms timeout. Runtime defaults, attempt counts,
   retry delays, and historical attempt metadata are unchanged.
-- Reserve a port valid for both TCP and UDP in all seven V2 fixtures.
+- Reserve a port valid for both TCP and UDP in all seven V2 fixtures. Spread
+  retry candidates rather than depending on consecutive UDP automatic ports.
+- For automatic startup ports only, retry Windows WSAEACCES 10013 using a
+  separated candidate and retain the existing 32-attempt limit. Keep explicit
+  port failures immediate and other permission errors non-retryable.
+- Observe raw V3 peer closure within the existing cleanup budget, discarding
+  unread replies without delivering the lost response to the application.
 - Retain bounded failure-tail capture and credential-free session/provider,
   attempt, routing-revision, and event_id diagnostics.
 
@@ -142,6 +183,11 @@ or runtime queue/presence algorithm rollback was introduced.
 
 ## Regression Test
 
+- Startup socket tests force a UDP collision, preserve explicit-port failure,
+  classify Windows 10013 separately from general permission failures, and verify
+  50 actual TCP/UDP paired allocations while retaining both socket owners.
+- Fixture candidate tests cover the exact failed Windows interval, dynamic-range
+  wraparound, and 32 distinct candidates without expanding the attempt budget.
 - A real multiplexed RPC replay into a full receive queue reports Overloaded,
   closes that connection, and preserves the older application-owned delivery.
 - An invalidated old session lease cannot remove replacement presence or its
@@ -167,36 +213,53 @@ production capacity measurement. No new performance optimization was attempted.
 
 ## Validation
 
-PASS on the final Rust implementation `968fe5a`:
+PASS on the final Rust implementation `b7626d7` (local macOS):
 
-- cargo fmt --all -- --check
-- cargo clippy --workspace --all-targets --all-features -- -D warnings
-- cargo test --locked --workspace --all-features
-- cargo xtask check
-- cargo test --locked -p netbaiot-runtime spool::
-- cargo test --locked -p netbaiot-transports mqtt_recovery
-- cargo test --locked -p netbaiot-server --test business_rpc_v2
-- cargo test --release --locked -p netbaiot-runtime ready_retry_queue_scaling
-  -- --ignored --nocapture --test-threads=1
+| Command | Seconds | Result |
+| --- | ---: | --- |
+| cargo fmt --all -- --check | 0.452 | PASS |
+| cargo clippy --workspace --all-targets --all-features -- -D warnings | 0.149 | PASS |
+| cargo test --locked --workspace --all-features | 101.501 | PASS |
+| cargo xtask check | 115.643 | PASS |
+| cargo test --locked -p netbaiot-runtime spool:: | 8.114 | PASS |
+| cargo test --locked -p netbaiot-transports mqtt_recovery | 7.120 | PASS |
+| cargo test --locked -p netbaiot-server --test business_rpc_v2 | 29.054 | PASS |
+| cargo test --release --locked -p netbaiot-runtime ready_retry_queue_scaling -- --ignored --nocapture --test-threads=1 | 8.752 | PASS |
 
-Windows post-fix: authentication 30/30 (73.844s), replay 30/30 (59.046s).
-Serial V2 suite PASS (42.672s), default parallel PASS (22.469s), workspace
-PASS (220.141s).
-[Post-fix repetitions](https://github.com/sskycn/netbaiot/actions/runs/37561300990).
+The opt-in subprocess_graceful_restart_sixty_second_soak also passed: twelve
+five-second restart generations, actual test duration 65.53s. Functional
+workspace tests exercise slow sinks, outage, SIGKILL loss, spool failure and
+subprocess replay. This is bounded functional/soak evidence, not capacity data.
 
-Native recovery and lifecycle: Windows PASS, Ubuntu PASS, macOS PASS.
-[Three-platform validation](https://github.com/sskycn/netbaiot/actions/runs/37561300959).
+Final Windows `b7626d7`: authentication 30/30, zero failures (75.781s), replay
+30/30, zero failures (42.563s), both failure rates 0%. Serial V2 suite PASS
+(43.875s), default parallel PASS (22.578s), workspace PASS (260.843s).
+[Final Windows repetitions](https://github.com/sskycn/netbaiot/actions/runs/37565914325).
+
+The V3 lost-response lifecycle fixture passed thirty repetitions on each of
+Windows and macOS. The formerly failing Windows subprocess fixture passed
+thirty repetitions. All three native platform jobs then passed at `8ce3879`.
+[Fixture repetitions](https://github.com/sskycn/netbaiot/actions/runs/37565456333).
+
+Final native recovery and lifecycle at `b7626d7`: Windows PASS, Ubuntu PASS,
+macOS PASS.
+[Three-platform recovery validation](https://github.com/sskycn/netbaiot/actions/runs/37565914379).
+Native developer experience, including actual demo/first-use startup: all three
+platforms PASS.
+[Three-platform developer validation](https://github.com/sskycn/netbaiot/actions/runs/37565914367).
 Rust checks, including MSRV/stable and MQTT reference-client verification, PASS.
-[Rust validation](https://github.com/sskycn/netbaiot/actions/runs/37561301529).
+[Rust validation](https://github.com/sskycn/netbaiot/actions/runs/37565915011).
 
-FAIL: historical pre-fix failures above, plus an intermediate ACK-observation
-polling failure fixed by bounding its cadence. The first sweep attempt failed
-to check out short SHAs and is excluded; the measured sweep uses full SHAs.
+FAIL: historical pre-fix failures above, an intermediate ACK-observation
+polling failure fixed by bounding its cadence, and the independently captured
+follow-up port/V3 fixture failures. The first sweep attempt failed to check out
+short SHAs and is excluded; the measured sweep uses full SHAs.
 
-BLOCKED: no required validation. Additional long-running fuzz/load/soak and
-connection-memory measurements were not run; decoder/transport algorithms were
-not changed. Exact attribution of the original replay Elapsed to the demonstrated
-budget mechanism remains unproven, as explicitly noted above.
+BLOCKED: no required validation. Long-running fuzz, throughput/load,
+connection-memory measurements and longer soak runs were not run. MQTT Device
+Profile CI fuzz smoke passed on the initial merge `a1768c1`; no decoder or wire
+algorithm was changed. Exact attribution of the original replay Elapsed to the
+demonstrated budget mechanism remains unproven, as explicitly noted above.
 
 Manual stage-sweep and thirty-repeat workflows are retained for reproducibility.
-Temporary diagnostic overlays and automatic investigation workflows are removed.
+Temporary diagnostic overlays and automatic investigation triggers are removed.
