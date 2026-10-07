@@ -1,3 +1,5 @@
+mod common;
+
 use async_trait::async_trait;
 use hmac::{Hmac, Mac};
 use netbaiot_client::NetbaIoTClient;
@@ -29,6 +31,15 @@ use tokio::{
     net::{TcpListener, TcpStream, UdpSocket},
     process::Command,
 };
+
+async fn reserve_business_ports() -> (Vec<TcpListener>, UdpSocket) {
+    let (ingress, udp) = common::reserve_tcp_udp_pair().await;
+    let mut tcp = vec![ingress];
+    for _ in 0..2 {
+        tcp.push(TcpListener::bind("127.0.0.1:0").await.unwrap());
+    }
+    (tcp, udp)
+}
 
 async fn write_rpc(
     socket: &mut TcpStream,
@@ -88,10 +99,7 @@ async fn command_pressure_preserves_auth_invalidation_and_event_ack() {
     let root = std::env::temp_dir().join(format!("netbaiot-rpc-pressure-{}", uuid::Uuid::new_v4()));
     let mut config: Config =
         serde_json::from_str(include_str!("../../../configs/development.json")).unwrap();
-    let mut reservations = Vec::new();
-    for _ in 0..3 {
-        reservations.push(TcpListener::bind("127.0.0.1:0").await.unwrap());
-    }
+    let (reservations, udp_reservation) = reserve_business_ports().await;
     let addresses = reservations
         .iter()
         .map(|listener| listener.local_addr().unwrap())
@@ -171,6 +179,7 @@ async fn command_pressure_preserves_auth_invalidation_and_event_ack() {
         max_auth_control_offline_ms: 30_000,
     });
     drop(reservations);
+    drop(udp_reservation);
     let path = write_config(&root, &config);
     let mut server = Command::new(env!("CARGO_BIN_EXE_netbaiot-server"))
         .arg(&path)
@@ -299,10 +308,7 @@ async fn commands_role_dispatches_to_real_tcp_and_shares_http_dedup() {
         std::env::temp_dir().join(format!("netbaiot-rpc-tcp-command-{}", uuid::Uuid::new_v4()));
     let mut config: Config =
         serde_json::from_str(include_str!("../../../configs/development.json")).unwrap();
-    let mut reservations = Vec::new();
-    for _ in 0..3 {
-        reservations.push(TcpListener::bind("127.0.0.1:0").await.unwrap());
-    }
+    let (reservations, udp_reservation) = reserve_business_ports().await;
     let addresses = reservations
         .iter()
         .map(|listener| listener.local_addr().unwrap())
@@ -358,6 +364,7 @@ async fn commands_role_dispatches_to_real_tcp_and_shares_http_dedup() {
     });
     config.spool_directory = root.join("spool");
     drop(reservations);
+    drop(udp_reservation);
     let path = write_config(&root, &config);
     let mut server = Command::new(env!("CARGO_BIN_EXE_netbaiot-server"))
         .arg(&path)
@@ -451,10 +458,7 @@ async fn business_rpc_command_mqtt_dedup_and_ack_use_real_sockets() {
     let root = std::env::temp_dir().join(format!("netbaiot-rpc-command-{}", uuid::Uuid::new_v4()));
     let mut config: Config =
         serde_json::from_str(include_str!("../../../configs/development.json")).unwrap();
-    let mut reservations = Vec::new();
-    for _ in 0..3 {
-        reservations.push(TcpListener::bind("127.0.0.1:0").await.unwrap());
-    }
+    let (reservations, udp_reservation) = reserve_business_ports().await;
     let addresses = reservations
         .iter()
         .map(|listener| listener.local_addr().unwrap())
@@ -480,6 +484,7 @@ async fn business_rpc_command_mqtt_dedup_and_ack_use_real_sockets() {
     });
     config.spool_directory = root.join("spool");
     drop(reservations);
+    drop(udp_reservation);
     let path = write_config(&root, &config);
     let mut server = Command::new(env!("CARGO_BIN_EXE_netbaiot-server"))
         .arg(&path)
@@ -953,10 +958,7 @@ async fn one_socket_authentication_progresses_while_event_ack_waits() {
         std::env::temp_dir().join(format!("netbaiot-business-rpc-v2-{}", uuid::Uuid::new_v4()));
     let mut config: Config =
         serde_json::from_str(include_str!("../../../configs/development.json")).unwrap();
-    let mut reservations = Vec::new();
-    for _ in 0..3 {
-        reservations.push(TcpListener::bind("127.0.0.1:0").await.unwrap());
-    }
+    let (reservations, udp_reservation) = reserve_business_ports().await;
     let addresses = reservations
         .iter()
         .map(|listener| listener.local_addr().unwrap())
@@ -983,6 +985,7 @@ async fn one_socket_authentication_progresses_while_event_ack_waits() {
     config.spool_directory = root.join("spool");
     config.limits.sink_timeout_ms = 8_000;
     drop(reservations);
+    drop(udp_reservation);
     let path = write_config(&root, &config);
     let diagnostics = RecoveryDiagnostics(root.join("server-diagnostics.log"));
     let mut server = Command::new(env!("CARGO_BIN_EXE_netbaiot-server"))
@@ -1050,6 +1053,18 @@ async fn one_socket_authentication_progresses_while_event_ack_waits() {
         .await
         .unwrap();
     assert_eq!(handler.calls.load(Ordering::Relaxed), 4);
+    // The no-recv authentication check is complete. Drain this responsibility
+    // before deliberately reconnecting the provider: its one-item SDK receive
+    // queue otherwise rejects replay and starts another reset-sync cycle.
+    let second_delivery = tokio::time::timeout(Duration::from_secs(5), events.recv())
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        second_delivery.delivery.event.device.device_id,
+        DeviceId::new("two").unwrap()
+    );
+    second_delivery.ack().await.unwrap();
     let legacy = NetbaIoTClient::builder()
         .endpoint(format!("http://{}", addresses[1]))
         .token("a".repeat(64))
@@ -1066,6 +1081,16 @@ async fn one_socket_authentication_progresses_while_event_ack_waits() {
             .is_err(),
         "V1 must not steal V2 sink ownership"
     );
+    tokio::time::timeout(Duration::from_secs(5), async {
+        loop {
+            if legacy.runtime().status().await.unwrap().pending_required == 0 {
+                break;
+            }
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .unwrap();
     handler.allowed.store(false, Ordering::SeqCst);
     handler.revision.store(2, Ordering::SeqCst);
     let invalidated = business
@@ -1078,6 +1103,9 @@ async fn one_socket_authentication_progresses_while_event_ack_waits() {
         .await
         .unwrap();
     assert_eq!(invalidated.applied_revision, 2);
+    // Each authentication generation has one SDK owner; retired owners must not
+    // automatically reconnect with the replacement's ClientId.
+    drop(first);
     assert!(device_result(addresses[0], "one").await.is_err());
     handler.allowed.store(true, Ordering::SeqCst);
     handler.revision.store(3, Ordering::SeqCst);
@@ -1095,6 +1123,7 @@ async fn one_socket_authentication_progresses_while_event_ack_waits() {
             )
         )
     ));
+    drop(_recovered);
     // A gap invalidates live authorization before the SDK's reset sync can
     // return the replacement provider to Serving.
     let mut recovery_attempts = 0usize;
@@ -1139,10 +1168,12 @@ async fn one_socket_authentication_progresses_while_event_ack_waits() {
         .unwrap();
     assert!(
         connection.connected,
-        "connection={connection:?}, shutdown_elapsed={:?}, provider_ready={}, device_connected={}",
+        "connection={connection:?}, shutdown_elapsed={:?}, provider_ready={}, device_connected={}, queued_deliveries={}, last_connection_error={:?}",
         shutdown_started.elapsed(),
         business.ready(),
-        _recovered_after_gap.mqtt_connected()
+        _recovered_after_gap.mqtt_connected(),
+        events.len(),
+        business.last_connection_error()
     );
     if !already_joined {
         shutdown.await;
@@ -1228,10 +1259,7 @@ async fn zero_offline_grace_revokes_live_session_and_requires_reset_sync() {
     ));
     let mut config: Config =
         serde_json::from_str(include_str!("../../../configs/development.json")).unwrap();
-    let mut reservations = Vec::new();
-    for _ in 0..3 {
-        reservations.push(TcpListener::bind("127.0.0.1:0").await.unwrap());
-    }
+    let (reservations, udp_reservation) = reserve_business_ports().await;
     let addresses = reservations
         .iter()
         .map(|listener| listener.local_addr().unwrap())
@@ -1257,6 +1285,7 @@ async fn zero_offline_grace_revokes_live_session_and_requires_reset_sync() {
     });
     config.spool_directory = root.join("spool");
     drop(reservations);
+    drop(udp_reservation);
     let path = write_config(&root, &config);
     let mut server = Command::new(env!("CARGO_BIN_EXE_netbaiot-server"))
         .arg(&path)
@@ -1362,10 +1391,7 @@ async fn mtls_verifies_server_and_maps_exact_client_certificate() {
     ));
     let mut config: Config =
         serde_json::from_str(include_str!("../../../configs/development.json")).unwrap();
-    let mut reservations = Vec::new();
-    for _ in 0..3 {
-        reservations.push(TcpListener::bind("127.0.0.1:0").await.unwrap());
-    }
+    let (reservations, udp_reservation) = reserve_business_ports().await;
     let addresses = reservations
         .iter()
         .map(|listener| listener.local_addr().unwrap())
@@ -1421,6 +1447,7 @@ async fn mtls_verifies_server_and_maps_exact_client_certificate() {
         max_auth_control_offline_ms: 0,
     });
     drop(reservations);
+    drop(udp_reservation);
     let path = write_config(&root, &config);
     let mut server = Command::new(env!("CARGO_BIN_EXE_netbaiot-server"))
         .arg(&path)
@@ -1607,10 +1634,7 @@ async fn v1_spooled_required_event_replays_to_v2_with_stable_event_id() {
     ));
     let mut config: Config =
         serde_json::from_str(include_str!("../../../configs/development.json")).unwrap();
-    let mut reservations = Vec::new();
-    for _ in 0..3 {
-        reservations.push(TcpListener::bind("127.0.0.1:0").await.unwrap());
-    }
+    let (reservations, udp_reservation) = reserve_business_ports().await;
     let addresses = reservations
         .iter()
         .map(|socket| socket.local_addr().unwrap())
@@ -1624,6 +1648,7 @@ async fn v1_spooled_required_event_replays_to_v2_with_stable_event_id() {
     config.limits.sink_timeout_ms = 300;
     config.limits.shutdown_drain_timeout_ms = 300;
     drop(reservations);
+    drop(udp_reservation);
     let path = write_config(&root, &config);
     let diagnostics = RecoveryDiagnostics(root.join("server-diagnostics.log"));
     let start = || {

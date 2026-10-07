@@ -413,14 +413,14 @@ impl Sessions {
         tracing::debug!(
             ?device,
             live_exists = live.is_some(),
-            live_generation = live.map(|session| session.generation),
-            cancelled = live.map(|session| session.cancel.is_cancelled()),
-            auth_generation = live.map(|session| session.auth.auth_generation),
-            credential_version = live.map(|session| session.auth.credential_version),
+            live_generation = ?live.map(|session| session.generation),
+            cancelled = ?live.map(|session| session.cancel.is_cancelled()),
+            auth_generation = ?live.map(|session| session.auth.auth_generation),
+            credential_version = ?live.map(|session| session.auth.credential_version),
             presence_exists = presence.is_some(),
-            presence_connected = presence.map(|value| value.connected),
-            presence_last_seen = presence.map(|value| value.last_seen),
-            presence_generation = presence.and_then(|value| value.session_generation),
+            presence_connected = ?presence.map(|value| value.connected),
+            presence_last_seen = ?presence.map(|value| value.last_seen),
+            presence_generation = ?presence.and_then(|value| value.session_generation),
             "connection registry diagnostic"
         );
         Ok(DeviceConnectionInfo {
