@@ -1006,6 +1006,80 @@ mod tests {
         }
     }
 
+    #[tokio::test]
+    async fn restore_before_worker_start_preserves_id_and_application_ack_ownership() {
+        assert_restored_business_delivery(false).await;
+    }
+
+    #[tokio::test]
+    async fn restore_wakes_parked_worker_before_business_sink_claim() {
+        assert_restored_business_delivery(true).await;
+    }
+
+    async fn assert_restored_business_delivery(park_worker: bool) {
+        let limits = Arc::new(Limits::default());
+        let sink = crate::BusinessRpcEventSink::new();
+        let id = SinkId::new("tcp-rpc").unwrap();
+        let bus = EventBus::new_paused(
+            limits.clone(),
+            Arc::new(Metrics::default()),
+            vec![SinkDefinition::bounded(
+                id.clone(),
+                SinkDeliveryMode::ConfirmedRequired,
+                sink.clone(),
+                &limits,
+            )],
+            vec![RouteDefinition {
+                tenant: None,
+                sinks: vec![id.clone()],
+            }],
+            7,
+        )
+        .unwrap();
+        let worker = bus.clone().run_sink(id.clone());
+        tokio::pin!(worker);
+        if park_worker {
+            // Poll through the empty-queue check and into the notification wait.
+            assert!(futures_util::poll!(worker.as_mut()).is_pending());
+        }
+        let event = event(8);
+        let event_id = event.event_id;
+        bus.restore(vec![SpoolRecord {
+            event,
+            pending_sinks: vec![id.clone()],
+            routing_revision: 3,
+            accepted_at: now_ms(),
+            attempts: BTreeMap::from([(id, 2)]),
+        }])
+        .unwrap();
+        // Own the restored delivery even when no business stream exists yet.
+        assert!(futures_util::poll!(worker.as_mut()).is_pending());
+        assert_eq!(bus.usage().unwrap().pending_required, 1);
+        let (sender, mut receiver) = tokio::sync::mpsc::channel(1);
+        let generation = sink.claim(sender, EventFilter::default()).unwrap();
+        let consume = async {
+            let request = receiver.recv().await.unwrap();
+            assert_eq!(request.delivery.event.event_id, event_id);
+            assert_eq!(request.delivery.attempt, 3);
+            assert_eq!(bus.spool_records().unwrap()[0].routing_revision, 3);
+            assert_eq!(bus.usage().unwrap().pending_required, 1);
+            request.result.send(Ok(SinkAck)).unwrap();
+            assert!(
+                bus.wait_required_drained(Duration::from_secs(1))
+                    .await
+                    .unwrap()
+            );
+            sink.release(generation).unwrap();
+            bus.stop.cancel();
+        };
+        tokio::time::timeout(Duration::from_secs(1), async {
+            tokio::join!(worker, consume);
+        })
+        .await
+        .unwrap();
+        assert_eq!(bus.usage().unwrap(), EventBusUsage::default());
+    }
+
     struct Signal {
         calls: AtomicUsize,
         block: Option<Arc<tokio::sync::Notify>>,

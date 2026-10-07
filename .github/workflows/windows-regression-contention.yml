@@ -29,16 +29,15 @@ jobs:
           root = pathlib.Path('target/evidence/windows-contention')
           root.mkdir(parents=True, exist_ok=True)
           samples = []
-          count = 10
+          count = 40
           while len(samples) < count:
               start = time.monotonic()
-              p = subprocess.run(['cargo', 'test', '--locked', '-p', 'netbaiot-server', '--test', 'business_rpc_v2'], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors='replace')
+              p = subprocess.run(['cargo', 'test', '--locked', '--all-features', '-p', 'netbaiot-server', '--test', 'business_rpc_v2'], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors='replace')
               (root / f'parallel-{len(samples)+1}.log').write_text(p.stdout, encoding='utf-8')
               sample = {'pass': p.returncode == 0, 'duration_s': round(time.monotonic()-start,3)}
               samples.append(sample)
               print(json.dumps({'iteration':len(samples), **sample}), flush=True)
-              if p.returncode and count == 10:
-                  count = 40
+              if p.returncode and sum(not s['pass'] for s in samples) == 1:
                   print('::notice title=parallel-state::'+json.dumps({'tail':p.stdout[-12000:]}).replace('%','%25'), flush=True)
           result = {'pass':sum(s['pass'] for s in samples), 'fail':sum(not s['pass'] for s in samples), 'samples':samples}
           (root / 'results.json').write_text(json.dumps(result,indent=2), encoding='utf-8')

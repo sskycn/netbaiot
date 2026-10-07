@@ -239,6 +239,12 @@ impl Sessions {
             command_ready: Arc::new(AtomicBool::new(transport == Transport::Tcp)),
         };
         if let Some(old) = state.sessions.insert(device.clone(), endpoint) {
+            tracing::debug!(
+                ?device,
+                generation,
+                previous_generation = old.generation,
+                "session takeover diagnostic"
+            );
             old.cancel.cancel();
         }
         state.generation = generation;
@@ -306,6 +312,8 @@ impl Sessions {
                 AuthInvalidation::All => true,
             };
             if matches && !endpoint.cancel.is_cancelled() {
+                tracing::debug!(device=?auth.device_key, generation=endpoint.generation,
+                    auth_generation=auth.auth_generation, "session invalidation diagnostic");
                 endpoint.cancel.cancel();
                 disconnected += 1;
             }
@@ -530,6 +538,43 @@ impl Drop for SessionLease {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn invalidated_old_generation_cannot_change_replacement_presence() {
+        let sessions = Sessions::new(Arc::new(Limits::default()));
+        let identity = auth("one");
+        let (old, _) = sessions
+            .register(identity.clone(), Transport::Mqtt)
+            .unwrap();
+        sessions
+            .disconnect_matching(&AuthInvalidation::All)
+            .unwrap();
+        assert!(old.cancel.is_cancelled());
+        let (current, _) = sessions.register(identity, Transport::Mqtt).unwrap();
+        drop(old);
+        sessions
+            .state
+            .lock()
+            .unwrap()
+            .presence
+            .get_mut(&current.device)
+            .unwrap()
+            .last_seen = 0;
+        sessions.touch(&current.device, Transport::Udp).unwrap();
+        let live = sessions.lookup(&current.device).unwrap().unwrap();
+        let presence = sessions.presence(&current.device).unwrap().unwrap();
+        let connection = sessions.connection(&current.device).unwrap();
+        assert_eq!(live.generation, current.generation);
+        assert!(!live.cancel.is_cancelled());
+        assert!(presence.connected && connection.connected);
+        assert_eq!(presence.session_generation, Some(current.generation));
+        assert_eq!(connection.session_generation, Some(current.generation));
+        assert_eq!(presence.transport, Transport::Mqtt);
+        let device = current.device.clone();
+        drop(current);
+        assert!(sessions.lookup(&device).unwrap().is_none());
+        assert!(!sessions.connection(&device).unwrap().connected);
+    }
 
     #[test]
     fn presence_queries_expire_only_the_target_and_keep_active_sessions() {
