@@ -13,7 +13,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        commit: [a91a910, 5d612af, 41eb71f, 6b559ac, 4ac37d7, 355b974, 7b4e3c4, 302912c, 1bd5cf8]
+        commit: [a91a9103f13a32058c35c177bb4765026c277040, 5d612af1e6f7530078e6819fa2114a8fa524b61f, 41eb71fd97d8008d6f3c1a5da45d18412df0dcf4, 6b559ac9470d13f4506557bdf47e3ea5aaae5c9a, 4ac37d7157952b861e152d03de3d265736b760b8, 355b9743a92193fa28241e48a9a0d2b81dabe47b, 7b4e3c47c909cd24a8a381eb377d6ef38905c143, 302912c59fbebfc27eabf8c653b0ab3620bde658, 1bd5cf8e15293bbed0ea8f80929f5405cf5a2751]
     runs-on: windows-latest
     timeout-minutes: 45
     steps:

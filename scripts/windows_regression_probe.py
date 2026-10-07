@@ -41,6 +41,8 @@ def main():
         if result.returncode:
             tail = (root / f"{name}-{iteration}.log").read_text(encoding="utf-8", errors="replace")[-2800:]
             print(tail, flush=True)
+            if iteration == 1:
+                annotation("regression-failure", {"commit": args.commit, "test": name, "tail": tail})
         return {"pass": result.returncode == 0, "duration_s": round(duration, 3)}
 
     base = ["cargo", "test", "--locked", "-p", "netbaiot-server", "--test", "business_rpc_v2"]
