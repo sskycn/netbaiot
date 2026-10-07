@@ -781,17 +781,31 @@ impl EventBus {
         let queue_len = sink.used_count.saturating_sub(sink.inflight);
         let now = Instant::now();
         let selection_started = self.metrics.lock_timing_enabled().then(Instant::now);
-        // Ready work remains FIFO. Due retries join the tail; later admissions
-        // cannot overtake them. Both queues remain covered by the same quotas.
-        while sink
-            .delayed
-            .first_key_value()
-            .is_some_and(|(deadline, _)| *deadline <= now)
-        {
-            let Some((_, mut records)) = sink.delayed.pop_first() else {
+        // Fill the worker's immediate demand, while promoting at least one due
+        // retry even with existing ready work. This bounds each lock acquisition
+        // and prevents new admissions from indefinitely postponing old retries.
+        // Deadline order and FIFO within each bucket remain authoritative.
+        let demand = sink.definition.concurrency.saturating_sub(sink.inflight);
+        let promotion_budget = demand.saturating_sub(sink.ready.len()).max(1);
+        let mut remaining = promotion_budget;
+        for _ in 0..promotion_budget {
+            let Some(mut entry) = sink.delayed.first_entry() else {
                 break;
             };
-            sink.ready.append(&mut records);
+            if *entry.key() > now {
+                break;
+            }
+            let promoted = entry.get().len().min(remaining);
+            if promoted == entry.get().len() {
+                let (_, mut records) = entry.remove_entry();
+                sink.ready.append(&mut records);
+            } else {
+                sink.ready.extend(entry.get_mut().drain(..promoted));
+            }
+            remaining -= promoted;
+            if remaining == 0 {
+                break;
+            }
         }
         let record = sink.ready.pop_front();
         if let Some(record) = &record {
@@ -1008,6 +1022,119 @@ mod tests {
         async fn deliver(&self, _: DeliveryEnvelope) -> std::result::Result<SinkAck, SinkError> {
             Ok(SinkAck)
         }
+    }
+
+    #[test]
+    fn due_promotion_bounds_each_take_and_preserves_deadline_fifo() {
+        for distinct in [false, true] {
+            let limits = Arc::new(Limits::default());
+            let id = SinkId::new("bounded-due").unwrap();
+            let mut definition = SinkDefinition::bounded(
+                id.clone(),
+                SinkDeliveryMode::ConfirmedRequired,
+                Arc::new(Ack),
+                &limits,
+            );
+            definition.concurrency = 4;
+            let bus = EventBus::new_paused(
+                limits,
+                Arc::new(Metrics::default()),
+                vec![definition.clone()],
+                vec![RouteDefinition {
+                    tenant: None,
+                    sinks: vec![id.clone()],
+                }],
+                1,
+            )
+            .unwrap();
+            for _ in 0..128 {
+                bus.publish(event(8)).unwrap();
+            }
+            let expected = {
+                let mut state = bus.state.lock().unwrap();
+                let sink = state.sinks.get_mut(&id).unwrap();
+                let records: Vec<_> = sink.ready.drain(..).collect();
+                let ids = records
+                    .iter()
+                    .map(|record| record.event.event_id)
+                    .collect::<Vec<_>>();
+                let due = Instant::now() - Duration::from_secs(1);
+                for (index, mut record) in records.into_iter().enumerate() {
+                    record.next_attempt =
+                        due + Duration::from_nanos(if distinct { index as u64 } else { 0 });
+                    sink.delayed
+                        .entry(record.next_attempt)
+                        .or_default()
+                        .push_back(record);
+                }
+                ids
+            };
+            for (index, expected_id) in expected.into_iter().enumerate() {
+                let record = bus.take_ready(&id).unwrap().unwrap();
+                assert_eq!(record.event.event_id, expected_id);
+                if index == 0 {
+                    let state = bus.state.lock().unwrap();
+                    let sink = &state.sinks[&id];
+                    assert_eq!(sink.ready.len(), 3);
+                    assert_eq!(sink.delayed.values().map(VecDeque::len).sum::<usize>(), 124);
+                }
+                if index < 127 {
+                    assert_eq!(bus.next_ready_delay(&id).unwrap(), Some(Duration::ZERO));
+                }
+                bus.complete(&id, record, Ok(SinkAck), &definition).unwrap();
+            }
+            assert_eq!(bus.usage().unwrap(), EventBusUsage::default());
+            assert_eq!(bus.next_ready_delay(&id).unwrap(), None);
+        }
+    }
+
+    #[test]
+    fn due_retry_progresses_with_continuous_new_ready_admissions() {
+        let limits = Arc::new(Limits::default());
+        let id = SinkId::new("fair-due").unwrap();
+        let definition = SinkDefinition::bounded(
+            id.clone(),
+            SinkDeliveryMode::ConfirmedRequired,
+            Arc::new(Ack),
+            &limits,
+        );
+        let bus = EventBus::new_paused(
+            limits,
+            Arc::new(Metrics::default()),
+            vec![definition.clone()],
+            vec![RouteDefinition {
+                tenant: None,
+                sinks: vec![id.clone()],
+            }],
+            1,
+        )
+        .unwrap();
+        for _ in 0..128 {
+            bus.publish(event(8)).unwrap();
+        }
+        let due_ids = {
+            let mut state = bus.state.lock().unwrap();
+            let sink = state.sinks.get_mut(&id).unwrap();
+            let deadline = Instant::now() - Duration::from_secs(1);
+            let mut ids = Vec::new();
+            for _ in 0..8 {
+                let mut record = sink.ready.pop_back().unwrap();
+                ids.push(record.event.event_id);
+                record.next_attempt = deadline;
+                sink.delayed.entry(deadline).or_default().push_back(record);
+            }
+            ids
+        };
+        let mut observed = Vec::new();
+        for _ in 0..256 {
+            let record = bus.take_ready(&id).unwrap().unwrap();
+            if due_ids.contains(&record.event.event_id) {
+                observed.push(record.event.event_id);
+            }
+            bus.complete(&id, record, Ok(SinkAck), &definition).unwrap();
+            bus.publish(event(8)).unwrap();
+        }
+        assert_eq!(observed, due_ids);
     }
 
     #[tokio::test]
