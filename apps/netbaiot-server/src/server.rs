@@ -745,18 +745,47 @@ pub(crate) fn shutdown_can_finish(
     mqtt_recovery_safe && eventbus_required_work_safe
 }
 
-// Port-zero allocation is independent for TCP and UDP. Retry before starting
-// any listeners/workers; explicit configured ports still fail immediately.
+// Automatic TCP/UDP allocation must verify both protocols before starting any
+// listeners/workers. Explicit configured ports still fail immediately.
 async fn bind_device_pair(address: SocketAddr) -> Result<(TcpListener, UdpSocket)> {
-    for _ in 0..32 {
-        let tcp = TcpListener::bind(address).await.map_err(|error| {
-            tracing::error!(listener="device_tcp",%address,error_kind=?error.kind(),"listener bind failed"); Error::Unavailable
-        })?;
+    bind_device_pair_candidates(address, address).await
+}
+
+fn retryable_auto_port_error(error: &std::io::Error, automatic: bool, windows: bool) -> bool {
+    automatic
+        && (error.kind() == std::io::ErrorKind::AddrInUse
+            || (windows && error.raw_os_error() == Some(10013)))
+}
+
+fn next_auto_port(port: u16) -> u16 {
+    // After one OS-selected candidate, spread probes across the dynamic range.
+    // The arithmetic stays in 49152..=65535, and 509 is coprime to 16384.
+    (49_152 + (u32::from(port).saturating_sub(49_152) + 509) % 16_384) as u16
+}
+
+async fn bind_device_pair_candidates(
+    address: SocketAddr,
+    mut candidate: SocketAddr,
+) -> Result<(TcpListener, UdpSocket)> {
+    for attempt in 1..=32 {
+        let tcp = match TcpListener::bind(candidate).await {
+            Ok(tcp) => tcp,
+            Err(error) if retryable_auto_port_error(&error, address.port() == 0, cfg!(windows)) => {
+                tracing::debug!(listener="device_tcp",address=%candidate,attempt,error_kind=?error.kind(),raw_os_error=?error.raw_os_error(),"automatic port candidate unavailable");
+                candidate.set_port(next_auto_port(candidate.port()));
+                continue;
+            }
+            Err(error) => {
+                tracing::error!(listener="device_tcp",address=%candidate,error_kind=?error.kind(),"listener bind failed");
+                return Err(Error::Unavailable);
+            }
+        };
         let bound = tcp.local_addr().map_err(|_| Error::Unavailable)?;
         match UdpSocket::bind(bound).await {
             Ok(udp) => return Ok((tcp, udp)),
-            Err(error) if address.port() == 0 && error.kind() == std::io::ErrorKind::AddrInUse => {
-                continue;
+            Err(error) if retryable_auto_port_error(&error, address.port() == 0, cfg!(windows)) => {
+                tracing::debug!(listener="device_udp",address=%bound,attempt,error_kind=?error.kind(),raw_os_error=?error.raw_os_error(),"automatic port candidate unavailable");
+                candidate.set_port(next_auto_port(bound.port()));
             }
             Err(error) => {
                 tracing::error!(listener="device_udp",address=%bound,error_kind=?error.kind(),"listener bind failed");
@@ -764,5 +793,63 @@ async fn bind_device_pair(address: SocketAddr) -> Result<(TcpListener, UdpSocket
             }
         }
     }
+    tracing::error!(%address,"automatic TCP/UDP port selection exhausted 32 candidates");
     Err(Error::Unavailable)
+}
+
+#[cfg(test)]
+mod paired_port_tests {
+    use super::*;
+
+    #[test]
+    fn automatic_retry_policy_is_port_and_platform_explicit() {
+        let collision = std::io::Error::from(std::io::ErrorKind::AddrInUse);
+        let windows_exclusion = std::io::Error::from_raw_os_error(10013);
+        let permission = std::io::Error::from(std::io::ErrorKind::PermissionDenied);
+        for automatic in [false, true] {
+            for windows in [false, true] {
+                assert_eq!(
+                    retryable_auto_port_error(&collision, automatic, windows),
+                    automatic
+                );
+                assert_eq!(
+                    retryable_auto_port_error(&windows_exclusion, automatic, windows),
+                    automatic && windows
+                );
+                assert!(!retryable_auto_port_error(&permission, automatic, windows));
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn automatic_pair_skips_reserved_udp_candidate_and_keeps_both_sockets() {
+        let blocked = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+        let first = blocked.local_addr().unwrap();
+        let requested = SocketAddr::new(first.ip(), 0);
+        let (tcp, udp) = bind_device_pair_candidates(requested, first).await.unwrap();
+        assert_ne!(tcp.local_addr().unwrap(), first);
+        assert_eq!(tcp.local_addr().unwrap(), udp.local_addr().unwrap());
+        assert_eq!(blocked.local_addr().unwrap(), first);
+    }
+
+    #[tokio::test]
+    async fn configured_pair_does_not_move_away_from_reserved_udp_port() {
+        let blocked = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+        let address = blocked.local_addr().unwrap();
+        assert!(matches!(
+            bind_device_pair(address).await,
+            Err(Error::Unavailable)
+        ));
+    }
+
+    #[tokio::test]
+    async fn automatic_pair_repeatedly_reserves_matching_addresses() {
+        for _ in 0..50 {
+            let (tcp, udp) = bind_device_pair("127.0.0.1:0".parse().unwrap())
+                .await
+                .unwrap();
+            assert_ne!(tcp.local_addr().unwrap().port(), 0);
+            assert_eq!(tcp.local_addr().unwrap(), udp.local_addr().unwrap());
+        }
+    }
 }

@@ -2,7 +2,7 @@ name: Native developer experience
 on:
   pull_request:
   push:
-    branches: [main, codex/developer-experience-phase1]
+    branches: [main, codex/developer-experience-phase1, codex/windows-native-prelude-diagnostics]
   workflow_dispatch:
 permissions:
   contents: read

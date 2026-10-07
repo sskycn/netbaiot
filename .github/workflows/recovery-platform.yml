@@ -27,21 +27,6 @@ jobs:
           python scripts/ci_annotate.py --title "Native subprocess recovery failed" -- cargo test --locked -p netbaiot-server --test server subprocess_ 2>&1 | tee -a native-recovery.log
           python scripts/ci_annotate.py --title "Native recovery ownership failed" -- cargo test --locked -p netbaiot-server --test server recovery_directory_is_exclusive 2>&1 | tee -a native-recovery.log
           python scripts/ci_annotate.py --title "Native startup lifecycle failed" -- cargo test --locked -p netbaiot-server --test server startup_failures_and_dropped_run_future 2>&1 | tee -a native-recovery.log
-      - name: Verify fixture lifecycle repeatedly
-        if: github.ref == 'refs/heads/codex/windows-native-prelude-diagnostics' && runner.os != 'Linux'
-        shell: bash
-        run: |
-          set -o pipefail
-          for sample in $(seq 1 30); do
-            echo "V3 lifecycle sample ${sample}/30"
-            python scripts/ci_annotate.py --title "V3 repeated lifecycle failed" -- cargo test --locked -p netbaiot-server --test business_rpc_v3 v3_command_real_mqtt_dedup_http_ack_and_lost_response -- --nocapture 2>&1 | tee -a native-recovery.log
-          done
-          if [[ "$RUNNER_OS" == "Windows" ]]; then
-            for sample in $(seq 1 30); do
-              echo "Subprocess fixture sample ${sample}/30"
-              python scripts/ci_annotate.py --title "Windows repeated fixture failed" -- cargo test --locked -p netbaiot-server --test server subprocess_mqtt_session_retained_and_qos1_inflight_survive_graceful_restart -- --nocapture 2>&1 | tee -a native-recovery.log
-            done
-          fi
       - name: Native workspace regressions including subprocess recovery
         timeout-minutes: 20
         shell: bash
