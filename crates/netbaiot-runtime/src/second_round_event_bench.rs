@@ -78,3 +78,61 @@ fn second_round_simultaneous_due() {
         }
     }
 }
+
+// Real owned async workers, not the direct take_ready/complete drain above.
+#[test]
+#[ignore = "serial second-round release measurement"]
+fn second_round_due_workers() {
+    if std::env::var_os("NETBAIOT_SECOND_ROUND").is_none() { return; }
+    if cfg!(debug_assertions) { panic!("release measurements only"); }
+    struct CountAck(AtomicUsize);
+    #[async_trait]
+    impl EventSink for CountAck {
+        async fn deliver(&self, _: DeliveryEnvelope) -> std::result::Result<SinkAck, SinkError> {
+            self.0.fetch_add(1, Ordering::Relaxed);
+            Ok(SinkAck)
+        }
+    }
+    let runtime = tokio::runtime::Builder::new_multi_thread().worker_threads(2).enable_all().build().unwrap();
+    runtime.block_on(async {
+        for depth in [128, 1024, 4096, Limits::default().global_event_max_count] {
+          for percent in [0, 10, 50, 100] {
+            for buckets in ["same", "distinct"] {
+              for run in 1..=3 {
+                let limits = Arc::new(Limits { sink_queue_max_count: depth, ..Limits::default() });
+                let id = SinkId::new("due-workers").unwrap();
+                let metrics = Arc::new(Metrics::with_lock_timing());
+                let sink = Arc::new(CountAck(AtomicUsize::new(0)));
+                let mut definition = SinkDefinition::bounded(id.clone(), SinkDeliveryMode::ConfirmedRequired, sink.clone(), &limits);
+                definition.concurrency = 8;
+                let bus = EventBus::new_paused(limits, metrics.clone(), vec![definition], vec![RouteDefinition { tenant: None, sinks: vec![id.clone()] }], 1).unwrap();
+                for _ in 0..depth { bus.publish(event(8)).unwrap(); }
+                {
+                    let mut state = bus.state.lock().unwrap();
+                    let queue = state.sinks.get_mut(&id).unwrap();
+                    let due = Instant::now() - Duration::from_secs(1);
+                    for index in 0..depth * percent / 100 {
+                        let mut record = queue.ready.pop_front().unwrap();
+                        record.attempt = 1;
+                        record.next_attempt = due + Duration::from_nanos(if buckets == "same" { 0 } else { index as u64 });
+                        queue.delayed.entry(record.next_attempt).or_default().push_back(record);
+                    }
+                }
+                let start = Instant::now();
+                let workers = bus.start_owned_workers().unwrap();
+                assert!(bus.wait_required_drained(Duration::from_secs(30)).await.unwrap());
+                let elapsed = start.elapsed().as_secs_f64();
+                assert_eq!(sink.0.load(Ordering::Relaxed), depth);
+                assert_eq!(bus.usage().unwrap(), EventBusUsage::default());
+                assert!(bus.spool_records().unwrap().is_empty());
+                workers.shutdown().await.unwrap();
+                println!("SECOND_WORKER,due_{percent}_{buckets},{depth},{run},{depth},{elapsed:.9},{:.3}", depth as f64 / elapsed);
+                println!("WORKER_METRICS_BEGIN,due_{percent}_{buckets},{depth},{run}");
+                print!("{}", metrics.render());
+                println!("WORKER_METRICS_END");
+              }
+            }
+          }
+        }
+    });
+}

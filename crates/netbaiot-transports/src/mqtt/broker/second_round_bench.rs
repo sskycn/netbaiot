@@ -417,6 +417,11 @@ fn finish(broker: &MqttBroker, attachment: &mut Attachment) {
         panic!("publish expected")
     };
     if let Some(id) = delivery.packet_id {
+        assert!(
+            broker
+                .begin_outbound_transfer(&attachment.key, attachment.generation, &delivery)
+                .unwrap()
+        );
         if delivery.message.qos == 1 {
             broker
                 .puback(&attachment.key, attachment.generation, id)
@@ -442,43 +447,60 @@ fn second_round_route_ack() {
     let topic = "v1/t/tenant-0/p/product/d/device-0/down";
     for count in [1, 8, 16, 32, 64, 128, 256] {
         for qos in [1, 2] {
-            let broker = MqttBroker::new(limits(count));
-            let mut attachment = broker
-                .attach_v5(&owner, "matrix".into(), false, 3600, u16::MAX)
-                .unwrap();
-            broker
-                .subscribe(&attachment.key, attachment.generation, topic, 2)
-                .unwrap();
-            {
-                let mut state = lock(&broker.state).unwrap();
-                let dummy = session(0, count, "none");
-                let target = state.sessions.get_mut(&attachment.key).unwrap();
-                let mut bytes = 0;
-                for (id, outbound) in dummy.outbound {
-                    bytes += outbound.bytes();
-                    target.insert_outbound(id, outbound);
-                    target.sent.insert(id);
-                    target.send_window.insert(id);
+            for mix in ["pure", "mixed"] {
+                let broker = MqttBroker::new(limits(count));
+                let mut attachment = broker
+                    .attach_v5(&owner, "matrix".into(), false, 3600, u16::MAX)
+                    .unwrap();
+                broker
+                    .subscribe(&attachment.key, attachment.generation, topic, 2)
+                    .unwrap();
+                {
+                    let mut state = lock(&broker.state).unwrap();
+                    let dummy = session(0, count, "none");
+                    let target = state.sessions.get_mut(&attachment.key).unwrap();
+                    let mut bytes = 0;
+                    for (id, mut outbound) in dummy.outbound {
+                        if mix == "pure" {
+                            let mut message = (match &outbound {
+                                OutboundState::AwaitPuback(m)
+                                | OutboundState::AwaitPubrec(m)
+                                | OutboundState::AwaitPubcomp(m) => m,
+                            })
+                            .clone();
+                            message.qos = qos;
+                            outbound = if qos == 1 {
+                                OutboundState::AwaitPuback(message)
+                            } else {
+                                OutboundState::AwaitPubrec(message)
+                            };
+                        }
+                        bytes += outbound.bytes();
+                        target.insert_outbound(id, outbound);
+                        target.sent.insert(id);
+                        target.send_window.insert(id);
+                        target.started_outbound.insert(id);
+                    }
+                    target.state_bytes += bytes;
+                    state.session_bytes += bytes;
+                    sync_session_usage(&mut state, &attachment.key).unwrap();
                 }
-                target.state_bytes += bytes;
-                state.session_bytes += bytes;
-                sync_session_usage(&mut state, &attachment.key).unwrap();
+                let message = publish(topic, qos, None);
+                probe(
+                    &format!("route_ack_qos{qos}_{mix}"),
+                    count,
+                    512,
+                    1,
+                    || (),
+                    |_| {
+                        broker
+                            .route_from_session(&attachment.key, &message)
+                            .unwrap();
+                        finish(&broker, &mut attachment);
+                    },
+                    |_| {},
+                );
             }
-            let message = publish(topic, qos, None);
-            probe(
-                &format!("route_ack_qos{qos}"),
-                count,
-                512,
-                1,
-                || (),
-                |_| {
-                    broker
-                        .route_from_session(&attachment.key, &message)
-                        .unwrap();
-                    finish(&broker, &mut attachment);
-                },
-                |_| {},
-            );
         }
     }
 }
@@ -528,8 +550,12 @@ fn second_round_metadata() {
                 fanout,
                 128,
                 1,
-                || (),
-                |_| broker.route_from_session(&source, &message).unwrap(),
+                || {
+                    let mut fresh = message.clone();
+                    fresh.payload = vec![7; 1024].into();
+                    fresh
+                },
+                |fresh| broker.route_from_session(&source, &fresh).unwrap(),
                 |delivered| {
                     assert_eq!(delivered, fanout);
                     for attachment in &mut attachments {
@@ -537,6 +563,120 @@ fn second_round_metadata() {
                     }
                 },
             );
+        }
+    }
+}
+
+// These controls measure a full state-machine operation with existing inflight
+// messages already transferred. Wall time is an upper bound on uncontended hold,
+// not a measurement of lock wait under network concurrency.
+#[test]
+#[ignore = "serial second-round release measurement"]
+fn second_round_ownership() {
+    if !enabled() {
+        return;
+    }
+    for count in [1, 8, 16, 32, 64, 128, 256, 1024] {
+        for qos in [1, 2] {
+            let broker = MqttBroker::new(limits(count));
+            let owner = auth(0, 1);
+            let attachment = broker
+                .attach_v5(&owner, "ownership".into(), false, 3600, u16::MAX)
+                .unwrap();
+            let template = {
+                let mut state = lock(&broker.state).unwrap();
+                let target = state.sessions.get_mut(&attachment.key).unwrap();
+                for id in 1..=count as u16 {
+                    let message = publish("v1/t/tenant-0/p/product/d/device-0/down", qos, None);
+                    target.state_bytes += message.bytes();
+                    target.insert_outbound(
+                        id,
+                        if qos == 1 {
+                            OutboundState::AwaitPuback(message)
+                        } else {
+                            OutboundState::AwaitPubcomp(message)
+                        },
+                    );
+                    target.started_outbound.insert(id);
+                }
+                state.session_bytes = state.sessions[&attachment.key].state_bytes;
+                sync_session_usage(&mut state, &attachment.key).unwrap();
+                state.sessions[&attachment.key].clone()
+            };
+            for position in ["front", "middle", "back", "random"] {
+                let mut sequence = 0;
+                probe(
+                    &format!("ack_qos{qos}_{position}"),
+                    count,
+                    256,
+                    1,
+                    || {
+                        {
+                            let mut state = lock(&broker.state).unwrap();
+                            state
+                                .sessions
+                                .insert(attachment.key.clone(), template.clone());
+                            state.session_bytes = template.state_bytes;
+                            sync_session_usage(&mut state, &attachment.key).unwrap();
+                        }
+                        sequence += 1;
+                        (match position {
+                            "front" => 1,
+                            "middle" => count.div_ceil(2),
+                            "back" => count,
+                            _ => sequence * 7919 % count + 1,
+                        }) as u16
+                    },
+                    |id| {
+                        if qos == 1 {
+                            broker
+                                .puback(&attachment.key, attachment.generation, id)
+                                .unwrap()
+                        } else {
+                            broker
+                                .pubcomp(&attachment.key, attachment.generation, id)
+                                .unwrap()
+                        }
+                    },
+                    |_| {},
+                );
+            }
+        }
+    }
+    for offline in [0, 16, 64, 128, 512] {
+        for count in [0, 16, 32, 128, 256] {
+            for distribution in ["none", "distinct", "same", "random"] {
+                let mut base = session(offline, count, distribution);
+                base.started_outbound.extend(base.outbound.keys().copied());
+                probe(
+                    &format!("expiry_started_offline{offline}_{distribution}"),
+                    count,
+                    256,
+                    16,
+                    || (),
+                    |_| {
+                        for _ in 0..16 {
+                            black_box(next_message_expiry(&base));
+                        }
+                    },
+                    |_| {},
+                );
+                if count > 0 {
+                    probe(
+                        &format!("expiry_remove_earliest_offline{offline}_{distribution}"),
+                        count,
+                        256,
+                        1,
+                        || base.clone(),
+                        |mut input| {
+                            black_box(input.remove_outbound(1));
+                            black_box(next_message_expiry(&input));
+                            input
+                        },
+                        |_| {},
+                    );
+                }
+            }
         }
     }
 }

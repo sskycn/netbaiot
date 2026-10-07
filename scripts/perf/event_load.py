@@ -100,6 +100,7 @@ def main():
     parser.add_argument("--duration", type=float, default=30)
     parser.add_argument("--connections", type=int, default=32)
     parser.add_argument("--sink-delay-ms", type=float, default=0)
+    parser.add_argument("--sink-outage-seconds", type=float, default=0)
     parser.add_argument("--sink-mode", choices=("none", "webhook"), default="webhook")
     parser.add_argument("--qos", type=int, choices=(0, 1, 2), default=1)
     parser.add_argument("--payload-bytes", type=int, default=256)
@@ -119,6 +120,10 @@ def main():
         "--loadgen-bin", default=os.path.join(ROOT, "target/release/netbaiot-loadgen")
     )
     args = parser.parse_args()
+    if not 0 <= args.sink_outage_seconds <= args.duration / 2:
+        raise SystemExit("sink outage must be between 0 and half the measured duration")
+    if args.sink_outage_seconds and args.sink_mode != "webhook":
+        raise SystemExit("sink outage requires webhook mode")
     device_ingress, management, sink_port = [free_port() for _ in range(3)]
     maximum = max(128, args.connections + 16)
     limits = {
@@ -255,9 +260,22 @@ def main():
                 text=True,
             )
             samples = []
+            outage_start = time.monotonic() + args.warmup + 1
+            outage_end = outage_start + args.sink_outage_seconds
+            outage_phases = []
+            outage_state = None
             profiler = None
             profile_at = time.time() + args.warmup + 1
             while load.poll() is None:
+                if args.sink_outage_seconds:
+                    now = time.monotonic()
+                    desired = 500 if outage_start <= now < outage_end else 204
+                    if desired != outage_state:
+                        with open(control + ".next", "w", encoding="utf-8") as output:
+                            json.dump({"delay": args.sink_delay_ms / 1000, "status": desired}, output)
+                        os.replace(control + ".next", control)
+                        outage_state = desired
+                        outage_phases.append({"status": desired, "relative_to_outage_start_seconds": now - outage_start})
                 if args.sample_output and profiler is None and time.time() >= profile_at:
                     profiler = subprocess.Popen(
                         [
@@ -324,6 +342,8 @@ def main():
                 "mqtt_metadata": args.mqtt_metadata,
                 "audit_open_loop": args.audit_open_loop,
                 "sink_delay_ms": args.sink_delay_ms,
+                "sink_outage_seconds": args.sink_outage_seconds,
+                "sink_outage_phases": outage_phases,
                 "load": last_json(load_out, "final"),
                 "setup_failure": last_json(load_out, "setup_failed"),
                 "load_exit": load.returncode,

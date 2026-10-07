@@ -42,7 +42,7 @@ def micro(args):
     cases = args.cases.split(",") if args.cases else ["topic", "preflight", "session", "route_ack", "expiry", "simultaneous_due", "metadata", "retained", "order"]
     paths = []
     for case in cases:
-        binary = args.runtime if case == "simultaneous_due" else args.transports
+        binary = args.runtime if case in ["simultaneous_due", "due_workers"] else args.transports
         command = [str(Path(binary).resolve()), "second_round_" + case, "--ignored", "--nocapture", "--test-threads=1"]
         manifest["commands"].append(command)
         print("MEASURE", case, flush=True)
@@ -62,6 +62,7 @@ def network(args):
         "large": ["--connections", "64", "--qos", "1", "--payload-bytes", "16384"],
         "q2": ["--connections", "64", "--qos", "2", "--payload-bytes", "1024"],
         "metadata": ["--connections", "100", "--qos", "1", "--payload-bytes", "1024", "--mqtt-v5", "--mqtt-metadata"],
+        "outage": ["--connections", "64", "--qos", "1", "--payload-bytes", "1024", "--sink-mode", "webhook", "--sink-outage-seconds", "5"],
         "slow": ["--connections", "64", "--qos", "1", "--payload-bytes", "1024", "--sink-mode", "webhook", "--sink-delay-ms", "10"],
     }
     plan = {"before_sha256": digest(args.before), "after_sha256": digest(args.after), "loadgen_sha256": digest(args.loadgen), "duration": args.duration, "warmup": args.warmup, "rate": args.rate, "order": args.order, "cases": args.cases.split(",")}
@@ -152,6 +153,29 @@ def summary(args):
     Path(args.output).write_text(json.dumps(data, indent=2, allow_nan=False))
 
 
+def auxiliary_records(paths):
+ groups={};workers={};section=None;lines=[]
+ for p in paths:
+  for line in p.read_text().splitlines():
+   if 'SECOND_LOCK,' in line:
+    _,name,size,*v=line[line.index('SECOND_LOCK,'):].split(',');keys=['wait_mean_ns','wait_p50_ns','wait_p95_ns','wait_p99_ns','wait_max_ns','hold_mean_ns','hold_p50_ns','hold_p95_ns','hold_p99_ns','hold_max_ns'];groups.setdefault(name+'/'+size,[]).append(dict(zip(keys,map(float,v))))
+   elif 'SECOND_WORKER,' in line:
+    _,name,size,run,count,elapsed,rate=line[line.index('SECOND_WORKER,'):].split(',');workers.setdefault(name+'/'+size,[]).append({'elapsed_seconds':float(elapsed),'throughput_ops_s':float(rate)})
+   elif 'WORKER_METRICS_BEGIN,' in line:
+    _,name,size,run=line[line.index('WORKER_METRICS_BEGIN,'):].split(',');section=name+'/'+size;lines=[]
+   elif line=='WORKER_METRICS_END':
+    from eventbus_summary import histogram, metrics
+    v=metrics('\n'.join(lines));workers[section][-1]['take_ready_hold']=histogram(v,'event_bus_site_take_ready_hold_ns');section=None
+   elif section:lines.append(line)
+ def median_tree(rows):
+  if isinstance(rows[0],dict):return {k:median_tree([r[k] for r in rows]) for k in rows[0]}
+  return statistics.median(rows)
+ return {'locks':{k:{f:(max(r[f] for r in rows) if f.endswith('_max_ns') else statistics.median(r[f] for r in rows)) for f in rows[0]} for k,rows in groups.items()},'workers':{k:median_tree(rows) for k,rows in workers.items()}}
+
+def auxiliary(args):
+    paths = [Path(path) for pattern in args.logs for path in glob.glob(pattern)]
+    Path(args.output).write_text(json.dumps(auxiliary_records(paths), indent=2))
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="mode", required=True)
@@ -178,6 +202,10 @@ def main():
     p.add_argument("--micro-after", nargs="+")
     p.add_argument("--output", required=True)
     p.set_defaults(run=summary)
+    p = sub.add_parser("auxiliary")
+    p.add_argument("--logs", nargs="+", required=True)
+    p.add_argument("--output", required=True)
+    p.set_defaults(run=auxiliary)
     args = parser.parse_args()
     args.run(args)
 

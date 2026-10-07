@@ -322,3 +322,6 @@ mod hostile {
         assert!(codec.decode(&ctx, wire.as_bytes()).is_ok());
     }
 }
+
+#[cfg(test)]
+mod second_round_bench;
