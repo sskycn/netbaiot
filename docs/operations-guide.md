@@ -43,6 +43,10 @@ Environment variables：
 | `RUST_LOG` | tracing filter，如 `info` 或 `netbaiot_server=debug` |
 | `NETBAIOT_PERF_LOCK_METRICS=1` | 仅性能实验的额外 lock timing；生产默认关闭 |
 
+启用额外计时后，`netbaiot_broker_site_<site>_{wait,hold}_ns` 使用固定操作分类（route、subscribe、各类 ACK、attach/detach、retained_replay、maintenance、recovery 等）。关闭时不读取时钟，也不分配这些 histogram。Histogram 分位数只能解释为 bucket 上界；`retained_replay` 包括 retained 非空时的完整订阅、容量检查和入队。
+
+第二轮之后，`netbaiot_broker_lock_{wait,hold}_us` 汇总所有 broker 锁操作；旧版本仅计 route，而且 wait 包含部分维护工作。两种口径不能直接比较。所有操作累计的 wait 还包括 producer ACK 之外的订阅者 ACK/出站工作，不能除以请求延迟作为单个请求的锁等待占比。详见 [第二轮性能报告](performance/second-round/report.md)。
+
 ## 最小开发与生产方向配置
 
 最小开发配置见 [`configs/development.json`](../configs/development.json)。它使用即时 ACK 的 in-process audit sink；适合验证 ingress，但看不到业务 consumer。端到端教程使用 [`configs/tutorial.json`](../configs/tutorial.json) 和本地 webhook。
