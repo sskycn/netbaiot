@@ -16,7 +16,7 @@ jobs:
       - name: Repeat with session and provider diagnostics
         shell: pwsh
         run: |
-          python scripts/windows_regression_probe.py --commit fixed --all-features --repetitions 30
+          python scripts/windows_regression_probe.py --commit fixed-recovery-budgets --all-features --repetitions 30
           $probeExit = $LASTEXITCODE
           python -c "import json,pathlib; logs=pathlib.Path('target/evidence/windows-regression'); names=['one_socket_authentication_progresses_while_event_ack_waits','v1_spooled_required_event_replays_to_v2_with_stable_event_id']; [print('::notice title=state-diagnostic::'+json.dumps({'test':name,'tail':next((p.read_text(encoding='utf-8',errors='replace')[-6500:] for p in logs.glob(name+'-*.log') if 'FAILED' in p.read_text(encoding='utf-8',errors='replace')),'no failures')}).replace('%','%25')) for name in names]"
           exit $probeExit

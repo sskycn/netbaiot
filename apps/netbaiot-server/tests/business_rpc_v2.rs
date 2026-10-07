@@ -1086,7 +1086,7 @@ async fn one_socket_authentication_progresses_while_event_ack_waits() {
             if legacy.runtime().status().await.unwrap().pending_required == 0 {
                 break;
             }
-            tokio::task::yield_now().await;
+            tokio::time::sleep(Duration::from_millis(10)).await;
         }
     })
     .await
@@ -1724,6 +1724,10 @@ async fn v1_spooled_required_event_replays_to_v2_with_stable_event_id() {
     });
     config.device_auth = Some(DeviceAuthSource::Static);
     config.event_delivery = Some(EventDeliverySource::BusinessRpc);
+    // The 300ms deadline above forces the V1 shutdown/spool transition. V2
+    // startup waits for a new subscriber and uses the normal delivery budget;
+    // readiness does not reset exhausted attempts or a 30s required backoff.
+    config.limits.sink_timeout_ms = netbaiot_runtime::Limits::default().sink_timeout_ms;
     write_config(&root, &config);
     let mut second = start();
     let (events, mut receiver) = BusinessRpcClient::connect(

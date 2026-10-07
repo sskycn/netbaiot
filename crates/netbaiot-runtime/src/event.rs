@@ -1080,6 +1080,125 @@ mod tests {
         assert_eq!(bus.usage().unwrap(), EventBusUsage::default());
     }
 
+    struct StartedBusinessSink {
+        inner: Arc<crate::BusinessRpcEventSink>,
+        entered: tokio::sync::mpsc::Sender<()>,
+    }
+
+    #[async_trait]
+    impl EventSink for StartedBusinessSink {
+        async fn deliver(
+            &self,
+            delivery: DeliveryEnvelope,
+        ) -> std::result::Result<SinkAck, SinkError> {
+            self.entered.try_send(()).unwrap();
+            self.inner.deliver(delivery).await
+        }
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn short_restore_timeout_keeps_required_work_in_backoff_after_subscriber_ready() {
+        assert_late_recovery_subscriber_budget(true).await;
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn normal_sink_budget_delivers_to_late_recovery_subscriber_without_retry() {
+        assert_late_recovery_subscriber_budget(false).await;
+    }
+
+    async fn assert_late_recovery_subscriber_budget(short: bool) {
+        let mut limits = Limits::default();
+        if short {
+            limits.sink_timeout_ms = 300;
+        }
+        let limits = Arc::new(limits);
+        let business = crate::BusinessRpcEventSink::new();
+        let (entered, mut started) = tokio::sync::mpsc::channel(1);
+        let id = SinkId::new("tcp-rpc").unwrap();
+        let bus = EventBus::new_paused(
+            limits.clone(),
+            Arc::new(Metrics::default()),
+            vec![SinkDefinition::bounded(
+                id.clone(),
+                SinkDeliveryMode::ConfirmedRequired,
+                Arc::new(StartedBusinessSink {
+                    inner: business.clone(),
+                    entered,
+                }),
+                &limits,
+            )],
+            vec![RouteDefinition {
+                tenant: None,
+                sinks: vec![id.clone()],
+            }],
+            7,
+        )
+        .unwrap();
+        let event = event(8);
+        let event_id = event.event_id;
+        bus.restore(vec![SpoolRecord {
+            event,
+            pending_sinks: vec![id.clone()],
+            routing_revision: 3,
+            accepted_at: now_ms(),
+            attempts: BTreeMap::from([(id.clone(), limits.sink_max_attempts - 1)]),
+        }])
+        .unwrap();
+        let worker = bus.clone().run_sink(id.clone());
+        tokio::pin!(worker);
+        assert!(futures_util::poll!(worker.as_mut()).is_pending());
+        started.recv().await.unwrap(); // The delivery timeout is now armed.
+        if short {
+            tokio::time::advance(Duration::from_millis(300)).await;
+            std::future::poll_fn(|cx| {
+                use std::future::Future;
+                assert!(worker.as_mut().poll(cx).is_pending());
+                if bus.next_ready_delay(&id).unwrap() == Some(Duration::from_secs(30)) {
+                    std::task::Poll::Ready(())
+                } else {
+                    std::task::Poll::Pending
+                }
+            })
+            .await;
+            tokio::time::advance(Duration::from_millis(2700)).await;
+        } else {
+            tokio::time::advance(Duration::from_secs(3)).await;
+        }
+        let (sender, mut receiver) = tokio::sync::mpsc::channel(1);
+        let generation = business.claim(sender, EventFilter::default()).unwrap();
+        if short {
+            // Subscriber readiness does not cancel the EventBus retry policy.
+            tokio::time::advance(Duration::from_secs(5)).await;
+            assert!(futures_util::poll!(worker.as_mut()).is_pending());
+            assert!(receiver.try_recv().is_err());
+            assert_eq!(bus.usage().unwrap().pending_required, 1);
+            assert_eq!(bus.spool_records().unwrap()[0].event.event_id, event_id);
+            tokio::time::advance(Duration::from_millis(22300)).await;
+        }
+        let application = async {
+            let request = receiver.recv().await.unwrap();
+            assert_eq!(request.delivery.event.event_id, event_id);
+            assert_eq!(
+                request.delivery.attempt,
+                limits.sink_max_attempts + u32::from(short)
+            );
+            request.result.send(Ok(SinkAck)).unwrap();
+            assert!(
+                bus.wait_required_drained(Duration::from_secs(1))
+                    .await
+                    .unwrap()
+            );
+            business.release(generation).unwrap();
+            bus.stop.cancel();
+        };
+        tokio::time::timeout(Duration::from_secs(1), async {
+            tokio::join!(worker, application);
+        })
+        .await
+        .unwrap();
+        assert_eq!(bus.usage().unwrap(), EventBusUsage::default());
+    }
+
     struct Signal {
         calls: AtomicUsize,
         block: Option<Arc<tokio::sync::Notify>>,
