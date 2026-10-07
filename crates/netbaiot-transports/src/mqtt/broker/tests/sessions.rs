@@ -178,6 +178,80 @@ fn wildcard_trie_and_dollar_rules() {
     }
 }
 
+#[test]
+fn topic_matcher_preserves_empty_levels_and_terminal_wildcards() {
+    for (filter, topic, expected) in [
+        ("#", "a", true),
+        ("+", "a", true),
+        ("+", "a/b", false),
+        ("+/x", "/x", true),
+        ("a/+", "a/", true),
+        ("a/+", "a", false),
+        ("a/#", "a", true),
+        ("a/#", "a/", true),
+        ("a/#", "ab", false),
+        ("a/+/c", "a//c", true),
+        ("a/+/c", "a/b/c", true),
+        ("a/+/c", "a/b/d", false),
+        ("a//b", "a//b", true),
+        ("a//b", "a/b", false),
+        ("/a", "/a", true),
+        ("/a", "a", false),
+        ("a/", "a/", true),
+        ("a/", "a", false),
+        ("/", "/", true),
+        ("+/+", "/", true),
+        ("#", "$SYS", false),
+        ("+", "$SYS", false),
+        ("+/x", "$device/x", false),
+        ("$SYS/#", "$SYS", true),
+        ("$SYS/+", "$SYS/", true),
+        ("a/#/b", "a/b", false),
+        ("#/x", "a/x", false),
+        ("a+", "a", false),
+    ] {
+        assert_eq!(
+            topic_matches(filter, topic),
+            expected,
+            "{filter:?} / {topic:?}"
+        );
+    }
+}
+
+#[test]
+fn topic_matcher_agrees_with_subscription_trie_for_valid_filters() {
+    let key = SessionKey {
+        device: auth("matcher").device_key,
+        client_id: "matcher".into(),
+    };
+    let levels = ["", "a", "b", "$SYS"];
+    let mut topics = Vec::new();
+    for first in levels {
+        topics.push(first.to_owned());
+        for second in levels {
+            topics.push(format!("{first}/{second}"));
+            for third in levels {
+                topics.push(format!("{first}/{second}/{third}"));
+            }
+        }
+    }
+    let filters = [
+        "#", "+", "+/+", "+/#", "a/+", "a/#", "a/+/b", "a//b", "/a", "a/", "/", "$SYS/#", "$SYS/+",
+        "+/a", "+/+/+", "a/b/#",
+    ];
+    for filter in filters {
+        let mut trie = SubscriptionTrie::default();
+        trie.insert(filter, key.clone(), Subscription::v311(1));
+        for topic in &topics {
+            assert_eq!(
+                topic_matches(filter, topic),
+                trie.matching(topic).contains_key(&key),
+                "{filter:?} / {topic:?}"
+            );
+        }
+    }
+}
+
 #[tokio::test]
 async fn mqtt_outbound_ack_state_matrix_preserves_transaction_on_wrong_ack() {
     let broker = MqttBroker::new(Arc::new(Limits::default()));

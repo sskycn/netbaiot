@@ -258,19 +258,17 @@ pub fn topic_matches(filter: &str, topic: &str) -> bool {
     if topic.starts_with('$') && (filter == "#" || filter == "+" || filter.starts_with("+/")) {
         return false;
     }
-    let filters = filter.split('/').collect::<Vec<_>>();
-    let topics = topic.split('/').collect::<Vec<_>>();
-    let mut at = 0usize;
-    while at < filters.len() {
-        match filters[at] {
-            "#" => return at + 1 == filters.len(),
-            "+" if at < topics.len() => {}
-            level if at < topics.len() && level == topics[at] => {}
+    let mut filters = filter.split('/');
+    let mut topics = topic.split('/');
+    while let Some(filter) = filters.next() {
+        match filter {
+            "#" => return filters.next().is_none(),
+            "+" if topics.next().is_some() => {}
+            level if topics.next() == Some(level) => {}
             _ => return false,
         }
-        at += 1;
     }
-    at == topics.len()
+    topics.next().is_none()
 }
 
 pub(super) fn valid_broker_message(message: &BrokerMessage, limits: &Limits) -> bool {

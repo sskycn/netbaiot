@@ -37,5 +37,39 @@
       "conclusion": "success",
       "html_url": "https://github.com/sskycn/netbaiot/actions/runs/37566826295"
     }
+  ],
+  "native_jobs": [
+    {
+      "name": "recovery (ubuntu-latest)",
+      "conclusion": "success",
+      "html_url": "https://github.com/sskycn/netbaiot/actions/runs/37566826294/job/112616346217"
+    },
+    {
+      "name": "recovery (macos-latest)",
+      "conclusion": "success",
+      "html_url": "https://github.com/sskycn/netbaiot/actions/runs/37566826294/job/112616346432"
+    },
+    {
+      "name": "recovery (windows-latest)",
+      "conclusion": "success",
+      "html_url": "https://github.com/sskycn/netbaiot/actions/runs/37566826294/job/112616346472"
+    }
+  ],
+  "dx_jobs": [
+    {
+      "name": "dx (ubuntu-latest)",
+      "conclusion": "success",
+      "html_url": "https://github.com/sskycn/netbaiot/actions/runs/37566826295/job/112616346327"
+    },
+    {
+      "name": "dx (windows-latest)",
+      "conclusion": "success",
+      "html_url": "https://github.com/sskycn/netbaiot/actions/runs/37566826295/job/112616346471"
+    },
+    {
+      "name": "dx (macos-latest)",
+      "conclusion": "success",
+      "html_url": "https://github.com/sskycn/netbaiot/actions/runs/37566826295/job/112616346519"
+    }
   ]
 }

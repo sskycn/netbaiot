@@ -27,7 +27,7 @@ def summarize(paths):
                 continue
             _, name, size, run, *values = line[marker:].split(",")
             groups.setdefault(f"{name}/{size}", []).append(dict(zip(FIELDS, map(float, values))))
-    return {key: {field: statistics.median(row[field] for row in rows) for field in FIELDS}
+    return {key: {field: (max(row[field] for row in rows) if field == "max_ns" else statistics.median(row[field] for row in rows)) for field in FIELDS}
             for key, rows in sorted(groups.items())}
 
 
