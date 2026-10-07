@@ -2,7 +2,7 @@ name: Native recovery and lifecycle
 on:
   pull_request:
   push:
-    branches: [main, codex/strict-reliability-audit, codex/windows-native-prelude-diagnostics]
+    branches: [main, codex/strict-reliability-audit]
   workflow_dispatch:
 permissions:
   contents: read
