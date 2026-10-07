@@ -31,9 +31,15 @@
       "command": "cargo test --locked -p netbaiot-server --test server subprocess_graceful_restart_sixty_second_soak -- --ignored --exact --nocapture",
       "status": "PASS",
       "raw_log": "target/second-round/final-validation/soak.log"
+    },
+    {
+      "command": "cargo xtask check release --part preflight",
+      "status": "PASS",
+      "raw_log": "target/second-round/final-validation/preflight-fixed.log"
     }
   ],
   "soak_seconds": 68.45,
   "fuzz_results": "fuzz-results.json",
-  "interpretation": "xtask includes fmt check, locked clippy all-targets/all-features -D warnings and locked workspace all-features tests. Serial validation pipeline exited0."
+  "interpretation": "xtask includes fmt check, locked clippy all-targets/all-features -D warnings and locked workspace all-features tests. Serial validation pipeline exited0.",
+  "ci_evidence_fix": "Release preflight on99b6e7c rejected two local absolute target paths in profile-summary.json; normalized with existing scrub_paths.py to <repo>, then preflight and evidence gate passed. Measurement values and hashes unchanged."
 }
