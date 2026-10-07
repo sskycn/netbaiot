@@ -1138,7 +1138,6 @@ dependencies = [
  "tokio",
  "tokio-rustls",
  "tokio-util",
- "tracing",
  "uuid",
  "webpki-roots",
  "x509-parser",
@@ -1162,7 +1161,6 @@ dependencies = [
  "tokio",
  "tokio-rustls",
  "tokio-util",
- "tracing",
  "uuid",
 ]
 
@@ -1183,7 +1181,6 @@ dependencies = [
  "schemars",
  "serde",
  "thiserror",
- "uuid",
 ]
 
 [[package]]
@@ -1295,7 +1292,6 @@ dependencies = [
  "serde_json",
  "serde_path_to_error",
  "sha2",
- "subtle",
  "tokio",
  "tokio-rustls",
  "tokio-util",
@@ -1326,7 +1322,6 @@ dependencies = [
  "socket2",
  "stats_alloc",
  "subtle",
- "thiserror",
  "tokio",
  "tokio-rustls",
  "tokio-util",
@@ -1340,8 +1335,6 @@ version = "0.2.3"
 dependencies = [
  "bytes",
  "netbaiot-protocol",
- "serde",
- "serde_json",
  "tokio",
  "uuid",
 ]

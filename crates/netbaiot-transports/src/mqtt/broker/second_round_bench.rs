@@ -117,7 +117,7 @@ fn session(offline: usize, outbound: usize, distribution: &str) -> StoredSession
         device: identity.device_key.clone(),
         client_id: "matrix".into(),
     };
-    let mut session = StoredSession::new(key, 1, SessionAuthorization::from(&identity));
+    let mut session = StoredSession::new(key, 1, Some(SessionAuthorization::from(&identity)));
     let deadline = now_ms() + 3_600_000;
     let expiry = |index| match distribution {
         "none" => None,
@@ -748,5 +748,64 @@ fn second_round_retained_subscribe() {
             print!("{}", metrics.render());
             println!("RETAINED_METRICS_END");
         }
+    }
+}
+
+#[tokio::test]
+#[ignore = "serial cleanup recovery measurement"]
+async fn legacy_cleanup_recovery_measurement() {
+    if std::env::var_os("NETBAIOT_LEGACY_BENCH").is_none() {
+        return;
+    }
+    if cfg!(debug_assertions) {
+        panic!("release measurements only");
+    }
+    for count in [1, 128, 512] {
+        let limits = Arc::new(Limits::default());
+        let broker = MqttBroker::new(limits.clone());
+        let sessions = (0..count)
+            .map(|index| {
+                let mut value = session(2, 2, "none");
+                value.key.client_id = format!("cleanup-{index}");
+                value
+            })
+            .collect();
+        broker
+            .restore(MqttRecoverySnapshot {
+                format_version: RECOVERY_VERSION,
+                snapshot_generation: 1,
+                sessions,
+                retained: Vec::new(),
+                pending_wills: Vec::new(),
+            })
+            .unwrap();
+        let directory =
+            std::env::temp_dir().join(format!("netbaiot-cleanup-mqtt-{}", uuid::Uuid::new_v4()));
+        let mut saves = Vec::new();
+        let mut loads = Vec::new();
+        let mut bytes = 0;
+        for iteration in 0..23 {
+            let started = Instant::now();
+            let path = broker.commit_to(&directory).await.unwrap();
+            let save = started.elapsed().as_nanos();
+            bytes = fs::metadata(path).unwrap().len();
+            let restored = MqttBroker::new(limits.clone());
+            let started = Instant::now();
+            assert!(restored.recover_from(&directory).await.unwrap());
+            let load = started.elapsed().as_nanos();
+            assert_eq!(restored.snapshot().unwrap().sessions.len(), count);
+            if iteration >= 3 {
+                saves.push(save);
+                loads.push(load);
+            }
+        }
+        for (operation, mut samples) in [("save", saves), ("load", loads)] {
+            samples.sort_unstable();
+            println!(
+                "CLEANUP_RECOVERY,mqtt,{count},{operation},{},{},{},{},{bytes}",
+                samples[10], samples[18], samples[19], samples[19]
+            );
+        }
+        fs::remove_dir_all(directory).unwrap();
     }
 }

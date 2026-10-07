@@ -93,13 +93,6 @@ pub enum Metric {
 }
 #[derive(Clone, Copy)]
 #[repr(usize)]
-pub enum BusinessRpcQueueClass {
-    Control,
-    Event,
-    Command,
-}
-#[derive(Clone, Copy)]
-#[repr(usize)]
 pub enum BusinessRpcCallResult {
     Success,
     DeviceRejected,
@@ -461,8 +454,8 @@ pub struct Metrics {
     management_authz_denied: [AtomicU64; 12],
     management_jwks_cache: [AtomicU64; 2],
     histograms: [HistogramState; HISTOGRAM_NAMES.len()],
-    business_rpc_queue_count: [AtomicU64; 3],
-    business_rpc_queue_bytes: [AtomicU64; 3],
+    business_rpc_queue_count: AtomicU64,
+    business_rpc_queue_bytes: AtomicU64,
     lock_timing_enabled: bool,
     event_bus_probes: [AtomicU64; EVENT_BUS_PROBES.len()],
     event_bus_timing: Option<Box<EventBusTiming>>,
@@ -491,8 +484,8 @@ impl Default for Metrics {
             management_authz_denied: std::array::from_fn(|_| AtomicU64::new(0)),
             management_jwks_cache: std::array::from_fn(|_| AtomicU64::new(0)),
             histograms: std::array::from_fn(|_| HistogramState::default()),
-            business_rpc_queue_count: std::array::from_fn(|_| AtomicU64::new(0)),
-            business_rpc_queue_bytes: std::array::from_fn(|_| AtomicU64::new(0)),
+            business_rpc_queue_count: AtomicU64::new(0),
+            business_rpc_queue_bytes: AtomicU64::new(0),
             lock_timing_enabled: false,
             event_bus_probes: std::array::from_fn(|_| AtomicU64::new(0)),
             event_bus_timing: None,
@@ -567,13 +560,17 @@ impl Metrics {
             Ordering::Relaxed,
         );
     }
-    pub fn business_rpc_queue_add(&self, class: BusinessRpcQueueClass, bytes: u64) {
-        self.business_rpc_queue_count[class as usize].fetch_add(1, Ordering::Relaxed);
-        self.business_rpc_queue_bytes[class as usize].fetch_add(bytes, Ordering::Relaxed);
+    pub fn business_rpc_queue_add(&self, bytes: u64) {
+        self.business_rpc_queue_count
+            .fetch_add(1, Ordering::Relaxed);
+        self.business_rpc_queue_bytes
+            .fetch_add(bytes, Ordering::Relaxed);
     }
-    pub fn business_rpc_queue_sub(&self, class: BusinessRpcQueueClass, bytes: u64) {
-        self.business_rpc_queue_count[class as usize].fetch_sub(1, Ordering::Relaxed);
-        self.business_rpc_queue_bytes[class as usize].fetch_sub(bytes, Ordering::Relaxed);
+    pub fn business_rpc_queue_sub(&self, bytes: u64) {
+        self.business_rpc_queue_count
+            .fetch_sub(1, Ordering::Relaxed);
+        self.business_rpc_queue_bytes
+            .fetch_sub(bytes, Ordering::Relaxed);
     }
     pub fn management_auth_attempt(&self, method: &str, result: &str) {
         let method = match method {
@@ -730,9 +727,7 @@ impl Metrics {
                 output.push_str(&format!("netbaiot_business_rpc_remote_errors_total{{method=\"{method}\",code=\"{code}\"}} {}\n", self.business_rpc_remote_errors[method_index][code_index].load(Ordering::Relaxed)));
             }
         }
-        for (index, class) in ["control", "event", "command"].iter().enumerate() {
-            output.push_str(&format!("netbaiot_business_rpc_queue_count{{class=\"{class}\"}} {}\nnetbaiot_business_rpc_queue_bytes{{class=\"{class}\"}} {}\n", self.business_rpc_queue_count[index].load(Ordering::Relaxed), self.business_rpc_queue_bytes[index].load(Ordering::Relaxed)));
-        }
+        output.push_str(&format!("netbaiot_business_rpc_queue_count{{class=\"control\"}} {}\nnetbaiot_business_rpc_queue_bytes{{class=\"control\"}} {}\n", self.business_rpc_queue_count.load(Ordering::Relaxed), self.business_rpc_queue_bytes.load(Ordering::Relaxed)));
         for (index, method) in ["static_token", "api_key", "jwt", "mtls", "unknown"]
             .iter()
             .enumerate()

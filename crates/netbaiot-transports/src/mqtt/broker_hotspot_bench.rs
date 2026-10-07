@@ -88,7 +88,7 @@ fn sample_session(offline: usize, outbound: usize) -> StoredSession {
         device: owner.device_key.clone(),
         client_id: "client".into(),
     };
-    let mut session = StoredSession::new(key, 1, SessionAuthorization::from(&owner));
+    let mut session = StoredSession::new(key, 1, Some(SessionAuthorization::from(&owner)));
     for _ in 0..offline {
         let entry = message("v1/t/tenant/p/product/d/device-0/down".into(), 1, true);
         session.offline_bytes += entry.bytes();

@@ -1,17 +1,12 @@
-//! Business RPC Stream V2 wire contract. V1 stream frames remain in `lib.rs`.
-use crate::{
-    AuthInvalidation, CodecId, CommandDispatch, DeviceCommand, DeviceKey, EventAck, EventDelivery,
-    EventFilter, ProtocolError, SubscriptionId,
-};
+//! Shared method DTOs and authorization/error vocabulary for current Business RPC.
+use crate::{AuthInvalidation, CodecId, CommandDispatch, DeviceCommand, DeviceKey};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-pub const BUSINESS_RPC_VERSION: u16 = 2;
 pub const BUSINESS_RPC_HELLO_MAX_BYTES: usize = 4 * 1024;
 pub const BUSINESS_RPC_AUTH_MAX_BYTES: usize = 16 * 1024;
 pub const BUSINESS_RPC_MAX_TOKEN_BYTES: usize = 256;
 pub const BUSINESS_RPC_MAX_ERROR_BYTES: usize = 256;
-pub const BUSINESS_RPC_EVENT_WINDOW: u16 = 1;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -46,15 +41,6 @@ pub struct DeviceCommandSendRequest {
 #[serde(deny_unknown_fields)]
 pub struct DeviceCommandSendResponse {
     pub dispatch: CommandDispatch,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct BusinessLimits {
-    pub max_frame_bytes: u32,
-    pub auth_max_inflight: u16,
-    pub event_max_inflight: u16,
-    pub heartbeat_ms: u32,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -93,203 +79,6 @@ impl RpcError {
             code,
             message: bounded,
         }
-    }
-}
-
-/// The JSON body is decoded into the method DTO only after method authorization.
-/// This allows unknown methods to receive a structured error using their request ID.
-#[derive(Clone, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
-pub enum BusinessRpcFrame {
-    Hello {
-        version: u16,
-        role: BusinessRole,
-        token: Option<String>,
-        limits: BusinessLimits,
-    },
-    Ready {
-        version: u16,
-        role: BusinessRole,
-        connection_epoch: u64,
-        limits: BusinessLimits,
-    },
-    Request {
-        request_id: Uuid,
-        method: String,
-        deadline_ms: u32,
-        body: serde_json::Value,
-    },
-    Response {
-        request_id: Uuid,
-        method: String,
-        body: Option<serde_json::Value>,
-        error: Option<RpcError>,
-    },
-    Subscribe {
-        subscription_id: SubscriptionId,
-        filter: EventFilter,
-    },
-    Subscribed {
-        subscription_id: SubscriptionId,
-    },
-    Event {
-        delivery: EventDelivery,
-    },
-    EventAck {
-        ack: EventAck,
-    },
-    EventNack {
-        ack: EventAck,
-        error: RpcError,
-    },
-    Ping {
-        nonce: u64,
-    },
-    Pong {
-        nonce: u64,
-    },
-    Cancel {
-        request_id: Uuid,
-    },
-    GoAway {
-        error: RpcError,
-    },
-}
-
-impl BusinessRpcFrame {
-    pub fn validate(&self) -> Result<(), ProtocolError> {
-        fn method(value: &str) -> bool {
-            !value.is_empty()
-                && value.len() <= 64
-                && value
-                    .bytes()
-                    .all(|byte| byte.is_ascii_lowercase() || byte == b'.' || byte == b'_')
-        }
-        fn error(value: &RpcError) -> bool {
-            value.message.len() <= BUSINESS_RPC_MAX_ERROR_BYTES
-        }
-        match self {
-            Self::Hello {
-                version,
-                token,
-                limits,
-                ..
-            } => {
-                if *version != BUSINESS_RPC_VERSION
-                    || token
-                        .as_ref()
-                        .is_some_and(|value| value.len() > BUSINESS_RPC_MAX_TOKEN_BYTES)
-                    || limits.max_frame_bytes == 0
-                    || limits.auth_max_inflight == 0
-                    || limits.event_max_inflight != BUSINESS_RPC_EVENT_WINDOW
-                    || limits.heartbeat_ms == 0
-                {
-                    return Err(ProtocolError);
-                }
-            }
-            Self::Ready {
-                version,
-                connection_epoch,
-                limits,
-                ..
-            } => {
-                if *version != BUSINESS_RPC_VERSION
-                    || *connection_epoch == 0
-                    || limits.max_frame_bytes == 0
-                    || limits.auth_max_inflight == 0
-                    || limits.event_max_inflight != BUSINESS_RPC_EVENT_WINDOW
-                    || limits.heartbeat_ms == 0
-                {
-                    return Err(ProtocolError);
-                }
-            }
-            Self::Request {
-                request_id,
-                method: name,
-                deadline_ms,
-                body,
-            } => {
-                if request_id.is_nil()
-                    || !method(name)
-                    || *deadline_ms == 0
-                    || serde_json::to_vec(body)
-                        .map_or(true, |bytes| bytes.len() > BUSINESS_RPC_AUTH_MAX_BYTES)
-                {
-                    return Err(ProtocolError);
-                }
-            }
-            Self::Response {
-                request_id,
-                method: name,
-                body,
-                error: failure,
-            } => {
-                if request_id.is_nil()
-                    || !method(name)
-                    || (body.is_some() == failure.is_some())
-                    || failure.as_ref().is_some_and(|value| !error(value))
-                    || body.as_ref().is_some_and(|value| {
-                        serde_json::to_vec(value)
-                            .map_or(true, |bytes| bytes.len() > BUSINESS_RPC_AUTH_MAX_BYTES)
-                    })
-                {
-                    return Err(ProtocolError);
-                }
-            }
-            Self::Subscribe {
-                subscription_id,
-                filter,
-            } => {
-                if subscription_id.0.is_nil() || filter.validate().is_err() {
-                    return Err(ProtocolError);
-                }
-            }
-            Self::Subscribed { subscription_id } => {
-                if subscription_id.0.is_nil() {
-                    return Err(ProtocolError);
-                }
-            }
-            Self::Event { delivery } => {
-                if delivery.subscription_id.0.is_nil()
-                    || delivery.delivery_id.0.is_nil()
-                    || delivery.event.event_id.0.is_nil()
-                {
-                    return Err(ProtocolError);
-                }
-            }
-            Self::EventAck { ack } => {
-                if ack.subscription_id.0.is_nil()
-                    || ack.delivery_id.0.is_nil()
-                    || ack.event_id.0.is_nil()
-                {
-                    return Err(ProtocolError);
-                }
-            }
-            Self::EventNack {
-                ack,
-                error: failure,
-            } => {
-                if ack.subscription_id.0.is_nil()
-                    || ack.delivery_id.0.is_nil()
-                    || ack.event_id.0.is_nil()
-                    || !error(failure)
-                {
-                    return Err(ProtocolError);
-                }
-            }
-            Self::GoAway { error: failure } => {
-                if !error(failure) {
-                    return Err(ProtocolError);
-                }
-            }
-            Self::Cancel { request_id } => {
-                if request_id.is_nil() {
-                    return Err(ProtocolError);
-                }
-            }
-            Self::Ping { .. } | Self::Pong { .. } => {}
-        }
-        Ok(())
     }
 }
 
@@ -364,28 +153,7 @@ mod tests {
     use super::*;
     use crate::{CommandId, DeviceCommandPayload, DeviceId, ProductId, TenantId};
     #[test]
-    fn v2_contract_and_v1_version_are_independent() {
-        assert_eq!(crate::PROTOCOL_VERSION, 1);
-        let frame = BusinessRpcFrame::Hello {
-            version: BUSINESS_RPC_VERSION,
-            role: BusinessRole::Multiplexed,
-            token: None,
-            limits: BusinessLimits {
-                max_frame_bytes: 65536,
-                auth_max_inflight: 8,
-                event_max_inflight: 1,
-                heartbeat_ms: 5000,
-            },
-        };
-        let wire = serde_json::to_value(&frame).unwrap();
-        assert_eq!(wire["type"], "hello");
-        assert_eq!(wire["role"], "multiplexed");
-        assert_eq!(wire["version"], 2);
-        assert!(serde_json::from_value::<BusinessRpcFrame>(wire).is_ok());
-    }
-
-    #[test]
-    fn roles_preserve_v2_names_and_capabilities() {
+    fn current_principal_roles_preserve_authorization_capabilities() {
         for (role, wire, events, auth, commands) in [
             (BusinessRole::Events, "events", true, false, false),
             (
@@ -435,11 +203,12 @@ mod tests {
         let mut malformed = wire;
         malformed["command"]["payload"]["arguments"] = serde_json::json!({"bad": [1, 2]});
         assert!(serde_json::from_value::<DeviceCommandSendRequest>(malformed).is_err());
-        let oversized = BusinessRpcFrame::Request {
+        let oversized = crate::business_rpc_v3::V3Open::Rpc {
+            parent_stream_id: None,
             request_id: Uuid::new_v4(),
             method: "device.command.send".into(),
             deadline_ms: 1_000,
-            body: serde_json::json!({ "command": { "payload": "x".repeat(BUSINESS_RPC_AUTH_MAX_BYTES) } }),
+            content_length: (crate::business_rpc_v3::V3_MAX_MESSAGE_BYTES + 1) as u32,
         };
         assert!(oversized.validate().is_err());
     }

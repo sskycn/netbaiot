@@ -1,5 +1,7 @@
 # Final MQTT state-machine remediation
 
+> Historical state-machine evidence from before the 2026-10-07 current-only cleanup. Version-specific compatibility below describes the recorded implementation. Current support: [protocol matrix](protocol-support.md), [upgrade](migration/current-protocol-only.md).
+
 Date: 2026-09-21
 
 Baseline SHA: `6e047b0a1be6b4a3a78aacefb3084e77f40e201e`.

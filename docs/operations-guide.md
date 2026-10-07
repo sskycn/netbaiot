@@ -24,7 +24,7 @@ netbaiot-server --print-default-limits
 |---|---|---|---|
 | `device_ingress` | TCP：MQTT/通用 TCP；UDP：NBI1/NBA1 | loopback `8080` | 同号 TCP/UDP `443`；TCP 必须 TLS，UDP 只认证不加密 |
 | `management_http` | `/api/v1/...` listener | loopback `9090` | 优先 loopback/管理网；非 loopback 必须 TLS |
-| `business_tcp` | confirmed stream listener | null | 当前只允许 loopback，且与 webhook 二选一 |
+| `business_tcp` | confirmed stream listener | null | 显式 `business_rpc`；生产 mTLS，开发回环 token；与 webhook 二选一 |
 | `development` | 强制所有 listener loopback | true | false |
 | `limits` | `Limits` 的覆盖字段 | `{}` 使用默认 | 按测量调优，不可设无界 |
 | `tls` | PEM certificate/private key | null | 对非 loopback management HTTP/MQTT/TCP 必填 |
@@ -39,7 +39,7 @@ Environment variables：
 |---|---|
 | `NETBAIOT_ADMIN_SECRET` | 64-hex management bearer；未设置时 loopback management 存活但所有请求 forbidden |
 | `NETBAIOT_DELIVERY_TOKEN` | webhook bearer |
-| `NETBAIOT_BUSINESS_STREAM_TOKEN` | `business_tcp` hello token；配置 stream 时必填 |
+| `NETBAIOT_BUSINESS_RPC_TOKEN` | 回环开发 Business RPC token；生产使用 mTLS principal |
 | `RUST_LOG` | tracing filter，如 `info` 或 `netbaiot_server=debug` |
 | `NETBAIOT_PERF_LOCK_METRICS=1` | 仅性能实验的额外 lock timing；生产默认关闭 |
 

@@ -12,7 +12,7 @@ pub struct BusinessEventRequest {
     pub result: oneshot::Sender<std::result::Result<SinkAck, SinkError>>,
 }
 
-/// Shared owner of the stable `tcp-rpc` sink across V1 and V2 subscribers.
+/// Generation-fenced owner of the current required `tcp-rpc` sink subscriber.
 pub struct BusinessRpcEventSink {
     active: Mutex<Option<ActiveStream>>,
     availability: Notify,

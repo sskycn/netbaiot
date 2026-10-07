@@ -1,0 +1,69 @@
+{
+  "sha": "21a694576a84436c1d27a69f59ea1d1a32e5006b",
+  "runs": [
+    {
+      "id": 37584667363,
+      "name": "MQTT Device Profile decoder fuzz smoke",
+      "head_sha": "21a694576a84436c1d27a69f59ea1d1a32e5006b",
+      "conclusion": "success",
+      "html_url": "https://github.com/sskycn/netbaiot/actions/runs/37584667363"
+    },
+    {
+      "id": 37584558262,
+      "name": "Rust checks",
+      "head_sha": "21a694576a84436c1d27a69f59ea1d1a32e5006b",
+      "conclusion": "success",
+      "html_url": "https://github.com/sskycn/netbaiot/actions/runs/37584558262"
+    },
+    {
+      "id": 37584557763,
+      "name": "Native developer experience",
+      "head_sha": "21a694576a84436c1d27a69f59ea1d1a32e5006b",
+      "conclusion": "success",
+      "html_url": "https://github.com/sskycn/netbaiot/actions/runs/37584557763"
+    },
+    {
+      "id": 37584558051,
+      "name": "Native recovery and lifecycle",
+      "head_sha": "21a694576a84436c1d27a69f59ea1d1a32e5006b",
+      "conclusion": "success",
+      "html_url": "https://github.com/sskycn/netbaiot/actions/runs/37584558051"
+    }
+  ],
+  "platform_jobs": {
+    "recovery": [
+      {
+        "name": "recovery (windows-latest)",
+        "conclusion": "success",
+        "html_url": "https://github.com/sskycn/netbaiot/actions/runs/37584558051/job/112671625452"
+      },
+      {
+        "name": "recovery (ubuntu-latest)",
+        "conclusion": "success",
+        "html_url": "https://github.com/sskycn/netbaiot/actions/runs/37584558051/job/112671625598"
+      },
+      {
+        "name": "recovery (macos-latest)",
+        "conclusion": "success",
+        "html_url": "https://github.com/sskycn/netbaiot/actions/runs/37584558051/job/112671625645"
+      }
+    ],
+    "dx": [
+      {
+        "name": "dx (ubuntu-latest)",
+        "conclusion": "success",
+        "html_url": "https://github.com/sskycn/netbaiot/actions/runs/37584557763/job/112671624179"
+      },
+      {
+        "name": "dx (macos-latest)",
+        "conclusion": "success",
+        "html_url": "https://github.com/sskycn/netbaiot/actions/runs/37584557763/job/112671624460"
+      },
+      {
+        "name": "dx (windows-latest)",
+        "conclusion": "success",
+        "html_url": "https://github.com/sskycn/netbaiot/actions/runs/37584557763/job/112671624489"
+      }
+    ]
+  }
+}

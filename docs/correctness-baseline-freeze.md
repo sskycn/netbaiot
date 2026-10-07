@@ -1,5 +1,7 @@
 # Correctness baseline freeze
 
+> Historical evidence recorded before the 2026-10-07 current-only cleanup. Preserve the recorded results and original version context; current support: [protocol matrix](protocol-support.md), [upgrade](migration/current-protocol-only.md).
+
 Baseline SHA: `564583edb5e805ba8d626ed7b774f7cce55c87b7`.
 
 Final SHA: the local commit containing this report; the exact content-derived SHA is

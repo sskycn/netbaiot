@@ -160,7 +160,7 @@ async fn run(cli: Cli) -> Result<(), CliError> {
                     netbaiot_server::check_config(
                         &config,
                         env::var("NETBAIOT_ADMIN_SECRET").ok().as_deref(),
-                        env::var("NETBAIOT_BUSINESS_STREAM_TOKEN").ok().as_deref(),
+                        None,
                     )
                     .await
                 }

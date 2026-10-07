@@ -69,9 +69,7 @@ pub async fn serve_path(path: &Path) -> std::result::Result<(), ServeError> {
     let report = check_config(
         &config,
         std::env::var("NETBAIOT_ADMIN_SECRET").ok().as_deref(),
-        std::env::var("NETBAIOT_BUSINESS_STREAM_TOKEN")
-            .ok()
-            .as_deref(),
+        None,
     )
     .await;
     if !report.valid {

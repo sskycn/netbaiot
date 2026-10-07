@@ -121,8 +121,8 @@ doc = false
 bench = false
 
 [[bin]]
-name = "business_stream"
-path = "fuzz_targets/business_stream.rs"
+name = "business_rpc_bootstrap"
+path = "fuzz_targets/business_rpc_bootstrap.rs"
 test = false
 doc = false
 bench = false
@@ -130,13 +130,6 @@ bench = false
 [[bin]]
 name = "device_classifier"
 path = "fuzz_targets/device_classifier.rs"
-test = false
-doc = false
-bench = false
-
-[[bin]]
-name = "business_rpc_v2"
-path = "fuzz_targets/business_rpc_v2.rs"
 test = false
 doc = false
 bench = false

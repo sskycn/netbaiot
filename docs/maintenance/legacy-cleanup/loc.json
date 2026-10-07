@@ -1,0 +1,21 @@
+{
+  "method": "Physical lines in all git-tracked .rs files per named crate, including tests/examples/measurement probes. Net difference includes added current tests.",
+  "before": {
+    "apps/netbaiot-server": 10225,
+    "apps/netbaiot-cli": 2457,
+    "crates/netbaiot-runtime": 15154,
+    "crates/netbaiot-client": 4507,
+    "crates/netbaiot-device-sdk": 2355,
+    "crates/netbaiot-transports": 27063,
+    "crates/netbaiot-protocol": 1873
+  },
+  "after": {
+    "apps/netbaiot-server": 9572,
+    "apps/netbaiot-cli": 2463,
+    "crates/netbaiot-runtime": 14983,
+    "crates/netbaiot-client": 3206,
+    "crates/netbaiot-device-sdk": 2355,
+    "crates/netbaiot-transports": 25629,
+    "crates/netbaiot-protocol": 1587
+  }
+}

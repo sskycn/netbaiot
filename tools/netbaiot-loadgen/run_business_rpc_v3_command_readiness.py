@@ -137,10 +137,9 @@ def run():
         requests_per_ip_second=loopback_headroom,
     )
     gateway["business_rpc"] = {
-        "version": 2,
-        "v3": V3_LIMITS,
-        "v3_send_ahead": None,
-        "v3_experiment_socket_send_buffer_bytes": None,
+        "limits": V3_LIMITS,
+        "send_ahead": None,
+        "experiment_socket_send_buffer_bytes": None,
         "tls": {
             "certificate": str(FIXTURES / "localhost-cert.pem"),
             "private_key": str(FIXTURES / "localhost-key.pem"),
@@ -165,7 +164,6 @@ def run():
         ],
         "development_token_env": None,
         "development_role": None,
-        "allow_v1": False,
         "max_connections": 8,
         "auth_max_inflight": 32,
         "max_auth_control_offline_ms": 30000,

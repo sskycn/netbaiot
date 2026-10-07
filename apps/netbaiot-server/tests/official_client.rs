@@ -46,6 +46,14 @@ async fn test_config(root: &Path) -> Config {
     config.device_ingress = addresses[0];
     config.management_http = addresses[1];
     config.business_tcp = Some(addresses[2]);
+    config.business_rpc = Some(
+        serde_json::from_value(serde_json::json!({
+            "limits":netbaiot_protocol::business_rpc_v3::V3Limits::default(),
+            "tls":null,"development_token_env":"NETBAIOT_BUSINESS_RPC_TOKEN",
+            "development_role":"events"
+        }))
+        .unwrap(),
+    );
     drop(reservations);
     drop(udp);
     config.delivery_url = None;
@@ -67,7 +75,7 @@ fn start_server(path: &Path, admin: &str, stream_token: &str) -> Child {
     command
         .arg(path)
         .env("NETBAIOT_ADMIN_SECRET", admin)
-        .env("NETBAIOT_BUSINESS_STREAM_TOKEN", stream_token)
+        .env("NETBAIOT_BUSINESS_RPC_TOKEN", stream_token)
         .stdout(Stdio::null())
         .stderr(Stdio::inherit())
         .kill_on_drop(true);
@@ -188,24 +196,47 @@ async fn official_clients_cover_mqtt_tcp_command_ack_status_and_offline_contract
         .await
         .unwrap();
     malformed.write_all(&[0, 0, 0, 1, b'{']).await.unwrap();
-    let mut response_length = [0u8; 4];
-    malformed.read_exact(&mut response_length).await.unwrap();
-    let mut response = vec![0; usize::try_from(u32::from_be_bytes(response_length)).unwrap()];
-    malformed.read_exact(&mut response).await.unwrap();
-    assert!(matches!(
-        serde_json::from_slice::<StreamServerFrame>(&response).unwrap(),
-        StreamServerFrame::Error {
-            error: ApiError {
-                code: ErrorCode::InvalidRequest,
-                ..
-            },
-            ..
-        }
-    ));
+    let mut response = [0u8; 1];
+    assert_eq!(
+        tokio::time::timeout(Duration::from_secs(2), malformed.read(&mut response))
+            .await
+            .unwrap()
+            .unwrap(),
+        0
+    );
+
+    for version in [0, 1, 2, 4, u16::MAX] {
+        let mut peer = TcpStream::connect(config.business_tcp.unwrap())
+            .await
+            .unwrap();
+        let header = serde_json::to_vec(&business_rpc_v3::V3Bootstrap::Hello {
+            version,
+            token: Some(stream_token.into()),
+            limits: business_rpc_v3::V3Limits::default(),
+        })
+        .unwrap();
+        peer.write_all(&(header.len() as u32).to_be_bytes())
+            .await
+            .unwrap();
+        peer.write_all(&header).await.unwrap();
+        let mut reply = [0u8; 1];
+        assert_eq!(
+            tokio::time::timeout(Duration::from_secs(2), peer.read(&mut reply))
+                .await
+                .unwrap()
+                .unwrap(),
+            0
+        );
+    }
 
     let rejected = business_client(&config, &admin, "incorrect-stream-token").await;
     let rejected = rejected.events().subscribe(EventFilter::default()).await;
-    if !matches!(&rejected, Err(ClientError::Unauthenticated { .. })) {
+    if !matches!(
+        &rejected,
+        Err(ClientError::Unauthenticated { .. }
+            | ClientError::Timeout
+            | ClientError::ServerUnavailable { .. })
+    ) {
         match rejected {
             Ok(_) => panic!("invalid business stream token was accepted"),
             Err(error) => panic!("unexpected invalid-token result: {error:?}"),
@@ -455,6 +486,8 @@ async fn official_client_reconnects_and_replays_unacked_event_with_same_id() {
     let source = publish_heartbeat(&device, 9).await;
     let first_delivery = next_event(&mut events).await;
     assert_eq!(first_delivery.event().source_message_id, source);
+    assert_eq!(business.metrics().events_acked, 0);
+    assert!(business.runtime().status().await.unwrap().pending_required > 0);
 
     business.runtime().drain().await.unwrap();
     assert!(
@@ -624,4 +657,69 @@ async fn tcp_device_frame(socket: &mut TcpStream) -> Vec<u8> {
     })
     .await
     .unwrap()
+}
+
+#[tokio::test]
+async fn current_slow_consumer_requires_application_ack_and_drop_stops_connection() {
+    let root = std::env::temp_dir().join(format!("netbaiot-current-slow-{}", uuid::Uuid::new_v4()));
+    let config = test_config(&root).await;
+    let path = write_config(&root, &config);
+    let admin = "e".repeat(64);
+    let token = "current-slow-consumer";
+    let mut server = start_server(&path, &admin, token);
+    let business = business_client(&config, &admin, token).await;
+    wait_ready(&business, &mut server).await;
+    let events = business
+        .events()
+        .subscribe(EventFilter::default())
+        .await
+        .unwrap();
+    let device = device_client(&config).await;
+    publish_heartbeat(&device, 10).await;
+    tokio::time::timeout(Duration::from_secs(2), async {
+        while business.metrics().events_received == 0 {
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+    })
+    .await
+    .unwrap();
+    assert_eq!(business.metrics().events_acked, 0);
+    assert!(business.runtime().status().await.unwrap().pending_required > 0);
+    drop(events);
+    let http = reqwest::Client::builder().no_proxy().build().unwrap();
+    tokio::time::timeout(Duration::from_secs(2), async {
+        loop {
+            let metrics = http
+                .get(format!("http://{}/api/v1/metrics", config.management_http))
+                .bearer_auth(&admin)
+                .send()
+                .await
+                .unwrap()
+                .text()
+                .await
+                .unwrap();
+            if metrics
+                .lines()
+                .any(|line| line == "netbaiot_business_rpc_active_connections 0")
+            {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+    })
+    .await
+    .unwrap();
+    device
+        .shutdown_with_timeout(Duration::from_secs(2))
+        .await
+        .unwrap();
+    business.runtime().drain().await.unwrap();
+    assert!(
+        tokio::time::timeout(Duration::from_secs(5), server.wait())
+            .await
+            .unwrap()
+            .unwrap()
+            .success()
+    );
+    std::fs::remove_dir_all(root).unwrap();
 }

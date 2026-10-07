@@ -6,7 +6,7 @@ pub async fn run(config: Config, stop: CancellationToken) -> Result<()> {
         config,
         stop,
         std::env::var("NETBAIOT_ADMIN_SECRET").ok(),
-        std::env::var("NETBAIOT_BUSINESS_STREAM_TOKEN").ok(),
+        None,
     )
     .await
 }
@@ -42,9 +42,9 @@ pub async fn run_with_credentials(
     config: Config,
     stop: CancellationToken,
     admin_secret: Option<String>,
-    business_stream_token: Option<String>,
+    business_rpc_token: Option<String>,
 ) -> Result<()> {
-    run_with_credentials_ready(config, stop, admin_secret, business_stream_token, None).await
+    run_with_credentials_ready(config, stop, admin_secret, business_rpc_token, None).await
 }
 
 /// Like run_with_credentials, with one bounded startup notification for embedded hosts.
@@ -53,7 +53,7 @@ pub async fn run_with_credentials_ready(
     config: Config,
     stop: CancellationToken,
     admin_secret: Option<String>,
-    business_stream_token: Option<String>,
+    business_rpc_token: Option<String>,
     ready: Option<tokio::sync::oneshot::Sender<BoundAddresses>>,
 ) -> Result<()> {
     config.validate()?;
@@ -324,7 +324,11 @@ pub async fn run_with_credentials_ready(
                 let _ = tls;
                 BusinessIdentity::Mtls { identities }
             } else {
-                let token = rpc.development_token()?.ok_or(Error::Configuration)?;
+                let token = match &business_rpc_token {
+                    Some(value) if !value.is_empty() && value.len() <= 256 => value.clone(),
+                    Some(_) => return Err(Error::Configuration),
+                    None => rpc.development_token()?.ok_or(Error::Configuration)?,
+                };
                 let role = rpc.development_role.unwrap_or(BusinessRole::Multiplexed);
                 BusinessIdentity::Development {
                     token_hash: Sha256::digest(token.as_bytes()).into(),
@@ -362,13 +366,11 @@ pub async fn run_with_credentials_ready(
             let transport = BusinessRpcTransportConfig {
                 identity,
                 tls,
-                v3: rpc.v3.clone(),
-                v3_send_ahead: rpc.v3_send_ahead,
-                v3_experiment_socket_send_buffer_bytes: rpc.v3_experiment_socket_send_buffer_bytes,
+                limits: rpc.limits.clone(),
+                send_ahead: rpc.send_ahead,
+                experiment_socket_send_buffer_bytes: rpc.experiment_socket_send_buffer_bytes,
                 max_connections: rpc.max_connections,
-                max_frame_bytes: 8 * 1024 * 1024,
                 auth_max_inflight: rpc.auth_max_inflight,
-                heartbeat_ms: 5_000,
                 handshake_timeout: Duration::from_millis(limits.connect_timeout_ms),
                 read_timeout: Duration::from_millis(limits.packet_read_timeout_ms.max(15_000)),
                 write_timeout: Duration::from_millis(limits.write_timeout_ms),
@@ -381,45 +383,15 @@ pub async fn run_with_credentials_ready(
                 mqtt: mqtt_broker.clone(),
                 commands: base_services.commands.clone(),
             });
-            if rpc.allow_v1 {
-                let secret = business_stream_token
-                    .as_deref()
-                    .ok_or(Error::Configuration)?;
-                if secret.is_empty() || secret.len() > 256 {
-                    return Err(Error::Configuration);
-                }
-                let legacy_hash: [u8; 32] = Sha256::digest(secret.as_bytes()).into();
-                business_future = Some(Box::pin(serve_business_mixed(
-                    listener,
-                    sink.clone(),
-                    legacy_hash,
-                    transport,
-                    services,
-                    limits.clone(),
-                    (
-                        business_accept_stop.child_token(),
-                        business_connection_stop.child_token(),
-                    ),
-                )));
-            } else {
-                business_future = Some(Box::pin(business_rpc::serve(
-                    listener,
-                    transport,
-                    services,
-                    business_accept_stop.child_token(),
-                    business_connection_stop.child_token(),
-                )));
-            }
-        } else {
-            let secret = business_stream_token.ok_or(Error::Configuration)?;
-            let hash: [u8; 32] = Sha256::digest(secret.as_bytes()).into();
-            business_future = Some(Box::pin(serve_business_stream(
+            business_future = Some(Box::pin(business_rpc::serve(
                 listener,
-                sink,
-                hash,
-                limits.clone(),
-                work_listeners.child_token(),
+                transport,
+                services,
+                business_accept_stop.child_token(),
+                business_connection_stop.child_token(),
             )));
+        } else {
+            return Err(Error::Configuration);
         }
     }
     let event_workers = events.start_owned_workers()?;
@@ -661,81 +633,6 @@ pub(crate) async fn watch_business_auth_offline(
             _ = tokio::time::sleep_until(deadline.unwrap_or_else(tokio::time::Instant::now)), if deadline.is_some() && !invalidated => {}
         }
     }
-}
-
-async fn serve_business_mixed(
-    listener: TcpListener,
-    sink: Arc<BusinessRpcEventSink>,
-    legacy_token_hash: [u8; 32],
-    transport: BusinessRpcTransportConfig,
-    services: Arc<BusinessRpcServices>,
-    limits: Arc<Limits>,
-    stops: (CancellationToken, CancellationToken),
-) -> Result<()> {
-    let (stop_accepting, stop_connections) = stops;
-    transport.validate(listener.local_addr().map_err(|_| Error::Unavailable)?)?;
-    let mut tasks = JoinSet::new();
-    loop {
-        let accepted = tokio::select! {
-            _ = stop_accepting.cancelled() => break,
-            completed = tasks.join_next(), if !tasks.is_empty() => { if let Some(Err(error)) = completed { tracing::warn!(%error, "business mixed connection failed"); } continue; },
-            accepted = listener.accept() => accepted.map_err(|_| Error::Unavailable)?,
-        };
-        if tasks.len() >= transport.max_connections {
-            drop(accepted.0);
-            continue;
-        }
-        let (mut stream, _) = accepted;
-        let sink = sink.clone();
-        let services = services.clone();
-        let transport = transport.clone();
-        let limits = limits.clone();
-        let stop = stop_connections.child_token();
-        tasks.spawn(async move {
-            let first =
-                tokio::time::timeout(Duration::from_millis(limits.connect_timeout_ms), async {
-                    let mut header = [0u8; 4];
-                    stream
-                        .read_exact(&mut header)
-                        .await
-                        .map_err(|_| Error::Unavailable)?;
-                    let length =
-                        usize::try_from(u32::from_be_bytes(header)).map_err(|_| Error::Invalid)?;
-                    if length == 0 || length > limits.max_tcp_frame_size {
-                        return Err(Error::Invalid);
-                    }
-                    let mut payload = vec![0u8; length];
-                    stream
-                        .read_exact(&mut payload)
-                        .await
-                        .map_err(|_| Error::Unavailable)?;
-                    Ok::<_, Error>(payload)
-                })
-                .await
-                .map_err(|_| Error::Timeout)??;
-            let header: serde_json::Value =
-                serde_json::from_slice(&first).map_err(|_| Error::Invalid)?;
-            match header.get("version").and_then(|value| value.as_u64()) {
-                Some(1) => {
-                    serve_business_connection(
-                        stream,
-                        sink,
-                        legacy_token_hash,
-                        limits,
-                        stop,
-                        Some(first),
-                    )
-                    .await
-                }
-                Some(2 | 3) if first.len() <= BUSINESS_RPC_HELLO_MAX_BYTES => {
-                    business_rpc::serve_accepted(stream, transport, services, stop, first).await
-                }
-                _ => Err(Error::Invalid),
-            }
-        });
-    }
-    while tasks.join_next().await.is_some() {}
-    Ok(())
 }
 
 pub(crate) fn shutdown_can_finish(

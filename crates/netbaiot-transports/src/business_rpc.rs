@@ -1,31 +1,28 @@
-//! Business RPC V2 transport: one reader, one writer, one event window per connection.
+//! Current Business RPC transport and shared authorization/control state.
 mod v3;
 use crate::mqtt::broker::MqttBroker;
 use netbaiot_core::{
-    AuthInvalidation, EventAck, EventDelivery, SubscriptionId, TenantId,
+    AuthInvalidation, EventDelivery, SubscriptionId, TenantId,
     business_rpc::{
         AuthInvalidateRequest, AuthInvalidateResponse, AuthSyncRequest, AuthSyncResponse,
-        BUSINESS_RPC_AUTH_MAX_BYTES, BUSINESS_RPC_EVENT_WINDOW, BUSINESS_RPC_HELLO_MAX_BYTES,
-        BUSINESS_RPC_MAX_TOKEN_BYTES, BUSINESS_RPC_VERSION, BusinessLimits, BusinessRole,
-        BusinessRpcFrame, DeviceCommandSendRequest, DeviceCommandSendResponse, RpcError,
-        RpcErrorCode,
+        BUSINESS_RPC_AUTH_MAX_BYTES, BUSINESS_RPC_HELLO_MAX_BYTES, BUSINESS_RPC_MAX_TOKEN_BYTES,
+        BusinessRole, DeviceCommandSendRequest, DeviceCommandSendResponse, RpcError, RpcErrorCode,
     },
 };
 use netbaiot_runtime::{
     BusinessEventRequest, BusinessProviderScope, BusinessRpcCall, BusinessRpcEventSink,
     BusinessRpcOutbound, BusinessRpcRegistry, CommandService, Error, Ingress, ProviderLease,
     Result, SinkAck, SinkError,
-    metrics::{BusinessRpcQueueClass, Histogram, Metric, Metrics},
+    metrics::{Histogram, Metric, Metrics},
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
-    collections::HashMap,
     net::SocketAddr,
     pin::Pin,
     sync::{
-        Arc, Mutex,
-        atomic::{AtomicBool, AtomicU64, Ordering},
+        Arc,
+        atomic::{AtomicU64, Ordering},
     },
     task::{Context, Poll},
     time::Duration,
@@ -130,29 +127,9 @@ impl BusinessPrincipal {
             | AuthInvalidation::All => self.global,
         }
     }
-    fn permits_role(&self, role: BusinessRole) -> bool {
-        (!role.auth_control()
-            || (self.role.auth_control()
-                && self.provider_id.as_deref() == Some("primary")
-                && self
-                    .provide_methods
-                    .iter()
-                    .any(|m| m == "device.authenticate")
-                && self
-                    .provide_methods
-                    .iter()
-                    .any(|m| m == "device.resolve_verifier")
-                && self.call_methods.iter().any(|m| m == "auth.sync")
-                && self.call_methods.iter().any(|m| m == "auth.invalidate")))
-            && (!role.events()
-                || (self.role.events() && self.sink_id.as_deref() == Some("tcp-rpc")))
-            && (!role.commands()
-                || (self.role.commands()
-                    && self.call_methods.iter().any(|m| m == "device.command.send")))
-    }
 }
 
-/// The caller must supply either a loopback development token or a verified mTLS identity map.
+/// Explicit current-protocol token or verified certificate identity, never device credentials.
 #[derive(Clone)]
 pub enum BusinessIdentity {
     Development {
@@ -168,14 +145,12 @@ pub enum BusinessIdentity {
 pub struct BusinessRpcTransportConfig {
     pub identity: BusinessIdentity,
     pub tls: Option<TlsAcceptor>,
-    pub v3: Option<netbaiot_core::business_rpc_v3::V3Limits>,
-    pub v3_send_ahead: Option<V3SendAhead>,
+    pub limits: netbaiot_core::business_rpc_v3::V3Limits,
+    pub send_ahead: Option<V3SendAhead>,
     /// Experiment only: OS socket send buffer request, outside the V3 protocol.
-    pub v3_experiment_socket_send_buffer_bytes: Option<usize>,
+    pub experiment_socket_send_buffer_bytes: Option<usize>,
     pub max_connections: usize,
-    pub max_frame_bytes: usize,
     pub auth_max_inflight: usize,
-    pub heartbeat_ms: u32,
     pub handshake_timeout: Duration,
     pub read_timeout: Duration,
     pub write_timeout: Duration,
@@ -200,21 +175,16 @@ impl V3SendAhead {
 impl BusinessRpcTransportConfig {
     pub fn validate(&self, address: SocketAddr) -> Result<()> {
         if self.max_connections == 0
-            || self.v3.as_ref().is_some_and(|v3| v3.validate().is_err())
-            || self.v3_send_ahead.is_some_and(|policy| {
-                self.v3
-                    .as_ref()
-                    .is_none_or(|limits| policy.as_mux().validate(limits).is_err())
-            })
+            || self.limits.validate().is_err()
             || self
-                .v3_experiment_socket_send_buffer_bytes
-                .is_some_and(|size| self.v3.is_none() || !(4096..=4 * 1024 * 1024).contains(&size))
+                .send_ahead
+                .is_some_and(|policy| policy.as_mux().validate(&self.limits).is_err())
+            || self
+                .experiment_socket_send_buffer_bytes
+                .is_some_and(|size| !(4096..=4 * 1024 * 1024).contains(&size))
             || self.max_connections > 1024
-            || self.max_frame_bytes < BUSINESS_RPC_AUTH_MAX_BYTES
-            || self.max_frame_bytes > 8 * 1024 * 1024
             || self.auth_max_inflight == 0
             || self.auth_max_inflight > u16::MAX as usize
-            || self.heartbeat_ms == 0
             || self.handshake_timeout.is_zero()
             || self.read_timeout.is_zero()
             || self.write_timeout.is_zero()
@@ -231,16 +201,6 @@ impl BusinessRpcTransportConfig {
             _ => return Err(Error::Configuration),
         }
         Ok(())
-    }
-    fn negotiated(&self, requested: &BusinessLimits) -> BusinessLimits {
-        BusinessLimits {
-            max_frame_bytes: requested.max_frame_bytes.min(self.max_frame_bytes as u32),
-            auth_max_inflight: requested
-                .auth_max_inflight
-                .min(self.auth_max_inflight as u16),
-            event_max_inflight: BUSINESS_RPC_EVENT_WINDOW,
-            heartbeat_ms: requested.heartbeat_ms.max(self.heartbeat_ms),
-        }
     }
 }
 
@@ -279,7 +239,7 @@ pub async fn serve(
         let services = services.clone();
         let stop = stop_connections.child_token();
         tasks.spawn(async move {
-            let _ = connection(stream, config, services, stop, None).await;
+            let _ = connection(stream, config, services, stop).await;
         });
     }
     while tasks.join_next().await.is_some() {}
@@ -311,62 +271,41 @@ async fn read_frame<R: AsyncRead + Unpin>(
     .await
     .map_err(|_| Error::Timeout)?
 }
-async fn write_frame<W: AsyncWrite + Unpin>(
-    writer: &mut W,
-    frame: &BusinessRpcFrame,
-    maximum: usize,
-    timeout: Duration,
-) -> Result<()> {
-    let payload = serde_json::to_vec(frame).map_err(|_| Error::Internal)?;
-    let length = u32::try_from(payload.len()).map_err(|_| Error::Overloaded)?;
-    if length == 0 || payload.len() > maximum {
-        return Err(Error::Overloaded);
-    }
-    // A partial write failure closes the connection; the writer never attempts another frame.
-    tokio::time::timeout(timeout, async {
-        writer
-            .write_all(&length.to_be_bytes())
-            .await
-            .map_err(|_| Error::Unavailable)?;
-        writer
-            .write_all(&payload)
-            .await
-            .map_err(|_| Error::Unavailable)?;
-        Ok(())
-    })
-    .await
-    .map_err(|_| Error::Timeout)?
+#[derive(Serialize)]
+struct RpcReply {
+    request_id: Uuid,
+    method: String,
+    body: Option<serde_json::Value>,
+    error: Option<RpcError>,
 }
 
 struct Queued {
-    frame: BusinessRpcFrame,
-    written: Option<oneshot::Sender<Result<()>>>,
+    frame: RpcReply,
     _bytes: OwnedSemaphorePermit,
-    _tracking: Option<QueueTrack>,
+    _tracking: QueueTrack,
 }
 struct QueueTrack {
     metrics: Arc<Metrics>,
-    class: BusinessRpcQueueClass,
     bytes: u64,
 }
 impl Drop for QueueTrack {
     fn drop(&mut self) {
-        self.metrics.business_rpc_queue_sub(self.class, self.bytes);
+        self.metrics.business_rpc_queue_sub(self.bytes);
     }
 }
 fn response<T: Serialize>(
     id: Uuid,
     method: &str,
     result: std::result::Result<T, RpcError>,
-) -> BusinessRpcFrame {
+) -> RpcReply {
     match result {
-        Ok(value) => BusinessRpcFrame::Response {
+        Ok(value) => RpcReply {
             request_id: id,
             method: method.into(),
             body: serde_json::to_value(value).ok(),
             error: None,
         },
-        Err(error) => BusinessRpcFrame::Response {
+        Err(error) => RpcReply {
             request_id: id,
             method: method.into(),
             body: None,
@@ -374,16 +313,14 @@ fn response<T: Serialize>(
         },
     }
 }
-fn error(id: Uuid, method: &str, code: RpcErrorCode, message: &str) -> BusinessRpcFrame {
+fn error(id: Uuid, method: &str, code: RpcErrorCode, message: &str) -> RpcReply {
     response::<()>(id, method, Err(RpcError::new(code, message)))
 }
 fn queue(
     tx: &mpsc::Sender<Queued>,
     budget: &Arc<Semaphore>,
     metrics: &Arc<Metrics>,
-    class: BusinessRpcQueueClass,
-    frame: BusinessRpcFrame,
-    written: Option<oneshot::Sender<Result<()>>>,
+    frame: RpcReply,
 ) -> Result<()> {
     let size = serde_json::to_vec(&frame)
         .map_err(|_| Error::Internal)?
@@ -396,16 +333,14 @@ fn queue(
             metrics.inc(Metric::BusinessRpcOverloads);
             Error::Overloaded
         })?;
-    metrics.business_rpc_queue_add(class, size as u64);
+    metrics.business_rpc_queue_add(size as u64);
     tx.try_send(Queued {
         frame,
-        written,
         _bytes: bytes,
-        _tracking: Some(QueueTrack {
+        _tracking: QueueTrack {
             metrics: metrics.clone(),
-            class,
             bytes: size as u64,
-        }),
+        },
     })
     .map_err(|_| {
         metrics.inc(Metric::BusinessRpcOverloads);
@@ -413,33 +348,17 @@ fn queue(
     })
 }
 
-/// Serve a plaintext V2 connection whose Hello frame was consumed by an explicit
-/// loopback V1/V2 dispatcher. TLS listeners use `serve` and never sniff protocols.
-pub async fn serve_accepted(
-    stream: TcpStream,
-    config: BusinessRpcTransportConfig,
-    services: Arc<BusinessRpcServices>,
-    stop: CancellationToken,
-    first_frame: Vec<u8>,
-) -> Result<()> {
-    if config.tls.is_some() {
-        return Err(Error::Configuration);
-    }
-    connection(stream, config, services, stop, Some(first_frame)).await
-}
-
 async fn connection(
     stream: TcpStream,
     config: BusinessRpcTransportConfig,
     services: Arc<BusinessRpcServices>,
     stop: CancellationToken,
-    first_frame: Option<Vec<u8>>,
 ) -> Result<()> {
     let metrics = services.ingress.metrics.clone();
     metrics.inc(Metric::BusinessRpcConnections);
     metrics.business_rpc_connection_started();
     let _active = ActiveBusinessConnection(metrics.clone());
-    let result = connection_inner(stream, config, services, stop, first_frame).await;
+    let result = connection_inner(stream, config, services, stop).await;
     if result.is_err() {
         metrics.inc(Metric::BusinessRpcAbnormalClosures);
     }
@@ -451,12 +370,10 @@ async fn connection_inner(
     config: BusinessRpcTransportConfig,
     services: Arc<BusinessRpcServices>,
     stop: CancellationToken,
-    first_frame: Option<Vec<u8>>,
 ) -> Result<()> {
-    let metrics = services.ingress.metrics.clone();
-    if config.v3.is_some() {
+    {
         let socket = socket2::SockRef::from(&stream);
-        if let Some(bytes) = config.v3_experiment_socket_send_buffer_bytes {
+        if let Some(bytes) = config.experiment_socket_send_buffer_bytes {
             socket
                 .set_send_buffer_size(bytes)
                 .map_err(|_| Error::Configuration)?;
@@ -469,7 +386,7 @@ async fn connection_inner(
     }
     let stream = ObservedSocket {
         inner: stream,
-        trace: config.v3.is_some() && std::env::var_os("NETBAIOT_V3_SOCKET_TRACE").is_some(),
+        trace: std::env::var_os("NETBAIOT_V3_SOCKET_TRACE").is_some(),
     };
     let (mut io, certificate): (Box<dyn Io>, Option<Vec<u8>>) = if let Some(acceptor) = &config.tls
     {
@@ -487,577 +404,19 @@ async fn connection_inner(
     } else {
         (Box::new(stream), None)
     };
-    let hello = match first_frame {
-        Some(frame) => frame,
-        None => {
-            read_frame(
-                &mut io,
-                BUSINESS_RPC_HELLO_MAX_BYTES,
-                config.handshake_timeout,
-            )
-            .await?
-        }
-    };
-    if serde_json::from_slice::<serde_json::Value>(&hello)
-        .ok()
-        .and_then(|value| value.get("version").and_then(serde_json::Value::as_u64))
-        == Some(3)
-    {
-        return v3::connection(io, certificate, hello, config, services, stop).await;
-    }
-    let hello_frame: BusinessRpcFrame =
-        serde_json::from_slice(&hello).map_err(|_| Error::Invalid)?;
-    hello_frame.validate().map_err(|_| Error::Invalid)?;
-    let BusinessRpcFrame::Hello {
-        version,
-        role,
-        token,
-        limits,
-    } = hello_frame
-    else {
-        return Err(Error::Invalid);
-    };
-    if version != BUSINESS_RPC_VERSION
-        || limits.max_frame_bytes < BUSINESS_RPC_AUTH_MAX_BYTES as u32
-        || limits.auth_max_inflight == 0
-        || limits.event_max_inflight != BUSINESS_RPC_EVENT_WINDOW
-        || limits.heartbeat_ms == 0
-    {
-        return Err(Error::Invalid);
-    }
-    let principal = match (&config.identity, certificate.as_deref()) {
-        (
-            BusinessIdentity::Development {
-                token_hash,
-                principal,
-            },
-            None,
-        ) => token
-            .as_deref()
-            .filter(|token| {
-                token.len() <= BUSINESS_RPC_MAX_TOKEN_BYTES
-                    && bool::from(
-                        Sha256::digest(token.as_bytes())
-                            .as_slice()
-                            .ct_eq(token_hash),
-                    )
-            })
-            .map(|_| principal.clone()),
-        (BusinessIdentity::Mtls { identities }, Some(cert)) if token.is_none() => {
-            let hash: [u8; 32] = Sha256::digest(cert).into();
-            identities
-                .iter()
-                .find(|(fingerprint, _)| bool::from(hash.ct_eq(fingerprint)))
-                .map(|(_, principal)| principal.clone())
-        }
-        _ => None,
-    };
-    let Some(principal) = principal else {
-        let _ = write_frame(
-            &mut io,
-            &BusinessRpcFrame::GoAway {
-                error: RpcError::new(
-                    RpcErrorCode::Unauthenticated,
-                    "business identity not authorized",
-                ),
-            },
-            BUSINESS_RPC_HELLO_MAX_BYTES,
-            config.write_timeout,
-        )
-        .await;
-        return Err(Error::Authentication);
-    };
-    if principal
-        .expires_at_ms
-        .is_some_and(|expiry| expiry <= netbaiot_runtime::now_ms())
-        || !principal.permits_role(role)
-    {
-        let _ = write_frame(
-            &mut io,
-            &BusinessRpcFrame::GoAway {
-                error: RpcError::new(RpcErrorCode::Forbidden, "business role not permitted"),
-            },
-            BUSINESS_RPC_HELLO_MAX_BYTES,
-            config.write_timeout,
-        )
-        .await;
-        return Err(Error::Forbidden);
-    }
-    let negotiated = config.negotiated(&limits);
-    let effective_max = negotiated.max_frame_bytes as usize;
-    let (mut reader, mut writer) = tokio::io::split(io);
-    let (control_tx, control_rx) = mpsc::channel::<Queued>(16);
-    let control_budget = Arc::new(Semaphore::new(16 * BUSINESS_RPC_AUTH_MAX_BYTES));
-    let (command_tx, command_rx) = mpsc::channel::<Queued>(16);
-    let command_budget = Arc::new(Semaphore::new(16 * BUSINESS_RPC_AUTH_MAX_BYTES));
-    let (command_work_tx, command_work_rx) = mpsc::channel::<CommandRequest>(16);
-    let command_work_budget = Arc::new(Semaphore::new(16 * BUSINESS_RPC_AUTH_MAX_BYTES));
-    let command_cancellations = Arc::new(Mutex::new(HashMap::<Uuid, Arc<AtomicBool>>::new()));
-    let event_budget = Arc::new(Semaphore::new(effective_max));
-    let (auth_tx, auth_rx) =
-        mpsc::channel::<BusinessRpcOutbound>(negotiated.auth_max_inflight as usize);
-    let (event_tx, event_rx) = mpsc::channel::<Queued>(1);
-    let (ack_tx, ack_rx) = mpsc::channel::<EventSignal>(2);
-    let mut provider = if role.auth_control() {
-        Some(Arc::new(services.registry.register_with_expiry(
-            auth_tx,
-            BusinessProviderScope {
-                global: principal.global,
-                tenants: principal.tenants.clone(),
-            },
-            principal.expires_at_ms,
-        )?))
-    } else {
-        None
-    };
-    let epoch = provider.as_ref().map_or(0, |lease| lease.epoch());
-    let lease_epoch = if epoch == 0 {
-        (Uuid::new_v4().as_u128() as u64).max(1)
-    } else {
-        epoch
-    };
-    write_frame(
-        &mut writer,
-        &BusinessRpcFrame::Ready {
-            version: BUSINESS_RPC_VERSION,
-            role,
-            connection_epoch: lease_epoch,
-            limits: negotiated.clone(),
-        },
-        effective_max,
-        config.write_timeout,
+    let hello = read_frame(
+        &mut io,
+        BUSINESS_RPC_HELLO_MAX_BYTES,
+        config.handshake_timeout,
     )
     .await?;
-    let connection_stop = stop.child_token();
-    let writer_stop = connection_stop.child_token();
-    let writer_metrics = metrics.clone();
-    let writer_handle = tokio::spawn(async move {
-        let result = writer_loop(
-            writer,
-            (control_rx, command_rx),
-            auth_rx,
-            event_rx,
-            effective_max,
-            config.write_timeout,
-            WriterSignals {
-                metrics: writer_metrics,
-                stop: writer_stop.clone(),
-            },
-        )
-        .await;
-        writer_stop.cancel();
-        result
-    });
-    let mut subscription: Option<(SubscriptionId, u64, tokio::task::JoinHandle<()>)> = None;
-    let mut ack_rx = Some(ack_rx);
-    let sync_confirmation = Arc::new(AtomicU64::new(0));
-    let (control_work_tx, control_work_rx) = mpsc::channel::<ControlRequest>(16);
-    let control_worker = provider.as_ref().map(|lease| {
-        tokio::spawn(control_loop(
-            control_work_rx,
-            control_tx.clone(),
-            control_budget.clone(),
-            services.clone(),
-            (lease.clone(), principal.clone()),
-            sync_confirmation.clone(),
-            connection_stop.clone(),
-        ))
-    });
-    let command_worker = tokio::spawn(command_loop(
-        command_work_rx,
-        command_tx.clone(),
-        command_budget.clone(),
-        services.clone(),
-        principal.clone(),
-        command_cancellations.clone(),
-        connection_stop.clone(),
-    ));
-    let expiry_deadline = principal.expires_at_ms.and_then(|expires_at| {
-        let remaining_ms = expires_at.saturating_sub(netbaiot_runtime::now_ms()).max(0) as u64;
-        tokio::time::Instant::now().checked_add(Duration::from_millis(remaining_ms))
-    });
-    let result = loop {
-        if principal
-            .expires_at_ms
-            .is_some_and(|expiry| expiry <= netbaiot_runtime::now_ms())
-        {
-            break Err(Error::Forbidden);
-        }
-        let bytes = tokio::select! {
-            _ = connection_stop.cancelled() => break Ok(()),
-            _ = tokio::time::sleep_until(expiry_deadline.unwrap_or_else(tokio::time::Instant::now)), if expiry_deadline.is_some() => break Err(Error::Forbidden),
-            result = read_frame(&mut reader, effective_max, config.read_timeout) => match result { Ok(value) => value, Err(error) => break Err(error) },
-        };
-        let frame: BusinessRpcFrame = match serde_json::from_slice(&bytes) {
-            Ok(value) => value,
-            Err(_) => break Err(Error::Invalid),
-        };
-        if frame.validate().is_err() {
-            break Err(Error::Invalid);
-        }
-        match frame {
-            BusinessRpcFrame::Response {
-                request_id,
-                method,
-                body,
-                error,
-            } if role.auth_control() => {
-                if bytes.len() > BUSINESS_RPC_AUTH_MAX_BYTES
-                    || !principal
-                        .provide_methods
-                        .iter()
-                        .any(|allowed| allowed == &method)
-                {
-                    break Err(Error::Forbidden);
-                }
-                let remote_code = error.as_ref().map(|error| error.code);
-                let result = match (body, error) {
-                    (Some(body), None) => Ok(body),
-                    (None, Some(error)) => Err(netbaiot_runtime::rpc_error_to_runtime(error.code)),
-                    _ => Err(Error::Invalid),
-                };
-                if services
-                    .registry
-                    .complete(epoch, request_id, &method, result)
-                    && let Some(code) = remote_code
-                {
-                    metrics.business_rpc_remote_error(&method, code);
-                }
-            }
-            BusinessRpcFrame::Subscribe {
-                subscription_id,
-                filter,
-            } if role.events() => {
-                if subscription.is_some()
-                    || filter.validate().is_err()
-                    || (!principal.global
-                        && filter
-                            .tenant
-                            .as_ref()
-                            .is_none_or(|tenant| !principal.allows_tenant(tenant)))
-                {
-                    break Err(Error::Invalid);
-                }
-                let ack_receiver = ack_rx.take().ok_or(Error::Internal)?;
-                let (send, recv) = mpsc::channel(1);
-                let generation = services.sink.claim(send, filter)?;
-                let (written, subscribed_written) = oneshot::channel();
-                if let Err(error) = queue(
-                    &control_tx,
-                    &control_budget,
-                    &metrics,
-                    BusinessRpcQueueClass::Control,
-                    BusinessRpcFrame::Subscribed { subscription_id },
-                    Some(written),
-                ) {
-                    let _ = services.sink.release(generation);
-                    break Err(error);
-                }
-                match subscribed_written.await {
-                    Ok(Ok(())) => {}
-                    _ => {
-                        let _ = services.sink.release(generation);
-                        break Err(Error::Unavailable);
-                    }
-                }
-                let worker_stop = connection_stop.clone();
-                let handle = tokio::spawn(event_loop(
-                    recv,
-                    ack_receiver,
-                    event_tx.clone(),
-                    (event_budget.clone(), metrics.clone()),
-                    subscription_id,
-                    config.event_ack_timeout,
-                    worker_stop,
-                ));
-                subscription = Some((subscription_id, generation, handle));
-            }
-            BusinessRpcFrame::EventAck { ack } if role.events() => {
-                if subscription
-                    .as_ref()
-                    .is_none_or(|(id, _, _)| *id != ack.subscription_id)
-                {
-                    break Err(Error::Invalid);
-                }
-                let _ = ack_tx.try_send(EventSignal { ack, success: true });
-            }
-            BusinessRpcFrame::EventNack { ack, .. } if role.events() => {
-                if subscription
-                    .as_ref()
-                    .is_none_or(|(id, _, _)| *id != ack.subscription_id)
-                {
-                    break Err(Error::Invalid);
-                }
-                let _ = ack_tx.try_send(EventSignal {
-                    ack,
-                    success: false,
-                });
-            }
-            BusinessRpcFrame::Ping { nonce } => {
-                let revision = sync_confirmation.load(Ordering::Acquire);
-                if revision != 0
-                    && revision != u64::MAX
-                    && sync_confirmation
-                        .compare_exchange(revision, 0, Ordering::AcqRel, Ordering::Acquire)
-                        .is_ok()
-                    && let Some(lease) = provider.as_ref()
-                    && let Ok(_admission) = services.ingress.lifecycle.begin_admission()
-                {
-                    lease.mark_serving(revision)?;
-                }
-                queue(
-                    &control_tx,
-                    &control_budget,
-                    &metrics,
-                    BusinessRpcQueueClass::Control,
-                    BusinessRpcFrame::Pong { nonce },
-                    None,
-                )?;
-            }
-            BusinessRpcFrame::Pong { .. } => {}
-            BusinessRpcFrame::Cancel { request_id } => {
-                if let Ok(cancellations) = command_cancellations.lock()
-                    && let Some(cancelled) = cancellations.get(&request_id)
-                {
-                    cancelled.store(true, Ordering::Release);
-                }
-            }
-            BusinessRpcFrame::GoAway { .. } => break Ok(()),
-            BusinessRpcFrame::Request {
-                request_id,
-                method,
-                deadline_ms,
-                body,
-            } if method == "device.command.send" => {
-                if !role.commands()
-                    || !principal
-                        .call_methods
-                        .iter()
-                        .any(|allowed| allowed == &method)
-                {
-                    queue(
-                        &command_tx,
-                        &command_budget,
-                        &metrics,
-                        BusinessRpcQueueClass::Command,
-                        error(
-                            request_id,
-                            &method,
-                            RpcErrorCode::Forbidden,
-                            "method not permitted",
-                        ),
-                        None,
-                    )?;
-                    continue;
-                }
-                let body_bytes = serde_json::to_vec(&body).map_err(|_| Error::Invalid)?.len();
-                let permits = u32::try_from(body_bytes).map_err(|_| Error::Overloaded)?;
-                let admitted = command_work_budget.clone().try_acquire_many_owned(permits);
-                let Ok(bytes) = admitted else {
-                    queue(
-                        &command_tx,
-                        &command_budget,
-                        &metrics,
-                        BusinessRpcQueueClass::Command,
-                        error(
-                            request_id,
-                            &method,
-                            RpcErrorCode::Overloaded,
-                            "command bytes exhausted",
-                        ),
-                        None,
-                    )?;
-                    continue;
-                };
-                let cancelled = Arc::new(AtomicBool::new(false));
-                let duplicate = match command_cancellations.lock() {
-                    Ok(mut cancellations) => {
-                        if let std::collections::hash_map::Entry::Vacant(entry) =
-                            cancellations.entry(request_id)
-                        {
-                            entry.insert(cancelled.clone());
-                            false
-                        } else {
-                            true
-                        }
-                    }
-                    Err(_) => break Err(Error::Internal),
-                };
-                if duplicate {
-                    queue(
-                        &command_tx,
-                        &command_budget,
-                        &metrics,
-                        BusinessRpcQueueClass::Command,
-                        error(
-                            request_id,
-                            &method,
-                            RpcErrorCode::Conflict,
-                            "request ID already pending",
-                        ),
-                        None,
-                    )?;
-                    continue;
-                }
-                let deadline = tokio::time::Instant::now()
-                    .checked_add(Duration::from_millis(u64::from(deadline_ms)))
-                    .ok_or(Error::Invalid)?;
-                if command_work_tx
-                    .try_send(CommandRequest {
-                        request_id,
-                        body,
-                        deadline,
-                        cancelled,
-                        _bytes: bytes,
-                    })
-                    .is_err()
-                {
-                    if let Ok(mut cancellations) = command_cancellations.lock() {
-                        cancellations.remove(&request_id);
-                    }
-                    queue(
-                        &command_tx,
-                        &command_budget,
-                        &metrics,
-                        BusinessRpcQueueClass::Command,
-                        error(
-                            request_id,
-                            &method,
-                            RpcErrorCode::Overloaded,
-                            "command queue full",
-                        ),
-                        None,
-                    )?;
-                }
-            }
-            BusinessRpcFrame::Request {
-                request_id,
-                method,
-                deadline_ms: _,
-                body: _,
-            } if !role.auth_control() => {
-                queue(
-                    &control_tx,
-                    &control_budget,
-                    &metrics,
-                    BusinessRpcQueueClass::Control,
-                    error(
-                        request_id,
-                        &method,
-                        RpcErrorCode::Forbidden,
-                        "method not permitted",
-                    ),
-                    None,
-                )?;
-            }
-            BusinessRpcFrame::Request {
-                request_id,
-                method,
-                deadline_ms,
-                body,
-            } if role.auth_control() => {
-                if bytes.len() > BUSINESS_RPC_AUTH_MAX_BYTES || deadline_ms == 0 {
-                    break Err(Error::Invalid);
-                }
-                if matches!(method.as_str(), "auth.sync" | "auth.invalidate")
-                    && !principal
-                        .call_methods
-                        .iter()
-                        .any(|allowed| allowed == &method)
-                {
-                    queue(
-                        &control_tx,
-                        &control_budget,
-                        &metrics,
-                        BusinessRpcQueueClass::Control,
-                        error(
-                            request_id,
-                            &method,
-                            RpcErrorCode::Forbidden,
-                            "method not permitted",
-                        ),
-                        None,
-                    )?;
-                    continue;
-                }
-                if method == "auth.sync"
-                    && sync_confirmation
-                        .compare_exchange(0, u64::MAX, Ordering::AcqRel, Ordering::Acquire)
-                        .is_err()
-                {
-                    queue(
-                        &control_tx,
-                        &control_budget,
-                        &metrics,
-                        BusinessRpcQueueClass::Control,
-                        error(
-                            request_id,
-                            &method,
-                            RpcErrorCode::Conflict,
-                            "sync already pending",
-                        ),
-                        None,
-                    )?;
-                    continue;
-                }
-                let method_for_error = method.clone();
-                if control_work_tx
-                    .try_send(ControlRequest {
-                        request_id,
-                        method,
-                        body,
-                    })
-                    .is_err()
-                {
-                    if method_for_error == "auth.sync" {
-                        sync_confirmation.store(0, Ordering::Release);
-                    }
-                    queue(
-                        &control_tx,
-                        &control_budget,
-                        &metrics,
-                        BusinessRpcQueueClass::Control,
-                        error(
-                            request_id,
-                            &method_for_error,
-                            RpcErrorCode::Overloaded,
-                            "control queue full",
-                        ),
-                        None,
-                    )?;
-                }
-            }
-            _ => break Err(Error::Invalid),
-        }
-    };
-    connection_stop.cancel();
-    if let Some((_, generation, handle)) = subscription {
-        let _ = services.sink.release(generation);
-        let _ = handle.await;
-    }
-    if let Some(worker) = control_worker {
-        worker.abort();
-        let _ = worker.await;
-    }
-    command_worker.abort();
-    let _ = command_worker.await;
-    provider.take();
-    let _ = writer_handle.await;
-    result
+    v3::connection(io, certificate, hello, config, services, stop).await
 }
 
 struct ControlRequest {
     request_id: Uuid,
     method: String,
     body: serde_json::Value,
-}
-
-struct CommandRequest {
-    request_id: Uuid,
-    body: serde_json::Value,
-    deadline: tokio::time::Instant,
-    cancelled: Arc<AtomicBool>,
-    _bytes: OwnedSemaphorePermit,
 }
 
 fn command_error(error: Error) -> RpcErrorCode {
@@ -1070,117 +429,9 @@ fn command_error(error: Error) -> RpcErrorCode {
         Error::Unavailable
         | Error::Draining
         | Error::Storage
-        | Error::IncompatibleSpool
+        | Error::UnsupportedRecoveryVersion(_)
         | Error::Authentication => RpcErrorCode::Unavailable,
         Error::Internal => RpcErrorCode::Internal,
-    }
-}
-
-async fn process_command_request<F, Fut>(
-    request: CommandRequest,
-    principal: &BusinessPrincipal,
-    dispatch: F,
-) -> BusinessRpcFrame
-where
-    F: FnOnce(netbaiot_core::DeviceCommand) -> Fut,
-    Fut: std::future::Future<Output = Result<netbaiot_core::CommandDispatch>>,
-{
-    let method = "device.command.send";
-    if request.cancelled.load(Ordering::Acquire) || tokio::time::Instant::now() >= request.deadline
-    {
-        return error(
-            request.request_id,
-            method,
-            RpcErrorCode::Timeout,
-            "command request expired",
-        );
-    }
-    match serde_json::from_value::<DeviceCommandSendRequest>(request.body) {
-        Err(_) => error(
-            request.request_id,
-            method,
-            RpcErrorCode::InvalidRequest,
-            "invalid command request",
-        ),
-        Ok(input) if !principal.allows_tenant(&input.command.device.tenant_id) => error(
-            request.request_id,
-            method,
-            RpcErrorCode::Forbidden,
-            "tenant not permitted",
-        ),
-        Ok(_)
-            if tokio::time::Instant::now() >= request.deadline
-                || request.cancelled.load(Ordering::Acquire) =>
-        {
-            error(
-                request.request_id,
-                method,
-                RpcErrorCode::Timeout,
-                "command request expired",
-            )
-        }
-        Ok(input) => match tokio::time::timeout_at(request.deadline, dispatch(input.command)).await
-        {
-            Err(_) => error(
-                request.request_id,
-                method,
-                RpcErrorCode::Timeout,
-                "command request expired",
-            ),
-            Ok(result) => match result {
-                Ok(dispatch) => response(
-                    request.request_id,
-                    method,
-                    Ok(DeviceCommandSendResponse { dispatch }),
-                ),
-                Err(failure) => error(
-                    request.request_id,
-                    method,
-                    command_error(failure),
-                    "command dispatch rejected",
-                ),
-            },
-        },
-    }
-}
-
-async fn command_loop(
-    mut requests: mpsc::Receiver<CommandRequest>,
-    writer: mpsc::Sender<Queued>,
-    budget: Arc<Semaphore>,
-    services: Arc<BusinessRpcServices>,
-    principal: BusinessPrincipal,
-    cancellations: Arc<Mutex<HashMap<Uuid, Arc<AtomicBool>>>>,
-    stop: CancellationToken,
-) {
-    while let Some(request) = tokio::select! {
-        _ = stop.cancelled() => None,
-        request = requests.recv() => request,
-    } {
-        let request_id = request.request_id;
-        let reply = process_command_request(request, &principal, |command| {
-            services.commands.send(command)
-        })
-        .await;
-        if let Ok(mut pending) = cancellations.lock() {
-            pending.remove(&request_id);
-        } else {
-            stop.cancel();
-            break;
-        }
-        if queue(
-            &writer,
-            &budget,
-            &services.ingress.metrics,
-            BusinessRpcQueueClass::Command,
-            reply,
-            None,
-        )
-        .is_err()
-        {
-            stop.cancel();
-            break;
-        }
     }
 }
 
@@ -1201,7 +452,7 @@ async fn control_loop(
         body,
     }) = tokio::select! { _ = stop.cancelled() => None, request = requests.recv() => request }
     {
-        // Both V2 and V3 use this worker. Keep the guard until all auth and
+        // Current protocol control work uses this worker. Keep the guard until all auth and
         // revision side effects finish; queued requests acquire no earlier rights.
         let reply = match services.ingress.lifecycle.begin_admission() {
             Err(_) => error(
@@ -1399,16 +650,14 @@ async fn control_loop(
                         "unknown method",
                     ),
                 };
-                if method == "auth.sync"
-                    && !matches!(&reply, BusinessRpcFrame::Response { error: None, .. })
-                {
+                if method == "auth.sync" && reply.error.is_some() {
                     confirmation.store(0, Ordering::Release);
                 }
                 drop(admission);
                 reply
             }
         };
-        let success = matches!(&reply, BusinessRpcFrame::Response { error: None, .. });
+        let success = reply.error.is_none();
         let metric = match (method.as_str(), success) {
             ("auth.sync", true) => Some(Metric::BusinessRpcProviderSyncSuccess),
             ("auth.sync", false) => Some(Metric::BusinessRpcProviderSyncFailure),
@@ -1419,148 +668,17 @@ async fn control_loop(
         if let Some(metric) = metric {
             services.ingress.metrics.inc(metric);
         }
-        if queue(
-            &writer,
-            &budget,
-            &services.ingress.metrics,
-            BusinessRpcQueueClass::Control,
-            reply,
-            None,
-        )
-        .is_err()
-        {
+        if queue(&writer, &budget, &services.ingress.metrics, reply).is_err() {
             stop.cancel();
             break;
         }
-    }
-}
-
-struct EventSignal {
-    ack: EventAck,
-    success: bool,
-}
-async fn event_loop(
-    mut requests: mpsc::Receiver<BusinessEventRequest>,
-    mut acks: mpsc::Receiver<EventSignal>,
-    writer: mpsc::Sender<Queued>,
-    resources: (Arc<Semaphore>, Arc<Metrics>),
-    subscription_id: SubscriptionId,
-    timeout: Duration,
-    stop: CancellationToken,
-) {
-    let (event_budget, metrics) = resources;
-    while let Some(request) =
-        tokio::select! { _ = stop.cancelled() => None, request = requests.recv() => request }
-    {
-        let delivery_id = netbaiot_core::DeliveryId::generate();
-        let event_id = request.delivery.event.event_id;
-        let frame = BusinessRpcFrame::Event {
-            delivery: EventDelivery {
-                delivery_id,
-                subscription_id,
-                event: (*request.delivery.event).clone(),
-                attempt: request.delivery.attempt,
-            },
-        };
-        if queue(
-            &writer,
-            &event_budget,
-            &metrics,
-            BusinessRpcQueueClass::Event,
-            frame,
-            None,
-        )
-        .is_err()
-        {
-            let _ = request.result.send(Err(SinkError::Retryable));
-            break;
-        }
-        let deadline = tokio::time::Instant::now() + timeout;
-        let started = std::time::Instant::now();
-        let result = loop {
-            let signal = tokio::select! {
-                _ = stop.cancelled() => break Err(SinkError::Retryable),
-                signal = tokio::time::timeout_at(deadline, acks.recv()) => match signal { Ok(Some(value)) => value, _ => break Err(SinkError::Retryable) },
-            };
-            if signal.ack.delivery_id == delivery_id
-                && signal.ack.subscription_id == subscription_id
-                && signal.ack.event_id == event_id
-            {
-                break if signal.success {
-                    Ok(SinkAck)
-                } else {
-                    Err(SinkError::Retryable)
-                };
-            }
-        };
-        let failed = result.is_err();
-        if result.is_ok() {
-            metrics.inc(Metric::BusinessRpcEventAcks);
-            metrics.observe(
-                Histogram::BusinessRpcEventAckLatency,
-                started.elapsed().as_micros().min(u64::MAX as u128) as u64,
-            );
-        } else if tokio::time::Instant::now() >= deadline {
-            metrics.inc(Metric::BusinessRpcTimeouts);
-        }
-        let _ = request.result.send(result);
-        if failed {
-            stop.cancel();
-            break;
-        }
-    }
-}
-struct WriterSignals {
-    metrics: Arc<Metrics>,
-    stop: CancellationToken,
-}
-async fn writer_loop<W: AsyncWrite + Unpin>(
-    mut writer: W,
-    mut queues: (mpsc::Receiver<Queued>, mpsc::Receiver<Queued>),
-    mut auth: mpsc::Receiver<BusinessRpcOutbound>,
-    mut events: mpsc::Receiver<Queued>,
-    maximum: usize,
-    timeout: Duration,
-    signals: WriterSignals,
-) -> Result<()> {
-    loop {
-        let item = tokio::select! {
-            biased;
-            _ = signals.stop.cancelled() => return Ok(()),
-            item = queues.0.recv(), if !queues.0.is_closed() => item,
-            item = auth.recv(), if !auth.is_closed() => item.map(|out| {
-                if matches!(out.call, BusinessRpcCall::Request { .. }) {
-                    signals.metrics.observe(Histogram::BusinessRpcQueueWait, out.queued_at.elapsed().as_micros().min(u64::MAX as u128) as u64);
-                }
-                let frame = match out.call {
-                    BusinessRpcCall::Request { request_id, method, deadline_ms, body } => BusinessRpcFrame::Request {
-                        request_id, method: method.into(), deadline_ms, body,
-                    },
-                    BusinessRpcCall::Cancel { request_id } => BusinessRpcFrame::Cancel { request_id },
-                };
-                Queued { frame, written: None, _bytes: out._bytes, _tracking: None }
-            }),
-            item = events.recv(), if !events.is_closed() => item,
-            item = queues.1.recv(), if !queues.1.is_closed() => item,
-        };
-        let Some(item) = item else { return Ok(()) };
-        let result = write_frame(&mut writer, &item.frame, maximum, timeout).await;
-        if let Some(written) = item.written {
-            let _ = written.send(result.as_ref().map(|_| ()).map_err(|_| Error::Unavailable));
-        }
-        result?;
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use netbaiot_core::{
-        CommandId, DeliveryState, DeviceCommand, DeviceCommandPayload, DeviceEvent,
-        DeviceEventKind, DeviceId, DeviceKey, EventId, Heartbeat, ProductId, SinkId,
-        SourceMessageId,
-    };
-    use netbaiot_runtime::DeliveryEnvelope;
+    use netbaiot_core::SinkId;
 
     #[test]
     fn command_runtime_capacity_and_offline_errors_keep_rpc_semantics() {
@@ -1572,179 +690,15 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn command_scope_deadline_and_cancel_precede_dispatch() {
-        let principal = BusinessPrincipal {
-            id: "commands".into(),
-            role: BusinessRole::Commands,
-            provider_id: None,
-            sink_id: None,
-            provide_methods: Vec::new(),
-            call_methods: vec!["device.command.send".into()],
-            global: false,
-            tenants: vec![TenantId::new("demo").unwrap()],
-            expires_at_ms: None,
-        };
-        let mut command = DeviceCommand {
-            command_id: CommandId::generate(),
-            device: DeviceKey {
-                tenant_id: TenantId::new("other").unwrap(),
-                product_id: ProductId::new("sensor").unwrap(),
-                device_id: DeviceId::new("one").unwrap(),
-            },
-            expires_at: None,
-            payload: DeviceCommandPayload {
-                name: "run".into(),
-                arguments: Default::default(),
-            },
-        };
-        let make_request =
-            |command: &DeviceCommand, deadline, cancelled: Arc<AtomicBool>| CommandRequest {
-                request_id: Uuid::new_v4(),
-                body: serde_json::to_value(DeviceCommandSendRequest {
-                    command: command.clone(),
-                })
-                .unwrap(),
-                deadline,
-                cancelled,
-                _bytes: Arc::new(Semaphore::new(1)).try_acquire_owned().unwrap(),
-            };
-        let future = tokio::time::Instant::now() + Duration::from_secs(5);
-        let forbidden = process_command_request(
-            make_request(&command, future, Arc::new(AtomicBool::new(false))),
-            &principal,
-            |_| async { panic!("scope denial must precede session lookup") },
-        )
-        .await;
-        assert!(matches!(
-            forbidden,
-            BusinessRpcFrame::Response {
-                error: Some(RpcError {
-                    code: RpcErrorCode::Forbidden,
-                    ..
-                }),
-                ..
-            }
-        ));
-        command.device.tenant_id = TenantId::new("demo").unwrap();
-        let expired = process_command_request(
-            make_request(
-                &command,
-                tokio::time::Instant::now(),
-                Arc::new(AtomicBool::new(false)),
-            ),
-            &principal,
-            |_| async { panic!("deadline must precede dispatch") },
-        )
-        .await;
-        assert!(matches!(
-            expired,
-            BusinessRpcFrame::Response {
-                error: Some(RpcError {
-                    code: RpcErrorCode::Timeout,
-                    ..
-                }),
-                ..
-            }
-        ));
-        let cancelled = Arc::new(AtomicBool::new(true));
-        let skipped = process_command_request(
-            make_request(&command, future, cancelled),
-            &principal,
-            |_| async { panic!("cancelled work must not dispatch") },
-        )
-        .await;
-        assert!(matches!(
-            skipped,
-            BusinessRpcFrame::Response {
-                error: Some(RpcError {
-                    code: RpcErrorCode::Timeout,
-                    ..
-                }),
-                ..
-            }
-        ));
-        let cancelled_after_admission = Arc::new(AtomicBool::new(false));
-        let flag = cancelled_after_admission.clone();
-        let accepted = process_command_request(
-            make_request(&command, future, cancelled_after_admission),
-            &principal,
-            move |command| async move {
-                flag.store(true, Ordering::Release);
-                Ok(netbaiot_core::CommandDispatch {
-                    command_id: command.command_id,
-                    state: DeliveryState::Queued,
-                })
-            },
-        )
-        .await;
-        assert!(matches!(
-            accepted,
-            BusinessRpcFrame::Response {
-                error: None,
-                body: Some(_),
-                ..
-            }
-        ));
-    }
-
-    #[tokio::test]
-    async fn command_response_pressure_preserves_control_queue_capacity() {
-        let (command_tx, _command_rx) = mpsc::channel(1);
-        let (control_tx, mut control_rx) = mpsc::channel(1);
-        let command_bytes = Arc::new(Semaphore::new(256));
-        let control_bytes = Arc::new(Semaphore::new(256));
-        let metrics = Arc::new(Metrics::default());
-        queue(
-            &command_tx,
-            &command_bytes,
-            &metrics,
-            BusinessRpcQueueClass::Command,
-            BusinessRpcFrame::Ping { nonce: 1 },
-            None,
-        )
-        .unwrap();
-        assert!(matches!(
-            queue(
-                &command_tx,
-                &command_bytes,
-                &metrics,
-                BusinessRpcQueueClass::Command,
-                BusinessRpcFrame::Ping { nonce: 2 },
-                None
-            ),
-            Err(Error::Overloaded)
-        ));
-        let id = Uuid::new_v4();
-        queue(
-            &control_tx,
-            &control_bytes,
-            &metrics,
-            BusinessRpcQueueClass::Control,
-            error(
-                id,
-                "auth.invalidate",
-                RpcErrorCode::Forbidden,
-                "revision denied",
-            ),
-            None,
-        )
-        .unwrap();
-        assert!(matches!(control_rx.recv().await.map(|item| item.frame),
-            Some(BusinessRpcFrame::Response { request_id, .. }) if request_id == id));
-    }
-
-    #[tokio::test]
-    async fn command_response_byte_limit_rejects_and_releases_permits() {
+    async fn control_response_byte_limit_rejects_and_releases_permits() {
         let (tx, mut rx) = mpsc::channel(2);
-        let budget = Arc::new(Semaphore::new(40));
+        let budget = Arc::new(Semaphore::new(128));
         let metrics = Arc::new(Metrics::default());
         queue(
             &tx,
             &budget,
             &metrics,
-            BusinessRpcQueueClass::Command,
-            BusinessRpcFrame::Ping { nonce: 1 },
-            None,
+            response(Uuid::new_v4(), "probe", Ok(true)),
         )
         .unwrap();
         assert!(matches!(
@@ -1752,21 +706,28 @@ mod tests {
                 &tx,
                 &budget,
                 &metrics,
-                BusinessRpcQueueClass::Command,
-                BusinessRpcFrame::Ping { nonce: 2 },
-                None
+                response(Uuid::new_v4(), "probe", Ok(true))
             ),
             Err(Error::Overloaded)
         ));
+        assert!(
+            metrics
+                .render()
+                .contains("netbaiot_business_rpc_queue_count{class=\"control\"} 1\n")
+        );
         drop(rx.recv().await);
+        assert_eq!(budget.available_permits(), 128);
+        let released = metrics.render();
+        assert!(released.contains("netbaiot_business_rpc_queue_count{class=\"control\"} 0\n"));
+        assert!(released.contains("netbaiot_business_rpc_queue_bytes{class=\"control\"} 0\n"));
+        assert!(!released.contains("{class=\"event\"}"));
+        assert!(!released.contains("{class=\"command\"}"));
         assert!(
             queue(
                 &tx,
                 &budget,
                 &metrics,
-                BusinessRpcQueueClass::Command,
-                BusinessRpcFrame::Ping { nonce: 3 },
-                None
+                response(Uuid::new_v4(), "probe", Ok(true))
             )
             .is_ok()
         );
@@ -1781,9 +742,7 @@ mod tests {
             &send,
             &budget,
             &metrics,
-            BusinessRpcQueueClass::Control,
-            BusinessRpcFrame::Ping { nonce: 1 },
-            None,
+            response(Uuid::new_v4(), "probe", Ok(true)),
         )
         .unwrap();
         assert!(matches!(
@@ -1791,9 +750,7 @@ mod tests {
                 &send,
                 &budget,
                 &metrics,
-                BusinessRpcQueueClass::Control,
-                BusinessRpcFrame::Pong { nonce: 2 },
-                None
+                response(Uuid::new_v4(), "probe", Ok(true))
             ),
             Err(Error::Overloaded)
         ));
@@ -1831,83 +788,10 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn event_ack_requires_exact_delivery_subscription_and_event() {
-        let (send, receive) = mpsc::channel(1);
-        let (ack_send, ack_receive) = mpsc::channel(2);
-        let (write_send, mut write_receive) = mpsc::channel(1);
-        let stop = CancellationToken::new();
-        let metrics = Arc::new(Metrics::default());
-        let subscription_id = SubscriptionId::generate();
-        let worker = tokio::spawn(event_loop(
-            receive,
-            ack_receive,
-            write_send,
-            (Arc::new(Semaphore::new(65_536)), metrics.clone()),
-            subscription_id,
-            Duration::from_secs(1),
-            stop.clone(),
-        ));
-        let event = Arc::new(DeviceEvent {
-            event_id: EventId::generate(),
-            source_message_id: SourceMessageId::new("ack-check").unwrap(),
-            device: DeviceKey {
-                tenant_id: TenantId::new("tenant").unwrap(),
-                product_id: ProductId::new("product").unwrap(),
-                device_id: DeviceId::new("device").unwrap(),
-            },
-            received_at: 1,
-            occurred_at: None,
-            kind: DeviceEventKind::Heartbeat(Heartbeat { sequence: 1 }),
-        });
-        let (result, mut done) = oneshot::channel();
-        send.send(BusinessEventRequest {
-            delivery: DeliveryEnvelope {
-                event: event.clone(),
-                sink_id: SinkId::new("tcp-rpc").unwrap(),
-                attempt: 1,
-                accepted_at: 1,
-            },
-            result,
-        })
-        .await
-        .unwrap();
-        let outbound = write_receive.recv().await.unwrap();
-        let BusinessRpcFrame::Event { delivery } = outbound.frame else {
-            panic!("event expected")
-        };
-        let mut ack = EventAck {
-            delivery_id: delivery.delivery_id,
-            subscription_id,
-            event_id: event.event_id,
-        };
-        ack.event_id = EventId::generate();
-        ack_send
-            .send(EventSignal {
-                ack: ack.clone(),
-                success: true,
-            })
-            .await
-            .unwrap();
-        assert!(matches!(
-            done.try_recv(),
-            Err(tokio::sync::oneshot::error::TryRecvError::Empty)
-        ));
-        ack.event_id = event.event_id;
-        ack_send
-            .send(EventSignal { ack, success: true })
-            .await
-            .unwrap();
-        assert!(done.await.unwrap().is_ok());
-        assert_eq!(metrics.get(Metric::BusinessRpcEventAcks), 1);
-        stop.cancel();
-        worker.await.unwrap();
-    }
-
-    #[tokio::test]
     async fn framing_handles_split_and_coalesced_frames() {
         let (mut sender, mut receiver) = tokio::io::duplex(256);
-        let first = b"{\"type\":\"ping\",\"nonce\":1}";
-        let second = b"{\"type\":\"pong\",\"nonce\":2}";
+        let first = br#"{"type":"hello","version":3,"token":"one"}"#;
+        let second = br#"{"type":"hello","version":3,"token":"two"}"#;
         let first_len = u32::try_from(first.len()).unwrap().to_be_bytes();
         let second_len = u32::try_from(second.len()).unwrap().to_be_bytes();
         sender.write_all(&first_len[..2]).await.unwrap();
@@ -1948,7 +832,10 @@ mod tests {
                     .is_err()
             );
         }
-        assert!(serde_json::from_slice::<BusinessRpcFrame>(b"{not json}").is_err());
+        assert!(
+            serde_json::from_slice::<netbaiot_core::business_rpc_v3::V3Bootstrap>(b"{not json}")
+                .is_err()
+        );
     }
 
     #[tokio::test(start_paused = true)]
@@ -1961,7 +848,7 @@ mod tests {
         ));
     }
     #[tokio::test]
-    async fn shared_v2_v3_control_worker_rejects_sync_and_invalidation_after_quiesce() {
+    async fn current_control_worker_rejects_sync_and_invalidation_after_quiesce() {
         use netbaiot_runtime::*;
         let limits = Arc::new(Limits::default());
         let metrics = Arc::new(Metrics::default());
@@ -2071,7 +958,7 @@ mod tests {
             .unwrap();
         assert!(matches!(
             reply_rx.recv().await.unwrap().frame,
-            BusinessRpcFrame::Response { error: None, .. }
+            RpcReply { error: None, .. }
         ));
         lease.mark_serving(1).unwrap();
         lifecycle.begin_quiesce().await.unwrap();
@@ -2097,7 +984,7 @@ mod tests {
                 .unwrap();
             assert!(matches!(
                 reply_rx.recv().await.unwrap().frame,
-                BusinessRpcFrame::Response {
+                RpcReply {
                     error: Some(RpcError {
                         code: RpcErrorCode::Unavailable,
                         ..

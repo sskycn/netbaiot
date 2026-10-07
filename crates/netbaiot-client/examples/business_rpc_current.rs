@@ -2,7 +2,7 @@
 //! Run with one of: multiplexed, dual, auth_webhook, invalidate.
 use async_trait::async_trait;
 use netbaiot_client::business_rpc::{
-    BusinessAuthHandler, BusinessRpcClient, BusinessRpcClientConfig, BusinessRpcTls,
+    BusinessAuthHandler, BusinessRpcTls, BusinessRpcV3Client, BusinessRpcV3ClientConfig,
 };
 use netbaiot_protocol::{
     AuthInvalidation, CodecId, DeviceId, DeviceKey, ProductId, TenantId,
@@ -88,12 +88,8 @@ impl BusinessAuthHandler for MemoryAuthority {
 fn config(
     address: SocketAddr,
     role: BusinessRole,
-) -> Result<BusinessRpcClientConfig, Box<dyn std::error::Error>> {
-    let mut config = BusinessRpcClientConfig::development(
-        address,
-        env::var("NETBAIOT_BUSINESS_RPC_TOKEN")?,
-        role,
-    );
+) -> Result<BusinessRpcV3ClientConfig, Box<dyn std::error::Error>> {
+    let mut config = current_config(address, env::var("NETBAIOT_BUSINESS_RPC_TOKEN")?, role);
     if let Ok(ca) = env::var("NETBAIOT_BUSINESS_RPC_CA_PEM") {
         config.token = None;
         config.tls = Some(BusinessRpcTls {
@@ -143,12 +139,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         _ => return Err("unknown mode".into()),
     };
     let (auth, mut auth_events) =
-        BusinessRpcClient::connect(config(address, role)?, Some(authority.clone()))?;
+        BusinessRpcV3Client::connect(config(address, role)?, Some(authority.clone()))?;
     auth.wait_ready().await?;
     let mut events_only = None;
     if mode == "dual" {
         let (events, receiver) =
-            BusinessRpcClient::connect(config(address, BusinessRole::Events)?, None)?;
+            BusinessRpcV3Client::connect(config(address, BusinessRole::Events)?, None)?;
         events.wait_ready().await?;
         events_only = Some(events);
         auth_events = receiver;
@@ -184,4 +180,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     auth.shutdown().await;
     Ok(())
+}
+
+fn current_config(
+    address: std::net::SocketAddr,
+    token: String,
+    role: BusinessRole,
+) -> BusinessRpcV3ClientConfig {
+    let mut settings = BusinessRpcV3ClientConfig::development(address, token);
+    settings.provider = role.auth_control();
+    settings.events = role.events();
+    settings
 }

@@ -12,6 +12,7 @@ on:
       - "fuzz/**"
       - "Cargo.lock"
       - "docs/releases/**"
+      - "docs/maintenance/**"
   push:
     branches: [main]
     paths:
@@ -23,6 +24,7 @@ on:
       - "fuzz/**"
       - "Cargo.lock"
       - "docs/releases/**"
+      - "docs/maintenance/**"
 
 jobs:
   decoder:

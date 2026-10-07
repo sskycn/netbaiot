@@ -1,5 +1,7 @@
 # MQTT protocol audit: M01–M07
 
+> Historical evidence recorded before the 2026-10-07 current-only cleanup. Preserve the recorded results and original version context; current support: [protocol matrix](protocol-support.md), [upgrade](migration/current-protocol-only.md).
+
 Baseline: `d4f7612a350d8c66e670ec897f3e7263ed2f00ff` on `main`. The script's `e9c9b066...` is a historical audit reference, not the code tested here. The working tree was clean before `tests/mqtt_protocol_regressions.py` was copied from the repository's existing local audit branch. No historical checkout was used.
 
 Normative sources: [MQTT 3.1.1 OASIS Standard](https://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html) and [MQTT 5.0 OASIS Standard](https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html). At the time of that audit, root `AGENTS.md` still described MQTT 5 as out of scope. The current rules and implementation now agree on the MQTT 5 profile in `docs/mqtt.md`. This audit preserves both versions.

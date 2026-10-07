@@ -1,11 +1,10 @@
-//! Bounded, real-network Business RPC V2 load gate.
+//! Bounded real-network current Business RPC load gate.
 //! Run against a disposable gateway configured for development Business RPC.
 use async_trait::async_trait;
 use hmac::{Hmac, Mac};
 use netbaiot_client::business_rpc::{
-    BusinessAuthHandler, BusinessDelivery, BusinessRpcClient, BusinessRpcClientConfig,
-    BusinessRpcClientError, BusinessRpcTls, BusinessRpcV3Client, BusinessRpcV3ClientConfig,
-    BusinessRpcV3Delivery,
+    BusinessAuthHandler, BusinessRpcClientError, BusinessRpcTls, BusinessRpcV3Client,
+    BusinessRpcV3ClientConfig, BusinessRpcV3Delivery,
 };
 use netbaiot_core::{
     AuthInvalidation, CodecId, CommandAck, CommandId, DeliveryState, DeviceCommand,
@@ -124,17 +123,12 @@ impl BusinessTransport {
 #[serde(rename_all = "snake_case")]
 enum Topology {
     #[default]
-    Multiplexed,
-    Dual,
     V3,
     V3Dual,
 }
 impl Topology {
     fn separate(self) -> bool {
-        matches!(self, Self::Dual | Self::V3Dual)
-    }
-    fn v3(self) -> bool {
-        matches!(self, Self::V3 | Self::V3Dual)
+        matches!(self, Self::V3Dual)
     }
 }
 impl Config {
@@ -164,9 +158,7 @@ impl Config {
             || self.command_rate.saturating_mul(self.duration_secs) > 100_000
             || self.command_device_count > 200
             || (self.command_rate > 0
-                && (!self.topology.v3()
-                    || self.command_device_count == 0
-                    || self.command_transport.is_none()))
+                && (self.command_device_count == 0 || self.command_transport.is_none()))
             || self.event_payload_bytes > 16_384
             || self
                 .frame_payload_bytes
@@ -420,9 +412,6 @@ struct Stats {
     command_ack_event_seen: HashSet<netbaiot_core::EventId>,
     auth_latency: Histogram,
     ack_latency: Histogram,
-    tls_handshake: Histogram,
-    sync_ready: Histogram,
-    full_ready: Histogram,
 }
 #[derive(Serialize)]
 struct TimedObservation {
@@ -454,133 +443,21 @@ impl CommandTrace {
 }
 type SharedStats = Arc<Mutex<Stats>>;
 
+fn command_ack_id(delivery: &BusinessRpcV3Delivery) -> Option<CommandId> {
+    match &delivery.delivery.event.kind {
+        DeviceEventKind::CommandAck(ack) => Some(ack.command_id),
+        _ => None,
+    }
+}
+
 async fn connect_business(
     config: &Config,
     handler: Arc<Handler>,
     role: BusinessRole,
-    stats: Option<&SharedStats>,
 ) -> Result<(
-    BusinessRpcClient,
-    tokio::sync::mpsc::Receiver<netbaiot_client::business_rpc::BusinessDelivery>,
+    BusinessRpcV3Client,
+    tokio::sync::mpsc::Receiver<BusinessRpcV3Delivery>,
 )> {
-    let mut settings = match &config.business_transport {
-        BusinessTransport::DevelopmentToken => BusinessRpcClientConfig::development(
-            config.business_address,
-            std::env::var("NETBAIOT_BUSINESS_RPC_TOKEN")?,
-            role,
-        ),
-        BusinessTransport::Mtls {
-            server_name,
-            ca_pem,
-            certificate_pem,
-            private_key_pem,
-        } => {
-            let mut settings =
-                BusinessRpcClientConfig::development(config.business_address, String::new(), role);
-            settings.token = None;
-            settings.tls = Some(BusinessRpcTls {
-                server_name: server_name.clone(),
-                ca_pem: ca_pem.clone(),
-                certificate_pem: certificate_pem.clone(),
-                private_key_pem: private_key_pem.clone(),
-            });
-            settings
-        }
-    };
-    settings.reconnect_initial = Duration::from_millis(100);
-    let (client, deliveries) = BusinessRpcClient::connect(settings, Some(handler))?;
-    tokio::time::timeout(Duration::from_secs(10), client.wait_ready()).await??;
-    if let Some(stats) = stats
-        && let Some(timing) = client.connection_timing()
-    {
-        let mut state = stats.lock().unwrap();
-        state.full_ready.add(timing.full_ready);
-        state.sync_ready.add(timing.sync_to_ready);
-        if let Some(tls) = timing.tls_handshake {
-            state.tls_handshake.add(tls);
-        }
-    }
-    Ok((client, deliveries))
-}
-
-enum AnyBusiness {
-    V2(BusinessRpcClient),
-    V3(BusinessRpcV3Client),
-}
-impl AnyBusiness {
-    async fn shutdown(&self) {
-        match self {
-            Self::V2(client) => client.shutdown().await,
-            Self::V3(client) => client.shutdown().await,
-        }
-    }
-    async fn invalidate(
-        &self,
-        revision: u64,
-        scope: AuthInvalidation,
-    ) -> std::result::Result<(), BusinessRpcClientError> {
-        match self {
-            Self::V2(client) => client.invalidate(revision, scope).await.map(|_| ()),
-            Self::V3(client) => client.invalidate(revision, scope).await.map(|_| ()),
-        }
-    }
-}
-enum AnyDelivery {
-    V2(BusinessDelivery),
-    V3(BusinessRpcV3Delivery),
-}
-impl AnyDelivery {
-    fn event_id(&self) -> netbaiot_core::EventId {
-        match self {
-            Self::V2(delivery) => delivery.delivery.event.event_id,
-            Self::V3(delivery) => delivery.delivery.event.event_id,
-        }
-    }
-    fn source_message_id(&self) -> &SourceMessageId {
-        match self {
-            Self::V2(delivery) => &delivery.delivery.event.source_message_id,
-            Self::V3(delivery) => &delivery.delivery.event.source_message_id,
-        }
-    }
-    fn command_ack_id(&self) -> Option<CommandId> {
-        let kind = match self {
-            Self::V2(delivery) => &delivery.delivery.event.kind,
-            Self::V3(delivery) => &delivery.delivery.event.kind,
-        };
-        match kind {
-            DeviceEventKind::CommandAck(ack) => Some(ack.command_id),
-            _ => None,
-        }
-    }
-    async fn ack(self) -> std::result::Result<(), BusinessRpcClientError> {
-        match self {
-            Self::V2(delivery) => delivery.ack().await,
-            Self::V3(delivery) => delivery.ack().await,
-        }
-    }
-}
-enum AnyDeliveries {
-    V2(tokio::sync::mpsc::Receiver<BusinessDelivery>),
-    V3(tokio::sync::mpsc::Receiver<BusinessRpcV3Delivery>),
-}
-impl AnyDeliveries {
-    async fn recv(&mut self) -> Option<AnyDelivery> {
-        match self {
-            Self::V2(deliveries) => deliveries.recv().await.map(AnyDelivery::V2),
-            Self::V3(deliveries) => deliveries.recv().await.map(AnyDelivery::V3),
-        }
-    }
-}
-async fn connect_event_business(
-    config: &Config,
-    handler: Arc<Handler>,
-    role: BusinessRole,
-    stats: &SharedStats,
-) -> Result<(AnyBusiness, AnyDeliveries)> {
-    if !config.topology.v3() {
-        let (client, deliveries) = connect_business(config, handler, role, Some(stats)).await?;
-        return Ok((AnyBusiness::V2(client), AnyDeliveries::V2(deliveries)));
-    }
     let mut settings = BusinessRpcV3ClientConfig::development(
         config.business_address,
         std::env::var("NETBAIOT_BUSINESS_RPC_TOKEN").unwrap_or_default(),
@@ -612,7 +489,7 @@ async fn connect_event_business(
     settings.reconnect_initial = Duration::from_millis(100);
     let (client, deliveries) = BusinessRpcV3Client::connect(settings, Some(handler))?;
     tokio::time::timeout(Duration::from_secs(10), client.wait_ready()).await??;
-    Ok((AnyBusiness::V3(client), AnyDeliveries::V3(deliveries)))
+    Ok((client, deliveries))
 }
 
 async fn connect_command_business(config: &Config) -> Result<BusinessRpcV3Client> {
@@ -758,10 +635,10 @@ async fn event_load(
         BusinessRole::Multiplexed
     };
     let (mut business, auth_deliveries) =
-        connect_event_business(config, handler.clone(), auth_role, &stats).await?;
+        connect_business(config, handler.clone(), auth_role).await?;
     let (mut event_business, mut deliveries) = if config.topology.separate() {
         let (events, deliveries) =
-            connect_event_business(config, handler.clone(), BusinessRole::Events, &stats).await?;
+            connect_business(config, handler.clone(), BusinessRole::Events).await?;
         (Some(events), deliveries)
     } else {
         (None, auth_deliveries)
@@ -1058,7 +935,7 @@ async fn event_load(
                     }
                 }
                 business.shutdown().await;
-                match connect_event_business(config, handler.clone(), BusinessRole::AuthControl, &stats).await {
+                match connect_business(config, handler.clone(), BusinessRole::AuthControl).await {
                     Ok((next, _)) => {
                         business = next;
                         revision = 1;
@@ -1080,7 +957,7 @@ async fn event_load(
                 if let Some(events) = event_business.take() { events.shutdown().await; }
                 else { business.shutdown().await; }
                 let role = if config.topology.separate() { BusinessRole::Events } else { BusinessRole::Multiplexed };
-                match connect_event_business(config, handler.clone(), role, &stats).await {
+                match connect_business(config, handler.clone(), role).await {
                     Ok((next, next_deliveries)) => {
                         if config.topology.separate() { event_business = Some(next); }
                         else { business = next; revision = 1; }
@@ -1138,8 +1015,8 @@ async fn event_load(
             }
             received = deliveries.recv() => {
                 let Some(delivery) = received else { break };
-                if let Some(command_id) = delivery.command_ack_id() {
-                    let event_id = delivery.event_id();
+                if let Some(command_id) = command_ack_id(&delivery) {
+                    let event_id = delivery.delivery.event.event_id;
                     {
                         let mut state = stats.lock().unwrap();
                         state.counts.command_ack_event_attempts += 1;
@@ -1157,7 +1034,7 @@ async fn event_load(
                     }
                     continue;
                 }
-                if !delivery.source_message_id().as_str().starts_with(&source_prefix) {
+                if !delivery.delivery.event.source_message_id.as_str().starts_with(&source_prefix) {
                     let _ = delivery.ack().await;
                     continue;
                 }
@@ -1165,7 +1042,7 @@ async fn event_load(
                 {
                     let mut state = stats.lock().unwrap();
                     state.counts.events += 1;
-                    if !seen.insert(delivery.event_id()) { state.counts.event_retries += 1; }
+                    if !seen.insert(delivery.delivery.event.event_id) { state.counts.event_retries += 1; }
                 }
                 if seen.len() > 100_000 { seen.clear(); }
                 if outage && Instant::now() < outage_until { continue; }
@@ -1189,8 +1066,8 @@ async fn event_load(
             else {
                 continue;
             };
-            if let Some(command_id) = delivery.command_ack_id() {
-                let event_id = delivery.event_id();
+            if let Some(command_id) = command_ack_id(&delivery) {
+                let event_id = delivery.delivery.event.event_id;
                 {
                     let mut state = stats.lock().unwrap();
                     state.counts.command_ack_event_attempts += 1;
@@ -1209,14 +1086,16 @@ async fn event_load(
                     stats.lock().unwrap().counts.command_ack_event_acks += 1;
                 }
             } else if delivery
-                .source_message_id()
+                .delivery
+                .event
+                .source_message_id
                 .as_str()
                 .starts_with(&source_prefix)
             {
                 {
                     let mut state = stats.lock().unwrap();
                     state.counts.events += 1;
-                    if !seen.insert(delivery.event_id()) {
+                    if !seen.insert(delivery.delivery.event.event_id) {
                         state.counts.event_retries += 1;
                     }
                 }
@@ -1297,13 +1176,8 @@ async fn verifier_probe(config: Config, stats: SharedStats, until: Instant) -> R
 
 async fn verifier_load(config: &Config, stats: SharedStats) -> Result<(u64, u64)> {
     let handler = Arc::new(Handler::new(config));
-    let (business, mut deliveries) = connect_business(
-        config,
-        handler.clone(),
-        BusinessRole::Multiplexed,
-        Some(&stats),
-    )
-    .await?;
+    let (business, mut deliveries) =
+        connect_business(config, handler.clone(), BusinessRole::Multiplexed).await?;
     let acknowledger = tokio::spawn(async move {
         while let Some(delivery) = deliveries.recv().await {
             let _ = delivery.ack().await;
@@ -1792,13 +1666,8 @@ async fn main() -> Result<()> {
     match config.scenario.as_str() {
         "auth" | "steady_auth" => {
             let handler = Arc::new(Handler::new(&config));
-            let (business, _) = connect_business(
-                &config,
-                handler.clone(),
-                BusinessRole::AuthControl,
-                Some(&stats),
-            )
-            .await?;
+            let (business, _) =
+                connect_business(&config, handler.clone(), BusinessRole::AuthControl).await?;
             auth_load(
                 config.clone(),
                 stats.clone(),
@@ -1825,7 +1694,7 @@ async fn main() -> Result<()> {
         }
         "topology_compare" => {
             let mut results = Vec::new();
-            for topology in [Topology::Multiplexed, Topology::Dual] {
+            for topology in [Topology::V3, Topology::V3Dual] {
                 let mut run_config = config.clone();
                 run_config.topology = topology;
                 let run_stats = Arc::new(Mutex::new(Stats::default()));
@@ -1850,8 +1719,6 @@ async fn main() -> Result<()> {
                         "rpc_remote_wait_ms_gateway": before.as_ref().zip(after.as_ref()).and_then(|(a,b)| gateway_histogram(a,b,"business_rpc_remote_wait_us")),
                         "rpc_queue_wait_ms_gateway": before.as_ref().zip(after.as_ref()).and_then(|(a,b)| gateway_histogram(a,b,"business_rpc_queue_wait_us")),
                         "event_ack_ms_gateway": before.as_ref().zip(after.as_ref()).and_then(|(a,b)| gateway_histogram(a,b,"business_rpc_event_ack_latency_us")),
-                        "sync_ms": (run.sync_ready.count > 0).then(|| run.sync_ready.summary()),
-                        "tls_handshake_ms": (run.tls_handshake.count > 0).then(|| run.tls_handshake.summary()),
                     },
                     "gateway_overloads": before.as_ref().zip(after.as_ref()).and_then(|(a,b)| gateway_delta(a,b,"business_rpc_overloads_total")),
                 }));
@@ -1862,13 +1729,8 @@ async fn main() -> Result<()> {
             let handler = Arc::new(Handler::new(&config));
             let until = started + Duration::from_secs(config.duration_secs);
             while Instant::now() < until {
-                let attempt = connect_business(
-                    &config,
-                    handler.clone(),
-                    BusinessRole::AuthControl,
-                    Some(&stats),
-                )
-                .await;
+                let attempt =
+                    connect_business(&config, handler.clone(), BusinessRole::AuthControl).await;
                 stats.lock().unwrap().counts.requests += 1;
                 match attempt {
                     Ok((business, _)) => {
@@ -1891,14 +1753,7 @@ async fn main() -> Result<()> {
                 || Instant::now() < started + Duration::from_secs(config.duration_secs)
             {
                 cycles += 1;
-                match connect_business(
-                    &config,
-                    handler.clone(),
-                    BusinessRole::AuthControl,
-                    Some(&stats),
-                )
-                .await
-                {
+                match connect_business(&config, handler.clone(), BusinessRole::AuthControl).await {
                     Ok((business, _)) => {
                         stats.lock().unwrap().counts.reconnects += 1;
                         let started = Instant::now();
@@ -2008,9 +1863,6 @@ async fn main() -> Result<()> {
                 "event_ack_ms_gateway": gateway_before.as_ref().zip(gateway_after.as_ref()).and_then(|(a,b)| gateway_histogram(a,b,"business_rpc_event_ack_latency_us")),
                 "handler_ms": handler_latency,
                 "event_ack_ms": (state.ack_latency.count > 0).then(|| state.ack_latency.summary()),
-                "tls_handshake_ms": (state.tls_handshake.count > 0).then(|| state.tls_handshake.summary()),
-                "sync_ms": (state.sync_ready.count > 0).then(|| state.sync_ready.summary()),
-                "full_ready_ms": (state.full_ready.count > 0).then(|| state.full_ready.summary()),
             },
             "topology_results": topology_results,
             "gateway_deltas": {

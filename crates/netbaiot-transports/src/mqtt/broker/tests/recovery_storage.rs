@@ -1,17 +1,14 @@
 use super::*;
 
 #[test]
-fn shared_payload_preserves_legacy_json_and_compact_recovery_bytes() {
-    let legacy =
-        br#"{"topic":"v1/t/t/p/p/d/shared/up","payload":[0,1,255],"qos":1,"retain":false}"#;
-    let message: BrokerMessage = serde_json::from_slice(legacy).unwrap();
-    assert_eq!(message.payload.as_ref(), &[0, 1, 255]);
-    let value = serde_json::to_value(&message).unwrap();
-    assert_eq!(value["payload"], serde_json::json!([0, 1, 255]));
-    assert_eq!(
-        serde_json::from_value::<BrokerMessage>(value).unwrap(),
-        message
-    );
+fn shared_payload_preserves_current_compact_recovery_bytes() {
+    let message = BrokerMessage {
+        topic: "v1/t/t/p/p/d/shared/up".into(),
+        payload: vec![0, 1, 255].into(),
+        qos: 1,
+        retain: false,
+        properties: Default::default(),
+    };
     let mut encoded = Vec::new();
     encode_message(&mut encoded, &message).unwrap();
     let mut expected = Vec::new();
@@ -24,7 +21,7 @@ fn shared_payload_preserves_legacy_json_and_compact_recovery_bytes() {
     assert_eq!(encoded, expected);
     let mut reader = RecordReader::new(&encoded);
     assert_eq!(
-        decode_message(&mut reader, &Limits::default(), RECOVERY_VERSION).unwrap(),
+        decode_message(&mut reader, &Limits::default()).unwrap(),
         message
     );
     reader.finish().unwrap();
@@ -106,7 +103,7 @@ async fn mqtt_recovery_storage_commit_replace_retry_and_io_errors() {
 }
 
 #[tokio::test]
-async fn v4_recovery_keeps_publish_properties_and_byte_accounting() {
+async fn recovery_keeps_publish_properties_and_byte_accounting() {
     let limits = Arc::new(Limits::default());
     let broker = MqttBroker::new(limits.clone());
     let auth = auth("a");
@@ -900,7 +897,7 @@ async fn recovery_file_rejects_corruption_and_unknown_version() {
     fs::write(&path, &unknown_version).unwrap();
     assert!(matches!(
         broker.recover_from(&directory).await,
-        Err(Error::Invalid)
+        Err(Error::UnsupportedRecoveryVersion(version)) if version == RECOVERY_VERSION + 1
     ));
 
     fs::remove_dir_all(directory).unwrap();

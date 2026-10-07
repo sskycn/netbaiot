@@ -1,8 +1,7 @@
 use async_trait::async_trait;
 use netbaiot_client::NetbaIoTClient;
 use netbaiot_client::business_rpc::{
-    BusinessAuthHandler, BusinessRpcClient, BusinessRpcClientConfig, BusinessRpcClientError,
-    BusinessRpcV3Client, BusinessRpcV3ClientConfig,
+    BusinessAuthHandler, BusinessRpcClientError, BusinessRpcV3Client, BusinessRpcV3ClientConfig,
 };
 use netbaiot_core::{
     AuthInvalidation, CodecId, CommandId, DeliveryState, DeviceCommand, DeviceCommandPayload,
@@ -187,8 +186,9 @@ async fn v3_command_real_tcp_short_dedup_ttl_and_shorter_command_ttl() {
     std::fs::create_dir_all(&root).unwrap();
     let mut config: Config =
         serde_json::from_str(include_str!("../../../configs/development.json")).unwrap();
+    let (tcp, udp_reservation) = common::reserve_tcp_udp_pair().await;
     let reservations = [
-        TcpListener::bind("127.0.0.1:0").await.unwrap(),
+        tcp,
         TcpListener::bind("127.0.0.1:0").await.unwrap(),
         TcpListener::bind("127.0.0.1:0").await.unwrap(),
     ];
@@ -204,15 +204,14 @@ async fn v3_command_real_tcp_short_dedup_ttl_and_shorter_command_ttl() {
     config.limits.command_dedup_ttl_ms = 500;
     config.spool_directory = root.join("spool");
     config.business_rpc = Some(BusinessRpcConfig {
-        version: 2,
-        v3: Some(V3Limits::default()),
-        v3_send_ahead: None,
-        v3_experiment_socket_send_buffer_bytes: None,
+        limits: V3Limits::default(),
+        send_ahead: None,
+        experiment_socket_send_buffer_bytes: None,
         tls: None,
         identities: Vec::new(),
         development_token_env: Some("NETBAIOT_BUSINESS_RPC_TOKEN".into()),
         development_role: Some(BusinessRole::Application),
-        allow_v1: false,
+
         max_connections: 8,
         auth_max_inflight: 16,
         max_auth_control_offline_ms: 0,
@@ -221,6 +220,7 @@ async fn v3_command_real_tcp_short_dedup_ttl_and_shorter_command_ttl() {
     let path = root.join("config.json");
     std::fs::write(&path, serde_json::to_vec(&config).unwrap()).unwrap();
     drop(reservations);
+    drop(udp_reservation);
     let mut server = Command::new(env!("CARGO_BIN_EXE_netbaiot-server"))
         .arg(&path)
         .env("NETBAIOT_ADMIN_SECRET", "a".repeat(64))
@@ -288,8 +288,9 @@ async fn v3_planned_restart_replays_event_but_resets_command_dedup() {
     std::fs::create_dir_all(&root).unwrap();
     let mut config: Config =
         serde_json::from_str(include_str!("../../../configs/development.json")).unwrap();
+    let (tcp, udp_reservation) = common::reserve_tcp_udp_pair().await;
     let reservations = [
-        TcpListener::bind("127.0.0.1:0").await.unwrap(),
+        tcp,
         TcpListener::bind("127.0.0.1:0").await.unwrap(),
         TcpListener::bind("127.0.0.1:0").await.unwrap(),
     ];
@@ -305,15 +306,14 @@ async fn v3_planned_restart_replays_event_but_resets_command_dedup() {
     config.limits.shutdown_drain_timeout_ms = 300;
     config.spool_directory = root.join("spool");
     config.business_rpc = Some(BusinessRpcConfig {
-        version: 2,
-        v3: Some(V3Limits::default()),
-        v3_send_ahead: None,
-        v3_experiment_socket_send_buffer_bytes: None,
+        limits: V3Limits::default(),
+        send_ahead: None,
+        experiment_socket_send_buffer_bytes: None,
         tls: None,
         identities: Vec::new(),
         development_token_env: Some("NETBAIOT_BUSINESS_RPC_TOKEN".into()),
         development_role: Some(BusinessRole::Application),
-        allow_v1: false,
+
         max_connections: 8,
         auth_max_inflight: 16,
         max_auth_control_offline_ms: 0,
@@ -322,6 +322,7 @@ async fn v3_planned_restart_replays_event_but_resets_command_dedup() {
     let path = root.join("config.json");
     std::fs::write(&path, serde_json::to_vec(&config).unwrap()).unwrap();
     drop(reservations);
+    drop(udp_reservation);
     let start = || {
         Command::new(env!("CARGO_BIN_EXE_netbaiot-server"))
             .arg(&path)
@@ -456,8 +457,9 @@ async fn v3_command_real_tcp_tenant_scope_and_capacity() {
     std::fs::create_dir_all(&root).unwrap();
     let mut config: Config =
         serde_json::from_str(include_str!("../../../configs/development.json")).unwrap();
-    let mut reservations = Vec::new();
-    for _ in 0..3 {
+    let (tcp, udp_reservation) = common::reserve_tcp_udp_pair().await;
+    let mut reservations = vec![tcp];
+    for _ in 0..2 {
         reservations.push(TcpListener::bind("127.0.0.1:0").await.unwrap());
     }
     let addresses: Vec<_> = reservations
@@ -485,10 +487,9 @@ async fn v3_command_real_tcp_tenant_scope_and_capacity() {
         .map(|byte| format!("{byte:02x}"))
         .collect();
     config.business_rpc = Some(BusinessRpcConfig {
-        version: 2,
-        v3: Some(V3Limits::default()),
-        v3_send_ahead: None,
-        v3_experiment_socket_send_buffer_bytes: None,
+        limits: V3Limits::default(),
+        send_ahead: None,
+        experiment_socket_send_buffer_bytes: None,
         tls: Some(ManagementTlsFiles {
             certificate: fixtures.join("localhost-cert.pem").to_string_lossy().into(),
             private_key: fixtures.join("localhost-key.pem").to_string_lossy().into(),
@@ -509,7 +510,7 @@ async fn v3_command_real_tcp_tenant_scope_and_capacity() {
         }],
         development_token_env: None,
         development_role: None,
-        allow_v1: false,
+
         max_connections: 8,
         auth_max_inflight: 16,
         max_auth_control_offline_ms: 0,
@@ -518,6 +519,7 @@ async fn v3_command_real_tcp_tenant_scope_and_capacity() {
     let path = root.join("config.json");
     std::fs::write(&path, serde_json::to_vec(&config).unwrap()).unwrap();
     drop(reservations);
+    drop(udp_reservation);
     let stderr = std::fs::File::create(root.join("server.log")).unwrap();
     let mut server = Command::new(env!("CARGO_BIN_EXE_netbaiot-server"))
         .arg(&path)
@@ -542,17 +544,16 @@ async fn v3_command_real_tcp_tenant_scope_and_capacity() {
         .await
         .unwrap()
         .unwrap();
-    let mut v2_config =
-        BusinessRpcClientConfig::development(addresses[2], "unused".into(), BusinessRole::Commands);
-    v2_config.token = None;
-    v2_config.tls = Some(BusinessRpcTls {
+    let mut other_config = current_config(addresses[2], "unused".into(), BusinessRole::Commands);
+    other_config.token = None;
+    other_config.tls = Some(BusinessRpcTls {
         server_name: "localhost".into(),
         ca_pem: fixtures.join("localhost-cert.pem"),
         certificate_pem: fixtures.join("management-client.pem"),
         private_key_pem: fixtures.join("management-client-key.pem"),
     });
-    let (v2, _) = BusinessRpcClient::connect(v2_config, None).unwrap();
-    tokio::time::timeout(Duration::from_secs(10), v2.wait_ready())
+    let (other, _) = BusinessRpcV3Client::connect(other_config, None).unwrap();
+    tokio::time::timeout(Duration::from_secs(10), other.wait_ready())
         .await
         .unwrap()
         .unwrap();
@@ -584,22 +585,22 @@ async fn v3_command_real_tcp_tenant_scope_and_capacity() {
     assert_eq!(received.command_id, accepted_command.command_id);
     assert_eq!(received.payload, accepted_command.payload);
     assert_eq!(
-        v2.send_command(&accepted_command).await.unwrap(),
+        other.send_command(&accepted_command).await.unwrap(),
         netbaiot_core::CommandDispatch {
             state: DeliveryState::Sent,
             ..accepted
         }
     );
-    let v2_first = command("v2-first");
-    let v2_receipt = v2.send_command(&v2_first).await.unwrap();
+    let other_first = command("other-first");
+    let other_receipt = other.send_command(&other_first).await.unwrap();
     let received: DeviceCommand =
         serde_json::from_slice(&read_tcp_device(&mut socket).await).unwrap();
-    assert_eq!(received.command_id, v2_first.command_id);
+    assert_eq!(received.command_id, other_first.command_id);
     assert_eq!(
-        business.send_command(&v2_first).await.unwrap(),
+        business.send_command(&other_first).await.unwrap(),
         netbaiot_core::CommandDispatch {
             state: DeliveryState::Sent,
-            ..v2_receipt
+            ..other_receipt
         }
     );
     let full = business.send_command(&command("capacity")).await;
@@ -615,7 +616,7 @@ async fn v3_command_real_tcp_tenant_scope_and_capacity() {
             .await
             .is_err()
     );
-    v2.shutdown().await;
+    other.shutdown().await;
     business.shutdown().await;
     server.start_kill().unwrap();
     let _ = server.wait().await;
@@ -628,7 +629,7 @@ async fn v3_command_real_mqtt_dedup_http_ack_and_lost_response() {
     std::fs::create_dir_all(&root).unwrap();
     let mut config: Config =
         serde_json::from_str(include_str!("../../../configs/development.json")).unwrap();
-    let (tcp, udp) = common::reserve_tcp_udp_pair().await;
+    let (tcp, udp_reservation) = common::reserve_tcp_udp_pair().await;
     let mut reservations = vec![tcp];
     for _ in 0..2 {
         reservations.push(TcpListener::bind("127.0.0.1:0").await.unwrap());
@@ -644,15 +645,14 @@ async fn v3_command_real_mqtt_dedup_http_ack_and_lost_response() {
     config.event_delivery = Some(EventDeliverySource::BusinessRpc);
     config.spool_directory = root.join("spool");
     config.business_rpc = Some(BusinessRpcConfig {
-        version: 2,
-        v3: Some(V3Limits::default()),
-        v3_send_ahead: None,
-        v3_experiment_socket_send_buffer_bytes: None,
+        limits: V3Limits::default(),
+        send_ahead: None,
+        experiment_socket_send_buffer_bytes: None,
         tls: None,
         identities: Vec::new(),
         development_token_env: Some("NETBAIOT_BUSINESS_RPC_TOKEN".into()),
         development_role: Some(BusinessRole::Application),
-        allow_v1: false,
+
         max_connections: 8,
         auth_max_inflight: 32,
         max_auth_control_offline_ms: 0,
@@ -661,7 +661,7 @@ async fn v3_command_real_mqtt_dedup_http_ack_and_lost_response() {
     let path = root.join("config.json");
     std::fs::write(&path, serde_json::to_vec(&config).unwrap()).unwrap();
     drop(reservations);
-    drop(udp);
+    drop(udp_reservation);
     let stderr = std::fs::File::create(root.join("server.log")).unwrap();
     let mut server = Command::new(env!("CARGO_BIN_EXE_netbaiot-server"))
         .arg(&path)
@@ -1122,8 +1122,9 @@ async fn real_socket_v3_provider_event_and_invalidation() {
     std::fs::create_dir_all(&root).unwrap();
     let mut config: Config =
         serde_json::from_str(include_str!("../../../configs/development.json")).unwrap();
-    let mut reservations = Vec::new();
-    for _ in 0..3 {
+    let (tcp, udp_reservation) = common::reserve_tcp_udp_pair().await;
+    let mut reservations = vec![tcp];
+    for _ in 0..2 {
         reservations.push(TcpListener::bind("127.0.0.1:0").await.unwrap());
     }
     let addresses: Vec<_> = reservations
@@ -1137,15 +1138,14 @@ async fn real_socket_v3_provider_event_and_invalidation() {
     config.event_delivery = Some(EventDeliverySource::BusinessRpc);
     config.spool_directory = root.join("spool");
     config.business_rpc = Some(BusinessRpcConfig {
-        version: 2,
-        v3: Some(V3Limits::default()),
-        v3_send_ahead: None,
-        v3_experiment_socket_send_buffer_bytes: None,
+        limits: V3Limits::default(),
+        send_ahead: None,
+        experiment_socket_send_buffer_bytes: None,
         tls: None,
         identities: Vec::new(),
         development_token_env: Some("NETBAIOT_BUSINESS_RPC_TOKEN".into()),
         development_role: Some(BusinessRole::Multiplexed),
-        allow_v1: false,
+
         max_connections: 8,
         auth_max_inflight: 16,
         max_auth_control_offline_ms: 30_000,
@@ -1154,6 +1154,7 @@ async fn real_socket_v3_provider_event_and_invalidation() {
     let path = root.join("config.json");
     std::fs::write(&path, serde_json::to_vec(&config).unwrap()).unwrap();
     drop(reservations);
+    drop(udp_reservation);
     let stderr = std::fs::File::create(root.join("server.log")).unwrap();
     let mut server = Command::new(env!("CARGO_BIN_EXE_netbaiot-server"))
         .arg(&path)
@@ -1169,17 +1170,6 @@ async fn real_socket_v3_provider_event_and_invalidation() {
         inflight: AtomicUsize::new(0),
         peak_inflight: AtomicUsize::new(0),
     });
-    let v2_config = BusinessRpcClientConfig::development(
-        addresses[2],
-        "v3-test-token".into(),
-        BusinessRole::Multiplexed,
-    );
-    let (v2, _) = BusinessRpcClient::connect(v2_config, Some(handler.clone())).unwrap();
-    tokio::time::timeout(Duration::from_secs(10), v2.wait_ready())
-        .await
-        .expect("V2 coexistence deadline")
-        .unwrap();
-    v2.shutdown().await;
     let client_config =
         BusinessRpcV3ClientConfig::development(addresses[2], "v3-test-token".into());
     let (client, mut events) =
@@ -1308,84 +1298,6 @@ async fn real_socket_v3_provider_event_and_invalidation() {
 }
 
 #[tokio::test]
-async fn v3_hello_is_rejected_when_v3_is_disabled() {
-    let root = std::env::temp_dir().join(format!("netbaiot-v3-disabled-{}", uuid::Uuid::new_v4()));
-    std::fs::create_dir_all(&root).unwrap();
-    let mut config: Config =
-        serde_json::from_str(include_str!("../../../configs/development.json")).unwrap();
-    let mut reservations = Vec::new();
-    for _ in 0..3 {
-        reservations.push(TcpListener::bind("127.0.0.1:0").await.unwrap());
-    }
-    let addresses: Vec<_> = reservations
-        .iter()
-        .map(|socket| socket.local_addr().unwrap())
-        .collect();
-    config.device_ingress = addresses[0];
-    config.management_http = addresses[1];
-    config.business_tcp = Some(addresses[2]);
-    config.spool_directory = root.join("spool");
-    config.business_rpc = Some(BusinessRpcConfig {
-        version: 2,
-        v3: None,
-        v3_send_ahead: None,
-        v3_experiment_socket_send_buffer_bytes: None,
-        tls: None,
-        identities: Vec::new(),
-        development_token_env: Some("NETBAIOT_BUSINESS_RPC_TOKEN".into()),
-        development_role: Some(BusinessRole::Multiplexed),
-        allow_v1: false,
-        max_connections: 8,
-        auth_max_inflight: 16,
-        max_auth_control_offline_ms: 30_000,
-    });
-    config.validate().unwrap();
-    let path = root.join("config.json");
-    std::fs::write(&path, serde_json::to_vec(&config).unwrap()).unwrap();
-    drop(reservations);
-    let stderr = std::fs::File::create(root.join("server.log")).unwrap();
-    let mut server = Command::new(env!("CARGO_BIN_EXE_netbaiot-server"))
-        .arg(&path)
-        .env("NETBAIOT_ADMIN_SECRET", "a".repeat(64))
-        .env("NETBAIOT_BUSINESS_RPC_TOKEN", "v3-test-token")
-        .stdout(Stdio::null())
-        .stderr(Stdio::from(stderr))
-        .kill_on_drop(true)
-        .spawn()
-        .unwrap();
-    let mut socket = tokio::time::timeout(Duration::from_secs(5), async {
-        loop {
-            if let Ok(socket) = TcpStream::connect(addresses[2]).await {
-                break socket;
-            }
-            tokio::time::sleep(Duration::from_millis(20)).await;
-        }
-    })
-    .await
-    .unwrap();
-    let hello = serde_json::to_vec(&V3Bootstrap::Hello {
-        version: 3,
-        token: Some("v3-test-token".into()),
-        limits: V3Limits::default(),
-    })
-    .unwrap();
-    socket
-        .write_all(&(hello.len() as u32).to_be_bytes())
-        .await
-        .unwrap();
-    socket.write_all(&hello).await.unwrap();
-    let mut response = [0; 1];
-    let n = tokio::time::timeout(Duration::from_secs(3), socket.read(&mut response))
-        .await
-        .unwrap()
-        .unwrap_or(0);
-    assert_eq!(n, 0, "disabled V3 must close without Ready");
-    server.start_kill().unwrap();
-    let _ = server.wait().await;
-    let _ = std::fs::remove_dir_all(root);
-}
-
-#[tokio::test]
 async fn v3_mtls_authenticates_before_role_free_stream_authorization() {
     use netbaiot_client::business_rpc::BusinessRpcTls;
     use netbaiot_server::{BusinessRpcIdentityConfig, ManagementTlsFiles};
@@ -1406,8 +1318,9 @@ async fn v3_mtls_authenticates_before_role_free_stream_authorization() {
         .collect::<String>();
     let mut config: Config =
         serde_json::from_str(include_str!("../../../configs/development.json")).unwrap();
-    let mut reservations = Vec::new();
-    for _ in 0..3 {
+    let (tcp, udp_reservation) = common::reserve_tcp_udp_pair().await;
+    let mut reservations = vec![tcp];
+    for _ in 0..2 {
         reservations.push(TcpListener::bind("127.0.0.1:0").await.unwrap());
     }
     let addresses: Vec<_> = reservations
@@ -1421,10 +1334,9 @@ async fn v3_mtls_authenticates_before_role_free_stream_authorization() {
     config.event_delivery = Some(EventDeliverySource::DevelopmentAudit);
     config.spool_directory = root.join("spool");
     config.business_rpc = Some(BusinessRpcConfig {
-        version: 2,
-        v3: Some(V3Limits::default()),
-        v3_send_ahead: None,
-        v3_experiment_socket_send_buffer_bytes: None,
+        limits: V3Limits::default(),
+        send_ahead: None,
+        experiment_socket_send_buffer_bytes: None,
         tls: Some(ManagementTlsFiles {
             certificate: fixtures.join("localhost-cert.pem").to_string_lossy().into(),
             private_key: fixtures.join("localhost-key.pem").to_string_lossy().into(),
@@ -1448,7 +1360,7 @@ async fn v3_mtls_authenticates_before_role_free_stream_authorization() {
         }],
         development_token_env: None,
         development_role: None,
-        allow_v1: false,
+
         max_connections: 8,
         auth_max_inflight: 16,
         max_auth_control_offline_ms: 0,
@@ -1457,6 +1369,7 @@ async fn v3_mtls_authenticates_before_role_free_stream_authorization() {
     let path = root.join("config.json");
     std::fs::write(&path, serde_json::to_vec(&config).unwrap()).unwrap();
     drop(reservations);
+    drop(udp_reservation);
     let mut server = Command::new(env!("CARGO_BIN_EXE_netbaiot-server"))
         .arg(&path)
         .env("NETBAIOT_ADMIN_SECRET", "a".repeat(64))
@@ -1530,4 +1443,15 @@ fn assert_sent_receipt(
         latest.state,
         DeliveryState::Sent | DeliveryState::Received
     ));
+}
+
+fn current_config(
+    address: std::net::SocketAddr,
+    token: String,
+    role: BusinessRole,
+) -> BusinessRpcV3ClientConfig {
+    let mut settings = BusinessRpcV3ClientConfig::development(address, token);
+    settings.provider = role.auth_control();
+    settings.events = role.events();
+    settings
 }

@@ -19,16 +19,18 @@ fn shared_fixture() -> BrokerMessage {
 }
 
 #[test]
-fn shared_metadata_preserves_historical_json_and_compact_message_bytes() {
+fn shared_metadata_preserves_snapshot_diagnostics_and_compact_message_bytes() {
     let message = shared_fixture();
     let expected = r#"{"topic":"v1/t/t/p/p/d/d/up","payload":[0,255],"qos":2,"retain":true,"properties":{"payload_format":0,"expires_at_ms":42,"content_type":"application/json","response_topic":"v1/t/t/p/p/d/d/down_ack","correlation_data":[1,2],"user_properties":[["k","v"],["k","two"]]}}"#;
     assert_eq!(serde_json::to_string(&message).unwrap(), expected);
-    assert_eq!(
-        serde_json::from_str::<BrokerMessage>(expected).unwrap(),
-        message
-    );
     let mut encoded = Vec::new();
     encode_message(&mut encoded, &message).unwrap();
+    let mut reader = RecordReader::new(&encoded);
+    assert_eq!(
+        decode_message(&mut reader, &Limits::default()).unwrap(),
+        message
+    );
+    reader.finish().unwrap();
     assert_eq!(
         Sha256::digest(&encoded).as_slice(),
         &[

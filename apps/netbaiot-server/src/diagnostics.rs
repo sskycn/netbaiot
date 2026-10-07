@@ -287,7 +287,7 @@ pub async fn load_config_diagnostic(path: &Path) -> std::result::Result<Config, 
 pub async fn check_config(
     config: &Config,
     admin_secret: Option<&str>,
-    stream_token: Option<&str>,
+    business_rpc_token: Option<&str>,
 ) -> ConfigReport {
     let mut out = config.diagnostics();
     if config.limits.validate().is_ok() {
@@ -361,24 +361,13 @@ pub async fn check_config(
     if config
         .business_rpc
         .as_ref()
-        .is_some_and(|rpc| rpc.development_token().is_err())
+        .is_some_and(|rpc| business_rpc_token.is_none() && rpc.development_token().is_err())
     {
         out.push(ConfigDiagnostic::new(
             "NBI-CFG-008",
             "business_rpc.development_token_env",
             "Business RPC development token source is unavailable or invalid.",
             "Set the configured environment variable to a bounded nonempty development token.",
-        ));
-    }
-    if config.business_tcp.is_some()
-        && config.business_rpc.as_ref().is_none_or(|rpc| rpc.allow_v1)
-        && stream_token.is_none()
-    {
-        out.push(ConfigDiagnostic::new(
-            "NBI-CFG-008",
-            "business_tcp",
-            "Legacy business streams require NETBAIOT_BUSINESS_STREAM_TOKEN.",
-            "Set the stream token through a protected environment source.",
         ));
     }
     for (path, result) in [

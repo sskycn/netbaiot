@@ -1,5 +1,7 @@
 # MQTT 3.1.1 conformance release-gate report
 
+> Historical evidence recorded before the 2026-10-07 current-only cleanup. Preserve the recorded results and original version context; current support: [protocol matrix](protocol-support.md), [upgrade](migration/current-protocol-only.md).
+
 ## Decision and scope
 
 The embedded server passes the MQTT 3.1.1 with Errata 01 release gate at the

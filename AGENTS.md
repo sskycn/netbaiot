@@ -166,7 +166,7 @@ STARTING -> RUNNING -> QUIESCING -> DRAINING -> SPOOLING -> DRAINED -> EXIT
 Quiesce first makes readiness false, closes the ingress admission gate, waits for
 active admission guards, stops new connections/uploads/commands/control mutation,
 then drains accepted required deliveries. Management auth/control/routes mutation,
-Business RPC V2/V3 auth sync/invalidation, offline-provider revocation, command
+Current Business RPC auth sync/invalidation, offline-provider revocation, command
 dispatch (including dedup retries), and final MQTT/TCP session establishment hold
 admission guards through their complete side effects. Diagnostic reads and the
 idempotent drain request remain available. Never substitute a readiness check for
@@ -321,7 +321,8 @@ Tenant inflight release must wake bounded pending work for other active sessions
 the tenant; ACK handlers must not scan all sessions. Recovery limits must cover
 compact NBMQ v6 records for every admitted legal state. Writes are streaming and
 bounded per record and finish with an authoritative record-count/byte-count/whole-stream
-digest trailer; NBMQ v1–v5 remain read-only compatible under version-specific ceilings. A structural recovery
+digest trailer. Only NBMQ v6 and EventBus NBSP v3 are supported; older or unknown
+versions fail explicitly, with no parser fallback or runtime migration. A structural recovery
 failure is not retryable, but EventBus required work must still drain or spool before
 the process remains alive and unready.
 

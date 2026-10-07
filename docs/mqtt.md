@@ -177,17 +177,14 @@ and returns Session Present=0. Management invalidation removes matching persiste
 state in the same bounded control operation.
 
 Planned restart writes compact NBMQ v6 records incrementally, with a checksummed
-header, a length/checksum on every bounded record, and an authenticated whole-image
+header, a length/checksum on every bounded record, and a whole-image integrity
 trailer containing the authoritative record count, byte count, and SHA-256 digest.
 v6 records include protocol version, MQTT 5 session expiry, subscription options,
 message properties/expiry, outbound transfer start state, retained origin, and
 delayed Will deadline/cancellation state. Pending Wills also retain the original
 publisher SessionKey for No Local filtering, independently of cancellation state.
 Payload bytes remain binary; there is no complete snapshot clone or whole-image
-serialization buffer. NBMQ v1 and v2 images remain readable under version-specific
-ceilings; NBMQ v3, v4, and v5 are also readable, while all new writes use v6. Legacy sessions that lack complete
-authorization/codec provenance are never exposed through the subscription index and
-reset safely on attach. The file uses restrictive permissions, file fsync, atomic
+serialization buffer. Only NBMQ v6 is readable and writable. Old and unknown versions fail explicitly before payload decoding; no legacy parser or migration remains. Current snapshots with an explicit unknown authorization profile cannot expose subscriptions and reset safely on reauthentication. The file uses restrictive permissions, file fsync, atomic
 rename, and directory fsync.
 It contains no password or socket/TLS/task state. Reconnect must authenticate before
 the `(DeviceKey, ClientId)` state can resume. Abrupt crash may lose mutations since

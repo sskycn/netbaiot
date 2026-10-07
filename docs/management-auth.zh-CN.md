@@ -119,4 +119,4 @@ HMAC 请求签名、OAuth2 Token Introspection、管理审计持久化、URI/DNS
 
 连接接入与管理 HTTP 请求分别使用有界的限流窗口，沿用 `requests_per_second` 和 `requests_per_ip_second` 配置。每个已接入 HTTP 请求只消耗一次请求额度。
 
-Business RPC V2 使用独立的 mTLS principal 或回环开发 token，管理凭据不能授权它。管理 HTTP 与 V2 的 `auth.invalidate` 共用完整的入口/MQTT 失效边界，详见 [Business RPC Stream V2](business-rpc-v2.zh-CN.md)。
+Current Business RPC 使用独立的 mTLS principal 或回环开发 token，管理凭据不能授权它。管理 HTTP 与 当前 RPC 的 `auth.invalidate` 共用完整的入口/MQTT 失效边界，详见 [Business RPC V3](business-rpc-v3.zh-CN.md)。

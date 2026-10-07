@@ -1,0 +1,58 @@
+[
+  {
+    "target": "business_rpc_bootstrap",
+    "runs": 10000,
+    "asan": true,
+    "status": "PASS",
+    "log_sha256": "67b56869a25d8969509e25f96280aa3f0bebadd63366a39bd85fd866cb746eea"
+  },
+  {
+    "target": "business_rpc_v3",
+    "runs": 10000,
+    "asan": true,
+    "status": "PASS",
+    "log_sha256": "5377dbc0dc158958a79dde48ac58edccf64ae798d6d9e387f5ff572641a08e14"
+  },
+  {
+    "target": "mqtt_device_profile",
+    "runs": 10000,
+    "asan": true,
+    "status": "PASS",
+    "log_sha256": "86fc4ff6fd02bcd35122b78a7857d0bfbf74b261ded4095a334b42ec7cc8d6fd"
+  },
+  {
+    "target": "mqtt_packet",
+    "runs": 10000,
+    "asan": true,
+    "status": "PASS",
+    "log_sha256": "01da83bba5c7e53f61be1cd41b20cb7cd2daaaee7a76be63cdd4a692fb276639"
+  },
+  {
+    "target": "mqtt_recovery",
+    "runs": 10000,
+    "asan": true,
+    "status": "PASS",
+    "log_sha256": "322b76a31c4573b960132ece9c6c91760f76fa0ee89a75f6d7ce07e15a4251b9"
+  },
+  {
+    "target": "mqtt_state",
+    "runs": 10000,
+    "asan": true,
+    "status": "PASS",
+    "log_sha256": "dbf146738b2336ea4fd40eaa0d7beecd742970129e7e2b43c0154ab1ff2515ad"
+  },
+  {
+    "target": "mqtt_v5_packet",
+    "runs": 10000,
+    "asan": true,
+    "status": "PASS",
+    "log_sha256": "6679b289a67e726d284d8434a4c3f0ae2e51bca03a01d10894a4e71b49ef63fa"
+  },
+  {
+    "target": "restart_spool",
+    "runs": 10000,
+    "asan": true,
+    "status": "PASS",
+    "log_sha256": "29654cc2d1931aa57bb92e5dc721435444e6d33c87b3399d873be917d4569c92"
+  }
+]

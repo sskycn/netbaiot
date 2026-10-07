@@ -8,8 +8,6 @@ rust-version.workspace = true
 [dependencies]
 netbaiot-protocol.workspace = true
 bytes.workspace = true
-serde.workspace = true
-serde_json.workspace = true
 tokio.workspace = true
 
 [lints]

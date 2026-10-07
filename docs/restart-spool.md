@@ -35,18 +35,7 @@ planned shutdown succeed. The generation increases on every
 replacement. A crash after the new rename but before old cleanup therefore selects
 only the new generation. Cleanup checks the generation before unlinking, so a stale
 cleanup handle cannot delete a newer image at the same path. Abandoned `.tmp` files
-are ignored. Version-1 append-only segments and version-2 snapshots remain readable for migration and are
-coalesced by stable `event_id`; once an authoritative snapshot exists, it is authoritative
-and legacy files are ignored until safe cleanup. Corrupt authoritative images never
-fall back to older files. NBSP v1/v2 have only record checksums: a complete-record
-boundary truncation (or header-only prefix) cannot be detected retrospectively.
-Older releases cannot read v3. Drain and acknowledge v3 work with this version
-before rollback; preserve the entire directory before an upgrade or rollback.
-On Windows an acknowledged empty v3 successor still exists. After stopping the
-gateway, use the current reader to validate that it contains zero pending records,
-then archive that empty file outside the active directory before starting a reader
-that only supports v1/v2. Preserve the full directory backup and MQTT recovery file.
-Never move a nonempty, unreadable or unvalidated snapshot to bypass recovery.
+are ignored. Only NBSP v3 is readable. The named `eventbus-recovery.spool` is authoritative; recovery never aggregates older append-only files or falls back to another filename. A non-authoritative leftover without a named snapshot fails closed because it may own accepted work. Old/unknown versions fail with `UnsupportedRecoveryVersion(version)` before record decoding. Unknown/unreadable stale files prevent cleanup before authoritative deletion. Preserve the entire directory and use a suitable previous release to finish or convert old responsibility before upgrading; see [current-only upgrade](migration/current-protocol-only.md). On Windows ACK cleanup retains a synced empty current successor; it is not proof that an incompatible reader can consume it.
 
 If business processed an event but its ACK was lost, the pending record is replayed
 with the same `event_id`. This can duplicate processing and is why consumers must be
@@ -56,7 +45,7 @@ The MQTT snapshot uses compact NBMQ v6 typed records: a version/generation heade
 and checksum, bounded binary records with lengths and checksums, and a final
 record-count, byte-count and whole-stream SHA-256 trailer. Sessions, subscriptions,
 QoS state, retained data and pending Wills are encoded from one coherent view without
-a whole-state clone. Readers accept v1–v5 for migration under version-specific bounds.
+a whole-state clone. Readers accept NBMQ v6 only; old/unknown versions fail explicitly.
 The independent `mqtt_recovery_max_bytes` ceiling covers configured broker state;
 it does not inherit the EventBus record limit. Both formats retain private-directory,
 file synchronization and platform replacement rules. See
@@ -68,51 +57,9 @@ either commit keeps the process alive and unready with bounded retry; failed Eve
 attempts remove their private temporary file. SIGKILL, OS crash, or power loss may
 discard recent in-memory changes and must not be described as crash durability.
 
-## Legacy ConfigAck restart spool compatibility
+## Unsupported files
 
-NBSP container versions 1 and 2 remain readable for supported event records:
-telemetry, device event, heartbeat, and command acknowledgement. These container
-versions do not independently version the embedded `DeviceEvent` JSON schema.
-The v3 writer changes the container integrity format only; supported-record JSON
-and the independent MQTT recovery format remain unchanged.
-
-A checksummed record whose exact `event.kind.kind` discriminator is `config_ack`
-cannot be delivered by this release. Recovery returns `Error::IncompatibleSpool`
-and logs:
-
-```text
-EventBus restart recovery failed; startup blocked error=restart spool contains legacy ConfigAck records created by an older NetbaIoT version; drain or complete the old spool with the previous release before upgrading; committed files are preserved
-```
-
-Startup fails before listeners bind or readiness becomes true. The new process
-neither skips nor converts the event, deletes the file, nor overwrites the pending
-responsibility. Unknown kinds, corrupt framing/checksums, malformed JSON, and
-excessively nested diagnostics remain invalid input rather than being mislabeled
-as ConfigAck. Inspection runs only after bounded record/checksum validation and
-current deserialization failure, without materializing a full JSON tree.
-
-If this error occurs, preserve the entire recovery directory and:
-
-1. Run the previous release with the original configuration/recovery directory and
-   compatible business consumers. Keep device traffic stopped externally so new
-   legacy records cannot arrive while existing required deliveries recover.
-2. Allow the required consumers to acknowledge replayed work. With the previous
-   release's CLI and existing admin credentials, inspect `netbaiot server status`
-   (using the deployment's `--endpoint` / `NETBAIOT_ENDPOINT` and `NETBAIOT_TOKEN`).
-   Wait for `pending_required` to reach zero and committed EventBus `.spool` files
-   to be removed by the gateway. Do not remove them yourself.
-3. Request planned shutdown with `netbaiot server drain --yes`, or send SIGTERM.
-   Verify successful exit and no remaining pending EventBus `.spool` records.
-   A successful drain can spool undelivered work, so exit alone is insufficient.
-4. Upgrade and restart with the same recovery directory, then restore device
-   traffic after readiness succeeds. Preserve `mqtt-runtime.state` for its
-   independent planned-restart responsibilities.
-
-The new release refuses to silently discard old required work. If the old consumer
-cannot acknowledge it, resolve that responsibility with the previous release before
-upgrading. Do not delete committed records to bypass the check. See the
-[configuration ownership migration](remove-device-config.md) and
-[connection event compatibility review](connection-events-spool-upgrade-cleanup.md).
+No historical payload decoder, migration service or fallback exists. NBMQ v1–v5 and NBSP v1/v2 must be completed or converted by a suitable previous version before upgrade. An unsupported EventBus spool blocks startup before listener/readiness publication and preserves its committed bytes. Current-format malformed event JSON, lengths, checksums or trailers remain invalid input. The new release does not skip responsibility, reinterpret bytes, or silently remove old files. See the [breaking change and operator steps](migration/current-protocol-only.md).
 
 ## Directory ownership and platform I/O
 

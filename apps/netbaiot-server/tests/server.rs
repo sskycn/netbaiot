@@ -169,9 +169,11 @@ fn startup_failures_and_dropped_run_future_release_owned_tasks() {
 }
 
 #[tokio::test]
-async fn legacy_config_ack_spool_blocks_startup_and_preserves_rollback_files() {
-    let root =
-        std::env::temp_dir().join(format!("netbaiot-legacy-startup-{}", uuid::Uuid::new_v4()));
+async fn unsupported_spool_version_blocks_startup_and_preserves_files() {
+    let root = std::env::temp_dir().join(format!(
+        "netbaiot-rejected-startup-{}",
+        uuid::Uuid::new_v4()
+    ));
     std::fs::create_dir_all(&root).unwrap();
     let device = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let management = TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -181,7 +183,7 @@ async fn legacy_config_ack_spool_blocks_startup_and_preserves_rollback_files() {
     c.spool_directory = root.join("spool");
     std::fs::create_dir_all(&c.spool_directory).unwrap();
     let path = c.spool_directory.join("eventbus-recovery.spool");
-    let bytes = include_bytes!("../../../tests/fixtures/restart-spool/config-ack-v2.spool");
+    let bytes = b"NBSP\0\0\0\x02";
     std::fs::write(&path, bytes).unwrap();
     // Reserved listeners also prove recovery fails before any listener bind/readiness.
     assert!(matches!(
@@ -190,7 +192,7 @@ async fn legacy_config_ack_spool_blocks_startup_and_preserves_rollback_files() {
             CancellationToken::new()
         )
         .await,
-        Err(Error::IncompatibleSpool)
+        Err(Error::UnsupportedRecoveryVersion(2))
     ));
     let config_path = root.join("config.json");
     std::fs::write(&config_path, serde_json::to_vec(&c).unwrap()).unwrap();
@@ -212,9 +214,9 @@ async fn legacy_config_ack_spool_blocks_startup_and_preserves_rollback_files() {
         String::from_utf8_lossy(&output.stderr)
     );
     assert!(log.contains("startup blocked"));
-    assert!(log.contains("legacy ConfigAck records"));
+    assert!(log.contains("unsupported restart recovery format version 2"));
     assert!(log.contains("previous release before upgrading"));
-    assert!(!log.contains("legacy:1"));
+
     assert!(!log.contains("device-1"));
     assert_eq!(std::fs::read(&path).unwrap(), bytes);
     assert_eq!(std::fs::read_dir(&c.spool_directory).unwrap().count(), 2);

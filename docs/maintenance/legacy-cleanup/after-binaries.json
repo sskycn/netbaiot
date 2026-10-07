@@ -1,0 +1,34 @@
+{
+  "netbaiot-server": {
+    "bytes": 11211040,
+    "sha256": "f0581a19450000886f9163c6f3881c7fbab3786f509fd7a3869a0f76835632e9"
+  },
+  "netbaiot": {
+    "bytes": 16295792,
+    "sha256": "1551ba6ba21b2b67874b0b07e2e225b4dd874f852fe595d8574b7c42747af184"
+  },
+  "netbaiot-loadgen": {
+    "bytes": 5274160,
+    "sha256": "6515b873af9b157edd472bb39a30b0a295963e07838cb3a9cb9ccfd0379c3ad7"
+  },
+  "business_rpc": {
+    "bytes": 7267376,
+    "sha256": "01504fd4b51c50f831aeb5e73dfa77d6835deaa1a50477c621858c6b52c7d7b8"
+  },
+  "admission_auth": {
+    "bytes": 1077552,
+    "sha256": "18bafd51b79a6c95f4f318b46772cc013ffde55b9cc43309d5bb41605f997fd3"
+  },
+  "udp_ack": {
+    "bytes": 595968,
+    "sha256": "b48a61a9610499e48028126183807188cbe752d881e349e7d1af0b8e12738f18"
+  },
+  "netbaiot_runtime-probe": {
+    "bytes": 9586448,
+    "sha256": "2f6e7f58cde760fbda9793c4231fa991d47aaae35c9ee2810e694070d2934d70"
+  },
+  "netbaiot_transports-probe": {
+    "bytes": 5784400,
+    "sha256": "e60cff180b96fd3b488d692ae514fb8cbb9aeffbb4ae2adca2014c431b5f221d"
+  }
+}

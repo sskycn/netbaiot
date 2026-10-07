@@ -69,9 +69,7 @@ pub async fn inspect(path: &Path, external: bool) -> Report {
             let report = netbaiot_server::check_config(
                 &config,
                 std::env::var("NETBAIOT_ADMIN_SECRET").ok().as_deref(),
-                std::env::var("NETBAIOT_BUSINESS_STREAM_TOKEN")
-                    .ok()
-                    .as_deref(),
+                None,
             )
             .await;
             (Some(config), report)

@@ -32,6 +32,14 @@ async fn config(root: &Path) -> Config {
     config.device_ingress = addresses[0];
     config.management_http = addresses[1];
     config.business_tcp = Some(addresses[4]);
+    config.business_rpc = Some(
+        serde_json::from_value(serde_json::json!({
+            "limits":netbaiot_protocol::business_rpc_v3::V3Limits::default(),
+            "tls":null,"development_token_env":"NETBAIOT_BUSINESS_RPC_TOKEN",
+            "development_role":"events"
+        }))
+        .unwrap(),
+    );
     config.delivery_url = None;
     config.spool_directory = root.join("spool");
     drop(reservations);

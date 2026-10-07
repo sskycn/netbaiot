@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import pathlib
+import re
 import shutil
 import socket
 import subprocess
@@ -180,7 +181,7 @@ class Results:
         )
 
 
-def command_check(command: list[str]) -> str:
+def command_check(command: list[str], *, rust_tests: bool = False) -> str:
     completed = subprocess.run(
         command,
         cwd=ROOT,
@@ -193,7 +194,15 @@ def command_check(command: list[str]) -> str:
             f"command failed ({completed.returncode}): {' '.join(command)}\n"
             f"{completed.stdout[-2000:]}\n{completed.stderr[-2000:]}"
         )
-    output = (completed.stdout + completed.stderr).strip().splitlines()
+    transcript = completed.stdout + completed.stderr
+    if rust_tests:
+        passed = sum(int(count) for count in re.findall(
+            r"(?m)^test result: ok\. (\d+) passed; 0 failed;", transcript,
+        ))
+        if passed == 0:
+            raise AssertionError(f"no Rust tests passed: {' '.join(command)}\n{transcript[-2000:]}")
+        return f"{passed} Rust tests passed: {' '.join(command)}"
+    output = transcript.strip().splitlines()
     return output[-1] if output else "completed"
 
 
@@ -1204,7 +1213,7 @@ def main() -> int:
                     "rust-release-invariant",
                     "named deterministic Rust evidence",
                     lambda test_filter=test_filter: command_check(
-                        ["cargo", "test", "--locked", test_filter]
+                        ["cargo", "test", "--locked", test_filter], rust_tests=True,
                     ),
                 )
         results.run(
@@ -1217,7 +1226,7 @@ def main() -> int:
                     "test",
                     "--locked",
                     "qos2_recovery_resumes_each_protocol_stage_without_reallocation",
-                ]
+                ], rust_tests=True,
             ),
         )
         if args.only is None:

@@ -649,7 +649,6 @@ dependencies = [
  "netbaiot-protocol",
  "serde",
  "thiserror",
- "uuid",
 ]
 
 [[package]]
@@ -680,7 +679,6 @@ name = "netbaiot-protocol"
 version = "0.2.3"
 dependencies = [
  "serde",
- "serde_json",
  "thiserror",
  "uuid",
 ]
@@ -730,7 +728,6 @@ dependencies = [
  "sha2",
  "socket2",
  "subtle",
- "thiserror",
  "tokio",
  "tokio-rustls",
  "tokio-util",
@@ -744,8 +741,6 @@ version = "0.2.3"
 dependencies = [
  "bytes",
  "netbaiot-protocol",
- "serde",
- "serde_json",
  "tokio",
 ]
 

@@ -23,7 +23,7 @@ jobs:
         run: |
           set -o pipefail
           python scripts/ci_annotate.py --title "Native spool tests failed" -- cargo test --locked -p netbaiot-runtime spool:: 2>&1 | tee native-recovery.log
-          python scripts/ci_annotate.py --title "Native MQTT recovery failed" -- cargo test --locked -p netbaiot-transports mqtt_recovery 2>&1 | tee -a native-recovery.log
+          python scripts/ci_annotate.py --title "Native MQTT recovery failed" -- cargo test --locked -p netbaiot-transports mqtt::broker::tests::recovery 2>&1 | tee -a native-recovery.log
           python scripts/ci_annotate.py --title "Native subprocess recovery failed" -- cargo test --locked -p netbaiot-server --test server subprocess_ 2>&1 | tee -a native-recovery.log
           python scripts/ci_annotate.py --title "Native recovery ownership failed" -- cargo test --locked -p netbaiot-server --test server recovery_directory_is_exclusive 2>&1 | tee -a native-recovery.log
           python scripts/ci_annotate.py --title "Native startup lifecycle failed" -- cargo test --locked -p netbaiot-server --test server startup_failures_and_dropped_run_future 2>&1 | tee -a native-recovery.log
