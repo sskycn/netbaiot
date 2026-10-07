@@ -1,8 +1,4 @@
-mod business_stream_v1;
 use async_trait::async_trait;
-#[cfg(test)]
-use business_stream_v1::TcpStreamSink;
-use business_stream_v1::{serve_business_connection, serve_business_stream};
 use netbaiot_codecs::JsonV1;
 use netbaiot_core::*;
 use netbaiot_runtime::*;
@@ -13,22 +9,21 @@ use netbaiot_transports::{
         V3SendAhead,
     },
     mqtt::broker::MqttBroker,
-    serve_device_ingress, serve_management_http,
-    tcp::{LengthPrefixFramer, TcpFramer},
-    udp,
+    serve_device_ingress, serve_management_http, udp,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{collections::HashMap, net::SocketAddr, path::PathBuf, sync::Arc, time::Duration};
-use subtle::ConstantTimeEq;
 use tokio::{
-    io::{AsyncReadExt, AsyncWriteExt},
-    net::{TcpListener, TcpStream, UdpSocket},
-    sync::mpsc,
+    io::AsyncReadExt,
+    net::{TcpListener, UdpSocket},
     task::JoinSet,
 };
 use tokio_rustls::{TlsAcceptor, rustls};
 use tokio_util::sync::CancellationToken;
+
+#[cfg(test)]
+use tokio::{io::AsyncWriteExt, sync::mpsc};
 
 mod auth_provider;
 mod bootstrap;
@@ -141,7 +136,6 @@ mod reliability_tests {
                 }],
                 development_token_env: None,
                 development_role: None,
-                allow_v1: false,
                 max_connections: 8,
                 auth_max_inflight: 16,
                 max_auth_control_offline_ms: 30_000,
@@ -427,7 +421,7 @@ mod reliability_tests {
     async fn eventbus_tcp_absence_filter_change_and_reconnect_preserve_isolation() {
         let limits = Arc::new(Limits::default());
         let metrics = Arc::new(Metrics::with_lock_timing());
-        let tcp = TcpStreamSink::new();
+        let tcp = BusinessRpcEventSink::new();
         let fast_id = SinkId::new("fast").unwrap();
         let tcp_id = SinkId::new("tcp").unwrap();
         let bus = EventBus::new(
@@ -505,7 +499,7 @@ mod reliability_tests {
 
     #[tokio::test]
     async fn active_subscriber_is_rejected_and_filter_mismatch_is_not_acknowledged() {
-        let sink = TcpStreamSink::new();
+        let sink = BusinessRpcEventSink::new();
         let (sender, _receiver) = mpsc::channel(1);
         let generation = sink
             .claim(

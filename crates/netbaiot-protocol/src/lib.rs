@@ -365,41 +365,6 @@ pub struct EventAck {
     pub event_id: EventId,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
-pub enum StreamClientFrame {
-    Hello {
-        version: u16,
-        token: String,
-    },
-    Subscribe {
-        version: u16,
-        subscription_id: SubscriptionId,
-        filter: EventFilter,
-    },
-    Ack {
-        version: u16,
-        ack: EventAck,
-    },
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
-pub enum StreamServerFrame {
-    Ready {
-        version: u16,
-        subscription_id: SubscriptionId,
-    },
-    Event {
-        version: u16,
-        delivery: EventDelivery,
-    },
-    Error {
-        version: u16,
-        error: ApiError,
-    },
-}
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ErrorCode {
@@ -655,13 +620,14 @@ mod tests {
         });
         assert!(serde_json::from_value::<EventAccepted>(accepted).is_ok());
 
-        let strict_client = serde_json::json!({
-            "type": "hello",
-            "version": PROTOCOL_VERSION,
-            "token": "x",
-            "future_client_field": true
-        });
-        assert!(serde_json::from_value::<StreamClientFrame>(strict_client).is_err());
+        let mut strict_client = serde_json::to_value(business_rpc_v3::V3Bootstrap::Hello {
+            version: business_rpc_v3::BUSINESS_RPC_V3_VERSION,
+            token: Some("x".into()),
+            limits: business_rpc_v3::V3Limits::default(),
+        })
+        .unwrap();
+        strict_client["future_client_field"] = serde_json::json!(true);
+        assert!(serde_json::from_value::<business_rpc_v3::V3Bootstrap>(strict_client).is_err());
     }
     #[test]
     fn connection_lifecycle_is_not_an_event_or_subscription_filter() {
@@ -722,38 +688,6 @@ mod tests {
                 "revision":1, "products":[], "routes":[], "devices":[]
             }))
             .is_err()
-        );
-    }
-    #[test]
-    fn v1_stream_golden_json_stays_compatible() {
-        let hello = StreamClientFrame::Hello {
-            version: PROTOCOL_VERSION,
-            token: "legacy".into(),
-        };
-        assert_eq!(
-            serde_json::to_string(&hello).unwrap(),
-            r#"{"type":"hello","version":1,"token":"legacy"}"#
-        );
-        let subscription_id = SubscriptionId(Uuid::nil());
-        let ready = StreamServerFrame::Ready {
-            version: PROTOCOL_VERSION,
-            subscription_id,
-        };
-        assert_eq!(
-            serde_json::to_string(&ready).unwrap(),
-            r#"{"type":"ready","version":1,"subscription_id":"00000000-0000-0000-0000-000000000000"}"#
-        );
-        let ack = StreamClientFrame::Ack {
-            version: PROTOCOL_VERSION,
-            ack: EventAck {
-                delivery_id: DeliveryId(Uuid::nil()),
-                subscription_id,
-                event_id: EventId(Uuid::nil()),
-            },
-        };
-        assert_eq!(
-            serde_json::to_string(&ack).unwrap(),
-            r#"{"type":"ack","version":1,"ack":{"delivery_id":"00000000-0000-0000-0000-000000000000","subscription_id":"00000000-0000-0000-0000-000000000000","event_id":"00000000-0000-0000-0000-000000000000"}}"#
         );
     }
 }

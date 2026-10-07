@@ -413,21 +413,6 @@ fn queue(
     })
 }
 
-/// Serve a plaintext V2 connection whose Hello frame was consumed by an explicit
-/// loopback V1/V2 dispatcher. TLS listeners use `serve` and never sniff protocols.
-pub async fn serve_accepted(
-    stream: TcpStream,
-    config: BusinessRpcTransportConfig,
-    services: Arc<BusinessRpcServices>,
-    stop: CancellationToken,
-    first_frame: Vec<u8>,
-) -> Result<()> {
-    if config.tls.is_some() {
-        return Err(Error::Configuration);
-    }
-    connection(stream, config, services, stop, Some(first_frame)).await
-}
-
 async fn connection(
     stream: TcpStream,
     config: BusinessRpcTransportConfig,

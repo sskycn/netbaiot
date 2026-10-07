@@ -95,8 +95,6 @@ pub struct BusinessRpcConfig {
     pub development_token_env: Option<String>,
     #[serde(default)]
     pub development_role: Option<BusinessRole>,
-    #[serde(default)]
-    pub allow_v1: bool,
     #[serde(default = "default_business_connections")]
     pub max_connections: usize,
     #[serde(default = "default_business_auth_inflight")]
@@ -183,6 +181,9 @@ impl Config {
     }
 
     pub(crate) fn validate_business(&self) -> Result<()> {
+        if self.business_tcp.is_some() && self.business_rpc.is_none() {
+            return Err(Error::Configuration);
+        }
         if let Some(rpc) = &self.business_rpc {
             if rpc.version != BUSINESS_RPC_VERSION
                 || rpc.v3.as_ref().is_some_and(|v3| v3.validate().is_err())
@@ -210,7 +211,6 @@ impl Config {
                     return Err(Error::Configuration);
                 }
                 if rpc.development_token_env.is_some()
-                    || rpc.allow_v1
                     || rpc.identities.is_empty()
                     || rpc.tls.as_ref().is_none_or(|tls| {
                         !tls.require_client_certificate || tls.client_ca.is_none()

@@ -212,7 +212,7 @@ async fn v3_command_real_tcp_short_dedup_ttl_and_shorter_command_ttl() {
         identities: Vec::new(),
         development_token_env: Some("NETBAIOT_BUSINESS_RPC_TOKEN".into()),
         development_role: Some(BusinessRole::Application),
-        allow_v1: false,
+
         max_connections: 8,
         auth_max_inflight: 16,
         max_auth_control_offline_ms: 0,
@@ -313,7 +313,7 @@ async fn v3_planned_restart_replays_event_but_resets_command_dedup() {
         identities: Vec::new(),
         development_token_env: Some("NETBAIOT_BUSINESS_RPC_TOKEN".into()),
         development_role: Some(BusinessRole::Application),
-        allow_v1: false,
+
         max_connections: 8,
         auth_max_inflight: 16,
         max_auth_control_offline_ms: 0,
@@ -509,7 +509,7 @@ async fn v3_command_real_tcp_tenant_scope_and_capacity() {
         }],
         development_token_env: None,
         development_role: None,
-        allow_v1: false,
+
         max_connections: 8,
         auth_max_inflight: 16,
         max_auth_control_offline_ms: 0,
@@ -652,7 +652,7 @@ async fn v3_command_real_mqtt_dedup_http_ack_and_lost_response() {
         identities: Vec::new(),
         development_token_env: Some("NETBAIOT_BUSINESS_RPC_TOKEN".into()),
         development_role: Some(BusinessRole::Application),
-        allow_v1: false,
+
         max_connections: 8,
         auth_max_inflight: 32,
         max_auth_control_offline_ms: 0,
@@ -1145,7 +1145,7 @@ async fn real_socket_v3_provider_event_and_invalidation() {
         identities: Vec::new(),
         development_token_env: Some("NETBAIOT_BUSINESS_RPC_TOKEN".into()),
         development_role: Some(BusinessRole::Multiplexed),
-        allow_v1: false,
+
         max_connections: 8,
         auth_max_inflight: 16,
         max_auth_control_offline_ms: 30_000,
@@ -1334,7 +1334,7 @@ async fn v3_hello_is_rejected_when_v3_is_disabled() {
         identities: Vec::new(),
         development_token_env: Some("NETBAIOT_BUSINESS_RPC_TOKEN".into()),
         development_role: Some(BusinessRole::Multiplexed),
-        allow_v1: false,
+
         max_connections: 8,
         auth_max_inflight: 16,
         max_auth_control_offline_ms: 30_000,
@@ -1448,7 +1448,7 @@ async fn v3_mtls_authenticates_before_role_free_stream_authorization() {
         }],
         development_token_env: None,
         development_role: None,
-        allow_v1: false,
+
         max_connections: 8,
         auth_max_inflight: 16,
         max_auth_control_offline_ms: 0,

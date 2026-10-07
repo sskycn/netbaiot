@@ -128,7 +128,7 @@ async fn command_pressure_preserves_auth_invalidation_and_event_ack() {
     };
     config.business_rpc = Some(BusinessRpcConfig {
         version: 2,
-        v3: None,
+        v3: Some(netbaiot_protocol::business_rpc_v3::V3Limits::default()),
         v3_send_ahead: None,
         v3_experiment_socket_send_buffer_bytes: None,
         tls: Some(ManagementTlsFiles {
@@ -173,7 +173,7 @@ async fn command_pressure_preserves_auth_invalidation_and_event_ack() {
         ],
         development_token_env: None,
         development_role: None,
-        allow_v1: false,
+
         max_connections: 8,
         auth_max_inflight: 16,
         max_auth_control_offline_ms: 30_000,
@@ -334,7 +334,7 @@ async fn commands_role_dispatches_to_real_tcp_and_shares_http_dedup() {
         .collect::<String>();
     config.business_rpc = Some(BusinessRpcConfig {
         version: 2,
-        v3: None,
+        v3: Some(netbaiot_protocol::business_rpc_v3::V3Limits::default()),
         v3_send_ahead: None,
         v3_experiment_socket_send_buffer_bytes: None,
         tls: Some(ManagementTlsFiles {
@@ -357,7 +357,7 @@ async fn commands_role_dispatches_to_real_tcp_and_shares_http_dedup() {
         }],
         development_token_env: None,
         development_role: None,
-        allow_v1: false,
+
         max_connections: 8,
         auth_max_inflight: 16,
         max_auth_control_offline_ms: 0,
@@ -470,14 +470,14 @@ async fn business_rpc_command_mqtt_dedup_and_ack_use_real_sockets() {
     config.event_delivery = Some(EventDeliverySource::BusinessRpc);
     config.business_rpc = Some(BusinessRpcConfig {
         version: 2,
-        v3: None,
+        v3: Some(netbaiot_protocol::business_rpc_v3::V3Limits::default()),
         v3_send_ahead: None,
         v3_experiment_socket_send_buffer_bytes: None,
         tls: None,
         identities: Vec::new(),
         development_token_env: Some("NETBAIOT_BUSINESS_RPC_TOKEN".into()),
         development_role: Some(BusinessRole::Application),
-        allow_v1: false,
+
         max_connections: 8,
         auth_max_inflight: 32,
         max_auth_control_offline_ms: 0,
@@ -970,14 +970,14 @@ async fn one_socket_authentication_progresses_while_event_ack_waits() {
     config.event_delivery = Some(EventDeliverySource::BusinessRpc);
     config.business_rpc = Some(BusinessRpcConfig {
         version: 2,
-        v3: None,
+        v3: Some(netbaiot_protocol::business_rpc_v3::V3Limits::default()),
         v3_send_ahead: None,
         v3_experiment_socket_send_buffer_bytes: None,
         tls: None,
         identities: Vec::new(),
         development_token_env: Some("NETBAIOT_BUSINESS_RPC_TOKEN".into()),
         development_role: None,
-        allow_v1: true,
+
         max_connections: 8,
         auth_max_inflight: 16,
         max_auth_control_offline_ms: 1_500,
@@ -992,7 +992,6 @@ async fn one_socket_authentication_progresses_while_event_ack_waits() {
         .arg(&path)
         .env("NETBAIOT_ADMIN_SECRET", "a".repeat(64))
         .env("NETBAIOT_BUSINESS_RPC_TOKEN", "rpc-test-token")
-        .env("NETBAIOT_BUSINESS_STREAM_TOKEN", "legacy-token")
         .env("RUST_LOG", "info,netbaiot_runtime=debug")
         .env("RUST_LOG_STYLE", "never")
         .stdout(Stdio::null())
@@ -1068,7 +1067,7 @@ async fn one_socket_authentication_progresses_while_event_ack_waits() {
     let legacy = NetbaIoTClient::builder()
         .endpoint(format!("http://{}", addresses[1]))
         .token("a".repeat(64))
-        .event_token("legacy-token")
+        .event_token("rpc-test-token")
         .event_address(addresses[2])
         .connect()
         .await
@@ -1079,7 +1078,7 @@ async fn one_socket_authentication_progresses_while_event_ack_waits() {
             .subscribe(netbaiot_core::EventFilter::default())
             .await
             .is_err(),
-        "V1 must not steal V2 sink ownership"
+        "a second current subscriber must not steal required sink ownership"
     );
     tokio::time::timeout(Duration::from_secs(5), async {
         loop {
@@ -1271,14 +1270,14 @@ async fn zero_offline_grace_revokes_live_session_and_requires_reset_sync() {
     config.event_delivery = Some(EventDeliverySource::DevelopmentAudit);
     config.business_rpc = Some(BusinessRpcConfig {
         version: 2,
-        v3: None,
+        v3: Some(netbaiot_protocol::business_rpc_v3::V3Limits::default()),
         v3_send_ahead: None,
         v3_experiment_socket_send_buffer_bytes: None,
         tls: None,
         identities: Vec::new(),
         development_token_env: Some("NETBAIOT_BUSINESS_RPC_TOKEN".into()),
         development_role: None,
-        allow_v1: false,
+
         max_connections: 8,
         auth_max_inflight: 16,
         max_auth_control_offline_ms: 0,
@@ -1415,7 +1414,7 @@ async fn mtls_verifies_server_and_maps_exact_client_certificate() {
     let principal_expiry = netbaiot_runtime::now_ms().saturating_add(12_000);
     config.business_rpc = Some(BusinessRpcConfig {
         version: 2,
-        v3: None,
+        v3: Some(netbaiot_protocol::business_rpc_v3::V3Limits::default()),
         v3_send_ahead: None,
         v3_experiment_socket_send_buffer_bytes: None,
         tls: Some(ManagementTlsFiles {
@@ -1441,7 +1440,7 @@ async fn mtls_verifies_server_and_maps_exact_client_certificate() {
         }],
         development_token_env: None,
         development_role: None,
-        allow_v1: false,
+
         max_connections: 8,
         auth_max_inflight: 16,
         max_auth_control_offline_ms: 0,
@@ -1627,7 +1626,7 @@ async fn mtls_verifies_server_and_maps_exact_client_certificate() {
 }
 
 #[tokio::test]
-async fn v1_spooled_required_event_replays_to_v2_with_stable_event_id() {
+async fn current_spooled_required_event_replays_to_v2_with_stable_event_id() {
     let root = std::env::temp_dir().join(format!(
         "netbaiot-business-upgrade-{}",
         uuid::Uuid::new_v4()
@@ -1642,6 +1641,14 @@ async fn v1_spooled_required_event_replays_to_v2_with_stable_event_id() {
     config.device_ingress = addresses[0];
     config.management_http = addresses[1];
     config.business_tcp = Some(addresses[2]);
+    config.business_rpc = Some(
+        serde_json::from_value(serde_json::json!({
+            "version":2,"v3":netbaiot_protocol::business_rpc_v3::V3Limits::default(),
+            "tls":null,"development_token_env":"NETBAIOT_BUSINESS_RPC_TOKEN",
+            "development_role":"events"
+        }))
+        .unwrap(),
+    );
     config.spool_directory = root.join("spool");
     config.credentials[0].credential_id = "cred-one".into();
     config.credentials[0].identity.device_key = identity("one").device_key;
@@ -1655,7 +1662,6 @@ async fn v1_spooled_required_event_replays_to_v2_with_stable_event_id() {
         Command::new(env!("CARGO_BIN_EXE_netbaiot-server"))
             .arg(&path)
             .env("NETBAIOT_ADMIN_SECRET", "a".repeat(64))
-            .env("NETBAIOT_BUSINESS_STREAM_TOKEN", "legacy-token")
             .env("NETBAIOT_BUSINESS_RPC_TOKEN", "rpc-test-token")
             .env("RUST_LOG", "info,netbaiot_runtime=debug")
             .env("RUST_LOG_STYLE", "never")
@@ -1669,7 +1675,7 @@ async fn v1_spooled_required_event_replays_to_v2_with_stable_event_id() {
     let legacy = NetbaIoTClient::builder()
         .endpoint(format!("http://{}", addresses[1]))
         .token("a".repeat(64))
-        .event_token("legacy-token")
+        .event_token("rpc-test-token")
         .event_address(addresses[2])
         .connect()
         .await
@@ -1710,14 +1716,14 @@ async fn v1_spooled_required_event_replays_to_v2_with_stable_event_id() {
 
     config.business_rpc = Some(BusinessRpcConfig {
         version: 2,
-        v3: None,
+        v3: Some(netbaiot_protocol::business_rpc_v3::V3Limits::default()),
         v3_send_ahead: None,
         v3_experiment_socket_send_buffer_bytes: None,
         tls: None,
         identities: Vec::new(),
         development_token_env: Some("NETBAIOT_BUSINESS_RPC_TOKEN".into()),
         development_role: None,
-        allow_v1: false,
+
         max_connections: 8,
         auth_max_inflight: 16,
         max_auth_control_offline_ms: 0,

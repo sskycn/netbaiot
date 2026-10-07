@@ -121,8 +121,8 @@ doc = false
 bench = false
 
 [[bin]]
-name = "business_stream"
-path = "fuzz_targets/business_stream.rs"
+name = "business_rpc_bootstrap"
+path = "fuzz_targets/business_rpc_bootstrap.rs"
 test = false
 doc = false
 bench = false

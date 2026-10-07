@@ -21,11 +21,7 @@ use std::{
     time::Duration,
 };
 use thiserror::Error;
-use tokio::{
-    io::{AsyncReadExt, AsyncWriteExt},
-    net::TcpStream,
-    sync::{OwnedSemaphorePermit, Semaphore, mpsc, oneshot},
-};
+use tokio::sync::{OwnedSemaphorePermit, Semaphore, mpsc};
 use tokio_util::sync::CancellationToken;
 
 const DEFAULT_EVENT_ITEMS: usize = 32;
@@ -192,6 +188,7 @@ struct ClientInner {
     event_token: Secret,
     http: reqwest::Client,
     event_address: Option<SocketAddr>,
+    event_tls: Option<business_rpc::BusinessRpcTls>,
     stream_handshake_timeout: Duration,
     ack_timeout: Duration,
     event_buffer_items: usize,
@@ -200,7 +197,7 @@ struct ClientInner {
     max_response_bytes: usize,
     reconnect: ReconnectPolicy,
     shutdown: CancellationToken,
-    metrics: Metrics,
+    metrics: Arc<Metrics>,
 }
 
 impl Drop for ClientInner {
@@ -231,6 +228,7 @@ pub struct ClientBuilder {
     api_key: bool,
     event_token: Option<String>,
     event_address: Option<SocketAddr>,
+    event_tls: Option<business_rpc::BusinessRpcTls>,
     connect_timeout: Duration,
     request_timeout: Duration,
     stream_handshake_timeout: Duration,
@@ -265,6 +263,7 @@ impl Default for ClientBuilder {
             api_key: false,
             event_token: None,
             event_address: None,
+            event_tls: None,
             connect_timeout: Duration::from_secs(5),
             request_timeout: Duration::from_secs(10),
             stream_handshake_timeout: Duration::from_secs(5),
@@ -297,8 +296,8 @@ impl ClientBuilder {
         self
     }
 
-    /// Sets the separately scoped confirmed-stream bearer token. When omitted,
-    /// the management token is used for deployments with one shared credential.
+    /// Sets the separately scoped current Business RPC development token.
+    /// Management credentials are never used implicitly for event connections.
     pub fn event_token(mut self, token: impl Into<String>) -> Self {
         self.event_token = Some(token.into());
         self
@@ -306,6 +305,12 @@ impl ClientBuilder {
 
     pub fn event_address(mut self, address: SocketAddr) -> Self {
         self.event_address = Some(address);
+        self
+    }
+
+    /// Configures mutual TLS for the current Business RPC event connection.
+    pub fn event_tls(mut self, tls: business_rpc::BusinessRpcTls) -> Self {
+        self.event_tls = Some(tls);
         self
     }
 
@@ -384,16 +389,24 @@ impl ClientBuilder {
                     && secret.len() == 64
                     && secret.bytes().all(|b| b.is_ascii_hexdigit())
             });
-            if !valid || (self.event_address.is_some() && self.event_token.is_none()) {
+            if !valid {
                 return Err(ClientError::InvalidRequest {
-                    message: "invalid API key or missing separate event token".into(),
+                    message: "invalid API key".into(),
                     request_id: None,
                 });
             }
         }
-        let event_token = self.event_token.unwrap_or_else(|| token.clone());
+        if self.event_address.is_some()
+            && self.event_tls.is_none()
+            && self.event_token.as_ref().is_none_or(String::is_empty)
+        {
+            return Err(ClientError::InvalidRequest {
+                message: "a separate current RPC event token is required".into(),
+                request_id: None,
+            });
+        }
+        let event_token = self.event_token.unwrap_or_default();
         if token.is_empty()
-            || event_token.is_empty()
             || self.connect_timeout.is_zero()
             || self.request_timeout.is_zero()
             || self.stream_handshake_timeout.is_zero()
@@ -427,6 +440,7 @@ impl ClientBuilder {
                 event_token: Secret(Arc::from(event_token)),
                 http,
                 event_address: self.event_address,
+                event_tls: self.event_tls,
                 stream_handshake_timeout: self.stream_handshake_timeout,
                 ack_timeout: self.ack_timeout,
                 event_buffer_items: self.event_buffer_items,
@@ -435,7 +449,7 @@ impl ClientBuilder {
                 max_response_bytes: self.max_response_bytes,
                 reconnect: self.reconnect,
                 shutdown: CancellationToken::new(),
-                metrics: Metrics::default(),
+                metrics: Arc::new(Metrics::default()),
             }),
         })
     }
@@ -718,32 +732,33 @@ impl Events {
                 message: "event stream address is not configured".into(),
                 request_id: None,
             })?;
-        let subscription_id = SubscriptionId::generate();
-        let stream = connect_event_stream(
+        let mut settings = business_rpc::BusinessRpcV3ClientConfig::development(
             address,
-            self.0.inner.event_token.clone(),
-            subscription_id,
-            &filter,
-            self.0.inner.max_frame_bytes,
-            self.0.inner.stream_handshake_timeout,
-        )
-        .await?;
+            self.0.inner.event_token.expose().to_owned(),
+        );
+        settings.tls = self.0.inner.event_tls.clone();
+        if settings.tls.is_some() {
+            settings.token = None;
+        }
+        settings.provider = false;
+        settings.events = true;
+        settings.filter = filter;
+        settings.connect_timeout = self.0.inner.stream_handshake_timeout;
+        settings.request_timeout = self.0.inner.ack_timeout;
+        settings.reconnect_initial = self.0.inner.reconnect.initial_backoff;
+        settings.reconnect_max = self.0.inner.reconnect.maximum_backoff;
+        let (rpc, deliveries) = business_rpc::BusinessRpcV3Client::connect(settings, None)
+            .map_err(current_rpc_error)?;
+        tokio::time::timeout(self.0.inner.stream_handshake_timeout, rpc.wait_ready())
+            .await
+            .map_err(|_| ClientError::Timeout)?
+            .map_err(current_rpc_error)?;
         let (sender, receiver) = mpsc::channel(self.0.inner.event_buffer_items);
         let cancel = self.0.inner.shutdown.child_token();
         let task_cancel = cancel.clone();
         let inner = self.0.inner.clone();
         let task = tokio::spawn(async move {
-            run_event_subscription(
-                inner,
-                address,
-                subscription_id,
-                filter,
-                ack_mode,
-                stream,
-                sender,
-                task_cancel,
-            )
-            .await;
+            run_event_subscription(inner, ack_mode, rpc, deliveries, sender, task_cancel).await;
         });
         Ok(EventStream {
             receiver,
@@ -753,50 +768,65 @@ impl Events {
     }
 }
 
-type AckCompletion = oneshot::Sender<Result<(), ClientError>>;
-
+enum DeliveryPayload {
+    Manual(business_rpc::BusinessRpcV3Delivery),
+    Immediate(EventDelivery),
+}
 pub struct Delivery {
-    delivery: EventDelivery,
-    ack: Option<oneshot::Sender<AckCompletion>>,
+    delivery: DeliveryPayload,
+    metrics: Arc<Metrics>,
     _byte_permit: OwnedSemaphorePermit,
+}
+impl Delivery {
+    fn wire(&self) -> &EventDelivery {
+        match &self.delivery {
+            DeliveryPayload::Manual(delivery) => &delivery.delivery,
+            DeliveryPayload::Immediate(delivery) => delivery,
+        }
+    }
 }
 
 impl fmt::Debug for Delivery {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("Delivery")
-            .field("delivery_id", &self.delivery.delivery_id)
-            .field("event_id", &self.delivery.event.event_id)
-            .field("attempt", &self.delivery.attempt)
+            .field("delivery_id", &self.wire().delivery_id)
+            .field("event_id", &self.wire().event.event_id)
+            .field("attempt", &self.wire().attempt)
             .finish_non_exhaustive()
     }
 }
 
 impl Delivery {
     pub fn event(&self) -> &DeviceEvent {
-        &self.delivery.event
+        &self.wire().event
     }
 
     pub fn event_id(&self) -> EventId {
-        self.delivery.event.event_id
+        self.wire().event.event_id
     }
 
     pub fn delivery_id(&self) -> DeliveryId {
-        self.delivery.delivery_id
+        self.wire().delivery_id
     }
 
     pub fn attempt(&self) -> u32 {
-        self.delivery.attempt
+        self.wire().attempt
     }
 
     /// Confirms application processing, then waits for the ACK frame write.
-    pub async fn ack(mut self) -> Result<(), ClientError> {
-        let Some(sender) = self.ack.take() else {
-            return Ok(());
-        };
-        let (done, completed) = oneshot::channel();
-        sender.send(done).map_err(|_| ClientError::ConnectionLost)?;
-        completed.await.map_err(|_| ClientError::ConnectionLost)?
+    pub async fn ack(self) -> Result<(), ClientError> {
+        if let DeliveryPayload::Manual(delivery) = self.delivery {
+            delivery.ack().await.map_err(|error| match error {
+                business_rpc::BusinessRpcClientError::Unavailable
+                | business_rpc::BusinessRpcClientError::OutcomeUnknown => {
+                    ClientError::ConnectionLost
+                }
+                other => current_rpc_error(other),
+            })?;
+            self.metrics.events_acked.fetch_add(1, Ordering::Relaxed);
+        }
+        Ok(())
     }
 }
 
@@ -833,442 +863,105 @@ impl Drop for EventStream {
     }
 }
 
-#[allow(clippy::too_many_arguments)]
+fn current_rpc_error(error: business_rpc::BusinessRpcClientError) -> ClientError {
+    use business_rpc::BusinessRpcClientError as Error;
+    match error {
+        Error::Unauthorized | Error::Remote(RpcCode::Unauthenticated) => {
+            ClientError::Unauthenticated { request_id: None }
+        }
+        Error::Remote(RpcCode::Forbidden) => ClientError::Forbidden {
+            required_scope: None,
+            request_id: None,
+        },
+        Error::Overloaded | Error::Remote(RpcCode::Overloaded) => {
+            ClientError::Overloaded { request_id: None }
+        }
+        Error::Timeout => ClientError::Timeout,
+        Error::Unavailable | Error::Remote(RpcCode::Unavailable) => {
+            ClientError::ServerUnavailable { request_id: None }
+        }
+        Error::InvalidConfig => ClientError::InvalidRequest {
+            message: "invalid current RPC stream configuration".into(),
+            request_id: None,
+        },
+        Error::Protocol | Error::Remote(_) | Error::OutcomeUnknown => {
+            ClientError::Protocol("current business RPC failure".into())
+        }
+    }
+}
+use netbaiot_protocol::business_rpc::RpcErrorCode as RpcCode;
+
 async fn run_event_subscription(
     inner: Arc<ClientInner>,
-    address: SocketAddr,
-    subscription_id: SubscriptionId,
-    filter: EventFilter,
     ack_mode: AckMode,
-    mut stream: TcpStream,
+    rpc: business_rpc::BusinessRpcV3Client,
+    mut deliveries: mpsc::Receiver<business_rpc::BusinessRpcV3Delivery>,
     sender: mpsc::Sender<Result<Delivery, ClientError>>,
     cancel: CancellationToken,
 ) {
     let byte_budget = Arc::new(Semaphore::new(inner.event_buffer_bytes));
-    let mut reconnect_attempt = 0u32;
+    let mut last_epoch = 0;
     loop {
-        let result = run_connected_stream(
-            &inner,
-            subscription_id,
-            ack_mode,
-            &mut stream,
-            &sender,
-            &byte_budget,
-            &cancel,
-        )
-        .await;
-        if cancel.is_cancelled() || sender.is_closed() {
-            break;
-        }
-        if let Err(
-            error @ (ClientError::Unauthenticated { .. }
-            | ClientError::Forbidden { .. }
-            | ClientError::VersionMismatch { .. }
-            | ClientError::Protocol(_)),
-        ) = result
-        {
-            let _ = sender.send(Err(error)).await;
-            break;
-        }
-        reconnect_attempt = reconnect_attempt.saturating_add(1);
-        inner.metrics.reconnects.fetch_add(1, Ordering::Relaxed);
-        let delay = reconnect_delay(&inner.reconnect, reconnect_attempt, subscription_id);
-        tokio::select! {
+        let delivery = tokio::select! {
             _ = cancel.cancelled() => break,
-            _ = tokio::time::sleep(delay) => {}
-        }
-        loop {
-            match connect_event_stream(
-                address,
-                inner.event_token.clone(),
-                subscription_id,
-                &filter,
-                inner.max_frame_bytes,
-                inner.stream_handshake_timeout,
-            )
-            .await
-            {
-                Ok(next) => {
-                    stream = next;
-                    reconnect_attempt = 0;
-                    break;
-                }
-                Err(
-                    error @ (ClientError::Unauthenticated { .. }
-                    | ClientError::Forbidden { .. }
-                    | ClientError::VersionMismatch { .. }),
-                ) => {
-                    let _ = sender.send(Err(error)).await;
-                    return;
-                }
-                Err(_) => {
-                    reconnect_attempt = reconnect_attempt.saturating_add(1);
-                    inner.metrics.reconnects.fetch_add(1, Ordering::Relaxed);
-                    let delay =
-                        reconnect_delay(&inner.reconnect, reconnect_attempt, subscription_id);
-                    tokio::select! {
-                        _ = cancel.cancelled() => return,
-                        _ = tokio::time::sleep(delay) => {}
-                    }
-                }
-            }
-        }
-    }
-}
-
-async fn run_connected_stream(
-    inner: &ClientInner,
-    subscription_id: SubscriptionId,
-    ack_mode: AckMode,
-    stream: &mut TcpStream,
-    sender: &mpsc::Sender<Result<Delivery, ClientError>>,
-    byte_budget: &Arc<Semaphore>,
-    cancel: &CancellationToken,
-) -> Result<(), ClientError> {
-    loop {
-        let frame = tokio::select! {
-            _ = cancel.cancelled() => return Ok(()),
-            frame = read_frame(stream, inner.max_frame_bytes) => frame?,
+            value = deliveries.recv() => match value { Some(value) => value, None => break },
         };
-        let frame: StreamServerFrame = serde_json::from_slice(&frame)
-            .map_err(|error| ClientError::Protocol(error.to_string()))?;
-        let delivery = match frame {
-            StreamServerFrame::Event { version, delivery }
-                if version == PROTOCOL_VERSION && delivery.subscription_id == subscription_id =>
+        if last_epoch != 0 && last_epoch != delivery.connection_epoch {
+            inner.metrics.reconnects.fetch_add(1, Ordering::Relaxed);
+        }
+        last_epoch = delivery.connection_epoch;
+        let encoded = match serde_json::to_vec(&delivery.delivery) {
+            Ok(value)
+                if value.len() <= inner.max_frame_bytes
+                    && value.len() <= inner.event_buffer_bytes =>
             {
-                delivery
+                value.len()
             }
-            StreamServerFrame::Error { error, .. } => return Err(ClientError::from_api(error)),
-            StreamServerFrame::Event { version, .. } | StreamServerFrame::Ready { version, .. } => {
-                if version != PROTOCOL_VERSION {
-                    return Err(ClientError::VersionMismatch {
-                        server_version: version,
-                    });
-                }
-                return Err(ClientError::Protocol("unexpected stream frame".into()));
+            _ => {
+                let _ = sender.try_send(Err(ClientError::Protocol(
+                    "event exceeds configured byte bounds".into(),
+                )));
+                break;
             }
         };
-        let encoded_bytes = serde_json::to_vec(&delivery)
-            .map_err(|error| ClientError::Protocol(error.to_string()))?
-            .len();
-        let permits = u32::try_from(encoded_bytes)
-            .map_err(|_| ClientError::Protocol("event exceeds byte budget".into()))?;
-        if encoded_bytes > inner.event_buffer_bytes {
-            return Err(ClientError::Protocol(
-                "event exceeds configured event buffer bytes".into(),
-            ));
-        }
+        let Ok(permits) = u32::try_from(encoded) else {
+            break;
+        };
         let permit = tokio::select! {
-            _ = cancel.cancelled() => return Ok(()),
-            permit = byte_budget.clone().acquire_many_owned(permits) => {
-                permit.map_err(|_| ClientError::ConnectionLost)?
-            }
+            _ = cancel.cancelled() => break,
+            value = byte_budget.clone().acquire_many_owned(permits) => match value { Ok(value) => value, Err(_) => break },
         };
         inner
             .metrics
             .events_received
             .fetch_add(1, Ordering::Relaxed);
-        if ack_mode == AckMode::Immediate {
-            send_ack(stream, &delivery, inner.ack_timeout, inner.max_frame_bytes).await?;
-            inner.metrics.events_acked.fetch_add(1, Ordering::Relaxed);
-            sender
-                .send(Ok(Delivery {
-                    delivery,
-                    ack: None,
-                    _byte_permit: permit,
-                }))
-                .await
-                .map_err(|_| ClientError::ConnectionLost)?;
-            continue;
-        }
-        let ack = EventAck {
-            delivery_id: delivery.delivery_id,
-            subscription_id,
-            event_id: delivery.event.event_id,
-        };
-        let (ack_sender, ack_receiver) = oneshot::channel();
-        sender
-            .send(Ok(Delivery {
-                delivery,
-                ack: Some(ack_sender),
-                _byte_permit: permit,
-            }))
-            .await
-            .map_err(|_| ClientError::ConnectionLost)?;
-        tokio::pin!(ack_receiver);
-        let completed = loop {
-            tokio::select! {
-                _ = cancel.cancelled() => return Ok(()),
-                request = &mut ack_receiver => {
-                    break request.map_err(|_| ClientError::ConnectionLost)?;
-                }
-                ready = stream.readable() => {
-                    ready.map_err(|_| ClientError::ConnectionLost)?;
-                    let mut byte = [0u8; 1];
-                    match stream.try_read(&mut byte) {
-                        Ok(0) => return Err(ClientError::ConnectionLost),
-                        Ok(_) => return Err(ClientError::Protocol(
-                            "server sent a frame before the outstanding delivery was ACKed".into(),
-                        )),
-                        Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {}
-                        Err(_) => return Err(ClientError::ConnectionLost),
-                    }
-                }
+        let payload = if ack_mode == AckMode::Immediate {
+            let wire = delivery.delivery.clone();
+            if let Err(error) = delivery.ack().await {
+                let _ = sender.try_send(Err(current_rpc_error(error)));
+                break;
             }
-        };
-        let result = send_ack_value(stream, ack, inner.ack_timeout, inner.max_frame_bytes).await;
-        if result.is_ok() {
             inner.metrics.events_acked.fetch_add(1, Ordering::Relaxed);
+            DeliveryPayload::Immediate(wire)
+        } else {
+            DeliveryPayload::Manual(delivery)
+        };
+        let item = Delivery {
+            delivery: payload,
+            metrics: inner.metrics.clone(),
+            _byte_permit: permit,
+        };
+        tokio::select! {
+            _ = cancel.cancelled() => break,
+            result = sender.send(Ok(item)) => { if result.is_err() { break; } }
         }
-        let _ = completed.send(result.clone());
-        result?;
     }
-}
-
-fn reconnect_delay(
-    policy: &ReconnectPolicy,
-    attempt: u32,
-    subscription_id: SubscriptionId,
-) -> Duration {
-    let exponent = attempt.min(20);
-    let base = policy
-        .initial_backoff
-        .saturating_mul(1u32.checked_shl(exponent).unwrap_or(u32::MAX))
-        .min(policy.maximum_backoff);
-    let max_ms = u64::try_from(base.as_millis()).unwrap_or(u64::MAX).max(1);
-    let seed = subscription_id.0.as_u128() as u64 ^ u64::from(attempt);
-    Duration::from_millis(1 + seed % max_ms)
-}
-
-async fn connect_event_stream(
-    address: SocketAddr,
-    token: Secret,
-    subscription_id: SubscriptionId,
-    filter: &EventFilter,
-    maximum: usize,
-    timeout: Duration,
-) -> Result<TcpStream, ClientError> {
-    tokio::time::timeout(timeout, async {
-        let mut stream = TcpStream::connect(address)
-            .await
-            .map_err(|_| ClientError::ServerUnavailable { request_id: None })?;
-        write_client_frame(
-            &mut stream,
-            &StreamClientFrame::Hello {
-                version: PROTOCOL_VERSION,
-                token: token.expose().to_owned(),
-            },
-            maximum,
-        )
-        .await?;
-        write_client_frame(
-            &mut stream,
-            &StreamClientFrame::Subscribe {
-                version: PROTOCOL_VERSION,
-                subscription_id,
-                filter: filter.clone(),
-            },
-            maximum,
-        )
-        .await?;
-        let frame = read_frame(&mut stream, maximum).await?;
-        match serde_json::from_slice::<StreamServerFrame>(&frame)
-            .map_err(|error| ClientError::Protocol(error.to_string()))?
-        {
-            StreamServerFrame::Ready {
-                version,
-                subscription_id: ready,
-            } if version == PROTOCOL_VERSION && ready == subscription_id => Ok(stream),
-            StreamServerFrame::Error { error, .. } => Err(ClientError::from_api(error)),
-            StreamServerFrame::Ready { version, .. } | StreamServerFrame::Event { version, .. }
-                if version != PROTOCOL_VERSION =>
-            {
-                Err(ClientError::VersionMismatch {
-                    server_version: version,
-                })
-            }
-            _ => Err(ClientError::Protocol("invalid stream handshake".into())),
-        }
-    })
-    .await
-    .map_err(|_| ClientError::Timeout)?
-}
-
-async fn send_ack(
-    stream: &mut TcpStream,
-    delivery: &EventDelivery,
-    timeout: Duration,
-    maximum: usize,
-) -> Result<(), ClientError> {
-    send_ack_value(
-        stream,
-        EventAck {
-            delivery_id: delivery.delivery_id,
-            subscription_id: delivery.subscription_id,
-            event_id: delivery.event.event_id,
-        },
-        timeout,
-        maximum,
-    )
-    .await
-}
-
-async fn send_ack_value(
-    stream: &mut TcpStream,
-    ack: EventAck,
-    timeout: Duration,
-    maximum: usize,
-) -> Result<(), ClientError> {
-    tokio::time::timeout(
-        timeout,
-        write_client_frame(
-            stream,
-            &StreamClientFrame::Ack {
-                version: PROTOCOL_VERSION,
-                ack,
-            },
-            maximum,
-        ),
-    )
-    .await
-    .map_err(|_| ClientError::Timeout)?
-}
-
-async fn write_client_frame(
-    stream: &mut TcpStream,
-    frame: &StreamClientFrame,
-    maximum: usize,
-) -> Result<(), ClientError> {
-    let payload =
-        serde_json::to_vec(frame).map_err(|error| ClientError::Protocol(error.to_string()))?;
-    if payload.is_empty() || payload.len() > maximum {
-        return Err(ClientError::Protocol(
-            "outbound frame exceeds configured limit".into(),
-        ));
-    }
-    let length = u32::try_from(payload.len())
-        .map_err(|_| ClientError::Protocol("outbound frame length overflow".into()))?;
-    stream
-        .write_all(&length.to_be_bytes())
-        .await
-        .map_err(|_| ClientError::ConnectionLost)?;
-    stream
-        .write_all(&payload)
-        .await
-        .map_err(|_| ClientError::ConnectionLost)
-}
-
-async fn read_frame(stream: &mut TcpStream, maximum: usize) -> Result<Vec<u8>, ClientError> {
-    let mut length = [0u8; 4];
-    stream
-        .read_exact(&mut length)
-        .await
-        .map_err(|_| ClientError::ConnectionLost)?;
-    let length = usize::try_from(u32::from_be_bytes(length))
-        .map_err(|_| ClientError::Protocol("frame length overflow".into()))?;
-    if length == 0 || length > maximum {
-        return Err(ClientError::Protocol("invalid or oversized frame".into()));
-    }
-    let mut payload = vec![0; length];
-    stream
-        .read_exact(&mut payload)
-        .await
-        .map_err(|_| ClientError::ConnectionLost)?;
-    Ok(payload)
+    rpc.shutdown().await;
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tokio::net::TcpListener;
-
-    async fn test_stream_server(
-        listener: TcpListener,
-        event_sent: oneshot::Sender<()>,
-        no_ack_observed: oneshot::Sender<()>,
-    ) {
-        let (mut socket, _) = listener.accept().await.unwrap();
-        let hello: StreamClientFrame = serde_json::from_slice(
-            &read_frame(&mut socket, DEFAULT_MAX_FRAME_BYTES)
-                .await
-                .unwrap(),
-        )
-        .unwrap();
-        assert!(matches!(
-            hello,
-            StreamClientFrame::Hello {
-                version: PROTOCOL_VERSION,
-                ..
-            }
-        ));
-        let subscribe: StreamClientFrame = serde_json::from_slice(
-            &read_frame(&mut socket, DEFAULT_MAX_FRAME_BYTES)
-                .await
-                .unwrap(),
-        )
-        .unwrap();
-        let subscription_id = match subscribe {
-            StreamClientFrame::Subscribe {
-                version: PROTOCOL_VERSION,
-                subscription_id,
-                ..
-            } => subscription_id,
-            _ => panic!("expected v1 subscribe"),
-        };
-        write_test_server_frame(
-            &mut socket,
-            &StreamServerFrame::Ready {
-                version: PROTOCOL_VERSION,
-                subscription_id,
-            },
-        )
-        .await;
-        write_test_server_frame(
-            &mut socket,
-            &StreamServerFrame::Event {
-                version: PROTOCOL_VERSION,
-                delivery: EventDelivery {
-                    delivery_id: DeliveryId::generate(),
-                    subscription_id,
-                    event: DeviceEvent {
-                        event_id: EventId::generate(),
-                        source_message_id: SourceMessageId::new("slow-consumer").unwrap(),
-                        device: DeviceKey {
-                            tenant_id: TenantId::new("tenant").unwrap(),
-                            product_id: ProductId::new("product").unwrap(),
-                            device_id: DeviceId::new("device").unwrap(),
-                        },
-                        received_at: 1,
-                        occurred_at: None,
-                        kind: DeviceEventKind::Heartbeat(Heartbeat { sequence: 1 }),
-                    },
-                    attempt: 1,
-                },
-            },
-        )
-        .await;
-        event_sent.send(()).unwrap();
-
-        assert!(
-            tokio::time::timeout(
-                Duration::from_millis(100),
-                read_frame(&mut socket, DEFAULT_MAX_FRAME_BYTES),
-            )
-            .await
-            .is_err(),
-            "an unread manual delivery must not be acknowledged"
-        );
-        no_ack_observed.send(()).unwrap();
-        let closed = tokio::time::timeout(Duration::from_secs(1), socket.read_u8()).await;
-        assert!(matches!(closed, Ok(Err(_))), "stream task did not close");
-    }
-
-    async fn write_test_server_frame(stream: &mut TcpStream, frame: &StreamServerFrame) {
-        let payload = serde_json::to_vec(frame).unwrap();
-        let length = u32::try_from(payload.len()).unwrap();
-        stream.write_all(&length.to_be_bytes()).await.unwrap();
-        stream.write_all(&payload).await.unwrap();
-    }
 
     #[tokio::test]
     async fn builder_rejects_invalid_limits_and_redacts_token() {
@@ -1321,46 +1014,6 @@ mod tests {
             .token("top-secret")
             .connect()
             .await
-            .unwrap();
-    }
-
-    #[test]
-    fn reconnect_backoff_is_bounded() {
-        let policy = ReconnectPolicy::default();
-        let id = SubscriptionId::generate();
-        for attempt in 0..100 {
-            assert!(reconnect_delay(&policy, attempt, id) <= policy.maximum_backoff);
-        }
-    }
-
-    #[tokio::test]
-    async fn slow_consumer_is_not_acked_and_stream_drop_cancels_socket_task() {
-        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let address = listener.local_addr().unwrap();
-        let (event_sent, event_received) = oneshot::channel();
-        let (no_ack_observed, no_ack_confirmed) = oneshot::channel();
-        let server = tokio::spawn(test_stream_server(listener, event_sent, no_ack_observed));
-        let client = NetbaIoTClient::builder()
-            .endpoint("http://127.0.0.1:1")
-            .token("management")
-            .event_token("events")
-            .event_address(address)
-            .event_buffer_limits(1, 1_024)
-            .connect()
-            .await
-            .unwrap();
-        let stream = client
-            .events()
-            .subscribe(EventFilter::default())
-            .await
-            .unwrap();
-        event_received.await.unwrap();
-        no_ack_confirmed.await.unwrap();
-        assert_eq!(client.metrics().events_acked, 0);
-        drop(stream);
-        tokio::time::timeout(Duration::from_secs(1), server)
-            .await
-            .expect("server did not observe subscription cancellation")
             .unwrap();
     }
 }

@@ -542,4 +542,24 @@ mod tests {
         let wire = serde_json::to_value(&hello).unwrap();
         assert_eq!(wire["token"], "private-test-token");
     }
+    #[test]
+    fn current_bootstrap_rejects_old_unknown_and_corrupt_versions() {
+        for version in [0, 1, 2, 4, u16::MAX] {
+            let hello = V3Bootstrap::Hello {
+                version,
+                token: None,
+                limits: V3Limits::default(),
+            };
+            assert!(hello.validate().is_err());
+        }
+        assert!(
+            V3Bootstrap::Hello {
+                version: BUSINESS_RPC_V3_VERSION,
+                token: None,
+                limits: V3Limits::default()
+            }
+            .validate()
+            .is_ok()
+        );
+    }
 }
