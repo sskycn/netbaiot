@@ -1,10 +1,5 @@
 name: Windows recovery regression stage sweep
 on:
-  push:
-    branches: [codex/windows-recovery-regression]
-    paths:
-      - .github/workflows/windows-regression-bisect.yml
-      - scripts/windows_regression_probe.py
   workflow_dispatch:
 permissions:
   contents: read

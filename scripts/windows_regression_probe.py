@@ -27,6 +27,7 @@ def main():
     parser.add_argument("--repetitions", type=int, default=10)
     parser.add_argument("--failure-repetitions", type=int, default=40)
     parser.add_argument("--skip-suites", action="store_true")
+    parser.add_argument("--all-features", action="store_true")
     args = parser.parse_args()
     root = Path("target/evidence/windows-regression")
     root.mkdir(parents=True, exist_ok=True)
@@ -46,6 +47,8 @@ def main():
         return {"pass": result.returncode == 0, "duration_s": round(duration, 3)}
 
     base = ["cargo", "test", "--locked", "-p", "netbaiot-server", "--test", "business_rpc_v2"]
+    if args.all_features:
+        base.append("--all-features")
     build = run("build", base + ["--no-run"], 1)
     if not build["pass"]:
         annotation("regression-build", {"commit": args.commit, **build})
