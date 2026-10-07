@@ -11,7 +11,7 @@ import time
 
 TESTS = (
     "one_socket_authentication_progresses_while_event_ack_waits",
-    "v1_spooled_required_event_replays_to_v2_with_stable_event_id",
+    "required_spooled_event_replays_to_current_with_stable_event_id",
 )
 
 
@@ -46,7 +46,7 @@ def main():
                 annotation("regression-failure", {"commit": args.commit, "test": name, "tail": tail})
         return {"pass": result.returncode == 0, "duration_s": round(duration, 3)}
 
-    base = ["cargo", "test", "--locked", "-p", "netbaiot-server", "--test", "business_rpc_v2"]
+    base = ["cargo", "test", "--locked", "-p", "netbaiot-server", "--test", "business_rpc_current"]
     if args.all_features:
         base.append("--all-features")
     build = run("build", base + ["--no-run"], 1)

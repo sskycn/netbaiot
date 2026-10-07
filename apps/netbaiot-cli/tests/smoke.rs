@@ -34,7 +34,7 @@ async fn config(root: &Path) -> Config {
     config.business_tcp = Some(addresses[4]);
     config.business_rpc = Some(
         serde_json::from_value(serde_json::json!({
-            "version":2,"v3":netbaiot_protocol::business_rpc_v3::V3Limits::default(),
+            "limits":netbaiot_protocol::business_rpc_v3::V3Limits::default(),
             "tls":null,"development_token_env":"NETBAIOT_BUSINESS_RPC_TOKEN",
             "development_role":"events"
         }))

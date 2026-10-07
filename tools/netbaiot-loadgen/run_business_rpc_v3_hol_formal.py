@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Repeat V2 and V3 HOL candidates with fresh gateways and preserve every raw result."""
+"""Repeat current RPC HOL candidates with fresh gateways and preserve every raw result."""
 import argparse
 import json
 import os
@@ -12,7 +12,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[2]
 HARNESS = ROOT / "tools/netbaiot-loadgen/run_business_rpc_v3_hol.py"
 ANALYZER = ROOT / "tools/netbaiot-loadgen/analyze_business_rpc_v3_hol.py"
-VARIANTS = ("multiplexed", "dual", "v3-baseline", "v3-ahead-8192", "v3-ahead-16384")
+VARIANTS = ("v3-dual", "v3-baseline", "v3-ahead-8192", "v3-ahead-16384")
 
 
 def stats(values):
@@ -42,14 +42,14 @@ def main():
     for run in range(1, args.repeat + 1):
         for variant in args.variants:
             target = args.output / f"run-{run}-{variant}"
-            mode = "v3-8192" if variant.startswith("v3-") else variant
+            mode = "v3-dual" if variant == "v3-dual" else "v3-8192"
             command = [sys.executable, str(HARNESS), "--duration-secs", str(args.duration_secs),
                        "--auth-unique-devices", "--auth-concurrency", str(args.auth_concurrency),
                        "--event-rate", str(args.event_rate), "--bytes-per-second",
                        str(args.bytes_per_second), "--delay-ms", str(args.delay_ms),
                        "--modes", mode, "--output", str(target)]
             environment = os.environ.copy()
-            if variant.startswith("v3-"):
+            if variant != "v3-dual":
                 if not args.no_trace_v3:
                     command.append("--trace-gateway")
                     environment["NETBAIOT_HOL_CAPTURE"] = "1"
@@ -65,7 +65,7 @@ def main():
                 failures.append(str(target))
                 continue
             raw = json.loads((target / f"{mode}.json").read_text())
-            if variant.startswith("v3-"):
+            if variant != "v3-dual":
                 summary = target / "summary.json"
                 subprocess.run([sys.executable, str(ANALYZER), str(target), mode,
                                 "--output", str(summary)], cwd=ROOT, check=True)
@@ -109,7 +109,7 @@ def main():
             "cpu_percent": stats([run["cpu_percent"] for run in runs]),
             "rss_peak_kb": stats([run["rss_peak_kb"] for run in runs]),
         }
-        if variant.startswith("v3-"):
+        if variant != "v3-dual":
             summary["variants"][variant].update({
                 "event_completion_p50_ms": stats([run["event_completion_ms"]["p50"] for run in runs]),
                 "event_completion_p95_ms": stats([run["event_completion_ms"]["p95"] for run in runs]),

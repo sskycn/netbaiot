@@ -48,7 +48,7 @@ async fn test_config(root: &Path) -> Config {
     config.business_tcp = Some(addresses[2]);
     config.business_rpc = Some(
         serde_json::from_value(serde_json::json!({
-            "version":2,"v3":netbaiot_protocol::business_rpc_v3::V3Limits::default(),
+            "limits":netbaiot_protocol::business_rpc_v3::V3Limits::default(),
             "tls":null,"development_token_env":"NETBAIOT_BUSINESS_RPC_TOKEN",
             "development_role":"events"
         }))
@@ -205,7 +205,7 @@ async fn official_clients_cover_mqtt_tcp_command_ack_status_and_offline_contract
         0
     );
 
-    for version in [0, 1, 4, u16::MAX] {
+    for version in [0, 1, 2, 4, u16::MAX] {
         let mut peer = TcpStream::connect(config.business_tcp.unwrap())
             .await
             .unwrap();

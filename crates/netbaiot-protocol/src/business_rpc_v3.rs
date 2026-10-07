@@ -1,5 +1,5 @@
 //! Business RPC V3 bootstrap and binary framing contract.
-//! V2's length-prefixed JSON frame contract remains in `business_rpc`.
+//! The sole supported Business RPC wire format.
 use crate::{EventFilter, SubscriptionId, business_rpc::RpcError};
 // The V3 application method uses the established command JSON DTO unchanged.
 pub use crate::business_rpc::{DeviceCommandSendRequest, DeviceCommandSendResponse};
@@ -464,7 +464,6 @@ mod tests {
     use super::*;
     #[test]
     fn frozen_wire_numbers_and_versions() {
-        assert_eq!(crate::business_rpc::BUSINESS_RPC_VERSION, 2);
         assert_eq!(BUSINESS_RPC_V3_VERSION, 3);
         assert_eq!(
             [

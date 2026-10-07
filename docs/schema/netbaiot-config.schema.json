@@ -150,10 +150,6 @@
     "BusinessRpcConfig": {
       "additionalProperties": false,
       "properties": {
-        "allow_v1": {
-          "default": false,
-          "type": "boolean"
-        },
         "auth_max_inflight": {
           "default": 128,
           "format": "uint",
@@ -177,12 +173,32 @@
             "null"
           ]
         },
+        "experiment_socket_send_buffer_bytes": {
+          "default": null,
+          "format": "uint",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
         "identities": {
           "default": [],
           "items": {
             "$ref": "#/$defs/BusinessRpcIdentityConfig"
           },
           "type": "array"
+        },
+        "limits": {
+          "$ref": "#/$defs/V3Limits",
+          "default": {
+            "heartbeat_ms": 5000,
+            "initial_connection_window_bytes": 4194304,
+            "initial_stream_window_bytes": 262144,
+            "max_concurrent_streams": 256,
+            "max_frame_payload_bytes": 8192
+          },
+          "description": "Limits for the sole current Business RPC wire format."
         },
         "max_auth_control_offline_ms": {
           "default": 30000,
@@ -196,38 +212,7 @@
           "minimum": 0,
           "type": "integer"
         },
-        "tls": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/ManagementTlsFiles"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "v3": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/V3Limits"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "V3 is available on the same listener only when explicitly configured."
-        },
-        "v3_experiment_socket_send_buffer_bytes": {
-          "default": null,
-          "format": "uint",
-          "minimum": 0,
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "v3_send_ahead": {
+        "send_ahead": {
           "anyOf": [
             {
               "$ref": "#/$defs/V3SendAhead"
@@ -239,16 +224,17 @@
           "default": null,
           "description": "Local sender policy, separate from the negotiated V3 receive windows."
         },
-        "version": {
-          "format": "uint16",
-          "maximum": 65535,
-          "minimum": 0,
-          "type": "integer"
+        "tls": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ManagementTlsFiles"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
-      "required": [
-        "version"
-      ],
       "type": "object"
     },
     "BusinessRpcIdentityConfig": {

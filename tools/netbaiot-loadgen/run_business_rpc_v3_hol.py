@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run fresh local gateways for V2 single, V2 dual, and V3 frame-size HOL samples.
+"""Run fresh gateways for current RPC single/dual and frame-size HOL samples.
 
 This user-space proxy limits a byte stream; it does not emulate TCP packet loss.
 The script writes loadgen JSON, metrics, and logs so each result is reviewable.
@@ -24,7 +24,7 @@ from scrub_paths import scrub_tree
 GATEWAY = ROOT / "target/release/netbaiot-server"
 LOADGEN = ROOT / "target/release/business_rpc"
 PROXY = ROOT / "tools/netbaiot-loadgen/business_stream_proxy.py"
-MODES = ("multiplexed", "dual", "v3-4096", "v3-8192", "v3-16384")
+MODES = ("v3-dual", "v3-4096", "v3-8192", "v3-16384")
 
 
 def free_ports(count):
@@ -57,7 +57,7 @@ def run_mode(mode, args):
     stream_window_bytes = args.stream_window_bytes
     disconnect_after_secs = args.disconnect_after_secs
     device, management, business, proxy_port = free_ports(4)
-    frame_size = int(mode.split("-")[1]) if mode.startswith("v3-") else 8192
+    frame_size = int(mode.split("-")[1]) if mode != "v3-dual" else 8192
     with tempfile.TemporaryDirectory(prefix=f"netbaiot-hol-{mode}-") as temporary:
         temporary = Path(temporary)
         gateway_config = json.loads((ROOT / "configs/development.json").read_text())
@@ -69,19 +69,18 @@ def run_mode(mode, args):
             "device_auth": "business_rpc",
             "event_delivery": "business_rpc",
             "business_rpc": {
-                "version": 2,
-                "v3": {
+                "limits": {
                     "max_frame_payload_bytes": frame_size,
                     "max_concurrent_streams": 256,
                     "initial_stream_window_bytes": 262144,
                     "initial_connection_window_bytes": 4194304,
                     "heartbeat_ms": 5000,
                 },
-                "v3_send_ahead": ({
+                "send_ahead": ({
                     "stream_bytes": args.send_ahead_stream_bytes,
                     "connection_bytes": args.send_ahead_connection_bytes,
                 } if args.send_ahead_stream_bytes is not None else None),
-                "v3_experiment_socket_send_buffer_bytes": args.socket_send_buffer_bytes,
+                "experiment_socket_send_buffer_bytes": args.socket_send_buffer_bytes,
                 "tls": None,
                 "development_token_env": "NETBAIOT_BUSINESS_RPC_TOKEN",
             },
@@ -112,9 +111,9 @@ def run_mode(mode, args):
         load_config = {
             "scenario": "multiplexed",
             "business_address": f"127.0.0.1:{business if args.no_proxy else proxy_port}",
-            "topology": "v3" if mode.startswith("v3-") else mode,
-            "frame_payload_bytes": frame_size if mode.startswith("v3-") else None,
-            "stream_window_bytes": stream_window_bytes if mode.startswith("v3-") else None,
+            "topology": "v3_dual" if mode == "v3-dual" else "v3",
+            "frame_payload_bytes": frame_size,
+            "stream_window_bytes": stream_window_bytes,
             "network_profile": ("loopback" if args.no_proxy else "user_proxy"),
             "device_address": f"127.0.0.1:{device}",
             "udp_address": f"127.0.0.1:{device}",

@@ -1,6 +1,6 @@
-//! Business RPC V3 client. V2's public client and wire contract are unchanged.
+//! Current Business RPC V3 client with owned bounded drivers.
 use super::{
-    BorrowedCommandRequest, BoundedCommandBody, BusinessAuthHandler, BusinessRpcClientConfig,
+    BorrowedCommandRequest, BoundedCommandBody, BusinessAuthHandler,
     BusinessRpcClientError as Error, BusinessRpcTls, Io, connect_io,
 };
 use bytes::Bytes;
@@ -99,17 +99,6 @@ impl BusinessRpcV3ClientConfig {
             return Err(Error::InvalidConfig);
         }
         Ok(())
-    }
-    fn connection_config(&self) -> BusinessRpcClientConfig {
-        let mut legacy = BusinessRpcClientConfig::development(
-            self.address,
-            self.token.clone().unwrap_or_default(),
-            netbaiot_protocol::business_rpc::BusinessRole::Multiplexed,
-        );
-        legacy.tls = self.tls.clone();
-        legacy.token = self.token.clone();
-        legacy.connect_timeout = self.connect_timeout;
-        legacy
     }
 }
 
@@ -620,7 +609,7 @@ async fn driver(mut context: DriverContext) {
             break;
         }
         let result = async {
-            let (mut io, _, _) = connect_io(&context.config.connection_config()).await?;
+            let (mut io, _, _) = connect_io(&context.config).await?;
             let (epoch, limits) = bootstrap(&mut io, &context.config).await?;
             context.epoch.store(epoch, Ordering::Release);
             connected(io, epoch, limits, &mut context).await
@@ -842,6 +831,31 @@ async fn connected(
                 reset(&writer_tx, owner, V3ResetCode::Cancel, &limits)?;
             }
             release_stream!(owner);
+        }};
+    }
+    macro_rules! finish_response {
+        ($id:expr, $bytes:expr) => {{
+            match complete_client_response(
+                $id,
+                $bytes,
+                &mut sync_id,
+                &mut sync_response_ok,
+                &mut invalidations,
+                &mut pending_commands,
+                &mut response_meta,
+            ) {
+                // A revision gap demotes the authority. Reopen only its Provider
+                // stream and perform reset sync; the event subscription stays owned.
+                Err(Error::Remote(RpcErrorCode::StaleRevision)) => {
+                    if let Some(parent) = provider_id {
+                        fail_stream!(parent, V3ResetCode::Cancel);
+                    }
+                }
+                Err(_) => {
+                    fail_stream!($id, V3ResetCode::ProtocolError);
+                }
+                Ok(()) => {}
+            }
         }};
     }
     let result: Result<(), Error> = async {
@@ -1089,10 +1103,8 @@ async fn connected(
                                     break Err(Error::Protocol);
                                 }
                             };
-                            if let Some(bytes) = received.complete
-                                && complete_client_response(id, &bytes, &mut sync_id, &mut sync_response_ok, &mut invalidations, &mut pending_commands, &mut response_meta).is_err()
-                            {
-                                fail_stream!(id, V3ResetCode::ProtocolError);
+                            if let Some(bytes) = received.complete {
+                                finish_response!(id, &bytes);
                             }
                         }
                     }
@@ -1113,9 +1125,7 @@ async fn connected(
                         }
                         if let Some(bytes) = received.complete {
                             if Some(id) == sync_id || invalidations.contains_key(&id) || pending_commands.contains_key(&id) {
-                                if complete_client_response(id, &bytes, &mut sync_id, &mut sync_response_ok, &mut invalidations, &mut pending_commands, &mut response_meta).is_err() {
-                                    fail_stream!(id, V3ResetCode::ProtocolError);
-                                }
+                                finish_response!(id, &bytes);
                             } else if let Some(method) = inbound_rpc.remove(&id) {
                                 if handlers.len() >= config.auth_max_inflight { let _ = streams.reset(id); reset(&writer_tx, id, V3ResetCode::Overloaded, &limits)?; continue; }
                                 let Some(handler) = handler.clone() else { break Err(Error::InvalidConfig); };
@@ -1212,7 +1222,11 @@ fn complete_client_response(
         } else {
             serde_json::from_slice(bytes).map_err(|_| Error::Protocol)
         };
+        let reset_provider = matches!(result, Err(Error::Remote(RpcErrorCode::StaleRevision)));
         let _ = done.send(result);
+        if reset_provider {
+            return Err(Error::Remote(RpcErrorCode::StaleRevision));
+        }
     } else if let Some((expected, done)) = pending_commands.remove(&id) {
         let result = if let Some(error) = response.error {
             Err(Error::Remote(error.code))
@@ -1230,4 +1244,375 @@ fn complete_client_response(
         let _ = done.send(result);
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use async_trait::async_trait;
+    use netbaiot_protocol::{
+        DeliveryId, DeviceEvent, DeviceEventKind, DeviceId, DeviceKey, EventId, Heartbeat,
+        ProductId, SourceMessageId, TenantId,
+        business_rpc::{
+            AuthenticatedDeviceWire, DeviceAuthenticateRequest, ResolveVerifierRequest,
+            ResolveVerifierResponse,
+        },
+        business_rpc_v3::{V3_HEADER_BYTES, V3FrameHeader},
+    };
+    use tokio::{
+        net::{TcpListener, TcpStream},
+        sync::Notify,
+    };
+
+    async fn read(socket: &mut TcpStream) -> Frame {
+        let mut raw = [0; V3_HEADER_BYTES];
+        socket.read_exact(&mut raw).await.unwrap();
+        let header = V3FrameHeader::parse(&raw, 8192).unwrap();
+        let mut payload = vec![0; header.payload_len as usize];
+        socket.read_exact(&mut payload).await.unwrap();
+        Frame {
+            header,
+            payload: payload.into(),
+        }
+    }
+    async fn write(socket: &mut TcpStream, id: u32, ty: V3FrameType, flags: u8, bytes: &[u8]) {
+        let header = V3FrameHeader {
+            payload_len: bytes.len() as u32,
+            stream_id: id,
+            frame_type: ty,
+            flags,
+        };
+        socket.write_all(&header.encode()).await.unwrap();
+        socket.write_all(bytes).await.unwrap();
+    }
+    async fn meta(socket: &mut TcpStream, id: u32, ty: V3FrameType, value: &impl Serialize) {
+        write(socket, id, ty, 0, &serde_json::to_vec(value).unwrap()).await;
+    }
+    async fn handshake(socket: &mut TcpStream, epoch: u64) {
+        let mut prefix = [0; 4];
+        socket.read_exact(&mut prefix).await.unwrap();
+        let length = u32::from_be_bytes(prefix) as usize;
+        assert!(length <= 4096);
+        let mut bytes = vec![0; length];
+        socket.read_exact(&mut bytes).await.unwrap();
+        let V3Bootstrap::Hello {
+            version, limits, ..
+        } = serde_json::from_slice(&bytes).unwrap()
+        else {
+            panic!("Hello required")
+        };
+        assert_eq!(version, BUSINESS_RPC_V3_VERSION);
+        let ready = serde_json::to_vec(&V3Bootstrap::Ready {
+            version,
+            limits,
+            connection_epoch: epoch,
+        })
+        .unwrap();
+        socket
+            .write_all(&(ready.len() as u32).to_be_bytes())
+            .await
+            .unwrap();
+        socket.write_all(&ready).await.unwrap();
+    }
+    async fn subscription(socket: &mut TcpStream) -> (u32, SubscriptionId) {
+        let frame = read(socket).await;
+        assert_eq!(frame.header.frame_type, V3FrameType::Open);
+        let V3Open::EventSubscription {
+            subscription_id, ..
+        } = decode(&frame).unwrap()
+        else {
+            panic!("subscription required")
+        };
+        meta(
+            socket,
+            frame.header.stream_id,
+            V3FrameType::Accept,
+            &V3Accept {
+                provider_epoch: None,
+                sync_required: false,
+            },
+        )
+        .await;
+        (frame.header.stream_id, subscription_id)
+    }
+    async fn provider(socket: &mut TcpStream) -> u32 {
+        let parent = read(socket).await;
+        assert!(matches!(
+            decode::<V3Open>(&parent).unwrap(),
+            V3Open::Provider { .. }
+        ));
+        let id = parent.header.stream_id;
+        meta(
+            socket,
+            id,
+            V3FrameType::Accept,
+            &V3Accept {
+                provider_epoch: Some(1),
+                sync_required: true,
+            },
+        )
+        .await;
+        let sync = read(socket).await;
+        assert!(
+            matches!(decode::<V3Open>(&sync).unwrap(), V3Open::Rpc { ref method, .. } if method == "auth.sync")
+        );
+        let data = read(socket).await;
+        assert_eq!(data.header.stream_id, sync.header.stream_id);
+        assert_eq!(data.header.flags, V3_END_STREAM);
+        let body = serde_json::to_vec(&AuthSyncResponse {
+            applied_revision: 1,
+        })
+        .unwrap();
+        meta(
+            socket,
+            sync.header.stream_id,
+            V3FrameType::Response,
+            &V3Response {
+                content_length: body.len() as u32,
+                error: None,
+            },
+        )
+        .await;
+        write(
+            socket,
+            sync.header.stream_id,
+            V3FrameType::Data,
+            V3_END_STREAM,
+            &body,
+        )
+        .await;
+        write(socket, 0, V3FrameType::Ping, 0, &1u64.to_be_bytes()).await;
+        loop {
+            if read(socket).await.header.frame_type == V3FrameType::Pong {
+                break;
+            }
+        }
+        id
+    }
+    struct HeldHandler {
+        entered: Mutex<Option<oneshot::Sender<()>>>,
+        dropped: Mutex<Option<oneshot::Sender<()>>>,
+        release: Notify,
+    }
+    struct HandlerDrop(Option<oneshot::Sender<()>>);
+    impl Drop for HandlerDrop {
+        fn drop(&mut self) {
+            if let Some(tx) = self.0.take() {
+                let _ = tx.send(());
+            }
+        }
+    }
+    #[async_trait]
+    impl BusinessAuthHandler for HeldHandler {
+        async fn authenticate(
+            &self,
+            _: DeviceAuthenticateRequest,
+        ) -> Result<AuthenticatedDeviceWire, RpcError> {
+            let _guard = HandlerDrop(self.dropped.lock().unwrap().take());
+            if let Some(tx) = self.entered.lock().unwrap().take() {
+                let _ = tx.send(());
+            }
+            self.release.notified().await;
+            Err(RpcError::new(RpcErrorCode::Unavailable, "released"))
+        }
+        async fn resolve_verifier(
+            &self,
+            _: ResolveVerifierRequest,
+        ) -> Result<ResolveVerifierResponse, RpcError> {
+            Err(RpcError::new(RpcErrorCode::Unavailable, "unused"))
+        }
+    }
+    #[tokio::test]
+    async fn disconnected_auth_handler_is_cancelled_before_replacement_ready() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let (entered, entered_rx) = oneshot::channel();
+        let (dropped, dropped_rx) = oneshot::channel();
+        let handler = Arc::new(HeldHandler {
+            entered: Mutex::new(Some(entered)),
+            dropped: Mutex::new(Some(dropped)),
+            release: Notify::new(),
+        });
+        let mut config = BusinessRpcV3ClientConfig::development(
+            listener.local_addr().unwrap(),
+            "test-token".into(),
+        );
+        config.events = false;
+        config.reconnect_initial = Duration::from_millis(1);
+        config.reconnect_max = Duration::from_millis(1);
+        let peer = tokio::spawn(async move {
+            let (mut first, _) = listener.accept().await.unwrap();
+            handshake(&mut first, 1).await;
+            let parent = provider(&mut first).await;
+            let bytes =
+                br#"{"credential_id":"cred-device","secret_hex":"00","min_auth_revision":1}"#;
+            meta(
+                &mut first,
+                2,
+                V3FrameType::Open,
+                &V3Open::Rpc {
+                    parent_stream_id: Some(parent),
+                    request_id: Uuid::new_v4(),
+                    method: "device.authenticate".into(),
+                    deadline_ms: 5000,
+                    content_length: bytes.len() as u32,
+                },
+            )
+            .await;
+            write(&mut first, 2, V3FrameType::Data, V3_END_STREAM, bytes).await;
+            entered_rx.await.unwrap();
+            drop(first);
+            let (mut second, _) = listener.accept().await.unwrap();
+            dropped_rx.await.unwrap();
+            handshake(&mut second, 2).await;
+            provider(&mut second).await;
+            second
+        });
+        let (client, _) = BusinessRpcV3Client::connect(config, Some(handler.clone())).unwrap();
+        let mut second = tokio::time::timeout(Duration::from_secs(3), peer)
+            .await
+            .unwrap()
+            .unwrap();
+        handler.release.notify_waiters();
+        let until = tokio::time::Instant::now() + Duration::from_millis(100);
+        while let Ok(frame) = tokio::time::timeout_at(until, read(&mut second)).await {
+            assert_ne!(
+                frame.header.frame_type,
+                V3FrameType::Response,
+                "retired handler response crossed connection epoch"
+            );
+        }
+        client.shutdown().await;
+    }
+    #[tokio::test]
+    async fn one_hundred_reconnect_epochs_and_shutdown_release_driver() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let mut config = BusinessRpcV3ClientConfig::development(
+            listener.local_addr().unwrap(),
+            "test-token".into(),
+        );
+        config.provider = false;
+        config.reconnect_initial = Duration::from_millis(1);
+        config.reconnect_max = Duration::from_millis(1);
+        let peer = tokio::spawn(async move {
+            for epoch in 1..=100 {
+                let (mut socket, _) = listener.accept().await.unwrap();
+                handshake(&mut socket, epoch).await;
+                subscription(&mut socket).await;
+            }
+        });
+        let (client, _) = BusinessRpcV3Client::connect(config, None).unwrap();
+        tokio::time::timeout(Duration::from_secs(20), peer)
+            .await
+            .unwrap()
+            .unwrap();
+        client.shutdown().await;
+        assert!(!client.ready());
+        let weak = Arc::downgrade(&client.inner);
+        drop(client);
+        assert!(weak.upgrade().is_none());
+    }
+    fn event() -> DeviceEvent {
+        DeviceEvent {
+            event_id: EventId::generate(),
+            source_message_id: SourceMessageId::new("pending-before-reset").unwrap(),
+            device: DeviceKey {
+                tenant_id: TenantId::new("tenant").unwrap(),
+                product_id: ProductId::new("product").unwrap(),
+                device_id: DeviceId::new("device").unwrap(),
+            },
+            received_at: 1,
+            occurred_at: None,
+            kind: DeviceEventKind::Heartbeat(Heartbeat { sequence: 2 }),
+        }
+    }
+    #[tokio::test]
+    async fn replay_to_full_receive_queue_preserves_old_delivery_and_fences_ack() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let mut config = BusinessRpcV3ClientConfig::development(
+            listener.local_addr().unwrap(),
+            "test-token".into(),
+        );
+        config.provider = false;
+        let (commands, command_rx) = mpsc::channel(32);
+        let (deliveries, mut receive) = mpsc::channel(1);
+        let event = event();
+        let old_id = DeliveryId::generate();
+        deliveries
+            .try_send(BusinessRpcV3Delivery {
+                delivery: EventDelivery {
+                    delivery_id: old_id,
+                    subscription_id: SubscriptionId::generate(),
+                    event: event.clone(),
+                    attempt: 1,
+                },
+                connection_epoch: 1,
+                stream_id: 2,
+                commands: commands.clone(),
+            })
+            .ok()
+            .unwrap();
+        let stop = CancellationToken::new();
+        let (ready, _) = watch::channel(false);
+        let mut context = DriverContext {
+            config,
+            handler: None,
+            commands: command_rx,
+            command_tx: commands,
+            deliveries,
+            ready,
+            revision: Arc::new(AtomicU64::new(1)),
+            epoch: Arc::new(AtomicU64::new(2)),
+            stop: stop.clone(),
+        };
+        let peer = async {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let (parent, subscription_id) = subscription(&mut socket).await;
+            let delivery = EventDelivery {
+                delivery_id: DeliveryId::generate(),
+                subscription_id,
+                event,
+                attempt: 2,
+            };
+            let body = serde_json::to_vec(&delivery).unwrap();
+            meta(
+                &mut socket,
+                2,
+                V3FrameType::Open,
+                &V3Open::EventDelivery {
+                    parent_stream_id: parent,
+                    delivery_id: delivery.delivery_id.0,
+                    event_id: delivery.event.event_id.0,
+                    attempt: 2,
+                    content_length: body.len() as u32,
+                },
+            )
+            .await;
+            write(&mut socket, 2, V3FrameType::Data, V3_END_STREAM, &body).await;
+            loop {
+                let frame = read(&mut socket).await;
+                if frame.header.frame_type == V3FrameType::ResetStream {
+                    assert_eq!(frame.header.stream_id, 2);
+                    assert_eq!(
+                        decode::<V3Reset>(&frame).unwrap().code,
+                        V3ResetCode::Overloaded
+                    );
+                    break;
+                }
+            }
+            let old = receive.recv().await.unwrap();
+            assert_eq!(old.delivery.delivery_id, old_id);
+            assert!(matches!(old.ack().await, Err(Error::Unavailable)));
+            assert!(receive.try_recv().is_err());
+            stop.cancel();
+        };
+        let driver = async {
+            let socket = TcpStream::connect(context.config.address).await.unwrap();
+            let _ = connected(Box::new(socket), 2, V3Limits::default(), &mut context).await;
+        };
+        tokio::time::timeout(Duration::from_secs(3), async {
+            tokio::join!(peer, driver);
+        })
+        .await
+        .unwrap();
+    }
 }

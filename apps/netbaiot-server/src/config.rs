@@ -80,15 +80,14 @@ pub enum EventDeliverySource {
 #[serde(deny_unknown_fields)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct BusinessRpcConfig {
-    pub version: u16,
-    /// V3 is available on the same listener only when explicitly configured.
+    /// Limits for the sole current Business RPC wire format.
     #[serde(default)]
-    pub v3: Option<business_rpc_v3::V3Limits>,
+    pub limits: business_rpc_v3::V3Limits,
     /// Local sender policy, separate from the negotiated V3 receive windows.
     #[serde(default)]
-    pub v3_send_ahead: Option<V3SendAhead>,
+    pub send_ahead: Option<V3SendAhead>,
     #[serde(default)]
-    pub v3_experiment_socket_send_buffer_bytes: Option<usize>,
+    pub experiment_socket_send_buffer_bytes: Option<usize>,
     pub tls: Option<ManagementTlsFiles>,
     #[serde(default)]
     pub identities: Vec<BusinessRpcIdentityConfig>,
@@ -185,18 +184,13 @@ impl Config {
             return Err(Error::Configuration);
         }
         if let Some(rpc) = &self.business_rpc {
-            if rpc.version != BUSINESS_RPC_VERSION
-                || rpc.v3.as_ref().is_some_and(|v3| v3.validate().is_err())
-                || rpc.v3_send_ahead.is_some_and(|policy| {
-                    rpc.v3
-                        .as_ref()
-                        .is_none_or(|limits| policy.as_mux().validate(limits).is_err())
-                })
+            if rpc.limits.validate().is_err()
                 || rpc
-                    .v3_experiment_socket_send_buffer_bytes
-                    .is_some_and(|size| {
-                        rpc.v3.is_none() || !(4096..=4 * 1024 * 1024).contains(&size)
-                    })
+                    .send_ahead
+                    .is_some_and(|policy| policy.as_mux().validate(&rpc.limits).is_err())
+                || rpc
+                    .experiment_socket_send_buffer_bytes
+                    .is_some_and(|size| !(4096..=4 * 1024 * 1024).contains(&size))
                 || self.business_tcp.is_none()
                 || rpc.max_connections == 0
                 || rpc.auth_max_inflight == 0
@@ -315,7 +309,6 @@ impl Config {
                 name.is_empty()
                     || name.len() > 64
                     || name == "NETBAIOT_ADMIN_SECRET"
-                    || name == "NETBAIOT_BUSINESS_STREAM_TOKEN"
                     || !name.bytes().all(|byte| {
                         byte.is_ascii_uppercase() || byte.is_ascii_digit() || byte == b'_'
                     })

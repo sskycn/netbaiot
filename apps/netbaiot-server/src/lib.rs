@@ -55,40 +55,44 @@ mod reliability_tests {
         let mut config: Config =
             serde_json::from_str(include_str!("../../../configs/development.json")).unwrap();
         config.business_tcp = Some("127.0.0.1:19002".parse().unwrap());
-        let legacy: BusinessRpcConfig = serde_json::from_value(serde_json::json!({
-            "version": 2,
-            "tls": null,
-            "development_token_env": "NETBAIOT_BUSINESS_RPC_TOKEN"
-        }))
-        .unwrap();
-        assert!(legacy.v3.is_none());
-        config.business_rpc = Some(legacy);
+        assert!(
+            serde_json::from_value::<BusinessRpcConfig>(serde_json::json!({
+                "version":2,"tls":null,"development_token_env":"NETBAIOT_BUSINESS_RPC_TOKEN"
+            }))
+            .is_err()
+        );
+        config.business_rpc = Some(
+            serde_json::from_value(serde_json::json!({
+                "tls":null,"development_token_env":"NETBAIOT_BUSINESS_RPC_TOKEN"
+            }))
+            .unwrap(),
+        );
         assert!(config.validate().is_ok());
 
         let mut limits = business_rpc_v3::V3Limits::default();
-        config.business_rpc.as_mut().unwrap().v3 = Some(limits.clone());
+        config.business_rpc.as_mut().unwrap().limits = limits.clone();
         assert!(config.validate().is_ok());
 
         limits.max_frame_payload_bytes = 1024;
-        config.business_rpc.as_mut().unwrap().v3 = Some(limits.clone());
+        config.business_rpc.as_mut().unwrap().limits = limits.clone();
         assert!(config.validate().is_err());
         limits.max_frame_payload_bytes = 8192;
         limits.max_concurrent_streams = 0;
-        config.business_rpc.as_mut().unwrap().v3 = Some(limits.clone());
+        config.business_rpc.as_mut().unwrap().limits = limits.clone();
         assert!(config.validate().is_err());
         limits.max_concurrent_streams = 256;
         limits.initial_connection_window_bytes = limits.initial_stream_window_bytes - 1;
-        config.business_rpc.as_mut().unwrap().v3 = Some(limits);
+        config.business_rpc.as_mut().unwrap().limits = limits;
         assert!(config.validate().is_err());
 
         let rpc = config.business_rpc.as_mut().unwrap();
-        rpc.v3 = Some(business_rpc_v3::V3Limits::default());
-        rpc.v3_send_ahead = Some(V3SendAhead {
+        rpc.limits = business_rpc_v3::V3Limits::default();
+        rpc.send_ahead = Some(V3SendAhead {
             stream_bytes: 1,
             connection_bytes: 8192,
         });
         assert!(config.validate().is_err());
-        config.business_rpc.as_mut().unwrap().v3_send_ahead = Some(V3SendAhead {
+        config.business_rpc.as_mut().unwrap().send_ahead = Some(V3SendAhead {
             stream_bytes: 8192,
             connection_bytes: 131072,
         });
@@ -97,7 +101,7 @@ mod reliability_tests {
             .business_rpc
             .as_mut()
             .unwrap()
-            .v3_experiment_socket_send_buffer_bytes = Some(1);
+            .experiment_socket_send_buffer_bytes = Some(1);
         assert!(config.validate().is_err());
     }
 
@@ -112,10 +116,9 @@ mod reliability_tests {
                 serde_json::from_str(include_str!("../../../configs/development.json")).unwrap();
             config.business_tcp = Some("127.0.0.1:19002".parse().unwrap());
             config.business_rpc = Some(BusinessRpcConfig {
-                version: 2,
-                v3: None,
-                v3_send_ahead: None,
-                v3_experiment_socket_send_buffer_bytes: None,
+                limits: netbaiot_core::business_rpc_v3::V3Limits::default(),
+                send_ahead: None,
+                experiment_socket_send_buffer_bytes: None,
                 tls: Some(ManagementTlsFiles {
                     certificate: "cert".into(),
                     private_key: "key".into(),
@@ -363,7 +366,6 @@ mod reliability_tests {
             let mut value = serde_json::to_value(&base).unwrap();
             value["business_tcp"] = serde_json::json!("127.0.0.1:19002");
             value["business_rpc"] = serde_json::json!({
-                "version": 2,
                 "tls": null,
                 "development_token_env": "NETBAIOT_BUSINESS_RPC_TOKEN"
             });

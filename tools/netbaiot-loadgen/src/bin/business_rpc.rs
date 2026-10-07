@@ -1,11 +1,10 @@
-//! Bounded, real-network Business RPC V2 load gate.
+//! Bounded real-network current Business RPC load gate.
 //! Run against a disposable gateway configured for development Business RPC.
 use async_trait::async_trait;
 use hmac::{Hmac, Mac};
 use netbaiot_client::business_rpc::{
-    BusinessAuthHandler, BusinessDelivery, BusinessRpcClient, BusinessRpcClientConfig,
-    BusinessRpcClientError, BusinessRpcTls, BusinessRpcV3Client, BusinessRpcV3ClientConfig,
-    BusinessRpcV3Delivery,
+    BusinessAuthHandler, BusinessRpcClientError, BusinessRpcTls, BusinessRpcV3Client,
+    BusinessRpcV3ClientConfig, BusinessRpcV3Delivery,
 };
 use netbaiot_core::{
     AuthInvalidation, CodecId, CommandAck, CommandId, DeliveryState, DeviceCommand,
@@ -124,17 +123,12 @@ impl BusinessTransport {
 #[serde(rename_all = "snake_case")]
 enum Topology {
     #[default]
-    Multiplexed,
-    Dual,
     V3,
     V3Dual,
 }
 impl Topology {
     fn separate(self) -> bool {
-        matches!(self, Self::Dual | Self::V3Dual)
-    }
-    fn v3(self) -> bool {
-        matches!(self, Self::V3 | Self::V3Dual)
+        matches!(self, Self::V3Dual)
     }
 }
 impl Config {
@@ -164,9 +158,7 @@ impl Config {
             || self.command_rate.saturating_mul(self.duration_secs) > 100_000
             || self.command_device_count > 200
             || (self.command_rate > 0
-                && (!self.topology.v3()
-                    || self.command_device_count == 0
-                    || self.command_transport.is_none()))
+                && (self.command_device_count == 0 || self.command_transport.is_none()))
             || self.event_payload_bytes > 16_384
             || self
                 .frame_payload_bytes
@@ -454,133 +446,48 @@ impl CommandTrace {
 }
 type SharedStats = Arc<Mutex<Stats>>;
 
+trait DeliveryView {
+    fn event_id(&self) -> netbaiot_core::EventId;
+    fn source_message_id(&self) -> &SourceMessageId;
+    fn command_ack_id(&self) -> Option<CommandId>;
+}
+impl DeliveryView for BusinessRpcV3Delivery {
+    fn event_id(&self) -> netbaiot_core::EventId {
+        self.delivery.event.event_id
+    }
+    fn source_message_id(&self) -> &SourceMessageId {
+        &self.delivery.event.source_message_id
+    }
+    fn command_ack_id(&self) -> Option<CommandId> {
+        match &self.delivery.event.kind {
+            DeviceEventKind::CommandAck(ack) => Some(ack.command_id),
+            _ => None,
+        }
+    }
+}
+
 async fn connect_business(
     config: &Config,
     handler: Arc<Handler>,
     role: BusinessRole,
     stats: Option<&SharedStats>,
 ) -> Result<(
-    BusinessRpcClient,
-    tokio::sync::mpsc::Receiver<netbaiot_client::business_rpc::BusinessDelivery>,
+    BusinessRpcV3Client,
+    tokio::sync::mpsc::Receiver<BusinessRpcV3Delivery>,
 )> {
-    let mut settings = match &config.business_transport {
-        BusinessTransport::DevelopmentToken => BusinessRpcClientConfig::development(
-            config.business_address,
-            std::env::var("NETBAIOT_BUSINESS_RPC_TOKEN")?,
-            role,
-        ),
-        BusinessTransport::Mtls {
-            server_name,
-            ca_pem,
-            certificate_pem,
-            private_key_pem,
-        } => {
-            let mut settings =
-                BusinessRpcClientConfig::development(config.business_address, String::new(), role);
-            settings.token = None;
-            settings.tls = Some(BusinessRpcTls {
-                server_name: server_name.clone(),
-                ca_pem: ca_pem.clone(),
-                certificate_pem: certificate_pem.clone(),
-                private_key_pem: private_key_pem.clone(),
-            });
-            settings
-        }
-    };
-    settings.reconnect_initial = Duration::from_millis(100);
-    let (client, deliveries) = BusinessRpcClient::connect(settings, Some(handler))?;
-    tokio::time::timeout(Duration::from_secs(10), client.wait_ready()).await??;
-    if let Some(stats) = stats
-        && let Some(timing) = client.connection_timing()
-    {
-        let mut state = stats.lock().unwrap();
-        state.full_ready.add(timing.full_ready);
-        state.sync_ready.add(timing.sync_to_ready);
-        if let Some(tls) = timing.tls_handshake {
-            state.tls_handshake.add(tls);
-        }
-    }
-    Ok((client, deliveries))
+    let unused = Arc::new(Mutex::new(Stats::default()));
+    connect_event_business(config, handler, role, stats.unwrap_or(&unused)).await
 }
 
-enum AnyBusiness {
-    V2(BusinessRpcClient),
-    V3(BusinessRpcV3Client),
-}
-impl AnyBusiness {
-    async fn shutdown(&self) {
-        match self {
-            Self::V2(client) => client.shutdown().await,
-            Self::V3(client) => client.shutdown().await,
-        }
-    }
-    async fn invalidate(
-        &self,
-        revision: u64,
-        scope: AuthInvalidation,
-    ) -> std::result::Result<(), BusinessRpcClientError> {
-        match self {
-            Self::V2(client) => client.invalidate(revision, scope).await.map(|_| ()),
-            Self::V3(client) => client.invalidate(revision, scope).await.map(|_| ()),
-        }
-    }
-}
-enum AnyDelivery {
-    V2(BusinessDelivery),
-    V3(BusinessRpcV3Delivery),
-}
-impl AnyDelivery {
-    fn event_id(&self) -> netbaiot_core::EventId {
-        match self {
-            Self::V2(delivery) => delivery.delivery.event.event_id,
-            Self::V3(delivery) => delivery.delivery.event.event_id,
-        }
-    }
-    fn source_message_id(&self) -> &SourceMessageId {
-        match self {
-            Self::V2(delivery) => &delivery.delivery.event.source_message_id,
-            Self::V3(delivery) => &delivery.delivery.event.source_message_id,
-        }
-    }
-    fn command_ack_id(&self) -> Option<CommandId> {
-        let kind = match self {
-            Self::V2(delivery) => &delivery.delivery.event.kind,
-            Self::V3(delivery) => &delivery.delivery.event.kind,
-        };
-        match kind {
-            DeviceEventKind::CommandAck(ack) => Some(ack.command_id),
-            _ => None,
-        }
-    }
-    async fn ack(self) -> std::result::Result<(), BusinessRpcClientError> {
-        match self {
-            Self::V2(delivery) => delivery.ack().await,
-            Self::V3(delivery) => delivery.ack().await,
-        }
-    }
-}
-enum AnyDeliveries {
-    V2(tokio::sync::mpsc::Receiver<BusinessDelivery>),
-    V3(tokio::sync::mpsc::Receiver<BusinessRpcV3Delivery>),
-}
-impl AnyDeliveries {
-    async fn recv(&mut self) -> Option<AnyDelivery> {
-        match self {
-            Self::V2(deliveries) => deliveries.recv().await.map(AnyDelivery::V2),
-            Self::V3(deliveries) => deliveries.recv().await.map(AnyDelivery::V3),
-        }
-    }
-}
 async fn connect_event_business(
     config: &Config,
     handler: Arc<Handler>,
     role: BusinessRole,
-    stats: &SharedStats,
-) -> Result<(AnyBusiness, AnyDeliveries)> {
-    if !config.topology.v3() {
-        let (client, deliveries) = connect_business(config, handler, role, Some(stats)).await?;
-        return Ok((AnyBusiness::V2(client), AnyDeliveries::V2(deliveries)));
-    }
+    _stats: &SharedStats,
+) -> Result<(
+    BusinessRpcV3Client,
+    tokio::sync::mpsc::Receiver<BusinessRpcV3Delivery>,
+)> {
     let mut settings = BusinessRpcV3ClientConfig::development(
         config.business_address,
         std::env::var("NETBAIOT_BUSINESS_RPC_TOKEN").unwrap_or_default(),
@@ -612,7 +519,7 @@ async fn connect_event_business(
     settings.reconnect_initial = Duration::from_millis(100);
     let (client, deliveries) = BusinessRpcV3Client::connect(settings, Some(handler))?;
     tokio::time::timeout(Duration::from_secs(10), client.wait_ready()).await??;
-    Ok((AnyBusiness::V3(client), AnyDeliveries::V3(deliveries)))
+    Ok((client, deliveries))
 }
 
 async fn connect_command_business(config: &Config) -> Result<BusinessRpcV3Client> {
@@ -1825,7 +1732,7 @@ async fn main() -> Result<()> {
         }
         "topology_compare" => {
             let mut results = Vec::new();
-            for topology in [Topology::Multiplexed, Topology::Dual] {
+            for topology in [Topology::V3, Topology::V3Dual] {
                 let mut run_config = config.clone();
                 run_config.topology = topology;
                 let run_stats = Arc::new(Mutex::new(Stats::default()));

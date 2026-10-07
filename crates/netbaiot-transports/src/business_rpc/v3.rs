@@ -1,4 +1,4 @@
-//! V3 is a separate binary stream engine. V2 frame parsing stays in the parent module.
+//! Current binary stream engine; the parent owns TLS/bootstrap and shared control state.
 use super::*;
 use bytes::Bytes;
 use netbaiot_core::business_rpc_v3::{
@@ -433,7 +433,7 @@ pub(super) async fn connection(
     services: Arc<BusinessRpcServices>,
     stop: CancellationToken,
 ) -> Result<()> {
-    let server_limits = config.v3.clone().ok_or(Error::Invalid)?;
+    let server_limits = config.limits.clone();
     let hello: V3Bootstrap = serde_json::from_slice(&hello).map_err(|_| Error::Invalid)?;
     hello.validate().map_err(|_| Error::Invalid)?;
     let V3Bootstrap::Hello {
@@ -486,7 +486,7 @@ pub(super) async fn connection(
         let metrics = metrics.clone();
         let limits = limits.clone();
         let timeout = config.write_timeout;
-        let send_ahead = config.v3_send_ahead;
+        let send_ahead = config.send_ahead;
         async move {
             tracing::debug!(
                 connection_epoch = epoch,
@@ -973,7 +973,7 @@ async fn reader_loop<R: AsyncRead + Unpin + Send + 'static>(
             }
             reply = optional_recv(&mut control_rx) => {
                 let Some(reply) = reply else { control_rx = None; continue; };
-                let BusinessRpcFrame::Response { request_id, method, body, error } = reply.frame else { continue; };
+                let RpcReply { request_id, method, body, error } = reply.frame;
                 let Some(id) = control_requests.remove(&request_id) else { continue; };
                 let bytes = match body { Some(body) => serde_json::to_vec(&body).map_err(|_| Error::Internal)?, None => Vec::new() };
                 let len = u32::try_from(bytes.len()).map_err(|_| Error::Overloaded)?;
@@ -1480,5 +1480,133 @@ mod send_ahead_tests {
         );
         stop.cancel();
         assert!(task.await.unwrap().is_ok());
+    }
+}
+
+#[cfg(test)]
+mod ack_tests {
+    use super::*;
+    #[tokio::test]
+    async fn event_ack_requires_exact_stream_delivery_and_event_identity() {
+        use netbaiot_runtime::*;
+        let limits = Arc::new(Limits::default());
+        let metrics = Arc::new(Metrics::default());
+        let registry = BusinessRpcRegistry::new(4, 65536, Duration::from_secs(1)).unwrap();
+        let sink = BusinessRpcEventSink::new();
+        let sink_id = netbaiot_core::SinkId::new("rpc").unwrap();
+        let events = EventBus::new(
+            limits.clone(),
+            metrics.clone(),
+            vec![SinkDefinition::bounded(
+                sink_id.clone(),
+                SinkDeliveryMode::ConfirmedRequired,
+                sink.clone(),
+                &limits,
+            )],
+            vec![netbaiot_core::RouteDefinition {
+                tenant: None,
+                sinks: vec![sink_id],
+            }],
+            1,
+        )
+        .unwrap();
+        let lifecycle = Arc::new(Lifecycle::starting());
+        lifecycle.mark_running().unwrap();
+        let ingress = Arc::new(Ingress::new(
+            limits.clone(),
+            AuthCache::new(
+                BusinessRpcAuthProvider::new(registry.clone()),
+                limits.clone(),
+                metrics.clone(),
+            ),
+            CodecRegistry::new(vec![(
+                netbaiot_core::CodecId::new("netbaiot-json").unwrap(),
+                1,
+                Arc::new(netbaiot_codecs::JsonV1::default()),
+            )])
+            .unwrap(),
+            events.clone(),
+            GatewayControl::empty(limits.clone()),
+            metrics,
+            Sessions::new(limits.clone()),
+            lifecycle.clone(),
+        ));
+        let mqtt = MqttBroker::new(limits);
+        let services = Arc::new(BusinessRpcServices {
+            registry: registry.clone(),
+            sink,
+            mqtt,
+            commands: Arc::new(CommandService::new(Arc::new(CommandRouter::new(
+                ingress.clone(),
+            )))),
+            ingress,
+        });
+
+        for case in 0..7 {
+            let delivery_id = netbaiot_core::DeliveryId::generate();
+            let event_id = netbaiot_core::EventId::generate();
+            let (result, mut receive) = oneshot::channel();
+            let mut pending = Some(PendingEvent {
+                id: 2,
+                queued_at: std::time::Instant::now(),
+                delivery_id,
+                event_id,
+                result,
+                written: None,
+                deadline: None,
+                started: None,
+            });
+            let id = if case == 1 { 4 } else { 2 };
+            let ack = V3EventAck {
+                delivery_id: if case == 2 {
+                    Uuid::new_v4()
+                } else {
+                    delivery_id.0
+                },
+                event_id: if case == 3 {
+                    Uuid::new_v4()
+                } else {
+                    event_id.0
+                },
+                status: if case == 4 {
+                    V3EventStatus::Error
+                } else {
+                    V3EventStatus::Ok
+                },
+            };
+            let bytes = if case == 6 {
+                b"invalid".to_vec()
+            } else {
+                serde_json::to_vec(&ack).unwrap()
+            };
+            let mut meta = HashMap::from([(
+                id,
+                V3Response {
+                    content_length: bytes.len() as u32,
+                    error: (case == 5)
+                        .then(|| RpcError::new(RpcErrorCode::Unavailable, "not committed")),
+                },
+            )]);
+            complete_response(
+                id,
+                &bytes,
+                &None,
+                &services,
+                &mut HashMap::new(),
+                &mut meta,
+                &mut pending,
+            )
+            .unwrap();
+            if case == 1 {
+                assert!(pending.is_some());
+                assert!(matches!(
+                    receive.try_recv(),
+                    Err(oneshot::error::TryRecvError::Empty)
+                ));
+            } else {
+                assert!(pending.is_none());
+                assert_eq!(receive.await.unwrap().is_ok(), case == 0);
+            }
+        }
     }
 }

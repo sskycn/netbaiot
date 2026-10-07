@@ -1,5 +1,5 @@
-//! Loopback Business RPC V2 command example. Production deployments use mTLS.
-use netbaiot_client::business_rpc::{BusinessRpcClient, BusinessRpcClientConfig};
+//! Loopback current Business RPC command example. Production deployments use mTLS.
+use netbaiot_client::business_rpc::{BusinessRpcV3Client, BusinessRpcV3ClientConfig};
 use netbaiot_protocol::{
     CommandId, DeviceCommand, DeviceCommandPayload, DeviceEventKind, DeviceId, DeviceKey,
     ProductId, TenantId, business_rpc::BusinessRole,
@@ -23,8 +23,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             arguments: Default::default(),
         },
     };
-    let (client, mut events) = BusinessRpcClient::connect(
-        BusinessRpcClientConfig::development(address, token, BusinessRole::Application),
+    let (client, mut events) = BusinessRpcV3Client::connect(
+        current_config(address, token, BusinessRole::Application),
         None,
     )?;
     client.wait_ready().await?;
@@ -46,4 +46,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     client.shutdown().await;
     Ok(())
+}
+
+fn current_config(
+    address: std::net::SocketAddr,
+    token: String,
+    role: BusinessRole,
+) -> BusinessRpcV3ClientConfig {
+    let mut settings = BusinessRpcV3ClientConfig::development(address, token);
+    settings.provider = role.auth_control();
+    settings.events = role.events();
+    settings
 }
