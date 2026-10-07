@@ -1,4 +1,161 @@
 {
-  "status": "PENDING",
-  "reason": "Local final validation completed; main push and native three-platform Actions verification follow. Baseline CI is recorded separately."
+  "status": "PASS",
+  "validated_main_commit": "fa5fb8475c2b92ba0cdb5bade261aaa5f4fcc8b4",
+  "scope": "Post-merge implementation validation; later CI-record commit changes only this report and CI evidence.",
+  "runs": [
+    {
+      "id": 37629405022,
+      "name": "MQTT Device Profile decoder fuzz smoke",
+      "head_sha": "fa5fb8475c2b92ba0cdb5bade261aaa5f4fcc8b4",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/sskycn/netbaiot/actions/runs/37629405022",
+      "created_at": "2026-10-07T13:33:14Z",
+      "updated_at": "2026-10-07T13:35:08Z"
+    },
+    {
+      "id": 37629405334,
+      "name": "Native developer experience",
+      "head_sha": "fa5fb8475c2b92ba0cdb5bade261aaa5f4fcc8b4",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/sskycn/netbaiot/actions/runs/37629405334",
+      "created_at": "2026-10-07T13:33:14Z",
+      "updated_at": "2026-10-07T13:42:50Z",
+      "jobs": [
+        {
+          "id": 112819428976,
+          "name": "dx (ubuntu-latest)",
+          "status": "completed",
+          "conclusion": "success",
+          "html_url": "https://github.com/sskycn/netbaiot/actions/runs/37629405334/job/112819428976",
+          "started_at": "2026-10-07T13:33:17Z",
+          "completed_at": "2026-10-07T13:37:06Z"
+        },
+        {
+          "id": 112819429401,
+          "name": "dx (windows-latest)",
+          "status": "completed",
+          "conclusion": "success",
+          "html_url": "https://github.com/sskycn/netbaiot/actions/runs/37629405334/job/112819429401",
+          "started_at": "2026-10-07T13:33:21Z",
+          "completed_at": "2026-10-07T13:42:49Z"
+        },
+        {
+          "id": 112819429499,
+          "name": "dx (macos-latest)",
+          "status": "completed",
+          "conclusion": "success",
+          "html_url": "https://github.com/sskycn/netbaiot/actions/runs/37629405334/job/112819429499",
+          "started_at": "2026-10-07T13:33:25Z",
+          "completed_at": "2026-10-07T13:39:17Z"
+        }
+      ]
+    },
+    {
+      "id": 37629406149,
+      "name": "Rust checks",
+      "head_sha": "fa5fb8475c2b92ba0cdb5bade261aaa5f4fcc8b4",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/sskycn/netbaiot/actions/runs/37629406149",
+      "created_at": "2026-10-07T13:33:14Z",
+      "updated_at": "2026-10-07T13:40:11Z",
+      "jobs": [
+        {
+          "id": 112819432439,
+          "name": "verify / preflight",
+          "status": "completed",
+          "conclusion": "success",
+          "html_url": "https://github.com/sskycn/netbaiot/actions/runs/37629406149/job/112819432439",
+          "started_at": "2026-10-07T13:33:19Z",
+          "completed_at": "2026-10-07T13:34:12Z"
+        },
+        {
+          "id": 112819432524,
+          "name": "verify / rust (1.88.0)",
+          "status": "completed",
+          "conclusion": "success",
+          "html_url": "https://github.com/sskycn/netbaiot/actions/runs/37629406149/job/112819432524",
+          "started_at": "2026-10-07T13:33:19Z",
+          "completed_at": "2026-10-07T13:37:26Z"
+        },
+        {
+          "id": 112819432828,
+          "name": "verify / mqtt / release-gate",
+          "status": "completed",
+          "conclusion": "success",
+          "html_url": "https://github.com/sskycn/netbaiot/actions/runs/37629406149/job/112819432828",
+          "started_at": "2026-10-07T13:33:19Z",
+          "completed_at": "2026-10-07T13:37:02Z"
+        },
+        {
+          "id": 112819432867,
+          "name": "verify / audit",
+          "status": "completed",
+          "conclusion": "success",
+          "html_url": "https://github.com/sskycn/netbaiot/actions/runs/37629406149/job/112819432867",
+          "started_at": "2026-10-07T13:33:19Z",
+          "completed_at": "2026-10-07T13:36:36Z"
+        },
+        {
+          "id": 112819432893,
+          "name": "verify / rust (stable)",
+          "status": "completed",
+          "conclusion": "success",
+          "html_url": "https://github.com/sskycn/netbaiot/actions/runs/37629406149/job/112819432893",
+          "started_at": "2026-10-07T13:33:19Z",
+          "completed_at": "2026-10-07T13:36:51Z"
+        },
+        {
+          "id": 112821357040,
+          "name": "Linux binary Quick Start",
+          "status": "completed",
+          "conclusion": "success",
+          "html_url": "https://github.com/sskycn/netbaiot/actions/runs/37629406149/job/112821357040",
+          "started_at": "2026-10-07T13:37:29Z",
+          "completed_at": "2026-10-07T13:40:10Z"
+        }
+      ]
+    },
+    {
+      "id": 37629405276,
+      "name": "Native recovery and lifecycle",
+      "head_sha": "fa5fb8475c2b92ba0cdb5bade261aaa5f4fcc8b4",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/sskycn/netbaiot/actions/runs/37629405276",
+      "created_at": "2026-10-07T13:33:14Z",
+      "updated_at": "2026-10-07T13:42:17Z",
+      "jobs": [
+        {
+          "id": 112819428126,
+          "name": "recovery (ubuntu-latest)",
+          "status": "completed",
+          "conclusion": "success",
+          "html_url": "https://github.com/sskycn/netbaiot/actions/runs/37629405276/job/112819428126",
+          "started_at": "2026-10-07T13:33:17Z",
+          "completed_at": "2026-10-07T13:36:55Z"
+        },
+        {
+          "id": 112819428499,
+          "name": "recovery (macos-latest)",
+          "status": "completed",
+          "conclusion": "success",
+          "html_url": "https://github.com/sskycn/netbaiot/actions/runs/37629405276/job/112819428499",
+          "started_at": "2026-10-07T13:33:24Z",
+          "completed_at": "2026-10-07T13:39:28Z"
+        },
+        {
+          "id": 112819428541,
+          "name": "recovery (windows-latest)",
+          "status": "completed",
+          "conclusion": "success",
+          "html_url": "https://github.com/sskycn/netbaiot/actions/runs/37629405276/job/112819428541",
+          "started_at": "2026-10-07T13:33:18Z",
+          "completed_at": "2026-10-07T13:42:16Z"
+        }
+      ]
+    }
+  ]
 }

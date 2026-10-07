@@ -140,7 +140,14 @@ mTLS 当前 V3，15s active，500 events/s、20 commands/s、10 auth/s，1 KiB e
 
 ## CI
 
-跨平台结果将在合并后记录到 [ci.json](legacy-cleanup/ci.json)。最终验收要求 Rust checks、MQTT fuzz smoke、Native developer experience、Native recovery and lifecycle 全部成功，且两个 Native matrix 的 Ubuntu/macOS/Windows 全绿；不能用本机 PASS 替代 Windows。
+实现合并提交 `fa5fb8475c2b92ba0cdb5bade261aaa5f4fcc8b4` 的四个 Actions 全部 PASS，实际 run/job/SHA 记录在 [ci.json](legacy-cleanup/ci.json)。本次 CI 结果记录提交只更新报告和 CI 证据；实现与上述已验证提交相同。
+
+| Actions | 结果 |
+|---|---|
+| [Rust checks](https://github.com/sskycn/netbaiot/actions/runs/37629406149) | PASS，包括 stable/MSRV、release/MQTT gate 和 Linux archive Quick Start |
+| [MQTT fuzz smoke](https://github.com/sskycn/netbaiot/actions/runs/37629405022) | PASS |
+| [Native developer experience](https://github.com/sskycn/netbaiot/actions/runs/37629405334) | Ubuntu PASS、macOS PASS、Windows PASS |
+| [Native recovery and lifecycle](https://github.com/sskycn/netbaiot/actions/runs/37629405276) | Ubuntu PASS、macOS PASS、Windows PASS；先行 recovery/shutdown + 完整 workspace |
 
 ## Remaining legacy / compatibility names
 
