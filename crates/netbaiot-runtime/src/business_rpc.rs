@@ -272,6 +272,7 @@ impl BusinessRpcRegistry {
         }
         provider.revision = revision;
         provider.serving = true;
+        tracing::debug!(epoch, revision, "business provider serving diagnostic");
         self.update_status(epoch, true);
         Ok(())
     }
@@ -299,6 +300,7 @@ impl BusinessRpcRegistry {
             return Err(Error::Conflict);
         }
         provider.revision = revision;
+        tracing::debug!(epoch, revision, "business provider revision diagnostic");
         state.pending.retain(|(owner, _), _| *owner != epoch);
         Ok(())
     }
@@ -324,6 +326,13 @@ impl BusinessRpcRegistry {
     // must not restart the grace clock or extend old authorization.
     fn update_status(&self, epoch: u64, serving: bool) {
         let previous = *self.status.borrow();
+        tracing::debug!(
+            epoch,
+            serving,
+            previous_serving = previous.serving,
+            previous_epoch = previous.epoch,
+            "business provider status diagnostic"
+        );
         self.status.send_replace(ProviderStatus {
             epoch,
             serving,

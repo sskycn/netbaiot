@@ -1384,4 +1384,112 @@ mod tests {
         assert!(new_receiver.try_recv().is_err());
         drop(new_writer);
     }
+
+    #[tokio::test]
+    async fn replay_to_full_multiplexed_receive_queue_closes_connection_without_losing_old_delivery()
+     {
+        let event = DeviceEvent {
+            event_id: EventId::generate(),
+            source_message_id: SourceMessageId::new("pending-before-reset").unwrap(),
+            device: DeviceKey {
+                tenant_id: TenantId::new("tenant").unwrap(),
+                product_id: ProductId::new("product").unwrap(),
+                device_id: DeviceId::new("device").unwrap(),
+            },
+            received_at: 1,
+            occurred_at: None,
+            kind: DeviceEventKind::Heartbeat(Heartbeat { sequence: 2 }),
+        };
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let config = BusinessRpcClientConfig::development(
+            listener.local_addr().unwrap(),
+            "test-token".into(),
+            BusinessRole::Multiplexed,
+        );
+        let (_commands_owner, mut commands) = mpsc::channel(1);
+        let (deliveries, mut received) = mpsc::channel(1);
+        let (old_writer, old_reader) = mpsc::channel(1);
+        drop(old_reader);
+        let old_delivery_id = DeliveryId::generate();
+        deliveries
+            .try_send(BusinessDelivery {
+                delivery: EventDelivery {
+                    delivery_id: old_delivery_id,
+                    subscription_id: SubscriptionId::generate(),
+                    event: event.clone(),
+                    attempt: 1,
+                },
+                epoch: 1,
+                writer: old_writer,
+                budget: Arc::new(Semaphore::new(16 * 1024)),
+            })
+            .unwrap();
+        let (ready, _ready_observer) = watch::channel(false);
+        let signals = DriverSignals {
+            ready,
+            timing: Arc::new(Mutex::new(None)),
+            last_connection_error: Arc::new(Mutex::new(None)),
+            last_protocol_context: Arc::new(Mutex::new(None)),
+        };
+        let handler = Arc::new(HeldHandler {
+            entered: Mutex::new(None),
+            dropped: Mutex::new(None),
+            release: Notify::new(),
+        });
+        let revision = AtomicU64::new(1);
+        let stop = CancellationToken::new();
+        let server = async {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            auth_server_handshake(&mut socket, 2).await;
+            let BusinessRpcFrame::Subscribe {
+                subscription_id, ..
+            } = read_frame(&mut socket, 16 * 1024, Duration::from_secs(2))
+                .await
+                .unwrap()
+            else {
+                panic!("subscribe expected")
+            };
+            for frame in [
+                BusinessRpcFrame::Subscribed { subscription_id },
+                BusinessRpcFrame::Event {
+                    delivery: EventDelivery {
+                        delivery_id: DeliveryId::generate(),
+                        subscription_id,
+                        event,
+                        attempt: 2,
+                    },
+                },
+            ] {
+                write_frame(&mut socket, &frame, 16 * 1024, Duration::from_secs(2))
+                    .await
+                    .unwrap();
+            }
+            // Keep the peer alive until the client processes the replay; EOF
+            // must not decide this regression's outcome.
+            stop.cancelled().await;
+        };
+        let application = async {
+            let result = connected(
+                &config,
+                Some(handler),
+                &mut commands,
+                &deliveries,
+                &revision,
+                &signals,
+                &stop,
+            )
+            .await;
+            assert!(matches!(result, Err(BusinessRpcClientError::Overloaded)));
+            let previous = received.recv().await.unwrap();
+            assert_eq!(previous.delivery.delivery_id, old_delivery_id);
+            assert!(previous.ack().await.is_err());
+            assert!(received.try_recv().is_err());
+            stop.cancel();
+        };
+        tokio::time::timeout(Duration::from_secs(3), async {
+            tokio::join!(server, application);
+        })
+        .await
+        .unwrap();
+    }
 }

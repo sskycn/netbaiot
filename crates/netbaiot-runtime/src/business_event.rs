@@ -52,6 +52,7 @@ impl BusinessRpcEventSink {
             filter,
         });
         drop(active);
+        tracing::debug!(generation, "business event sink claimed diagnostic");
         self.availability.notify_waiters();
         Ok(generation)
     }

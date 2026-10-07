@@ -1,0 +1,32 @@
+name: Windows recovery regression stage sweep
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  stage:
+    strategy:
+      fail-fast: false
+      matrix:
+        commit: [a91a9103f13a32058c35c177bb4765026c277040, 5d612af1e6f7530078e6819fa2114a8fa524b61f, 41eb71fd97d8008d6f3c1a5da45d18412df0dcf4, 6b559ac9470d13f4506557bdf47e3ea5aaae5c9a, 4ac37d7157952b861e152d03de3d265736b760b8, 355b9743a92193fa28241e48a9a0d2b81dabe47b, 7b4e3c47c909cd24a8a381eb377d6ef38905c143, 302912c59fbebfc27eabf8c653b0ab3620bde658, 1bd5cf8e15293bbed0ea8f80929f5405cf5a2751]
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: probe
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ matrix.commit }}
+          path: source
+      - uses: dtolnay/rust-toolchain@1.88.0
+      - name: Repeat original tests and compare serial and parallel execution
+        working-directory: source
+        shell: pwsh
+        run: python ../probe/scripts/windows_regression_probe.py --commit ${{ matrix.commit }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-regression-${{ matrix.commit }}
+          path: source/target/evidence/windows-regression/
+          retention-days: 14
