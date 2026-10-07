@@ -401,6 +401,20 @@ impl Sessions {
         timing.acquired();
         self.prune_presence_entry(&mut state, device);
         let presence = state.presence.get(device);
+        let live = state.sessions.get(device);
+        tracing::debug!(
+            ?device,
+            live_exists = live.is_some(),
+            live_generation = live.map(|session| session.generation),
+            cancelled = live.map(|session| session.cancel.is_cancelled()),
+            auth_generation = live.map(|session| session.auth.auth_generation),
+            credential_version = live.map(|session| session.auth.credential_version),
+            presence_exists = presence.is_some(),
+            presence_connected = presence.map(|value| value.connected),
+            presence_last_seen = presence.map(|value| value.last_seen),
+            presence_generation = presence.and_then(|value| value.session_generation),
+            "connection registry diagnostic"
+        );
         Ok(DeviceConnectionInfo {
             device: device.clone(),
             connected: presence.is_some_and(|value| value.connected),
@@ -496,6 +510,8 @@ impl Drop for SessionLease {
                 .get(&self.device)
                 .is_some_and(|endpoint| endpoint.generation == self.generation)
         {
+            tracing::debug!(device=?self.device, generation=self.generation,
+                cancelled=self.cancel.is_cancelled(), "current session lease dropped");
             state.sessions.remove(&self.device);
             self.cancel.cancel();
             if let Some(tenant) = state.tenants.get_mut(&self.device.tenant_id) {

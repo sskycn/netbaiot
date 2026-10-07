@@ -918,6 +918,35 @@ fn write_config(root: &Path, config: &Config) -> std::path::PathBuf {
     std::fs::write(&path, serde_json::to_vec(config).unwrap()).unwrap();
     path
 }
+
+struct RecoveryDiagnostics(std::path::PathBuf);
+impl RecoveryDiagnostics {
+    fn stderr(&self) -> Stdio {
+        Stdio::from(
+            std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(&self.0)
+                .unwrap(),
+        )
+    }
+}
+impl Drop for RecoveryDiagnostics {
+    fn drop(&mut self) {
+        if std::thread::panicking() {
+            use std::io::{Read, Seek, SeekFrom};
+            if let Ok(mut file) = std::fs::File::open(&self.0) {
+                let _ = file
+                    .seek(SeekFrom::End(-65_536))
+                    .or_else(|_| file.seek(SeekFrom::Start(0)));
+                let mut tail = String::new();
+                let _ = file.take(65_536).read_to_string(&mut tail);
+                eprintln!("server diagnostics:\n{tail}");
+            }
+        }
+    }
+}
+
 #[tokio::test]
 async fn one_socket_authentication_progresses_while_event_ack_waits() {
     let root =
@@ -955,13 +984,16 @@ async fn one_socket_authentication_progresses_while_event_ack_waits() {
     config.limits.sink_timeout_ms = 8_000;
     drop(reservations);
     let path = write_config(&root, &config);
+    let diagnostics = RecoveryDiagnostics(root.join("server-diagnostics.log"));
     let mut server = Command::new(env!("CARGO_BIN_EXE_netbaiot-server"))
         .arg(&path)
         .env("NETBAIOT_ADMIN_SECRET", "a".repeat(64))
         .env("NETBAIOT_BUSINESS_RPC_TOKEN", "rpc-test-token")
         .env("NETBAIOT_BUSINESS_STREAM_TOKEN", "legacy-token")
+        .env("RUST_LOG", "info,netbaiot_runtime=debug")
+        .env("RUST_LOG_STYLE", "never")
         .stdout(Stdio::null())
-        .stderr(Stdio::null())
+        .stderr(diagnostics.stderr())
         .kill_on_drop(true)
         .spawn()
         .unwrap();
@@ -1093,19 +1125,24 @@ async fn one_socket_authentication_progresses_while_event_ack_waits() {
     // Initiate cancellation, but check the grace window before waiting for
     // the asynchronous driver join (which can itself exceed the 1500ms grace).
     let shutdown = business.shutdown();
+    let shutdown_started = std::time::Instant::now();
     tokio::pin!(shutdown);
     let already_joined = std::future::poll_fn(|cx| {
         use std::future::Future;
         std::task::Poll::Ready(shutdown.as_mut().poll(cx).is_ready())
     })
     .await;
+    let connection = legacy
+        .devices()
+        .connection(&identity("one").device_key)
+        .await
+        .unwrap();
     assert!(
-        legacy
-            .devices()
-            .connection(&identity("one").device_key)
-            .await
-            .unwrap()
-            .connected
+        connection.connected,
+        "connection={connection:?}, shutdown_elapsed={:?}, provider_ready={}, device_connected={}",
+        shutdown_started.elapsed(),
+        business.ready(),
+        _recovered_after_gap.mqtt_connected()
     );
     if !already_joined {
         shutdown.await;
@@ -1588,14 +1625,17 @@ async fn v1_spooled_required_event_replays_to_v2_with_stable_event_id() {
     config.limits.shutdown_drain_timeout_ms = 300;
     drop(reservations);
     let path = write_config(&root, &config);
+    let diagnostics = RecoveryDiagnostics(root.join("server-diagnostics.log"));
     let start = || {
         Command::new(env!("CARGO_BIN_EXE_netbaiot-server"))
             .arg(&path)
             .env("NETBAIOT_ADMIN_SECRET", "a".repeat(64))
             .env("NETBAIOT_BUSINESS_STREAM_TOKEN", "legacy-token")
             .env("NETBAIOT_BUSINESS_RPC_TOKEN", "rpc-test-token")
+            .env("RUST_LOG", "info,netbaiot_runtime=debug")
+            .env("RUST_LOG_STYLE", "never")
             .stdout(Stdio::null())
-            .stderr(Stdio::null())
+            .stderr(diagnostics.stderr())
             .kill_on_drop(true)
             .spawn()
             .unwrap()

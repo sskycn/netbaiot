@@ -546,6 +546,8 @@ impl EventBus {
         }
         let restored = prepared.len();
         for (record, bytes) in prepared {
+            tracing::debug!(event_id=%record.event.event_id, attempts=?record.attempts,
+                routing_revision=record.routing_revision, "restored required event diagnostic");
             let event = Arc::new(record.event);
             let pending = record.pending_sinks.into_iter().collect::<BTreeSet<_>>();
             for id in &pending {
@@ -788,8 +790,10 @@ impl EventBus {
             sink.ready.append(&mut records);
         }
         let record = sink.ready.pop_front();
-        if record.is_some() {
+        if let Some(record) = &record {
             sink.inflight += 1;
+            tracing::debug!(sink_id=%id, event_id=%record.event.event_id,
+                "ready delivery diagnostic");
         }
         let selection_ns = selection_started.map(|started| started.elapsed().as_nanos() as u64);
         if let Some(selection_ns) = selection_ns {
@@ -824,6 +828,8 @@ impl EventBus {
             sink.inflight = sink.inflight.saturating_sub(1);
         }
         record.attempt = record.attempt.saturating_add(1);
+        tracing::debug!(sink_id=%id, event_id=%record.event.event_id, attempt=record.attempt,
+            ?result, "delivery completion diagnostic");
         if let Some(active) = state.active.get_mut(&record.event.event_id) {
             active.attempts.insert(id.clone(), record.attempt);
         }
