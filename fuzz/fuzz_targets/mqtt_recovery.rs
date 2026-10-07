@@ -16,11 +16,12 @@ fuzz_target!(|data: &[u8]| {
         let broker = MqttBroker::new(limits);
         let _ = broker.restore(snapshot);
     }
-    // Reach historical and current record decoders behind valid framing and integrity.
+    // Reach the current record decoder behind valid framing and integrity.
     let kind = data.first().copied().unwrap_or(1);
     let payload = data.get(1..).unwrap_or_default();
     let limits = Limits::default();
-    for version in [3u32, 4, 5, 6] {
+    {
+        let version = 6u32;
         let mut header = Vec::with_capacity(16);
         header.extend_from_slice(b"NBMQ");
         header.extend_from_slice(&version.to_be_bytes());
@@ -57,13 +58,10 @@ fuzz_target!(|data: &[u8]| {
         let _ = decode_mqtt_recovery(&bad_digest, &limits);
     }
 
-    // Exercise the immediately previous release's bounded NBMQ v1 JSON envelope as well.
-    let mut legacy = Vec::with_capacity(52 + data.len());
-    legacy.extend_from_slice(b"NBMQ");
-    legacy.extend_from_slice(&1u32.to_be_bytes());
-    legacy.extend_from_slice(&1u64.to_be_bytes());
-    legacy.extend_from_slice(&(data.len() as u32).to_be_bytes());
-    legacy.extend_from_slice(data);
-    legacy.extend_from_slice(&Sha256::digest(data));
-    let _ = decode_mqtt_recovery(&legacy, &limits);
+    // Minimal unsupported headers exercise rejection without historical framing or payloads.
+    for version in [0u32, 1, 2, 3, 4, 5, 7, u32::MAX] {
+        let mut header = b"NBMQ".to_vec();
+        header.extend_from_slice(&version.to_be_bytes());
+        assert!(decode_mqtt_recovery(&header, &limits).is_err());
+    }
 });

@@ -42,7 +42,7 @@ impl StoredSession {
     pub(super) fn new(
         key: SessionKey,
         incarnation: u64,
-        authorization: SessionAuthorization,
+        authorization: Option<SessionAuthorization>,
     ) -> Self {
         let state_bytes = key.client_id.len()
             + key.device.tenant_id.as_str().len()
@@ -55,7 +55,7 @@ impl StoredSession {
             session_expiry_interval: 0,
             expires_at_ms: None,
             incarnation,
-            authorization: Some(authorization),
+            authorization,
             subscriptions: HashMap::new(),
             offline: VecDeque::new(),
             offline_bytes: 0,
@@ -283,7 +283,8 @@ impl MqttBroker {
         let session_present = !clean_session && state.sessions.contains_key(&key);
         if !state.sessions.contains_key(&key) {
             state.generation = state.generation.wrapping_add(1).max(1);
-            let mut session = StoredSession::new(key.clone(), state.generation, authorization);
+            let mut session =
+                StoredSession::new(key.clone(), state.generation, Some(authorization));
             session.version = version;
             session.session_expiry_interval = session_expiry_interval;
             self.check_new_session(&state, &key, session.state_bytes)?;

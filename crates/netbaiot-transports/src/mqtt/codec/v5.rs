@@ -141,7 +141,7 @@ pub fn connect_reason(error: &Error) -> ConnackReason {
         Error::Configuration
         | Error::Conflict
         | Error::Storage
-        | Error::IncompatibleSpool
+        | Error::UnsupportedRecoveryVersion(_)
         | Error::Internal
         | Error::Codec => ConnackReason::ImplementationSpecific,
     }
@@ -156,9 +156,10 @@ pub fn disconnect_reason(error: &Error) -> DisconnectReason {
         Error::Timeout => DisconnectReason::KeepAliveTimeout,
         Error::Draining => DisconnectReason::ServerShuttingDown,
         Error::Codec => DisconnectReason::PayloadFormatInvalid,
-        Error::Configuration | Error::Storage | Error::IncompatibleSpool | Error::Internal => {
-            DisconnectReason::ImplementationSpecific
-        }
+        Error::Configuration
+        | Error::Storage
+        | Error::UnsupportedRecoveryVersion(_)
+        | Error::Internal => DisconnectReason::ImplementationSpecific,
     }
 }
 

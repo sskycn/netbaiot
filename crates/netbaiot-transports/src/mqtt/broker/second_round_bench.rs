@@ -117,7 +117,7 @@ fn session(offline: usize, outbound: usize, distribution: &str) -> StoredSession
         device: identity.device_key.clone(),
         client_id: "matrix".into(),
     };
-    let mut session = StoredSession::new(key, 1, SessionAuthorization::from(&identity));
+    let mut session = StoredSession::new(key, 1, Some(SessionAuthorization::from(&identity)));
     let deadline = now_ms() + 3_600_000;
     let expiry = |index| match distribution {
         "none" => None,

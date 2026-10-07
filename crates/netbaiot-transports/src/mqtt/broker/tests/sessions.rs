@@ -115,34 +115,30 @@ fn packet_identifier_not_reused_before_qos_exchange_finishes() {
 }
 
 #[test]
-fn v4_outbound_record_remains_readable_without_started_flag() {
+fn current_outbound_record_preserves_started_flag() {
     let limits = Arc::new(Limits::default());
     let broker = MqttBroker::new(limits.clone());
-    let device = auth("v4-outbound");
+    let device = auth("current-outbound");
     let mut attachment = broker
         .attach_v5(&device, "client".into(), false, 60, 4)
         .unwrap();
     attachment.detach().unwrap();
-    let mut snapshot = broker.snapshot().unwrap();
+    let base = broker.snapshot().unwrap();
     let message = BrokerMessage {
-        topic: "v1/t/t/p/p/d/v4-outbound/down".into(),
-        payload: b"legacy".to_vec().into(),
+        topic: "v1/t/t/p/p/d/current-outbound/down".into(),
+        payload: b"current".to_vec().into(),
         qos: 1,
         retain: false,
         properties: Default::default(),
     };
-    let mut record = vec![0, 7, 0];
-    encode_message(&mut record, &message).unwrap();
-    decode_record(
-        RECORD_OUTBOUND,
-        &record,
-        &mut snapshot,
-        &limits,
-        RECOVERY_VERSION_V4,
-    )
-    .unwrap();
-    assert!(snapshot.sessions[0].started_outbound.contains(&7));
-    assert!(snapshot.sessions[0].outbound.contains_key(&7));
+    for started in [false, true] {
+        let mut snapshot = base.clone();
+        let mut record = vec![0, 7, 0, u8::from(started)];
+        encode_message(&mut record, &message).unwrap();
+        decode_record(RECORD_OUTBOUND, &record, &mut snapshot, &limits).unwrap();
+        assert_eq!(snapshot.sessions[0].started_outbound.contains(&7), started);
+        assert!(snapshot.sessions[0].outbound.contains_key(&7));
+    }
 }
 
 #[test]

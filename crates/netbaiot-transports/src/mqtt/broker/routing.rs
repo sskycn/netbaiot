@@ -349,7 +349,7 @@ pub(super) fn retained_topic_owner_acl(tenant: &TenantId, topic: &str) -> bool {
 }
 
 pub(super) fn authorization_complete(authorization: &SessionAuthorization) -> bool {
-    authorization.codec_id.is_some() && authorization.codec_version.is_some_and(|value| value > 0)
+    authorization.codec_version > 0
 }
 
 impl MqttBroker {

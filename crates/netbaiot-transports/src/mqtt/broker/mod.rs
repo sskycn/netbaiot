@@ -11,7 +11,7 @@ use netbaiot_runtime::{
     BrokerProbe, ByteBudget, BytesPermit, Error, Histogram, Limits, Metrics, Result,
     WeakByteBudget, lock, now_ms,
 };
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque},
@@ -30,18 +30,12 @@ use tokio_util::sync::CancellationToken;
 
 const STATE_OVERHEAD: usize = 64;
 const RECOVERY_MAGIC: &[u8; 4] = b"NBMQ";
-const RECOVERY_VERSION_V1: u32 = 1;
-const RECOVERY_VERSION_V2: u32 = 2;
-const RECOVERY_VERSION_V3: u32 = 3;
-const RECOVERY_VERSION_V4: u32 = 4;
-const RECOVERY_VERSION_V5: u32 = 5;
 const RECOVERY_VERSION: u32 = 6;
-const LEGACY_V1_RECOVERY_READ_MAX: usize = 1_342_177_280;
 const RECOVERY_FILE: &str = "mqtt-runtime.state";
 const HOT_MAINTENANCE_BUDGET: usize = 64;
 const TICK_MAINTENANCE_BUDGET: usize = 1_024;
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq, Serialize)]
 pub struct SessionKey {
     pub device: DeviceKey,
     pub client_id: String,
@@ -67,66 +61,25 @@ impl Subscription {
     }
 }
 
-impl<'de> Deserialize<'de> for Subscription {
-    fn deserialize<D: serde::Deserializer<'de>>(
-        deserializer: D,
-    ) -> std::result::Result<Self, D::Error> {
-        #[derive(Deserialize)]
-        #[serde(untagged)]
-        enum Format {
-            Legacy(u8),
-            Current {
-                qos: u8,
-                no_local: bool,
-                retain_as_published: bool,
-                retain_handling: u8,
-            },
-        }
-        Ok(match Format::deserialize(deserializer)? {
-            Format::Legacy(qos) => Self::v311(qos),
-            Format::Current {
-                qos,
-                no_local,
-                retain_as_published,
-                retain_handling,
-            } => Self {
-                qos,
-                no_local,
-                retain_as_published,
-                retain_handling,
-            },
-        })
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct BrokerMessage {
     pub topic: Arc<str>,
-    #[serde(with = "payload_bytes")]
+    #[serde(serialize_with = "serialize_payload")]
     pub payload: bytes::Bytes,
     pub qos: u8,
     pub retain: bool,
-    #[serde(default)]
     pub properties: SharedPublishProperties,
 }
 
-// Keep historical JSON recovery payloads as arrays of byte values.
-mod payload_bytes {
-    use super::*;
-    pub fn serialize<S: serde::Serializer>(
-        payload: &bytes::Bytes,
-        serializer: S,
-    ) -> std::result::Result<S::Ok, S::Error> {
-        payload.as_ref().serialize(serializer)
-    }
-    pub fn deserialize<'de, D: serde::Deserializer<'de>>(
-        deserializer: D,
-    ) -> std::result::Result<bytes::Bytes, D::Error> {
-        Vec::<u8>::deserialize(deserializer).map(bytes::Bytes::from)
-    }
+// Current in-memory snapshot diagnostics encode byte payloads without a recovery decoder.
+fn serialize_payload<S: serde::Serializer>(
+    payload: &bytes::Bytes,
+    serializer: S,
+) -> std::result::Result<S::Ok, S::Error> {
+    payload.as_ref().serialize(serializer)
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
 pub struct PublishProperties {
     pub payload_format: Option<u8>,
     pub expires_at_ms: Option<i64>,
@@ -137,8 +90,8 @@ pub struct PublishProperties {
 }
 
 /// Cloneable broker metadata with copy-on-write mutation. Empty MQTT 3.1.1
-/// properties need no allocation or shared global reference counter. Recovery
-/// serialization remains exactly the historical PublishProperties object.
+/// properties need no allocation or shared global reference counter. Current
+/// snapshot diagnostics expose the logical PublishProperties object.
 #[derive(Clone, Default)]
 pub struct SharedPublishProperties(Option<Arc<PublishProperties>>);
 static EMPTY_PUBLISH_PROPERTIES: PublishProperties = PublishProperties {
@@ -191,14 +144,6 @@ impl Serialize for SharedPublishProperties {
         (**self).serialize(serializer)
     }
 }
-impl<'de> Deserialize<'de> for SharedPublishProperties {
-    fn deserialize<D: serde::Deserializer<'de>>(
-        deserializer: D,
-    ) -> std::result::Result<Self, D::Error> {
-        PublishProperties::deserialize(deserializer).map(Self::from)
-    }
-}
-
 impl PublishProperties {
     pub fn from_wire(properties: &v5::Properties) -> Self {
         Self {
@@ -358,7 +303,7 @@ pub enum BrokerFrame {
     Pubrel { packet_id: u16, dup: bool },
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub enum InboundQos2State {
     AwaitPubrel(BrokerMessage),
     Delivering {
@@ -398,7 +343,7 @@ enum OutboundAck {
     Pubcomp,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub enum OutboundState {
     AwaitPuback(BrokerMessage),
     AwaitPubrec(BrokerMessage),
@@ -415,18 +360,13 @@ impl OutboundState {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize)]
 struct StoredSession {
     key: SessionKey,
-    #[serde(default)]
     version: MqttVersion,
-    #[serde(default)]
     session_expiry_interval: u32,
-    #[serde(default)]
     expires_at_ms: Option<i64>,
-    #[serde(default)]
     incarnation: u64,
-    #[serde(default)]
     authorization: Option<SessionAuthorization>,
     subscriptions: HashMap<String, Subscription>,
     offline: VecDeque<BrokerMessage>,
@@ -434,7 +374,7 @@ struct StoredSession {
     inbound_qos2: HashMap<u16, InboundQos2State>,
     #[serde(skip)]
     inbound_operations: HashMap<u16, u64>,
-    #[serde(default)]
+    #[serde(skip)]
     inbound_reservations: HashMap<u16, RetainedReservation>,
     outbound: HashMap<u16, OutboundState>,
     #[serde(skip)]
@@ -442,7 +382,6 @@ struct StoredSession {
     #[serde(skip)]
     command_progress: HashMap<u16, Arc<netbaiot_runtime::CommandProgress>>,
     /// Original transmission order for reconnect retransmission (MQTT-4.6.0-1).
-    #[serde(default)]
     outbound_order: VecDeque<u16>,
     next_packet_id: u16,
     state_bytes: usize,
@@ -463,19 +402,16 @@ struct StoredSession {
     inbound_window: HashSet<u16>,
     /// A QoS PUBLISH whose first transfer has begun must finish its ACK exchange
     /// even after Message Expiry. This state survives disconnect and NBMQ recovery.
-    #[serde(default)]
     started_outbound: HashSet<u16>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 struct SessionAuthorization {
     credential_version: u32,
     auth_generation: u64,
     permissions: Permissions,
-    #[serde(default)]
-    codec_id: Option<CodecId>,
-    #[serde(default)]
-    codec_version: Option<u16>,
+    codec_id: CodecId,
+    codec_version: u16,
 }
 
 impl From<&AuthenticatedDevice> for SessionAuthorization {
@@ -484,13 +420,13 @@ impl From<&AuthenticatedDevice> for SessionAuthorization {
             credential_version: auth.credential_version,
             auth_generation: auth.auth_generation,
             permissions: auth.permissions.clone(),
-            codec_id: Some(auth.codec_id.clone()),
-            codec_version: Some(auth.codec_version),
+            codec_id: auth.codec_id.clone(),
+            codec_version: auth.codec_version,
         }
     }
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize)]
 struct RetainedReservation {
     global_count: usize,
     global_bytes: usize,
@@ -498,17 +434,13 @@ struct RetainedReservation {
     tenant_bytes: usize,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize)]
 struct PendingWill {
     owner: DeviceKey,
-    #[serde(default)]
     origin: Option<SessionKey>,
     message: BrokerMessage,
-    #[serde(default)]
     due_at_ms: Option<i64>,
-    #[serde(default)]
     cancel_on_resume: Option<(SessionKey, u64)>,
-    #[serde(default)]
     message_expiry_interval: Option<u32>,
     #[serde(skip)]
     retained_reservation: RetainedReservation,
@@ -541,11 +473,10 @@ struct SubscriptionTrie {
     root: TrieNode,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize)]
 struct RetainedMessage {
     tenant_id: TenantId,
     message: BrokerMessage,
-    #[serde(default)]
     origin: Option<SessionKey>,
 }
 
@@ -634,13 +565,12 @@ struct TenantUsage {
     qos2_inflight: usize,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize)]
 pub struct MqttRecoverySnapshot {
     pub format_version: u32,
     pub snapshot_generation: u64,
     sessions: Vec<StoredSession>,
     retained: Vec<(String, RetainedMessage)>,
-    #[serde(default)]
     pending_wills: Vec<PendingWill>,
 }
 
@@ -812,10 +742,6 @@ const RECORD_HEADER_BYTES: usize = 5;
 const RECORD_CHECKSUM_BYTES: usize = 32;
 const RECOVERY_TRAILER_MAGIC: &[u8; 4] = b"NEND";
 const RECOVERY_TRAILER_BYTES: usize = 4 + 8 + 8 + 32;
-
-const fn version_one() -> u32 {
-    RECOVERY_VERSION_V1
-}
 
 #[cfg(test)]
 #[path = "../broker_hotspot_bench.rs"]

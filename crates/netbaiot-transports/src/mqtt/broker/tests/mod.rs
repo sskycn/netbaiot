@@ -520,7 +520,7 @@ mod commands;
 mod expiry;
 mod inbound_qos2;
 mod outbound;
-mod recovery_compat;
+mod recovery_current;
 mod recovery_storage;
 mod routing;
 mod sessions;

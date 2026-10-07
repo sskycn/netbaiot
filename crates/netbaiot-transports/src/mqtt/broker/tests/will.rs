@@ -407,11 +407,11 @@ fn takeover_clean_start_zero_delay_publishes_old_will() {
 }
 
 #[test]
-fn v5_pending_will_record_remains_readable_without_origin_field() {
+fn current_pending_will_record_preserves_explicit_absent_origin() {
     let limits = Arc::new(Limits::default());
-    let owner = auth("legacy-will").device_key;
+    let owner = auth("unknown-origin-will").device_key;
     let message = BrokerMessage {
-        topic: "v1/t/t/p/p/d/legacy-will/up".into(),
+        topic: "v1/t/t/p/p/d/unknown-origin-will/up".into(),
         payload: b"old".to_vec().into(),
         qos: 1,
         retain: false,
@@ -422,10 +422,10 @@ fn v5_pending_will_record_remains_readable_without_origin_field() {
     put_string(&mut payload, owner.product_id.as_str()).unwrap();
     put_string(&mut payload, owner.device_id.as_str()).unwrap();
     encode_message(&mut payload, &message).unwrap();
-    payload.extend_from_slice(&[0, 0]); // no delayed cancellation or expiry
+    payload.extend_from_slice(&[0, 0, 0]); // no delayed cancellation, expiry or origin
     let mut header = Vec::new();
     header.extend_from_slice(RECOVERY_MAGIC);
-    header.extend_from_slice(&RECOVERY_VERSION_V5.to_be_bytes());
+    header.extend_from_slice(&RECOVERY_VERSION.to_be_bytes());
     header.extend_from_slice(&1_u64.to_be_bytes());
     let mut record = Vec::new();
     record.push(RECORD_PENDING_WILL);
@@ -443,7 +443,7 @@ fn v5_pending_will_record_remains_readable_without_origin_field() {
     image.extend_from_slice(&(record.len() as u64).to_be_bytes());
     image.extend_from_slice(&stream_hash.finalize());
     let snapshot = decode_mqtt_recovery(&image, &limits).unwrap();
-    assert_eq!(snapshot.format_version, RECOVERY_VERSION_V5);
+    assert_eq!(snapshot.format_version, RECOVERY_VERSION);
     assert_eq!(snapshot.pending_wills.len(), 1);
     assert_eq!(snapshot.pending_wills[0].origin, None);
     MqttBroker::new(limits).restore(snapshot).unwrap();

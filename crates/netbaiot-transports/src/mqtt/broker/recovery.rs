@@ -205,14 +205,13 @@ pub(super) fn read_recovery(
     };
     let size = usize::try_from(file.metadata().map_err(|_| Error::Storage)?.len())
         .map_err(|_| Error::Overloaded)?;
-    if size < RECOVERY_PREFIX_BYTES {
+    if size < 8 {
         return Err(Error::Invalid);
     }
     // The decoder allocates one checked record at a time; actual reads are also
     // capped, even if the open file grows after metadata. Probe exact EOF below.
     let ceiling = limits
         .mqtt_recovery_max_bytes
-        .max(LEGACY_V1_RECOVERY_READ_MAX)
         .checked_add(1)
         .ok_or(Error::Overloaded)?;
     read_storage_snapshot(file, size, ceiling, limits)
@@ -254,33 +253,23 @@ pub(super) fn decode_recovery_reader(
     limits: &Limits,
 ) -> Result<MqttRecoverySnapshot> {
     let mut header = [0u8; RECOVERY_PREFIX_BYTES];
-    reader.read_exact(&mut header).map_err(|_| Error::Invalid)?;
+    reader
+        .read_exact(&mut header[..8])
+        .map_err(|_| Error::Invalid)?;
     if &header[..4] != RECOVERY_MAGIC {
         return Err(Error::Invalid);
     }
     let version = u32::from_be_bytes(header[4..8].try_into().map_err(|_| Error::Invalid)?);
+    if version != RECOVERY_VERSION {
+        return Err(Error::UnsupportedRecoveryVersion(version));
+    }
+    if size > limits.mqtt_recovery_max_bytes {
+        return Err(Error::Invalid);
+    }
+    reader
+        .read_exact(&mut header[8..])
+        .map_err(|_| Error::Invalid)?;
     let generation = u64::from_be_bytes(header[8..16].try_into().map_err(|_| Error::Invalid)?);
-    let maximum = if version == RECOVERY_VERSION_V1 {
-        LEGACY_V1_RECOVERY_READ_MAX
-    } else {
-        limits.mqtt_recovery_max_bytes
-    };
-    if size > maximum {
-        return Err(Error::Invalid);
-    }
-    if version == RECOVERY_VERSION_V1 {
-        return decode_v1(reader, size, generation, limits);
-    }
-    if !matches!(
-        version,
-        RECOVERY_VERSION_V2
-            | RECOVERY_VERSION_V3
-            | RECOVERY_VERSION_V4
-            | RECOVERY_VERSION_V5
-            | RECOVERY_VERSION
-    ) {
-        return Err(Error::Invalid);
-    }
     let mut header_checksum = [0u8; 32];
     reader
         .read_exact(&mut header_checksum)
@@ -289,13 +278,10 @@ pub(super) fn decode_recovery_reader(
         return Err(Error::Invalid);
     }
     let mut consumed = RECOVERY_HEADER_BYTES;
-    let records_end = if version >= RECOVERY_VERSION_V3 {
-        size.checked_sub(RECOVERY_TRAILER_BYTES)
-            .filter(|end| *end >= RECOVERY_HEADER_BYTES)
-            .ok_or(Error::Invalid)?
-    } else {
-        size
-    };
+    let records_end = size
+        .checked_sub(RECOVERY_TRAILER_BYTES)
+        .filter(|end| *end >= RECOVERY_HEADER_BYTES)
+        .ok_or(Error::Invalid)?;
     let mut stream_hash = Sha256::new();
     stream_hash.update(header);
     let mut record_count = 0u64;
@@ -347,71 +333,35 @@ pub(super) fn decode_recovery_reader(
         }
         let wire_bytes = RECORD_HEADER_BYTES + length + RECORD_CHECKSUM_BYTES;
         consumed += length + RECORD_CHECKSUM_BYTES;
-        if version >= RECOVERY_VERSION_V3 {
-            stream_hash.update(record_header);
-            stream_hash.update(&payload);
-            stream_hash.update(checksum);
-            record_count = record_count.checked_add(1).ok_or(Error::Invalid)?;
-            total_record_bytes = total_record_bytes
-                .checked_add(u64::try_from(wire_bytes).map_err(|_| Error::Invalid)?)
-                .ok_or(Error::Invalid)?;
-        }
-        decode_record(kind, &payload, &mut snapshot, limits, version)?;
+
+        stream_hash.update(record_header);
+        stream_hash.update(&payload);
+        stream_hash.update(checksum);
+        record_count = record_count.checked_add(1).ok_or(Error::Invalid)?;
+        total_record_bytes = total_record_bytes
+            .checked_add(u64::try_from(wire_bytes).map_err(|_| Error::Invalid)?)
+            .ok_or(Error::Invalid)?;
+
+        decode_record(kind, &payload, &mut snapshot, limits)?;
     }
     if consumed != records_end {
         return Err(Error::Invalid);
     }
-    if version >= RECOVERY_VERSION_V3 {
-        let mut trailer = [0u8; RECOVERY_TRAILER_BYTES];
-        reader
-            .read_exact(&mut trailer)
-            .map_err(|_| Error::Invalid)?;
-        if &trailer[..4] != RECOVERY_TRAILER_MAGIC
-            || u64::from_be_bytes(trailer[4..12].try_into().map_err(|_| Error::Invalid)?)
-                != record_count
-            || u64::from_be_bytes(trailer[12..20].try_into().map_err(|_| Error::Invalid)?)
-                != total_record_bytes
-            || stream_hash.finalize().as_slice() != &trailer[20..]
-        {
-            return Err(Error::Invalid);
-        }
-    }
-    Ok(snapshot)
-}
 
-pub(super) fn decode_v1(
-    mut reader: impl Read,
-    size: usize,
-    generation: u64,
-    _limits: &Limits,
-) -> Result<MqttRecoverySnapshot> {
-    if size < 52 {
-        return Err(Error::Invalid);
-    }
-    let mut length_bytes = [0u8; 4];
+    let mut trailer = [0u8; RECOVERY_TRAILER_BYTES];
     reader
-        .read_exact(&mut length_bytes)
+        .read_exact(&mut trailer)
         .map_err(|_| Error::Invalid)?;
-    let length = usize::try_from(u32::from_be_bytes(length_bytes)).map_err(|_| Error::Invalid)?;
-    if length.saturating_add(52) != size || length > LEGACY_V1_RECOVERY_READ_MAX {
+    if &trailer[..4] != RECOVERY_TRAILER_MAGIC
+        || u64::from_be_bytes(trailer[4..12].try_into().map_err(|_| Error::Invalid)?)
+            != record_count
+        || u64::from_be_bytes(trailer[12..20].try_into().map_err(|_| Error::Invalid)?)
+            != total_record_bytes
+        || stream_hash.finalize().as_slice() != &trailer[20..]
+    {
         return Err(Error::Invalid);
     }
-    let mut payload = vec![0u8; length];
-    reader
-        .read_exact(&mut payload)
-        .map_err(|_| Error::Invalid)?;
-    let mut checksum = [0u8; 32];
-    reader
-        .read_exact(&mut checksum)
-        .map_err(|_| Error::Invalid)?;
-    if Sha256::digest(&payload).as_slice() != checksum {
-        return Err(Error::Invalid);
-    }
-    let snapshot: MqttRecoverySnapshot =
-        serde_json::from_slice(&payload).map_err(|_| Error::Invalid)?;
-    if snapshot.snapshot_generation != generation || snapshot.format_version != version_one() {
-        return Err(Error::Invalid);
-    }
+
     Ok(snapshot)
 }
 
@@ -530,27 +480,17 @@ pub(super) fn encode_session_meta(output: &mut Vec<u8>, session: &StoredSession)
     put_string(output, session.key.device.device_id.as_str())?;
     put_string(output, &session.key.client_id)?;
     output.extend_from_slice(&session.incarnation.to_be_bytes());
-    if let Some(authorization) = session
-        .authorization
-        .as_ref()
-        .filter(|profile| profile.codec_id.is_some() && profile.codec_version.is_some())
-    {
+    if let Some(authorization) = session.authorization.as_ref() {
         output.push(1);
         output.extend_from_slice(&authorization.credential_version.to_be_bytes());
         output.extend_from_slice(&authorization.auth_generation.to_be_bytes());
         output.push(u8::from(authorization.permissions.publish));
         output.push(u8::from(authorization.permissions.commands));
-        let codec_id = authorization.codec_id.as_ref().ok_or(Error::Invalid)?;
-        put_string(output, codec_id.as_str())?;
-        output.extend_from_slice(
-            &authorization
-                .codec_version
-                .ok_or(Error::Invalid)?
-                .to_be_bytes(),
-        );
+        put_string(output, authorization.codec_id.as_str())?;
+        output.extend_from_slice(&authorization.codec_version.to_be_bytes());
     } else {
-        // NBMQ v2 had no codec provenance. Mark it unknown in v6 so attach still
-        // resets the session instead of inventing a profile or blocking shutdown.
+        // Current NBMQ explicitly represents an unknown profile; it cannot resume
+        // subscriptions before reauthentication. No profile is invented.
         output.push(0);
     }
     output.extend_from_slice(&session.next_packet_id.to_be_bytes());
@@ -567,7 +507,6 @@ pub(super) fn encode_session_meta(output: &mut Vec<u8>, session: &StoredSession)
 pub(super) fn decode_message(
     reader: &mut RecordReader<'_>,
     limits: &Limits,
-    format_version: u32,
 ) -> Result<BrokerMessage> {
     let topic = reader.string(limits.max_topic_bytes)?;
     let payload = reader.bytes(limits.max_mqtt_packet_size)?;
@@ -580,7 +519,7 @@ pub(super) fn decode_message(
     if qos > 2 || !valid_topic(&topic, limits, false) {
         return Err(Error::Invalid);
     }
-    let properties = if format_version >= RECOVERY_VERSION_V4 {
+    let properties = {
         let payload_format = match reader.u8()? {
             value @ (0 | 1) => Some(value),
             2 => None,
@@ -616,8 +555,6 @@ pub(super) fn decode_message(
             correlation_data,
             user_properties,
         }
-    } else {
-        PublishProperties::default()
     };
     Ok(BrokerMessage {
         topic: topic.into(),
@@ -633,7 +570,6 @@ pub(super) fn decode_record(
     payload: &[u8],
     snapshot: &mut MqttRecoverySnapshot,
     limits: &Limits,
-    format_version: u32,
 ) -> Result<()> {
     let mut reader = RecordReader::new(payload);
     match kind {
@@ -666,15 +602,9 @@ pub(super) fn decode_record(
                             _ => return Err(Error::Invalid),
                         },
                     };
-                    let (codec_id, codec_version) = if format_version >= RECOVERY_VERSION_V3 {
-                        (
-                            Some(CodecId::new(reader.string(64)?).map_err(|_| Error::Invalid)?),
-                            Some(reader.u16()?),
-                        )
-                    } else {
-                        (None, None)
-                    };
-                    if codec_version == Some(0) {
+                    let codec_id = CodecId::new(reader.string(64)?).map_err(|_| Error::Invalid)?;
+                    let codec_version = reader.u16()?;
+                    if codec_version == 0 {
                         return Err(Error::Invalid);
                     }
                     Some(SessionAuthorization {
@@ -692,23 +622,20 @@ pub(super) fn decode_record(
                 return Err(Error::Invalid);
             }
             let last_seen_ms = reader.i64()?;
-            let (version, session_expiry_interval, expires_at_ms) =
-                if format_version >= RECOVERY_VERSION_V4 {
-                    let version = match reader.u8()? {
-                        4 => MqttVersion::V311,
-                        5 => MqttVersion::V5,
-                        _ => return Err(Error::Invalid),
-                    };
-                    let interval = reader.u32()?;
-                    let expiry = reader.i64()?;
-                    (
-                        version,
-                        interval,
-                        if expiry == -1 { None } else { Some(expiry) },
-                    )
-                } else {
-                    (MqttVersion::V311, 0, None)
+            let (version, session_expiry_interval, expires_at_ms) = {
+                let version = match reader.u8()? {
+                    4 => MqttVersion::V311,
+                    5 => MqttVersion::V5,
+                    _ => return Err(Error::Invalid),
                 };
+                let interval = reader.u32()?;
+                let expiry = reader.i64()?;
+                (
+                    version,
+                    interval,
+                    if expiry == -1 { None } else { Some(expiry) },
+                )
+            };
             reader.finish()?;
             let key = SessionKey {
                 device: DeviceKey {
@@ -718,21 +645,7 @@ pub(super) fn decode_record(
                 },
                 client_id,
             };
-            let mut session = StoredSession::new(
-                key,
-                incarnation,
-                authorization.clone().unwrap_or(SessionAuthorization {
-                    credential_version: 0,
-                    auth_generation: 0,
-                    permissions: Permissions {
-                        publish: false,
-                        commands: false,
-                    },
-                    codec_id: None,
-                    codec_version: None,
-                }),
-            );
-            session.authorization = authorization;
+            let mut session = StoredSession::new(key, incarnation, authorization);
             session.version = version;
             session.session_expiry_interval = session_expiry_interval;
             session.expires_at_ms = expires_at_ms;
@@ -743,11 +656,7 @@ pub(super) fn decode_record(
         RECORD_SUBSCRIPTION => {
             let filter = reader.string(limits.max_topic_bytes)?;
             let qos = reader.u8()?;
-            let options = if format_version >= RECOVERY_VERSION_V4 {
-                reader.u8()?
-            } else {
-                0
-            };
+            let options = reader.u8()?;
             reader.finish()?;
             if qos > 2
                 || options & 0xc3 != 0
@@ -771,7 +680,7 @@ pub(super) fn decode_record(
             }
         }
         RECORD_OFFLINE => {
-            let message = decode_message(&mut reader, limits, format_version)?;
+            let message = decode_message(&mut reader, limits)?;
             reader.finish()?;
             if !matches!(message.qos, 1 | 2) {
                 return Err(Error::Invalid);
@@ -789,7 +698,7 @@ pub(super) fn decode_record(
         RECORD_INBOUND_QOS2 => {
             let packet_id = reader.u16()?;
             let stage = reader.u8()?;
-            let message = decode_message(&mut reader, limits, format_version)?;
+            let message = decode_message(&mut reader, limits)?;
             reader.finish()?;
             if packet_id == 0 || message.qos != 2 {
                 return Err(Error::Invalid);
@@ -817,18 +726,14 @@ pub(super) fn decode_record(
         RECORD_OUTBOUND => {
             let packet_id = reader.u16()?;
             let stage = reader.u8()?;
-            let started = if format_version >= RECOVERY_VERSION_V5 {
+            let started = {
                 match reader.u8()? {
                     0 => false,
                     1 => true,
                     _ => return Err(Error::Invalid),
                 }
-            } else {
-                // v1-v4 did not record the transfer boundary. Conservatively retain
-                // protocol responsibility for every recovered outbound exchange.
-                true
             };
-            let message = decode_message(&mut reader, limits, format_version)?;
+            let message = decode_message(&mut reader, limits)?;
             reader.finish()?;
             if packet_id == 0
                 || (stage == 0 && message.qos != 1)
@@ -879,41 +784,38 @@ pub(super) fn decode_record(
                 product_id: ProductId::new(reader.string(64)?).map_err(|_| Error::Invalid)?,
                 device_id: DeviceId::new(reader.string(64)?).map_err(|_| Error::Invalid)?,
             };
-            let message = decode_message(&mut reader, limits, format_version)?;
-            let (due_at_ms, cancel_on_resume, message_expiry_interval) =
-                if format_version >= RECOVERY_VERSION_V4 {
-                    let (due_at_ms, cancel_on_resume) = match reader.u8()? {
-                        0 => (None, None),
-                        1 => {
-                            let client_id = reader.string(limits.max_client_id_bytes)?;
-                            let incarnation = reader.u64()?;
-                            let due = reader.i64()?;
-                            if incarnation == 0 || due < 0 {
-                                return Err(Error::Invalid);
-                            }
-                            (
-                                Some(due),
-                                Some((
-                                    SessionKey {
-                                        device: owner.clone(),
-                                        client_id,
-                                    },
-                                    incarnation,
-                                )),
-                            )
+            let message = decode_message(&mut reader, limits)?;
+            let (due_at_ms, cancel_on_resume, message_expiry_interval) = {
+                let (due_at_ms, cancel_on_resume) = match reader.u8()? {
+                    0 => (None, None),
+                    1 => {
+                        let client_id = reader.string(limits.max_client_id_bytes)?;
+                        let incarnation = reader.u64()?;
+                        let due = reader.i64()?;
+                        if incarnation == 0 || due < 0 {
+                            return Err(Error::Invalid);
                         }
-                        _ => return Err(Error::Invalid),
-                    };
-                    let expiry = match reader.u8()? {
-                        0 => None,
-                        1 => Some(reader.u32()?),
-                        _ => return Err(Error::Invalid),
-                    };
-                    (due_at_ms, cancel_on_resume, expiry)
-                } else {
-                    (None, None, None)
+                        (
+                            Some(due),
+                            Some((
+                                SessionKey {
+                                    device: owner.clone(),
+                                    client_id,
+                                },
+                                incarnation,
+                            )),
+                        )
+                    }
+                    _ => return Err(Error::Invalid),
                 };
-            let origin = if format_version >= RECOVERY_VERSION {
+                let expiry = match reader.u8()? {
+                    0 => None,
+                    1 => Some(reader.u32()?),
+                    _ => return Err(Error::Invalid),
+                };
+                (due_at_ms, cancel_on_resume, expiry)
+            };
+            let origin = {
                 match reader.u8()? {
                     0 => None,
                     1 => Some(SessionKey {
@@ -922,8 +824,6 @@ pub(super) fn decode_record(
                     }),
                     _ => return Err(Error::Invalid),
                 }
-            } else {
-                cancel_on_resume.as_ref().map(|(key, _)| key.clone())
             };
             reader.finish()?;
             if message.payload.len() > limits.max_will_payload_bytes {
@@ -944,8 +844,8 @@ pub(super) fn decode_record(
                 return Err(Error::Overloaded);
             }
             let tenant = TenantId::new(reader.string(64)?).map_err(|_| Error::Invalid)?;
-            let message = decode_message(&mut reader, limits, format_version)?;
-            let origin = if format_version >= RECOVERY_VERSION_V4 {
+            let message = decode_message(&mut reader, limits)?;
+            let origin = {
                 match reader.u8()? {
                     0 => None,
                     1 => Some(SessionKey {
@@ -961,8 +861,6 @@ pub(super) fn decode_record(
                     }),
                     _ => return Err(Error::Invalid),
                 }
-            } else {
-                None
             };
             reader.finish()?;
             if !message.retain || message.payload.is_empty() {
@@ -1161,15 +1059,10 @@ impl MqttBroker {
     }
 
     pub fn restore(&self, snapshot: MqttRecoverySnapshot) -> Result<()> {
-        if !matches!(
-            snapshot.format_version,
-            RECOVERY_VERSION_V1
-                | RECOVERY_VERSION_V2
-                | RECOVERY_VERSION_V3
-                | RECOVERY_VERSION_V4
-                | RECOVERY_VERSION_V5
-                | RECOVERY_VERSION
-        ) || snapshot.sessions.len() > self.limits.max_persistent_sessions
+        if snapshot.format_version != RECOVERY_VERSION {
+            return Err(Error::UnsupportedRecoveryVersion(snapshot.format_version));
+        }
+        if snapshot.sessions.len() > self.limits.max_persistent_sessions
             || snapshot.retained.len() > self.limits.max_retained_messages
         {
             return Err(Error::Configuration);
@@ -1213,10 +1106,6 @@ impl MqttBroker {
             capacity_wakes: BTreeSet::new(),
         };
         for mut session in snapshot.sessions {
-            if snapshot.format_version < RECOVERY_VERSION_V4 && session.version != MqttVersion::V311
-            {
-                return Err(Error::Invalid);
-            }
             if session.version == MqttVersion::V5 {
                 if session.session_expiry_interval == 0 {
                     continue;
@@ -1236,18 +1125,12 @@ impl MqttBroker {
             session.inbound_operations.clear();
             session.inbound_reservations.clear();
             if session.incarnation == 0 {
-                replacement.generation = replacement.generation.wrapping_add(1).max(1);
-                session.incarnation = replacement.generation;
+                return Err(Error::Invalid);
             }
             for entry in session.inbound_qos2.values_mut() {
                 if let InboundQos2State::Delivering { message, .. } = entry {
                     *entry = InboundQos2State::AwaitPubrel(message.clone());
                 }
-            }
-            if session.outbound_order.is_empty() && !session.outbound.is_empty() {
-                let mut packet_ids = session.outbound.keys().copied().collect::<Vec<_>>();
-                packet_ids.sort_unstable();
-                session.outbound_order = packet_ids.into();
             }
             let ordered_ids = session
                 .outbound_order

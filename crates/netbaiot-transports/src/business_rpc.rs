@@ -432,7 +432,7 @@ fn command_error(error: Error) -> RpcErrorCode {
         Error::Unavailable
         | Error::Draining
         | Error::Storage
-        | Error::IncompatibleSpool
+        | Error::UnsupportedRecoveryVersion(_)
         | Error::Authentication => RpcErrorCode::Unavailable,
         Error::Internal => RpcErrorCode::Internal,
     }
