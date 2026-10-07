@@ -58,6 +58,7 @@ def network(args):
     output = Path(args.output)
     output.mkdir(parents=True, exist_ok=True)
     cases = {
+        "plain": ["--connections", "256", "--qos", "1", "--payload-bytes", "1024"],
         "q1": ["--connections", "256", "--qos", "1", "--payload-bytes", "1024"],
         "large": ["--connections", "64", "--qos", "1", "--payload-bytes", "16384"],
         "q2": ["--connections", "64", "--qos", "2", "--payload-bytes", "1024"],
@@ -71,6 +72,8 @@ def network(args):
         for index, label in enumerate(args.order):
             binary = args.before if label == "A" else args.after
             command = [sys.executable, str(ROOT / "scripts/perf/event_load.py"), "--server-bin", binary, "--loadgen-bin", args.loadgen, "--rate", str(args.rate), "--duration", str(args.duration), "--warmup", str(args.warmup), "--sink-mode", "none", "--subscribe-uplink", "--audit-open-loop"] + cases[case]
+            if case == "plain":
+                command.remove("--subscribe-uplink")
             print("NETWORK", case, index, label, flush=True)
             with (output / f"{case}-{index}-{label}.json").open("w") as result:
                 subprocess.run(command, cwd=ROOT, stdout=result, check=True, timeout=args.duration + args.warmup + 90)

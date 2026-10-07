@@ -11,7 +11,7 @@ import subprocess
 import tempfile
 import time
 
-from connection_memory import SECRET, fd_count, free_port, rss_kib, status
+from connection_memory import SECRET, fd_count, free_ports, rss_kib, status
 
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
@@ -124,7 +124,7 @@ def main():
         raise SystemExit("sink outage must be between 0 and half the measured duration")
     if args.sink_outage_seconds and args.sink_mode != "webhook":
         raise SystemExit("sink outage requires webhook mode")
-    device_ingress, management, sink_port = [free_port() for _ in range(3)]
+    device_ingress, management, sink_port = free_ports(3)
     maximum = max(128, args.connections + 16)
     limits = {
         "max_connections": maximum,
@@ -249,8 +249,11 @@ def main():
                     status(management, args.tls)
                     break
                 except Exception:
-                    if server.poll() is not None or time.time() > deadline:
-                        raise RuntimeError("server did not start")
+                    if server.poll() is not None:
+                        detail = server.stderr.read(4096)
+                        raise RuntimeError(f"server did not start (exit {server.returncode}): {detail}")
+                    if time.time() > deadline:
+                        raise RuntimeError("server startup deadline elapsed while process remained alive")
                     time.sleep(.05)
             server_cpu_before = process_cpu_seconds(server.pid)
             load = subprocess.Popen(
@@ -357,6 +360,9 @@ def main():
                 "profile_stderr": profile_stderr[-512:],
             }
             print(json.dumps(result, sort_keys=True))
+        except Exception as error:
+            print(json.dumps({"setup_failure": str(error), "ports": [device_ingress, management, sink_port]}))
+            raise
         finally:
             for process in (load, server, sink):
                 if process is not None and process.poll() is None:

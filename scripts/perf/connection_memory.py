@@ -17,11 +17,23 @@ SECRET = "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"
 
 
 def free_port():
-    sock = socket.socket()
-    sock.bind(("127.0.0.1", 0))
-    port = sock.getsockname()[1]
-    sock.close()
-    return port
+    return free_ports(1)[0]
+
+
+def free_ports(count):
+    """Keep test reservations open together so returned ports are distinct."""
+    if not 1 <= count <= 16:
+        raise ValueError("test port reservation count must be between 1 and 16")
+    sockets = []
+    try:
+        for _ in range(count):
+            sock = socket.socket()
+            sockets.append(sock)
+            sock.bind(("127.0.0.1", 0))
+        return [sock.getsockname()[1] for sock in sockets]
+    finally:
+        for sock in sockets:
+            sock.close()
 
 
 def rss_kib(pid):
