@@ -7,6 +7,34 @@ from unittest.mock import MagicMock, patch
 import run
 
 
+class RustEvidenceTests(unittest.TestCase):
+    def test_empty_filtered_or_ignored_only_runs_cannot_pass(self):
+        for output in ["", "running 0 tests\n", "test ignored ... ignored\n",
+                       "test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 42 filtered out;\n"]:
+            with self.subTest(output=output), patch.object(run.subprocess, "run") as command:
+                command.return_value = MagicMock(returncode=0, stdout=output, stderr="")
+                with self.assertRaisesRegex(AssertionError, "no Rust tests passed"):
+                    run.command_check(["cargo", "test", "missing_filter"], rust_tests=True)
+
+    def test_real_test_may_be_surrounded_by_empty_workspace_harnesses(self):
+        output = ("test result: ok. 0 passed; 0 failed; 0 ignored;\n"
+                  "test result: ok. 1 passed; 0 failed; 0 ignored;\n"
+                  "test result: ok. 2 passed; 0 failed; 0 ignored;\n")
+        with patch.object(run.subprocess, "run") as command:
+            command.return_value = MagicMock(returncode=0, stdout=output, stderr="")
+            self.assertIn("3 Rust tests passed", run.command_check(
+                ["cargo", "test", "current_filter"], rust_tests=True,
+            ))
+
+    def test_a_failed_workspace_command_still_fails_with_prior_passes(self):
+        with patch.object(run.subprocess, "run") as command:
+            command.return_value = MagicMock(
+                returncode=1, stdout="test result: ok. 1 passed; 0 failed;\n", stderr="test failed",
+            )
+            with self.assertRaisesRegex(AssertionError, "command failed"):
+                run.command_check(["cargo", "test", "current_filter"], rust_tests=True)
+
+
 class KeepaliveEvidenceTests(unittest.TestCase):
     def observe(self, *, net_elapsed=1.5, reference_elapsed=2.5,
                 net_error=None, reference_error=None, reference_connack_error=None):
