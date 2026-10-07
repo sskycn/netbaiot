@@ -226,18 +226,20 @@ fn mqtt_route_preflight_bounded_memory_001() {
     let broker = route_projection_fixture(1_000, 8 * 1024);
     let state = broker.state.lock().unwrap();
     let stored_payload_bytes = state.offline_bytes;
+    let message = BrokerMessage {
+        topic: "route/plan/shared".into(),
+        payload: b"one-message".to_vec().into(),
+        qos: 1,
+        retain: false,
+        properties: Default::default(),
+    };
     let plan = preflight_route(
         &state,
         &auth("route-plan").device_key,
         None,
-        &BrokerMessage {
-            topic: "route/plan/shared".into(),
-            payload: b"one-message".to_vec().into(),
-            qos: 1,
-            retain: false,
-            properties: Default::default(),
-        },
+        &message,
         &broker.limits,
+        message.bytes(),
     )
     .unwrap();
     assert_eq!(plan.targets.len(), 1_000);
@@ -316,18 +318,20 @@ fn mqtt_route_preflight_benchmark_manual() {
         let broker = route_projection_fixture(targets, 0);
         let state = broker.state.lock().unwrap();
         let started = std::time::Instant::now();
+        let message = BrokerMessage {
+            topic: "route/plan/shared".into(),
+            payload: b"benchmark".to_vec().into(),
+            qos: 1,
+            retain: false,
+            properties: Default::default(),
+        };
         let plan = preflight_route(
             &state,
             &auth("route-plan").device_key,
             None,
-            &BrokerMessage {
-                topic: "route/plan/shared".into(),
-                payload: b"benchmark".to_vec().into(),
-                qos: 1,
-                retain: false,
-                properties: Default::default(),
-            },
+            &message,
             &broker.limits,
+            message.bytes(),
         )
         .unwrap();
         println!(

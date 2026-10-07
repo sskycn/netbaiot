@@ -1,0 +1,35 @@
+{
+  "final_status": "KEPT",
+  "initial_growing_map_status": "REVERTED",
+  "reason": "Map growth raised allocated bytes at 1000 tenants; reserve a bounded count hint on first required target. No protocol or production limit change.",
+  "initial_example": {
+    "mean_ns": 240453.773,
+    "p50_ns": 241250.0,
+    "p95_ns": 254458.0,
+    "p99_ns": 259625.0,
+    "max_ns": 281209.0,
+    "allocations_per_op": 2023.0,
+    "allocated_bytes_per_op": 726874.0
+  },
+  "baseline_example": {
+    "mean_ns": 239345.695,
+    "p50_ns": 240125.0,
+    "p95_ns": 253667.0,
+    "p99_ns": 259708.0,
+    "max_ns": 276250.0,
+    "allocations_per_op": 2015.0,
+    "allocated_bytes_per_op": 645118.0
+  },
+  "final_binary": {
+    "netbaiot-server": {
+      "sha256": "4be9f915badba0a828496ca217cd33986acb75d93ffb40748b34d6521b19aacf",
+      "bytes": 12165968
+    },
+    "transports-probe": {
+      "sha256": "7c72d2061e0659c406ac7073593862a41263f652ae18bab666983db91c587746",
+      "bytes": 6440192
+    },
+    "parent_sha": "1d4ec8b769b5de236009443c43fb63e964dbcc78",
+    "source_delta_sha256": "a007df8ab4637ed5a3427489f3a4c423c67a38fc40bc57147d678320a55f2184"
+  }
+}

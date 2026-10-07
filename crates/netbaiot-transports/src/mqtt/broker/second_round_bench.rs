@@ -220,13 +220,14 @@ fn second_round_preflight() {
             let owner = auth(0, 1).device_key;
             for qos in [0, 1, 2] {
                 let message = publish(topic, qos, None);
+                let charge = message.bytes();
                 probe(
                     &format!("preflight_tenants{tenants}_qos{qos}"),
                     fanout,
                     256,
                     1,
                     || (),
-                    |_| preflight_route(&state, &owner, None, &message, &limits).unwrap(),
+                    |_| preflight_route(&state, &owner, None, &message, &limits, charge).unwrap(),
                     |plan| assert_eq!(plan.targets.len(), fanout),
                 );
             }

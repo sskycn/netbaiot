@@ -2,6 +2,8 @@
 """Serial second-round experiments. Never builds during measurement."""
 import argparse
 import hashlib
+import glob
+import itertools
 import json
 import os
 from pathlib import Path
@@ -76,6 +78,80 @@ def network(args):
                 raise RuntimeError(f"failed workload retained in {case}-{index}-{label}.json")
 
 
+def network_summary(paths):
+    groups = {}
+    for path in paths:
+        path = Path(path)
+        data = json.loads(path.read_text())
+        stats = data["load"]["stats"]
+        counters = stats["counters"]
+        ack = "pubcomp" if data["qos"] == 2 else "puback"
+        histogram = stats["latencies"][ack]
+        metrics = {}
+        for line in data["metrics"].splitlines():
+            if line.startswith("#") or "{" in line:
+                continue
+            try:
+                name, value = line.rsplit(" ", 1)
+                metrics[name] = float(value)
+            except ValueError:
+                continue
+        row = {"file": path.name, "cohort": path.parent.name, "samples": histogram["count"],
+               "throughput_ops_s": counters.get("measurement_" + ack + "s", 0) / data["duration_seconds"],
+               "rss_peak_kib": max(item["rss_kib"] for item in data["samples"]),
+               "cpu_mean_percent": statistics.mean(item["cpu_percent"] for item in data["samples"]),
+               "errors": len(stats["error_samples"]), "unexpected_disconnects": counters.get("client_errors", 0),
+               "pending_at_disconnect": counters.get("pending_at_disconnect", 0),
+               "queue_peak_count": max(item["event_count"] for item in data["samples"]),
+               "queue_peak_bytes": max(item["event_bytes"] for item in data["samples"]),
+               "overload": metrics.get("netbaiot_queue_rejects_total", 0) + metrics.get("netbaiot_ingress_rejected_total", 0)}
+        row.update({key: histogram[key] for key in ["p50_ms", "p95_ms", "p99_ms", "p999_ms"]})
+        for lock in ["broker_lock", "event_bus_state"]:
+            for kind in ["wait", "hold"]:
+                stem = f"netbaiot_{lock}_{kind}_us"
+                count = metrics.get(stem + "_count", 0)
+                row[lock + "_" + kind + "_mean_us"] = metrics.get(stem + "_sum", 0) / count if count else None
+        case, _, label = path.stem.rsplit("-", 2)
+        groups.setdefault(case, {}).setdefault(label, []).append(row)
+    summaries = {}
+    for case, variants in groups.items():
+        output = {}
+        for label, rows in variants.items():
+            output[label] = {"runs": rows, "median": {key: statistics.median(row[key] for row in rows if row[key] is not None)
+                           if any(row[key] is not None for row in rows) else None
+                           for key in rows[0] if key not in ["file", "cohort"]}}
+        if set(output) == {"A", "B"}:
+            a, b = output["A"]["median"], output["B"]["median"]
+            output["delta_percent"] = {key: 100 * (b[key] / a[key] - 1) if a[key] not in [None, 0] and b[key] is not None else None for key in a}
+            x = [row["p99_ms"] for row in variants["A"]]
+            y = [row["p99_ms"] for row in variants["B"]]
+            if len(x) + len(y) <= 16:
+                values = x + y
+                difference = abs(statistics.median(x) - statistics.median(y))
+                extreme = total = 0
+                for split in itertools.combinations(range(len(values)), len(x)):
+                    selected = set(split)
+                    observed = abs(statistics.median(values[i] for i in selected) - statistics.median(values[i] for i in range(len(values)) if i not in selected))
+                    extreme += observed >= difference - 1e-12
+                    total += 1
+                output["p99_two_sided_exact_permutation_p"] = extreme / total
+        summaries[case] = output
+    return summaries
+
+
+def summary(args):
+    data = {}
+    if args.network:
+        data["network"] = network_summary([path for pattern in args.network for path in glob.glob(pattern)])
+    if args.micro_before and args.micro_after:
+        before = summarize([path for pattern in args.micro_before for path in glob.glob(pattern)])
+        after = summarize([path for pattern in args.micro_after for path in glob.glob(pattern)])
+        if before.keys() != after.keys():
+            raise ValueError("micro case sets differ")
+        data["micro"] = {key: {"before": before[key], "after": after[key]} for key in before}
+    Path(args.output).write_text(json.dumps(data, indent=2, allow_nan=False))
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="mode", required=True)
@@ -96,6 +172,12 @@ def main():
     p.add_argument("--warmup", type=float, default=3)
     p.add_argument("--rate", type=float, default=20000)
     p.set_defaults(run=network)
+    p = sub.add_parser("summary")
+    p.add_argument("--network", nargs="+")
+    p.add_argument("--micro-before", nargs="+")
+    p.add_argument("--micro-after", nargs="+")
+    p.add_argument("--output", required=True)
+    p.set_defaults(run=summary)
     args = parser.parse_args()
     args.run(args)
 
