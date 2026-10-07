@@ -1,0 +1,285 @@
+[
+  {
+    "before_path": "apps/netbaiot-server/src/business_stream_v1.rs",
+    "after_path": null,
+    "removed_declarations": [
+      "ActiveStreamLease",
+      "TcpStreamSink",
+      "business_handshake",
+      "drop",
+      "finish_rejected_stream",
+      "read_frame",
+      "rejected_close_discards_only_a_fixed_byte_budget",
+      "rejected_close_has_a_deadline_and_cancellation_priority",
+      "serve_business_connection",
+      "serve_business_stream",
+      "write_frame",
+      "write_stream_error"
+    ]
+  },
+  {
+    "before_path": "apps/netbaiot-server/src/server.rs",
+    "after_path": "apps/netbaiot-server/src/server.rs",
+    "removed_declarations": [
+      "serve_business_mixed"
+    ]
+  },
+  {
+    "before_path": "apps/netbaiot-server/tests/business_rpc_v2.rs",
+    "after_path": "apps/netbaiot-server/tests/business_rpc_current.rs",
+    "removed_declarations": [
+      "read_rpc",
+      "v1_spooled_required_event_replays_to_v2_with_stable_event_id",
+      "write_rpc"
+    ]
+  },
+  {
+    "before_path": "apps/netbaiot-server/tests/business_rpc_v3.rs",
+    "after_path": "apps/netbaiot-server/tests/business_rpc_v3.rs",
+    "removed_declarations": [
+      "v3_hello_is_rejected_when_v3_is_disabled"
+    ]
+  },
+  {
+    "before_path": "apps/netbaiot-server/tests/server.rs",
+    "after_path": "apps/netbaiot-server/tests/server.rs",
+    "removed_declarations": [
+      "legacy_config_ack_spool_blocks_startup_and_preserves_rollback_files"
+    ]
+  },
+  {
+    "before_path": "crates/netbaiot-client/src/business_rpc.rs",
+    "after_path": "crates/netbaiot-client/src/business_rpc.rs",
+    "removed_declarations": [
+      "BusinessDelivery",
+      "BusinessRpcClient",
+      "BusinessRpcClientConfig",
+      "BusinessRpcConnectionTiming",
+      "ClientInner",
+      "Command",
+      "DriverSignals",
+      "HandlerDrop",
+      "HeldHandler",
+      "Outbound",
+      "Pending",
+      "PendingResult",
+      "ack",
+      "auth_server_handshake",
+      "connect",
+      "connected",
+      "connection_epoch",
+      "connection_timing",
+      "development",
+      "driver",
+      "drop",
+      "enqueue",
+      "fail",
+      "handshake",
+      "handshake_auth_response",
+      "invalidate",
+      "is_closed",
+      "last_connection_error",
+      "last_protocol_context",
+      "nack",
+      "old_auth_handler_is_cancelled_before_replacement_writer_is_ready",
+      "old_delivery_ack_cannot_use_replacement_writer",
+      "one_hundred_reconnect_generations_and_shutdown_release_driver",
+      "protocol_at",
+      "protocol_context",
+      "read_frame",
+      "ready",
+      "replay_to_full_multiplexed_receive_queue_closes_connection_without_losing_old_delivery",
+      "respond",
+      "rpc_error",
+      "send_command",
+      "shutdown",
+      "validate",
+      "wait_ready",
+      "write_frame"
+    ]
+  },
+  {
+    "before_path": "crates/netbaiot-client/src/business_rpc/v3.rs",
+    "after_path": "crates/netbaiot-client/src/business_rpc/v3.rs",
+    "removed_declarations": [
+      "connection_config"
+    ]
+  },
+  {
+    "before_path": "crates/netbaiot-client/src/lib.rs",
+    "after_path": "crates/netbaiot-client/src/lib.rs",
+    "removed_declarations": [
+      "AckCompletion",
+      "connect_event_stream",
+      "read_frame",
+      "reconnect_backoff_is_bounded",
+      "reconnect_delay",
+      "run_connected_stream",
+      "send_ack",
+      "send_ack_value",
+      "slow_consumer_is_not_acked_and_stream_drop_cancels_socket_task",
+      "test_stream_server",
+      "write_client_frame",
+      "write_test_server_frame"
+    ]
+  },
+  {
+    "before_path": "crates/netbaiot-protocol/src/business_rpc.rs",
+    "after_path": "crates/netbaiot-protocol/src/business_rpc.rs",
+    "removed_declarations": [
+      "BUSINESS_RPC_EVENT_WINDOW",
+      "BUSINESS_RPC_VERSION",
+      "BusinessLimits",
+      "BusinessRpcFrame",
+      "error",
+      "method",
+      "roles_preserve_v2_names_and_capabilities",
+      "v2_contract_and_v1_version_are_independent",
+      "validate"
+    ]
+  },
+  {
+    "before_path": "crates/netbaiot-protocol/src/lib.rs",
+    "after_path": "crates/netbaiot-protocol/src/lib.rs",
+    "removed_declarations": [
+      "EventAck",
+      "StreamClientFrame",
+      "StreamServerFrame",
+      "stable_error_and_ack_json",
+      "v1_stream_golden_json_stays_compatible"
+    ]
+  },
+  {
+    "before_path": "crates/netbaiot-runtime/src/metrics.rs",
+    "after_path": "crates/netbaiot-runtime/src/metrics.rs",
+    "removed_declarations": [
+      "BusinessRpcQueueClass"
+    ]
+  },
+  {
+    "before_path": "crates/netbaiot-runtime/src/spool.rs",
+    "after_path": "crates/netbaiot-runtime/src/spool.rs",
+    "removed_declarations": [
+      "EventTag",
+      "GENERATION_VERSION",
+      "KindTag",
+      "LEGACY_ACK_V1",
+      "LEGACY_ACK_V2",
+      "LEGACY_VERSION",
+      "RecordTag",
+      "RemovedKind",
+      "SUPPORTED_V1",
+      "SUPPORTED_V2",
+      "contains_legacy_config_ack",
+      "historical_supported_records_recover_with_identity_and_attempts",
+      "legacy_config_ack_blocks_recovery_and_replacement_without_mutation",
+      "legacy_diagnostic_requires_exact_path_valid_json_and_intact_framing",
+      "legacy_named_v2_preserves_generation_for_cleanup_and_migration",
+      "segment"
+    ]
+  },
+  {
+    "before_path": "crates/netbaiot-transports/src/business_rpc.rs",
+    "after_path": "crates/netbaiot-transports/src/business_rpc.rs",
+    "removed_declarations": [
+      "CommandRequest",
+      "EventSignal",
+      "WriterSignals",
+      "command_loop",
+      "command_response_byte_limit_rejects_and_releases_permits",
+      "command_response_pressure_preserves_control_queue_capacity",
+      "command_scope_deadline_and_cancel_precede_dispatch",
+      "event_ack_requires_exact_delivery_subscription_and_event",
+      "event_loop",
+      "negotiated",
+      "permits_role",
+      "process_command_request",
+      "serve_accepted",
+      "shared_v2_v3_control_worker_rejects_sync_and_invalidation_after_quiesce",
+      "write_frame",
+      "writer_loop"
+    ]
+  },
+  {
+    "before_path": "crates/netbaiot-transports/src/mqtt/broker/mod.rs",
+    "after_path": "crates/netbaiot-transports/src/mqtt/broker/mod.rs",
+    "removed_declarations": [
+      "Format",
+      "LEGACY_V1_RECOVERY_READ_MAX",
+      "RECOVERY_VERSION_V1",
+      "RECOVERY_VERSION_V2",
+      "RECOVERY_VERSION_V3",
+      "RECOVERY_VERSION_V4",
+      "RECOVERY_VERSION_V5",
+      "deserialize",
+      "fn"
+    ]
+  },
+  {
+    "before_path": "crates/netbaiot-transports/src/mqtt/broker/recovery.rs",
+    "after_path": "crates/netbaiot-transports/src/mqtt/broker/recovery.rs",
+    "removed_declarations": [
+      "decode_v1"
+    ]
+  },
+  {
+    "before_path": "crates/netbaiot-transports/src/mqtt/broker/tests/recovery_compat.rs",
+    "after_path": null,
+    "removed_declarations": [
+      "mqtt_recovery_acl_ownership_001",
+      "mqtt_recovery_historical_binary_fixtures_upgrade_to_v6",
+      "mqtt_recovery_historical_nonempty_fixtures_preserve_qos_and_retained",
+      "mqtt_recovery_v1_compat_001",
+      "mqtt_recovery_v1_large_compat_001",
+      "mqtt_recovery_v2_compat_001",
+      "mqtt_recovery_v3_raw_binary_round_trip_bound",
+      "v4_recovery_preserves_v5_session_and_v3_remains_readable"
+    ]
+  },
+  {
+    "before_path": "crates/netbaiot-transports/src/mqtt/broker/tests/recovery_storage.rs",
+    "after_path": "crates/netbaiot-transports/src/mqtt/broker/tests/recovery_storage.rs",
+    "removed_declarations": [
+      "shared_payload_preserves_legacy_json_and_compact_recovery_bytes",
+      "v4_recovery_keeps_publish_properties_and_byte_accounting"
+    ]
+  },
+  {
+    "before_path": "crates/netbaiot-transports/src/mqtt/broker/tests/sessions.rs",
+    "after_path": "crates/netbaiot-transports/src/mqtt/broker/tests/sessions.rs",
+    "removed_declarations": [
+      "v4_outbound_record_remains_readable_without_started_flag"
+    ]
+  },
+  {
+    "before_path": "crates/netbaiot-transports/src/mqtt/broker/tests/shared_metadata.rs",
+    "after_path": "crates/netbaiot-transports/src/mqtt/broker/tests/shared_metadata.rs",
+    "removed_declarations": [
+      "shared_metadata_preserves_historical_json_and_compact_message_bytes"
+    ]
+  },
+  {
+    "before_path": "crates/netbaiot-transports/src/mqtt/broker/tests/will.rs",
+    "after_path": "crates/netbaiot-transports/src/mqtt/broker/tests/will.rs",
+    "removed_declarations": [
+      "v5_pending_will_record_remains_readable_without_origin_field"
+    ]
+  },
+  {
+    "before_path": "tools/netbaiot-loadgen/src/bin/business_rpc.rs",
+    "after_path": "tools/netbaiot-loadgen/src/bin/business_rpc.rs",
+    "removed_declarations": [
+      "AnyBusiness",
+      "AnyDeliveries",
+      "AnyDelivery",
+      "ack",
+      "connect_event_business",
+      "event_id",
+      "invalidate",
+      "recv",
+      "shutdown",
+      "source_message_id",
+      "v3"
+    ]
+  }
+]

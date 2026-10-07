@@ -1,0 +1,1001 @@
+[
+  {
+    "status": "M",
+    "paths": [
+      ".github/workflows/mqtt-device-fuzz.yml"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      ".github/workflows/recovery-platform.yml"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      ".github/workflows/windows-regression-diagnostics.yml"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "AGENTS.md"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "Cargo.lock"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "README.md"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "apps/netbaiot-cli/Cargo.toml"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "apps/netbaiot-cli/src/doctor/mod.rs"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "apps/netbaiot-cli/src/main.rs"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "apps/netbaiot-cli/tests/dx.rs"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "apps/netbaiot-cli/tests/dx2.rs"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "apps/netbaiot-cli/tests/smoke.rs"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "apps/netbaiot-server/Cargo.toml"
+    ]
+  },
+  {
+    "status": "D",
+    "paths": [
+      "apps/netbaiot-server/src/business_stream_v1.rs"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "apps/netbaiot-server/src/config.rs"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "apps/netbaiot-server/src/diagnostics.rs"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "apps/netbaiot-server/src/entry.rs"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "apps/netbaiot-server/src/lib.rs"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "apps/netbaiot-server/src/server.rs"
+    ]
+  },
+  {
+    "status": "R086",
+    "paths": [
+      "apps/netbaiot-server/tests/business_rpc_v2.rs",
+      "apps/netbaiot-server/tests/business_rpc_current.rs"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "apps/netbaiot-server/tests/business_rpc_v3.rs"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "apps/netbaiot-server/tests/official_client.rs"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "apps/netbaiot-server/tests/server.rs"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "crates/netbaiot-client/Cargo.toml"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "crates/netbaiot-client/examples/business_command.rs"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "crates/netbaiot-client/examples/business_event_consumer.rs"
+    ]
+  },
+  {
+    "status": "R089",
+    "paths": [
+      "crates/netbaiot-client/examples/business_rpc_v2.rs",
+      "crates/netbaiot-client/examples/business_rpc_current.rs"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "crates/netbaiot-client/src/business_rpc.rs"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "crates/netbaiot-client/src/business_rpc/v3.rs"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "crates/netbaiot-client/src/lib.rs"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "crates/netbaiot-core/Cargo.toml"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "crates/netbaiot-protocol/Cargo.toml"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "crates/netbaiot-protocol/src/business_rpc.rs"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "crates/netbaiot-protocol/src/business_rpc_v3.rs"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "crates/netbaiot-protocol/src/lib.rs"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "crates/netbaiot-runtime/src/business_event.rs"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "crates/netbaiot-runtime/src/business_rpc.rs"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "crates/netbaiot-runtime/src/lib.rs"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "crates/netbaiot-runtime/src/metrics.rs"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "crates/netbaiot-runtime/src/recovery_io.rs"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "crates/netbaiot-runtime/src/spool.rs"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "crates/netbaiot-transports/Cargo.toml"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "crates/netbaiot-transports/src/business_rpc.rs"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "crates/netbaiot-transports/src/business_rpc/v3.rs"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "crates/netbaiot-transports/src/management_http.rs"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "crates/netbaiot-transports/src/mqtt/broker/mod.rs"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "crates/netbaiot-transports/src/mqtt/broker/recovery.rs"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "crates/netbaiot-transports/src/mqtt/broker/routing.rs"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "crates/netbaiot-transports/src/mqtt/broker/second_round_bench.rs"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "crates/netbaiot-transports/src/mqtt/broker/session.rs"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "crates/netbaiot-transports/src/mqtt/broker/tests/mod.rs"
+    ]
+  },
+  {
+    "status": "D",
+    "paths": [
+      "crates/netbaiot-transports/src/mqtt/broker/tests/recovery_compat.rs"
+    ]
+  },
+  {
+    "status": "A",
+    "paths": [
+      "crates/netbaiot-transports/src/mqtt/broker/tests/recovery_current.rs"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "crates/netbaiot-transports/src/mqtt/broker/tests/recovery_storage.rs"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "crates/netbaiot-transports/src/mqtt/broker/tests/sessions.rs"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "crates/netbaiot-transports/src/mqtt/broker/tests/shared_metadata.rs"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "crates/netbaiot-transports/src/mqtt/broker/tests/will.rs"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "crates/netbaiot-transports/src/mqtt/broker_hotspot_bench.rs"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "crates/netbaiot-transports/src/mqtt/codec/v5.rs"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "crates/netbaiot-v3-mux/Cargo.toml"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "docs/business-integration-guide.md"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "docs/business-integration.md"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "docs/business-integration.zh-CN.md"
+    ]
+  },
+  {
+    "status": "D",
+    "paths": [
+      "docs/business-rpc-v2-checklist.md"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "docs/business-rpc-v2-production-readiness.zh-CN.md"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "docs/business-rpc-v2-reliability.zh-CN.md"
+    ]
+  },
+  {
+    "status": "D",
+    "paths": [
+      "docs/business-rpc-v2.md"
+    ]
+  },
+  {
+    "status": "D",
+    "paths": [
+      "docs/business-rpc-v2.zh-CN.md"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "docs/business-rpc-v3-hol2.zh-CN.md"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "docs/business-rpc-v3-production-readiness.zh-CN.md"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "docs/business-rpc-v3.md"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "docs/business-rpc-v3.zh-CN.md"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "docs/client.md"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "docs/client.zh-CN.md"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "docs/configuration-fields.md"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "docs/connection-events-spool-upgrade-cleanup.md"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "docs/control-plane.md"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "docs/correctness-baseline-freeze.md"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "docs/correctness-resource-reliability-audit.md"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "docs/final-state-machine-remediation.md"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "docs/graceful-restart.md"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "docs/graceful-restart.zh-CN.md"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "docs/http-api.md"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "docs/http-api.zh-CN.md"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "docs/lifecycle-command-hardening.md"
+    ]
+  },
+  {
+    "status": "A",
+    "paths": [
+      "docs/maintenance/legacy-cleanup-inventory.md"
+    ]
+  },
+  {
+    "status": "A",
+    "paths": [
+      "docs/maintenance/legacy-cleanup-report.md"
+    ]
+  },
+  {
+    "status": "A",
+    "paths": [
+      "docs/maintenance/legacy-cleanup/after-binaries.json"
+    ]
+  },
+  {
+    "status": "A",
+    "paths": [
+      "docs/maintenance/legacy-cleanup/baseline-ci.json"
+    ]
+  },
+  {
+    "status": "A",
+    "paths": [
+      "docs/maintenance/legacy-cleanup/before-binaries.json"
+    ]
+  },
+  {
+    "status": "A",
+    "paths": [
+      "docs/maintenance/legacy-cleanup/changed-files.json"
+    ]
+  },
+  {
+    "status": "A",
+    "paths": [
+      "docs/maintenance/legacy-cleanup/ci.json"
+    ]
+  },
+  {
+    "status": "A",
+    "paths": [
+      "docs/maintenance/legacy-cleanup/fuzz-summary.json"
+    ]
+  },
+  {
+    "status": "A",
+    "paths": [
+      "docs/maintenance/legacy-cleanup/loc.json"
+    ]
+  },
+  {
+    "status": "A",
+    "paths": [
+      "docs/maintenance/legacy-cleanup/measurement-summary.json"
+    ]
+  },
+  {
+    "status": "A",
+    "paths": [
+      "docs/maintenance/legacy-cleanup/mqtt-release-results.json"
+    ]
+  },
+  {
+    "status": "A",
+    "paths": [
+      "docs/maintenance/legacy-cleanup/raw-manifest.json"
+    ]
+  },
+  {
+    "status": "A",
+    "paths": [
+      "docs/maintenance/legacy-cleanup/remaining-protocol-references.json"
+    ]
+  },
+  {
+    "status": "A",
+    "paths": [
+      "docs/maintenance/legacy-cleanup/removed-declarations.json"
+    ]
+  },
+  {
+    "status": "A",
+    "paths": [
+      "docs/maintenance/legacy-cleanup/repeat-cohorts.json"
+    ]
+  },
+  {
+    "status": "A",
+    "paths": [
+      "docs/maintenance/legacy-cleanup/verification-summary.json"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "docs/management-auth.md"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "docs/management-auth.zh-CN.md"
+    ]
+  },
+  {
+    "status": "A",
+    "paths": [
+      "docs/migration/current-protocol-only.md"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "docs/mqtt-3.1.1-conformance-report.md"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "docs/mqtt-3.1.1-conformance.md"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "docs/mqtt-3.1.1-implementation-report.md"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "docs/mqtt-protocol-fix-report.md"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "docs/mqtt-session-recovery.md"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "docs/mqtt.md"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "docs/mqtt.zh-CN.md"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "docs/operations-guide.md"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "docs/performance-separate-host-audit.md"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "docs/performance/README.md"
+    ]
+  },
+  {
+    "status": "A",
+    "paths": [
+      "docs/performance/second-round/final-ci.json"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "docs/production-reliability-remediation.md"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "docs/protocol-support.md"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "docs/public-protocol.md"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "docs/public-protocol.zh-CN.md"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "docs/reliability-followup-audit.md"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "docs/remove-device-config.md"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "docs/remove-device-http.md"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "docs/restart-spool.md"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "docs/schema/netbaiot-config.schema.json"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "docs/sdk-client-implementation-report.md"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "docs/strict-reliability-audit.md"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "docs/troubleshooting.md"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "docs/windows-recovery-regression.md"
+    ]
+  },
+  {
+    "status": "D",
+    "paths": [
+      "examples/business_tcp_client.py"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "fuzz/Cargo.lock"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "fuzz/Cargo.toml"
+    ]
+  },
+  {
+    "status": "A",
+    "paths": [
+      "fuzz/fuzz_targets/business_rpc_bootstrap.rs"
+    ]
+  },
+  {
+    "status": "D",
+    "paths": [
+      "fuzz/fuzz_targets/business_rpc_v2.rs"
+    ]
+  },
+  {
+    "status": "D",
+    "paths": [
+      "fuzz/fuzz_targets/business_stream.rs"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "fuzz/fuzz_targets/mqtt_recovery.rs"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "fuzz/fuzz_targets/restart_spool.rs"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "fuzz/seed_corpus.py"
+    ]
+  },
+  {
+    "status": "D",
+    "paths": [
+      "scripts/perf/capacity_audit.py"
+    ]
+  },
+  {
+    "status": "D",
+    "paths": [
+      "scripts/perf/capacity_consumer.py"
+    ]
+  },
+  {
+    "status": "D",
+    "paths": [
+      "scripts/perf/test_capacity_audit.py"
+    ]
+  },
+  {
+    "status": "A",
+    "paths": [
+      "scripts/perf/test_capacity_summary.py"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "scripts/tutorial_smoke.sh"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "scripts/windows_regression_probe.py"
+    ]
+  },
+  {
+    "status": "D",
+    "paths": [
+      "tests/fixtures/restart-spool/README.md"
+    ]
+  },
+  {
+    "status": "D",
+    "paths": [
+      "tests/fixtures/restart-spool/config-ack-v1.spool"
+    ]
+  },
+  {
+    "status": "D",
+    "paths": [
+      "tests/fixtures/restart-spool/config-ack-v2.spool"
+    ]
+  },
+  {
+    "status": "D",
+    "paths": [
+      "tests/fixtures/restart-spool/generate.py"
+    ]
+  },
+  {
+    "status": "D",
+    "paths": [
+      "tests/fixtures/restart-spool/supported-v1.spool"
+    ]
+  },
+  {
+    "status": "D",
+    "paths": [
+      "tests/fixtures/restart-spool/supported-v2.spool"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "tests/mqtt_conformance/catalog.json"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "tests/mqtt_conformance/fixtures/mqtt_recovery/README.md"
+    ]
+  },
+  {
+    "status": "D",
+    "paths": [
+      "tests/mqtt_conformance/fixtures/mqtt_recovery/v1-empty.nbmq"
+    ]
+  },
+  {
+    "status": "D",
+    "paths": [
+      "tests/mqtt_conformance/fixtures/mqtt_recovery/v1-session-retained.nbmq"
+    ]
+  },
+  {
+    "status": "D",
+    "paths": [
+      "tests/mqtt_conformance/fixtures/mqtt_recovery/v2-empty.nbmq"
+    ]
+  },
+  {
+    "status": "D",
+    "paths": [
+      "tests/mqtt_conformance/fixtures/mqtt_recovery/v2-session-retained.nbmq"
+    ]
+  },
+  {
+    "status": "D",
+    "paths": [
+      "tests/mqtt_conformance/fixtures/mqtt_recovery/v3-empty.nbmq"
+    ]
+  },
+  {
+    "status": "D",
+    "paths": [
+      "tests/mqtt_conformance/fixtures/mqtt_recovery/v3-session-retained.nbmq"
+    ]
+  },
+  {
+    "status": "D",
+    "paths": [
+      "tests/mqtt_conformance/fixtures/mqtt_recovery/v4-empty.nbmq"
+    ]
+  },
+  {
+    "status": "D",
+    "paths": [
+      "tests/mqtt_conformance/fixtures/mqtt_recovery/v4-session-retained.nbmq"
+    ]
+  },
+  {
+    "status": "R066",
+    "paths": [
+      "tests/mqtt_conformance/fixtures/mqtt_recovery/v5-qos2-no-local-delayed-will.nbmq",
+      "tests/mqtt_conformance/fixtures/mqtt_recovery/v6-session-qos-will.nbmq"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "tests/mqtt_conformance/run.py"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "tests/mqtt_conformance/test_results.py"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "tools/netbaiot-loadgen/run_business_rpc_v3_command_readiness.py"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "tools/netbaiot-loadgen/run_business_rpc_v3_hol.py"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "tools/netbaiot-loadgen/run_business_rpc_v3_hol_formal.py"
+    ]
+  },
+  {
+    "status": "M",
+    "paths": [
+      "tools/netbaiot-loadgen/src/bin/business_rpc.rs"
+    ]
+  }
+]

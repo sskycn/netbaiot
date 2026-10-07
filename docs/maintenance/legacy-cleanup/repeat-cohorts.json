@@ -1,0 +1,201 @@
+{
+  "client": {
+    "target": "netbaiot_client",
+    "filters": [
+      "business_rpc::v3::tests::"
+    ],
+    "expected_active_tests": 3,
+    "test_names": [
+      "business_rpc::v3::tests::disconnected_auth_handler_is_cancelled_before_replacement_ready",
+      "business_rpc::v3::tests::one_hundred_reconnect_epochs_and_shutdown_release_driver",
+      "business_rpc::v3::tests::replay_to_full_receive_queue_preserves_old_delivery_and_fences_ack"
+    ],
+    "repetitions_per_mode": 30,
+    "binary_sha256": "455a9732c6084cc056f203e4c84b4915fe888fde785d78cdb5ccd49064cd3c71"
+  },
+  "spool": {
+    "target": "netbaiot_runtime",
+    "filters": [
+      "spool::tests::"
+    ],
+    "expected_active_tests": 14,
+    "test_names": [
+      "spool::tests::authority_and_cleanup_fail_closed_and_retry_preserves_latest",
+      "spool::tests::capacity_and_unusable_directory_fail_without_a_commit",
+      "spool::tests::committed_record_round_trips_with_same_event_id",
+      "spool::tests::corrupt_truncated_oversized_and_unknown_versions_fail",
+      "spool::tests::current_records_preserve_identity_attempts_telemetry_and_command_ack",
+      "spool::tests::dangling_authoritative_symlink_is_not_first_start",
+      "spool::tests::empty_or_absent_spool_recovers_no_work",
+      "spool::tests::repeated_failed_restarts_replace_one_generation_without_duplicates",
+      "spool::tests::serialization_has_a_hard_record_limit_before_allocation_growth",
+      "spool::tests::stale_cleanup_handle_cannot_delete_newer_committed_generation",
+      "spool::tests::temporary_file_budget_blocks_commit_without_replacing_authority",
+      "spool::tests::unreadable_file_parent_and_special_paths_are_storage_errors",
+      "spool::tests::unsupported_versions_block_recovery_commit_and_preserve_files",
+      "spool::tests::whole_snapshot_integrity"
+    ],
+    "repetitions_per_mode": 30,
+    "binary_sha256": "244f4523581de95d77e81df7ec50e523582cc0eed99821cfa19b575f63996ecd"
+  },
+  "broker": {
+    "target": "netbaiot_transports",
+    "filters": [
+      "recovery_current::",
+      "recovery_storage::",
+      "current_pending_will_record",
+      "current_outbound_record"
+    ],
+    "expected_active_tests": 22,
+    "test_names": [
+      "mqtt::broker::tests::recovery_current::current_golden_bytes_round_trip_without_format_change",
+      "mqtt::broker::tests::recovery_current::current_recovery_preserves_mqtt5_persistent_session",
+      "mqtt::broker::tests::recovery_current::mqtt_recovery_acl_ownership_001",
+      "mqtt::broker::tests::recovery_current::mqtt_recovery_raw_binary_round_trip_bound",
+      "mqtt::broker::tests::recovery_current::recovery_rejects_old_future_and_corrupt_versions_before_payload",
+      "mqtt::broker::tests::recovery_current::unsupported_file_versions_preserve_existing_state_and_committed_bytes",
+      "mqtt::broker::tests::recovery_storage::command_progress_follows_started_qos_recovery_after_write_failure",
+      "mqtt::broker::tests::recovery_storage::mqtt_recovery_semantic_invalid_001",
+      "mqtt::broker::tests::recovery_storage::mqtt_recovery_storage_commit_replace_retry_and_io_errors",
+      "mqtt::broker::tests::recovery_storage::mqtt_recovery_v6_large_client_id_will_fits_admitted_bounds",
+      "mqtt::broker::tests::recovery_storage::mqtt_recovery_whole_image_integrity_001",
+      "mqtt::broker::tests::recovery_storage::mqtt_temporary_file_budget_blocks_commit_without_replacing_snapshot",
+      "mqtt::broker::tests::recovery_storage::qos2_recovery_resumes_each_protocol_stage_without_reallocation",
+      "mqtt::broker::tests::recovery_storage::recovery_file_rejects_corruption_and_unknown_version",
+      "mqtt::broker::tests::recovery_storage::recovery_file_round_trip_preserves_session_retained_and_inflight",
+      "mqtt::broker::tests::recovery_storage::recovery_file_supports_legal_state_larger_than_event_spool_record",
+      "mqtt::broker::tests::recovery_storage::recovery_keeps_publish_properties_and_byte_accounting",
+      "mqtt::broker::tests::recovery_storage::retained_qos2_reserved_state_round_trips_recovery",
+      "mqtt::broker::tests::recovery_storage::shared_payload_preserves_current_compact_recovery_bytes",
+      "mqtt::broker::tests::recovery_storage::v5_message_expiry_cleans_offline_retained_and_recovery_state",
+      "mqtt::broker::tests::sessions::current_outbound_record_preserves_started_flag",
+      "mqtt::broker::tests::will::current_pending_will_record_preserves_explicit_absent_origin"
+    ],
+    "repetitions_per_mode": 30,
+    "binary_sha256": "db8fd57a76b97bafcbf3f423161afe28f143ee5d28a6cdc805674d736847317b"
+  },
+  "rpc_unit": {
+    "target": "netbaiot_transports",
+    "filters": [
+      "business_rpc::"
+    ],
+    "expected_active_tests": 13,
+    "test_names": [
+      "business_rpc::tests::command_response_byte_limit_rejects_and_releases_permits",
+      "business_rpc::tests::command_response_pressure_preserves_control_queue_capacity",
+      "business_rpc::tests::command_runtime_capacity_and_offline_errors_keep_rpc_semantics",
+      "business_rpc::tests::control_queue_pressure_rejects_without_leaking_byte_permits",
+      "business_rpc::tests::current_control_worker_rejects_sync_and_invalidation_after_quiesce",
+      "business_rpc::tests::framing_handles_split_and_coalesced_frames",
+      "business_rpc::tests::framing_rejects_zero_oversize_truncated_and_malformed_json",
+      "business_rpc::tests::scoped_business_principal_cannot_invalidate_other_tenants_or_all",
+      "business_rpc::tests::slow_partial_header_times_out_without_allocation",
+      "business_rpc::v3::ack_tests::event_ack_requires_exact_stream_delivery_and_event_identity",
+      "business_rpc::v3::send_ahead_tests::exhausted_send_ahead_waits_for_a_wake_source",
+      "business_rpc::v3::send_ahead_tests::shutdown_cancels_goaway_waiting_for_peer_credit",
+      "business_rpc::v3::send_ahead_tests::shutdown_cancels_writer_waiting_on_socket"
+    ],
+    "repetitions_per_mode": 30,
+    "binary_sha256": "db8fd57a76b97bafcbf3f423161afe28f143ee5d28a6cdc805674d736847317b"
+  },
+  "rpc_current": {
+    "target": "business_rpc_current",
+    "filters": [
+      "command_pressure_preserves",
+      "commands_role_dispatches",
+      "business_rpc_command_mqtt_dedup",
+      "one_socket_authentication",
+      "zero_offline_grace",
+      "required_spooled_event"
+    ],
+    "expected_active_tests": 6,
+    "test_names": [
+      "business_rpc_command_mqtt_dedup_and_ack_use_real_sockets",
+      "command_pressure_preserves_auth_invalidation_and_event_ack",
+      "commands_role_dispatches_to_real_tcp_and_shares_http_dedup",
+      "one_socket_authentication_progresses_while_event_ack_waits",
+      "required_spooled_event_replays_to_current_with_stable_event_id",
+      "zero_offline_grace_revokes_live_session_and_requires_reset_sync"
+    ],
+    "repetitions_per_mode": 30,
+    "binary_sha256": "e3ff7a1eb6d60821d5a1565e5d4a8536afe15b804aba83372153e97e778a64c7"
+  },
+  "rpc_commands": {
+    "target": "business_rpc_v3",
+    "filters": [
+      "v3_command_",
+      "v3_planned_restart",
+      "real_socket_v3_provider"
+    ],
+    "expected_active_tests": 5,
+    "test_names": [
+      "real_socket_v3_provider_event_and_invalidation",
+      "v3_command_real_mqtt_dedup_http_ack_and_lost_response",
+      "v3_command_real_tcp_short_dedup_ttl_and_shorter_command_ttl",
+      "v3_command_real_tcp_tenant_scope_and_capacity",
+      "v3_planned_restart_replays_event_but_resets_command_dedup"
+    ],
+    "repetitions_per_mode": 30,
+    "binary_sha256": "4b8349f9eb953353bb1d0906d35b602eef2bbd65db815e6e8de8deb6bcc3a073"
+  },
+  "official": {
+    "target": "official_client",
+    "filters": [
+      "official_client_reconnects",
+      "current_slow_consumer",
+      "official_clients_cover_mqtt"
+    ],
+    "expected_active_tests": 3,
+    "test_names": [
+      "current_slow_consumer_requires_application_ack_and_drop_stops_connection",
+      "official_client_reconnects_and_replays_unacked_event_with_same_id",
+      "official_clients_cover_mqtt_tcp_command_ack_status_and_offline_contracts"
+    ],
+    "repetitions_per_mode": 30,
+    "binary_sha256": "cca511a8a7c898165b26ec8d5de1615f201378a598ca8a1a5814a803987f0540"
+  },
+  "restart": {
+    "target": "server",
+    "filters": [
+      "subprocess_mqtt_session_retained",
+      "subprocess_mqtt_qos2",
+      "subprocess_graceful_restart_spools",
+      "subprocess_spool_failure",
+      "recovery_directory_is_exclusive"
+    ],
+    "expected_active_tests": 5,
+    "test_names": [
+      "recovery_directory_is_exclusive_between_processes_and_released_on_exit",
+      "subprocess_graceful_restart_spools_and_replays_every_accepted_event_id",
+      "subprocess_mqtt_qos2_resumes_outbound_and_inbound_restart_stages",
+      "subprocess_mqtt_session_retained_and_qos1_inflight_survive_graceful_restart",
+      "subprocess_spool_failure_stays_alive_until_repaired_then_replays_same_event_id"
+    ],
+    "repetitions_per_mode": 30,
+    "binary_sha256": "aa753eff46900f84504cf9b904b33d8f154bbd8f83775708bd92138e9de42022"
+  },
+  "certificate": {
+    "target": "business_rpc_current",
+    "filters": [
+      "mtls_verifies_server"
+    ],
+    "expected_active_tests": 1,
+    "test_names": [
+      "mtls_verifies_server_and_maps_exact_client_certificate"
+    ],
+    "repetitions_per_mode": 10,
+    "binary_sha256": "e3ff7a1eb6d60821d5a1565e5d4a8536afe15b804aba83372153e97e778a64c7"
+  },
+  "certificate_streams": {
+    "target": "business_rpc_v3",
+    "filters": [
+      "v3_mtls_authenticates"
+    ],
+    "expected_active_tests": 1,
+    "test_names": [
+      "v3_mtls_authenticates_before_role_free_stream_authorization"
+    ],
+    "repetitions_per_mode": 10,
+    "binary_sha256": "4b8349f9eb953353bb1d0906d35b602eef2bbd65db815e6e8de8deb6bcc3a073"
+  }
+}

@@ -30,7 +30,7 @@ See [migration](remove-device-config.md).
 
 Control mutations acquire lifecycle admission before their first side effect and
 retain it through completion: HTTP auth invalidation, control/routes replacement,
-Business RPC V2/V3 auth sync/invalidation, provider-offline revocation, commands and
+Current Business RPC auth sync/invalidation, provider-offline revocation, commands and
 MQTT/TCP session establishment. Quiesce waits for admitted operations before broker
 recovery starts. New mutations return HTTP 503 `draining` / RPC `unavailable`;
 command retries also obey this fence. Diagnostic reads remain available and repeated

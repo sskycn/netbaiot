@@ -1,0 +1,26 @@
+{
+  "netbaiot-server": {
+    "bytes": 12168384,
+    "sha256": "b500cb0b9d15c546941db55f22530185690dc8b486f5c8389867387f5cf77222"
+  },
+  "netbaiot-loadgen": {
+    "bytes": 5273920,
+    "sha256": "ef0e3dba298cf5155e9e1e5319d1d207973bbeef37dce55986c09070c205eaad"
+  },
+  "business_rpc": {
+    "bytes": 7928608,
+    "sha256": "f1d93b0e8e5d2215ab2bf417a6446a0c554f5fc92aab232d40f11ceb67d62d14"
+  },
+  "admission_auth": {
+    "bytes": 1076576,
+    "sha256": "e56be33340b86d303310cdecaaec80f909edeea1300e7baea8ba6046a865132f"
+  },
+  "udp_ack": {
+    "bytes": 595968,
+    "sha256": "90d12985318adb7b88f1f5529f2903eea211d473c4fcd44ff977ee71f870d43b"
+  },
+  "netbaiot-cli (executable netbaiot)": {
+    "bytes": 16422432,
+    "sha256": "5667b2d591ce0e61a1ac710ef4c7fada516104195cc895821863ddb8e40d7bb9"
+  }
+}

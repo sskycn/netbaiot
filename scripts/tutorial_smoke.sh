@@ -124,9 +124,11 @@ python3 -c '
 import json,sys
 c=json.load(open(sys.argv[1])); c["delivery_url"]=None
 c["business_tcp"]=f"127.0.0.1:{sys.argv[3]}"; c["spool_directory"]=sys.argv[4]
+c["event_delivery"]="business_rpc"
+c["business_rpc"]={"tls":None,"development_token_env":"NETBAIOT_BUSINESS_RPC_TOKEN","development_role":"events"}
 json.dump(c,open(sys.argv[2],"w"))
 ' "$RUN_DIR/config.json" "$RUN_DIR/stream-config.json" "$BUSINESS_PORT" "$RUN_DIR/stream-spool"
-NETBAIOT_ADMIN_SECRET=$ADMIN NETBAIOT_BUSINESS_STREAM_TOKEN=business-stream-demo-token RUST_LOG=info \
+NETBAIOT_ADMIN_SECRET=$ADMIN NETBAIOT_BUSINESS_RPC_TOKEN=business-rpc-demo-token RUST_LOG=info \
   ./target/debug/netbaiot-server "$RUN_DIR/stream-config.json" >"$RUN_DIR/server-stream.log" 2>&1 &
 SERVER_PID=$!
 for _ in $(seq 1 100); do
@@ -140,19 +142,27 @@ for _ in $(seq 1 100); do
   fi
   sleep 0.05
 done
-python3 examples/business_tcp_client.py --address "127.0.0.1:$BUSINESS_PORT" \
-  --token business-stream-demo-token --count 1 >"$RUN_DIR/business-stream.log" &
+NETBAIOT_ENDPOINT="http://127.0.0.1:$MGMT_PORT" NETBAIOT_TOKEN="$ADMIN" \
+  NETBAIOT_EVENT_ADDRESS="127.0.0.1:$BUSINESS_PORT" NETBAIOT_EVENT_TOKEN=business-rpc-demo-token \
+  ./target/debug/netbaiot --output json events subscribe >"$RUN_DIR/business-stream.log" &
 BUSINESS_PID=$!
-sleep 0.2
 NETBAIOT_DEVICE_CREDENTIAL_ID=demo-device NETBAIOT_DEVICE_SECRET=$SECRET \
   NETBAIOT_MQTT_ENDPOINT="mqtt://127.0.0.1:$MQTT_PORT" \
   cargo run --quiet -p netbaiot-device-sdk --example device_mqtt
-wait "$BUSINESS_PID"
-BUSINESS_PID=
-[[ $(rg -c '"delivery"' "$RUN_DIR/business-stream.log") -eq 1 ]]
+for _ in $(seq 1 100); do
+  if rg -q '"event_id"' "$RUN_DIR/business-stream.log"; then
+    break
+  fi
+  kill -0 "$BUSINESS_PID"
+  sleep 0.05
+done
+[[ $(rg -c '"event_id"' "$RUN_DIR/business-stream.log") -eq 1 ]]
 curl --noproxy '*' -fsS -X POST "http://127.0.0.1:$MGMT_PORT/api/v1/drain" \
   -H "Authorization: Bearer $ADMIN" | rg '"draining":true'
 wait "$SERVER_PID"
 SERVER_PID=
+kill "$BUSINESS_PID"
+wait "$BUSINESS_PID"
+BUSINESS_PID=
 rg 'shutdown complete' "$RUN_DIR/server-stream.log"
 printf '%s\n' 'tutorial smoke: PASS'

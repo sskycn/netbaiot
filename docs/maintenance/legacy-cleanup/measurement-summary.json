@@ -1,0 +1,1382 @@
+{
+  "baseline_commit": "21a694576a84436c1d27a69f59ea1d1a32e5006b",
+  "implementation_commit": "8213095",
+  "comparison": "serial ABBA; same host and frozen current-wire load generators",
+  "network": {
+    "q1": {
+      "A": {
+        "runs": [
+          {
+            "file": "q1-0-A.json",
+            "cohort": "mqtt",
+            "samples": 300000,
+            "throughput_ops_s": 20000.0,
+            "rss_peak_kib": 17696,
+            "cpu_mean_percent": 208.2095238095238,
+            "errors": 0,
+            "unexpected_disconnects": 0,
+            "pending_at_disconnect": 0,
+            "queue_peak_count": 17,
+            "queue_peak_bytes": 20264,
+            "overload": 0.0,
+            "p50_ms": 0.32,
+            "p95_ms": 0.65,
+            "p99_ms": 0.88,
+            "p999_ms": 1.11,
+            "broker_lock_wait_mean_us": null,
+            "broker_lock_hold_mean_us": null,
+            "event_bus_state_wait_mean_us": null,
+            "event_bus_state_hold_mean_us": null
+          },
+          {
+            "file": "q1-3-A.json",
+            "cohort": "mqtt",
+            "samples": 300020,
+            "throughput_ops_s": 20001.333333333332,
+            "rss_peak_kib": 17600,
+            "cpu_mean_percent": 219.54285714285714,
+            "errors": 0,
+            "unexpected_disconnects": 0,
+            "pending_at_disconnect": 0,
+            "queue_peak_count": 4,
+            "queue_peak_bytes": 4780,
+            "overload": 0.0,
+            "p50_ms": 0.34,
+            "p95_ms": 0.69,
+            "p99_ms": 0.99,
+            "p999_ms": 3.74,
+            "broker_lock_wait_mean_us": null,
+            "broker_lock_hold_mean_us": null,
+            "event_bus_state_wait_mean_us": null,
+            "event_bus_state_hold_mean_us": null
+          }
+        ],
+        "median": {
+          "samples": 300010.0,
+          "throughput_ops_s": 20000.666666666664,
+          "rss_peak_kib": 17648.0,
+          "cpu_mean_percent": 213.87619047619046,
+          "errors": 0.0,
+          "unexpected_disconnects": 0.0,
+          "pending_at_disconnect": 0.0,
+          "queue_peak_count": 10.5,
+          "queue_peak_bytes": 12522.0,
+          "overload": 0.0,
+          "p50_ms": 0.33,
+          "p95_ms": 0.6699999999999999,
+          "p99_ms": 0.935,
+          "p999_ms": 2.4250000000000003,
+          "broker_lock_wait_mean_us": null,
+          "broker_lock_hold_mean_us": null,
+          "event_bus_state_wait_mean_us": null,
+          "event_bus_state_hold_mean_us": null
+        }
+      },
+      "B": {
+        "runs": [
+          {
+            "file": "q1-1-B.json",
+            "cohort": "mqtt",
+            "samples": 300000,
+            "throughput_ops_s": 20000.0,
+            "rss_peak_kib": 20752,
+            "cpu_mean_percent": 209.43,
+            "errors": 0,
+            "unexpected_disconnects": 0,
+            "pending_at_disconnect": 0,
+            "queue_peak_count": 28,
+            "queue_peak_bytes": 33420,
+            "overload": 0.0,
+            "p50_ms": 0.31,
+            "p95_ms": 0.64,
+            "p99_ms": 1.06,
+            "p999_ms": 17.92,
+            "broker_lock_wait_mean_us": null,
+            "broker_lock_hold_mean_us": null,
+            "event_bus_state_wait_mean_us": null,
+            "event_bus_state_hold_mean_us": null
+          },
+          {
+            "file": "q1-2-B.json",
+            "cohort": "mqtt",
+            "samples": 300000,
+            "throughput_ops_s": 20000.0,
+            "rss_peak_kib": 18128,
+            "cpu_mean_percent": 225.83,
+            "errors": 0,
+            "unexpected_disconnects": 0,
+            "pending_at_disconnect": 0,
+            "queue_peak_count": 12,
+            "queue_peak_bytes": 14304,
+            "overload": 0.0,
+            "p50_ms": 0.34,
+            "p95_ms": 0.67,
+            "p99_ms": 0.98,
+            "p999_ms": 2.88,
+            "broker_lock_wait_mean_us": null,
+            "broker_lock_hold_mean_us": null,
+            "event_bus_state_wait_mean_us": null,
+            "event_bus_state_hold_mean_us": null
+          }
+        ],
+        "median": {
+          "samples": 300000.0,
+          "throughput_ops_s": 20000.0,
+          "rss_peak_kib": 19440.0,
+          "cpu_mean_percent": 217.63,
+          "errors": 0.0,
+          "unexpected_disconnects": 0.0,
+          "pending_at_disconnect": 0.0,
+          "queue_peak_count": 20.0,
+          "queue_peak_bytes": 23862.0,
+          "overload": 0.0,
+          "p50_ms": 0.325,
+          "p95_ms": 0.655,
+          "p99_ms": 1.02,
+          "p999_ms": 10.4,
+          "broker_lock_wait_mean_us": null,
+          "broker_lock_hold_mean_us": null,
+          "event_bus_state_wait_mean_us": null,
+          "event_bus_state_hold_mean_us": null
+        }
+      },
+      "delta_percent": {
+        "samples": -0.0033332222259208066,
+        "throughput_ops_s": -0.0033332222259097044,
+        "rss_peak_kib": 10.154125113327295,
+        "cpu_mean_percent": 1.7551320301019802,
+        "errors": null,
+        "unexpected_disconnects": null,
+        "pending_at_disconnect": null,
+        "queue_peak_count": 90.47619047619047,
+        "queue_peak_bytes": 90.56061332055583,
+        "overload": null,
+        "p50_ms": -1.5151515151515138,
+        "p95_ms": -2.238805970149238,
+        "p99_ms": 9.090909090909083,
+        "p999_ms": 328.8659793814433,
+        "broker_lock_wait_mean_us": null,
+        "broker_lock_hold_mean_us": null,
+        "event_bus_state_wait_mean_us": null,
+        "event_bus_state_hold_mean_us": null
+      },
+      "p99_two_sided_exact_permutation_p": 0.6666666666666666
+    }
+  },
+  "rpc": {
+    "A": [
+      {
+        "file": "measurements/rpc/1-A/v3-8192.json",
+        "full_elapsed_s": 22.263987709,
+        "active_load_interval_s": 15,
+        "event_acks": 7482,
+        "event_ack_rate_in_active_interval": 498.8,
+        "event_ack_p50_ms": 1.28,
+        "event_ack_p99_ms": 1.6,
+        "command_requests": 330,
+        "command_accepted": 300,
+        "command_accepted_rate_in_active_interval": 20.0,
+        "command_device_deliveries": 300,
+        "command_device_acks": 300,
+        "command_ack_event_acks": 300,
+        "command_errors_tail": 30,
+        "command_unknown": 0,
+        "accepted_without_delivery": 0,
+        "duplicates": 0,
+        "publish_errors": 0,
+        "auth_success": 148,
+        "auth_requests": 148,
+        "auth_p99_ms": 103.0
+      },
+      {
+        "file": "measurements/rpc/4-A/v3-8192.json",
+        "full_elapsed_s": 22.264191625,
+        "active_load_interval_s": 15,
+        "event_acks": 7500,
+        "event_ack_rate_in_active_interval": 500.0,
+        "event_ack_p50_ms": 1.26,
+        "event_ack_p99_ms": 1.67,
+        "command_requests": 330,
+        "command_accepted": 300,
+        "command_accepted_rate_in_active_interval": 20.0,
+        "command_device_deliveries": 300,
+        "command_device_acks": 300,
+        "command_ack_event_acks": 300,
+        "command_errors_tail": 30,
+        "command_unknown": 0,
+        "accepted_without_delivery": 0,
+        "duplicates": 0,
+        "publish_errors": 0,
+        "auth_success": 148,
+        "auth_requests": 148,
+        "auth_p99_ms": 102.0
+      }
+    ],
+    "B": [
+      {
+        "file": "measurements/rpc/2-B/v3-8192.json",
+        "full_elapsed_s": 22.264423375,
+        "active_load_interval_s": 15,
+        "event_acks": 7496,
+        "event_ack_rate_in_active_interval": 499.73333333333335,
+        "event_ack_p50_ms": 1.28,
+        "event_ack_p99_ms": 1.65,
+        "command_requests": 330,
+        "command_accepted": 300,
+        "command_accepted_rate_in_active_interval": 20.0,
+        "command_device_deliveries": 300,
+        "command_device_acks": 300,
+        "command_ack_event_acks": 300,
+        "command_errors_tail": 30,
+        "command_unknown": 0,
+        "accepted_without_delivery": 0,
+        "duplicates": 0,
+        "publish_errors": 0,
+        "auth_success": 148,
+        "auth_requests": 148,
+        "auth_p99_ms": 103.0
+      },
+      {
+        "file": "measurements/rpc/3-B/v3-8192.json",
+        "full_elapsed_s": 22.268105666,
+        "active_load_interval_s": 15,
+        "event_acks": 7496,
+        "event_ack_rate_in_active_interval": 499.73333333333335,
+        "event_ack_p50_ms": 1.28,
+        "event_ack_p99_ms": 1.68,
+        "command_requests": 330,
+        "command_accepted": 300,
+        "command_accepted_rate_in_active_interval": 20.0,
+        "command_device_deliveries": 300,
+        "command_device_acks": 300,
+        "command_ack_event_acks": 300,
+        "command_errors_tail": 30,
+        "command_unknown": 0,
+        "accepted_without_delivery": 0,
+        "duplicates": 0,
+        "publish_errors": 0,
+        "auth_success": 148,
+        "auth_requests": 148,
+        "auth_p99_ms": 103.0
+      }
+    ]
+  },
+  "recovery": {
+    "spool/1/save": {
+      "B": {
+        "runs": [
+          {
+            "p50_ns": 8764375,
+            "p95_ns": 11777000,
+            "p99_ns": 11795667,
+            "max_ns": 11795667,
+            "bytes": 419
+          },
+          {
+            "p50_ns": 7936000,
+            "p95_ns": 8006500,
+            "p99_ns": 8147167,
+            "max_ns": 8147167,
+            "bytes": 419
+          }
+        ],
+        "median": {
+          "p50_ns": 8350187.5,
+          "p95_ns": 9891750.0,
+          "p99_ns": 9971417.0,
+          "max_ns": 9971417.0,
+          "bytes": 419.0
+        }
+      },
+      "A": {
+        "runs": [
+          {
+            "p50_ns": 7941875,
+            "p95_ns": 7980625,
+            "p99_ns": 8060666,
+            "max_ns": 8060666,
+            "bytes": 419
+          },
+          {
+            "p50_ns": 7929709,
+            "p95_ns": 8007083,
+            "p99_ns": 8028416,
+            "max_ns": 8028416,
+            "bytes": 419
+          }
+        ],
+        "median": {
+          "p50_ns": 7935792.0,
+          "p95_ns": 7993854.0,
+          "p99_ns": 8044541.0,
+          "max_ns": 8044541.0,
+          "bytes": 419.0
+        }
+      },
+      "p50_delta_percent": 5.221854353037481
+    },
+    "spool/1/load": {
+      "B": {
+        "runs": [
+          {
+            "p50_ns": 156417,
+            "p95_ns": 210917,
+            "p99_ns": 229667,
+            "max_ns": 229667,
+            "bytes": 419
+          },
+          {
+            "p50_ns": 47292,
+            "p95_ns": 60958,
+            "p99_ns": 67875,
+            "max_ns": 67875,
+            "bytes": 419
+          }
+        ],
+        "median": {
+          "p50_ns": 101854.5,
+          "p95_ns": 135937.5,
+          "p99_ns": 148771.0,
+          "max_ns": 148771.0,
+          "bytes": 419.0
+        }
+      },
+      "A": {
+        "runs": [
+          {
+            "p50_ns": 47458,
+            "p95_ns": 56083,
+            "p99_ns": 63209,
+            "max_ns": 63209,
+            "bytes": 419
+          },
+          {
+            "p50_ns": 43958,
+            "p95_ns": 58375,
+            "p99_ns": 60333,
+            "max_ns": 60333,
+            "bytes": 419
+          }
+        ],
+        "median": {
+          "p50_ns": 45708.0,
+          "p95_ns": 57229.0,
+          "p99_ns": 61771.0,
+          "max_ns": 61771.0,
+          "bytes": 419.0
+        }
+      },
+      "p50_delta_percent": 122.83735888684694
+    },
+    "spool/128/save": {
+      "B": {
+        "runs": [
+          {
+            "p50_ns": 11067292,
+            "p95_ns": 12021375,
+            "p99_ns": 12073583,
+            "max_ns": 12073583,
+            "bytes": 44996
+          },
+          {
+            "p50_ns": 9489875,
+            "p95_ns": 10655250,
+            "p99_ns": 11216583,
+            "max_ns": 11216583,
+            "bytes": 44996
+          }
+        ],
+        "median": {
+          "p50_ns": 10278583.5,
+          "p95_ns": 11338312.5,
+          "p99_ns": 11645083.0,
+          "max_ns": 11645083.0,
+          "bytes": 44996.0
+        }
+      },
+      "A": {
+        "runs": [
+          {
+            "p50_ns": 9431292,
+            "p95_ns": 10508500,
+            "p99_ns": 11291208,
+            "max_ns": 11291208,
+            "bytes": 44996
+          },
+          {
+            "p50_ns": 10345125,
+            "p95_ns": 11314458,
+            "p99_ns": 11348709,
+            "max_ns": 11348709,
+            "bytes": 44996
+          }
+        ],
+        "median": {
+          "p50_ns": 9888208.5,
+          "p95_ns": 10911479.0,
+          "p99_ns": 11319958.5,
+          "max_ns": 11319958.5,
+          "bytes": 44996.0
+        }
+      },
+      "p50_delta_percent": 3.9478839872763682
+    },
+    "spool/128/load": {
+      "B": {
+        "runs": [
+          {
+            "p50_ns": 771792,
+            "p95_ns": 853459,
+            "p99_ns": 869208,
+            "max_ns": 869208,
+            "bytes": 44996
+          },
+          {
+            "p50_ns": 554208,
+            "p95_ns": 707250,
+            "p99_ns": 757709,
+            "max_ns": 757709,
+            "bytes": 44996
+          }
+        ],
+        "median": {
+          "p50_ns": 663000.0,
+          "p95_ns": 780354.5,
+          "p99_ns": 813458.5,
+          "max_ns": 813458.5,
+          "bytes": 44996.0
+        }
+      },
+      "A": {
+        "runs": [
+          {
+            "p50_ns": 558000,
+            "p95_ns": 632250,
+            "p99_ns": 641292,
+            "max_ns": 641292,
+            "bytes": 44996
+          },
+          {
+            "p50_ns": 626333,
+            "p95_ns": 643625,
+            "p99_ns": 658666,
+            "max_ns": 658666,
+            "bytes": 44996
+          }
+        ],
+        "median": {
+          "p50_ns": 592166.5,
+          "p95_ns": 637937.5,
+          "p99_ns": 649979.0,
+          "max_ns": 649979.0,
+          "bytes": 44996.0
+        }
+      },
+      "p50_delta_percent": 11.961753999930757
+    },
+    "spool/512/save": {
+      "B": {
+        "runs": [
+          {
+            "p50_ns": 12884208,
+            "p95_ns": 14333375,
+            "p99_ns": 15325625,
+            "max_ns": 15325625,
+            "bytes": 179780
+          },
+          {
+            "p50_ns": 12593291,
+            "p95_ns": 13071125,
+            "p99_ns": 13594000,
+            "max_ns": 13594000,
+            "bytes": 179780
+          }
+        ],
+        "median": {
+          "p50_ns": 12738749.5,
+          "p95_ns": 13702250.0,
+          "p99_ns": 14459812.5,
+          "max_ns": 14459812.5,
+          "bytes": 179780.0
+        }
+      },
+      "A": {
+        "runs": [
+          {
+            "p50_ns": 12231208,
+            "p95_ns": 13642167,
+            "p99_ns": 17785041,
+            "max_ns": 17785041,
+            "bytes": 179780
+          },
+          {
+            "p50_ns": 12798250,
+            "p95_ns": 13655125,
+            "p99_ns": 13677292,
+            "max_ns": 13677292,
+            "bytes": 179780
+          }
+        ],
+        "median": {
+          "p50_ns": 12514729.0,
+          "p95_ns": 13648646.0,
+          "p99_ns": 15731166.5,
+          "max_ns": 15731166.5,
+          "bytes": 179780.0
+        }
+      },
+      "p50_delta_percent": 1.7900547426955793
+    },
+    "spool/512/load": {
+      "B": {
+        "runs": [
+          {
+            "p50_ns": 1246541,
+            "p95_ns": 1456959,
+            "p99_ns": 1582000,
+            "max_ns": 1582000,
+            "bytes": 179780
+          },
+          {
+            "p50_ns": 1166042,
+            "p95_ns": 1360709,
+            "p99_ns": 1450625,
+            "max_ns": 1450625,
+            "bytes": 179780
+          }
+        ],
+        "median": {
+          "p50_ns": 1206291.5,
+          "p95_ns": 1408834.0,
+          "p99_ns": 1516312.5,
+          "max_ns": 1516312.5,
+          "bytes": 179780.0
+        }
+      },
+      "A": {
+        "runs": [
+          {
+            "p50_ns": 1248250,
+            "p95_ns": 1430584,
+            "p99_ns": 1439958,
+            "max_ns": 1439958,
+            "bytes": 179780
+          },
+          {
+            "p50_ns": 1192958,
+            "p95_ns": 1440083,
+            "p99_ns": 1449250,
+            "max_ns": 1449250,
+            "bytes": 179780
+          }
+        ],
+        "median": {
+          "p50_ns": 1220604.0,
+          "p95_ns": 1435333.5,
+          "p99_ns": 1444604.0,
+          "max_ns": 1444604.0,
+          "bytes": 179780.0
+        }
+      },
+      "p50_delta_percent": -1.1725752168598502
+    },
+    "mqtt/1/save": {
+      "B": {
+        "runs": [
+          {
+            "p50_ns": 8654459,
+            "p95_ns": 9824709,
+            "p99_ns": 10385250,
+            "max_ns": 10385250,
+            "bytes": 4727
+          },
+          {
+            "p50_ns": 6978166,
+            "p95_ns": 8002417,
+            "p99_ns": 8053125,
+            "max_ns": 8053125,
+            "bytes": 4727
+          }
+        ],
+        "median": {
+          "p50_ns": 7816312.5,
+          "p95_ns": 8913563.0,
+          "p99_ns": 9219187.5,
+          "max_ns": 9219187.5,
+          "bytes": 4727.0
+        }
+      },
+      "A": {
+        "runs": [
+          {
+            "p50_ns": 6936042,
+            "p95_ns": 7919375,
+            "p99_ns": 7953625,
+            "max_ns": 7953625,
+            "bytes": 4727
+          },
+          {
+            "p50_ns": 7052416,
+            "p95_ns": 7991500,
+            "p99_ns": 8034083,
+            "max_ns": 8034083,
+            "bytes": 4727
+          }
+        ],
+        "median": {
+          "p50_ns": 6994229.0,
+          "p95_ns": 7955437.5,
+          "p99_ns": 7993854.0,
+          "max_ns": 7993854.0,
+          "bytes": 4727.0
+        }
+      },
+      "p50_delta_percent": 11.753740119175404
+    },
+    "mqtt/1/load": {
+      "B": {
+        "runs": [
+          {
+            "p50_ns": 276291,
+            "p95_ns": 431084,
+            "p99_ns": 439708,
+            "max_ns": 439708,
+            "bytes": 4727
+          },
+          {
+            "p50_ns": 62875,
+            "p95_ns": 75583,
+            "p99_ns": 85750,
+            "max_ns": 85750,
+            "bytes": 4727
+          }
+        ],
+        "median": {
+          "p50_ns": 169583.0,
+          "p95_ns": 253333.5,
+          "p99_ns": 262729.0,
+          "max_ns": 262729.0,
+          "bytes": 4727.0
+        }
+      },
+      "A": {
+        "runs": [
+          {
+            "p50_ns": 75333,
+            "p95_ns": 100791,
+            "p99_ns": 116667,
+            "max_ns": 116667,
+            "bytes": 4727
+          },
+          {
+            "p50_ns": 69667,
+            "p95_ns": 81333,
+            "p99_ns": 90375,
+            "max_ns": 90375,
+            "bytes": 4727
+          }
+        ],
+        "median": {
+          "p50_ns": 72500.0,
+          "p95_ns": 91062.0,
+          "p99_ns": 103521.0,
+          "max_ns": 103521.0,
+          "bytes": 4727.0
+        }
+      },
+      "p50_delta_percent": 133.90758620689653
+    },
+    "mqtt/128/save": {
+      "B": {
+        "runs": [
+          {
+            "p50_ns": 13270041,
+            "p95_ns": 15189792,
+            "p99_ns": 15884417,
+            "max_ns": 15884417,
+            "bytes": 592502
+          },
+          {
+            "p50_ns": 12888625,
+            "p95_ns": 13903292,
+            "p99_ns": 14053709,
+            "max_ns": 14053709,
+            "bytes": 592502
+          }
+        ],
+        "median": {
+          "p50_ns": 13079333.0,
+          "p95_ns": 14546542.0,
+          "p99_ns": 14969063.0,
+          "max_ns": 14969063.0,
+          "bytes": 592502.0
+        }
+      },
+      "A": {
+        "runs": [
+          {
+            "p50_ns": 12434458,
+            "p95_ns": 13314458,
+            "p99_ns": 14091459,
+            "max_ns": 14091459,
+            "bytes": 592502
+          },
+          {
+            "p50_ns": 12268417,
+            "p95_ns": 13374958,
+            "p99_ns": 13870417,
+            "max_ns": 13870417,
+            "bytes": 592502
+          }
+        ],
+        "median": {
+          "p50_ns": 12351437.5,
+          "p95_ns": 13344708.0,
+          "p99_ns": 13980938.0,
+          "max_ns": 13980938.0,
+          "bytes": 592502.0
+        }
+      },
+      "p50_delta_percent": 5.893204738314872
+    },
+    "mqtt/128/load": {
+      "B": {
+        "runs": [
+          {
+            "p50_ns": 2818792,
+            "p95_ns": 3381833,
+            "p99_ns": 3656041,
+            "max_ns": 3656041,
+            "bytes": 592502
+          },
+          {
+            "p50_ns": 2638750,
+            "p95_ns": 3030542,
+            "p99_ns": 3199041,
+            "max_ns": 3199041,
+            "bytes": 592502
+          }
+        ],
+        "median": {
+          "p50_ns": 2728771.0,
+          "p95_ns": 3206187.5,
+          "p99_ns": 3427541.0,
+          "max_ns": 3427541.0,
+          "bytes": 592502.0
+        }
+      },
+      "A": {
+        "runs": [
+          {
+            "p50_ns": 2677416,
+            "p95_ns": 3104500,
+            "p99_ns": 3393334,
+            "max_ns": 3393334,
+            "bytes": 592502
+          },
+          {
+            "p50_ns": 2596792,
+            "p95_ns": 2817000,
+            "p99_ns": 2882334,
+            "max_ns": 2882334,
+            "bytes": 592502
+          }
+        ],
+        "median": {
+          "p50_ns": 2637104.0,
+          "p95_ns": 2960750.0,
+          "p99_ns": 3137834.0,
+          "max_ns": 3137834.0,
+          "bytes": 592502.0
+        }
+      },
+      "p50_delta_percent": 3.4760479677707012
+    },
+    "mqtt/512/save": {
+      "B": {
+        "runs": [
+          {
+            "p50_ns": 27970792,
+            "p95_ns": 29294000,
+            "p99_ns": 35029125,
+            "max_ns": 35029125,
+            "bytes": 2370038
+          },
+          {
+            "p50_ns": 28060458,
+            "p95_ns": 29099458,
+            "p99_ns": 29935500,
+            "max_ns": 29935500,
+            "bytes": 2370038
+          }
+        ],
+        "median": {
+          "p50_ns": 28015625.0,
+          "p95_ns": 29196729.0,
+          "p99_ns": 32482312.5,
+          "max_ns": 32482312.5,
+          "bytes": 2370038.0
+        }
+      },
+      "A": {
+        "runs": [
+          {
+            "p50_ns": 27943750,
+            "p95_ns": 28972750,
+            "p99_ns": 29037375,
+            "max_ns": 29037375,
+            "bytes": 2370038
+          },
+          {
+            "p50_ns": 28112459,
+            "p95_ns": 30871250,
+            "p99_ns": 33050208,
+            "max_ns": 33050208,
+            "bytes": 2370038
+          }
+        ],
+        "median": {
+          "p50_ns": 28028104.5,
+          "p95_ns": 29922000.0,
+          "p99_ns": 31043791.5,
+          "max_ns": 31043791.5,
+          "bytes": 2370038.0
+        }
+      },
+      "p50_delta_percent": -0.04452495173192794
+    },
+    "mqtt/512/load": {
+      "B": {
+        "runs": [
+          {
+            "p50_ns": 9896833,
+            "p95_ns": 10047917,
+            "p99_ns": 10437042,
+            "max_ns": 10437042,
+            "bytes": 2370038
+          },
+          {
+            "p50_ns": 9857042,
+            "p95_ns": 10282958,
+            "p99_ns": 10461375,
+            "max_ns": 10461375,
+            "bytes": 2370038
+          }
+        ],
+        "median": {
+          "p50_ns": 9876937.5,
+          "p95_ns": 10165437.5,
+          "p99_ns": 10449208.5,
+          "max_ns": 10449208.5,
+          "bytes": 2370038.0
+        }
+      },
+      "A": {
+        "runs": [
+          {
+            "p50_ns": 9837875,
+            "p95_ns": 10086000,
+            "p99_ns": 10568500,
+            "max_ns": 10568500,
+            "bytes": 2370038
+          },
+          {
+            "p50_ns": 9864792,
+            "p95_ns": 9915375,
+            "p99_ns": 9967834,
+            "max_ns": 9967834,
+            "bytes": 2370038
+          }
+        ],
+        "median": {
+          "p50_ns": 9851333.5,
+          "p95_ns": 10000687.5,
+          "p99_ns": 10268167.0,
+          "max_ns": 10268167.0,
+          "bytes": 2370038.0
+        }
+      },
+      "p50_delta_percent": 0.25990390031969124
+    }
+  },
+  "startup": {
+    "profile": "release",
+    "configuration": "default static device auth/development audit sink; automatic TCP/UDP and pre-reserved management port; fresh recovery directory; no business listener",
+    "samples": [
+      {
+        "iteration": 1,
+        "label": "A",
+        "startup_to_authenticated_ready_ns": 5454334,
+        "exit_code": 0,
+        "binary_sha256": "b500cb0b9d15c546941db55f22530185690dc8b486f5c8389867387f5cf77222"
+      },
+      {
+        "iteration": 2,
+        "label": "B",
+        "startup_to_authenticated_ready_ns": 4209042,
+        "exit_code": 0,
+        "binary_sha256": "f0581a19450000886f9163c6f3881c7fbab3786f509fd7a3869a0f76835632e9"
+      },
+      {
+        "iteration": 3,
+        "label": "B",
+        "startup_to_authenticated_ready_ns": 4356500,
+        "exit_code": 0,
+        "binary_sha256": "f0581a19450000886f9163c6f3881c7fbab3786f509fd7a3869a0f76835632e9"
+      },
+      {
+        "iteration": 4,
+        "label": "A",
+        "startup_to_authenticated_ready_ns": 4258000,
+        "exit_code": 0,
+        "binary_sha256": "b500cb0b9d15c546941db55f22530185690dc8b486f5c8389867387f5cf77222"
+      },
+      {
+        "iteration": 5,
+        "label": "A",
+        "startup_to_authenticated_ready_ns": 3981666,
+        "exit_code": 0,
+        "binary_sha256": "b500cb0b9d15c546941db55f22530185690dc8b486f5c8389867387f5cf77222"
+      },
+      {
+        "iteration": 6,
+        "label": "B",
+        "startup_to_authenticated_ready_ns": 3807750,
+        "exit_code": 0,
+        "binary_sha256": "f0581a19450000886f9163c6f3881c7fbab3786f509fd7a3869a0f76835632e9"
+      },
+      {
+        "iteration": 7,
+        "label": "B",
+        "startup_to_authenticated_ready_ns": 3730375,
+        "exit_code": 0,
+        "binary_sha256": "f0581a19450000886f9163c6f3881c7fbab3786f509fd7a3869a0f76835632e9"
+      },
+      {
+        "iteration": 8,
+        "label": "A",
+        "startup_to_authenticated_ready_ns": 3847500,
+        "exit_code": 0,
+        "binary_sha256": "b500cb0b9d15c546941db55f22530185690dc8b486f5c8389867387f5cf77222"
+      },
+      {
+        "iteration": 9,
+        "label": "A",
+        "startup_to_authenticated_ready_ns": 3733208,
+        "exit_code": 0,
+        "binary_sha256": "b500cb0b9d15c546941db55f22530185690dc8b486f5c8389867387f5cf77222"
+      },
+      {
+        "iteration": 10,
+        "label": "B",
+        "startup_to_authenticated_ready_ns": 3772000,
+        "exit_code": 0,
+        "binary_sha256": "f0581a19450000886f9163c6f3881c7fbab3786f509fd7a3869a0f76835632e9"
+      },
+      {
+        "iteration": 11,
+        "label": "B",
+        "startup_to_authenticated_ready_ns": 3865333,
+        "exit_code": 0,
+        "binary_sha256": "f0581a19450000886f9163c6f3881c7fbab3786f509fd7a3869a0f76835632e9"
+      },
+      {
+        "iteration": 12,
+        "label": "A",
+        "startup_to_authenticated_ready_ns": 3744209,
+        "exit_code": 0,
+        "binary_sha256": "b500cb0b9d15c546941db55f22530185690dc8b486f5c8389867387f5cf77222"
+      },
+      {
+        "iteration": 13,
+        "label": "A",
+        "startup_to_authenticated_ready_ns": 4056458,
+        "exit_code": 0,
+        "binary_sha256": "b500cb0b9d15c546941db55f22530185690dc8b486f5c8389867387f5cf77222"
+      },
+      {
+        "iteration": 14,
+        "label": "B",
+        "startup_to_authenticated_ready_ns": 4202125,
+        "exit_code": 0,
+        "binary_sha256": "f0581a19450000886f9163c6f3881c7fbab3786f509fd7a3869a0f76835632e9"
+      },
+      {
+        "iteration": 15,
+        "label": "B",
+        "startup_to_authenticated_ready_ns": 3657458,
+        "exit_code": 0,
+        "binary_sha256": "f0581a19450000886f9163c6f3881c7fbab3786f509fd7a3869a0f76835632e9"
+      },
+      {
+        "iteration": 16,
+        "label": "A",
+        "startup_to_authenticated_ready_ns": 3904208,
+        "exit_code": 0,
+        "binary_sha256": "b500cb0b9d15c546941db55f22530185690dc8b486f5c8389867387f5cf77222"
+      },
+      {
+        "iteration": 17,
+        "label": "A",
+        "startup_to_authenticated_ready_ns": 3993417,
+        "exit_code": 0,
+        "binary_sha256": "b500cb0b9d15c546941db55f22530185690dc8b486f5c8389867387f5cf77222"
+      },
+      {
+        "iteration": 18,
+        "label": "B",
+        "startup_to_authenticated_ready_ns": 4108500,
+        "exit_code": 0,
+        "binary_sha256": "f0581a19450000886f9163c6f3881c7fbab3786f509fd7a3869a0f76835632e9"
+      },
+      {
+        "iteration": 19,
+        "label": "B",
+        "startup_to_authenticated_ready_ns": 3857875,
+        "exit_code": 0,
+        "binary_sha256": "f0581a19450000886f9163c6f3881c7fbab3786f509fd7a3869a0f76835632e9"
+      },
+      {
+        "iteration": 20,
+        "label": "A",
+        "startup_to_authenticated_ready_ns": 3852916,
+        "exit_code": 0,
+        "binary_sha256": "b500cb0b9d15c546941db55f22530185690dc8b486f5c8389867387f5cf77222"
+      }
+    ],
+    "A": {
+      "samples": 10,
+      "median_ns": 3942937.0,
+      "min_ns": 3733208,
+      "max_ns": 5454334
+    },
+    "B": {
+      "samples": 10,
+      "median_ns": 3861604.0,
+      "min_ns": 3657458,
+      "max_ns": 4356500
+    }
+  },
+  "network_confirmation": {
+    "q1": {
+      "A": {
+        "runs": [
+          {
+            "file": "q1-3-A.json",
+            "cohort": "mqtt-confirmation",
+            "samples": 300020,
+            "throughput_ops_s": 20001.333333333332,
+            "rss_peak_kib": 17840,
+            "cpu_mean_percent": 201.55238095238096,
+            "errors": 0,
+            "unexpected_disconnects": 0,
+            "pending_at_disconnect": 0,
+            "queue_peak_count": 13,
+            "queue_peak_bytes": 15522,
+            "overload": 0.0,
+            "p50_ms": 0.32,
+            "p95_ms": 0.64,
+            "p99_ms": 0.89,
+            "p999_ms": 1.19,
+            "broker_lock_wait_mean_us": null,
+            "broker_lock_hold_mean_us": null,
+            "event_bus_state_wait_mean_us": null,
+            "event_bus_state_hold_mean_us": null
+          },
+          {
+            "file": "q1-0-A.json",
+            "cohort": "mqtt-confirmation",
+            "samples": 300020,
+            "throughput_ops_s": 20001.333333333332,
+            "rss_peak_kib": 17792,
+            "cpu_mean_percent": 207.89523809523808,
+            "errors": 0,
+            "unexpected_disconnects": 0,
+            "pending_at_disconnect": 0,
+            "queue_peak_count": 11,
+            "queue_peak_bytes": 13121,
+            "overload": 0.0,
+            "p50_ms": 0.33,
+            "p95_ms": 0.66,
+            "p99_ms": 0.92,
+            "p999_ms": 1.22,
+            "broker_lock_wait_mean_us": null,
+            "broker_lock_hold_mean_us": null,
+            "event_bus_state_wait_mean_us": null,
+            "event_bus_state_hold_mean_us": null
+          }
+        ],
+        "median": {
+          "samples": 300020.0,
+          "throughput_ops_s": 20001.333333333332,
+          "rss_peak_kib": 17816.0,
+          "cpu_mean_percent": 204.7238095238095,
+          "errors": 0.0,
+          "unexpected_disconnects": 0.0,
+          "pending_at_disconnect": 0.0,
+          "queue_peak_count": 12.0,
+          "queue_peak_bytes": 14321.5,
+          "overload": 0.0,
+          "p50_ms": 0.325,
+          "p95_ms": 0.65,
+          "p99_ms": 0.905,
+          "p999_ms": 1.205,
+          "broker_lock_wait_mean_us": null,
+          "broker_lock_hold_mean_us": null,
+          "event_bus_state_wait_mean_us": null,
+          "event_bus_state_hold_mean_us": null
+        }
+      },
+      "B": {
+        "runs": [
+          {
+            "file": "q1-2-B.json",
+            "cohort": "mqtt-confirmation",
+            "samples": 299980,
+            "throughput_ops_s": 19998.666666666668,
+            "rss_peak_kib": 17568,
+            "cpu_mean_percent": 208.8,
+            "errors": 0,
+            "unexpected_disconnects": 0,
+            "pending_at_disconnect": 0,
+            "queue_peak_count": 10,
+            "queue_peak_bytes": 11920,
+            "overload": 0.0,
+            "p50_ms": 0.32,
+            "p95_ms": 0.65,
+            "p99_ms": 0.92,
+            "p999_ms": 1.21,
+            "broker_lock_wait_mean_us": null,
+            "broker_lock_hold_mean_us": null,
+            "event_bus_state_wait_mean_us": null,
+            "event_bus_state_hold_mean_us": null
+          },
+          {
+            "file": "q1-1-B.json",
+            "cohort": "mqtt-confirmation",
+            "samples": 300020,
+            "throughput_ops_s": 20001.333333333332,
+            "rss_peak_kib": 19152,
+            "cpu_mean_percent": 211.15,
+            "errors": 0,
+            "unexpected_disconnects": 0,
+            "pending_at_disconnect": 0,
+            "queue_peak_count": 7,
+            "queue_peak_bytes": 8365,
+            "overload": 0.0,
+            "p50_ms": 0.32,
+            "p95_ms": 0.64,
+            "p99_ms": 0.97,
+            "p999_ms": 13.83,
+            "broker_lock_wait_mean_us": null,
+            "broker_lock_hold_mean_us": null,
+            "event_bus_state_wait_mean_us": null,
+            "event_bus_state_hold_mean_us": null
+          }
+        ],
+        "median": {
+          "samples": 300000.0,
+          "throughput_ops_s": 20000.0,
+          "rss_peak_kib": 18360.0,
+          "cpu_mean_percent": 209.97500000000002,
+          "errors": 0.0,
+          "unexpected_disconnects": 0.0,
+          "pending_at_disconnect": 0.0,
+          "queue_peak_count": 8.5,
+          "queue_peak_bytes": 10142.5,
+          "overload": 0.0,
+          "p50_ms": 0.32,
+          "p95_ms": 0.645,
+          "p99_ms": 0.9450000000000001,
+          "p999_ms": 7.52,
+          "broker_lock_wait_mean_us": null,
+          "broker_lock_hold_mean_us": null,
+          "event_bus_state_wait_mean_us": null,
+          "event_bus_state_hold_mean_us": null
+        }
+      },
+      "delta_percent": {
+        "samples": -0.006666222251849874,
+        "throughput_ops_s": -0.0066662222518387715,
+        "rss_peak_kib": 3.053435114503822,
+        "cpu_mean_percent": 2.5650120952735556,
+        "errors": null,
+        "unexpected_disconnects": null,
+        "pending_at_disconnect": null,
+        "queue_peak_count": -29.166666666666664,
+        "queue_peak_bytes": -29.179904339629225,
+        "overload": null,
+        "p50_ms": -1.538461538461544,
+        "p95_ms": -0.7692307692307665,
+        "p99_ms": 4.419889502762442,
+        "p999_ms": 524.0663900414937,
+        "broker_lock_wait_mean_us": null,
+        "broker_lock_hold_mean_us": null,
+        "event_bus_state_wait_mean_us": null,
+        "event_bus_state_hold_mean_us": null
+      },
+      "p99_two_sided_exact_permutation_p": 0.6666666666666666
+    }
+  },
+  "network_steady": {
+    "q1": {
+      "A": {
+        "runs": [
+          {
+            "file": "q1-1-A.json",
+            "cohort": "mqtt-steady",
+            "samples": 600012,
+            "throughput_ops_s": 20000.4,
+            "rss_peak_kib": 19632,
+            "cpu_mean_percent": 235.37317073170732,
+            "errors": 0,
+            "unexpected_disconnects": 0,
+            "pending_at_disconnect": 0,
+            "queue_peak_count": 21,
+            "queue_peak_bytes": 25032,
+            "overload": 0.0,
+            "p50_ms": 0.33,
+            "p95_ms": 0.69,
+            "p99_ms": 1.07,
+            "p999_ms": 11.18,
+            "broker_lock_wait_mean_us": null,
+            "broker_lock_hold_mean_us": null,
+            "event_bus_state_wait_mean_us": null,
+            "event_bus_state_hold_mean_us": null
+          },
+          {
+            "file": "q1-2-A.json",
+            "cohort": "mqtt-steady",
+            "samples": 599884,
+            "throughput_ops_s": 19996.133333333335,
+            "rss_peak_kib": 21376,
+            "cpu_mean_percent": 236.7609756097561,
+            "errors": 0,
+            "unexpected_disconnects": 0,
+            "pending_at_disconnect": 0,
+            "queue_peak_count": 11,
+            "queue_peak_bytes": 13112,
+            "overload": 0.0,
+            "p50_ms": 0.33,
+            "p95_ms": 0.69,
+            "p99_ms": 1.03,
+            "p999_ms": 17.67,
+            "broker_lock_wait_mean_us": null,
+            "broker_lock_hold_mean_us": null,
+            "event_bus_state_wait_mean_us": null,
+            "event_bus_state_hold_mean_us": null
+          }
+        ],
+        "median": {
+          "samples": 599948.0,
+          "throughput_ops_s": 19998.26666666667,
+          "rss_peak_kib": 20504.0,
+          "cpu_mean_percent": 236.0670731707317,
+          "errors": 0.0,
+          "unexpected_disconnects": 0.0,
+          "pending_at_disconnect": 0.0,
+          "queue_peak_count": 16.0,
+          "queue_peak_bytes": 19072.0,
+          "overload": 0.0,
+          "p50_ms": 0.33,
+          "p95_ms": 0.69,
+          "p99_ms": 1.05,
+          "p999_ms": 14.425,
+          "broker_lock_wait_mean_us": null,
+          "broker_lock_hold_mean_us": null,
+          "event_bus_state_wait_mean_us": null,
+          "event_bus_state_hold_mean_us": null
+        }
+      },
+      "B": {
+        "runs": [
+          {
+            "file": "q1-0-B.json",
+            "cohort": "mqtt-steady",
+            "samples": 599996,
+            "throughput_ops_s": 19999.866666666665,
+            "rss_peak_kib": 19200,
+            "cpu_mean_percent": 237.61463414634147,
+            "errors": 0,
+            "unexpected_disconnects": 0,
+            "pending_at_disconnect": 0,
+            "queue_peak_count": 6,
+            "queue_peak_bytes": 7158,
+            "overload": 0.0,
+            "p50_ms": 0.33,
+            "p95_ms": 0.67,
+            "p99_ms": 1.0,
+            "p999_ms": 11.96,
+            "broker_lock_wait_mean_us": null,
+            "broker_lock_hold_mean_us": null,
+            "event_bus_state_wait_mean_us": null,
+            "event_bus_state_hold_mean_us": null
+          },
+          {
+            "file": "q1-3-B.json",
+            "cohort": "mqtt-steady",
+            "samples": 599991,
+            "throughput_ops_s": 19999.7,
+            "rss_peak_kib": 19840,
+            "cpu_mean_percent": 224.50487804878048,
+            "errors": 0,
+            "unexpected_disconnects": 0,
+            "pending_at_disconnect": 0,
+            "queue_peak_count": 277,
+            "queue_peak_bytes": 330514,
+            "overload": 0.0,
+            "p50_ms": 0.31,
+            "p95_ms": 0.65,
+            "p99_ms": 1.1,
+            "p999_ms": 19.89,
+            "broker_lock_wait_mean_us": null,
+            "broker_lock_hold_mean_us": null,
+            "event_bus_state_wait_mean_us": null,
+            "event_bus_state_hold_mean_us": null
+          }
+        ],
+        "median": {
+          "samples": 599993.5,
+          "throughput_ops_s": 19999.783333333333,
+          "rss_peak_kib": 19520.0,
+          "cpu_mean_percent": 231.05975609756098,
+          "errors": 0.0,
+          "unexpected_disconnects": 0.0,
+          "pending_at_disconnect": 0.0,
+          "queue_peak_count": 141.5,
+          "queue_peak_bytes": 168836.0,
+          "overload": 0.0,
+          "p50_ms": 0.32,
+          "p95_ms": 0.66,
+          "p99_ms": 1.05,
+          "p999_ms": 15.925,
+          "broker_lock_wait_mean_us": null,
+          "broker_lock_hold_mean_us": null,
+          "event_bus_state_wait_mean_us": null,
+          "event_bus_state_hold_mean_us": null
+        }
+      },
+      "delta_percent": {
+        "samples": 0.007583990612514135,
+        "throughput_ops_s": 0.007583990612491931,
+        "rss_peak_kib": -4.799063597346864,
+        "cpu_mean_percent": -2.1211416763528335,
+        "errors": null,
+        "unexpected_disconnects": null,
+        "pending_at_disconnect": null,
+        "queue_peak_count": 784.375,
+        "queue_peak_bytes": 785.2558724832214,
+        "overload": null,
+        "p50_ms": -3.0303030303030276,
+        "p95_ms": -4.347826086956507,
+        "p99_ms": 0.0,
+        "p999_ms": 10.398613518197575,
+        "broker_lock_wait_mean_us": null,
+        "broker_lock_hold_mean_us": null,
+        "event_bus_state_wait_mean_us": null,
+        "event_bus_state_hold_mean_us": null
+      },
+      "p99_two_sided_exact_permutation_p": 1.0
+    }
+  }
+}

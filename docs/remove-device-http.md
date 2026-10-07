@@ -1,5 +1,7 @@
 # Remove Device HTTP/HTTPS Transport
 
+> Historical implementation evidence. Business streams and recovery compatibility described below predate the [current-only protocol cleanup](migration/current-protocol-only.md).
+
 > Historical audit: device-configuration ownership described here was removed later.
 > Current behavior and migration: [Remove device configuration](remove-device-config.md).
 

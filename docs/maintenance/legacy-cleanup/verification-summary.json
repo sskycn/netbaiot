@@ -1,0 +1,97 @@
+{
+  "protocol_cohorts": {
+    "executions": 520,
+    "test_executions": 4300,
+    "all_pass": true,
+    "modes": [
+      "default",
+      "serial"
+    ],
+    "concurrent_repetitions_per_mode": 30,
+    "certificate_repetitions_per_mode": 10
+  },
+  "final_metric_change": {
+    "executions": 120,
+    "test_executions": 780,
+    "all_pass": true,
+    "repetitions_per_mode": 30
+  },
+  "dependency_edges_removed": [
+    {
+      "package": "netbaiot-client",
+      "dependency": "tracing",
+      "scope": "normal"
+    },
+    {
+      "package": "netbaiot-protocol",
+      "dependency": "serde_json",
+      "scope": "normal; dev dependency retained"
+    },
+    {
+      "package": "netbaiot-server",
+      "dependency": "subtle",
+      "scope": "normal"
+    },
+    {
+      "package": "netbaiot-core",
+      "dependency": "uuid",
+      "scope": "normal"
+    },
+    {
+      "package": "netbaiot-transports",
+      "dependency": "thiserror",
+      "scope": "normal"
+    },
+    {
+      "package": "netbaiot-v3-mux",
+      "dependency": "serde",
+      "scope": "normal"
+    },
+    {
+      "package": "netbaiot-v3-mux",
+      "dependency": "serde_json",
+      "scope": "normal"
+    },
+    {
+      "package": "netbaiot-cli",
+      "dependency": "tracing",
+      "scope": "normal"
+    }
+  ],
+  "cargo_machete": "not installed; manual call-site/target audit and strict all-target compilation",
+  "removed_external_packages": 0,
+  "final_gates": {
+    "final-check.log": {
+      "status": "PASS",
+      "log_sha256": "4cfd178d4bb6deaa73cf9e5c55d16c84d063a2a5432e04fd6d6b81020f71511b"
+    },
+    "final-release-rust.log": {
+      "status": "PASS",
+      "log_sha256": "54f0a4f06b20c4e81e6a44a0db442d23879ce22026cbcc5308cb493b7ea2da88"
+    },
+    "report-final-xtask.log": {
+      "status": "PASS",
+      "log_sha256": "c7bdfa8f8d2bd274db5c571111aec60559cc28d9dc5777ee47177c7f34430aab"
+    },
+    "report-final-preflight.log": {
+      "status": "PASS",
+      "log_sha256": "25664e4ae43f8178e193decab43187badf774c023e044a857799f09545b6ab5b"
+    },
+    "report-final-mqtt.log": {
+      "status": "PASS",
+      "log_sha256": "f918e1dae0e0b9642c7fb6144347c78c4ae1ba10b66980f4d301238401e51386"
+    },
+    "final-doc.log": {
+      "status": "PASS",
+      "log_sha256": "aac0f8de001137f594324ae4b8c8f8cca86c04b578702eba6c8042b7bb1af50d"
+    },
+    "final-tutorial.log": {
+      "status": "PASS",
+      "log_sha256": "8b09eb7ee00058b8a01decac267ce612034eb060033fa84825bdeae018d52f58"
+    },
+    "final-restart-soak.log": {
+      "status": "PASS",
+      "log_sha256": "daa659f92f6ccca63f16b810a4d312fc33b66d8a8ca0511bd625345362da07f2"
+    }
+  }
+}

@@ -1,0 +1,646 @@
+{
+  "scope": "Current files returned by rg --files --hidden; ignored raw data and Git internals excluded. This audit file itself quotes historical/removed names as an evidence index, not implementation.",
+  "pattern": "Business\\s+(?:RPC|Stream)\\s+V[12]|RpcV[12]|V[12]Rpc|legacy\\s+rpc|rpc\\s+legacy|recovery[ _-]v[1-5]\\b|decode_v[1-5]\\b|migrate_v[1-5]\\b|rpc_v[12]|business_rpc_v2|business_stream_v1|allow_v[12]|NETBAIOT_BUSINESS_STREAM_TOKEN",
+  "files": [
+    {
+      "path": "docs/audit-evidence/mqtt-release-gate-results.json",
+      "reason": "Archived measurement/release evidence; historical identities/values remain unchanged.",
+      "matches": [
+        {
+          "line": 546,
+          "text": "      \"test_id\": \"MQTT-RECOVERY-V2-ROUNDTRIP-001\","
+        },
+        {
+          "line": 555,
+          "text": "      \"test_id\": \"MQTT-RECOVERY-V3-ROUNDTRIP-001\","
+        },
+        {
+          "line": 564,
+          "text": "      \"test_id\": \"MQTT-RECOVERY-V1-COMPAT-001\","
+        },
+        {
+          "line": 618,
+          "text": "      \"test_id\": \"MQTT-RECOVERY-V1-LARGE-COMPAT-001\","
+        }
+      ]
+    },
+    {
+      "path": "docs/audit-evidence/mqtt-release-gate.log",
+      "reason": "Archived measurement/release evidence; historical identities/values remain unchanged.",
+      "matches": [
+        {
+          "line": 66,
+          "text": "MQTT-RECOVERY-V2-ROUNDTRIP-001: PASS —      Running tests/end_to_end.rs (target/debug/deps/end_to_end-86d20c0f6c3be1d6)"
+        },
+        {
+          "line": 67,
+          "text": "MQTT-RECOVERY-V3-ROUNDTRIP-001: PASS —      Running tests/end_to_end.rs (target/debug/deps/end_to_end-86d20c0f6c3be1d6)"
+        },
+        {
+          "line": 68,
+          "text": "MQTT-RECOVERY-V1-COMPAT-001: PASS —      Running tests/end_to_end.rs (target/debug/deps/end_to_end-86d20c0f6c3be1d6)"
+        },
+        {
+          "line": 74,
+          "text": "MQTT-RECOVERY-V1-LARGE-COMPAT-001: PASS —      Running tests/end_to_end.rs (target/debug/deps/end_to_end-86d20c0f6c3be1d6)"
+        }
+      ]
+    },
+    {
+      "path": "docs/business-rpc-v2-production-readiness.zh-CN.md",
+      "reason": "Historical audit explicitly marked with current support/migration context; old behavior refers to its recorded revision.",
+      "matches": [
+        {
+          "line": 86,
+          "text": "在本轮最终代码上通过：`cargo fmt --all -- --check`；stable 和 Rust 1.88.0 各自的 `cargo clippy --locked --workspace --all-targets --all-features -- -D warnings` 与 `cargo test --locked --workspace --all-features`；`python3 tests/mqtt_conformance/run.py --netbaiot-only`（31/31）；`cargo +nightly fuzz run business_rpc_v2 -- -runs=10000`（10,000 次，无崩溃）；`subprocess_graceful_restart_sixty_second_soak`（65.23 秒，PASS）。Python 代理语法检查和 netem shell 语法检查也通过。长时负载及 Linux netem 的 `NOT RUN` 状态不受这些自动回归结果改变。"
+        }
+      ]
+    },
+    {
+      "path": "docs/business-rpc-v2-reliability.zh-CN.md",
+      "reason": "Historical audit explicitly marked with current support/migration context; old behavior refers to its recorded revision.",
+      "matches": [
+        {
+          "line": 1,
+          "text": "# Business RPC V2 可靠性与负载门禁"
+        },
+        {
+          "line": 5,
+          "text": "后续 mTLS、双角色拓扑、WAN-like 流延迟、CPU/RSS、证书生命周期与生产门禁记录见 [Business RPC V2 生产就绪门禁](business-rpc-v2-production-readiness.zh-CN.md)。本页以下数字仍是上一阶段的明文 loopback/dev profile 历史测量，不能与新一轮 release/mTLS 数据混写或作为当前生产容量。"
+        },
+        {
+          "line": 32,
+          "text": "在 JSON 中选择 `auth`、`multiplexed`、`reconnect`、`verifier` 或 `consumer_outage`。开发模式只连回环地址，业务 token 由 `NETBAIOT_BUSINESS_RPC_TOKEN` 提供；管理指标采样另需 `NETBAIOT_ADMIN_SECRET`。配置文件不包含密钥。服务端须为 Business RPC V2 开启 `business_tcp`、`device_auth: business_rpc`、`event_delivery: business_rpc`，并使用可识别 `demo/sensor` 的 JSON codec。`gateway_pid` 可选；Linux 读取 `/proc/<pid>/status`，macOS 使用 `ps`，不可用时 RSS 为 null。`management_url` 可选，采样固定名称的 pending/queue/同步/迟到指标。"
+        },
+        {
+          "line": 102,
+          "text": "cargo +nightly fuzz run business_rpc_v2 -- -runs=10000"
+        }
+      ]
+    },
+    {
+      "path": "docs/correctness-baseline-freeze.md",
+      "reason": "Historical audit explicitly marked with current support/migration context; old behavior refers to its recorded revision.",
+      "matches": [
+        {
+          "line": 23,
+          "text": "| Large NBMQ v1 compatibility | P1 | yes | the smaller current ceiling was checked before the file version was read | read the fixed prefix first, then apply the exact legacy v1 ceiling or current v2/v3 ceiling | `MQTT-RECOVERY-V1-LARGE-COMPAT-001` uses a prior-format encoder and a v1 file larger than a lowered current-format test ceiling | PASS; legacy v1 decoding may allocate its bounded JSON payload |"
+        }
+      ]
+    },
+    {
+      "path": "docs/eventbus-batch-evidence/final/mqtt-release-gate.log",
+      "reason": "Archived measurement/release evidence; historical identities/values remain unchanged.",
+      "matches": [
+        {
+          "line": 66,
+          "text": "MQTT-RECOVERY-V2-ROUNDTRIP-001: PASS —      Running tests/end_to_end.rs (target/debug/deps/end_to_end-910d8e5a8e426061)"
+        },
+        {
+          "line": 67,
+          "text": "MQTT-RECOVERY-V3-ROUNDTRIP-001: PASS —      Running tests/end_to_end.rs (target/debug/deps/end_to_end-910d8e5a8e426061)"
+        },
+        {
+          "line": 68,
+          "text": "MQTT-RECOVERY-V1-COMPAT-001: PASS —      Running tests/end_to_end.rs (target/debug/deps/end_to_end-910d8e5a8e426061)"
+        },
+        {
+          "line": 74,
+          "text": "MQTT-RECOVERY-V1-LARGE-COMPAT-001: PASS —      Running tests/end_to_end.rs (target/debug/deps/end_to_end-910d8e5a8e426061)"
+        }
+      ]
+    },
+    {
+      "path": "docs/eventbus-batch-evidence/final/mqtt-results.json",
+      "reason": "Archived measurement/release evidence; historical identities/values remain unchanged.",
+      "matches": [
+        {
+          "line": 546,
+          "text": "      \"test_id\": \"MQTT-RECOVERY-V2-ROUNDTRIP-001\","
+        },
+        {
+          "line": 555,
+          "text": "      \"test_id\": \"MQTT-RECOVERY-V3-ROUNDTRIP-001\","
+        },
+        {
+          "line": 564,
+          "text": "      \"test_id\": \"MQTT-RECOVERY-V1-COMPAT-001\","
+        },
+        {
+          "line": 618,
+          "text": "      \"test_id\": \"MQTT-RECOVERY-V1-LARGE-COMPAT-001\","
+        }
+      ]
+    },
+    {
+      "path": "docs/eventbus-lock-evidence/final/mqtt-release-gate.log",
+      "reason": "Archived measurement/release evidence; historical identities/values remain unchanged.",
+      "matches": [
+        {
+          "line": 66,
+          "text": "MQTT-RECOVERY-V2-ROUNDTRIP-001: PASS —      Running tests/end_to_end.rs (target/debug/deps/end_to_end-910d8e5a8e426061)"
+        },
+        {
+          "line": 67,
+          "text": "MQTT-RECOVERY-V3-ROUNDTRIP-001: PASS —      Running tests/end_to_end.rs (target/debug/deps/end_to_end-910d8e5a8e426061)"
+        },
+        {
+          "line": 68,
+          "text": "MQTT-RECOVERY-V1-COMPAT-001: PASS —      Running tests/end_to_end.rs (target/debug/deps/end_to_end-910d8e5a8e426061)"
+        },
+        {
+          "line": 74,
+          "text": "MQTT-RECOVERY-V1-LARGE-COMPAT-001: PASS —      Running tests/end_to_end.rs (target/debug/deps/end_to_end-910d8e5a8e426061)"
+        }
+      ]
+    },
+    {
+      "path": "docs/eventbus-lock-evidence/final/mqtt-results.json",
+      "reason": "Archived measurement/release evidence; historical identities/values remain unchanged.",
+      "matches": [
+        {
+          "line": 546,
+          "text": "      \"test_id\": \"MQTT-RECOVERY-V2-ROUNDTRIP-001\","
+        },
+        {
+          "line": 555,
+          "text": "      \"test_id\": \"MQTT-RECOVERY-V3-ROUNDTRIP-001\","
+        },
+        {
+          "line": 564,
+          "text": "      \"test_id\": \"MQTT-RECOVERY-V1-COMPAT-001\","
+        },
+        {
+          "line": 618,
+          "text": "      \"test_id\": \"MQTT-RECOVERY-V1-LARGE-COMPAT-001\","
+        }
+      ]
+    },
+    {
+      "path": "docs/final-state-machine-remediation.md",
+      "reason": "Historical audit explicitly marked with current support/migration context; old behavior refers to its recorded revision.",
+      "matches": [
+        {
+          "line": 29,
+          "text": "| Recovery size | P1 | yes | v1 cloned and JSON-expanded the complete state | streaming compact NBMQ v2 records; 192.25 MiB configured bound; v1 read compatibility | `MQTT-RECOVERY-V2-ROUNDTRIP-001`, `MQTT-RECOVERY-V1-COMPAT-001`, actual decoder fuzz | PASS; legacy v1 decoding still needs its bounded payload allocation |"
+        }
+      ]
+    },
+    {
+      "path": "docs/lifecycle-command-hardening.md",
+      "reason": "Historical audit explicitly marked with current support/migration context; old behavior refers to its recorded revision.",
+      "matches": [
+        {
+          "line": 175,
+          "text": "- `fuzz/seed_corpus.py` 后，11 个现有目标各 `cargo +nightly fuzz run TARGET -- -runs=10000 -timeout=5 -max_len=131072`：mqtt_device_profile、mqtt_packet、mqtt_v5_packet、mqtt_state、mqtt_recovery、udp_envelope、tcp_frame、restart_spool、business_stream、business_rpc_v2、business_rpc_v3，全部退出 0，ASan 默认开启。"
+        }
+      ]
+    },
+    {
+      "path": "docs/maintenance/legacy-cleanup-inventory.md",
+      "reason": "Removal/baseline documentation; describes the compatibility break, not live support.",
+      "matches": [
+        {
+          "line": 5,
+          "text": "Version namespaces are distinct: Business Stream V1, Business RPC V2 and current Business RPC V3; MQTT recovery NBMQ v1–v6 (current v6); EventBus restart spool NBSP v1–v3 (current v3). Current HTTP/device JSON schema version 1 and MQTT 3.1.1/5.0 are independent and remain supported. The user's current-only cleanup instruction supersedes the previous historical recovery compatibility requirement."
+        },
+        {
+          "line": 9,
+          "text": "| DELETE | `apps/netbaiot-server/src/business_stream_v1.rs` and V1 listener/dispatcher branches | Remove framing, hello/subscription/event/ACK loop and V1 token setting; preserve event ACK/restart correctness via current RPC |"
+        },
+        {
+          "line": 17,
+          "text": "| DELETE / REWRITE | Config `version`, `allow_v1`, optional current-protocol dispatch | Replace with a single current listener/config path. Old config fields have no aliases and fail under deny_unknown_fields policy |"
+        }
+      ]
+    },
+    {
+      "path": "docs/maintenance/legacy-cleanup-report.md",
+      "reason": "Removal/baseline documentation; describes the compatibility break, not live support.",
+      "matches": [
+        {
+          "line": 23,
+          "text": "| V1 模块/函数 | 删除 `apps/netbaiot-server/src/business_stream_v1.rs`；`serve_business_mixed`、V1 hello/subscription/framing/writer、`ActiveStreamLease`；root client 的 V1 reader/writer/reconnect/ACK driver | `EventStream`/`Delivery` 有实际消费者，改用当前 V3 driver；手动 ACK、独立 event token、count/byte bounds、取消和 drop 停止任务仍有效 |"
+        },
+        {
+          "line": 32,
+          "text": "| 配置/CLI | `version`、`allow_v1`、optional `v3` dispatcher、`v3_send_ahead`/旧 socket-buffer 字段名、旧 `NETBAIOT_BUSINESS_STREAM_TOKEN` 入口；loadgen 旧 protocol topology variants | 单一 `limits`/`send_ahead`/`experiment_socket_send_buffer_bytes` 当前 config；无 serde alias，旧字段按 deny_unknown_fields 拒绝；当前 event 地址/token 与所有管理/设备命令保留 |"
+        },
+        {
+          "line": 35,
+          "text": "| Fuzz/CI | 删除 V1 `business_stream` 与 V2 `business_rpc_v2` targets，替换为当前 bootstrap；Native recovery 先行 gate 由旧 test-name prefix 改为当前 recovery 模块；MQTT catalog 旧恢复 filters 替换为 current golden/roundtrip/MQTT5/unsupported tests | 当前 framing/state/recovery/corrupt/unsupported fuzz；Rust release evidence 必须实际有通过的测试，`0 tests`/ignored-only 不通过；全部 workspace/native Windows 测试保留，无 ignore/continue-on-error/放宽 timeout/sleep；维护验证报告也触发已有 fuzz smoke |"
+        }
+      ]
+    },
+    {
+      "path": "docs/maintenance/legacy-cleanup/changed-files.json",
+      "reason": "Generated cleanup audit/evidence index: removed declarations, old source paths or test names, not live code.",
+      "matches": [
+        {
+          "line": 83,
+          "text": "      \"apps/netbaiot-server/src/business_stream_v1.rs\""
+        },
+        {
+          "line": 119,
+          "text": "      \"apps/netbaiot-server/tests/business_rpc_v2.rs\","
+        },
+        {
+          "line": 162,
+          "text": "      \"crates/netbaiot-client/examples/business_rpc_v2.rs\","
+        },
+        {
+          "line": 709,
+          "text": "      \"fuzz/fuzz_targets/business_rpc_v2.rs\""
+        }
+      ]
+    },
+    {
+      "path": "docs/maintenance/legacy-cleanup/removed-declarations.json",
+      "reason": "Generated cleanup audit/evidence index: removed declarations, old source paths or test names, not live code.",
+      "matches": [
+        {
+          "line": 3,
+          "text": "    \"before_path\": \"apps/netbaiot-server/src/business_stream_v1.rs\","
+        },
+        {
+          "line": 28,
+          "text": "    \"before_path\": \"apps/netbaiot-server/tests/business_rpc_v2.rs\","
+        },
+        {
+          "line": 222,
+          "text": "      \"decode_v1\""
+        }
+      ]
+    },
+    {
+      "path": "docs/migration/current-protocol-only.md",
+      "reason": "Removal/baseline documentation; describes the compatibility break, not live support.",
+      "matches": [
+        {
+          "line": 3,
+          "text": "From this cleanup, Business RPC V1 and V2 implementations are removed. Business RPC V3 is the only accepted business stream. MQTT recovery accepts NBMQ v6 only; the independent EventBus spool accepts NBSP v3 only. NBMQ v1–v5 and NBSP v1/v2 readers, JSON recovery, migration paths and historical fixtures are removed. Old/unknown headers fail with `UnsupportedRecoveryVersion(version)` or protocol rejection/connection close. Current framing, payload bytes, checksum/trailer, permissions and resource limits remain in force. MQTT 3.1.1/5.0 and management `/api/v1` remain supported."
+        },
+        {
+          "line": 7,
+          "text": "Upgrade business clients to `BusinessRpcV3Client` or the current `NetbaIoTClient` event façade before deploying the listener. Old public stream/V2 frame/client/config types have been removed, without deprecated wrappers. The Python V1 example and V1 capacity harness are removed; use the current Rust examples and RPC loadgen. Old configurations containing `version`, `allow_v1`, `v3`, `v3_send_ahead` or `v3_experiment_socket_send_buffer_bytes` fail under `deny_unknown_fields`. Configure `limits`, `send_ahead` and `experiment_socket_send_buffer_bytes` instead. Enabling `business_tcp` requires explicit `business_rpc`; omitting it no longer enables an old protocol. Replace `NETBAIOT_BUSINESS_STREAM_TOKEN` with the current configured development token environment variable on loopback, or use mTLS with an explicitly mapped principal in production. Management/device credentials never substitute for business credentials."
+        }
+      ]
+    },
+    {
+      "path": "docs/performance/business-rpc-v3-command-readiness/fault-storm-20s-mtls/gateway-config.json",
+      "reason": "Archived measurement/release evidence; historical identities/values remain unchanged.",
+      "matches": [
+        {
+          "line": 75,
+          "text": "    \"allow_v1\": false,"
+        }
+      ]
+    },
+    {
+      "path": "docs/performance/business-rpc-v3-command-readiness/readiness-30m-mtls-50-device-preflight/gateway-config.json",
+      "reason": "Archived measurement/release evidence; historical identities/values remain unchanged.",
+      "matches": [
+        {
+          "line": 74,
+          "text": "    \"allow_v1\": false,"
+        }
+      ]
+    },
+    {
+      "path": "docs/performance/business-rpc-v3-command-readiness/readiness-30m-mtls-final/gateway-config.json",
+      "reason": "Archived measurement/release evidence; historical identities/values remain unchanged.",
+      "matches": [
+        {
+          "line": 75,
+          "text": "    \"allow_v1\": false,"
+        }
+      ]
+    },
+    {
+      "path": "docs/performance/business-rpc-v3-command-readiness/readiness-30m-mtls-paced-publish-failure/gateway-config.json",
+      "reason": "Archived measurement/release evidence; historical identities/values remain unchanged.",
+      "matches": [
+        {
+          "line": 75,
+          "text": "    \"allow_v1\": false,"
+        }
+      ]
+    },
+    {
+      "path": "docs/performance/business-rpc-v3-command-readiness/readiness-30m-mtls-startup-failure/gateway-config.json",
+      "reason": "Archived measurement/release evidence; historical identities/values remain unchanged.",
+      "matches": [
+        {
+          "line": 71,
+          "text": "    \"allow_v1\": false,"
+        }
+      ]
+    },
+    {
+      "path": "docs/performance/business-rpc-v3-command-readiness/readiness-30m-mtls-unpaced/gateway-config.json",
+      "reason": "Archived measurement/release evidence; historical identities/values remain unchanged.",
+      "matches": [
+        {
+          "line": 74,
+          "text": "    \"allow_v1\": false,"
+        }
+      ]
+    },
+    {
+      "path": "docs/performance/business-rpc-v3-command-readiness/readiness-30m-paced-60s-preflight-failure/gateway-config.json",
+      "reason": "Archived measurement/release evidence; historical identities/values remain unchanged.",
+      "matches": [
+        {
+          "line": 74,
+          "text": "    \"allow_v1\": false,"
+        }
+      ]
+    },
+    {
+      "path": "docs/performance/business-rpc-v3-command-readiness/readiness-30m-paced-60s-preflight/gateway-config.json",
+      "reason": "Archived measurement/release evidence; historical identities/values remain unchanged.",
+      "matches": [
+        {
+          "line": 75,
+          "text": "    \"allow_v1\": false,"
+        }
+      ]
+    },
+    {
+      "path": "docs/performance/business-rpc-v3-command-readiness/smoke-60s-mtls-final/gateway-config.json",
+      "reason": "Archived measurement/release evidence; historical identities/values remain unchanged.",
+      "matches": [
+        {
+          "line": 71,
+          "text": "    \"allow_v1\": false,"
+        }
+      ]
+    },
+    {
+      "path": "docs/performance/business-rpc-v3-command-readiness/smoke-60s-mtls-r2/gateway-config.json",
+      "reason": "Archived measurement/release evidence; historical identities/values remain unchanged.",
+      "matches": [
+        {
+          "line": 71,
+          "text": "    \"allow_v1\": false,"
+        }
+      ]
+    },
+    {
+      "path": "docs/performance/business-rpc-v3-command-readiness/smoke-60s-mtls-r3/gateway-config.json",
+      "reason": "Archived measurement/release evidence; historical identities/values remain unchanged.",
+      "matches": [
+        {
+          "line": 71,
+          "text": "    \"allow_v1\": false,"
+        }
+      ]
+    },
+    {
+      "path": "docs/performance/business-rpc-v3-command-readiness/smoke-60s-mtls-r4/gateway-config.json",
+      "reason": "Archived measurement/release evidence; historical identities/values remain unchanged.",
+      "matches": [
+        {
+          "line": 71,
+          "text": "    \"allow_v1\": false,"
+        }
+      ]
+    },
+    {
+      "path": "docs/performance/business-rpc-v3-command-readiness/smoke-60s-mtls-r5/gateway-config.json",
+      "reason": "Archived measurement/release evidence; historical identities/values remain unchanged.",
+      "matches": [
+        {
+          "line": 71,
+          "text": "    \"allow_v1\": false,"
+        }
+      ]
+    },
+    {
+      "path": "docs/performance/business-rpc-v3-command-readiness/smoke-60s-mtls-v3-dual/gateway-config.json",
+      "reason": "Archived measurement/release evidence; historical identities/values remain unchanged.",
+      "matches": [
+        {
+          "line": 71,
+          "text": "    \"allow_v1\": false,"
+        }
+      ]
+    },
+    {
+      "path": "docs/performance/business-rpc-v3-command-readiness/smoke-60s-mtls/gateway-config.json",
+      "reason": "Archived measurement/release evidence; historical identities/values remain unchanged.",
+      "matches": [
+        {
+          "line": 71,
+          "text": "    \"allow_v1\": false,"
+        }
+      ]
+    },
+    {
+      "path": "docs/performance/developer-experience/evidence/phase2-source-manifest.json",
+      "reason": "Archived measurement/release evidence; historical identities/values remain unchanged.",
+      "matches": [
+        {
+          "line": 29,
+          "text": "  \"apps/netbaiot-server/src/business_stream_v1.rs\": \"26c5defe826889251b1a4d297ebb577eb579b330e965eb8bdac776c4e1e141e5\","
+        },
+        {
+          "line": 38,
+          "text": "  \"apps/netbaiot-server/tests/business_rpc_v2.rs\": \"d602ccd1af8764d3e95722f8ae88bbc4fdf70e4ee35623722be88fdd168d7186\","
+        },
+        {
+          "line": 46,
+          "text": "  \"crates/netbaiot-client/examples/business_rpc_v2.rs\": \"1e156ce07b01a24788f73364cff628a352f1d3891750f94eec482507ad37d71e\","
+        }
+      ]
+    },
+    {
+      "path": "docs/performance/developer-experience/evidence/post-merge-restart-fixture-source-manifest.json",
+      "reason": "Archived measurement/release evidence; historical identities/values remain unchanged.",
+      "matches": [
+        {
+          "line": 29,
+          "text": "  \"apps/netbaiot-server/src/business_stream_v1.rs\": \"26c5defe826889251b1a4d297ebb577eb579b330e965eb8bdac776c4e1e141e5\","
+        },
+        {
+          "line": 38,
+          "text": "  \"apps/netbaiot-server/tests/business_rpc_v2.rs\": \"d602ccd1af8764d3e95722f8ae88bbc4fdf70e4ee35623722be88fdd168d7186\","
+        },
+        {
+          "line": 46,
+          "text": "  \"crates/netbaiot-client/examples/business_rpc_v2.rs\": \"1e156ce07b01a24788f73364cff628a352f1d3891750f94eec482507ad37d71e\","
+        }
+      ]
+    },
+    {
+      "path": "docs/performance/developer-experience/evidence/post-merge-v3-close-source-manifest.json",
+      "reason": "Archived measurement/release evidence; historical identities/values remain unchanged.",
+      "matches": [
+        {
+          "line": 29,
+          "text": "  \"apps/netbaiot-server/src/business_stream_v1.rs\": \"26c5defe826889251b1a4d297ebb577eb579b330e965eb8bdac776c4e1e141e5\","
+        },
+        {
+          "line": 38,
+          "text": "  \"apps/netbaiot-server/tests/business_rpc_v2.rs\": \"d602ccd1af8764d3e95722f8ae88bbc4fdf70e4ee35623722be88fdd168d7186\","
+        },
+        {
+          "line": 46,
+          "text": "  \"crates/netbaiot-client/examples/business_rpc_v2.rs\": \"1e156ce07b01a24788f73364cff628a352f1d3891750f94eec482507ad37d71e\","
+        }
+      ]
+    },
+    {
+      "path": "docs/performance/lifecycle-hardening/changed-files.txt",
+      "reason": "Archived measurement/release evidence; historical identities/values remain unchanged.",
+      "matches": [
+        {
+          "line": 3,
+          "text": "apps/netbaiot-server/tests/business_rpc_v2.rs"
+        }
+      ]
+    },
+    {
+      "path": "docs/performance/lifecycle-hardening/validation.json",
+      "reason": "Archived measurement/release evidence; historical identities/values remain unchanged.",
+      "matches": [
+        {
+          "line": 433,
+          "text": "      \"target\": \"business_rpc_v2\","
+        },
+        {
+          "line": 439,
+          "text": "        \"business_rpc_v2\","
+        },
+        {
+          "line": 611,
+          "text": "      \"target\": \"business_rpc_v2\","
+        },
+        {
+          "line": 617,
+          "text": "        \"business_rpc_v2\","
+        }
+      ]
+    },
+    {
+      "path": "docs/performance/mixed-ingress/integration-validation.json",
+      "reason": "Archived measurement/release evidence; historical identities/values remain unchanged.",
+      "matches": [
+        {
+          "line": 103,
+          "text": "        \"MQTT-RECOVERY-V1-LARGE-COMPAT-001: PASS —      Running tests/end_to_end.rs (target/debug/deps/end_to_end-4f0c6ac88ef340f4)\","
+        }
+      ]
+    },
+    {
+      "path": "docs/performance/mixed-ingress/validation.json",
+      "reason": "Archived measurement/release evidence; historical identities/values remain unchanged.",
+      "matches": [
+        {
+          "line": 79,
+          "text": "        \"MQTT-RECOVERY-V1-LARGE-COMPAT-001: PASS \\u2014      Running tests/end_to_end.rs (target/debug/deps/end_to_end-910d8e5a8e426061)\","
+        }
+      ]
+    },
+    {
+      "path": "docs/performance/remove-device-config/validation/mqtt-conformance.json",
+      "reason": "Archived measurement/release evidence; historical identities/values remain unchanged.",
+      "matches": [
+        {
+          "line": 546,
+          "text": "      \"test_id\": \"MQTT-RECOVERY-V2-ROUNDTRIP-001\","
+        },
+        {
+          "line": 555,
+          "text": "      \"test_id\": \"MQTT-RECOVERY-V3-ROUNDTRIP-001\","
+        },
+        {
+          "line": 564,
+          "text": "      \"test_id\": \"MQTT-RECOVERY-V1-COMPAT-001\","
+        },
+        {
+          "line": 618,
+          "text": "      \"test_id\": \"MQTT-RECOVERY-V1-LARGE-COMPAT-001\","
+        }
+      ]
+    },
+    {
+      "path": "docs/performance/remove-device-http/validation/mqtt-conformance.json",
+      "reason": "Archived measurement/release evidence; historical identities/values remain unchanged.",
+      "matches": [
+        {
+          "line": 546,
+          "text": "      \"test_id\": \"MQTT-RECOVERY-V2-ROUNDTRIP-001\","
+        },
+        {
+          "line": 555,
+          "text": "      \"test_id\": \"MQTT-RECOVERY-V3-ROUNDTRIP-001\","
+        },
+        {
+          "line": 564,
+          "text": "      \"test_id\": \"MQTT-RECOVERY-V1-COMPAT-001\","
+        },
+        {
+          "line": 618,
+          "text": "      \"test_id\": \"MQTT-RECOVERY-V1-LARGE-COMPAT-001\","
+        }
+      ]
+    },
+    {
+      "path": "docs/performance/strict-reliability-audit/evidence/release-gate-results-final.json",
+      "reason": "Archived measurement/release evidence; historical identities/values remain unchanged.",
+      "matches": [
+        {
+          "line": 546,
+          "text": "      \"test_id\": \"MQTT-RECOVERY-V2-ROUNDTRIP-001\","
+        },
+        {
+          "line": 555,
+          "text": "      \"test_id\": \"MQTT-RECOVERY-V3-ROUNDTRIP-001\","
+        },
+        {
+          "line": 564,
+          "text": "      \"test_id\": \"MQTT-RECOVERY-V1-COMPAT-001\","
+        },
+        {
+          "line": 618,
+          "text": "      \"test_id\": \"MQTT-RECOVERY-V1-LARGE-COMPAT-001\","
+        }
+      ]
+    },
+    {
+      "path": "docs/remove-device-http.md",
+      "reason": "Historical audit explicitly marked with current support/migration context; old behavior refers to its recorded revision.",
+      "matches": [
+        {
+          "line": 108,
+          "text": "confirmed business stream v1 are unchanged. The control status field removal does"
+        }
+      ]
+    },
+    {
+      "path": "docs/strict-reliability-audit.md",
+      "reason": "Historical audit explicitly marked with current support/migration context; old behavior refers to its recorded revision.",
+      "matches": [
+        {
+          "line": 33,
+          "text": "| 原生 CI 新发现：流拒绝错误丢失 | **2**。HELLO 后客户端已 pipeline SUBSCRIBE，拒绝后立即关闭仍有未读数据 | Windows 原有 official-client 断言实际 FAIL：Unauthenticated 被 ConnectionLost 替代；修复后同一断言 PASS | `apps/netbaiot-server/src/business_stream_v1.rs:201,242,257` |"
+        },
+        {
+          "line": 216,
+          "text": " apps/netbaiot-server/src/business_stream_v1.rs     |  68 +++"
+        }
+      ]
+    },
+    {
+      "path": "docs/windows-recovery-regression.md",
+      "reason": "Historical audit explicitly marked with current support/migration context; old behavior refers to its recorded revision.",
+      "matches": [
+        {
+          "line": 228,
+          "text": "| cargo test --locked -p netbaiot-server --test business_rpc_v2 | 29.054 | PASS |"
+        }
+      ]
+    }
+  ]
+}
