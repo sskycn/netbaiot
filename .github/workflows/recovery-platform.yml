@@ -2,7 +2,7 @@ name: Native recovery and lifecycle
 on:
   pull_request:
   push:
-    branches: [main, codex/strict-reliability-audit]
+    branches: [main, codex/strict-reliability-audit, codex/windows-native-prelude-diagnostics]
   workflow_dispatch:
 permissions:
   contents: read
@@ -22,17 +22,17 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          cargo test --locked -p netbaiot-runtime spool:: 2>&1 | tee native-recovery.log
-          cargo test --locked -p netbaiot-transports mqtt_recovery 2>&1 | tee -a native-recovery.log
-          cargo test --locked -p netbaiot-server --test server subprocess_ 2>&1 | tee -a native-recovery.log
-          cargo test --locked -p netbaiot-server --test server recovery_directory_is_exclusive 2>&1 | tee -a native-recovery.log
-          cargo test --locked -p netbaiot-server --test server startup_failures_and_dropped_run_future 2>&1 | tee -a native-recovery.log
+          python scripts/ci_annotate.py --title "Native spool tests failed" -- cargo test --locked -p netbaiot-runtime spool:: 2>&1 | tee native-recovery.log
+          python scripts/ci_annotate.py --title "Native MQTT recovery failed" -- cargo test --locked -p netbaiot-transports mqtt_recovery 2>&1 | tee -a native-recovery.log
+          python scripts/ci_annotate.py --title "Native subprocess recovery failed" -- cargo test --locked -p netbaiot-server --test server subprocess_ 2>&1 | tee -a native-recovery.log
+          python scripts/ci_annotate.py --title "Native recovery ownership failed" -- cargo test --locked -p netbaiot-server --test server recovery_directory_is_exclusive 2>&1 | tee -a native-recovery.log
+          python scripts/ci_annotate.py --title "Native startup lifecycle failed" -- cargo test --locked -p netbaiot-server --test server startup_failures_and_dropped_run_future 2>&1 | tee -a native-recovery.log
       - name: Native workspace regressions including subprocess recovery
         timeout-minutes: 20
         shell: bash
         run: |
           set -o pipefail
-          cargo test --locked --workspace --all-features 2>&1 | tee -a native-recovery.log
+          python scripts/ci_annotate.py --title "Native workspace tests failed" -- cargo test --locked --workspace --all-features 2>&1 | tee -a native-recovery.log
       - uses: actions/upload-artifact@v4
         if: always()
         with:
