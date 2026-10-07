@@ -357,14 +357,6 @@ pub struct EventDelivery {
     pub attempt: u32,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct EventAck {
-    pub delivery_id: DeliveryId,
-    pub subscription_id: SubscriptionId,
-    pub event_id: EventId,
-}
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ErrorCode {
@@ -565,7 +557,7 @@ mod tests {
     }
 
     #[test]
-    fn stable_error_and_ack_json() {
+    fn stable_error_and_current_ack_json() {
         let error = ApiError {
             code: ErrorCode::DeviceOffline,
             message: "device is not currently connected".into(),
@@ -578,10 +570,10 @@ mod tests {
         );
 
         let event_id = EventId(Uuid::nil());
-        let ack = EventAck {
-            delivery_id: DeliveryId(Uuid::nil()),
-            subscription_id: SubscriptionId(Uuid::nil()),
-            event_id,
+        let ack = business_rpc_v3::V3EventAck {
+            status: business_rpc_v3::V3EventStatus::Ok,
+            delivery_id: Uuid::nil(),
+            event_id: event_id.0,
         };
         let value = serde_json::to_value(ack).unwrap();
         assert_eq!(value["event_id"], event_id.0.to_string());

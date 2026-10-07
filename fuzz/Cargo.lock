@@ -680,7 +680,6 @@ name = "netbaiot-protocol"
 version = "0.2.3"
 dependencies = [
  "serde",
- "serde_json",
  "thiserror",
  "uuid",
 ]
