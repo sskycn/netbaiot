@@ -1,5 +1,7 @@
 # Production reliability remediation
 
+> Historical implementation/measurement evidence from before the current-only cleanup (baseline `21a6945`, 2026-10-07). Commands, old protocol names and compatibility claims below describe their recorded revisions. Current support and upgrade instructions: [protocol matrix](protocol-support.md), [breaking change](migration/current-protocol-only.md).
+
 > Historical audit: device-configuration ownership described here was removed later.
 > Current behavior and migration: [Remove device configuration](remove-device-config.md).
 

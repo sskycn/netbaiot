@@ -54,10 +54,7 @@ NEND | record count | total record bytes | whole-stream SHA-256
 Shutdown stops listeners, closes owners, waits for detach, then streams one coherent
 lock-held view to a private temporary file, fsyncs it, atomically renames it, and
 fsyncs the directory. The encoder allocates at most one bounded record, hashes
-incrementally, and keeps binary payloads raw. The decoder reads v4/v5/v6 incrementally and
-retains read compatibility with NBMQ v2 records and the legacy NBMQ v1 JSON envelope.
-v1 uses the immediately previous release's 1,342,177,280-byte read ceiling; v2/v3/v4/v5/v6
-use the compact configured ceiling. File and record limits are checked before
+incrementally, and keeps binary payloads raw. The decoder reads NBMQ v6 only. Old/unknown versions fail explicitly before payload decoding; there is no JSON recovery reader or version-specific read ceiling. File and record limits are checked before
 allocation. Restore recomputes logical counters and rejects impossible QoS/topic/
 packet-ID/order/authorization/codec/ownership state instead of trusting serialized
 counters.
@@ -98,37 +95,10 @@ loss may lose recent retained updates, sessions, offline messages, QoS state, an
 EventBus deliveries that were not in an earlier committed image. Continuous disk
 checkpointing was intentionally not added to the hot path.
 
-## Upgrade and rollback across NBMQ v6
+## Current-only upgrade and rollback
 
-Before upgrading, finish a planned shutdown and retain a verified copy of the
-committed v5 snapshot together with its EventBus restart spool. Start the v6
-binary with the original recovery directory. It reads v1–v5 and writes v6 on
-the next successful planned shutdown. Keep the v5 copy separate: the v6 file
-is the authoritative state after the new binary has run.
+Before deploying this release, use a suitable previous release to finish accepted work or convert old files to NBMQ v6 and EventBus NBSP v3. Preserve the complete directory and original configuration. This release does not read NBMQ v1–v5, infer old Will origins, synthesize session incarnations/order, or migrate old JSON profiles. See [operator upgrade steps](migration/current-protocol-only.md).
 
-A v1–v5 pending Will has no explicit publisher origin field. For a delayed Will,
-the reader uses the recorded `cancel_on_resume` SessionKey as its origin. For an
-immediate pending Will without that key, origin stays unknown (`None`); the
-reader does not invent a ClientId. A legacy immediate Will can therefore be
-forwarded to a matching No Local subscription after recovery. v6 records retain
-the origin explicitly, including when a recovered state is written again.
+Current NBMQ v6 explicitly stores the Will origin and full known authorization/codec profile. Its unknown-profile marker is still a legal current field: such a session cannot enter the subscription index or resume before reauthentication under the matching profile. No codec identity is invented. Current writers and headers remain unchanged.
 
-NBMQ v2 also lacks codec authorization provenance. A v2 session can be read and
-its QoS state carried into a v6 image, but the v6 writer marks that profile as
-unknown rather than inventing a codec ID/version. On the next authenticated
-reconnect, the existing conservative profile check resets that session; do not
-promise seamless resume of such legacy QoS exchanges. v3 and later carry codec
-provenance and retain their normal matching-profile resume behavior.
-
-An older binary rejects v6 rather than silently interpreting it. Direct
-downgrade with a v6 snapshot is unsupported; there is no v6-to-v5 converter that
-preserves the new Will-origin semantics. If the upgraded process has made **no**
-broker or business state change at all, an operator may evaluate restoring a
-verified pre-upgrade v5 snapshot and its paired EventBus spool in an isolated
-copy before restarting the old binary. This requires checking timers, Will
-publication, accepted events, subscriptions, ACKs, and retained changes, not
-merely checking that no client is currently connected. If the new version has
-processed business or protocol state, the old snapshot is stale and is **not**
-a lossless rollback. Preserve the v6 state and roll forward or use a separately
-validated migration procedure. Never delete or edit the v6 recovery file to
-make the old binary start.
+For rollback, the destination release must read both current formats. Otherwise complete all responsibilities using a compatible release first. A pre-upgrade snapshot becomes stale once new traffic, timers, Wills, accepted events or ACKs change state; it is not a lossless rollback. Do not delete or reinterpret current files to start an older binary.

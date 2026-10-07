@@ -1,5 +1,7 @@
 # Business RPC V3 实测与生产就绪边界
 
+> Historical implementation/measurement evidence from before the current-only cleanup (baseline `21a6945`, 2026-10-07). Commands, old protocol names and compatibility claims below describe their recorded revisions. Current support and upgrade instructions: [protocol matrix](protocol-support.md), [breaking change](migration/current-protocol-only.md).
+
 **当前判定：V3 wire、流状态、流控和功能回归已实现，但 16 KiB Event 的 HOL 性能门禁尚未通过。** 本页记录实际观测和仍需解决的问题；它不构成公网生产容量声明。V3 在 TCP/TLS 上切分应用消息并调度不同流，不能消除 TCP 丢包引起的队头阻塞。
 
 ## 环境与复现

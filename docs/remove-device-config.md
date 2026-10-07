@@ -1,5 +1,7 @@
 # Remove device configuration ownership
 
+> Historical implementation/measurement evidence from before the current-only cleanup (baseline `21a6945`, 2026-10-07). Commands, old protocol names and compatibility claims below describe their recorded revisions. Current support and upgrade instructions: [protocol matrix](protocol-support.md), [breaking change](migration/current-protocol-only.md).
+
 Baseline: `8ec59f37530659d65fe4ea398aba831b156d1d6b` (clean local `main`).
 Work branch: `codex/remove-device-config`. Local integration only; no push.
 Implementation: `eb20e865b368b14f32bceac580c7215ed1ae2634`.

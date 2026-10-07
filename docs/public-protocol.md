@@ -1,10 +1,10 @@
-# Public protocol v1
+# Public protocol and version namespaces
 
 `netbaiot-protocol` is the authoritative, runtime-independent Rust model for the
-public NetbaIoT wire contract. It depends only on serialization, JSON, UUID, and
+public NetbaIoT wire contracts. Normal dependencies are serialization, UUID, and
 error-model crates. It does not depend on Tokio, HTTP, MQTT, the server, or runtime
 internals. Crate SemVer and wire `PROTOCOL_VERSION` are separate compatibility
-dimensions; the current wire version is `1`.
+dimensions. `PROTOCOL_VERSION = 1` identifies device JSON; Business RPC uses its independent current version 3. Restart files use NBMQ v6 and NBSP v3. Management remains `/api/v1`.
 
 Strong public identifiers include `TenantId`, `ProductId`, `DeviceId`, `DeviceKey`,
 `EventId`, `DeliveryId`, `CommandId`, `SinkId`, and
@@ -17,18 +17,7 @@ device event, or command ACK. Restart replay retains
 the event ID. `DeliveryId` instead identifies one stream delivery attempt and may
 change after reconnect.
 
-Connection presence belongs to Sessions and management connection queries, not the
-business event stream. The 0.x connection-event cleanup removes the unused lifecycle
-variants and filter strings from the public Rust/JSON model. Rebuild clients and
-remove obsolete filters; supported device uplinks and confirmed stream framing keep
-wire version 1. See the [compatibility review](connection-events-spool-upgrade-cleanup.md)
-and [legacy spool upgrade procedure](restart-spool.md#legacy-configack-restart-spool-compatibility).
-
-The confirmed stream uses four-byte big-endian length framing around bounded JSON.
-The client sends `hello` with version/authentication, then `subscribe` with a bounded
-`EventFilter`. The server responds `ready`, then sends `event` frames containing an
-`EventDelivery`. The client confirms processing with `ack` containing all of
-`delivery_id`, `subscription_id`, and `event_id`. A write or decode is not an ACK.
+Connection presence belongs to Sessions and management queries, rather than business event variants. Current Business RPC uses bounded length-prefixed Hello/Ready followed by binary stream framing. Provider and EventSubscription parents have independent ownership; application ACK matches the delivery/event identity on its current epoch/stream. `V3EventAck` is the current ACK DTO; the old standalone `EventAck` and stream/V2 envelopes are removed. A write or decode is never a business ACK. See [current framing and methods](business-rpc-v3.md) and [upgrade requirements](migration/current-protocol-only.md).
 
 Management errors use `ApiError { code, message, request_id, required_scope }`.
 Stable codes include authentication, authorization, invalid request/version,
@@ -51,6 +40,5 @@ The 0.x device-HTTP removal is an intentional source/control-API breaking change
 `TransportKind::Http` and `ConnectionCounts.http` are removed. Transport strings
 are now `mqtt`, `tcp`, `udp`; the status summary serializes exactly those three
 counts and excludes management connections. UDP remains sessionless (active count
-zero). Device JSON v1, MQTT 3.1.1, TCP framing, NBI1/NBA1 and confirmed business
-stream v1 are unchanged; their wire versions do not change. Rebuild public clients
+zero). Device JSON v1, MQTT 3.1.1, TCP framing, NBI1/NBA1 and the current Business RPC V3 wire bytes remain unchanged. Rebuild public clients
 together with the server. See [migration](remove-device-http.md).

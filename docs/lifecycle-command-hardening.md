@@ -1,5 +1,7 @@
 # Lifecycle、命令状态与资源边界加固报告
 
+> Historical implementation/measurement evidence from before the current-only cleanup (baseline `21a6945`, 2026-10-07). Commands, old protocol names and compatibility claims below describe their recorded revisions. Current support and upgrade instructions: [protocol matrix](protocol-support.md), [breaking change](migration/current-protocol-only.md).
+
 日期：2026-10-05。审计基线：`ef8d54c`，工作区版本 `0.2.2`。
 本报告记录本次修复和本机实测，不宣称生产容量、崩溃持久性或业务 exactly-once。
 先完成第 1—5 项并通过完整 fmt/clippy/test，再执行第 6—8 项。

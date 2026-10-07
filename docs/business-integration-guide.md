@@ -68,39 +68,13 @@ python3 examples/business_http_sink.py
 
 它只在内存中去重，适合教程，不适合生产。业务 sink unavailable 时，NetbaIoT 使用独立的 count/byte queue 与有界退避重试；required backlog 到达上限会在 EventAccepted 前向设备施加 backpressure，而不是无限吃内存。计划关机时未 ACK 或 ACK 不确定的 required delivery 会被写入 restart spool。
 
-## Confirmed TCP/RPC stream
+## Confirmed Business RPC
 
-该模式适合官方 Rust client 或需要显式应用 ACK 的长连接消费者。配置只能二选一：
+业务监听器只支持 [Business RPC V3](business-rpc-v3.zh-CN.md)，必须显式配置 `business_tcp` 与 `business_rpc`。生产使用 mTLS principal；回环开发配置独立 `NETBAIOT_BUSINESS_RPC_TOKEN`，并在客户端显式设置事件 token。管理或设备凭据不授权这个监听器。
 
-```json
-"delivery_url": null,
-"business_tcp": "127.0.0.1:9100"
-```
+bootstrap 为有界 Hello/Ready JSON；后续是 12-byte header 的二进制 stream framing。Provider、EventSubscription 和在线命令 RPC 分别管理。唯一活动 required sink `tcp-rpc` 所有者每次只有一个事件在途。应用事务成功后调用 ACK，匹配当前 epoch/stream、delivery 与 event identity；socket write 与 WINDOW_UPDATE 都不是业务 ACK。filter 改变不能丢弃已经接受的 required 工作。重连可以重放稳定 EventId，业务必须幂等。
 
-并设置独立 token：
-
-```bash
-export NETBAIOT_BUSINESS_STREAM_TOKEN=business-stream-demo-token
-```
-
-当前 business stream 只允许 loopback，因为该监听器尚未单独实现 TLS；跨主机生产集成应优先使用 HTTPS webhook，或在受控 TLS tunnel/sidecar 后使用 stream。当前实现只有一个活动订阅者，顺序发送并逐条等待 ACK。
-
-每帧是 4-byte big-endian 长度 + bounded JSON：
-
-1. Client `hello {version:1, token}`。
-2. Client `subscribe {version:1, subscription_id, filter}`。
-3. Server `ready`；只有收到它才表示订阅已安装。
-4. Server `event {delivery}`。
-5. Client 完成业务事务后发送 `ack`，必须同时匹配 `delivery_id`、`subscription_id`、`event_id`。
-
-socket write 不等于 ACK；错误或不匹配 ACK 会让投递失败并可能重放。断线重连可能收到同一 `event_id` 和新的 `delivery_id`。
-
-```bash
-python3 examples/business_tcp_client.py \
-  --address 127.0.0.1:9100 --token business-stream-demo-token --count 1
-```
-
-该示例包含完整 framing、hello/subscribe/ready/event/ack。filter 可限制 tenant/product/device/event types，但它不会在事件接受后改变已存在的 required 责任；重连时使用不匹配 filter 不能静默丢掉旧事件。
+使用下面的官方 Rust 示例，不再保留旧 Python wire 实现。旧客户端和恢复文件必须先完成[升级准备](migration/current-protocol-only.md)。
 
 ## 官方 Rust 业务客户端
 
@@ -110,7 +84,7 @@ python3 examples/business_tcp_client.py \
 NETBAIOT_ENDPOINT=http://127.0.0.1:9090 \
 NETBAIOT_TOKEN="$NETBAIOT_ADMIN_SECRET" \
 NETBAIOT_EVENT_ADDRESS=127.0.0.1:9100 \
-NETBAIOT_EVENT_TOKEN=business-stream-demo-token \
+NETBAIOT_EVENT_TOKEN=business-rpc-demo-token \
 cargo run -p netbaiot-client --example business_event_consumer
 ```
 
@@ -144,9 +118,9 @@ while let Some(delivery) = events.next().await {
 client.shutdown();
 ```
 
-Manual 是 correctness-first 默认。`AckMode::Immediate` 只适合应用明确接受“进入本地 bounded channel 后即 ACK”的数据丢失窗口。流有 item 和 byte 双重上限，丢弃未 ACK delivery 会关闭连接并触发重放。
+Manual 是 correctness-first 默认。`AckMode::Immediate` 只适合应用明确接受“进入本地 bounded channel 后即 ACK”的数据丢失窗口。流有 item 和 byte 双重上限，丢弃未 ACK delivery 不会确认；网关按超时/重试策略重放。
 
-断线重连使用 cancellation-aware full-jitter exponential backoff，默认 100 ms–5 s；重新认证并用同一个 subscription ID 订阅。终止性 auth/forbidden/version/protocol 错误不会无穷重试。`client.shutdown()`、丢弃 stream 或最后一个 client 会停止 owned task。
+断线重连使用 可取消的有界指数退避，默认 100 ms–5 s；重新认证并按相同 filter 建立新 epoch/subscription identity。底层服务就绪等待应由调用方加超时或取消。`client.shutdown()`、丢弃 stream 或最后一个 client 会停止 owned task。
 
 API 模块：`events()`、`commands()`、`devices()`、`runtime()`、`auth_cache()`、`routes()`。Token 的 Debug 输出脱敏，响应体和所有 timeout 有界。
 
@@ -166,7 +140,7 @@ cargo run -p netbaiot-cli -- auth invalidate --device device-1
 cargo run -p netbaiot-cli -- server drain --yes
 ```
 
-事件 stream 还需 `NETBAIOT_EVENT_ADDRESS` 和可选 `NETBAIOT_EVENT_TOKEN`：
+事件 stream 还需 `NETBAIOT_EVENT_ADDRESS` 和独立 `NETBAIOT_EVENT_TOKEN`（开发 token 模式）：
 
 ```bash
 cargo run -p netbaiot-cli -- events subscribe \

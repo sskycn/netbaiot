@@ -24,4 +24,4 @@
 
 错误使用稳定的 `ApiError` JSON 结构，字段包括 `code`、安全的 `message`、可选 `request_id` 和可选 `required_scope`。例如，离线命令使用 `device_offline`。缺少 Scope 返回 403 并填写 `required_scope`；资源越权返回通用 403，不透露设备是否存在。无效管理凭据返回 401；JWKS 验证服务暂时不可用时返回 503。设备和管理接口的授权相互独立。
 
-控制面 mutation、V2/V3 auth.sync/auth.invalidate、provider 离线撤销、命令提交（含去重重试）与 MQTT/TCP 最终建连均持有 lifecycle admission guard。Quiescing 后拒绝新操作，等待已获准操作完成，再等待 MQTT owner 的 QoS/Will 清理并写入快照。诊断读取和幂等 drain 请求仍可使用。
+控制面 mutation、当前 Business RPC auth.sync/auth.invalidate、provider 离线撤销、命令提交（含去重重试）与 MQTT/TCP 最终建连均持有 lifecycle admission guard。Quiescing 后拒绝新操作，等待已获准操作完成，再等待 MQTT owner 的 QoS/Will 清理并写入快照。诊断读取和幂等 drain 请求仍可使用。

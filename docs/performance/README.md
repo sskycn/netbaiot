@@ -1,5 +1,7 @@
 # Performance evidence policy
 
+Recorded measurements describe their named commit, workload and environment. Historical protocol/config/tool names are preserved as evidence, including removed RPC and recovery versions. Use the [current protocol matrix](../protocol-support.md) and [upgrade guide](../migration/current-protocol-only.md) for current deployments; historical results are not current capacity claims.
+
 This directory keeps the evidence needed to understand and reproduce performance
 decisions: methods, source and commands, environment metadata, compact summaries,
 provenance manifests, and small regression fixtures. Raw per-request samples,

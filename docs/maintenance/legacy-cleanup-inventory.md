@@ -7,7 +7,7 @@ Version namespaces are distinct: Business Stream V1, Business RPC V2 and current
 | Classification | Surface | Action / dependent invariants |
 |---|---|---|
 | DELETE | `apps/netbaiot-server/src/business_stream_v1.rs` and V1 listener/dispatcher branches | Remove framing, hello/subscription/event/ACK loop and V1 token setting; preserve event ACK/restart correctness via current RPC |
-| DELETE | Protocol `StreamClientFrame` / `StreamServerFrame` | V1-specific envelopes, hello/ready validators and compatibility tests removed; shared EventDelivery/EventAck/EventFilter remain |
+| DELETE | Protocol `StreamClientFrame` / `StreamServerFrame` | V1-specific envelopes, hello/ready validators and compatibility tests removed; shared EventDelivery/EventFilter remain; the later public-API audit also removes unused EventAck, with current V3EventAck serialization coverage |
 | REWRITE | Root client `EventStream` and CLI event consumer | Preserve bounded, manually acknowledged subscription interface using the existing current RPC client; remove V1 transport driver |
 | DELETE | V2 `BusinessRpcFrame`, Hello/Ready `BusinessLimits`, version/event-window constants | No standalone length-prefixed JSON V2 transport or negotiation remains |
 | KEEP | Method DTOs, authenticated-device wire identity, structured RpcError, authorization role semantics | Current V3 uses these shared types; retain their JSON bytes and validation without V2 frame wrappers |

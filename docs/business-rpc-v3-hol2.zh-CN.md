@@ -1,5 +1,7 @@
 # Business RPC V3 HOL 第二阶段：发送提前量实验
 
+> Historical implementation/measurement evidence from before the current-only cleanup (baseline `21a6945`, 2026-10-07). Commands, old protocol names and compatibility claims below describe their recorded revisions. Current support and upgrade instructions: [protocol matrix](protocol-support.md), [breaking change](migration/current-protocol-only.md).
+
 ## Baseline
 
 | 项目 | 值 |

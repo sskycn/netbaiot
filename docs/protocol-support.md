@@ -62,3 +62,15 @@ application `ACK event_id`. A socket write alone is not a business acknowledgeme
 Best-effort sinks follow their configured bounded overflow policy. See
 [delivery semantics](delivery-semantics.md) and
 [business integration](business-integration-guide.md).
+
+## Current business and recovery formats
+
+| Surface | Supported format | Rejected formats |
+| --- | --- | --- |
+| Business RPC | V3 only | V1, V2 and unknown versions |
+| MQTT restart recovery | NBMQ v6 only | NBMQ v1–v5 and unknown versions |
+| EventBus restart spool | NBSP v3 only | NBSP v1/v2 and unknown versions |
+| Device MQTT | 3.1.1 and 5.0 | See the implemented profile above |
+| Management HTTP | `/api/v1/...` | Independent of RPC wire version |
+
+Current wire/file bytes remain unchanged. Old clients must upgrade and old files must be completed or converted by a suitable previous version before upgrade. No runtime converter or fallback is provided. See [breaking change and upgrade](migration/current-protocol-only.md).

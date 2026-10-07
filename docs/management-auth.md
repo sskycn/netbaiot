@@ -119,4 +119,4 @@ HMAC request signing, OAuth2 token introspection, administrative audit persisten
 
 Connection admission and management request rates use separate bounded windows with the existing `requests_per_second` and `requests_per_ip_second` settings. Each accepted HTTP request consumes one request quota.
 
-Business RPC V2 has a separate mTLS principal or loopback development token. Management credentials never authorize it. Both management `auth.invalidate` and V2 `auth.invalidate` call the same complete ingress/MQTT invalidation boundary; see [Business RPC Stream V2](business-rpc-v2.md).
+Current Business RPC has a separate mTLS principal or loopback development token. Management credentials never authorize it. Both management `auth.invalidate` and current RPC `auth.invalidate` call the same complete ingress/MQTT invalidation boundary; see [Business RPC V3](business-rpc-v3.md).

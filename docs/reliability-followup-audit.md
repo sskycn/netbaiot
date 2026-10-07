@@ -1,5 +1,7 @@
 # Reliability follow-up audit
 
+> Historical evidence recorded before the 2026-10-07 current-only cleanup. Preserve the recorded results and original version context; current support: [protocol matrix](protocol-support.md), [upgrade](migration/current-protocol-only.md).
+
 > Historical audit: device configuration was subsequently removed; see [current ownership](remove-device-config.md).
 
 > Historical report: describes the revision measured when it was written, not the

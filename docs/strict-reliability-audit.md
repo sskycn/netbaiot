@@ -1,5 +1,7 @@
 # NetbaIoT 严格可靠性审计与修复
 
+> Historical implementation/measurement evidence from before the current-only cleanup (baseline `21a6945`, 2026-10-07). Commands, old protocol names and compatibility claims below describe their recorded revisions. Current support and upgrade instructions: [protocol matrix](protocol-support.md), [breaking change](migration/current-protocol-only.md).
+
 审计日期：2026-10-06。结论：**满足末尾列明条件后可发布。** Windows/Linux/macOS 原生恢复、退出和完整 workspace 已实际执行通过。经作者单独授权只推送审计分支验证 CI；未合并或推送 main，未创建 tag 或 Release，项目版本仍为 0.2.3。最终分支提交仍须通过同一 CI 门禁后方可合并。
 
 ## 审计基线

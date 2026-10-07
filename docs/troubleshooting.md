@@ -137,29 +137,19 @@ curl --noproxy '*' http://127.0.0.1:9090/api/v1/metrics \
 
 **原因**：没有先 hello/subscribe、token 错、未等待 ready、已有另一个 owner（conflict）、filter 不匹配、frame/ACK 字段错误。
 
-**解决**：用 `examples/business_tcp_client.py`；确认 config 为 `business_tcp` 而非 webhook；一次只运行一个 consumer；ACK 三个 ID 必须完整匹配。
+**解决**：使用官方 Rust 当前客户端示例 `business_event_consumer`；显式配置 `business_tcp` 与 `business_rpc`；一次只运行一个 required consumer；应用处理后才 ACK，必须匹配当前 epoch/stream、delivery 与 event identity。
 
 ## 19. Spool/recovery 启动失败
 
 **原因**：目录不可读写、磁盘满、checksum/length/trailer/版本损坏、配置上限低于已提交镜像、错误复用远程/不支持 fsync 的存储。
 
-**解决**：保留文件做事故证据；检查 owner/mode、free space、inode 和 server 精确错误。EventBus v2 可读 v1；MQTT writer v3 可读 v1/v2/v3。未知/部分/损坏状态会 fail loudly，不能静默忽略责任。
+**解决**：保留文件做事故证据；检查 owner/mode、free space、inode 和 server 精确错误。EventBus 只读 NBSP v3；MQTT 只读 NBMQ v6。未知/部分/损坏状态会 fail loudly，不能静默忽略责任。
 
-### Legacy ConfigAck 升级不兼容
+### 旧版恢复文件不兼容
 
-**症状**：启动日志包含 `restart spool contains legacy ConfigAck records` 和
-`startup blocked`，进程以 `IncompatibleSpool` 退出，尚未开放 listener/readiness。
+**症状**：`UnsupportedRecoveryVersion(version)` 或日志包含 `unsupported restart recovery format version`，文件字节保留。旧 EventBus spool 会在 listener/readiness 发布前阻止启动。
 
-**原因**：旧版本尚有 ConfigAck required delivery 未获业务 ACK。新版本已移除该业务类型，
-不能把旧责任转换为 CommandAck、跳过记录或清空文件后继续启动。
-
-**处理**：保留整个 recovery 目录，用旧版本及原配置恢复，外部停止新设备流量，
-让兼容的业务消费者 ACK 完旧 spool。用旧版 `netbaiot server status` 确认
-`pending_required=0` 且 EventBus `.spool` 已由网关清理，再执行
-`netbaiot server drain --yes`（或 SIGTERM）。确认成功退出且没有剩余 EventBus spool
-后再升级。单纯成功 drain 可能仍将未完成工作写入 spool，不能作为完成迁移的证据。
-新版本失败时会保留文件字节，支持回退旧 binary；独立的 `mqtt-runtime.state` 不应删除。
-见[完整升级步骤](restart-spool.md#legacy-configack-restart-spool-compatibility)。
+**处理**：保留完整 recovery 目录和原配置，在升级前由合适的旧版本完成 accepted 责任或转换为 NBMQ v6 / NBSP v3。不能跳过、重解释或删除文件。旧版本成功 drain 也可能留下未获 ACK 的 spool，必须验证待处理工作和实际文件格式。见[完整升级步骤](migration/current-protocol-only.md)。
 
 ## 20. Management endpoint 无法访问
 

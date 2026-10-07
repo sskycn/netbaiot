@@ -1,5 +1,7 @@
 # Connection event cleanup and restart spool upgrade diagnostics
 
+> Historical implementation/measurement evidence from before the current-only cleanup (baseline `21a6945`, 2026-10-07). Commands, old protocol names and compatibility claims below describe their recorded revisions. Current support and upgrade instructions: [protocol matrix](protocol-support.md), [breaking change](migration/current-protocol-only.md).
+
 Baseline: `6595ebe6775ed630d691ca93f3551278525387b0` (local `main`, initially clean).
 
 ## Scope and producer inventory
@@ -77,7 +79,7 @@ Never delete the spool to bypass startup refusal; retain independent MQTT state.
 
 Historical fixtures are generated with actual Rust protocol and SpoolRecord
 serializers from `8ec59f37530659d65fe4ea398aba831b156d1d6b`, before ConfigAck removal.
-See [fixture source and regeneration](../tests/fixtures/restart-spool/README.md).
+See [fixture source and regeneration](https://github.com/sskycn/netbaiot/blob/21a694576a84436c1d27a69f59ea1d1a32e5006b/tests/fixtures/restart-spool/README.md).
 Both NBSP versions cover legacy ConfigAck refusal and still-supported heartbeat,
 telemetry, and CommandAck records with stable event IDs, sink IDs, revisions, and
 retry attempts. Runtime tests compare file bytes after failure and attempted commit.

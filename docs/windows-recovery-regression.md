@@ -1,5 +1,7 @@
 # Windows recovery regression investigation
 
+> Historical implementation/measurement evidence from before the current-only cleanup (baseline `21a6945`, 2026-10-07). Commands, old protocol names and compatibility claims below describe their recorded revisions. Current support and upgrade instructions: [protocol matrix](protocol-support.md), [breaking change](migration/current-protocol-only.md).
+
 Date: 2026-10-07. Original main: `1bd5cf8e15293bbed0ea8f80929f5405cf5a2751`.
 Optimization baseline: `a91a9103f13a32058c35c177bb4765026c277040`.
 Windows measurements used GitHub Actions `windows-latest`, Rust 1.88.0.

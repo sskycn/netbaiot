@@ -1,6 +1,6 @@
 # Business RPC V3 多流协议
 
-V3 在现有 `business_tcp` listener 上显式启用：保留 `business_rpc.version: 2`，另加 `business_rpc.v3` 限额。V2 Hello 继续使用未修改的四字节长度前缀 JSON 协议；V3 Hello 进入独立二进制流引擎。客户端不会自动降级。V3 Hello 不包含 role；服务端按已认证的 BusinessPrincipal、每个 OPEN 的类型、方法及租户范围授权。生产环境使用 TLS 和客户端证书指纹映射，明文令牌仅用于 loopback 开发。V2 的身份配置和 `BusinessRole` 继续保留。
+Business RPC V3 是 `business_tcp` 唯一支持的业务流协议。配置 `business_rpc.limits`（也可使用有界默认值），监听器直接进入当前解析器。Hello/Ready 的版本字段用于拒绝旧版及未知客户端。Hello 不声明角色；已认证 principal、OPEN 类型、方法和租户范围共同决定权限。生产环境使用 mTLS，并按证书指纹精确映射身份；独立的回环开发 token 只授予配置的开发角色。管理凭据及设备凭据不能授权业务监听器。
 
 ## Wire 协议
 
@@ -16,7 +16,7 @@ Provider 和 EventSubscription 是长寿命父流。Provider 下有网关发起�
 
 业务端调用 `BusinessRpcV3Client::send_command(&command)`。`Queued` 只表示当前本地 MQTT/TCP 设备会话已接受下发，不表示设备已收到或执行。设备稍后上报的 `CommandAck` 仍作为普通 EventDelivery 按 `command_id` 匹配。提交后断线或超时返回 `OutcomeUnknown`；重连后用相同内容和 `command_id` 显式重试。每次 RPC 有新的 `request_id` 和 stream ID。同一 `(tenant_id, command_id)` 内容冲突返回 `Conflict`；设备离线或命令未就绪返回 `Unavailable`。下发成功后 RESET_STREAM 不撤销命令。排空期间所有命令提交（包括去重重试）均被拒绝。
 
-HTTP `/api/v1/devices/commands`、V2 和 V3 共用一个 `CommandService` 和进程内幂等表。`command_dedup_max_entries` 默认 4096，`command_dedup_ttl_ms` 默认 300000。窗口内同内容重试返回最新已知回执状态，不再次下发；表满返回 `Overloaded`，失败的下发不会占用 ID。此表不持久化，崩溃或重启后幂等历史丢失，不保证跨重启 exactly-once。业务命令历史和离线重试仍由业务系统负责。
+HTTP `/api/v1/devices/commands` 和当前 Business RPC 共用一个 `CommandService` 和进程内幂等表。`command_dedup_max_entries` 默认 4096，`command_dedup_ttl_ms` 默认 300000。窗口内同内容重试返回最新已知回执状态，不再次下发；表满返回 `Overloaded`，失败的下发不会占用 ID。此表不持久化，崩溃或重启后幂等历史丢失，不保证跨重启 exactly-once。业务命令历史和离线重试仍由业务系统负责。
 
 单个 writer 按协商大小惰性切分 body，并在不同流间调度 DATA。RPC 与 Event 的调度份额为 4:1，连续 control 帧最多四个，没有发送 credit 的流会跳过；同一流的 OPEN/RESPONSE 一定先于 DATA。发送 DATA 同时扣除连接和流窗口，WINDOW_UPDATE 实际写出后才返还接收 credit，与应用 Event ACK 分离。RESET_STREAM 结束单流，父流 reset 同时清理子流；连接协议错误和 principal 过期发送 GOAWAY 并关闭。单流错误应通过 RESET_STREAM 隔离。
 
@@ -24,10 +24,10 @@ HTTP `/api/v1/devices/commands`、V2 和 V3 共用一个 `CommandService` 和进
 
 默认 DATA payload 8 KiB、并发流 256、流窗口 256 KiB、连接窗口 4 MiB、心跳配置 5 秒；硬帧上限 16 KiB、metadata 4 KiB、消息 8 MiB。服务端和 SDK 每连接 outbound body 限额 16 MiB，服务端 inbound reassembly 每连接 16 MiB、全进程 128 MiB。control 队列最多 64 帧与 256 KiB；writer 和 credit 通道各 256 项。这些只是资源边界，不是容量或最优性能实测结论。观察固定名称的 `business_rpc_v3_*` 指标及原有认证、事件指标，不把标识符、令牌或证书内容作为指标 label。
 
-开发环境可在现有有效 V2 配置的 `business_rpc` 中增加：
+开发环境在 `business_rpc` 中配置当前限额，并设置显式 `business_tcp` 监听器：
 
 ```json
-"v3": {
+"limits": {
   "max_frame_payload_bytes": 8192,
   "max_concurrent_streams": 256,
   "initial_stream_window_bytes": 262144,
@@ -36,7 +36,7 @@ HTTP `/api/v1/devices/commands`、V2 和 V3 共用一个 `CommandService` 和进
 }
 ```
 
-客户端显式使用 `BusinessRpcV3ClientConfig` 与 `BusinessRpcV3Client::connect`，在依赖 Provider/订阅前等待 `wait_ready()`。重连有有界退避并重建父流；旧事件句柄受 epoch 栅栏保护，不能在新连接上 ACK。TCP 自身仍有队头阻塞，丢包可能暂停所有流；V3 解决的是应用层整帧写入造成的阻塞。迁移时保留 V2，显式启用 V3，先迁移一个客户端，再以相同负载比较认证延迟、ACK 和资源占用。
+客户端显式使用 `BusinessRpcV3ClientConfig` 与 `BusinessRpcV3Client::connect`，在依赖 Provider/订阅前等待 `wait_ready()`。重连有有界退避并重建父流；旧事件句柄受 epoch 栅栏保护，不能在新连接上 ACK。TCP 自身仍有队头阻塞，丢包可能暂停所有流；V3 解决的是应用层整帧写入造成的阻塞。部署当前监听器前必须升级业务客户端，见[兼容性变更与升级](migration/current-protocol-only.md)。`StaleRevision` 会重建 Provider 流并执行 reset sync，事件订阅保持独立所有权。底层 `wait_ready()` 持续等待服务就绪；调用方应配置自己的超时或取消。
 
 实际 16 KiB Event 限速短测尚未证明默认 256 KiB 流窗口下有稳定、明显的认证尾延迟改善；原因与原始数字见 [V3 生产就绪测量](business-rpc-v3-production-readiness.zh-CN.md)。
 

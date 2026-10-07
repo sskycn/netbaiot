@@ -1,5 +1,7 @@
 # MQTT 3.1.1 implementation report
 
+> Historical implementation/measurement evidence from before the current-only cleanup (baseline `21a6945`, 2026-10-07). Commands, old protocol names and compatibility claims below describe their recorded revisions. Current support and upgrade instructions: [protocol matrix](protocol-support.md), [breaking change](migration/current-protocol-only.md).
+
 ## 1. Baseline commit
 
 `b337c1127d1640b32f0518e38e016872dede6653`.

@@ -1,5 +1,7 @@
 # SDK and client implementation report
 
+> Historical evidence recorded before the 2026-10-07 current-only cleanup. Preserve the recorded results and original version context; current support: [protocol matrix](protocol-support.md), [upgrade](migration/current-protocol-only.md).
+
 > Historical dependency note: this report's `rumqttc` description records its
 > original baseline. The current device SDK uses the repository's
 > `netbaiot-mqtt-wire` and Device Profile driver; see [device SDK](device-sdk.md).
