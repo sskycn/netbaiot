@@ -1,5 +1,7 @@
 name: Windows RPC regression repeats
 on:
+  push:
+    branches: [codex/windows-native-prelude-diagnostics]
   workflow_dispatch:
 permissions:
   contents: read
