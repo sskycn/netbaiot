@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build and verify the five small, self-contained binary release archives."""
+"""Build safe archives; require Linux and validate every present optional target."""
 
 import argparse
 import gzip
@@ -13,6 +13,7 @@ from urllib.parse import quote, unquote, urlsplit
 
 from release_preflight import LINK, REQUIRED, ROOT, TARGETS, check_tag, package_files, workspace_version
 from scrub_paths import LOCAL_PATH
+from release_targets import DETAILS, REQUIRED_TARGETS
 
 
 MAX_ARCHIVE_BYTES = 256 * 1024 * 1024
@@ -22,6 +23,31 @@ MAX_MEMBERS = 256
 def binary_names(target):
     suffix = ".exe" if "windows" in target else ""
     return (f"netbaiot-server{suffix}", f"netbaiot{suffix}")
+
+
+def validate_binary(header, target):
+    spec = DETAILS[target]
+    if spec["format"] == "elf":
+        valid = (len(header) >= 20 and header[:7] == b"\x7fELF\x02\x01\x01"
+                 and int.from_bytes(header[18:20], "little") == spec["machine"])
+    elif spec["format"] == "pe":
+        offset = int.from_bytes(header[60:64], "little") if len(header) >= 64 else len(header)
+        valid = (header[:2] == b"MZ" and offset >= 64 and offset + 6 <= len(header)
+                 and header[offset:offset+4] == b"PE\0\0"
+                 and int.from_bytes(header[offset+4:offset+6], "little") == spec["machine"])
+    else:
+        magic = header[:4]
+        endian = "little" if magic == b"\xcf\xfa\xed\xfe" else "big"
+        valid = (magic in (b"\xcf\xfa\xed\xfe", b"\xfe\xed\xfa\xcf") and len(header) >= 8
+                 and int.from_bytes(header[4:8], endian) == spec["machine"])
+        if magic in (b"\xca\xfe\xba\xbe", b"\xca\xfe\xba\xbf") and len(header) >= 8:
+            count = int.from_bytes(header[4:8], "big")
+            stride = 20 if magic == b"\xca\xfe\xba\xbe" else 32
+            valid = (0 < count <= 32 and 8 + count * stride <= len(header)
+                     and any(int.from_bytes(header[8+i*stride:12+i*stride], "big") == spec["machine"]
+                             for i in range(count)))
+    if not valid:
+        raise ValueError(f"invalid binary format/architecture for {target}")
 
 
 def render_markdown(text, name, included, root, tag):
@@ -76,10 +102,8 @@ def validate_archive(archive, tag, target, expected_files=None):
                 if name not in binary_names(target):
                     raise ValueError("unexpected duplicate/platform binary")
                 source = bundle.extractfile(member)
-                magic = source.read(4)
-                expected = (b"MZ",) if "windows" in target else ((b"\x7fELF",) if "linux" in target
-                    else (b"\xcf\xfa\xed\xfe", b"\xfe\xed\xfa\xcf", b"\xca\xfe\xba\xbe"))
-                if not magic.startswith(expected) or ("windows" not in target and member.mode & 0o111 != 0o111):
+                validate_binary(source.read(4096), target)
+                if "windows" not in target and member.mode & 0o111 != 0o111:
                     raise ValueError(f"invalid binary or executable mode: {name}")
             elif name.endswith((".md", ".json", ".py", ".sh")):
                 if member.size > 2 * 1024 * 1024:
@@ -145,40 +169,78 @@ def package(root, build_dir, dist, tag, target):
     return archive
 
 
-def checksums(root, dist, tag):
+def archive_set(root, dist, tag, require_linux=True):
     check_tag(tag, workspace_version(root))
     expected = {f"netbaiot-{tag}-{target}.tar.gz": target for target in TARGETS}
     actual = {path.name for path in dist.glob("*.tar.gz")}
-    if actual != set(expected):
-        raise ValueError(f"must have exactly five platform archives; missing={sorted(set(expected)-actual)}, extra={sorted(actual-set(expected))}")
+    required = {f"netbaiot-{tag}-{target}.tar.gz" for target in REQUIRED_TARGETS} if require_linux else set()
+    if not actual or required - actual or actual - set(expected):
+        raise ValueError(f"invalid archive set; missing required Linux={sorted(required-actual)}, extra={sorted(actual-set(expected))}")
+    if not require_linux and any(expected[name] in REQUIRED_TARGETS for name in actual):
+        raise ValueError("optional-only set cannot contain official Linux targets")
+    return {name: expected[name] for name in sorted(actual)}
+
+
+def checksum_lines(root, dist, tag, require_linux=True):
+    expected = archive_set(root, dist, tag, require_linux)
     lines = []
     for name, target in sorted(expected.items()):
         path = dist / name
+        if path.is_symlink() or not path.is_file():
+            raise ValueError(f"not a regular archive asset: {name}")
         validate_archive(path, tag, target, package_files(root, tag))
         digest = hashlib.sha256()
         with path.open("rb") as source:
             for chunk in iter(lambda: source.read(1024 * 1024), b""):
                 digest.update(chunk)
         lines.append(f"{digest.hexdigest()}  {name}\n")
+    return lines
+
+
+def checksums(root, dist, tag, require_linux=True):
+    lines = checksum_lines(root, dist, tag, require_linux)
+    manifest = dist / "SHA256SUMS"
+    if manifest.is_symlink() or (manifest.exists() and not manifest.is_file()):
+        raise ValueError("unsafe checksum manifest")
     (dist / "SHA256SUMS").write_text("".join(lines), encoding="ascii")
-    print("Archives/checksums PASS: five unique targets, valid contents, SHA256SUMS")
+    print(f"Archives/checksums PASS: {len(lines)} valid targets, SHA256SUMS")
+
+
+def verify_checksums(root, dist, tag, require_linux=True, verbose=True):
+    expected = "".join(checksum_lines(root, dist, tag, require_linux))
+    if (dist / "SHA256SUMS").is_symlink():
+        raise ValueError("unsafe checksum manifest")
+    if (dist / "SHA256SUMS").stat().st_size != len(expected.encode("ascii")):
+        raise ValueError("SHA256SUMS length does not match the exact asset set")
+    if (dist / "SHA256SUMS").read_text(encoding="ascii") != expected:
+        raise ValueError("SHA256SUMS does not exactly match present, validated archives")
+    if verbose:
+        print("SHA256SUMS verification PASS")
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=("package", "checksums"))
+    parser.add_argument("action", choices=("package", "checksums", "verify-checksums", "assets"))
     parser.add_argument("--repo", type=Path, default=ROOT)
     parser.add_argument("--tag", required=True)
     parser.add_argument("--target", choices=TARGETS)
     parser.add_argument("--build-dir", type=Path)
     parser.add_argument("--dist", type=Path, required=True)
+    parser.add_argument("--optional-only", action="store_true", help="independent development artifacts, not an official release set")
     args = parser.parse_args()
     if args.action == "package":
         if not args.target or not args.build_dir:
             parser.error("package requires --target and --build-dir")
         package(args.repo.resolve(), args.build_dir, args.dist, args.tag, args.target)
+    elif args.action == "checksums":
+        checksums(args.repo.resolve(), args.dist, args.tag, not args.optional_only)
     else:
-        checksums(args.repo.resolve(), args.dist, args.tag)
+        verify_checksums(args.repo.resolve(), args.dist, args.tag, not args.optional_only,
+                         verbose=args.action != "assets")
+        if args.action == "assets":
+            for name in archive_set(args.repo.resolve(), args.dist, args.tag, not args.optional_only):
+                print(name)
+            print("SHA256SUMS")
 
 
 if __name__ == "__main__":

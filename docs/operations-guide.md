@@ -1,5 +1,10 @@
 # 运维与生产部署指南
 
+正式生产部署推荐 Linux x86_64 或 ARM64，正式发布在 Ubuntu 24.04 两种架构上原生构建、
+运行并验证 SHA256。其他发行版先确认 loader/glibc、TLS 与恢复目录配置。
+macOS 定位为开发与测试，Windows 为实验性兼容，不提供生产稳定性保证。
+Linux 发布门禁独立于 macOS/Windows 可选检查；详见[平台支持](platform-support.md)。
+
 ## 配置模型
 
 统一入口可先检查配置再启动：

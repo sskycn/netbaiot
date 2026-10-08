@@ -1,130 +1,32 @@
 name: GitHub Release
-
 on:
   workflow_dispatch:
     inputs:
       release-tag:
-        description: Candidate version (vX.Y.Z); verifies/builds/smokes without publishing
+        description: Candidate version (vX.Y.Z); verifies Linux without publishing
         required: true
         type: string
   push:
-    tags:
-      - "v*"
-
+    tags: ["v*"]
 permissions:
   contents: read
-
 env:
   RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.release-tag || github.ref_name }}
-
 jobs:
   verify:
     uses: ./.github/workflows/release-verify.yml
     with:
       release-tag: ${{ github.event_name == 'workflow_dispatch' && inputs.release-tag || github.ref_name }}
-
-  build:
-    name: Build ${{ matrix.target }}
+  linux:
     needs: verify
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 45
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - runner: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-            builder: cargo
-          - runner: ubuntu-latest
-            target: aarch64-unknown-linux-gnu
-            builder: cross
-          - runner: macos-latest
-            target: x86_64-apple-darwin
-            builder: cargo
-          - runner: macos-latest
-            target: aarch64-apple-darwin
-            builder: cargo
-          - runner: windows-latest
-            target: x86_64-pc-windows-msvc
-            builder: cargo
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.target }}
-
-      - name: Install cross
-        if: matrix.builder == 'cross'
-        run: cargo install cross --locked
-
-      - name: Build release binaries
-        shell: bash
-        run: |
-          if [[ "${{ matrix.builder }}" == "cross" ]]; then
-            cross build --locked --release --target "${{ matrix.target }}" \
-              -p netbaiot-server -p netbaiot-cli
-          else
-            cargo build --locked --release --target "${{ matrix.target }}" \
-              -p netbaiot-server -p netbaiot-cli
-          fi
-
-      - name: Package release archive
-        shell: bash
-        run: >-
-          cargo xtask package --no-build
-          --target "${{ matrix.target }}"
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: release-${{ matrix.target }}
-          path: dist/*.tar.gz
-          if-no-files-found: error
-          retention-days: 1
-
-  archive-set:
-    name: Verify five archives and checksums
-    needs: build
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with:
-          path: dist
-          pattern: release-*
-          merge-multiple: true
-      - run: python3 scripts/release_package.py checksums --tag "$RELEASE_TAG" --dist dist
-      - uses: actions/upload-artifact@v4
-        with:
-          name: release-checksums
-          path: dist/SHA256SUMS
-          if-no-files-found: error
-          retention-days: 1
-
-  archive-smoke:
-    name: Run Linux archive Quick Start
-    needs: build
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with:
-          name: release-x86_64-unknown-linux-gnu
-          path: dist
-      - name: Install test-only MQTT client
-        run: sudo apt-get update && sudo apt-get install --yes mosquitto-clients
-      - name: Extract and run the actual archive
-        run: >-
-          cargo xtask check release --part archive
-          --archive "dist/netbaiot-${RELEASE_TAG}-x86_64-unknown-linux-gnu.tar.gz"
-
+    uses: ./.github/workflows/linux-packages.yml
+    with:
+      release-tag: ${{ github.event_name == 'workflow_dispatch' && inputs.release-tag || github.ref_name }}
   publish:
-    name: Publish GitHub Release
+    name: Publish official Linux Release
     if: github.event_name == 'push'
-    needs: [verify, build, archive-set, archive-smoke]
-    runs-on: ubuntu-latest
+    needs: [verify, linux]
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
       contents: write
@@ -132,23 +34,21 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
+          pattern: linux-release-*
           path: dist
-          pattern: release-*
           merge-multiple: true
-
-      - name: Generate checksums and publish release
+      - name: Verify exact assets and publish
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          python3 scripts/release_package.py checksums --tag "$RELEASE_TAG" --dist dist
+          python3 scripts/release_package.py verify-checksums --tag "$RELEASE_TAG" --dist dist
+          python3 scripts/release_package.py assets --tag "$RELEASE_TAG" --dist dist > assets.txt
+          mapfile -t files < assets.txt
+          assets=()
+          for file in "${files[@]}"; do assets+=("dist/$file"); done
           notes_file="docs/releases/${RELEASE_TAG}.md"
           test -s "$notes_file"
-          args=(release create "$RELEASE_TAG" dist/*
-            --repo "$GITHUB_REPOSITORY"
-            --title "NetbaIoT $RELEASE_TAG"
-            --notes-file "$notes_file"
-            --verify-tag)
-          if [[ "$RELEASE_TAG" == *-* ]]; then
-            args+=(--prerelease)
-          fi
+          args=(release create "$RELEASE_TAG" "${assets[@]}" --repo "$GITHUB_REPOSITORY"
+            --title "NetbaIoT $RELEASE_TAG" --notes-file "$notes_file" --verify-tag)
+          if [[ "$RELEASE_TAG" == *-* ]]; then args+=(--prerelease); fi
           gh "${args[@]}"

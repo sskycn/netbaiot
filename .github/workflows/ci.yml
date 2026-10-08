@@ -11,14 +11,6 @@ jobs:
   verify:
     uses: ./.github/workflows/release-verify.yml
 
-  archive-smoke:
-    name: Linux binary Quick Start
+  linux:
     needs: verify
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - run: sudo apt-get update && sudo apt-get install --yes mosquitto-clients
-      - name: Package and execute the extracted archive
-        run: cargo xtask check release --part archive
+    uses: ./.github/workflows/linux-packages.yml

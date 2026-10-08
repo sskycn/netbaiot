@@ -1,5 +1,10 @@
 # 5-minute Quick Start
 
+Use Linux x86_64 or ARM64 for production. macOS supports development/testing;
+Windows is experimental and has no guaranteed official archive for each version.
+See [platform support and release policy](platform-support.md). This walkthrough
+uses local development credentials; production setup is in the operations guide.
+
 The one-command demo below needs only the NetbaIoT binary. The manual walkthrough starts a webhook receiver, sends a
 real MQTT publish, and shows the normalized `DeviceEvent`. It uses the checked-in
 tutorial device credential on loopback. Do not reuse that credential or the
@@ -126,9 +131,10 @@ properties and exclusions are listed in the [protocol support matrix](protocol-s
 
 ## Windows manual start
 
-The Bash script above is the macOS/Linux entry point. On Windows, extract the
-Windows archive and open PowerShell terminals in its package directory. Install
-Python 3.9+ and Mosquitto client tools. Rust is only needed if building from source.
+The Bash script above is the macOS/Linux entry point. Windows is experimental:
+build from source, or use an independently validated optional archive if available.
+Open PowerShell in the source or extracted package directory. Install Python 3.9+
+and Mosquitto clients for this manual walkthrough; source builds also need Rust/MSVC.
 
 Terminal 1 runs the webhook:
 

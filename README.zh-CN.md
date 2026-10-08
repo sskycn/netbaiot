@@ -185,13 +185,18 @@ MQTT 和 TCP 在连接时认证并绑定设备身份。非 loopback 设备 TCP �
 
 ## 构建与发布
 
+Linux x86_64 和 ARM64 是正式支持且推荐的生产部署平台。macOS x86_64 / Apple Silicon
+用于开发与测试。Windows 属于实验性兼容平台，保留源码编译和独立手动检查，
+不保证生产稳定性或每次发布都有 Windows 二进制。详见[平台支持](docs/platform-support.md)。
+
 使用 workspace 最低支持版本构建：
 
 ```bash
 cargo +1.88.0 build --locked
 ```
 
-GitHub Actions 会在打 tag 后为 Linux、macOS 和 Windows 构建发布包，见
+GitHub Actions 正式发布必须通过两个 Linux 原生包、SHA256SUMS 与实际运行 smoke。
+macOS/Windows 可选构建独立进行，失败不阻断 Linux 发布，见
 [Releases](https://github.com/sskycn/netbaiot/releases)。仓库目前没有官方 Docker 镜像。
 命令行客户端程序名为 `netbaiot`，详见 [CLI 指南](docs/cli.md)。
 

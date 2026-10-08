@@ -1,0 +1,62 @@
+name: Optional macOS and experimental Windows builds
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: Independent development/experimental artifacts; no Linux release gate
+        type: choice
+        options: [all, macos, windows]
+        default: all
+permissions:
+  contents: read
+jobs:
+  plan:
+    runs-on: ubuntu-24.04
+    outputs:
+      matrix: ${{ steps.targets.outputs.matrix }}
+      tag: ${{ steps.targets.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: targets
+        env:
+          OPTIONAL_PLATFORM: ${{ inputs.platform }}
+        run: python3 scripts/release_targets.py --group optional --platform "$OPTIONAL_PLATFORM" --github-output
+  build:
+    name: Optional ${{ matrix.target }}
+    needs: plan
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    env:
+      RELEASE_TAG: ${{ needs.plan.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - name: Native correctness and recovery checks
+        shell: bash
+        run: python scripts/ci_annotate.py --title "Optional platform checks failed" -- cargo xtask check
+      - name: Compile and package optional target
+        shell: bash
+        run: cargo xtask package --target "${{ matrix.target }}"
+      - name: Verify independent optional checksum set
+        shell: bash
+        run: |
+          python scripts/release_package.py checksums --tag "$RELEASE_TAG" --dist dist --optional-only
+          python scripts/release_package.py verify-checksums --tag "$RELEASE_TAG" --dist dist --optional-only
+      - name: CLI startup on native host
+        shell: bash
+        run: cargo run --locked -p netbaiot-cli -- demo --once
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: optional-${{ matrix.target }}
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 14
