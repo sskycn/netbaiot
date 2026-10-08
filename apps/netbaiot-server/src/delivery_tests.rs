@@ -6,7 +6,7 @@ use std::{collections::BTreeMap, hint::black_box};
 static DELIVERY_ALLOCATOR: &stats_alloc::StatsAlloc<std::alloc::System> =
     &stats_alloc::INSTRUMENTED_SYSTEM;
 
-fn event(kind: DeviceEventKind) -> DeviceEvent {
+pub(super) fn event(kind: DeviceEventKind) -> DeviceEvent {
     DeviceEvent {
         event_id: EventId(uuid::Uuid::parse_str("00000000-0000-4000-8000-000000000001").unwrap()),
         source_message_id: SourceMessageId::new("source:1").unwrap(),

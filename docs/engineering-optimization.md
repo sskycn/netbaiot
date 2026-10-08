@@ -58,3 +58,41 @@ The same reqwest request-construction benchmark compares the retained legacy
 
 This excludes network time and does not imply the same end-to-end improvement.
 PASS: JSON compatibility tests, the release benchmark and `cargo xtask check`.
+
+## Phase 4: failure diagnostics, bounded retry hints and pause
+
+The original `SinkError::{Retryable,Permanent}` and `EventSink::deliver` remain
+source-compatible. An additive, defaulted `deliver_detailed` hook and sanitized
+`SinkFailure` metadata are necessary for the server crate to report retry hints
+and a closed reason vocabulary to the runtime without another shared mutex.
+Reasons distinguish network, timeout, 429, 5xx, auth, other 4xx, malformed/oversized
+responses, panic and unspecified custom-sink errors. No secrets or remote error
+bodies enter diagnostics.
+
+429/503 delta-seconds Retry-After is parsed with a checked u64 conversion and
+clamped to `retry_max_ms` in both HttpSink and EventBus. Invalid values are ignored;
+HTTP-date support was evaluated but not implemented. Local backoff still provides
+a nonzero minimum. Redirects and the 4096-byte response-body ceiling remain.
+
+Each required sink pauses after a permanent failure or three consecutive failures,
+using the existing local maximum retry interval. At expiry, one recovery probe is
+allowed; ACK clears the pause. Previously started requests complete normally.
+Nothing releases count, bytes or required ownership until ACK. No new task, lock,
+background timer or per-event breaker is introduced. Shutdown still drains or
+spools accepted required work, even while a sink is paused.
+
+A current inflight operation token rejects duplicate/stale completions, including
+saturated persisted attempt counts. The token is node-local and transient; no
+spool format changes are needed. Inflight token entries are bounded by existing
+delivery concurrency. A count-bounded timestamp bucket index per sink provides
+oldest age without scanning active events on metrics/status reads.
+
+Administrative status adds bounded per-sink diagnostics. Prometheus exposes
+aggregate queue/count/bytes/inflight/pause/age/hint-use values and a fixed reason
+vocabulary. Sink/device/event IDs and URLs are never metric labels.
+
+Fixtures exercise 200, 500, 429/503 with hints, 401/403/404, deadline, refused
+connection, invalid response, declared and chunked oversized bodies, and recovery
+to 200. Tests verify spool ownership, stable event IDs, cleanup, one probe,
+duplicate completion protection and nonzero drain reporting during an outage.
+PASS: 32 EventBus tests, HTTP classification/outage tests and `cargo xtask check`.

@@ -35,9 +35,56 @@ pub enum SinkError {
     Permanent,
 }
 
+/// Closed, credential-free failure vocabulary for runtime diagnostics.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+#[repr(usize)]
+pub enum SinkFailureReason {
+    Other,
+    Network,
+    Timeout,
+    #[serde(rename = "http_429")]
+    Http429,
+    #[serde(rename = "http_5xx")]
+    Http5xx,
+    HttpAuth,
+    #[serde(rename = "http_4xx")]
+    Http4xx,
+    InvalidResponse,
+    ResponseTooLarge,
+    Panic,
+}
+
+/// Additive delivery metadata: the existing SinkError variants remain intact.
+/// External delays are always clamped again by the EventBus local retry ceiling.
+#[derive(Clone, Copy, Debug)]
+pub struct SinkFailure {
+    pub error: SinkError,
+    pub reason: SinkFailureReason,
+    pub retry_after: Option<Duration>,
+}
+impl From<SinkError> for SinkFailure {
+    fn from(error: SinkError) -> Self {
+        Self {
+            error,
+            reason: SinkFailureReason::Other,
+            retry_after: None,
+        }
+    }
+}
+
 #[async_trait]
 pub trait EventSink: Send + Sync {
     async fn deliver(&self, delivery: DeliveryEnvelope) -> std::result::Result<SinkAck, SinkError>;
+
+    /// Optional richer failure information. Existing sink implementations keep
+    /// their source/API behavior through this default adapter.
+    async fn deliver_detailed(
+        &self,
+        delivery: DeliveryEnvelope,
+    ) -> std::result::Result<SinkAck, SinkFailure> {
+        self.deliver(delivery).await.map_err(Into::into)
+    }
 }
 
 #[derive(Clone)]
@@ -106,6 +153,7 @@ struct DeliveryRecord {
     accepted_at: i64,
     attempt: u32,
     next_attempt: Instant,
+    operation: u64,
 }
 
 struct SinkState {
@@ -116,6 +164,35 @@ struct SinkState {
     used_bytes: usize,
     inflight: usize,
     notify: Arc<tokio::sync::Notify>,
+    consecutive_failures: u32,
+    paused_until: Option<Instant>,
+    last_failure: Option<SinkFailureReason>,
+    retries: u64,
+    failures: u64,
+    drops: u64,
+    retry_after_used: u64,
+    // At most used_count timestamp buckets, without payload duplication.
+    pending_ages: BTreeMap<i64, usize>,
+}
+
+/// Bounded administrative diagnostics. Identifiers are never metric labels.
+#[derive(Clone, Debug, Serialize)]
+pub struct SinkDiagnostics {
+    pub sink_id: SinkId,
+    /// Includes ready, retrying and inflight responsibilities.
+    pub queue_count: usize,
+    pub queue_bytes: usize,
+    pub inflight: usize,
+    pub retry_total: u64,
+    pub failure_total: u64,
+    pub drop_total: u64,
+    pub retry_after_used_total: u64,
+    pub oldest_pending_age_ms: u64,
+    pub consecutive_failures: u32,
+    /// Remains true during the single recovery probe.
+    pub paused: bool,
+    pub pause_remaining_ms: u64,
+    pub last_failure: Option<SinkFailureReason>,
 }
 
 struct ActiveEvent {
@@ -126,6 +203,8 @@ struct ActiveEvent {
     attempts: BTreeMap<SinkId, u32>,
     accepted_at: i64,
     routing_revision: u64,
+    // Only current inflight deliveries allocate entries (bounded by sink concurrency).
+    operations: BTreeMap<SinkId, u64>,
 }
 
 struct State {
@@ -136,6 +215,7 @@ struct State {
     active_bytes: usize,
     pending_required: usize,
     accepting: bool,
+    next_operation: u64,
 }
 
 /// Immutable, sorted effective fanout. The slices also own safe snapshots across
@@ -291,6 +371,14 @@ impl EventBus {
                     used_bytes: 0,
                     inflight: 0,
                     notify: Arc::new(tokio::sync::Notify::new()),
+                    consecutive_failures: 0,
+                    paused_until: None,
+                    last_failure: None,
+                    retries: 0,
+                    failures: 0,
+                    drops: 0,
+                    retry_after_used: 0,
+                    pending_ages: BTreeMap::new(),
                 },
             );
         }
@@ -306,6 +394,7 @@ impl EventBus {
                 active_bytes: 0,
                 pending_required: 0,
                 accepting: true,
+                next_operation: 0,
             }),
             changed: tokio::sync::Notify::new(),
             stop: CancellationToken::new(),
@@ -373,6 +462,61 @@ impl EventBus {
         })
     }
 
+    /// Administrative diagnostics read at most max_sinks compact state entries.
+    pub fn sink_diagnostics(&self) -> Result<Vec<SinkDiagnostics>> {
+        let state = self.lock_state(EventBusProbe::Other)?;
+        let now = Instant::now();
+        let now_ms = now_ms();
+        Ok(state
+            .sinks
+            .iter()
+            .map(|(id, sink)| SinkDiagnostics {
+                sink_id: id.clone(),
+                queue_count: sink.used_count,
+                queue_bytes: sink.used_bytes,
+                inflight: sink.inflight,
+                retry_total: sink.retries,
+                failure_total: sink.failures,
+                drop_total: sink.drops,
+                retry_after_used_total: sink.retry_after_used,
+                oldest_pending_age_ms: sink.pending_ages.first_key_value().map_or(
+                    0,
+                    |(accepted_at, _)| {
+                        u64::try_from(now_ms.saturating_sub(*accepted_at)).unwrap_or(0)
+                    },
+                ),
+                consecutive_failures: sink.consecutive_failures,
+                paused: sink.paused_until.is_some(),
+                pause_remaining_ms: sink.paused_until.map_or(0, |deadline| {
+                    u64::try_from(deadline.saturating_duration_since(now).as_millis())
+                        .unwrap_or(u64::MAX)
+                }),
+                last_failure: sink.last_failure,
+            })
+            .collect())
+    }
+
+    /// Aggregate gauges have no dynamic labels and scan only bounded sink state.
+    pub fn render_sink_metrics(&self) -> Result<String> {
+        let diagnostics = self.sink_diagnostics()?;
+        let sum = |get: fn(&SinkDiagnostics) -> u64| {
+            diagnostics.iter().map(get).fold(0u64, u64::saturating_add)
+        };
+        Ok(format!(
+            "netbaiot_sink_queue_count {}\nnetbaiot_sink_queue_bytes {}\nnetbaiot_sink_inflight {}\nnetbaiot_sink_paused {}\nnetbaiot_sink_retry_after_used_total {}\nnetbaiot_sink_oldest_pending_age_ms {}\n",
+            sum(|s| s.queue_count as u64),
+            sum(|s| s.queue_bytes as u64),
+            sum(|s| s.inflight as u64),
+            sum(|s| u64::from(s.paused)),
+            sum(|s| s.retry_after_used_total),
+            diagnostics
+                .iter()
+                .map(|s| s.oldest_pending_age_ms)
+                .max()
+                .unwrap_or(0)
+        ))
+    }
+
     pub fn publish(&self, event: DeviceEvent) -> Result<EventAcceptance> {
         let bytes = bounded_json_bytes(&event, self.limits.global_event_max_bytes)?;
         let event = Arc::new(event);
@@ -428,16 +572,19 @@ impl EventBus {
                 && sink.used_bytes.saturating_add(bytes) <= sink.definition.max_bytes;
             if !available {
                 self.metrics.inc(Metric::SinkDrops);
+                sink.drops = sink.drops.saturating_add(1);
                 continue;
             }
             sink.used_count += 1;
             sink.used_bytes += bytes;
+            *sink.pending_ages.entry(now).or_default() += 1;
             sink.ready.push_back(DeliveryRecord {
                 event: event.clone(),
                 bytes,
                 accepted_at: now,
                 attempt: 0,
                 next_attempt: Instant::now(),
+                operation: 0,
             });
             remaining.insert(id.clone());
             if sink.definition.mode == SinkDeliveryMode::ConfirmedRequired {
@@ -464,6 +611,7 @@ impl EventBus {
                 attempts: BTreeMap::new(),
                 accepted_at: now,
                 routing_revision: revision,
+                operations: BTreeMap::new(),
             },
         );
         let lock_hold_us = hold_started.map(|started| started.elapsed().as_micros() as u64);
@@ -566,12 +714,14 @@ impl EventBus {
                 if let Some(sink) = state.sinks.get_mut(id) {
                     sink.used_count += 1;
                     sink.used_bytes += bytes;
+                    *sink.pending_ages.entry(record.accepted_at).or_default() += 1;
                     sink.ready.push_back(DeliveryRecord {
                         event: event.clone(),
                         bytes,
                         accepted_at: record.accepted_at,
                         attempt: *record.attempts.get(id).unwrap_or(&0),
                         next_attempt: Instant::now(),
+                        operation: 0,
                     });
                 }
             }
@@ -585,6 +735,7 @@ impl EventBus {
                     attempts: record.attempts,
                     accepted_at: record.accepted_at,
                     routing_revision: record.routing_revision,
+                    operations: BTreeMap::new(),
                 },
             );
         }
@@ -696,13 +847,22 @@ impl EventBus {
                     };
                     let result = std::panic::AssertUnwindSafe(tokio::time::timeout(
                         timeout,
-                        sink.deliver(envelope),
+                        sink.deliver_detailed(envelope),
                     ))
                     .catch_unwind()
                     .await;
                     let result = match result {
                         Ok(Ok(result)) => result,
-                        Ok(Err(_)) | Err(_) => Err(SinkError::Retryable),
+                        Ok(Err(_)) => Err(SinkFailure {
+                            error: SinkError::Retryable,
+                            reason: SinkFailureReason::Timeout,
+                            retry_after: None,
+                        }),
+                        Err(_) => Err(SinkFailure {
+                            error: SinkError::Retryable,
+                            reason: SinkFailureReason::Panic,
+                            retry_after: None,
+                        }),
                     };
                     (record, result)
                 });
@@ -726,7 +886,7 @@ impl EventBus {
                         self.metrics.event_bus_probe(EventBusProbe::WakeJoin);
                         match completed {
                             Some(Ok((record, result))) => {
-                                if let Err(error) = self.complete(&id, record, result, &definition) {
+                                if let Err(error) = self.complete_detailed(&id, record, result, &definition) {
                                     tracing::error!(%error, sink_id=%id, "EventBus failed to complete delivery");
                                 }
                             }
@@ -768,7 +928,7 @@ impl EventBus {
                         self.metrics.event_bus_probe(EventBusProbe::WakeJoin);
                         match completed {
                             Some(Ok((record, result))) => {
-                                if let Err(error) = self.complete(&id, record, result, &definition) {
+                                if let Err(error) = self.complete_detailed(&id, record, result, &definition) {
                                     tracing::error!(%error, sink_id=%id, "EventBus failed to complete delivery");
                                 }
                             }
@@ -789,9 +949,16 @@ impl EventBus {
         let mut state = self.lock_state(EventBusProbe::TakeReady)?;
         #[cfg(test)]
         clock.acquired();
+        let operation = state.next_operation.checked_add(1).ok_or(Error::Internal)?;
         let sink = state.sinks.get_mut(id).ok_or(Error::Internal)?;
         let queue_len = sink.used_count.saturating_sub(sink.inflight);
         let now = Instant::now();
+        if sink
+            .paused_until
+            .is_some_and(|deadline| deadline > now || sink.inflight != 0)
+        {
+            return Ok(None);
+        }
         let selection_started = self.metrics.lock_timing_enabled().then(Instant::now);
         // Fill the worker's immediate demand, while promoting at least one due
         // retry even with existing ready work. This bounds each lock acquisition
@@ -819,11 +986,18 @@ impl EventBus {
                 break;
             }
         }
-        let record = sink.ready.pop_front();
-        if let Some(record) = &record {
+        let mut record = sink.ready.pop_front();
+        if let Some(record) = &mut record {
+            record.operation = operation;
             sink.inflight += 1;
             tracing::debug!(sink_id=%id, event_id=%record.event.event_id,
                 "ready delivery diagnostic");
+        }
+        if let Some(record) = &record {
+            state.next_operation = operation;
+            if let Some(active) = state.active.get_mut(&record.event.event_id) {
+                active.operations.insert(id.clone(), operation);
+            }
         }
         let selection_ns = selection_started.map(|started| started.elapsed().as_nanos() as u64);
         if let Some(selection_ns) = selection_ns {
@@ -836,20 +1010,43 @@ impl EventBus {
         let state = self.lock_state(EventBusProbe::NextDelay)?;
         let sink = state.sinks.get(id).ok_or(Error::Internal)?;
         let now = Instant::now();
+        if sink.used_count == sink.inflight {
+            return Ok(None);
+        }
+        if sink
+            .paused_until
+            .is_some_and(|deadline| deadline <= now && sink.inflight != 0)
+        {
+            return Ok(None);
+        }
+        let pause = sink.paused_until.map_or(Duration::ZERO, |deadline| {
+            deadline.saturating_duration_since(now)
+        });
         if !sink.ready.is_empty() {
-            return Ok(Some(Duration::ZERO));
+            return Ok(Some(pause));
         }
         Ok(sink
             .delayed
             .first_key_value()
-            .map(|(deadline, _)| deadline.saturating_duration_since(now)))
+            .map(|(deadline, _)| deadline.saturating_duration_since(now).max(pause)))
     }
 
+    #[cfg(test)]
     fn complete(
         &self,
         id: &SinkId,
-        mut record: DeliveryRecord,
+        record: DeliveryRecord,
         result: std::result::Result<SinkAck, SinkError>,
+        definition: &SinkDefinition,
+    ) -> Result<()> {
+        self.complete_detailed(id, record, result.map_err(Into::into), definition)
+    }
+
+    fn complete_detailed(
+        &self,
+        id: &SinkId,
+        mut record: DeliveryRecord,
+        result: std::result::Result<SinkAck, SinkFailure>,
         definition: &SinkDefinition,
     ) -> Result<()> {
         let mut state = self.lock_state(EventBusProbe::Complete)?;
@@ -859,6 +1056,9 @@ impl EventBus {
             return Ok(());
         };
         if !active.remaining.contains(id) {
+            return Ok(());
+        }
+        if active.operations.get(id).copied() != Some(record.operation) {
             return Ok(());
         }
         if active.required.contains(id) && state.pending_required == 0 {
@@ -872,12 +1072,20 @@ impl EventBus {
         tracing::debug!(sink_id=%id, event_id=%record.event.event_id, attempt=record.attempt,
             ?result, "delivery completion diagnostic");
         if let Some(active) = state.active.get_mut(&record.event.event_id) {
+            active.operations.remove(id);
             active.attempts.insert(id.clone(), record.attempt);
         }
         let age = now_ms().saturating_sub(record.accepted_at);
-        let retry = matches!(result, Err(SinkError::Retryable))
-            && record.attempt < definition.max_attempts
+        let retry = matches!(
+            result,
+            Err(SinkFailure {
+                error: SinkError::Retryable,
+                ..
+            })
+        ) && record.attempt < definition.max_attempts
             && age < i64::try_from(definition.max_age.as_millis()).unwrap_or(i64::MAX);
+        let maximum_delay = Duration::from_millis(self.limits.retry_max_ms.max(1));
+        let mut delay = maximum_delay;
         if retry {
             let exponent = record.attempt.min(30);
             let cap = self
@@ -886,8 +1094,37 @@ impl EventBus {
                 .saturating_mul(1u64.checked_shl(exponent).unwrap_or(u64::MAX))
                 .min(self.limits.retry_max_ms);
             let seed = record.event.event_id.0.as_u128() as u64 ^ u64::from(record.attempt);
-            record.next_attempt = Instant::now() + Duration::from_millis(1 + seed % cap.max(1));
+            delay = Duration::from_millis(1 + seed % cap.max(1));
+        }
+        let required = definition.mode == SinkDeliveryMode::ConfirmedRequired;
+        {
             let sink = state.sinks.get_mut(id).ok_or(Error::Internal)?;
+            if let Err(failure) = result {
+                self.metrics.sink_failure(failure.reason);
+                sink.failures = sink.failures.saturating_add(1);
+                sink.consecutive_failures = sink.consecutive_failures.saturating_add(1);
+                sink.last_failure = Some(failure.reason);
+                if let Some(hint) = failure.retry_after {
+                    delay = delay.max(hint.min(maximum_delay));
+                    sink.retry_after_used = sink.retry_after_used.saturating_add(1);
+                }
+                if required
+                    && (failure.error == SinkError::Permanent || sink.consecutive_failures >= 3)
+                {
+                    // One sink-level cooldown, then one probe at a time. Existing
+                    // inflight requests retain ownership and complete normally.
+                    sink.paused_until = Some(Instant::now() + maximum_delay);
+                }
+            } else {
+                sink.consecutive_failures = 0;
+                sink.paused_until = None;
+                sink.last_failure = None;
+            }
+        }
+        record.next_attempt = Instant::now() + delay;
+        if retry {
+            let sink = state.sinks.get_mut(id).ok_or(Error::Internal)?;
+            sink.retries = sink.retries.saturating_add(1);
             sink.delayed
                 .entry(record.next_attempt)
                 .or_default()
@@ -897,11 +1134,9 @@ impl EventBus {
             self.metrics.inc(Metric::SinkRetries);
             return Ok(());
         }
-        let required = definition.mode == SinkDeliveryMode::ConfirmedRequired;
         if result.is_err() && required {
-            record.next_attempt =
-                Instant::now() + Duration::from_millis(self.limits.retry_max_ms.max(1));
             let sink = state.sinks.get_mut(id).ok_or(Error::Internal)?;
+            sink.retries = sink.retries.saturating_add(1);
             sink.delayed
                 .entry(record.next_attempt)
                 .or_default()
@@ -915,6 +1150,14 @@ impl EventBus {
             let sink = state.sinks.get_mut(id).ok_or(Error::Internal)?;
             sink.used_count = sink.used_count.saturating_sub(1);
             sink.used_bytes = sink.used_bytes.saturating_sub(record.bytes);
+            if let std::collections::btree_map::Entry::Occupied(mut entry) =
+                sink.pending_ages.entry(record.accepted_at)
+            {
+                *entry.get_mut() -= 1;
+                if *entry.get() == 0 {
+                    entry.remove();
+                }
+            }
         }
         if result.is_ok() {
             self.metrics.inc(Metric::SinkAcks);
@@ -924,6 +1167,9 @@ impl EventBus {
             );
         } else {
             self.metrics.inc(Metric::SinkDrops);
+            if let Some(sink) = state.sinks.get_mut(id) {
+                sink.drops = sink.drops.saturating_add(1);
+            }
         }
         let mut remove_event = false;
         let mut removed_required = false;
@@ -1063,6 +1309,12 @@ mod tests {
         );
         for active in state.active.values() {
             assert!(active.required.is_subset(&active.remaining));
+            assert!(
+                active
+                    .operations
+                    .keys()
+                    .all(|id| active.remaining.contains(id))
+            );
         }
         for (id, sink) in &state.sinks {
             let active = state
@@ -1071,6 +1323,18 @@ mod tests {
                 .filter(|event| event.remaining.contains(id))
                 .collect::<Vec<_>>();
             assert_eq!(sink.used_count, active.len());
+            assert_eq!(
+                sink.inflight,
+                active
+                    .iter()
+                    .filter(|event| event.operations.contains_key(id))
+                    .count()
+            );
+            let mut ages = BTreeMap::<i64, usize>::new();
+            for event in &active {
+                *ages.entry(event.accepted_at).or_default() += 1;
+            }
+            assert_eq!(sink.pending_ages, ages);
             assert_eq!(
                 sink.used_bytes,
                 active.iter().map(|event| event.bytes).sum::<usize>()
@@ -1133,6 +1397,97 @@ mod tests {
     }
 
     struct Ack;
+
+    #[tokio::test(start_paused = true)]
+    async fn saturated_attempts_still_fence_stale_and_duplicate_completions() {
+        let bus = route_bus(
+            Limits {
+                retry_max_ms: 100,
+                retry_base_ms: 1,
+                ..Limits::default()
+            },
+            vec![route(None, &["a"])],
+        )
+        .unwrap();
+        let id = SinkId::new("a").unwrap();
+        let definition = bus.state.lock().unwrap().sinks[&id].definition.clone();
+        let mut restored = audit_record();
+        restored.attempts.insert(id.clone(), u32::MAX);
+        bus.restore(vec![restored]).unwrap();
+        let record = bus.take_ready(&id).unwrap().unwrap();
+        let stale = record.clone();
+        bus.complete(&id, record, Err(SinkError::Retryable), &definition)
+            .unwrap();
+        bus.complete(&id, stale.clone(), Err(SinkError::Retryable), &definition)
+            .unwrap();
+        assert_eventbus_invariants(&bus);
+        tokio::time::advance(Duration::from_millis(100)).await;
+        let probe = bus.take_ready(&id).unwrap().unwrap();
+        bus.complete(&id, stale, Ok(SinkAck), &definition).unwrap();
+        assert_eq!(checked_usage(&bus).pending_required, 1);
+        bus.complete(&id, probe, Ok(SinkAck), &definition).unwrap();
+        assert_eq!(checked_usage(&bus), EventBusUsage::default());
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn sink_pause_preserves_ownership_and_has_one_bounded_recovery_probe() {
+        let bus = route_bus(
+            Limits {
+                retry_base_ms: 1,
+                retry_max_ms: 100,
+                ..Limits::default()
+            },
+            vec![route(None, &["a"])],
+        )
+        .unwrap();
+        let id = SinkId::new("a").unwrap();
+        let definition = bus.state.lock().unwrap().sinks[&id].definition.clone();
+        for _ in 0..3 {
+            bus.publish(event(8)).unwrap();
+        }
+        let record = bus.take_ready(&id).unwrap().unwrap();
+        let duplicate = record.clone();
+        let failure = SinkFailure {
+            error: SinkError::Permanent,
+            reason: SinkFailureReason::HttpAuth,
+            retry_after: Some(Duration::from_secs(u64::MAX)),
+        };
+        bus.complete_detailed(&id, record, Err(failure), &definition)
+            .unwrap();
+        bus.complete_detailed(&id, duplicate, Err(failure), &definition)
+            .unwrap();
+        assert_eventbus_invariants(&bus);
+        assert_eq!(checked_usage(&bus).pending_required, 3);
+        assert_eq!(bus.sink_diagnostics().unwrap()[0].failure_total, 1);
+        assert_eq!(bus.sink_diagnostics().unwrap()[0].retry_after_used_total, 1);
+        assert!(bus.take_ready(&id).unwrap().is_none());
+        assert_eq!(
+            bus.next_ready_delay(&id).unwrap(),
+            Some(Duration::from_millis(100))
+        );
+        assert!(
+            !bus.wait_required_drained(Duration::from_millis(10))
+                .await
+                .unwrap()
+        );
+        assert_eq!(bus.spool_records().unwrap().len(), 3);
+        tokio::time::advance(Duration::from_millis(100)).await;
+        let probe = bus.take_ready(&id).unwrap().unwrap();
+        assert!(bus.take_ready(&id).unwrap().is_none());
+        assert_eq!(bus.next_ready_delay(&id).unwrap(), None);
+        assert_eq!(bus.sink_diagnostics().unwrap()[0].inflight, 1);
+        bus.complete(&id, probe, Ok(SinkAck), &definition).unwrap();
+        assert!(!bus.sink_diagnostics().unwrap()[0].paused);
+        while let Some(record) = bus.take_ready(&id).unwrap() {
+            bus.complete(&id, record, Ok(SinkAck), &definition).unwrap();
+            assert_eventbus_invariants(&bus);
+        }
+        assert_eq!(checked_usage(&bus), EventBusUsage::default());
+        let diagnostics = bus.sink_diagnostics().unwrap();
+        assert_eq!(diagnostics[0].oldest_pending_age_ms, 0);
+        assert_eq!(diagnostics[0].queue_count, 0);
+        assert!(!bus.render_sink_metrics().unwrap().contains("sink_id"));
+    }
     #[async_trait]
     impl EventSink for Ack {
         async fn deliver(&self, _: DeliveryEnvelope) -> std::result::Result<SinkAck, SinkError> {
