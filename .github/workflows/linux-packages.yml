@@ -1,0 +1,75 @@
+name: Linux release archives
+on:
+  workflow_call:
+    inputs:
+      release-tag:
+        type: string
+        default: ""
+permissions:
+  contents: read
+jobs:
+  plan:
+    runs-on: ubuntu-24.04
+    outputs:
+      matrix: ${{ steps.targets.outputs.matrix }}
+      tag: ${{ steps.targets.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: targets
+        env:
+          CANDIDATE_TAG: ${{ inputs.release-tag }}
+        run: python3 scripts/release_targets.py --group required --tag "$CANDIDATE_TAG" --github-output
+  build:
+    name: Build and run ${{ matrix.target }}
+    needs: plan
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    env:
+      RELEASE_TAG: ${{ needs.plan.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Assert native Linux architecture
+        run: |
+          test "$(rustc -vV | sed -n 's/^host: //p')" = "${{ matrix.target }}"
+      - name: Full native quality and recovery regressions
+        run: python3 scripts/ci_annotate.py --title "Linux native checks failed" -- cargo xtask check
+      - name: Build release and package
+        run: cargo xtask package --target "${{ matrix.target }}"
+      - name: Install test-only MQTT client
+        run: sudo apt-get update && sudo apt-get install --yes mosquitto-clients
+      - name: Execute the actual native Linux archive
+        run: python3 tests/release_archive_smoke.py "dist/netbaiot-${RELEASE_TAG}-${{ matrix.target }}.tar.gz"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-release-${{ matrix.target }}
+          path: dist/*.tar.gz
+          if-no-files-found: error
+          retention-days: 7
+  checksums:
+    name: Verify required Linux archives and SHA256
+    needs: [plan, build]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      RELEASE_TAG: ${{ needs.plan.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: linux-release-*
+          path: dist
+          merge-multiple: true
+      - run: |
+          python3 scripts/release_package.py checksums --tag "$RELEASE_TAG" --dist dist
+          python3 scripts/release_package.py verify-checksums --tag "$RELEASE_TAG" --dist dist
+          cd dist && sha256sum -c SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-release-checksums
+          path: dist/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 7

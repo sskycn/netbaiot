@@ -54,6 +54,12 @@ flowchart LR
 
 ## Quick Start
 
+Linux x86_64 and ARM64 are the supported production deployment platforms.
+macOS x86_64/Apple Silicon supports development and testing. Windows remains
+experimental, with source builds and independent manual checks; per-release
+Windows binaries and production stability are not guaranteed. See
+[platform support](docs/platform-support.md).
+
 From a source checkout (Rust 1.88+):
 
 ```bash
@@ -223,8 +229,10 @@ Build from source with the workspace's minimum supported Rust toolchain:
 cargo +1.88.0 build --locked
 ```
 
-Tagged releases are built by GitHub Actions for Linux, macOS, and Windows; see
-[Releases](https://github.com/sskycn/netbaiot/releases). There is no official
+Official tagged releases require native Linux x86_64 and ARM64 archives, their
+SHA256SUMS and real binary smoke checks. Independent optional macOS/Windows
+builds cannot block Linux publishing; see [platform support](docs/platform-support.md)
+and [Releases](https://github.com/sskycn/netbaiot/releases). There is no official
 Docker image in this repository. The command-line client is `netbaiot`; see the
 [CLI guide](docs/cli.md).
 

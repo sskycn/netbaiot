@@ -1,0 +1,51 @@
+{
+  "policy_commit": "7d4a1fc71de443dd2432a17ce550628c7e4c7a33",
+  "run": "https://github.com/sskycn/netbaiot/actions/runs/37734523362",
+  "jobs": [
+    {
+      "name": "verify / audit",
+      "url": "https://github.com/sskycn/netbaiot/actions/runs/37734523362/job/113170942756",
+      "result": "PASS"
+    },
+    {
+      "name": "verify / rust (stable)",
+      "url": "https://github.com/sskycn/netbaiot/actions/runs/37734523362/job/113170942965",
+      "result": "PASS"
+    },
+    {
+      "name": "verify / preflight",
+      "url": "https://github.com/sskycn/netbaiot/actions/runs/37734523362/job/113170942969",
+      "result": "PASS"
+    },
+    {
+      "name": "verify / mqtt / release-gate",
+      "url": "https://github.com/sskycn/netbaiot/actions/runs/37734523362/job/113170942977",
+      "result": "PASS"
+    },
+    {
+      "name": "verify / rust (1.88.0)",
+      "url": "https://github.com/sskycn/netbaiot/actions/runs/37734523362/job/113170943032",
+      "result": "PASS"
+    },
+    {
+      "name": "linux / plan",
+      "url": "https://github.com/sskycn/netbaiot/actions/runs/37734523362/job/113172031222",
+      "result": "PASS"
+    },
+    {
+      "name": "linux / Build and run aarch64-unknown-linux-gnu",
+      "url": "https://github.com/sskycn/netbaiot/actions/runs/37734523362/job/113172066505",
+      "result": "PASS"
+    },
+    {
+      "name": "linux / Build and run x86_64-unknown-linux-gnu",
+      "url": "https://github.com/sskycn/netbaiot/actions/runs/37734523362/job/113172066617",
+      "result": "PASS"
+    },
+    {
+      "name": "linux / Verify required Linux archives and SHA256",
+      "url": "https://github.com/sskycn/netbaiot/actions/runs/37734523362/job/113173603071",
+      "result": "PASS"
+    }
+  ]
+}

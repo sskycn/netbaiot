@@ -14,8 +14,10 @@ python3 -m unittest discover -s tests -p 'test_release_*.py' -v
 CI and tagged releases share `release-verify.yml`: Rust 1.88.0/stable fmt, clippy,
 workspace tests, cargo audit, MQTT protocol regressions, the full release gate,
 MQTT 5 raw/Mosquitto tests, and Device Profile SDK interoperability. All must pass
-before building. Publishing then waits for five verified platform archives and
-an actual Linux archive Quick Start smoke test. SHA256SUMS covers all five.
+before building. Publishing requires both Linux x86_64/ARM64 archives, native
+quality/recovery and actual archive smoke on both architectures, plus exact-set
+SHA256 verification. Optional macOS/Windows workflows cannot block publishing.
+The target list is owned by `scripts/release_targets.json`; see [platform support](platform-support.md).
 
 Before a formal tag, dispatch and confirm **MQTT Device Profile decoder fuzz
 smoke** for the exact candidate commit. Review Actions results and do not tag a
@@ -23,9 +25,11 @@ candidate with a failing correctness gate. `scripts/release.sh` runs preflight
 before creating/pushing a tag; running it is an explicit release action.
 
 The **GitHub Release** workflow also accepts a manual `release-tag` input. Dispatch
-it on the candidate ref with `vX.Y.Z` to run verify, all five builds, and Linux
+it on the candidate ref with `vX.Y.Z` to run verify, both Linux builds, and native
 archive smoke. The publish job is skipped on manual dispatch, so this rehearsal
 creates neither a tag nor a GitHub Release. Only an actual tag push publishes.
+macOS/Windows artifacts use the separate manual **Optional macOS and experimental
+Windows builds** workflow. It reports failures normally and does not publish Releases.
 
 To test packaging locally after building release server/CLI binaries:
 

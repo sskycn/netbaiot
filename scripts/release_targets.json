@@ -1,0 +1,11 @@
+{
+  "required": [
+    {"target": "x86_64-unknown-linux-gnu", "runner": "ubuntu-24.04", "format": "elf", "machine": 62},
+    {"target": "aarch64-unknown-linux-gnu", "runner": "ubuntu-24.04-arm", "format": "elf", "machine": 183}
+  ],
+  "optional": [
+    {"target": "x86_64-apple-darwin", "runner": "macos-latest", "format": "macho", "machine": 16777223},
+    {"target": "aarch64-apple-darwin", "runner": "macos-latest", "format": "macho", "machine": 16777228},
+    {"target": "x86_64-pc-windows-msvc", "runner": "windows-latest", "format": "pe", "machine": 34404}
+  ]
+}

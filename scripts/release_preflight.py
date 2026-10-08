@@ -8,19 +8,16 @@ import re
 import subprocess
 
 from scrub_paths import LOCAL_PATH, scrub_tree
+from release_targets import TARGETS
 
 
 ROOT = Path(__file__).resolve().parents[1]
-TARGETS = (
-    "x86_64-unknown-linux-gnu", "aarch64-unknown-linux-gnu",
-    "x86_64-apple-darwin", "aarch64-apple-darwin", "x86_64-pc-windows-msvc",
-)
 REQUIRED = (
     "README.md", "README.zh-CN.md", "LICENSE", "NOTICE", "SECURITY.md",
     "CONTRIBUTING.md", "AGENTS.md", "docs/schema/netbaiot-config.schema.json", "configs/tutorial.json", "configs/development.json", "scripts/demo/start.sh",
     "examples/business_http_sink.py", "examples/device_tcp.py", "examples/device_udp.py",
     "docs/quick-start.md", "docs/protocol-support.md", "docs/delivery-semantics.md",
-    "docs/security.md", "docs/operations-guide.md",
+    "docs/security.md", "docs/operations-guide.md", "docs/platform-support.md",
 )
 TAG = re.compile(r"v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?")
 LINK = re.compile(r"(!?\[[^\]\n]*\]\()([^\s)]+)(\))")

@@ -13,7 +13,8 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 from release_preflight import REQUIRED, TARGETS, check_tag, check_versions, package_files
-from release_package import binary_names, checksums, package, validate_archive
+from release_package import binary_names, checksums, package, validate_archive, verify_checksums
+from release_targets import DETAILS, REQUIRED_TARGETS, OPTIONAL_TARGETS
 from scrub_paths import scrub_text, scrub_tree
 
 
@@ -30,10 +31,22 @@ class ReleaseTests(unittest.TestCase):
 
     def build(self, target):
         build = self.root / "build" / target
-        build.mkdir(parents=True)
-        magic = b"MZ00" if "windows" in target else b"\x7fELF" if "linux" in target else b"\xcf\xfa\xed\xfe"
+        build.mkdir(parents=True, exist_ok=True)
+        spec = DETAILS[target]
+        header = bytearray(256)
+        if spec["format"] == "elf":
+            header[:7] = b"\x7fELF\x02\x01\x01"
+            header[18:20] = spec["machine"].to_bytes(2, "little")
+        elif spec["format"] == "pe":
+            header[:2] = b"MZ"
+            header[60:64] = (128).to_bytes(4, "little")
+            header[128:132] = b"PE\0\0"
+            header[132:134] = spec["machine"].to_bytes(2, "little")
+        else:
+            header[:4] = b"\xcf\xfa\xed\xfe"
+            header[4:8] = spec["machine"].to_bytes(4, "little")
         for name in binary_names(target):
-            (build / name).write_bytes(magic + b"test-only format stub")
+            (build / name).write_bytes(header + b"test-only non-executable format stub")
         return build
 
     def bundle(self, target=TARGETS[0]):
@@ -67,6 +80,8 @@ class ReleaseTests(unittest.TestCase):
             package_files(self.root, "v0.2.3")
 
     def test_five_targets_and_checksum_set(self):
+        # Preserve validation of every supported optional target; five is no
+        # longer the required set, but remains a valid all-platform set.
         for target in TARGETS:
             self.bundle(target)
         dist = self.root / "dist"
@@ -78,6 +93,57 @@ class ReleaseTests(unittest.TestCase):
         (dist / "unrelated.tar.gz").write_bytes(b"extra archive")
         with self.assertRaises(ValueError):
             checksums(self.root, dist, "v0.2.3")
+
+    def test_linux_only_set_needs_no_windows_or_macos(self):
+        for target in REQUIRED_TARGETS:
+            self.bundle(target)
+        dist = self.root / "dist"
+        checksums(self.root, dist, "v0.2.3")
+        verify_checksums(self.root, dist, "v0.2.3")
+        self.assertEqual(len((dist / "SHA256SUMS").read_text().splitlines()), 2)
+        for target in REQUIRED_TARGETS:
+            archive = dist / f"netbaiot-v0.2.3-{target}.tar.gz"
+            held = archive.read_bytes()
+            archive.unlink()
+            with self.assertRaises(ValueError):
+                checksums(self.root, dist, "v0.2.3")
+            archive.write_bytes(held)
+
+    def test_optional_archive_is_validated_and_checksum_tampering_fails(self):
+        for target in REQUIRED_TARGETS + OPTIONAL_TARGETS[:1]:
+            self.bundle(target)
+        dist = self.root / "dist"
+        checksums(self.root, dist, "v0.2.3")
+        verify_checksums(self.root, dist, "v0.2.3")
+        self.assertEqual(len((dist / "SHA256SUMS").read_text().splitlines()), 3)
+        original = (dist / "SHA256SUMS").read_text()
+        for altered in ("0" * 64 + original[64:], original.splitlines()[0] + "\n",
+                        original + original.splitlines()[0] + "\n",
+                        original.replace("netbaiot-v0.2.3", "netbaiot-v0.2.4")):
+            with self.subTest(manifest=altered):
+                (dist / "SHA256SUMS").write_text(altered)
+                with self.assertRaises(ValueError):
+                    verify_checksums(self.root, dist, "v0.2.3")
+        optional = dist / f"netbaiot-v0.2.3-{OPTIONAL_TARGETS[0]}.tar.gz"
+        optional.write_bytes(b"corrupt optional archive")
+        with self.assertRaises((ValueError, tarfile.TarError)):
+            checksums(self.root, dist, "v0.2.3")
+
+    def test_mislabeled_linux_architecture_is_rejected(self):
+        wrong = self.build(REQUIRED_TARGETS[0])
+        with self.assertRaises(ValueError):
+            package(self.root, wrong, self.root / "dist", "v0.2.3", REQUIRED_TARGETS[1])
+
+    def test_optional_only_is_explicit_and_cannot_override_linux_requirement(self):
+        self.bundle(OPTIONAL_TARGETS[-1])
+        dist = self.root / "dist"
+        with self.assertRaises(ValueError):
+            checksums(self.root, dist, "v0.2.3")
+        checksums(self.root, dist, "v0.2.3", require_linux=False)
+        verify_checksums(self.root, dist, "v0.2.3", require_linux=False)
+        self.bundle(REQUIRED_TARGETS[0])
+        with self.assertRaises(ValueError):
+            checksums(self.root, dist, "v0.2.3", require_linux=False)
 
     def test_windows_document_paths_use_posix_archive_names(self):
         guide = self.root / "docs/windows-paths.md"

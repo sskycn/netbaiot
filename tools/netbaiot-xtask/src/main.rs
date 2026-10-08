@@ -648,6 +648,8 @@ fn package(target: Option<String>, no_build: bool) -> Result<(), String> {
     {
         return Err("target must be a Rust target triple".into());
     }
+    // The packaging policy owns supported targets; reject before compiling.
+    python(&["scripts/release_targets.py", "--check-target", &target])?;
     if !no_build {
         run(
             "cargo",
