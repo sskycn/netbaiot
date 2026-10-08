@@ -29,6 +29,14 @@ jobs:
         run: |
           set -o pipefail
           cargo xtask check 2>&1 | tee dx-platform.log
+      - name: Native release archive validation
+        timeout-minutes: 10
+        shell: bash
+        run: |
+          set -o pipefail
+          target="$(rustc -vV | sed -n 's/^host: //p')"
+          cargo build --locked --release --target "$target" -p netbaiot-server -p netbaiot-cli
+          cargo xtask package --no-build --target "$target"
       - name: Actual first-use commands
         timeout-minutes: 5
         shell: bash

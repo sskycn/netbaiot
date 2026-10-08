@@ -60,6 +60,8 @@ def validate_archive(archive, tag, target, expected_files=None):
         for member in bundle:
             path = PurePosixPath(member.name)
             if (member.name in seen or len(seen) >= MAX_MEMBERS or path.is_absolute()
+                    or "\\" in member.name
+                    or member.name != path.as_posix()
                     or ".." in path.parts or not path.parts or path.parts[0] != prefix
                     or not (member.isfile() or member.isdir())):
                 raise ValueError(f"unsafe or duplicate archive member: {member.name}")
