@@ -144,7 +144,7 @@ Schema does not replace `netbaiot config check`; cross-field, TLS, secret-source
 | `control_max_bytes` | "integer" | `16777216` | Serialized gateway product profiles and routes (not preallocated). |
 | `control_max_products` | "integer" | `4096` | Gateway product/codec profiles only; no per-device business state. |
 | `event_queue_max_bytes_per_tenant` | "integer" | `67108864` | Serialized outstanding event bytes per tenant, charged once per event. The global byte ceiling also applies. No payload buffer is preallocated. |
-| `event_queue_max_count_per_tenant` | "integer" | `16384` | Outstanding EventBus events per tenant, including retries and inflight work. The global count ceiling also applies; defaults preserve existing admission. |
+| `event_queue_max_count_per_tenant` | "integer" | `16384` | Outstanding EventBus events per tenant, including retries and inflight work. The global count ceiling also applies; the existing default ceiling is unchanged. |
 | `external_timeout_ms` | "integer" | `5000` |  |
 | `global_connection_logical_bytes` | "integer" | `134217728` |  |
 | `global_event_max_bytes` | "integer" | `67108864` |  |

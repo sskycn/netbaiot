@@ -4,6 +4,8 @@
 use super::*;
 use std::hint::black_box;
 
+include!("broker_engineering_bench.rs");
+
 fn identity(index: usize) -> AuthenticatedDevice {
     AuthenticatedDevice {
         device_key: DeviceKey {

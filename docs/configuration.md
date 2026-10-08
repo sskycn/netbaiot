@@ -68,7 +68,9 @@ bytes are counted once, regardless of fanout. Ownership ends only after the last
 sink responsibility completes. Required sink failures continue to own the quota.
 
 Both limits default to the existing global event limits (16384 events, 67108864
-bytes), preserving old configurations. Set them lower to reserve global capacity
+bytes). Old configuration files remain parseable and default capacity is unchanged.
+Previously increased global limits need explicit tenant settings if a tenant must
+own more than these defaults. Set them lower to reserve global capacity
 for other tenants. Global and sink limits still apply independently; setting a
 tenant limit above the global limit does not increase capacity. Admission and
 restart replay preflight all global, tenant and required sink quotas before commit.

@@ -4,7 +4,7 @@
 
 `device_ingress` 在同一个地址、相同端口号绑定一个 TCP listener 和一个 UDP socket。
 开发示例为 `127.0.0.1:8080`，生产可配置 `0.0.0.0:443`。TCP 通过同一证书承载
-标准 MQTT 3.1.1 TLS 和通用分帧 TLS TCP。TLS 握手后才识别应用协议，
+标准 MQTT 3.1.1 / 有界 MQTT 5.0 TLS 和通用分帧 TLS TCP。TLS 握手后才识别应用协议，
 不要求 ALPN、自定义前导或修改客户端 wire protocol。UDP 同端口继续使用 NBI1/HMAC，
 只认证不加密，不涉及 DTLS/QUIC。
 
@@ -45,7 +45,8 @@ DeviceEvent(event_id)
 但不计入设备 `active_connections`；没有增加协议独占连接池，原有全局/IP 池仍共享，因此不承诺协议间绝对无饥饿。
 
 探测缓冲固定 12 字节：1 字节包头、最多 4 字节 Remaining Length、2 字节协议名长度、4 字节名称及 1 字节版本。MQTT 复用 Remaining Length 解码，
-校验 `00 04 MQTT` 和版本字节，版本 4 正常处理，其他版本交原解析器返回标准 CONNACK=1 后关闭。
+校验 `00 04 MQTT` 和版本字节，level 4 进入 MQTT 3.1.1 解析器，level 5 进入有界 MQTT 5.0 解析器。
+其他 level 由既有解析器返回不支持版本的 CONNACK 后关闭；分类器不会将它们误判为通用 TCP。
 通用 TCP 校验 1..max_tcp_frame_size 长度和 JSON 对象/空白起始。现有合法帧上限为 1 MiB，
 长度首字节为零，与 MQTT 0x10 不冲突。失败后不切换解析器，已读前缀完整回放。
 

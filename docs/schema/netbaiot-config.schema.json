@@ -523,7 +523,7 @@
         },
         "event_queue_max_count_per_tenant": {
           "default": 16384,
-          "description": "Outstanding EventBus events per tenant, including retries and inflight work.\nThe global count ceiling also applies; defaults preserve existing admission.",
+          "description": "Outstanding EventBus events per tenant, including retries and inflight work.\nThe global count ceiling also applies; the existing default ceiling is unchanged.",
           "format": "uint",
           "maximum": 4294967295,
           "minimum": 1,

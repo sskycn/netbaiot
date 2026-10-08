@@ -125,7 +125,7 @@ pub struct Limits {
     pub global_event_max_count: usize,
     pub global_event_max_bytes: usize,
     /// Outstanding EventBus events per tenant, including retries and inflight work.
-    /// The global count ceiling also applies; defaults preserve existing admission.
+    /// The global count ceiling also applies; the existing default ceiling is unchanged.
     pub event_queue_max_count_per_tenant: usize,
     /// Serialized outstanding event bytes per tenant, charged once per event.
     /// The global byte ceiling also applies. No payload buffer is preallocated.

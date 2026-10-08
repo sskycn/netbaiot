@@ -1,5 +1,11 @@
 # NetbaIoT 工程优化报告
 
+> Current status（2026-10-08）：本报告保留历史版本的实现和测量结果。
+> 下文“due promotion 一次搬移全部到期记录”描述的是本报告基线；
+> `c7f0fd6` 已改为按可用 worker / ready demand 限制 promotion budget，保持 deadline/FIFO。
+> 详见[第二轮报告](../second-round/report.md)。当前 EventBus 的 required 计数、
+> HTTP serializer、Sink 故障处理和租户积压更新见[本轮报告](../../engineering-optimization.md)。
+
 测量日期：2026-10-07（本机工作区日期）。基线为 main `a91a910`。按六个功能优化阶段分别提交，然后评估 session 扫描，最后物理拆分 broker；没有改变全局锁模型、协议格式或生产默认上限。第 7 项仅完成测量与评估，**未实现增量 usage / expiry 缓存**。
 
 测量主机：Apple M4，10 CPU，16 GiB，macOS 27.0.1（26A434），arm64；Rust 1.99.0（b940084d7，2026-09-28）。这是同机工程回归证据，不能当成生产容量。原始日志、冻结二进制、逐轮 JSON 均在 `target/engineering-hotspots/`；本目录只保存小型汇总和复现补丁。
