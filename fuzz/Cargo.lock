@@ -635,7 +635,7 @@ dependencies = [
 
 [[package]]
 name = "netbaiot-codecs"
-version = "0.2.3"
+version = "0.2.4"
 dependencies = [
  "netbaiot-core",
  "serde",
@@ -644,7 +644,7 @@ dependencies = [
 
 [[package]]
 name = "netbaiot-core"
-version = "0.2.3"
+version = "0.2.4"
 dependencies = [
  "netbaiot-protocol",
  "serde",
@@ -669,14 +669,14 @@ dependencies = [
 
 [[package]]
 name = "netbaiot-mqtt-wire"
-version = "0.2.3"
+version = "0.2.4"
 dependencies = [
  "bytes",
 ]
 
 [[package]]
 name = "netbaiot-protocol"
-version = "0.2.3"
+version = "0.2.4"
 dependencies = [
  "serde",
  "thiserror",
@@ -685,7 +685,7 @@ dependencies = [
 
 [[package]]
 name = "netbaiot-runtime"
-version = "0.2.3"
+version = "0.2.4"
 dependencies = [
  "async-trait",
  "atomicwrites",
@@ -711,7 +711,7 @@ dependencies = [
 
 [[package]]
 name = "netbaiot-transports"
-version = "0.2.3"
+version = "0.2.4"
 dependencies = [
  "async-trait",
  "bytes",
@@ -737,7 +737,7 @@ dependencies = [
 
 [[package]]
 name = "netbaiot-v3-mux"
-version = "0.2.3"
+version = "0.2.4"
 dependencies = [
  "bytes",
  "netbaiot-protocol",

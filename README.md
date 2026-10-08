@@ -207,7 +207,7 @@ the original measurements and setup.
   downlink.
 - Recovery is for successful planned graceful shutdowns. It is not a general
   database and does not make arbitrary process or machine crashes durable.
-- The workspace is version `0.2.3` and has not reached 1.0. Review protocol and
+- The workspace is version `0.2.4` and has not reached 1.0. Review protocol and
   migration notes before upgrading; do not assume every API is stable.
 
 ## Documentation
@@ -219,7 +219,7 @@ the original measurements and setup.
 - [Security](docs/security.md) · [Operations](docs/operations-guide.md) · [Troubleshooting](docs/troubleshooting.md)
 - [Business integration and clients](docs/business-integration-guide.md) · [CLI](docs/cli.md) · [Device SDK](docs/device-sdk.md)
 - [Benchmark overview](docs/benchmarks.md) · [Performance baseline](docs/performance-baseline.md)
-- [v0.2.3 release notes](docs/releases/v0.2.3.md) · [Release notes template](docs/release-template.md) · [Project descriptions and launch drafts](docs/project-description.md)
+- [v0.2.4 release notes](docs/releases/v0.2.4.md) · [Release notes template](docs/release-template.md) · [Project descriptions and launch drafts](docs/project-description.md)
 
 ## Build and release
 
