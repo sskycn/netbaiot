@@ -58,3 +58,19 @@ sources, real PEM/key matching and runtime ownership/ports remain separate check
 The [generated field/default reference](configuration-fields.md) is rebuilt by
 `cargo xtask config-reference`; [operations](operations-guide.md) contains the
 handwritten security/deployment guidance.
+
+## Per-tenant event backlog
+
+`limits.event_queue_max_count_per_tenant` and
+`limits.event_queue_max_bytes_per_tenant` bound outstanding EventBus events for
+each tenant, including queued, retrying and inflight deliveries. Serialized event
+bytes are counted once, regardless of fanout. Ownership ends only after the last
+sink responsibility completes. Required sink failures continue to own the quota.
+
+Both limits default to the existing global event limits (16384 events, 67108864
+bytes). Old configuration files remain parseable and default capacity is unchanged.
+Previously increased global limits need explicit tenant settings if a tenant must
+own more than these defaults. Set them lower to reserve global capacity
+for other tenants. Global and sink limits still apply independently; setting a
+tenant limit above the global limit does not increase capacity. Admission and
+restart replay preflight all global, tenant and required sink quotas before commit.

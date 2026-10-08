@@ -267,6 +267,7 @@ async fn handle_management(
                     "event_count": usage.events,
                     "event_bytes": usage.bytes,
                     "pending_required": usage.pending_required,
+                    "sink_diagnostics": services.ingress.events.sink_diagnostics()?,
                     "auth_cache_entries": auth_entries,
                     "auth_cache_bytes": auth_bytes,
                     "business_auth_serving": services.business_auth.as_ref().is_some_and(|registry| registry.is_serving()),
@@ -279,6 +280,7 @@ async fn handle_management(
         }
         (hyper::Method::GET, "/api/v1/metrics") => {
             let mut body = services.ingress.metrics.render();
+            body.push_str(&services.ingress.events.render_sink_metrics()?);
             if let Ok((total, inflight)) = services.commands.usage() {
                 body.push_str(&format!(
                     "netbaiot_command_dedup_entries {}\nnetbaiot_command_dedup_inflight {}\nnetbaiot_command_dedup_accepted {}\n",

@@ -34,6 +34,7 @@ use tokio_rustls::{TlsConnector, rustls};
 use tokio_util::sync::CancellationToken;
 
 mod common;
+mod engineering_soak;
 
 // These integration tests close ephemeral-port reservations before a subprocess or composition
 // root binds the configured addresses. Serializing only those tests prevents the Rust test

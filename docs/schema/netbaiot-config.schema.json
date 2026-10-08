@@ -513,6 +513,22 @@
           "minimum": 1,
           "type": "integer"
         },
+        "event_queue_max_bytes_per_tenant": {
+          "default": 67108864,
+          "description": "Serialized outstanding event bytes per tenant, charged once per event.\nThe global byte ceiling also applies. No payload buffer is preallocated.",
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "event_queue_max_count_per_tenant": {
+          "default": 16384,
+          "description": "Outstanding EventBus events per tenant, including retries and inflight work.\nThe global count ceiling also applies; the existing default ceiling is unchanged.",
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
         "external_timeout_ms": {
           "default": 5000,
           "format": "uint64",
@@ -1638,6 +1654,8 @@
         "connection_memory_reservation": 524288,
         "control_max_bytes": 16777216,
         "control_max_products": 4096,
+        "event_queue_max_bytes_per_tenant": 67108864,
+        "event_queue_max_count_per_tenant": 16384,
         "external_timeout_ms": 5000,
         "global_connection_logical_bytes": 134217728,
         "global_event_max_bytes": 67108864,

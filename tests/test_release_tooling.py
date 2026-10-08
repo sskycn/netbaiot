@@ -118,10 +118,41 @@ class ReleaseTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             package(self.root, self.root / "build" / TARGETS[0], self.root / "dist", "v0.2.3", TARGETS[0])
 
+    def test_nested_and_url_encoded_archive_links(self):
+        nested = self.root / "docs/sub/file name.md"
+        nested.parent.mkdir()
+        nested.write_text("[readme](../../README.md) [guide](.././quick-start.md)\n")
+        (self.root / "README.md").write_text("[nested](docs/sub/file%20name.md)\n")
+        selected = package_files(self.root, "v0.2.3") + ["docs/sub/file name.md"]
+        with patch("release_package.package_files", return_value=selected):
+            archive = self.bundle()
+        validate_archive(archive, "v0.2.3", TARGETS[0], selected)
+        for path in ("../../outside.md", "%2e%2e/%2e%2e/outside.md", "/outside.md"):
+            with self.subTest(path=path):
+                (self.root / "README.md").write_text(f"[escape]({path})\n")
+                with self.assertRaises(ValueError):
+                    package(self.root, self.root / "build" / TARGETS[0],
+                            self.root / "dist", "v0.2.3", TARGETS[0])
+
+    def test_symlinked_package_input_is_rejected(self):
+        original = self.root / "docs/quick-start.md"
+        target = self.root / "other.md"
+        original.rename(target)
+        try:
+            original.symlink_to(target)
+        except OSError as error:
+            self.skipTest(f"symlinks unavailable: {error}")
+        with self.assertRaises(ValueError):
+            package_files(self.root, "v0.2.3")
+
     def test_hostile_or_incomplete_archives_fail(self):
         archive = self.root / f"netbaiot-v0.2.3-{TARGETS[0]}.tar.gz"
         prefix = archive.name[:-7]
         for names, link in [([f"{prefix}/../escape"], False),
+                            (["/absolute"], False),
+                            (["C:/absolute"], False),
+                            ([f"{prefix}/docs\\..\\..\\escape"], False),
+                            ([f"{prefix}/./README.md"], False),
                             ([f"{prefix}/README.md"] * 2, False),
                             ([f"{prefix}/README.md"], True),
                             ([f"{prefix}/README.md"], False)]:

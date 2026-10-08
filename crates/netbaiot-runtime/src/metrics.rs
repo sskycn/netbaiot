@@ -460,6 +460,7 @@ pub struct Metrics {
     event_bus_probes: [AtomicU64; EVENT_BUS_PROBES.len()],
     event_bus_timing: Option<Box<EventBusTiming>>,
     broker_timing: Option<Box<BrokerTiming>>,
+    sink_failures_by_reason: [AtomicU64; 10],
 }
 
 impl Default for Metrics {
@@ -490,11 +491,15 @@ impl Default for Metrics {
             event_bus_probes: std::array::from_fn(|_| AtomicU64::new(0)),
             event_bus_timing: None,
             broker_timing: None,
+            sink_failures_by_reason: std::array::from_fn(|_| AtomicU64::new(0)),
         }
     }
 }
 
 impl Metrics {
+    pub(crate) fn sink_failure(&self, reason: crate::SinkFailureReason) {
+        self.sink_failures_by_reason[reason as usize].fetch_add(1, Ordering::Relaxed);
+    }
     pub fn business_rpc_method_result(&self, method: &str, result: BusinessRpcCallResult) {
         let index = match method {
             "device.authenticate" => 0,
@@ -671,6 +676,26 @@ impl Metrics {
                 format!("netbaiot_{name}_total {}\n", value.load(Ordering::Relaxed))
             })
             .collect();
+        for (reason, value) in [
+            "other",
+            "network",
+            "timeout",
+            "http_429",
+            "http_5xx",
+            "http_auth",
+            "http_4xx",
+            "invalid_response",
+            "response_too_large",
+            "panic",
+        ]
+        .iter()
+        .zip(&self.sink_failures_by_reason)
+        {
+            output.push_str(&format!(
+                "netbaiot_sink_error_total{{reason=\"{reason}\"}} {}\n",
+                value.load(Ordering::Relaxed)
+            ));
+        }
         output.push_str(&format!(
             "netbaiot_business_rpc_active_connections {}\n",
             self.business_rpc_active.load(Ordering::Relaxed)

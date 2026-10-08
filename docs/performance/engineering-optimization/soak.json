@@ -1,0 +1,31 @@
+{
+  "host": "macOS arm64",
+  "build": "debug test binary; existing local test TLS certificate",
+  "test": "tls_mqtt_qos1_http",
+  "events": 600,
+  "requests": 784,
+  "outage_pending": 200,
+  "outage_event_bytes": 51200,
+  "elapsed_ms": 60018,
+  "puback_p50_ns": 608583,
+  "puback_p95_ns": 1846000,
+  "shutdown_ms": 9,
+  "rate_per_second": 10,
+  "final_pending_required": 0,
+  "final_event_count": 0,
+  "final_event_bytes": 0,
+  "final_sink_queue_count": 0,
+  "final_sink_queue_bytes": 0,
+  "final_inflight": 0,
+  "stable_event_ids": true,
+  "task_baseline_restored": true,
+  "clean_exit": true,
+  "recovery_records": 0,
+  "restart_soak": {
+    "cycles": 12,
+    "dwell_seconds": 5,
+    "result": "PASS"
+  },
+  "time_suite_max_rss_bytes": 27394048,
+  "limitation": "Bounded 60-second reliability evidence on a shared development host. RSS is time -l observation of the fixed test/subprocess suite, excludes compilation, and is not a per-connection memory measurement or a production capacity/SLA claim."
+}

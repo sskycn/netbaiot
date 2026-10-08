@@ -1,5 +1,10 @@
 # Benchmarks and measurements
 
+The [2026-10-08 engineering optimization report](engineering-optimization.md)
+records incremental EventBus responsibility accounting, borrowed HTTP JSON
+serialization, bounded HTTP outage recovery and a MQTT session matrix. Its
+curated measurements are in `docs/performance/engineering-optimization/`.
+
 The repository preserves measured performance, resource, and reliability
 experiments. They are evidence for the stated setup only. Several measurements
 belong to historical commits and must not be read as capacity for the current

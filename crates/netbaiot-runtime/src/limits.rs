@@ -124,6 +124,12 @@ pub struct Limits {
     pub max_fanout_per_event: usize,
     pub global_event_max_count: usize,
     pub global_event_max_bytes: usize,
+    /// Outstanding EventBus events per tenant, including retries and inflight work.
+    /// The global count ceiling also applies; the existing default ceiling is unchanged.
+    pub event_queue_max_count_per_tenant: usize,
+    /// Serialized outstanding event bytes per tenant, charged once per event.
+    /// The global byte ceiling also applies. No payload buffer is preallocated.
+    pub event_queue_max_bytes_per_tenant: usize,
     pub sink_queue_max_count: usize,
     pub sink_queue_max_bytes: usize,
     pub sink_delivery_concurrency: usize,
@@ -264,6 +270,8 @@ impl Default for Limits {
             max_fanout_per_event: 8,
             global_event_max_count: 16_384,
             global_event_max_bytes: 67_108_864,
+            event_queue_max_count_per_tenant: 16_384,
+            event_queue_max_bytes_per_tenant: 67_108_864,
             sink_queue_max_count: 4_096,
             sink_queue_max_bytes: 16_777_216,
             sink_delivery_concurrency: 8,
@@ -422,6 +430,30 @@ impl Limits {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn tenant_backlog_limits_keep_old_configs_and_validate_new_scalars() {
+        let old: Limits = serde_json::from_str("{}").unwrap();
+        assert_eq!(
+            old.event_queue_max_count_per_tenant,
+            old.global_event_max_count
+        );
+        assert_eq!(
+            old.event_queue_max_bytes_per_tenant,
+            old.global_event_max_bytes
+        );
+        let configured: Limits = serde_json::from_str(
+            r#"{"event_queue_max_count_per_tenant":2,"event_queue_max_bytes_per_tenant":512}"#,
+        )
+        .unwrap();
+        configured.validate().unwrap();
+        let json = serde_json::to_value(&configured).unwrap();
+        assert_eq!(json["event_queue_max_count_per_tenant"], 2);
+        assert_eq!(json["event_queue_max_bytes_per_tenant"], 512);
+        let mut invalid = configured;
+        invalid.event_queue_max_count_per_tenant = 0;
+        assert!(invalid.validate().is_err());
+    }
 
     #[test]
     fn defaults_validate_and_inconsistent_hierarchies_fail() {
