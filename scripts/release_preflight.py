@@ -44,7 +44,8 @@ def package_files(root, tag):
     # Only public Markdown guides, selected examples and tutorial inputs. No raw
     # evidence, source tree, build products, fixtures or fuzz corpus is copied.
     paths = set(REQUIRED)
-    paths.update(str(path.relative_to(root)) for path in (root / "docs").glob("*.md"))
+    # Package manifests use tar/Markdown paths, independent of the host OS.
+    paths.update(path.relative_to(root).as_posix() for path in (root / "docs").glob("*.md"))
     paths.add(f"docs/releases/{tag}.md")
     for name in sorted(paths):
         path = root / name

@@ -4,8 +4,8 @@
 import argparse
 import gzip
 import hashlib
-import os
 from pathlib import Path, PurePosixPath
+import posixpath
 import shutil
 import tarfile
 import tempfile
@@ -90,7 +90,7 @@ def validate_archive(archive, tag, target, expected_files=None):
             required.discard(name)
         if required:
             raise ValueError(f"missing archive files: {sorted(required)}")
-        file_names = {str(PurePosixPath(item).relative_to(prefix)) for item in seen
+        file_names = {PurePosixPath(item).relative_to(prefix).as_posix() for item in seen
                       if item != prefix and bundle.getmember(item).isfile()}
         if expected_files is not None and file_names != set(expected_files) | set(binary_names(target)):
             raise ValueError("unexpected archive files")
@@ -101,7 +101,7 @@ def validate_archive(archive, tag, target, expected_files=None):
                 url = urlsplit(match[2])
                 if url.scheme or url.netloc or not url.path:
                     continue
-                resolved = os.path.normpath(str(PurePosixPath(name).parent / unquote(url.path)))
+                resolved = posixpath.normpath((PurePosixPath(name).parent / unquote(url.path)).as_posix())
                 if resolved not in file_names:
                     raise ValueError(f"broken archive link in {name}: {url.path}")
     return prefix

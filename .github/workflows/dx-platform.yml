@@ -20,6 +20,9 @@ jobs:
         with:
           python-version: "3.11"
       - uses: dtolnay/rust-toolchain@1.88.0
+      - name: Native release packaging regressions
+        timeout-minutes: 1
+        run: python -m unittest discover -s tests -p "test_release_*.py" -v
       - name: CLI, startup, cancellation and recovery regressions
         timeout-minutes: 20
         shell: bash

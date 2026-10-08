@@ -3,7 +3,7 @@
 import contextlib
 import io
 import json
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 import sys
 import tarfile
 import tempfile
@@ -78,6 +78,32 @@ class ReleaseTests(unittest.TestCase):
         (dist / "unrelated.tar.gz").write_bytes(b"extra archive")
         with self.assertRaises(ValueError):
             checksums(self.root, dist, "v0.2.3")
+
+    def test_windows_document_paths_use_posix_archive_names(self):
+        guide = self.root / "docs/windows-paths.md"
+        guide.write_text("[quick start](quick-start.md)\n")
+        (self.root / "README.md").write_text("[guide](docs/windows-paths.md)\n")
+        # Exercise Windows path serialization even when preflight runs on Unix.
+        documents = [PureWindowsPath(path) for path in (self.root / "docs").glob("*.md")]
+        with patch("release_preflight.Path.glob", return_value=documents):
+            selected = package_files(self.root, "v0.2.3")
+            self.assertIn("docs/windows-paths.md", selected)
+            self.assertTrue(all("\\" not in name for name in selected))
+            archive = self.bundle("x86_64-pc-windows-msvc")
+        prefix = validate_archive(archive, "v0.2.3", "x86_64-pc-windows-msvc", selected)
+        with tarfile.open(archive) as bundle:
+            self.assertIn(f"{prefix}/docs/windows-paths.md", bundle.getnames())
+            text = bundle.extractfile(f"{prefix}/README.md").read().decode()
+            self.assertIn("(docs/windows-paths.md)", text)
+
+    def test_archive_links_normalize_relative_posix_paths_on_every_target(self):
+        (self.root / "README.md").write_text("[guide](docs/../docs/quick-start.md)\n")
+        (self.root / "docs/quick-start.md").write_text(
+            "[readme](../README.md) [protocol](./protocol-support.md)\n")
+        for target in TARGETS:
+            with self.subTest(target=target):
+                archive = self.bundle(target)
+                validate_archive(archive, "v0.2.3", target, package_files(self.root, "v0.2.3"))
 
     def test_source_links_are_pinned_but_packaged_links_stay_local(self):
         (self.root / "source.rs").write_text("source")
