@@ -1,0 +1,57 @@
+{
+  "code_commit": "5a2c30628fd567b0d76bdf22bfa74a8268adfcf1",
+  "native_run": "https://github.com/sskycn/netbaiot/actions/runs/37730417541",
+  "release_run": "https://github.com/sskycn/netbaiot/actions/runs/37730418188",
+  "native_jobs": [
+    {
+      "name": "dx (ubuntu-latest)",
+      "url": "https://github.com/sskycn/netbaiot/actions/runs/37730417541/job/113158027460",
+      "result": "PASS",
+      "native_archive": "PASS"
+    },
+    {
+      "name": "dx (macos-latest)",
+      "url": "https://github.com/sskycn/netbaiot/actions/runs/37730417541/job/113158027634",
+      "result": "PASS",
+      "native_archive": "PASS"
+    },
+    {
+      "name": "dx (windows-latest)",
+      "url": "https://github.com/sskycn/netbaiot/actions/runs/37730417541/job/113158027661",
+      "result": "PASS",
+      "native_archive": "PASS"
+    }
+  ],
+  "release_jobs": [
+    {
+      "name": "verify / preflight",
+      "url": "https://github.com/sskycn/netbaiot/actions/runs/37730418188/job/113158029894",
+      "result": "PASS"
+    },
+    {
+      "name": "verify / rust (1.88.0)",
+      "url": "https://github.com/sskycn/netbaiot/actions/runs/37730418188/job/113158029980",
+      "result": "PASS"
+    },
+    {
+      "name": "verify / audit",
+      "url": "https://github.com/sskycn/netbaiot/actions/runs/37730418188/job/113158030104",
+      "result": "PASS"
+    },
+    {
+      "name": "verify / rust (stable)",
+      "url": "https://github.com/sskycn/netbaiot/actions/runs/37730418188/job/113158030215",
+      "result": "PASS"
+    },
+    {
+      "name": "verify / mqtt / release-gate",
+      "url": "https://github.com/sskycn/netbaiot/actions/runs/37730418188/job/113158030250",
+      "result": "PASS"
+    },
+    {
+      "name": "Linux binary Quick Start",
+      "url": "https://github.com/sskycn/netbaiot/actions/runs/37730418188/job/113159056590",
+      "result": "PASS"
+    }
+  ]
+}

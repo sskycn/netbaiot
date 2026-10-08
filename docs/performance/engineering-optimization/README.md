@@ -17,6 +17,8 @@ logs, binaries, certificates or large benchmark artifacts.
   outage between the first and second thirds of 600 publishes, final accounting
   and task cleanup; also the existing 12-cycle restart soak. RSS is the fixed
   test/subprocess suite observation, excluding compilation.
+- `validation.json`: verified source commit and PASS links for the three native
+  package jobs and six complete release CI jobs.
 
 Run release measurements serially and avoid concurrent builds or other loads:
 

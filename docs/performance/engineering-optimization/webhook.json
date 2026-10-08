@@ -6,6 +6,16 @@
     {
       "borrowed": false,
       "payload_bytes": 32,
+      "repeat": 1,
+      "p50_ns": 2417,
+      "p95_ns": 2583,
+      "p99_ns": 4334,
+      "allocations": 37.0,
+      "allocated_bytes": 3451.0
+    },
+    {
+      "borrowed": false,
+      "payload_bytes": 32,
       "repeat": 2,
       "p50_ns": 2417,
       "p95_ns": 2500,

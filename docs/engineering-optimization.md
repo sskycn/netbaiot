@@ -92,7 +92,7 @@ recovery 必须等待配置修正，不能丢弃。详见[配置说明](configur
 | stable / Rust 1.88 final rust gate | PASS：各 496 workspace tests；fmt / all-targets all-features Clippy `-D warnings` |
 | MQTT external release gate | PASS：77 conformance cases，125/125 normative requirements；raw regressions、MQTT 5 smoke / Mosquitto、Device SDK TCP/TLS / certificate rejection / persistent reconnect / bounded-memory probes |
 | release preflight | PASS：生成 schema/reference 无 drift，版本 / 112 package inputs / sanitized evidence，13 Python regressions |
-| native archive jobs | 本机 macOS package / extracted smoke PASS；CI Linux/macOS PASS；Windows 首次 workspace FAIL、archive NOT RUN，诊断重跑中 |
+| native archive jobs | PASS：Windows x86_64-pc-windows-msvc、Linux、macOS 原生 `package --no-build`，全部 native workspace / first-use checks；本机 macOS extracted smoke 亦 PASS |
 | bounded restart_spool fuzz smoke | PASS：nightly，208238 runs / 21 秒，max_len=65536，RSS limit=512 MiB |
 
 测试夹具早期曾暴露无效管理客户端和超出默认设备限流的发布频率，已修正；
@@ -105,6 +105,10 @@ Timeout，原生 TCP 探测也在 2000 ms 内超时，不能把该环境的关�
 以独立原生 TCP 的实际拒绝/超时结果严格验证对应 HTTP 分类；成功连接或其他结果仍失败。
 另以真实 TLS 证书拒绝在每个平台严格验证 Network / Retryable。50 ms body-timeout
 和所有 HTTP 分类断言保留。只修正测试；生产分类与默认 timeout 未改变。
+最终代码 `5a2c306` 的[三平台 native CI](https://github.com/sskycn/netbaiot/actions/runs/37730417541)
+和[完整 release CI](https://github.com/sskycn/netbaiot/actions/runs/37730418188)均 PASS。
+初次 Windows FAIL 与环境 PATH BLOCKED 已解决，当前无未解决的 FAIL / BLOCKED；
+小型[验证记录](performance/engineering-optimization/validation.json)保存逐 job 结果。
 
 ## 9. Benchmark before / after
 
@@ -128,7 +132,7 @@ after-final；HTTP 的[同 workload 数据](performance/engineering-optimization
 | restore | 500 / 666 | 12 / 13 | 2176 / 2544 |
 
 HTTP request construction 的 32/1024/16384/65536-byte payload，旧/新 allocations 为
-37/13、38/15、38/15、38/15；P50 ns 为 2292/1125、2708/1542、8334/6416、20625/17584。
+37/13、38/15、38/15、38/15；P50 ns 为 2417/1125、2708/1542、8334/6416、20625/17584。
 网络时间不在该测量内，不能直接推算端到端收益。
 
 [MQTT 矩阵](performance/engineering-optimization/mqtt.json)覆盖 offline=0/1/10/100/128（默认 max），
@@ -189,8 +193,9 @@ branch can be verified before merging; it replaces the stale single feature-bran
 Tests cover nested/percent-encoded links, relative parents, POSIX and Windows
 manifest paths, absolute members, traversal, symlinks and duplicate members.
 PASS: 13 release-tool tests, `cargo xtask check` (format, Clippy, workspace tests,
-evidence check), and native macOS `package --no-build`. Native Windows/Linux
-full package jobs will be verified after pushing the staged changes.
+evidence check), and native macOS `package --no-build`. Final phase-6 native
+Windows/Linux/macOS package jobs all PASS; see the validation record above.
+The initial Windows fixture failures were diagnosed and corrected.
 
 ## Phase 2: incremental required responsibilities
 
@@ -226,7 +231,7 @@ The same reqwest request-construction benchmark compares the retained legacy
 
 | Payload bytes | Old/new median ns | Old/new allocations | Old/new allocated bytes |
 | --- | --- | --- | --- |
-| 32 | 2292 / 1125 | 37 / 13 | 3451 / 1327 |
+| 32 | 2417 / 1125 | 37 / 13 | 3451 / 1327 |
 | 1024 | 2708 / 1542 | 38 / 15 | 6271 / 3405 |
 | 16384 | 8334 / 6416 | 38 / 15 | 52351 / 34125 |
 | 65536 | 20625 / 17584 | 38 / 15 | 199807 / 132429 |
