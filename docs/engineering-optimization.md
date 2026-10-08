@@ -35,3 +35,26 @@ subsystem measurements on this macOS host, not capacity or SLA claims. Publish,
 complete, retry and restore allocation/timing rows are retained in the final
 measurement summary; their costs remain visible rather than being inferred from
 the usage improvement.
+
+## Phase 3: borrowed HTTP envelope
+
+The private `WebhookEnvelope` borrows IDs and `DeviceEventKind`; timestamps and
+the event type are copied scalars. The request serializes once into reqwest's
+body. No event-lifetime JSON cache or additional payload tree is retained.
+Exact JSON-value tests cover every event kind, null and populated occurrence
+timestamps, UUIDs, numeric/boolean/text telemetry and escaped Unicode. Object
+member ordering is not an API contract; all nine fields and nested values match
+the old serializer.
+
+The same reqwest request-construction benchmark compares the retained legacy
+`json!` implementation and the borrowed envelope (512 samples, three repeats):
+
+| Payload bytes | Old/new median ns | Old/new allocations | Old/new allocated bytes |
+| --- | --- | --- | --- |
+| 32 | 2292 / 1125 | 37 / 13 | 3451 / 1327 |
+| 1024 | 2708 / 1542 | 38 / 15 | 6271 / 3405 |
+| 16384 | 8334 / 6416 | 38 / 15 | 52351 / 34125 |
+| 65536 | 20625 / 17584 | 38 / 15 | 199807 / 132429 |
+
+This excludes network time and does not imply the same end-to-end improvement.
+PASS: JSON compatibility tests, the release benchmark and `cargo xtask check`.

@@ -1,0 +1,237 @@
+{
+  "host": "macOS arm64",
+  "toolchain": "rustc 1.99.0",
+  "measurement": "same payloads, same reqwest JSON request construction; network excluded",
+  "rows": [
+    {
+      "borrowed": false,
+      "payload_bytes": 32,
+      "repeat": 2,
+      "p50_ns": 2417,
+      "p95_ns": 2500,
+      "p99_ns": 2584,
+      "allocations": 37.0,
+      "allocated_bytes": 3451.0
+    },
+    {
+      "borrowed": false,
+      "payload_bytes": 32,
+      "repeat": 3,
+      "p50_ns": 2167,
+      "p95_ns": 2500,
+      "p99_ns": 2584,
+      "allocations": 37.0,
+      "allocated_bytes": 3451.0
+    },
+    {
+      "borrowed": true,
+      "payload_bytes": 32,
+      "repeat": 1,
+      "p50_ns": 1125,
+      "p95_ns": 1208,
+      "p99_ns": 1292,
+      "allocations": 13.0,
+      "allocated_bytes": 1327.0
+    },
+    {
+      "borrowed": true,
+      "payload_bytes": 32,
+      "repeat": 2,
+      "p50_ns": 1125,
+      "p95_ns": 1208,
+      "p99_ns": 1250,
+      "allocations": 13.0,
+      "allocated_bytes": 1327.0
+    },
+    {
+      "borrowed": true,
+      "payload_bytes": 32,
+      "repeat": 3,
+      "p50_ns": 1125,
+      "p95_ns": 1208,
+      "p99_ns": 1250,
+      "allocations": 13.0,
+      "allocated_bytes": 1327.0
+    },
+    {
+      "borrowed": false,
+      "payload_bytes": 1024,
+      "repeat": 1,
+      "p50_ns": 2709,
+      "p95_ns": 2834,
+      "p99_ns": 4750,
+      "allocations": 38.0,
+      "allocated_bytes": 6271.0
+    },
+    {
+      "borrowed": false,
+      "payload_bytes": 1024,
+      "repeat": 2,
+      "p50_ns": 2708,
+      "p95_ns": 2792,
+      "p99_ns": 2917,
+      "allocations": 38.0,
+      "allocated_bytes": 6271.0
+    },
+    {
+      "borrowed": false,
+      "payload_bytes": 1024,
+      "repeat": 3,
+      "p50_ns": 2458,
+      "p95_ns": 2708,
+      "p99_ns": 2792,
+      "allocations": 38.0,
+      "allocated_bytes": 6271.0
+    },
+    {
+      "borrowed": true,
+      "payload_bytes": 1024,
+      "repeat": 1,
+      "p50_ns": 1542,
+      "p95_ns": 1625,
+      "p99_ns": 1709,
+      "allocations": 15.0,
+      "allocated_bytes": 3405.0
+    },
+    {
+      "borrowed": true,
+      "payload_bytes": 1024,
+      "repeat": 2,
+      "p50_ns": 1542,
+      "p95_ns": 1625,
+      "p99_ns": 1625,
+      "allocations": 15.0,
+      "allocated_bytes": 3405.0
+    },
+    {
+      "borrowed": true,
+      "payload_bytes": 1024,
+      "repeat": 3,
+      "p50_ns": 1542,
+      "p95_ns": 1625,
+      "p99_ns": 1666,
+      "allocations": 15.0,
+      "allocated_bytes": 3405.0
+    },
+    {
+      "borrowed": false,
+      "payload_bytes": 16384,
+      "repeat": 1,
+      "p50_ns": 8459,
+      "p95_ns": 9334,
+      "p99_ns": 9458,
+      "allocations": 38.0,
+      "allocated_bytes": 52351.0
+    },
+    {
+      "borrowed": false,
+      "payload_bytes": 16384,
+      "repeat": 2,
+      "p50_ns": 8334,
+      "p95_ns": 8584,
+      "p99_ns": 10084,
+      "allocations": 38.0,
+      "allocated_bytes": 52351.0
+    },
+    {
+      "borrowed": false,
+      "payload_bytes": 16384,
+      "repeat": 3,
+      "p50_ns": 7750,
+      "p95_ns": 7834,
+      "p99_ns": 7917,
+      "allocations": 38.0,
+      "allocated_bytes": 52351.0
+    },
+    {
+      "borrowed": true,
+      "payload_bytes": 16384,
+      "repeat": 1,
+      "p50_ns": 6416,
+      "p95_ns": 6875,
+      "p99_ns": 6958,
+      "allocations": 15.0,
+      "allocated_bytes": 34125.0
+    },
+    {
+      "borrowed": true,
+      "payload_bytes": 16384,
+      "repeat": 2,
+      "p50_ns": 6416,
+      "p95_ns": 6459,
+      "p99_ns": 6541,
+      "allocations": 15.0,
+      "allocated_bytes": 34125.0
+    },
+    {
+      "borrowed": true,
+      "payload_bytes": 16384,
+      "repeat": 3,
+      "p50_ns": 6125,
+      "p95_ns": 6417,
+      "p99_ns": 6917,
+      "allocations": 15.0,
+      "allocated_bytes": 34125.0
+    },
+    {
+      "borrowed": false,
+      "payload_bytes": 65536,
+      "repeat": 1,
+      "p50_ns": 21959,
+      "p95_ns": 23125,
+      "p99_ns": 24959,
+      "allocations": 38.0,
+      "allocated_bytes": 199807.0
+    },
+    {
+      "borrowed": false,
+      "payload_bytes": 65536,
+      "repeat": 2,
+      "p50_ns": 20625,
+      "p95_ns": 21708,
+      "p99_ns": 24709,
+      "allocations": 38.0,
+      "allocated_bytes": 199807.0
+    },
+    {
+      "borrowed": false,
+      "payload_bytes": 65536,
+      "repeat": 3,
+      "p50_ns": 19750,
+      "p95_ns": 20666,
+      "p99_ns": 23250,
+      "allocations": 38.0,
+      "allocated_bytes": 199807.0
+    },
+    {
+      "borrowed": true,
+      "payload_bytes": 65536,
+      "repeat": 1,
+      "p50_ns": 17916,
+      "p95_ns": 18084,
+      "p99_ns": 21625,
+      "allocations": 15.0,
+      "allocated_bytes": 132429.0
+    },
+    {
+      "borrowed": true,
+      "payload_bytes": 65536,
+      "repeat": 2,
+      "p50_ns": 17583,
+      "p95_ns": 17667,
+      "p99_ns": 19000,
+      "allocations": 15.0,
+      "allocated_bytes": 132429.0
+    },
+    {
+      "borrowed": true,
+      "payload_bytes": 65536,
+      "repeat": 3,
+      "p50_ns": 17584,
+      "p95_ns": 17917,
+      "p99_ns": 21125,
+      "allocations": 15.0,
+      "allocated_bytes": 132429.0
+    }
+  ]
+}

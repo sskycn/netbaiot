@@ -1,5 +1,36 @@
 use super::*;
 
+/// The existing webhook schema, borrowing the accepted event for this request.
+/// No second payload tree or event-lifetime JSON buffer is retained.
+#[derive(Serialize)]
+struct WebhookEnvelope<'a> {
+    event_id: &'a EventId,
+    source_message_id: &'a SourceMessageId,
+    tenant_id: &'a TenantId,
+    product_id: &'a ProductId,
+    device_id: &'a DeviceId,
+    event_type: EventType,
+    received_at: Timestamp,
+    occurred_at: Option<Timestamp>,
+    payload: &'a DeviceEventKind,
+}
+
+impl<'a> From<&'a DeviceEvent> for WebhookEnvelope<'a> {
+    fn from(event: &'a DeviceEvent) -> Self {
+        Self {
+            event_id: &event.event_id,
+            source_message_id: &event.source_message_id,
+            tenant_id: &event.device.tenant_id,
+            product_id: &event.device.product_id,
+            device_id: &event.device.device_id,
+            event_type: event.kind.event_type(),
+            received_at: event.received_at,
+            occurred_at: event.occurred_at,
+            payload: &event.kind,
+        }
+    }
+}
+
 pub(crate) struct AuditSink;
 #[async_trait]
 impl EventSink for AuditSink {
@@ -41,17 +72,7 @@ impl HttpSink {
 #[async_trait]
 impl EventSink for HttpSink {
     async fn deliver(&self, delivery: DeliveryEnvelope) -> std::result::Result<SinkAck, SinkError> {
-        let webhook = serde_json::json!({
-            "event_id": delivery.event.event_id,
-            "source_message_id": delivery.event.source_message_id,
-            "tenant_id": delivery.event.device.tenant_id,
-            "product_id": delivery.event.device.product_id,
-            "device_id": delivery.event.device.device_id,
-            "event_type": delivery.event.kind.event_type(),
-            "received_at": delivery.event.received_at,
-            "occurred_at": delivery.event.occurred_at,
-            "payload": delivery.event.kind,
-        });
+        let webhook = WebhookEnvelope::from(delivery.event.as_ref());
         let mut request = self
             .client
             .post(self.url.clone())
@@ -85,3 +106,7 @@ impl EventSink for HttpSink {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "delivery_tests.rs"]
+mod tests;
