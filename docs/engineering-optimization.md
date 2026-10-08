@@ -16,3 +16,22 @@ manifest paths, absolute members, traversal, symlinks and duplicate members.
 PASS: 13 release-tool tests, `cargo xtask check` (format, Clippy, workspace tests,
 evidence check), and native macOS `package --no-build`. Native Windows/Linux
 full package jobs will be verified after pushing the staged changes.
+
+## Phase 2: incremental required responsibilities
+
+`State.pending_required` counts sink responsibilities, not events. Publish and
+whole-batch restore preflight checked additions before commit. Only removal of a
+present required sink on a terminal ACK decrements it. Retries, permanent errors,
+timeouts, panic, cancellation and spool snapshots retain ownership. Duplicate or
+unrelated completions cannot alter inflight or byte accounting.
+
+The test-only `assert_eventbus_invariants` recomputes required responsibilities,
+active bytes, per-sink count/bytes and ready/delayed/inflight accounting. Existing
+admission, restore, duplicate, retry, panic, isolation and spool tests invoke it.
+PASS: 30 EventBus tests and `cargo xtask check`. The serial release benchmark uses identical before/after
+workloads at 1/64/256/1024/4096/16384 active events. Median usage latency (ns) was
+42/125/250/875/4667/20334 before and 41/41/41/41/41/41 after. These are isolated
+subsystem measurements on this macOS host, not capacity or SLA claims. Publish,
+complete, retry and restore allocation/timing rows are retained in the final
+measurement summary; their costs remain visible rather than being inferred from
+the usage improvement.

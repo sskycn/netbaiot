@@ -134,6 +134,7 @@ struct State {
     routing_revision: u64,
     active: HashMap<EventId, ActiveEvent>,
     active_bytes: usize,
+    pending_required: usize,
     accepting: bool,
 }
 
@@ -303,6 +304,7 @@ impl EventBus {
                 routing_revision,
                 active: HashMap::new(),
                 active_bytes: 0,
+                pending_required: 0,
                 accepting: true,
             }),
             changed: tokio::sync::Notify::new(),
@@ -367,11 +369,7 @@ impl EventBus {
         Ok(EventBusUsage {
             events: state.active.len(),
             bytes: state.active_bytes,
-            pending_required: state
-                .active
-                .values()
-                .map(|event| event.required.len())
-                .sum(),
+            pending_required: state.pending_required,
         })
     }
 
@@ -403,8 +401,12 @@ impl EventBus {
             return Err(Error::Overloaded);
         }
         // Required capacity is checked for every sink before the first mutation.
+        let mut required_count = 0usize;
         for id in targets.iter() {
             let sink = state_ref.sinks.get(id).ok_or(Error::Configuration)?;
+            if sink.definition.mode == SinkDeliveryMode::ConfirmedRequired {
+                required_count += 1;
+            }
             if sink.definition.mode == SinkDeliveryMode::ConfirmedRequired
                 && (sink.used_count >= sink.definition.max_count
                     || sink.used_bytes.saturating_add(bytes) > sink.definition.max_bytes)
@@ -412,6 +414,10 @@ impl EventBus {
                 return Err(Error::Overloaded);
             }
         }
+        let pending_required = state_ref
+            .pending_required
+            .checked_add(required_count)
+            .ok_or(Error::Overloaded)?;
         let now = now_ms();
         let mut remaining = BTreeSet::new();
         let mut required = BTreeSet::new();
@@ -447,6 +453,7 @@ impl EventBus {
         let event_id = event.event_id;
         let revision = state_ref.routing_revision;
         state_ref.active_bytes += bytes;
+        state_ref.pending_required = pending_required;
         state_ref.active.insert(
             event_id,
             ActiveEvent {
@@ -494,6 +501,7 @@ impl EventBus {
         let mut state = self.lock_state(EventBusProbe::Other)?;
         let mut ids = BTreeSet::new();
         let mut total_bytes = state.active_bytes;
+        let mut total_required = state.pending_required;
         let total_count = state
             .active
             .len()
@@ -512,6 +520,9 @@ impl EventBus {
             {
                 return Err(Error::Overloaded);
             }
+            total_required = total_required
+                .checked_add(record.pending_sinks.len())
+                .ok_or(Error::Overloaded)?;
             if !ids.insert(record.event.event_id)
                 || state.active.contains_key(&record.event.event_id)
             {
@@ -578,6 +589,7 @@ impl EventBus {
             );
         }
         state.active_bytes = total_bytes;
+        state.pending_required = total_required;
         let notifies = projections
             .keys()
             .filter_map(|id| state.sinks.get(id).map(|sink| sink.notify.clone()))
@@ -841,6 +853,17 @@ impl EventBus {
         definition: &SinkDefinition,
     ) -> Result<()> {
         let mut state = self.lock_state(EventBusProbe::Complete)?;
+        // A repeated or unrelated completion cannot release another delivery's
+        // inflight slot, queue bytes, or required responsibility.
+        let Some(active) = state.active.get(&record.event.event_id) else {
+            return Ok(());
+        };
+        if !active.remaining.contains(id) {
+            return Ok(());
+        }
+        if active.required.contains(id) && state.pending_required == 0 {
+            return Err(Error::Internal);
+        }
         {
             let sink = state.sinks.get_mut(id).ok_or(Error::Internal)?;
             sink.inflight = sink.inflight.saturating_sub(1);
@@ -903,10 +926,14 @@ impl EventBus {
             self.metrics.inc(Metric::SinkDrops);
         }
         let mut remove_event = false;
+        let mut removed_required = false;
         if let Some(active) = state.active.get_mut(&record.event.event_id) {
             active.remaining.remove(id);
-            active.required.remove(id);
+            removed_required = active.required.remove(id);
             remove_event = active.remaining.is_empty();
+        }
+        if removed_required {
+            state.pending_required -= 1;
         }
         if remove_event && let Some(active) = state.active.remove(&record.event.event_id) {
             state.active_bytes = state.active_bytes.saturating_sub(active.bytes);
@@ -1016,6 +1043,95 @@ mod tests {
     use netbaiot_core::*;
     use std::sync::atomic::{AtomicUsize, Ordering};
 
+    fn assert_eventbus_invariants(bus: &EventBus) {
+        let state = bus.state.lock().unwrap();
+        assert_eq!(
+            state.pending_required,
+            state
+                .active
+                .values()
+                .map(|event| event.required.len())
+                .sum::<usize>()
+        );
+        assert_eq!(
+            state.active_bytes,
+            state
+                .active
+                .values()
+                .map(|event| event.bytes)
+                .sum::<usize>()
+        );
+        for active in state.active.values() {
+            assert!(active.required.is_subset(&active.remaining));
+        }
+        for (id, sink) in &state.sinks {
+            let active = state
+                .active
+                .values()
+                .filter(|event| event.remaining.contains(id))
+                .collect::<Vec<_>>();
+            assert_eq!(sink.used_count, active.len());
+            assert_eq!(
+                sink.used_bytes,
+                active.iter().map(|event| event.bytes).sum::<usize>()
+            );
+            assert_eq!(
+                sink.used_count,
+                sink.ready.len()
+                    + sink.delayed.values().map(VecDeque::len).sum::<usize>()
+                    + sink.inflight
+            );
+            assert!(sink.used_count <= sink.definition.max_count);
+            assert!(sink.used_bytes <= sink.definition.max_bytes);
+        }
+    }
+
+    fn checked_usage(bus: &EventBus) -> EventBusUsage {
+        assert_eventbus_invariants(bus);
+        bus.usage().unwrap()
+    }
+
+    #[test]
+    fn incremental_required_accounting_ignores_duplicate_and_wrong_completions() {
+        let bus = route_bus(Limits::default(), vec![route(None, &["a", "b", "c"])]).unwrap();
+        let a = SinkId::new("a").unwrap();
+        let b = SinkId::new("b").unwrap();
+        let c = SinkId::new("c").unwrap();
+        bus.state
+            .lock()
+            .unwrap()
+            .sinks
+            .get_mut(&c)
+            .unwrap()
+            .definition
+            .mode = SinkDeliveryMode::BestEffort;
+        bus.publish(event(8)).unwrap();
+        assert_eq!(checked_usage(&bus).pending_required, 2);
+        let definition = bus.state.lock().unwrap().sinks[&a].definition.clone();
+        let record = bus.take_ready(&a).unwrap().unwrap();
+        let duplicate = record.clone();
+        bus.complete(
+            &SinkId::new("wrong").unwrap(),
+            record.clone(),
+            Ok(SinkAck),
+            &definition,
+        )
+        .unwrap();
+        assert_eq!(checked_usage(&bus).pending_required, 2);
+        bus.complete(&a, record, Ok(SinkAck), &definition).unwrap();
+        assert_eq!(checked_usage(&bus).pending_required, 1);
+        bus.complete(&a, duplicate, Ok(SinkAck), &definition)
+            .unwrap();
+        assert_eq!(checked_usage(&bus).pending_required, 1);
+        for id in [b, c] {
+            let definition = bus.state.lock().unwrap().sinks[&id].definition.clone();
+            let record = bus.take_ready(&id).unwrap().unwrap();
+            bus.complete(&id, record, Ok(SinkAck), &definition).unwrap();
+            assert_eventbus_invariants(&bus);
+        }
+        assert_eq!(checked_usage(&bus), EventBusUsage::default());
+    }
+
     struct Ack;
     #[async_trait]
     impl EventSink for Ack {
@@ -1083,7 +1199,7 @@ mod tests {
                 }
                 bus.complete(&id, record, Ok(SinkAck), &definition).unwrap();
             }
-            assert_eq!(bus.usage().unwrap(), EventBusUsage::default());
+            assert_eq!(checked_usage(&bus), EventBusUsage::default());
             assert_eq!(bus.next_ready_delay(&id).unwrap(), None);
         }
     }
@@ -1185,7 +1301,7 @@ mod tests {
         .unwrap();
         // Own the restored delivery even when no business stream exists yet.
         assert!(futures_util::poll!(worker.as_mut()).is_pending());
-        assert_eq!(bus.usage().unwrap().pending_required, 1);
+        assert_eq!(checked_usage(&bus).pending_required, 1);
         let (sender, mut receiver) = tokio::sync::mpsc::channel(1);
         let generation = sink.claim(sender, EventFilter::default()).unwrap();
         let consume = async {
@@ -1193,7 +1309,7 @@ mod tests {
             assert_eq!(request.delivery.event.event_id, event_id);
             assert_eq!(request.delivery.attempt, 3);
             assert_eq!(bus.spool_records().unwrap()[0].routing_revision, 3);
-            assert_eq!(bus.usage().unwrap().pending_required, 1);
+            assert_eq!(checked_usage(&bus).pending_required, 1);
             request.result.send(Ok(SinkAck)).unwrap();
             assert!(
                 bus.wait_required_drained(Duration::from_secs(1))
@@ -1208,7 +1324,7 @@ mod tests {
         })
         .await
         .unwrap();
-        assert_eq!(bus.usage().unwrap(), EventBusUsage::default());
+        assert_eq!(checked_usage(&bus), EventBusUsage::default());
     }
 
     struct StartedBusinessSink {
@@ -1302,7 +1418,7 @@ mod tests {
             tokio::time::advance(Duration::from_secs(5)).await;
             assert!(futures_util::poll!(worker.as_mut()).is_pending());
             assert!(receiver.try_recv().is_err());
-            assert_eq!(bus.usage().unwrap().pending_required, 1);
+            assert_eq!(checked_usage(&bus).pending_required, 1);
             assert_eq!(bus.spool_records().unwrap()[0].event.event_id, event_id);
             tokio::time::advance(Duration::from_millis(22300)).await;
         }
@@ -1327,7 +1443,7 @@ mod tests {
         })
         .await
         .unwrap();
-        assert_eq!(bus.usage().unwrap(), EventBusUsage::default());
+        assert_eq!(checked_usage(&bus), EventBusUsage::default());
     }
 
     struct Signal {
@@ -1738,12 +1854,12 @@ mod tests {
         let bus = audit_bus(Limits::default()).await;
         let original = event(8);
         bus.publish(original.clone()).unwrap();
-        let before = bus.usage().unwrap();
+        let before = checked_usage(&bus);
         for payload in [8, 100] {
             let mut duplicate = event(payload);
             duplicate.event_id = original.event_id;
             assert!(matches!(bus.publish(duplicate), Err(Error::Conflict)));
-            assert_eq!(bus.usage().unwrap(), before);
+            assert_eq!(checked_usage(&bus), before);
             assert_eq!(
                 bus.spool_records().unwrap()[0].event.event_id,
                 original.event_id
@@ -1761,7 +1877,7 @@ mod tests {
             let definition = bus.state.lock().unwrap().sinks[&id].definition.clone();
             bus.complete(&id, delivery, Ok(SinkAck), &definition)
                 .unwrap();
-            assert_eq!(bus.usage().unwrap().pending_required, 1 - index);
+            assert_eq!(checked_usage(&bus).pending_required, 1 - index);
             if index == 0 {
                 assert!(
                     !bus.wait_required_drained(Duration::from_millis(1))
@@ -1774,7 +1890,7 @@ mod tests {
                 );
             }
         }
-        assert_eq!(bus.usage().unwrap(), EventBusUsage::default());
+        assert_eq!(checked_usage(&bus), EventBusUsage::default());
         // Only active responsibility is guarded: after ACK completion reuse is legal.
         bus.publish(original).unwrap();
     }
@@ -1806,8 +1922,8 @@ mod tests {
             }
         }
         assert_eq!((accepted, conflicts), (1, 1));
-        assert_eq!(bus.usage().unwrap().events, 1);
-        assert_eq!(bus.usage().unwrap().pending_required, 2);
+        assert_eq!(checked_usage(&bus).events, 1);
+        assert_eq!(checked_usage(&bus).pending_required, 2);
         assert_eq!(bus.spool_records().unwrap().len(), 1);
     }
 
@@ -1835,7 +1951,7 @@ mod tests {
             if bus.restore(vec![good.clone(), bad]).is_ok() {
                 accepted.push(index);
             }
-            if bus.usage().unwrap() != EventBusUsage::default() {
+            if checked_usage(&bus) != EventBusUsage::default() {
                 accepted.push(index + 100);
             }
             for sink in bus.state.lock().unwrap().sinks.values() {
@@ -1869,7 +1985,7 @@ mod tests {
         ] {
             let bus = audit_bus(limits).await;
             assert!(bus.restore(vec![good.clone(), audit_record()]).is_err());
-            if bus.usage().unwrap() != EventBusUsage::default() {
+            if checked_usage(&bus) != EventBusUsage::default() {
                 accepted.push(999);
             }
         }
@@ -1879,9 +1995,9 @@ mod tests {
         );
         let bus = audit_bus(Limits::default()).await;
         bus.restore(vec![good.clone()]).unwrap();
-        let before = bus.usage().unwrap();
+        let before = checked_usage(&bus);
         assert!(matches!(bus.restore(vec![good]), Err(Error::Conflict)));
-        assert_eq!(bus.usage().unwrap(), before);
+        assert_eq!(checked_usage(&bus), before);
         let mut historical = audit_record();
         historical
             .attempts
@@ -1929,7 +2045,7 @@ mod tests {
             let acceptance = bus.publish(original.clone()).unwrap();
             assert_eq!(acceptance.required_deliveries, count);
             assert_eq!(
-                bus.usage().unwrap(),
+                checked_usage(&bus),
                 EventBusUsage {
                     events: 1,
                     bytes,
@@ -1975,7 +2091,7 @@ mod tests {
                     assert_eq!(pending[0].pending_sinks, ids[index + 1..]);
                 }
             }
-            assert_eq!(restored.usage().unwrap(), EventBusUsage::default());
+            assert_eq!(checked_usage(&restored), EventBusUsage::default());
             let state = lock(&restored.state).unwrap();
             assert!(state.sinks.values().all(|sink| sink.used_count == 0
                 && sink.used_bytes == 0
@@ -2166,7 +2282,7 @@ mod tests {
         for sink in sinks {
             assert_eq!(*sink.0.lock().unwrap(), vec![event_id; 3]);
         }
-        assert_eq!(bus.usage().unwrap(), EventBusUsage::default());
+        assert_eq!(checked_usage(&bus), EventBusUsage::default());
         bus.stop_workers().await.unwrap();
     }
 
@@ -2221,7 +2337,7 @@ mod tests {
                     }],
                 )
                 .unwrap();
-                let before = bus.usage().unwrap();
+                let before = checked_usage(&bus);
                 let accounting = || {
                     let state = lock(&bus.state).unwrap();
                     state
@@ -2239,7 +2355,7 @@ mod tests {
                 };
                 let counters = accounting();
                 assert!(matches!(bus.publish(event(8)), Err(Error::Overloaded)));
-                assert_eq!(bus.usage().unwrap(), before);
+                assert_eq!(checked_usage(&bus), before);
                 assert_eq!(accounting(), counters);
                 assert_eq!(bus.spool_records().unwrap().len(), 1);
             }
@@ -2279,9 +2395,9 @@ mod tests {
         .await
         .unwrap();
         bus.close_admission().unwrap();
-        let before = bus.usage().unwrap();
+        let before = checked_usage(&bus);
         bus.stop_workers().await.unwrap();
-        assert_eq!(bus.usage().unwrap(), before);
+        assert_eq!(checked_usage(&bus), before);
         let records = bus.spool_records().unwrap();
         assert_eq!(records.len(), 1);
         assert_eq!(records[0].event.event_id, acceptance.event_id);
@@ -2338,7 +2454,7 @@ mod tests {
         );
         assert_eq!(metrics.get(Metric::SinkRetries), 1);
         assert_eq!(metrics.get(Metric::SinkAcks), 1);
-        assert_eq!(bus.usage().unwrap(), EventBusUsage::default());
+        assert_eq!(checked_usage(&bus), EventBusUsage::default());
         bus.stop_workers().await.unwrap();
     }
 
@@ -2376,7 +2492,7 @@ mod tests {
                 .unwrap()
         );
         assert_eq!(sink.calls.load(Ordering::SeqCst), 2);
-        assert_eq!(bus.usage().unwrap(), EventBusUsage::default());
+        assert_eq!(checked_usage(&bus), EventBusUsage::default());
         bus.stop_workers().await.unwrap();
     }
 
@@ -2428,14 +2544,14 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(slow.calls.load(Ordering::Relaxed), 1);
-        assert_eq!(bus.usage().unwrap().pending_required, 1);
+        assert_eq!(checked_usage(&bus).pending_required, 1);
         release.notify_one();
         assert!(
             bus.wait_required_drained(Duration::from_secs(1))
                 .await
                 .unwrap()
         );
-        assert_eq!(bus.usage().unwrap(), EventBusUsage::default());
+        assert_eq!(checked_usage(&bus), EventBusUsage::default());
         bus.stop_workers().await.unwrap();
     }
 
@@ -2682,7 +2798,7 @@ mod tests {
         .unwrap();
         bus.publish(named_event("parked")).unwrap();
         tokio::time::sleep(Duration::from_millis(35)).await;
-        assert_eq!(bus.usage().unwrap().pending_required, 1);
+        assert_eq!(checked_usage(&bus).pending_required, 1);
         assert!(sink.calls.load(Ordering::SeqCst) < 10);
         sink.fail.store(false, Ordering::SeqCst);
         assert!(
@@ -2690,7 +2806,7 @@ mod tests {
                 .await
                 .unwrap()
         );
-        assert_eq!(bus.usage().unwrap(), EventBusUsage::default());
+        assert_eq!(checked_usage(&bus), EventBusUsage::default());
         bus.stop_workers().await.unwrap();
     }
     #[test]
@@ -2713,7 +2829,7 @@ mod tests {
             bus.complete(&id, record, Ok(SinkAck), &definition).unwrap();
         }
         assert!(bus.take_ready(&id).unwrap().is_none());
-        assert_eq!(bus.usage().unwrap(), EventBusUsage::default());
+        assert_eq!(checked_usage(&bus), EventBusUsage::default());
     }
 
     #[tokio::test]
@@ -2731,7 +2847,7 @@ mod tests {
             bus.complete(&id, record, Err(SinkError::Retryable), &definition)
                 .unwrap();
         }
-        let bytes = bus.usage().unwrap().bytes;
+        let bytes = checked_usage(&bus).bytes;
         {
             let mut state = bus.state.lock().unwrap();
             let sink = state.sinks.get_mut(&id).unwrap();
@@ -2771,7 +2887,7 @@ mod tests {
         let spooled = bus.spool_records().unwrap();
         assert_eq!(spooled.len(), 2);
         assert!(spooled.iter().all(|record| record.pending_sinks == vec![id.clone()] && record.attempts[&id] == 1));
-        assert_eq!(bus.usage().unwrap().bytes, bytes);
+        assert_eq!(checked_usage(&bus).bytes, bytes);
         {
             let mut state = bus.state.lock().unwrap();
             let sink = state.sinks.get_mut(&id).unwrap();
@@ -2790,7 +2906,7 @@ mod tests {
             bus.complete(&id, record, Ok(SinkAck), &definition).unwrap();
         }
         assert_eq!(bus.next_ready_delay(&id).unwrap(), None);
-        assert_eq!(bus.usage().unwrap(), EventBusUsage::default());
+        assert_eq!(checked_usage(&bus), EventBusUsage::default());
         assert!(bus.spool_records().unwrap().is_empty());
     }
 
@@ -2905,4 +3021,5 @@ mod tests {
         }
     }
     include!("second_round_event_bench.rs");
+    include!("event_accounting_bench.rs");
 }
