@@ -217,13 +217,40 @@ async fn http_failure_classes_and_retry_after_are_bounded() {
     tokio::time::sleep(Duration::from_millis(100)).await;
     *fixture.response.lock().unwrap() = ResponseSpec::status(200);
     sink.deliver_detailed(envelope()).await.unwrap();
-    let url = fixture.url.clone();
     fixture.shutdown().await;
-    // Winsock can take longer than the deliberately short body-timeout test
-    // to report a refused loopback connection. Use a separate bounded deadline
-    // so Network does not race that Timeout assertion.
+    // Choose a checked-free port outside the usual ephemeral range. Reusing a
+    // released port-0 listener can race another fixture or auto-bind a client
+    // to its own destination. A still-bound socket can instead stall SYNs.
+    // Candidate work is bounded, and the native probe verifies actual refusal.
+    let mut address = None;
+    for port in 10_000..10_032 {
+        match TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, port)).await {
+            Ok(listener) => {
+                address = Some(listener.local_addr().unwrap());
+                drop(listener);
+                break;
+            }
+            Err(error)
+                if matches!(
+                    error.kind(),
+                    std::io::ErrorKind::AddrInUse | std::io::ErrorKind::PermissionDenied
+                ) => {}
+            Err(error) => panic!("refusal fixture bind failed: {:?}", error.kind()),
+        }
+    }
+    let address = address.expect("bounded refusal fixture candidates exhausted");
+    let refused = tokio::time::timeout(
+        Duration::from_secs(2),
+        tokio::net::TcpStream::connect(address),
+    )
+    .await
+    .expect("unbound loopback endpoint must finish the TCP attempt")
+    .unwrap_err();
+    assert_eq!(refused.kind(), std::io::ErrorKind::ConnectionRefused);
+    // Keep the deliberate 50 ms body-timeout test independent of Winsock's
+    // connection-error timing, with a bounded refusal deadline.
     let sink = HttpSink::new(
-        &url,
+        &format!("http://{address}/events"),
         &Limits {
             sink_timeout_ms: 2_000,
             ..limits
