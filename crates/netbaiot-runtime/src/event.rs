@@ -216,6 +216,13 @@ struct State {
     pending_required: usize,
     accepting: bool,
     next_operation: u64,
+    tenants: HashMap<TenantId, TenantBacklog>,
+}
+
+#[derive(Clone, Copy, Default, Debug, PartialEq, Eq)]
+struct TenantBacklog {
+    count: usize,
+    bytes: usize,
 }
 
 /// Immutable, sorted effective fanout. The slices also own safe snapshots across
@@ -395,6 +402,7 @@ impl EventBus {
                 pending_required: 0,
                 accepting: true,
                 next_operation: 0,
+                tenants: HashMap::new(),
             }),
             changed: tokio::sync::Notify::new(),
             stop: CancellationToken::new(),
@@ -539,8 +547,27 @@ impl EventBus {
         if targets.is_empty() {
             return Err(Error::Unavailable);
         }
+        let active_bytes = state_ref
+            .active_bytes
+            .checked_add(bytes)
+            .ok_or(Error::Overloaded)?;
         if state_ref.active.len() >= self.limits.global_event_max_count
-            || state_ref.active_bytes.saturating_add(bytes) > self.limits.global_event_max_bytes
+            || active_bytes > self.limits.global_event_max_bytes
+        {
+            return Err(Error::Overloaded);
+        }
+        let tenant_id = &event.device.tenant_id;
+        let current = state_ref
+            .tenants
+            .get(tenant_id)
+            .copied()
+            .unwrap_or_default();
+        let tenant = TenantBacklog {
+            count: current.count.checked_add(1).ok_or(Error::Overloaded)?,
+            bytes: current.bytes.checked_add(bytes).ok_or(Error::Overloaded)?,
+        };
+        if tenant.count > self.limits.event_queue_max_count_per_tenant
+            || tenant.bytes > self.limits.event_queue_max_bytes_per_tenant
         {
             return Err(Error::Overloaded);
         }
@@ -553,7 +580,10 @@ impl EventBus {
             }
             if sink.definition.mode == SinkDeliveryMode::ConfirmedRequired
                 && (sink.used_count >= sink.definition.max_count
-                    || sink.used_bytes.saturating_add(bytes) > sink.definition.max_bytes)
+                    || sink
+                        .used_bytes
+                        .checked_add(bytes)
+                        .is_none_or(|total| total > sink.definition.max_bytes))
             {
                 return Err(Error::Overloaded);
             }
@@ -569,7 +599,10 @@ impl EventBus {
         for id in targets.iter() {
             let sink = state_ref.sinks.get_mut(id).ok_or(Error::Configuration)?;
             let available = sink.used_count < sink.definition.max_count
-                && sink.used_bytes.saturating_add(bytes) <= sink.definition.max_bytes;
+                && sink
+                    .used_bytes
+                    .checked_add(bytes)
+                    .is_some_and(|total| total <= sink.definition.max_bytes);
             if !available {
                 self.metrics.inc(Metric::SinkDrops);
                 sink.drops = sink.drops.saturating_add(1);
@@ -599,8 +632,15 @@ impl EventBus {
         }
         let event_id = event.event_id;
         let revision = state_ref.routing_revision;
-        state_ref.active_bytes += bytes;
+        state_ref.active_bytes = active_bytes;
         state_ref.pending_required = pending_required;
+        if let Some(existing) = state_ref.tenants.get_mut(&event.device.tenant_id) {
+            *existing = tenant;
+        } else {
+            state_ref
+                .tenants
+                .insert(event.device.tenant_id.clone(), tenant);
+        }
         state_ref.active.insert(
             event_id,
             ActiveEvent {
@@ -659,6 +699,7 @@ impl EventBus {
             return Err(Error::Overloaded);
         }
         let mut projections = BTreeMap::<SinkId, (usize, usize)>::new();
+        let mut tenant_projections = BTreeMap::<TenantId, TenantBacklog>::new();
         for (record, bytes) in &prepared {
             if record.pending_sinks.is_empty() || record.accepted_at < 0 {
                 return Err(Error::Invalid);
@@ -678,6 +719,17 @@ impl EventBus {
             }
             total_bytes = total_bytes.checked_add(*bytes).ok_or(Error::Overloaded)?;
             if total_bytes > self.limits.global_event_max_bytes {
+                return Err(Error::Overloaded);
+            }
+            let tenant_id = &record.event.device.tenant_id;
+            let tenant = tenant_projections
+                .entry(tenant_id.clone())
+                .or_insert_with(|| state.tenants.get(tenant_id).copied().unwrap_or_default());
+            tenant.count = tenant.count.checked_add(1).ok_or(Error::Overloaded)?;
+            tenant.bytes = tenant.bytes.checked_add(*bytes).ok_or(Error::Overloaded)?;
+            if tenant.count > self.limits.event_queue_max_count_per_tenant
+                || tenant.bytes > self.limits.event_queue_max_bytes_per_tenant
+            {
                 return Err(Error::Overloaded);
             }
             let mut pending = BTreeSet::new();
@@ -741,6 +793,7 @@ impl EventBus {
         }
         state.active_bytes = total_bytes;
         state.pending_required = total_required;
+        state.tenants.extend(tenant_projections);
         let notifies = projections
             .keys()
             .filter_map(|id| state.sinks.get(id).map(|sink| sink.notify.clone()))
@@ -1183,6 +1236,14 @@ impl EventBus {
         }
         if remove_event && let Some(active) = state.active.remove(&record.event.event_id) {
             state.active_bytes = state.active_bytes.saturating_sub(active.bytes);
+            let key = &active.event.device.tenant_id;
+            if let Some(tenant) = state.tenants.get_mut(key) {
+                tenant.count -= 1;
+                tenant.bytes -= active.bytes;
+                if tenant.count == 0 {
+                    state.tenants.remove(key);
+                }
+            }
         }
         drop(state);
         self.metrics.event_bus_probe(EventBusProbe::NotifyDrain);
@@ -1307,6 +1368,18 @@ mod tests {
                 .map(|event| event.bytes)
                 .sum::<usize>()
         );
+        let mut tenants = HashMap::<TenantId, TenantBacklog>::new();
+        for event in state.active.values() {
+            let tenant = tenants
+                .entry(event.event.device.tenant_id.clone())
+                .or_default();
+            tenant.count += 1;
+            tenant.bytes += event.bytes;
+        }
+        assert_eq!(state.tenants, tenants);
+        assert!(state.tenants.values().all(|tenant| tenant.count
+            <= bus.limits.event_queue_max_count_per_tenant
+            && tenant.bytes <= bus.limits.event_queue_max_bytes_per_tenant));
         for active in state.active.values() {
             assert!(active.required.is_subset(&active.remaining));
             assert!(
@@ -1394,6 +1467,100 @@ mod tests {
             assert_eventbus_invariants(&bus);
         }
         assert_eq!(checked_usage(&bus), EventBusUsage::default());
+    }
+
+    #[test]
+    fn tenant_count_admission_is_atomic_and_releases_after_last_sink() {
+        let bus = route_bus(
+            Limits {
+                event_queue_max_count_per_tenant: 2,
+                ..Limits::default()
+            },
+            vec![route(None, &["a", "b", "c"])],
+        )
+        .unwrap();
+        let ids = ["a", "b", "c"].map(|id| SinkId::new(id).unwrap());
+        {
+            let mut state = bus.state.lock().unwrap();
+            let sink = state.sinks.get_mut(&ids[2]).unwrap();
+            sink.definition.mode = SinkDeliveryMode::BestEffort;
+            sink.definition.max_count = 1;
+        }
+        bus.publish(event(8)).unwrap();
+        bus.publish(event(8)).unwrap(); // A full best-effort sink still sheds its copy.
+        let before = checked_usage(&bus);
+        assert!(matches!(bus.publish(event(8)), Err(Error::Overloaded)));
+        assert_eq!(checked_usage(&bus), before);
+        let mut other = event(8);
+        other.device.tenant_id = TenantId::new("another").unwrap();
+        bus.publish(other).unwrap();
+        for id in &ids[..2] {
+            let definition = bus.state.lock().unwrap().sinks[id].definition.clone();
+            let record = bus.take_ready(id).unwrap().unwrap();
+            bus.complete(id, record, Ok(SinkAck), &definition).unwrap();
+        }
+        // Required ACKs alone do not release the event's best-effort ownership.
+        assert!(matches!(bus.publish(event(8)), Err(Error::Overloaded)));
+        let definition = bus.state.lock().unwrap().sinks[&ids[2]].definition.clone();
+        let record = bus.take_ready(&ids[2]).unwrap().unwrap();
+        bus.complete(&ids[2], record, Ok(SinkAck), &definition)
+            .unwrap();
+        bus.publish(event(8)).unwrap();
+        for id in &ids {
+            let definition = bus.state.lock().unwrap().sinks[id].definition.clone();
+            while let Some(record) = bus.take_ready(id).unwrap() {
+                bus.complete(id, record, Ok(SinkAck), &definition).unwrap();
+                assert_eventbus_invariants(&bus);
+            }
+        }
+        assert_eq!(checked_usage(&bus), EventBusUsage::default());
+        assert!(bus.state.lock().unwrap().tenants.is_empty());
+    }
+
+    #[test]
+    fn tenant_bytes_and_restore_batch_fail_without_partial_reservation() {
+        let bytes = serde_json::to_vec(&event(8)).unwrap().len();
+        let bus = route_bus(
+            Limits {
+                event_queue_max_bytes_per_tenant: bytes * 2 - 1,
+                ..Limits::default()
+            },
+            vec![route(None, &["a", "b"])],
+        )
+        .unwrap();
+        bus.publish(event(8)).unwrap();
+        let before = checked_usage(&bus);
+        assert!(matches!(bus.publish(event(8)), Err(Error::Overloaded)));
+        assert_eq!(checked_usage(&bus), before);
+        let mut other = event(8);
+        other.device.tenant_id = TenantId::new("u").unwrap();
+        bus.publish(other).unwrap();
+        assert_eventbus_invariants(&bus);
+
+        let bus = route_bus(
+            Limits {
+                event_queue_max_count_per_tenant: 1,
+                ..Limits::default()
+            },
+            vec![route(None, &["a"])],
+        )
+        .unwrap();
+        assert!(matches!(
+            bus.restore(vec![audit_record(), audit_record()]),
+            Err(Error::Overloaded)
+        ));
+        assert_eq!(checked_usage(&bus), EventBusUsage::default());
+        assert!(bus.state.lock().unwrap().tenants.is_empty());
+        let record = audit_record();
+        bus.restore(vec![record.clone()]).unwrap();
+        let before = checked_usage(&bus);
+        assert!(bus.restore(vec![record]).is_err());
+        assert_eq!(checked_usage(&bus), before);
+        assert!(matches!(
+            bus.restore(vec![audit_record()]),
+            Err(Error::Overloaded)
+        ));
+        assert_eq!(checked_usage(&bus), before);
     }
 
     struct Ack;

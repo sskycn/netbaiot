@@ -96,3 +96,23 @@ connection, invalid response, declared and chunked oversized bodies, and recover
 to 200. Tests verify spool ownership, stable event IDs, cleanup, one probe,
 duplicate completion protection and nonzero drain reporting during an outage.
 PASS: 32 EventBus tests, HTTP classification/outage tests and `cargo xtask check`.
+
+## Phase 5: tenant backlog quota
+
+Existing tenant ingress limits bound active admission, not accepted backlog.
+EventBus now keeps one count/byte entry per tenant with outstanding events;
+the map is bounded by global event count and empty entries are removed. Bytes
+count the serialized event once, independent of fanout. Retry, pause, inflight and
+spooling preserve ownership; the last sink completion releases the event quota.
+
+Publish preflights global, tenant and required sink capacity before mutation.
+Restore projects the entire batch in local bounded accounting before committing.
+Checked additions prevent wraparound. Best-effort capacity shedding is unchanged.
+The new Limits fields default to the existing global values, preserving previous
+configurations; operators can set smaller tenant limits for isolation. Generated
+schema and field references include the additive settings.
+
+PASS: 34 EventBus tests, including tenant count/byte rejection, unrelated-tenant
+progress, final-sink release, best-effort shedding, failed restore rollback and
+duplicate restoration. The authoritative test invariant also recomputes every
+tenant entry. `cargo xtask check` validates the workspace and generated artifacts.

@@ -6,6 +6,7 @@ fn engineering_eventbus_accounting_benchmark() {
     for depth in [1, 64, 256, 1024, 4096, 16384] {
         let limits = Limits {
             global_event_max_count: depth + 1,
+            event_queue_max_count_per_tenant: depth + 1,
             sink_queue_max_count: depth + 1,
             sink_delivery_concurrency: 1,
             ..Limits::default()
