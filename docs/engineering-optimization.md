@@ -99,11 +99,12 @@ recovery 必须等待配置修正，不能丢弃。详见[配置说明](configur
 没有删除测试、放宽生产限制或提前 ACK。失败记录不能作为通过证据，表中 PASS 仅对应修正后的运行。
 本机 Mosquitto broker 已安装于工具的 `sbin` 目录，初次 MQTT gate 因 PATH 未覆盖该目录
 报告 BLOCKED；重跑仅为该测试命令增加 PATH，不安装新运行时依赖。
-Windows native workspace 暴露关闭端口分类夹具的问题：50 ms 和 2000 ms 均返回
-Timeout，而测试期待 Network。新增原生 CI failure-tail annotation 定位后，拒绝连接夹具
-不再复用刚释放的自动端口：在通常的自动端口范围之外至多检查 32 个候选。
-先以原生 TCP 确认实际 ConnectionRefused，再以独立且有界的 2000 ms 验证 HTTP Network。
-50 ms body-timeout 和严格分类断言均保留。只修正测试；生产分类与默认 timeout 未改变。
+Windows native workspace 暴露关闭端口夹具的不成立假设：50 ms 和 2000 ms 均返回
+Timeout，原生 TCP 探测也在 2000 ms 内超时，不能把该环境的关闭端口固定等同立即拒绝。
+新增原生 CI failure-tail annotation 定位后，在自动端口范围之外至多检查 32 个候选，
+以独立原生 TCP 的实际拒绝/超时结果严格验证对应 HTTP 分类；成功连接或其他结果仍失败。
+另以真实 TLS 证书拒绝在每个平台严格验证 Network / Retryable。50 ms body-timeout
+和所有 HTTP 分类断言保留。只修正测试；生产分类与默认 timeout 未改变。
 
 ## 9. Benchmark before / after
 

@@ -239,14 +239,21 @@ async fn http_failure_classes_and_retry_after_are_bounded() {
         }
     }
     let address = address.expect("bounded refusal fixture candidates exhausted");
-    let refused = tokio::time::timeout(
+    let native = tokio::time::timeout(
         Duration::from_secs(2),
         tokio::net::TcpStream::connect(address),
     )
-    .await
-    .expect("unbound loopback endpoint must finish the TCP attempt")
-    .unwrap_err();
-    assert_eq!(refused.kind(), std::io::ErrorKind::ConnectionRefused);
+    .await;
+    let expected = match native {
+        Ok(Err(error)) if error.kind() == std::io::ErrorKind::ConnectionRefused => {
+            SinkFailureReason::Network
+        }
+        Ok(Err(error)) if error.kind() == std::io::ErrorKind::TimedOut => {
+            SinkFailureReason::Timeout
+        }
+        Err(_) => SinkFailureReason::Timeout,
+        other => panic!("closed endpoint returned unexpected native result: {other:?}"),
+    };
     // Keep the deliberate 50 ms body-timeout test independent of Winsock's
     // connection-error timing, with a bounded refusal deadline.
     let sink = HttpSink::new(
@@ -259,8 +266,41 @@ async fn http_failure_classes_and_retry_after_are_bounded() {
     .unwrap();
     assert_eq!(
         sink.deliver_detailed(envelope()).await.unwrap_err().reason,
-        SinkFailureReason::Network
+        expected,
     );
+
+    // Independently exercise a real network failure on every platform, without
+    // relying on the host's closed-port SYN/RST timing. TLS validation must reject
+    // this existing test certificate before an HTTP request can be sent.
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures");
+    let acceptor = crate::tls_acceptor(&crate::TlsFiles {
+        certificate: root.join("localhost-cert.pem").display().to_string(),
+        private_key: root.join("localhost-key.pem").display().to_string(),
+    })
+    .await
+    .unwrap();
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let peer = tokio::spawn(async move {
+        tokio::time::timeout(Duration::from_secs(5), async move {
+            let (socket, _) = listener.accept().await.unwrap();
+            assert!(acceptor.accept(socket).await.is_err());
+        })
+        .await
+        .unwrap();
+    });
+    let sink = HttpSink::new(
+        &format!("https://{address}/events"),
+        &Limits {
+            sink_timeout_ms: 2_000,
+            ..limits
+        },
+    )
+    .unwrap();
+    let failure = sink.deliver_detailed(envelope()).await.unwrap_err();
+    assert_eq!(failure.reason, SinkFailureReason::Network);
+    assert_eq!(failure.error, SinkError::Retryable);
+    peer.await.unwrap();
 }
 
 #[tokio::test]
