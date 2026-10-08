@@ -90,8 +90,9 @@ recovery 必须等待配置修正，不能丢弃。详见[配置说明](configur
 | planned restart soak | PASS：12 cycles × 5 秒驻留，spool/replay stable IDs；两个 soak 合计约 130 秒 |
 | owned tasks / clean exit / spool cleanup | PASS：TLS soak 恢复任务基线、正常退出、recovery records=0 |
 | stable / Rust 1.88 final rust gate | PASS：各 496 workspace tests；fmt / all-targets all-features Clippy `-D warnings` |
-| MQTT external release gate | RUNNING |
-| release preflight / native archive jobs | macOS native package + extracted CLI/MQTT/TCP/UDP/graceful smoke PASS；其余 RUNNING |
+| MQTT external release gate | PASS：77 conformance cases，125/125 normative requirements；raw regressions、MQTT 5 smoke / Mosquitto、Device SDK TCP/TLS / certificate rejection / persistent reconnect / bounded-memory probes |
+| release preflight | PASS：生成 schema/reference 无 drift，版本 / 112 package inputs / sanitized evidence，13 Python regressions |
+| native archive jobs | 本机 macOS package / extracted smoke PASS；CI Linux/macOS PASS；Windows 首次 workspace FAIL、archive NOT RUN，诊断重跑中 |
 | bounded restart_spool fuzz smoke | PASS：nightly，208238 runs / 21 秒，max_len=65536，RSS limit=512 MiB |
 
 测试夹具早期曾暴露无效管理客户端和超出默认设备限流的发布频率，已修正；

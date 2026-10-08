@@ -28,7 +28,7 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          cargo xtask check 2>&1 | tee dx-platform.log
+          python scripts/ci_annotate.py --title "Native workspace checks failed" -- cargo xtask check 2>&1 | tee dx-platform.log
       - name: Native release archive validation
         timeout-minutes: 10
         shell: bash
