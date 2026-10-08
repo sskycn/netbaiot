@@ -219,7 +219,17 @@ async fn http_failure_classes_and_retry_after_are_bounded() {
     sink.deliver_detailed(envelope()).await.unwrap();
     let url = fixture.url.clone();
     fixture.shutdown().await;
-    let sink = HttpSink::new(&url, &limits).unwrap();
+    // Winsock can take longer than the deliberately short body-timeout test
+    // to report a refused loopback connection. Use a separate bounded deadline
+    // so Network does not race that Timeout assertion.
+    let sink = HttpSink::new(
+        &url,
+        &Limits {
+            sink_timeout_ms: 2_000,
+            ..limits
+        },
+    )
+    .unwrap();
     assert_eq!(
         sink.deliver_detailed(envelope()).await.unwrap_err().reason,
         SinkFailureReason::Network

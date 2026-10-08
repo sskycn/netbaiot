@@ -99,6 +99,10 @@ recovery 必须等待配置修正，不能丢弃。详见[配置说明](configur
 没有删除测试、放宽生产限制或提前 ACK。失败记录不能作为通过证据，表中 PASS 仅对应修正后的运行。
 本机 Mosquitto broker 已安装于工具的 `sbin` 目录，初次 MQTT gate 因 PATH 未覆盖该目录
 报告 BLOCKED；重跑仅为该测试命令增加 PATH，不安装新运行时依赖。
+Windows native workspace 首次暴露关闭端口分类夹具的 deadline 竞争：50 ms 到期后
+正确返回 Timeout，而测试期待 Network。新增原生 CI failure-tail annotation 定位该问题，
+连接拒绝用例改为独立且有界的 2000 ms，保留 50 ms body-timeout 用例和严格分类断言。
+这只修正测试；HttpSink 的分类与生产默认 timeout 未改变。
 
 ## 9. Benchmark before / after
 
