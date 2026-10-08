@@ -170,7 +170,7 @@ MQTT 和 TCP 在连接时认证并绑定设备身份。非 loopback 设备 TCP �
 - MQTT over WebSocket、MQTT-SN、共享订阅、Broker bridge 和 `$SYS` 服务不在支持范围内。
 - UDP 经过认证但不加密、无会话，也不支持命令下行。
 - 恢复只覆盖成功完成的计划优雅关机；它不是通用数据库，不能让任意进程或机器崩溃变得持久。
-- Workspace 版本为 `0.2.3`，尚未到 1.0。升级前请阅读协议和迁移说明，不要默认所有 API 均稳定。
+- Workspace 版本为 `0.2.4`，尚未到 1.0。升级前请阅读协议和迁移说明，不要默认所有 API 均稳定。
 
 ## 文档
 
@@ -181,7 +181,7 @@ MQTT 和 TCP 在连接时认证并绑定设备身份。非 loopback 设备 TCP �
 - [安全](docs/security.md) · [运维](docs/operations-guide.md) · [故障排查](docs/troubleshooting.md)
 - [业务集成与客户端](docs/business-integration-guide.md) · [CLI](docs/cli.zh-CN.md) · [设备 SDK](docs/device-sdk.zh-CN.md)
 - [基准概述](docs/benchmarks.md) · [性能基线](docs/performance-baseline.md)
-- [v0.2.3 发布说明](docs/releases/v0.2.3.md) · [发布模板](docs/release-template.md) · [项目介绍和发布草稿](docs/project-description.md)
+- [v0.2.4 发布说明](docs/releases/v0.2.4.md) · [发布模板](docs/release-template.md) · [项目介绍和发布草稿](docs/project-description.md)
 
 ## 构建与发布
 
