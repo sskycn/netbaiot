@@ -247,15 +247,21 @@ def run_case(args, out, codec, transport, scenario, devices, fault):
             acked = int(delta.get('netbaiot_sink_acks_total', 0))
             accepted = int(delta.get('netbaiot_events_accepted_total', 0))
             healthy = (fault == 'none' and accepted == acked == counters.get('published', 0)
+                and counters.get('event_accepted_receipts', 0) == counters.get('published', 0)
                 and (transport == 'udp' or counters.get('connected', 0) == devices)
                 and not state['pending_required'] and not state['active_sessions']
                 and not any(counters.get(k, 0) for k in ('client_errors', 'forced_tasks', 'panicked_tasks',
-                    'schedule_missed', 'client_window_full', 'business_ack_timeouts', 'sink_probe_overloads', 'sink_owner_errors')))
+                    'schedule_missed', 'client_window_full', 'business_ack_timeouts', 'sink_probe_overloads', 'sink_owner_errors', 'udp_unconfirmed')))
             fault_ok = (not state['active_sessions'] and not state['pending_required'] and not state['event_count']
                 and not any(counters.get(k, 0) for k in ('forced_tasks', 'panicked_tasks', 'sink_owner_errors'))
                 and (accepted == 0 if fault in ('wrong_hmac', 'wrong_version', 'oversize', 'half_connection') else accepted == acked))
+            profile_ok = (args.profiling and fault == 'none' and accepted == acked
+                and counters.get('event_accepted_receipts', 0) == accepted
+                and accepted + int(delta.get('netbaiot_ingress_rejected_total', 0)) == counters.get('published', 0)
+                and not state['active_sessions'] and not state['pending_required'] and not state['event_count']
+                and not any(counters.get(k, 0) for k in ('forced_tasks', 'panicked_tasks', 'sink_owner_errors')))
             measured = [s for s in samples if 0 < s['measurement_s'] < args.duration] or samples
-            summary.update(status='pass' if healthy else 'fault_observed' if fault != 'none' and fault_ok else 'failed',
+            summary.update(status='pass' if healthy else 'profiled_with_rejections' if profile_ok else 'fault_observed' if fault != 'none' and fault_ok else 'failed',
                 measured_duration_s=args.duration, wall_seconds=time.monotonic() - started,
                 connected=counters.get('connected', 0), connection_attempts=counters.get('connect_attempts', 0),
                 connection_success_ratio=counters.get('connected', 0) / max(1, counters.get('connect_attempts', 0)) if transport != 'udp' else None,
@@ -316,6 +322,7 @@ def main():
     p.add_argument('--threads', type=int, default=min(os.cpu_count() or 1, 8))
     p.add_argument('--tls', action='store_true')
     p.add_argument('--heaptrack', action='store_true')
+    p.add_argument('--profiling', action='store_true', help='retain observed bounded ingress rejections as profiling evidence, never a capacity PASS')
     args = p.parse_args()
     if not (1 <= args.duration <= 86400 and 1 <= args.sample_interval <= 60 and 1 <= args.ramp <= 2000 and 1 <= args.threads <= 64) or any(not 1 <= n <= 10000 for n in args.devices) or (args.rate is not None and not 1 <= args.rate <= 1000000):
         p.error('invalid bounded duration/population/rate/sample configuration')

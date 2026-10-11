@@ -77,6 +77,7 @@ Codec 错误包括现有 validate/decode 失败；sink_failed 保留 required de
 
 原生 Linux CI 分别真实执行 x86_64/ARM64 TLS 负载、微基准、异常输入、perf 栈/flamegraph 和 heaptrack 分配画像。
 Profiling 使用独立 case，避免把 profiler 开销混进普通容量数据。仅对测试凭据与合成设备进行分析。
+`--profiling` 允许记录与 ingress 拒绝完全对账、所有已接纳工作已 ACK 的 `profiled_with_rejections`，该状态永远不是容量 PASS；遗漏 required ACK、未归零队列、未知丢失仍失败。
 CPU/heap 热点得到证据后再决定减少复制/分配或锁竞争；没有证据不进行猜测性热路径修改。禁止 unsafe、安全检查删减、协议变化。
 工具方法见 [Inferno](https://github.com/jonhoo/inferno) 和 [heaptrack](https://github.com/KDE/heaptrack)。
 tokio-console 需要专门 runtime instrumentation，当前使用稳定 runtime task 计数；未执行 console 检查时明确标记。
@@ -93,6 +94,13 @@ tokio-console 需要专门 runtime instrumentation，当前使用稳定 runtime 
 | 6 小时/24 小时 | 等待真实完整运行，不能加速时钟代替 |
 | 1000/5000/10000 部署 CPU/内存/网络规格 | 等待对应平台及负载的实测，暂不提供估算 |
 | 未覆盖风险 | 同机测量、真实 WAN/NIC、外部认证/业务 ACK 服务、真实设备差异、长期开机与断电恢复 |
+
+已完成的本阶段预检：[本机摘要](performance/production-readiness/local-preflight.json)、[来源 manifest](performance/production-readiness/local-manifest.json)。
+macOS ARM64 同机 TLS MQTT 3.1.1、每例 1000 台传感器、12 秒：四 Codec 均 1200 条发送/接纳/业务确认，连接成功率 100%，最终 session/required queue 为零。
+设备发送至业务 ACK P95 0.33–0.35 ms，P99 0.53–0.71 ms；这些是短期 loopback 预检，不能推导 Linux 部署规格。
+本阶段完整 workspace 542 项通过、46 项既有 ignored；另外实际执行 TLS outage 60.67 秒、混合 Codec 重连 60.02 秒、子进程重启 64.36 秒，均通过。
+6/24 小时正在本机用冻结二进制执行：四 Codec/传输配对，每台独立网关 1000 设备；逐分钟采样。八台同机测试网关不是单网关 8000 台容量证据。
+Linux x86_64/ARM64 的完整真实矩阵见 [Actions](https://github.com/sskycn/netbaiot/actions/runs/38113863601)，运行尚未完成时不写成 PASS。
 
 部署时按 [运维指南](operations-guide.md) 配置独立管理授权、验证服务器 TLS 证书、限制暴露端口与管理网，设置有界 count/byte、ACK/retry/timeout 与恢复 spool。
 FD 的实际峰值和服务启动 `RLIMIT_NOFILE` 必须一起验证；工具只尝试调整自有进程的 soft limit，不修改系统参数。

@@ -1,0 +1,859 @@
+{
+  "status": "completed_preflight_only",
+  "placement": "same_host_macOS_ARM64_loopback",
+  "scope": "1000 TLS MQTT 3.1.1 sensor devices, four codecs, 12 seconds each; no stable production capacity claim",
+  "cases": [
+    {
+      "status": "pass",
+      "devices": 1000,
+      "codec": "cbor",
+      "transport": "mqtt311",
+      "scenario": "sensor",
+      "measured_duration_s": 12.0,
+      "submitted": 1200,
+      "transport_received": 1200,
+      "event_accepted": 1200,
+      "sink_confirmed": 1200,
+      "connection_success_ratio": 1.0,
+      "resources": {
+        "samples": 17,
+        "peak_rss_kib": 50448,
+        "median_rss_kib": 49792,
+        "median_cpu_pct": 2.6741245027799607,
+        "max_fd": 1014,
+        "max_tasks": 1008,
+        "max_connections": 1000,
+        "max_sessions": 1000
+      },
+      "final_sessions": 0,
+      "final_queues_empty": true,
+      "receipt": {
+        "count": 1200,
+        "max_ms": 1.99,
+        "mean_ms": 0.17653,
+        "p50_ms": 0.17,
+        "p95_ms": 0.23,
+        "p999_ms": 1.23,
+        "p99_ms": 0.36
+      },
+      "business_ack": {
+        "count": 1200,
+        "max_ms": 2.033,
+        "mean_ms": 0.24642333333333336,
+        "p50_ms": 0.24,
+        "p95_ms": 0.33,
+        "p999_ms": 1.38,
+        "p99_ms": 0.53
+      },
+      "stages": {
+        "mqtt_protocol_validation_us": {
+          "count": 1200,
+          "p50_upper_ms": 0.01,
+          "p95_upper_ms": 0.01,
+          "p99_upper_ms": 0.01
+        },
+        "validation_to_admission_us": {
+          "count": 1200,
+          "p50_upper_ms": 0.01,
+          "p95_upper_ms": 0.01,
+          "p99_upper_ms": 0.025
+        },
+        "admission_wait_us": {
+          "count": 1200,
+          "p50_upper_ms": 0.01,
+          "p95_upper_ms": 0.01,
+          "p99_upper_ms": 0.01
+        },
+        "admission_lock_wait_us": {
+          "count": 4400,
+          "p50_upper_ms": 0.01,
+          "p95_upper_ms": 0.01,
+          "p99_upper_ms": 0.01
+        },
+        "admission_lock_hold_us": {
+          "count": 4400,
+          "p50_upper_ms": 0.01,
+          "p95_upper_ms": 0.01,
+          "p99_upper_ms": 0.01
+        },
+        "event_bus_lock_wait_us": {
+          "count": 0,
+          "p50_upper_ms": null,
+          "p95_upper_ms": null,
+          "p99_upper_ms": null
+        },
+        "event_bus_lock_hold_us": {
+          "count": 0,
+          "p50_upper_ms": null,
+          "p95_upper_ms": null,
+          "p99_upper_ms": null
+        },
+        "event_bus_state_wait_us": {
+          "count": 0,
+          "p50_upper_ms": null,
+          "p95_upper_ms": null,
+          "p99_upper_ms": null
+        },
+        "event_bus_state_hold_us": {
+          "count": 0,
+          "p50_upper_ms": null,
+          "p95_upper_ms": null,
+          "p99_upper_ms": null
+        },
+        "broker_lock_wait_us": {
+          "count": 0,
+          "p50_upper_ms": null,
+          "p95_upper_ms": null,
+          "p99_upper_ms": null
+        },
+        "broker_lock_hold_us": {
+          "count": 0,
+          "p50_upper_ms": null,
+          "p95_upper_ms": null,
+          "p99_upper_ms": null
+        },
+        "authentication_to_codec_us": {
+          "count": 1200,
+          "p50_upper_ms": 0.025,
+          "p95_upper_ms": 0.025,
+          "p99_upper_ms": 0.05
+        },
+        "codec_to_event_accepted_us": {
+          "count": 1200,
+          "p50_upper_ms": 0.01,
+          "p95_upper_ms": 0.01,
+          "p99_upper_ms": 0.025
+        },
+        "event_accepted_to_sink_ack_us": {
+          "count": 1200,
+          "p50_upper_ms": 0.01,
+          "p95_upper_ms": 1.0,
+          "p99_upper_ms": 1.0
+        },
+        "puback_write_us": {
+          "count": 1200,
+          "p50_upper_ms": 0.025,
+          "p95_upper_ms": 0.025,
+          "p99_upper_ms": 0.025
+        },
+        "business_rpc_auth_latency_us": {
+          "count": 0,
+          "p50_upper_ms": null,
+          "p95_upper_ms": null,
+          "p99_upper_ms": null
+        },
+        "business_rpc_verifier_latency_us": {
+          "count": 0,
+          "p50_upper_ms": null,
+          "p95_upper_ms": null,
+          "p99_upper_ms": null
+        },
+        "business_rpc_event_ack_latency_us": {
+          "count": 0,
+          "p50_upper_ms": null,
+          "p95_upper_ms": null,
+          "p99_upper_ms": null
+        },
+        "business_rpc_admission_us": {
+          "count": 0,
+          "p50_upper_ms": null,
+          "p95_upper_ms": null,
+          "p99_upper_ms": null
+        },
+        "business_rpc_remote_wait_us": {
+          "count": 0,
+          "p50_upper_ms": null,
+          "p95_upper_ms": null,
+          "p99_upper_ms": null
+        },
+        "business_rpc_queue_wait_us": {
+          "count": 0,
+          "p50_upper_ms": null,
+          "p95_upper_ms": null,
+          "p99_upper_ms": null
+        },
+        "business_rpc_v3_scheduler_wait_us": {
+          "count": 0,
+          "p50_upper_ms": null,
+          "p95_upper_ms": null,
+          "p99_upper_ms": null
+        },
+        "business_rpc_v3_writer_wait_us": {
+          "count": 0,
+          "p50_upper_ms": null,
+          "p95_upper_ms": null,
+          "p99_upper_ms": null
+        },
+        "authentication_us": {
+          "count": 1000,
+          "p50_upper_ms": 0.01,
+          "p95_upper_ms": 0.01,
+          "p99_upper_ms": 0.01
+        },
+        "codec_latency_us": {
+          "count": 1200,
+          "p50_upper_ms": 0.025,
+          "p95_upper_ms": 0.025,
+          "p99_upper_ms": 0.05
+        },
+        "ingress_latency_us": {
+          "count": 1200,
+          "p50_upper_ms": 0.025,
+          "p95_upper_ms": 0.05,
+          "p99_upper_ms": 0.1
+        },
+        "sink_latency_us": {
+          "count": 1200,
+          "p50_upper_ms": 0.25,
+          "p95_upper_ms": 0.25,
+          "p99_upper_ms": 0.25
+        },
+        "eventbus_queue_latency_us": {
+          "count": 1200,
+          "p50_upper_ms": 0.025,
+          "p95_upper_ms": 0.05,
+          "p99_upper_ms": 0.05
+        }
+      }
+    },
+    {
+      "status": "pass",
+      "devices": 1000,
+      "codec": "json",
+      "transport": "mqtt311",
+      "scenario": "sensor",
+      "measured_duration_s": 12.0,
+      "submitted": 1200,
+      "transport_received": 1200,
+      "event_accepted": 1200,
+      "sink_confirmed": 1200,
+      "connection_success_ratio": 1.0,
+      "resources": {
+        "samples": 18,
+        "peak_rss_kib": 49792,
+        "median_rss_kib": 49088,
+        "median_cpu_pct": 2.7245770480795777,
+        "max_fd": 1014,
+        "max_tasks": 1008,
+        "max_connections": 1000,
+        "max_sessions": 1000
+      },
+      "final_sessions": 0,
+      "final_queues_empty": true,
+      "receipt": {
+        "count": 1200,
+        "max_ms": 2.52,
+        "mean_ms": 0.17366499999999999,
+        "p50_ms": 0.17,
+        "p95_ms": 0.25,
+        "p999_ms": 1.31,
+        "p99_ms": 0.41
+      },
+      "business_ack": {
+        "count": 1200,
+        "max_ms": 2.559,
+        "mean_ms": 0.243805,
+        "p50_ms": 0.24,
+        "p95_ms": 0.34,
+        "p999_ms": 1.63,
+        "p99_ms": 0.59
+      },
+      "stages": {
+        "mqtt_protocol_validation_us": {
+          "count": 1200,
+          "p50_upper_ms": 0.01,
+          "p95_upper_ms": 0.01,
+          "p99_upper_ms": 0.01
+        },
+        "validation_to_admission_us": {
+          "count": 1200,
+          "p50_upper_ms": 0.01,
+          "p95_upper_ms": 0.01,
+          "p99_upper_ms": 0.025
+        },
+        "admission_wait_us": {
+          "count": 1200,
+          "p50_upper_ms": 0.01,
+          "p95_upper_ms": 0.01,
+          "p99_upper_ms": 0.025
+        },
+        "admission_lock_wait_us": {
+          "count": 4400,
+          "p50_upper_ms": 0.01,
+          "p95_upper_ms": 0.01,
+          "p99_upper_ms": 0.01
+        },
+        "admission_lock_hold_us": {
+          "count": 4400,
+          "p50_upper_ms": 0.01,
+          "p95_upper_ms": 0.01,
+          "p99_upper_ms": 0.01
+        },
+        "event_bus_lock_wait_us": {
+          "count": 0,
+          "p50_upper_ms": null,
+          "p95_upper_ms": null,
+          "p99_upper_ms": null
+        },
+        "event_bus_lock_hold_us": {
+          "count": 0,
+          "p50_upper_ms": null,
+          "p95_upper_ms": null,
+          "p99_upper_ms": null
+        },
+        "event_bus_state_wait_us": {
+          "count": 0,
+          "p50_upper_ms": null,
+          "p95_upper_ms": null,
+          "p99_upper_ms": null
+        },
+        "event_bus_state_hold_us": {
+          "count": 0,
+          "p50_upper_ms": null,
+          "p95_upper_ms": null,
+          "p99_upper_ms": null
+        },
+        "broker_lock_wait_us": {
+          "count": 0,
+          "p50_upper_ms": null,
+          "p95_upper_ms": null,
+          "p99_upper_ms": null
+        },
+        "broker_lock_hold_us": {
+          "count": 0,
+          "p50_upper_ms": null,
+          "p95_upper_ms": null,
+          "p99_upper_ms": null
+        },
+        "authentication_to_codec_us": {
+          "count": 1200,
+          "p50_upper_ms": 0.025,
+          "p95_upper_ms": 0.025,
+          "p99_upper_ms": 0.05
+        },
+        "codec_to_event_accepted_us": {
+          "count": 1200,
+          "p50_upper_ms": 0.01,
+          "p95_upper_ms": 0.025,
+          "p99_upper_ms": 0.025
+        },
+        "event_accepted_to_sink_ack_us": {
+          "count": 1200,
+          "p50_upper_ms": 0.01,
+          "p95_upper_ms": 1.0,
+          "p99_upper_ms": 1.0
+        },
+        "puback_write_us": {
+          "count": 1200,
+          "p50_upper_ms": 0.025,
+          "p95_upper_ms": 0.025,
+          "p99_upper_ms": 0.025
+        },
+        "business_rpc_auth_latency_us": {
+          "count": 0,
+          "p50_upper_ms": null,
+          "p95_upper_ms": null,
+          "p99_upper_ms": null
+        },
+        "business_rpc_verifier_latency_us": {
+          "count": 0,
+          "p50_upper_ms": null,
+          "p95_upper_ms": null,
+          "p99_upper_ms": null
+        },
+        "business_rpc_event_ack_latency_us": {
+          "count": 0,
+          "p50_upper_ms": null,
+          "p95_upper_ms": null,
+          "p99_upper_ms": null
+        },
+        "business_rpc_admission_us": {
+          "count": 0,
+          "p50_upper_ms": null,
+          "p95_upper_ms": null,
+          "p99_upper_ms": null
+        },
+        "business_rpc_remote_wait_us": {
+          "count": 0,
+          "p50_upper_ms": null,
+          "p95_upper_ms": null,
+          "p99_upper_ms": null
+        },
+        "business_rpc_queue_wait_us": {
+          "count": 0,
+          "p50_upper_ms": null,
+          "p95_upper_ms": null,
+          "p99_upper_ms": null
+        },
+        "business_rpc_v3_scheduler_wait_us": {
+          "count": 0,
+          "p50_upper_ms": null,
+          "p95_upper_ms": null,
+          "p99_upper_ms": null
+        },
+        "business_rpc_v3_writer_wait_us": {
+          "count": 0,
+          "p50_upper_ms": null,
+          "p95_upper_ms": null,
+          "p99_upper_ms": null
+        },
+        "authentication_us": {
+          "count": 1000,
+          "p50_upper_ms": 0.01,
+          "p95_upper_ms": 0.01,
+          "p99_upper_ms": 0.01
+        },
+        "codec_latency_us": {
+          "count": 1200,
+          "p50_upper_ms": 0.025,
+          "p95_upper_ms": 0.025,
+          "p99_upper_ms": 0.05
+        },
+        "ingress_latency_us": {
+          "count": 1200,
+          "p50_upper_ms": 0.025,
+          "p95_upper_ms": 0.05,
+          "p99_upper_ms": 0.1
+        },
+        "sink_latency_us": {
+          "count": 1200,
+          "p50_upper_ms": 0.25,
+          "p95_upper_ms": 0.25,
+          "p99_upper_ms": 0.5
+        },
+        "eventbus_queue_latency_us": {
+          "count": 1200,
+          "p50_upper_ms": 0.025,
+          "p95_upper_ms": 0.05,
+          "p99_upper_ms": 0.05
+        }
+      }
+    },
+    {
+      "status": "pass",
+      "devices": 1000,
+      "codec": "msgpack",
+      "transport": "mqtt311",
+      "scenario": "sensor",
+      "measured_duration_s": 12.0,
+      "submitted": 1200,
+      "transport_received": 1200,
+      "event_accepted": 1200,
+      "sink_confirmed": 1200,
+      "connection_success_ratio": 1.0,
+      "resources": {
+        "samples": 17,
+        "peak_rss_kib": 50400,
+        "median_rss_kib": 49808,
+        "median_cpu_pct": 1.8329898768551611,
+        "max_fd": 1014,
+        "max_tasks": 1008,
+        "max_connections": 1000,
+        "max_sessions": 1000
+      },
+      "final_sessions": 0,
+      "final_queues_empty": true,
+      "receipt": {
+        "count": 1200,
+        "max_ms": 2.482,
+        "mean_ms": 0.17719166666666666,
+        "p50_ms": 0.17,
+        "p95_ms": 0.23,
+        "p999_ms": 2.32,
+        "p99_ms": 0.46
+      },
+      "business_ack": {
+        "count": 1200,
+        "max_ms": 2.516,
+        "mean_ms": 0.24828833333333333,
+        "p50_ms": 0.24,
+        "p95_ms": 0.34,
+        "p999_ms": 2.43,
+        "p99_ms": 0.6
+      },
+      "stages": {
+        "mqtt_protocol_validation_us": {
+          "count": 1200,
+          "p50_upper_ms": 0.01,
+          "p95_upper_ms": 0.01,
+          "p99_upper_ms": 0.01
+        },
+        "validation_to_admission_us": {
+          "count": 1200,
+          "p50_upper_ms": 0.01,
+          "p95_upper_ms": 0.01,
+          "p99_upper_ms": 0.025
+        },
+        "admission_wait_us": {
+          "count": 1200,
+          "p50_upper_ms": 0.01,
+          "p95_upper_ms": 0.01,
+          "p99_upper_ms": 0.01
+        },
+        "admission_lock_wait_us": {
+          "count": 4400,
+          "p50_upper_ms": 0.01,
+          "p95_upper_ms": 0.01,
+          "p99_upper_ms": 0.01
+        },
+        "admission_lock_hold_us": {
+          "count": 4400,
+          "p50_upper_ms": 0.01,
+          "p95_upper_ms": 0.01,
+          "p99_upper_ms": 0.01
+        },
+        "event_bus_lock_wait_us": {
+          "count": 0,
+          "p50_upper_ms": null,
+          "p95_upper_ms": null,
+          "p99_upper_ms": null
+        },
+        "event_bus_lock_hold_us": {
+          "count": 0,
+          "p50_upper_ms": null,
+          "p95_upper_ms": null,
+          "p99_upper_ms": null
+        },
+        "event_bus_state_wait_us": {
+          "count": 0,
+          "p50_upper_ms": null,
+          "p95_upper_ms": null,
+          "p99_upper_ms": null
+        },
+        "event_bus_state_hold_us": {
+          "count": 0,
+          "p50_upper_ms": null,
+          "p95_upper_ms": null,
+          "p99_upper_ms": null
+        },
+        "broker_lock_wait_us": {
+          "count": 0,
+          "p50_upper_ms": null,
+          "p95_upper_ms": null,
+          "p99_upper_ms": null
+        },
+        "broker_lock_hold_us": {
+          "count": 0,
+          "p50_upper_ms": null,
+          "p95_upper_ms": null,
+          "p99_upper_ms": null
+        },
+        "authentication_to_codec_us": {
+          "count": 1200,
+          "p50_upper_ms": 0.025,
+          "p95_upper_ms": 0.025,
+          "p99_upper_ms": 0.05
+        },
+        "codec_to_event_accepted_us": {
+          "count": 1200,
+          "p50_upper_ms": 0.01,
+          "p95_upper_ms": 0.01,
+          "p99_upper_ms": 0.025
+        },
+        "event_accepted_to_sink_ack_us": {
+          "count": 1200,
+          "p50_upper_ms": 0.01,
+          "p95_upper_ms": 1.0,
+          "p99_upper_ms": 1.0
+        },
+        "puback_write_us": {
+          "count": 1200,
+          "p50_upper_ms": 0.025,
+          "p95_upper_ms": 0.025,
+          "p99_upper_ms": 0.025
+        },
+        "business_rpc_auth_latency_us": {
+          "count": 0,
+          "p50_upper_ms": null,
+          "p95_upper_ms": null,
+          "p99_upper_ms": null
+        },
+        "business_rpc_verifier_latency_us": {
+          "count": 0,
+          "p50_upper_ms": null,
+          "p95_upper_ms": null,
+          "p99_upper_ms": null
+        },
+        "business_rpc_event_ack_latency_us": {
+          "count": 0,
+          "p50_upper_ms": null,
+          "p95_upper_ms": null,
+          "p99_upper_ms": null
+        },
+        "business_rpc_admission_us": {
+          "count": 0,
+          "p50_upper_ms": null,
+          "p95_upper_ms": null,
+          "p99_upper_ms": null
+        },
+        "business_rpc_remote_wait_us": {
+          "count": 0,
+          "p50_upper_ms": null,
+          "p95_upper_ms": null,
+          "p99_upper_ms": null
+        },
+        "business_rpc_queue_wait_us": {
+          "count": 0,
+          "p50_upper_ms": null,
+          "p95_upper_ms": null,
+          "p99_upper_ms": null
+        },
+        "business_rpc_v3_scheduler_wait_us": {
+          "count": 0,
+          "p50_upper_ms": null,
+          "p95_upper_ms": null,
+          "p99_upper_ms": null
+        },
+        "business_rpc_v3_writer_wait_us": {
+          "count": 0,
+          "p50_upper_ms": null,
+          "p95_upper_ms": null,
+          "p99_upper_ms": null
+        },
+        "authentication_us": {
+          "count": 1000,
+          "p50_upper_ms": 0.01,
+          "p95_upper_ms": 0.01,
+          "p99_upper_ms": 0.01
+        },
+        "codec_latency_us": {
+          "count": 1200,
+          "p50_upper_ms": 0.025,
+          "p95_upper_ms": 0.025,
+          "p99_upper_ms": 0.05
+        },
+        "ingress_latency_us": {
+          "count": 1200,
+          "p50_upper_ms": 0.025,
+          "p95_upper_ms": 0.05,
+          "p99_upper_ms": 0.1
+        },
+        "sink_latency_us": {
+          "count": 1200,
+          "p50_upper_ms": 0.25,
+          "p95_upper_ms": 0.25,
+          "p99_upper_ms": 0.25
+        },
+        "eventbus_queue_latency_us": {
+          "count": 1200,
+          "p50_upper_ms": 0.025,
+          "p95_upper_ms": 0.05,
+          "p99_upper_ms": 0.05
+        }
+      }
+    },
+    {
+      "status": "pass",
+      "devices": 1000,
+      "codec": "protobuf",
+      "transport": "mqtt311",
+      "scenario": "sensor",
+      "measured_duration_s": 12.0,
+      "submitted": 1200,
+      "transport_received": 1200,
+      "event_accepted": 1200,
+      "sink_confirmed": 1200,
+      "connection_success_ratio": 1.0,
+      "resources": {
+        "samples": 17,
+        "peak_rss_kib": 50352,
+        "median_rss_kib": 49712,
+        "median_cpu_pct": 1.8192681412281686,
+        "max_fd": 1014,
+        "max_tasks": 1008,
+        "max_connections": 1000,
+        "max_sessions": 1000
+      },
+      "final_sessions": 0,
+      "final_queues_empty": true,
+      "receipt": {
+        "count": 1200,
+        "max_ms": 4.38,
+        "mean_ms": 0.180885,
+        "p50_ms": 0.17,
+        "p95_ms": 0.24,
+        "p999_ms": 1.97,
+        "p99_ms": 0.49
+      },
+      "business_ack": {
+        "count": 1200,
+        "max_ms": 4.575,
+        "mean_ms": 0.25131416666666667,
+        "p50_ms": 0.25,
+        "p95_ms": 0.35,
+        "p999_ms": 2.04,
+        "p99_ms": 0.71
+      },
+      "stages": {
+        "mqtt_protocol_validation_us": {
+          "count": 1200,
+          "p50_upper_ms": 0.01,
+          "p95_upper_ms": 0.01,
+          "p99_upper_ms": 0.01
+        },
+        "validation_to_admission_us": {
+          "count": 1200,
+          "p50_upper_ms": 0.01,
+          "p95_upper_ms": 0.025,
+          "p99_upper_ms": 0.025
+        },
+        "admission_wait_us": {
+          "count": 1200,
+          "p50_upper_ms": 0.01,
+          "p95_upper_ms": 0.01,
+          "p99_upper_ms": 0.01
+        },
+        "admission_lock_wait_us": {
+          "count": 4400,
+          "p50_upper_ms": 0.01,
+          "p95_upper_ms": 0.01,
+          "p99_upper_ms": 0.01
+        },
+        "admission_lock_hold_us": {
+          "count": 4400,
+          "p50_upper_ms": 0.01,
+          "p95_upper_ms": 0.01,
+          "p99_upper_ms": 0.01
+        },
+        "event_bus_lock_wait_us": {
+          "count": 0,
+          "p50_upper_ms": null,
+          "p95_upper_ms": null,
+          "p99_upper_ms": null
+        },
+        "event_bus_lock_hold_us": {
+          "count": 0,
+          "p50_upper_ms": null,
+          "p95_upper_ms": null,
+          "p99_upper_ms": null
+        },
+        "event_bus_state_wait_us": {
+          "count": 0,
+          "p50_upper_ms": null,
+          "p95_upper_ms": null,
+          "p99_upper_ms": null
+        },
+        "event_bus_state_hold_us": {
+          "count": 0,
+          "p50_upper_ms": null,
+          "p95_upper_ms": null,
+          "p99_upper_ms": null
+        },
+        "broker_lock_wait_us": {
+          "count": 0,
+          "p50_upper_ms": null,
+          "p95_upper_ms": null,
+          "p99_upper_ms": null
+        },
+        "broker_lock_hold_us": {
+          "count": 0,
+          "p50_upper_ms": null,
+          "p95_upper_ms": null,
+          "p99_upper_ms": null
+        },
+        "authentication_to_codec_us": {
+          "count": 1200,
+          "p50_upper_ms": 0.025,
+          "p95_upper_ms": 0.025,
+          "p99_upper_ms": 0.05
+        },
+        "codec_to_event_accepted_us": {
+          "count": 1200,
+          "p50_upper_ms": 0.01,
+          "p95_upper_ms": 0.025,
+          "p99_upper_ms": 0.025
+        },
+        "event_accepted_to_sink_ack_us": {
+          "count": 1200,
+          "p50_upper_ms": 0.01,
+          "p95_upper_ms": 1.0,
+          "p99_upper_ms": 1.0
+        },
+        "puback_write_us": {
+          "count": 1200,
+          "p50_upper_ms": 0.025,
+          "p95_upper_ms": 0.025,
+          "p99_upper_ms": 0.025
+        },
+        "business_rpc_auth_latency_us": {
+          "count": 0,
+          "p50_upper_ms": null,
+          "p95_upper_ms": null,
+          "p99_upper_ms": null
+        },
+        "business_rpc_verifier_latency_us": {
+          "count": 0,
+          "p50_upper_ms": null,
+          "p95_upper_ms": null,
+          "p99_upper_ms": null
+        },
+        "business_rpc_event_ack_latency_us": {
+          "count": 0,
+          "p50_upper_ms": null,
+          "p95_upper_ms": null,
+          "p99_upper_ms": null
+        },
+        "business_rpc_admission_us": {
+          "count": 0,
+          "p50_upper_ms": null,
+          "p95_upper_ms": null,
+          "p99_upper_ms": null
+        },
+        "business_rpc_remote_wait_us": {
+          "count": 0,
+          "p50_upper_ms": null,
+          "p95_upper_ms": null,
+          "p99_upper_ms": null
+        },
+        "business_rpc_queue_wait_us": {
+          "count": 0,
+          "p50_upper_ms": null,
+          "p95_upper_ms": null,
+          "p99_upper_ms": null
+        },
+        "business_rpc_v3_scheduler_wait_us": {
+          "count": 0,
+          "p50_upper_ms": null,
+          "p95_upper_ms": null,
+          "p99_upper_ms": null
+        },
+        "business_rpc_v3_writer_wait_us": {
+          "count": 0,
+          "p50_upper_ms": null,
+          "p95_upper_ms": null,
+          "p99_upper_ms": null
+        },
+        "authentication_us": {
+          "count": 1000,
+          "p50_upper_ms": 0.01,
+          "p95_upper_ms": 0.01,
+          "p99_upper_ms": 0.01
+        },
+        "codec_latency_us": {
+          "count": 1200,
+          "p50_upper_ms": 0.025,
+          "p95_upper_ms": 0.025,
+          "p99_upper_ms": 0.05
+        },
+        "ingress_latency_us": {
+          "count": 1200,
+          "p50_upper_ms": 0.025,
+          "p95_upper_ms": 0.05,
+          "p99_upper_ms": 0.1
+        },
+        "sink_latency_us": {
+          "count": 1200,
+          "p50_upper_ms": 0.25,
+          "p95_upper_ms": 0.25,
+          "p99_upper_ms": 0.25
+        },
+        "eventbus_queue_latency_us": {
+          "count": 1200,
+          "p50_upper_ms": 0.025,
+          "p95_upper_ms": 0.05,
+          "p99_upper_ms": 0.05
+        }
+      }
+    }
+  ]
+}

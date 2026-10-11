@@ -1,0 +1,41 @@
+{
+  "raw_root": "/Users/sam/Dev/work/sskycn/netbaiot/target/performance/production-readiness/long-preflight",
+  "files": [
+    {
+      "case": "1000-cbor-mqtt311-sensor-none",
+      "summary_sha256": "09cdf0f5550e0f8b3e45b40fd4521066ac05daaea475dccee2926cea2fdc57f4",
+      "environment_sha256": "21fdcd8a4e3a462f51af9d4d356fddc76486e35e21e9d2fb9f8e1e2523353400",
+      "server_sha256": "4e894c960e3c9d58a6f0d35666d2190f27a1dc000ca7be77285daa1f8658b8e2",
+      "loadgen_sha256": "1e98fd22f3764766dae819c870442f4ef1a3ab6e23e2281e59b1f093a5d777e0",
+      "source_revision": "3f114a9db0df6646f216c30a77a12d5cd0bf2cfb",
+      "dirty_at_run": true
+    },
+    {
+      "case": "1000-json-mqtt311-sensor-none",
+      "summary_sha256": "73dbb9b390e13f02cae5a93c27185d2e273e2db327bdadf5df311f14c2191f58",
+      "environment_sha256": "21fdcd8a4e3a462f51af9d4d356fddc76486e35e21e9d2fb9f8e1e2523353400",
+      "server_sha256": "4e894c960e3c9d58a6f0d35666d2190f27a1dc000ca7be77285daa1f8658b8e2",
+      "loadgen_sha256": "1e98fd22f3764766dae819c870442f4ef1a3ab6e23e2281e59b1f093a5d777e0",
+      "source_revision": "3f114a9db0df6646f216c30a77a12d5cd0bf2cfb",
+      "dirty_at_run": true
+    },
+    {
+      "case": "1000-msgpack-mqtt311-sensor-none",
+      "summary_sha256": "d2fd68bac4b6b09f1f0f28f504d3f3452cba8455d5c2ce92ee294879088e1d44",
+      "environment_sha256": "21fdcd8a4e3a462f51af9d4d356fddc76486e35e21e9d2fb9f8e1e2523353400",
+      "server_sha256": "4e894c960e3c9d58a6f0d35666d2190f27a1dc000ca7be77285daa1f8658b8e2",
+      "loadgen_sha256": "1e98fd22f3764766dae819c870442f4ef1a3ab6e23e2281e59b1f093a5d777e0",
+      "source_revision": "3f114a9db0df6646f216c30a77a12d5cd0bf2cfb",
+      "dirty_at_run": true
+    },
+    {
+      "case": "1000-protobuf-mqtt311-sensor-none",
+      "summary_sha256": "472d61672514f1d276c50f425b124b1495272aba455a8624834c9fccab475cce",
+      "environment_sha256": "21fdcd8a4e3a462f51af9d4d356fddc76486e35e21e9d2fb9f8e1e2523353400",
+      "server_sha256": "4e894c960e3c9d58a6f0d35666d2190f27a1dc000ca7be77285daa1f8658b8e2",
+      "loadgen_sha256": "1e98fd22f3764766dae819c870442f4ef1a3ab6e23e2281e59b1f093a5d777e0",
+      "source_revision": "3f114a9db0df6646f216c30a77a12d5cd0bf2cfb",
+      "dirty_at_run": true
+    }
+  ]
+}
