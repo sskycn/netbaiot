@@ -23,6 +23,9 @@ order. The protected byte count is the header plus all record framing/content;
 the fixed 52-byte trailer is included in segment/total capacity. The reader requires
 this definitive trailer, exact count/length and digest, and rejects trailing bytes.
 Only one bounded record is serialized at a time by the writer.
+Recovery and old-snapshot validation read the file incrementally. Validation before
+replacement deserializes and discards one record at a time; startup recovery keeps
+decoded records private until the complete stream has passed validation.
 
 `SpoolRecord` contains the complete normalized event, stable `event_id`, pending
 required sink IDs, routing revision, accepted time, and attempt metadata. All file

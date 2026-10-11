@@ -2,7 +2,7 @@ use crate::{Error, Limits, Result, SpoolRecord, recovery_io};
 use sha2::{Digest, Sha256};
 use std::{
     fs,
-    io::Write,
+    io::{BufReader, Read, Write},
     path::{Path, PathBuf},
     sync::Arc,
 };
@@ -101,12 +101,7 @@ impl RestartSpool {
                     return Err(Error::Storage);
                 }
                 let file = recovery_io::open_snapshot(&path)?.ok_or(Error::Storage)?;
-                let bytes = recovery_io::read_bounded(
-                    file,
-                    limits.spool_segment_max_bytes.min(limits.spool_max_bytes),
-                )?;
-                decode_spool_records(&bytes, &limits)?;
-                let generation = segment_generation(&bytes)?;
+                let (generation, _) = read_segment_stream(file, &limits, false)?;
                 // Never let cleanup for an older recovery batch delete a newer
                 // atomically replaced snapshot at the same path.
                 if generation == committed.generation {
@@ -121,11 +116,7 @@ impl RestartSpool {
                             if candidate != &path {
                                 let file =
                                     recovery_io::open_snapshot(candidate)?.ok_or(Error::Storage)?;
-                                let bytes = recovery_io::read_bounded(
-                                    file,
-                                    limits.spool_segment_max_bytes.min(limits.spool_max_bytes),
-                                )?;
-                                decode_spool_records(&bytes, &limits)?;
+                                read_segment_stream(file, &limits, false)?;
                             }
                         }
                         for candidate in stale {
@@ -166,9 +157,11 @@ fn commit_sync(directory: &Path, limits: &Limits, records: &[SpoolRecord]) -> Re
     }
     recovery_io::prepare_directory(directory)?;
     recovery_io::ensure_temporary_capacity(directory, limits.spool_max_records)?;
-    let existing = recover_sync(directory, limits)?;
-    let generation = existing
-        .generation
+    let previous_generation = match recovery_io::open_snapshot(&directory.join(SNAPSHOT_NAME))? {
+        Some(file) => read_segment_stream(file, limits, false)?.0,
+        None => recover_sync(directory, limits)?.generation,
+    };
+    let generation = previous_generation
         .checked_add(1)
         .ok_or(Error::Overloaded)?;
     let id = Uuid::new_v4();
@@ -249,13 +242,7 @@ fn recover_sync(directory: &Path, limits: &Limits) -> Result<RecoveryBatch> {
     }
     let authoritative = directory.join(SNAPSHOT_NAME);
     if let Some(file) = recovery_io::open_snapshot(&authoritative)? {
-        let bytes = recovery_io::read_bounded(
-            file,
-            limits.spool_segment_max_bytes.min(limits.spool_max_bytes),
-        )?;
-        let generation = segment_generation(&bytes)?;
-        let mut records = Vec::new();
-        decode_segment(&bytes, limits, &mut records)?;
+        let (generation, records) = read_segment_stream(file, limits, true)?;
         return Ok(RecoveryBatch {
             records,
             committed_files: vec![CommittedSpool {
@@ -270,11 +257,7 @@ fn recover_sync(directory: &Path, limits: &Limits) -> Result<RecoveryBatch> {
     // A leftover file must fail closed; it may still own accepted work.
     if let Some(path) = files.first() {
         let file = recovery_io::open_snapshot(path)?.ok_or(Error::Storage)?;
-        let bytes = recovery_io::read_bounded(
-            file,
-            limits.spool_segment_max_bytes.min(limits.spool_max_bytes),
-        )?;
-        segment_generation(&bytes)?;
+        read_segment_stream(file, limits, false)?;
         return Err(Error::Invalid);
     }
     Ok(RecoveryBatch {
@@ -282,6 +265,103 @@ fn recover_sync(directory: &Path, limits: &Limits) -> Result<RecoveryBatch> {
         committed_files: Vec::new(),
         generation: 0,
     })
+}
+
+fn read_exact_segment(reader: &mut impl Read, bytes: &mut [u8]) -> Result<()> {
+    reader.read_exact(bytes).map_err(|error| {
+        if error.kind() == std::io::ErrorKind::UnexpectedEof {
+            Error::Invalid
+        } else {
+            Error::Storage
+        }
+    })
+}
+
+/// Validate the complete NBSP v3 image while retaining at most one wire record.
+/// Commit validation discards decoded records; startup recovery returns collected
+/// records only after the whole-stream digest and every record have passed validation.
+fn read_segment_stream(
+    file: fs::File,
+    limits: &Limits,
+    collect: bool,
+) -> Result<(u64, Vec<SpoolRecord>)> {
+    let length = usize::try_from(file.metadata().map_err(|_| Error::Storage)?.len())
+        .map_err(|_| Error::Overloaded)?;
+    if length > limits.spool_segment_max_bytes.min(limits.spool_max_bytes) {
+        return Err(Error::Overloaded);
+    }
+    if length < 8 {
+        return Err(Error::Invalid);
+    }
+    let mut reader = BufReader::new(file);
+    let mut header = [0u8; 16];
+    read_exact_segment(&mut reader, &mut header[..8])?;
+    if header[..4] != *MAGIC {
+        return Err(Error::Invalid);
+    }
+    let version = u32::from_be_bytes(header[4..8].try_into().map_err(|_| Error::Invalid)?);
+    if version != VERSION {
+        return Err(Error::UnsupportedRecoveryVersion(version));
+    }
+    let records_end = length
+        .checked_sub(TRAILER_BYTES)
+        .filter(|end| *end >= 16)
+        .ok_or(Error::Invalid)?;
+    read_exact_segment(&mut reader, &mut header[8..])?;
+    let generation = u64::from_be_bytes(header[8..16].try_into().map_err(|_| Error::Invalid)?);
+    let mut digest = Sha256::new();
+    digest.update(header);
+    let mut at = 16usize;
+    let mut count = 0usize;
+    let mut payload = Vec::new();
+    let mut records = Vec::new();
+    while at < records_end {
+        let mut length_bytes = [0u8; 4];
+        read_exact_segment(&mut reader, &mut length_bytes)?;
+        let record_len =
+            usize::try_from(u32::from_be_bytes(length_bytes)).map_err(|_| Error::Invalid)?;
+        if record_len == 0 || record_len > limits.spool_record_max_bytes {
+            return Err(Error::Invalid);
+        }
+        at = at
+            .checked_add(4)
+            .and_then(|value| value.checked_add(record_len))
+            .and_then(|value| value.checked_add(32))
+            .filter(|value| *value <= records_end)
+            .ok_or(Error::Invalid)?;
+        if count >= limits.spool_max_records {
+            return Err(Error::Overloaded);
+        }
+        payload.resize(record_len, 0);
+        read_exact_segment(&mut reader, &mut payload)?;
+        let mut checksum = [0u8; 32];
+        read_exact_segment(&mut reader, &mut checksum)?;
+        if Sha256::digest(&payload).as_slice() != checksum {
+            return Err(Error::Invalid);
+        }
+        let record: SpoolRecord = serde_json::from_slice(&payload).map_err(|_| Error::Invalid)?;
+        if collect {
+            records.push(record);
+        }
+        digest.update(length_bytes);
+        digest.update(&payload);
+        digest.update(checksum);
+        count += 1;
+    }
+    let mut trailer = [0u8; TRAILER_BYTES];
+    read_exact_segment(&mut reader, &mut trailer)?;
+    let trailer_count = u64::from_be_bytes(trailer[4..12].try_into().map_err(|_| Error::Invalid)?);
+    let trailer_bytes = u64::from_be_bytes(trailer[12..20].try_into().map_err(|_| Error::Invalid)?);
+    digest.update(&trailer[..20]);
+    if trailer[..4] != *TRAILER_MAGIC
+        || trailer_count != u64::try_from(count).map_err(|_| Error::Overloaded)?
+        || trailer_bytes != u64::try_from(at).map_err(|_| Error::Overloaded)?
+        || digest.finalize().as_slice() != &trailer[20..]
+        || reader.read(&mut [0; 1]).map_err(|_| Error::Storage)? != 0
+    {
+        return Err(Error::Invalid);
+    }
+    Ok((generation, records))
 }
 
 fn decode_segment(input: &[u8], limits: &Limits, output: &mut Vec<SpoolRecord>) -> Result<()> {
@@ -347,20 +427,6 @@ fn decode_segment(input: &[u8], limits: &Limits, output: &mut Vec<SpoolRecord>) 
         return Err(Error::Invalid);
     }
     Ok(())
-}
-
-fn segment_generation(input: &[u8]) -> Result<u64> {
-    if input.len() < 8 || input.get(..4) != Some(MAGIC) {
-        return Err(Error::Invalid);
-    }
-    let version = u32::from_be_bytes(input[4..8].try_into().map_err(|_| Error::Invalid)?);
-    if version != VERSION {
-        return Err(Error::UnsupportedRecoveryVersion(version));
-    }
-    let generation = input.get(8..16).ok_or(Error::Invalid)?;
-    Ok(u64::from_be_bytes(
-        generation.try_into().map_err(|_| Error::Invalid)?,
-    ))
 }
 
 /// Fuzzable bounded decoder for one committed segment image.
@@ -596,6 +662,51 @@ mod tests {
             .await
             .unwrap();
         assert!(spool.recover().await.unwrap().records.is_empty());
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[tokio::test]
+    async fn large_streamed_snapshot_validates_before_generation_update() {
+        let directory =
+            std::env::temp_dir().join(format!("netbaiot-streamed-spool-{}", Uuid::new_v4()));
+        let limits = Arc::new(Limits::default());
+        let spool = RestartSpool::new(directory.clone(), limits.clone());
+        let second_sink = SinkId::new("second").unwrap();
+        let records = (0..2_048)
+            .map(|index| {
+                let mut item = record();
+                item.event.event_id = EventId(Uuid::from_u128(index + 1));
+                item.pending_sinks.push(second_sink.clone());
+                item.attempts.insert(second_sink.clone(), 2);
+                item
+            })
+            .collect::<Vec<_>>();
+        let path = spool.commit(records.clone()).await.unwrap().unwrap();
+        let (generation, discarded) = read_segment_stream(
+            recovery_io::open_snapshot(&path).unwrap().unwrap(),
+            &limits,
+            false,
+        )
+        .unwrap();
+        assert_eq!(generation, 1);
+        assert!(discarded.is_empty());
+        let old_bytes = fs::read(&path).unwrap();
+        let decoded = decode_spool_records(&old_bytes, &limits).unwrap();
+        let (_, streamed) = read_segment_stream(
+            recovery_io::open_snapshot(&path).unwrap().unwrap(),
+            &limits,
+            true,
+        )
+        .unwrap();
+        assert_eq!(streamed.len(), records.len());
+        assert_eq!(
+            serde_json::to_value(&streamed).unwrap(),
+            serde_json::to_value(&decoded).unwrap()
+        );
+        spool.commit(records).await.unwrap();
+        let recovered = spool.recover().await.unwrap();
+        assert_eq!(recovered.generation, 2);
+        assert_eq!(recovered.records.len(), 2_048);
         fs::remove_dir_all(directory).unwrap();
     }
 
