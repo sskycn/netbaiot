@@ -410,7 +410,7 @@ fn send_ack(
     // Invalidation during admission must not leave an old signer usable for a receipt.
     let receipt = ingress
         .auth_cache
-        .with_current_verifier(&verified, |verifier| {
+        .with_current_verifier(verified, |verifier| {
             let ack = encode_ack(
                 verifier,
                 envelope.credential_version,
