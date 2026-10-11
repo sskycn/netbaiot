@@ -1,8 +1,21 @@
 # Release notes template
 
-Copy this drafting aid to `docs/releases/vX.Y.Z.md` before tagging. The release
-workflow requires that exact tag's nonempty notes file and uses it as the GitHub
-Release body. A missing file or tag/workspace/lockfile mismatch fails preflight.
+`scripts/release.sh vX.Y.Z` automatically creates `docs/releases/vX.Y.Z.md` when
+the file is missing or empty. It records Git commit subjects since the nearest
+reachable release tag, with commit links, a comparison link and upgrade references.
+Without a previous release tag, it includes the available repository history.
+The notes and workspace/lockfile version changes are committed together after
+preflight, then the branch and tag are pushed atomically.
+
+To write curated notes, copy this drafting aid to `docs/releases/vX.Y.Z.md`, fill
+it in and commit it before running the script. Existing nonempty notes are
+preserved. Run the script from a clean branch synchronized with `origin`; all
+branch/tag checks run before generation. Failed preparation/preflight restores
+generated notes and version files without creating a release commit or tag.
+
+The release workflow still requires that exact tag's nonempty notes file and uses
+it as the GitHub Release body. Direct preflight does not generate notes or update
+versions: missing notes or tag/workspace/lockfile mismatch still fail.
 
 ## Maintainer preflight
 
