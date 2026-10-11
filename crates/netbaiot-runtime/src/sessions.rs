@@ -206,23 +206,28 @@ impl Sessions {
             return Err(Error::Invalid);
         }
         let device = auth.device_key.clone();
+        #[cfg(test)]
+        let mut timing = crate::hotspot_bench::LockClock::start();
         let mut state = lock(&self.state)?;
-        self.prune_presence(&mut state);
-        state.tenants.retain(|_, tenant| {
-            tenant.connections > 0
-                || tenant.bytes.upgrade().is_some()
-                || tenant.command_slots.upgrade().is_some()
-        });
+        #[cfg(test)]
+        timing.acquired();
         let replacing = state.sessions.contains_key(&device);
         if !replacing && state.sessions.len() >= self.limits.max_connections {
             return Err(Error::Overloaded);
         }
         self.ensure_presence_slot(&mut state, &device)?;
         let generation = state.generation.checked_add(1).ok_or(Error::Overloaded)?;
-        if !state.tenants.contains_key(&device.tenant_id)
-            && state.tenants.len() >= self.limits.max_devices
-        {
-            return Err(Error::Overloaded);
+        if !state.tenants.contains_key(&device.tenant_id) {
+            if state.tenants.len() >= self.limits.max_devices {
+                state.tenants.retain(|_, tenant| {
+                    tenant.connections > 0
+                        || tenant.bytes.upgrade().is_some()
+                        || tenant.command_slots.upgrade().is_some()
+                });
+            }
+            if state.tenants.len() >= self.limits.max_devices {
+                return Err(Error::Overloaded);
+            }
         }
         if !replacing
             && state
@@ -438,27 +443,35 @@ impl Sessions {
         self.prune_presence_entry(&mut state, device);
         let presence = state.presence.get(device);
         let live = state.sessions.get(device);
-        tracing::debug!(
-            ?device,
-            live_exists = live.is_some(),
-            live_generation = ?live.map(|session| session.generation),
-            cancelled = ?live.map(|session| session.cancel.is_cancelled()),
-            auth_generation = ?live.map(|session| session.auth.auth_generation),
-            credential_version = ?live.map(|session| session.auth.credential_version),
-            presence_exists = presence.is_some(),
-            presence_connected = ?presence.map(|value| value.connected),
-            presence_last_seen = ?presence.map(|value| value.last_seen),
-            presence_generation = ?presence.and_then(|value| value.session_generation),
-            "connection registry diagnostic"
-        );
-        Ok(DeviceConnectionInfo {
+        let info = DeviceConnectionInfo {
             device: device.clone(),
             connected: presence.is_some_and(|value| value.connected),
             transport: presence.map(|value| value.transport),
             connected_at: presence.and_then(|value| value.connected_at),
             last_seen: presence.map(|value| value.last_seen),
             session_generation: presence.and_then(|value| value.session_generation),
-        })
+        };
+        let live_generation = live.map(|session| session.generation);
+        let cancelled = live.map(|session| session.cancel.is_cancelled());
+        let auth_generation = live.map(|session| session.auth.auth_generation);
+        let credential_version = live.map(|session| session.auth.credential_version);
+        drop(state);
+        #[cfg(test)]
+        drop(timing);
+        tracing::debug!(
+            ?device,
+            live_exists = live_generation.is_some(),
+            live_generation = ?live_generation,
+            cancelled = ?cancelled,
+            auth_generation = ?auth_generation,
+            credential_version = ?credential_version,
+            presence_exists = info.last_seen.is_some(),
+            presence_connected = ?info.last_seen.map(|_| info.connected),
+            presence_last_seen = ?info.last_seen,
+            presence_generation = ?info.session_generation,
+            "connection registry diagnostic"
+        );
+        Ok(info)
     }
 
     pub fn registry_counts(&self) -> Result<(usize, usize, usize)> {
@@ -935,6 +948,38 @@ mod tests {
     }
 
     #[test]
+    fn repeated_reconnects_reclaim_expired_presence_on_query_or_pressure() {
+        let sessions = Sessions::new(Arc::new(Limits {
+            max_devices: 3,
+            max_devices_per_tenant: 3,
+            ..Limits::default()
+        }));
+        let expired = auth("expired").device_key.clone();
+        sessions.touch(&expired, Transport::Udp).unwrap();
+        sessions
+            .state
+            .lock()
+            .unwrap()
+            .presence
+            .get_mut(&expired)
+            .unwrap()
+            .last_seen = 0;
+        let hot = auth("hot");
+        for _ in 0..1_000 {
+            drop(sessions.register(hot.clone(), Transport::Mqtt).unwrap().0);
+        }
+        assert_eq!(sessions.state.lock().unwrap().presence.len(), 2);
+        assert!(sessions.presence(&expired).unwrap().is_none());
+        sessions
+            .touch(&auth("third").device_key, Transport::Udp)
+            .unwrap();
+        sessions
+            .touch(&auth("fourth").device_key, Transport::Udp)
+            .unwrap();
+        assert!(sessions.registry_counts().unwrap().2 <= 3);
+    }
+
+    #[test]
     #[ignore = "isolated serial release connection list benchmark"]
     fn connection_list_scaling() {
         for size in [256, 1_024, 4_096] {
@@ -964,6 +1009,35 @@ mod tests {
                 );
             }
             drop(leases);
+        }
+    }
+
+    #[test]
+    #[ignore = "isolated serial release reconnect benchmark"]
+    fn reconnect_with_offline_presence_scaling() {
+        for size in [256, 1_024, 4_096] {
+            let sessions = Sessions::new(Arc::new(Limits {
+                max_devices: size + 1,
+                max_devices_per_tenant: size + 1,
+                ..Limits::default()
+            }));
+            for index in 0..size {
+                sessions
+                    .touch(
+                        &auth(&format!("presence-{index:05}")).device_key,
+                        Transport::Udp,
+                    )
+                    .unwrap();
+            }
+            let hot = auth("hot");
+            crate::hotspot_bench::measure(
+                "session_reconnect",
+                size,
+                200,
+                || (),
+                |_| sessions.register(hot.clone(), Transport::Mqtt).unwrap().0,
+                drop,
+            );
         }
     }
 
