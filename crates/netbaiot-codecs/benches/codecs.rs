@@ -65,4 +65,36 @@ fn main() {
             });
         }
     }
+    // Text-heavy commands and rejected output have different allocation behavior
+    // from numeric telemetry. Inputs are allocated outside measurement regions.
+    let command = DeviceCommand {
+        command_id: CommandId(uuid::Uuid::from_u128(1)),
+        device: key.clone(),
+        expires_at: Some(1000),
+        payload: DeviceCommandPayload {
+            name: "set".into(),
+            arguments: (0..64)
+                .map(|i| (format!("field{i}"), Scalar::Text("x".repeat(256))))
+                .collect(),
+        },
+    };
+    let ectx = EncodeContext { device: &key };
+    for (id, _, codec) in netbaiot_codecs::builtins(CodecLimits::default()).unwrap() {
+        let format = id.as_str().strip_prefix("netbaiot-").unwrap();
+        let size = codec.encode(&ectx, &command).unwrap().len();
+        measure(format, 64, "encode_text", size, || {
+            black_box(codec.encode(&ectx, &command).unwrap());
+        });
+    }
+    for (id, _, codec) in netbaiot_codecs::builtins(CodecLimits {
+        decoded_bytes: 256,
+        ..CodecLimits::default()
+    })
+    .unwrap()
+    {
+        let format = id.as_str().strip_prefix("netbaiot-").unwrap();
+        measure(format, 64, "encode_rejected", 0, || {
+            assert!(black_box(codec.encode(&ectx, &command)).is_err());
+        });
+    }
 }

@@ -111,6 +111,41 @@ forces explicit rejection, opens the sink, and verifies zero residual accounting
 Its process RSS is distinct from the real server's RSS. Results are diagnostics,
 not production capacity certification.
 
+## Four-codec network matrix
+
+`codec_campaign.py` runs actual MQTT 3.1.1/5.0 QoS0/1/2, framed TCP and signed
+NBI1/NBA1 UDP against one frozen gateway binary and a required confirmed webhook.
+Every codec covers two-field telemetry, large telemetry (64 x 128-byte text on
+streams, four fields on UDP to retain its 1200-byte limit), heartbeat, and online
+MQTT/TCP commands. Independent wire encoders check exact command bytes. It uses
+bounded Python clients and at most eight webhook handler threads, fixed inflight
+work per client, hard receive limits and owned process shutdown.
+
+```bash
+python3 scripts/perf/codec_campaign.py --server /absolute/path/to/before-server --output target/performance/codec-before --revision BEFORE_SHA --seconds 1 --workers 4 --repeats 3
+python3 scripts/perf/codec_campaign.py --server /absolute/path/to/after-server --output target/performance/codec-after --revision AFTER_SHA --seconds 1 --workers 4 --repeats 3
+```
+
+Freeze both release binaries before running, use the same harness and configuration,
+and serialize runs without compilation or other tests. `summary.json` records each
+case, protocol-receipt and confirmed-webhook P50/P95/P99, device-received command
+latency, CPU, sampled RSS/growth, errors, management counters and post-case queues.
+The rate denominator includes connection setup and bounded result polling; latency
+starts after payload encoding immediately before socket send. QoS0 has no receipt;
+QoS2 reports complete PUBCOMP exchange. Webhook timing ends when the test handler
+flushes its 2xx response, rather than when the gateway observes ACK or business
+finally completes. Commands report reception, never execution. CPU uses `ps` process
+time, RSS is sampled at 100ms and does not measure allocation peak or isolate
+per-connection memory. Source/configuration and executable SHA-256 are retained.
+
+This is a short regression matrix, not a sustainable production capacity or soak
+claim. Use `--sink-delay-ms 10` for closed-loop slow-sink measurements; this controls
+offered work and does not itself force queue overload. The mixed-codec bounded
+backpressure regression explicitly fills required capacity and checks rollback and
+complete byte/count cleanup. The workflow's opt-in `linux-comparison` job builds
+both revisions on the same Linux x86_64 runner; dispatch with `compare=true` and an
+explicit baseline revision. Merely configuring this job is not execution evidence.
+
 ## Device protocol removal comparison
 
 `device_protocol_benchmark.py` measures MQTT, framed TCP and signed UDP NBA1

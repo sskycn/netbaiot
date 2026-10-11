@@ -453,11 +453,25 @@ impl EventBus {
     }
 
     pub fn replace_routes(&self, revision: u64, routes: Vec<RouteDefinition>) -> Result<()> {
+        self.replace_routes_with(revision, &routes, || Ok(()))
+    }
+
+    /// Validate once while excluding admissions and route writers. The callback
+    /// publishes control state; after success only infallible assignments remain.
+    /// Control readers can observe publication while this lock still excludes
+    /// admissions, which will then use exactly the published routing revision.
+    pub(crate) fn replace_routes_with(
+        &self,
+        revision: u64,
+        routes: &[RouteDefinition],
+        publish_control: impl FnOnce() -> Result<()>,
+    ) -> Result<()> {
         let mut state = self.lock_state(EventBusProbe::Other)?;
-        let routes = compile_routes(&routes, &state.sinks, &self.limits)?;
         if revision <= state.routing_revision {
             return Err(Error::Conflict);
         }
+        let routes = compile_routes(routes, &state.sinks, &self.limits)?;
+        publish_control()?;
         state.routes = routes;
         state.routing_revision = revision;
         Ok(())
@@ -2279,6 +2293,73 @@ mod tests {
                 expected
             );
         }
+    }
+
+    #[test]
+    fn joint_route_commit_excludes_admissions_and_rolls_back_failures() {
+        use std::sync::{
+            atomic::{AtomicBool, Ordering},
+            mpsc::sync_channel,
+        };
+        let bus = route_bus(Limits::default(), vec![route(None, &["a"])]).unwrap();
+        let old = bus.publish(event(8)).unwrap().event_id;
+        let published = AtomicBool::new(false);
+        assert!(matches!(
+            bus.replace_routes_with(8, &[route(None, &["b"])], || {
+                Err(Error::Unavailable) // injected control publication failure
+            }),
+            Err(Error::Unavailable)
+        ));
+        assert_eq!(bus.state.lock().unwrap().routing_revision, 7);
+        assert!(
+            bus.replace_routes_with(8, &[route(None, &["missing"])], || {
+                published.store(true, Ordering::SeqCst);
+                Ok(())
+            })
+            .is_err()
+        );
+        assert!(!published.load(Ordering::SeqCst));
+        let (entered, observe) = sync_channel(1);
+        let (resume, release) = sync_channel(1);
+        std::thread::scope(|scope| {
+            let bus = &bus;
+            let writer = scope.spawn(move || {
+                bus.replace_routes_with(8, &[route(None, &["b"])], || {
+                    entered.send(()).unwrap();
+                    release.recv_timeout(Duration::from_secs(3)).unwrap();
+                    Ok(())
+                })
+            });
+            observe.recv_timeout(Duration::from_secs(3)).unwrap();
+            // A deterministic exclusion check, without timing/sleep assertions.
+            assert!(matches!(
+                bus.state.try_lock(),
+                Err(std::sync::TryLockError::WouldBlock)
+            ));
+            let admission = scope.spawn(move || bus.publish(event(8)).unwrap());
+            resume.send(()).unwrap();
+            writer.join().unwrap().unwrap();
+            let new = admission.join().unwrap().event_id;
+            let records = bus.spool_records().unwrap();
+            let first = records.iter().find(|r| r.event.event_id == old).unwrap();
+            assert_eq!(first.routing_revision, 7);
+            assert_eq!(first.pending_sinks, vec![SinkId::new("a").unwrap()]);
+            let second = records.iter().find(|r| r.event.event_id == new).unwrap();
+            assert_eq!(second.routing_revision, 8);
+            assert_eq!(second.pending_sinks, vec![SinkId::new("b").unwrap()]);
+        });
+        // A writer racing a stale preflight cannot publish any control side effect.
+        bus.validate_route_update(9, &[route(None, &["a"])])
+            .unwrap();
+        bus.replace_routes(10, vec![route(None, &["b"])]).unwrap();
+        assert!(matches!(
+            bus.replace_routes_with(9, &[route(None, &["a"])], || {
+                published.store(true, Ordering::SeqCst);
+                Ok(())
+            }),
+            Err(Error::Conflict)
+        ));
+        assert!(!published.load(Ordering::SeqCst));
     }
 
     #[test]

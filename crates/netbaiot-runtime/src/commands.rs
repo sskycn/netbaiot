@@ -199,7 +199,10 @@ impl CommandRouter {
                 },
                 &command,
             )
-            .map_err(|_| Error::Codec)?;
+            .map_err(|_| {
+                self.ingress.metrics.inc(Metric::CommandCodecFailures);
+                Error::Codec
+            })?;
         if bytes.len() > self.ingress.limits.max_command_bytes {
             return Err(Error::Invalid);
         }

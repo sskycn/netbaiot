@@ -252,11 +252,9 @@ impl DeviceCodec for JsonV1 {
         {
             return Err(CodecError);
         }
-        let data = serde_json::to_vec(command).map_err(|_| CodecError)?;
-        if data.len() > self.limits.decoded_bytes {
-            return Err(CodecError);
-        }
-        Ok(data)
+        let mut writer = crate::common::BoundedWriter::new(self.limits.decoded_bytes);
+        serde_json::to_writer(&mut writer, command).map_err(|_| CodecError)?;
+        Ok(writer.bytes)
     }
 }
 #[cfg(test)]

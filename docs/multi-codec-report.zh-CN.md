@@ -159,7 +159,7 @@ allocator 中计数，因此时间包含其计数开销；decode 包含正常 ev
 | 64 | msgpack | 1144 | 1234 | 7249.9 | 2325.1 | 85 / 12598 |
 | 64 | protobuf | 1412 | 1457 | 8539.9 | 2886.9 | 77 / 8760 |
 
-完整每轮时间与 encode/decode 分配见 [codecs.csv](performance/multi-codec/evidence/codecs.csv)。
+encode/decode 的三轮聚合时间与分配见 [summary.json](performance/multi-codec/evidence/summary.json)；原始 CSV 的提交、路径和 SHA-256 保存在其中，可从原提交恢复。
 CBOR 的命令浮点采用可无损缩小的表示；上行固定向量使用 float64，因此两种方向
 不能仅凭字段数直接推断字节大小。不同字段数量下 Protobuf/Map 的字段名与结构成本
 也不同，二进制格式不保证总是更小或更快。没有运行真实 MQTT 改前/改后性能对照，

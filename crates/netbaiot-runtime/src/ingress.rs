@@ -83,7 +83,10 @@ impl Ingress {
                 },
                 payload,
             )
-            .map_err(|_| Error::Codec)?;
+            .map_err(|_| {
+                self.metrics.inc(Metric::CodecFailures);
+                Error::Codec
+            })?;
         if kinds.len() != 1 {
             return Err(Error::Codec);
         }
@@ -148,12 +151,15 @@ impl Ingress {
     /// Trusted provider selects the codec; an existing product profile must agree.
     /// Absent product profiles permit supported dynamic-provider identities.
     pub fn validate_auth_profile(&self, auth: &AuthenticatedDevice) -> Result<()> {
-        self.codecs.get(auth)?;
+        self.codecs
+            .get(auth)
+            .inspect_err(|_| self.metrics.inc(Metric::CodecProfileUnsupported))?;
         if let Some(product) = self
             .control
             .product(&auth.device_key.tenant_id, &auth.device_key.product_id)?
             && (product.codec_id != auth.codec_id || product.codec_version != auth.codec_version)
         {
+            self.metrics.inc(Metric::CodecProfileMismatch);
             return Err(Error::Forbidden);
         }
         Ok(())
@@ -233,15 +239,34 @@ impl Ingress {
         snapshot: ControlSnapshot,
     ) -> Result<()> {
         admission.check(&self.lifecycle)?;
-        let _gate = lock(&self.auth_registration)?;
         if snapshot.products.len() > self.limits.control_max_products {
             return Err(Error::Overloaded);
         }
+        let _gate = lock(&self.auth_registration)?;
         // Adding a profile must not change the interpretation of existing live sessions.
         if self.sessions.product_codec_conflicts(&snapshot.products)? {
             return Err(Error::Conflict);
         }
-        self.control.apply(snapshot, &self.codecs)
+        let prepared = self.control.prepare(snapshot, &self.codecs)?;
+        self.events
+            .replace_routes_with(prepared.revision(), &prepared.routes(), || {
+                self.control.commit(prepared)
+            })
+    }
+
+    pub fn replace_routes_admitted(
+        &self,
+        admission: &AdmissionGuard<'_>,
+        revision: u64,
+        routes: Vec<RouteDefinition>,
+    ) -> Result<()> {
+        admission.check(&self.lifecycle)?;
+        let _gate = lock(&self.auth_registration)?;
+        let prepared = self.control.prepare_routes(revision, routes)?;
+        self.events
+            .replace_routes_with(prepared.revision(), &prepared.routes(), || {
+                self.control.commit(prepared)
+            })
     }
 
     pub fn invalidate_auth(

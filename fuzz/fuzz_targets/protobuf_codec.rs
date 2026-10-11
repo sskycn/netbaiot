@@ -1,12 +1,19 @@
 #![no_main]
+mod codec_invariants;
 use libfuzzer_sys::fuzz_target;
 use netbaiot_core::*;
 fuzz_target!(|data: &[u8]| {
     if data.len() > 65536 { return; }
-    let key = DeviceKey{tenant_id:TenantId::new("t").unwrap(),product_id:ProductId::new("p").unwrap(),device_id:DeviceId::new("d").unwrap()};
-    let codec = netbaiot_codecs::ProtobufV1::default();
-    let ctx = DecodeContext{device:&key,received_at:0};
-    let decoded=codec.decode(&ctx,data);
-    assert_eq!(decoded.is_ok(),codec.validate_payload(&ctx,data).is_ok());
-    if let Ok(events)=decoded { assert_eq!(events.len(),1); assert_eq!(events[0].device,key); if let DeviceEventKind::Telemetry(fields)=&events[0].kind{assert!(fields.len()<=64);} }
+    let limits = CodecLimits::default();
+    codec_invariants::check(&netbaiot_codecs::ProtobufV1::new(limits.clone()), &limits, data);
+    // Independently vary every resource bound while retaining the raw input.
+    let small = CodecLimits {
+        input_bytes: 1024,
+        decoded_bytes: 4096,
+        fields: 4,
+        field_bytes: 16,
+        nesting_depth: 2,
+        output_messages: 1,
+    };
+    codec_invariants::check(&netbaiot_codecs::ProtobufV1::new(small.clone()), &small, data);
 });

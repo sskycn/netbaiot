@@ -3,6 +3,7 @@
 from pathlib import Path
 import struct
 import hashlib
+import importlib.util
 
 root = Path(__file__).parent / 'corpus'
 def text(b):
@@ -20,6 +21,47 @@ def seed(target, name, data):
     path = root / target
     path.mkdir(parents=True, exist_ok=True)
     (path / name).write_bytes(data)
+
+# Independent wire vectors cover valid kinds, field boundaries and semantic errors.
+fixtures = Path(__file__).parents[1] / 'crates/netbaiot-codecs/tests/fixtures'
+spec = importlib.util.spec_from_file_location('codec_vectors', fixtures / 'generate.py')
+vectors = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(vectors)
+for codec in ['cbor', 'msgpack', 'protobuf']:
+    target = codec + '_codec'
+    for fixture in sorted(fixtures.glob('*.' + codec)):
+        if fixture.stem == 'command':
+            continue
+        data = fixture.read_bytes()
+        seed(target, fixture.stem, data)
+        seed(target, fixture.stem + '-truncated', data[:-1])
+        seed(target, fixture.stem + '-trailing', data + b'\xff')
+    hostile = {
+        'cbor': [b'\xbb' + b'\xff'*8, b'\x7b' + b'\xff'*8,
+                 b'\xa2\x61x\x01\x61x\x02', b'\xa1\x61x'*65 + b'\x00', b'\xbf\xff'],
+        'msgpack': [b'\xdf' + b'\xff'*4, b'\xdb' + b'\xff'*4,
+                    b'\x82\xa1x\x01\xa1x\x02', b'\x81\xa1x'*65 + b'\x00', b'\xc7\xff\0'],
+        'protobuf': [b'\x12' + b'\xff'*10, b'\x08\x01\x08\x01', b'\xaa\x06\x03abc',
+                     b'\x62\x02\x08\x01', b'\xff'*11],
+    }
+    for i, data in enumerate(hostile[codec]):
+        seed(target, f'hostile-{i}', data)
+    for count, width in [(1,256), (64,128), (64,256), (65,1), (1,257)]:
+        value = {'schema_version':1, 'source_message_id':'s'*64, 'kind':'telemetry',
+                 'data':{f'f{i}':'x'*width for i in range(count)}}
+        seed(target, f'fields-{count}-text-{width}', getattr(vectors,codec)(value))
+    valid = (fixtures / ('telemetry.'+codec)).read_bytes()
+    if codec == 'protobuf':
+        seed(target, 'valid-with-unknown-fields', valid + b'\xa0\x06\x01\xaa\x06\x03abc')
+        seed(target, 'valid-with-duplicate-version', valid + b'\x08\x01')
+    else:
+        enc = getattr(vectors,codec)
+        duplicate = bytes([valid[0]+1]) + valid[1:] + enc('schema_version') + enc(1)
+        seed(target, 'duplicate-envelope', duplicate)
+        data_key = enc('data')
+        at = valid.index(data_key) + len(data_key)
+        marker = b'\xa2\x61n\x01\x61n\x02' if codec == 'cbor' else b'\x82\xa1n\x01\xa1n\x02'
+        seed(target, 'duplicate-telemetry-fields', valid[:at] + marker)
 
 for flags in [0xc2, 0xc0, 0xc6, 0xd6]:
     body = text(b'MQTT') + bytes([4, flags, 0, 30]) + text(b'a')

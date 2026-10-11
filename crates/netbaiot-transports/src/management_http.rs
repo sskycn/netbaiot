@@ -481,18 +481,11 @@ async fn handle_management(
                 &body(req, services.ingress.limits.max_http_body_size).await?,
             )
             .map_err(|_| Error::Invalid)?;
-            let revision = snapshot.revision;
-            let routes = snapshot.routes.clone();
             let admission = services.ingress.lifecycle.begin_admission()?;
             let _mutation = services.control_lock.lock().await;
             services
                 .ingress
-                .events
-                .validate_route_update(revision, &routes)?;
-            services
-                .ingress
                 .apply_control_snapshot_admitted(&admission, snapshot)?;
-            services.ingress.events.replace_routes(revision, routes)?;
             Ok(response(StatusCode::NO_CONTENT, Vec::new()))
         }
         (hyper::Method::PUT, "/api/v1/routes") => {
@@ -506,20 +499,11 @@ async fn handle_management(
                 &body(req, services.ingress.limits.max_http_body_size).await?,
             )
             .map_err(|_| Error::Invalid)?;
-            let _admission = services.ingress.lifecycle.begin_admission()?;
+            let admission = services.ingress.lifecycle.begin_admission()?;
             let _mutation = services.control_lock.lock().await;
             services
                 .ingress
-                .events
-                .validate_route_update(update.revision, &update.routes)?;
-            services
-                .ingress
-                .control
-                .replace_routes(update.revision, update.routes.clone())?;
-            services
-                .ingress
-                .events
-                .replace_routes(update.revision, update.routes)?;
+                .replace_routes_admitted(&admission, update.revision, update.routes)?;
             Ok(response(StatusCode::NO_CONTENT, Vec::new()))
         }
         (hyper::Method::POST, "/api/v1/drain") => {

@@ -18,6 +18,58 @@ use tokio::{
 };
 use tokio_util::sync::CancellationToken;
 const FORMATS: [&str; 4] = ["json", "cbor", "msgpack", "protobuf"];
+
+fn control_snapshot(ingress: &Ingress, revision: u64) -> ControlSnapshot {
+    ControlSnapshot {
+        revision,
+        products: FORMATS
+            .iter()
+            .map(|f| {
+                let a = identity(f, "d");
+                ProductRuntimeConfig {
+                    tenant_id: a.device_key.tenant_id,
+                    product_id: a.device_key.product_id,
+                    codec_id: a.codec_id,
+                    codec_version: 1,
+                    revision,
+                }
+            })
+            .collect(),
+        routes: ingress.control.routes().unwrap().as_ref().clone(),
+    }
+}
+
+#[tokio::test]
+async fn control_commit_publishes_event_revision_and_rejects_invalid_routes_atomically() {
+    let (ingress, _, _, _) = fixture(None);
+    ingress.events.stop_workers().await.unwrap();
+    ingress
+        .apply_control_snapshot(control_snapshot(&ingress, 2))
+        .unwrap();
+    ingress
+        .events
+        .publish(DeviceEvent {
+            event_id: EventId::generate(),
+            source_message_id: SourceMessageId::new("control:2").unwrap(),
+            device: identity("json", "d").device_key,
+            received_at: 1,
+            occurred_at: None,
+            kind: DeviceEventKind::Heartbeat(Heartbeat { sequence: 1 }),
+        })
+        .unwrap();
+    assert_eq!(
+        ingress.events.spool_records().unwrap()[0].routing_revision,
+        2
+    );
+    let mut invalid = control_snapshot(&ingress, 3);
+    invalid.routes[0].sinks = vec![SinkId::new("missing").unwrap()];
+    assert!(ingress.apply_control_snapshot(invalid).is_err());
+    assert_eq!(ingress.control.revision().unwrap(), 2);
+    assert_eq!(
+        ingress.events.spool_records().unwrap()[0].routing_revision,
+        2
+    );
+}
 fn identity(format: &str, device: &str) -> AuthenticatedDevice {
     AuthenticatedDevice {
         device_key: DeviceKey {
@@ -34,6 +86,99 @@ fn identity(format: &str, device: &str) -> AuthenticatedDevice {
             commands: true,
         },
     }
+}
+
+#[tokio::test]
+async fn admitted_control_and_routes_finish_before_quiesce_and_new_updates_are_fenced() {
+    let (ingress, _, _, _) = fixture(None);
+    let admitted = ingress.lifecycle.begin_admission().unwrap();
+    let owner = ingress.lifecycle.clone();
+    let quiesce = tokio::spawn(async move { owner.begin_quiesce().await });
+    tokio::time::timeout(Duration::from_secs(3), async {
+        while ingress.lifecycle.state() == LifecycleState::Running {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .unwrap();
+    assert!(!quiesce.is_finished());
+    ingress
+        .apply_control_snapshot_admitted(&admitted, control_snapshot(&ingress, 2))
+        .unwrap();
+    ingress
+        .replace_routes_admitted(
+            &admitted,
+            3,
+            ingress.control.routes().unwrap().as_ref().clone(),
+        )
+        .unwrap();
+    assert_eq!(ingress.control.revision().unwrap(), 3);
+    assert!(matches!(
+        ingress.apply_control_snapshot(control_snapshot(&ingress, 4)),
+        Err(Error::Draining)
+    ));
+    drop(admitted);
+    quiesce.await.unwrap().unwrap();
+    ingress.events.stop_workers().await.unwrap();
+}
+
+#[tokio::test]
+async fn unconfigured_dynamic_product_allows_distinct_bound_profiles_until_provisioned() {
+    let (ingress, _, _, _) = fixture(None);
+    let mut leases = Vec::new();
+    let mut candidates = Vec::new();
+    for f in ["json", "cbor"] {
+        let id = format!("{f}-tcp");
+        let mut candidate = ingress
+            .authenticate_session(AuthenticationRequest::Secret {
+                credential_id: &id,
+                secret: b"0707070707070707070707070707070707070707070707070707070707070707",
+            })
+            .await
+            .unwrap();
+        candidate.auth.device_key.product_id = ProductId::new("dynamic").unwrap();
+        candidate.auth.device_key.device_id = DeviceId::new(f).unwrap();
+        candidates.push(candidate.clone());
+        leases.push(
+            ingress
+                .register_session(candidate, Transport::Tcp)
+                .unwrap()
+                .0,
+        );
+    }
+    let mut snapshot = control_snapshot(&ingress, 2);
+    snapshot.products.push(ProductRuntimeConfig {
+        tenant_id: TenantId::new("t").unwrap(),
+        product_id: ProductId::new("dynamic").unwrap(),
+        codec_id: CodecId::new("netbaiot-json").unwrap(),
+        codec_version: 1,
+        revision: 2,
+    });
+    assert!(matches!(
+        ingress.apply_control_snapshot(snapshot.clone()),
+        Err(Error::Conflict)
+    ));
+    assert_eq!(ingress.control.revision().unwrap(), 1);
+    drop(leases);
+    ingress.apply_control_snapshot(snapshot).unwrap();
+    assert!(
+        ingress
+            .register_session(candidates[0].clone(), Transport::Tcp)
+            .is_ok()
+    );
+    assert!(matches!(
+        ingress.register_session(candidates[1].clone(), Transport::Tcp),
+        Err(Error::Forbidden)
+    ));
+    // A positive cache entry also undergoes the current product-profile check.
+    let stale = identity("cbor", "d");
+    let mut stale = stale;
+    stale.device_key.product_id = ProductId::new("dynamic").unwrap();
+    assert!(matches!(
+        ingress.validate_auth_profile(&stale),
+        Err(Error::Forbidden)
+    ));
+    ingress.events.stop_workers().await.unwrap();
 }
 fn payload(format: &str) -> Vec<u8> {
     std::fs::read(
@@ -55,12 +200,19 @@ impl EventSink for Capture {
 fn fixture(
     provider: Option<Arc<dyn DeviceAuthenticator>>,
 ) -> (Arc<Ingress>, Arc<Services>, Arc<Capture>, CancellationToken) {
-    let l = Arc::new(Limits {
+    fixture_with_sink(provider, None, None)
+}
+fn fixture_with_sink(
+    provider: Option<Arc<dyn DeviceAuthenticator>>,
+    delivery: Option<Arc<dyn EventSink>>,
+    limits: Option<Limits>,
+) -> (Arc<Ingress>, Arc<Services>, Arc<Capture>, CancellationToken) {
+    let l = Arc::new(limits.unwrap_or(Limits {
         requests_per_second: 10000,
         messages_per_device_second: 10000,
         messages_per_tenant_second: 10000,
         ..Limits::default()
-    });
+    }));
     let metrics = Arc::new(Metrics::default());
     let sink = Arc::new(Capture::default());
     let sid = SinkId::new("capture").unwrap();
@@ -74,7 +226,7 @@ fn fixture(
         vec![SinkDefinition::bounded(
             sid,
             SinkDeliveryMode::ConfirmedRequired,
-            sink.clone(),
+            delivery.unwrap_or_else(|| sink.clone()),
             &l,
         )],
         routes.clone(),
@@ -139,6 +291,180 @@ fn fixture(
     let stop = CancellationToken::new();
     let services = Services::new(ingress.clone(), stop.clone());
     (ingress, services, sink, stop)
+}
+
+#[tokio::test]
+async fn mixed_codec_required_backpressure_control_update_and_capacity_cleanup() {
+    use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+    struct SlowSink {
+        blocked: AtomicBool,
+        release: tokio::sync::Notify,
+        acked: AtomicUsize,
+    }
+    #[async_trait]
+    impl EventSink for SlowSink {
+        async fn deliver(&self, _: DeliveryEnvelope) -> std::result::Result<SinkAck, SinkError> {
+            let released = self.release.notified();
+            if self.blocked.load(Ordering::SeqCst) {
+                released.await;
+            }
+            self.acked.fetch_add(1, Ordering::SeqCst);
+            Ok(SinkAck)
+        }
+    }
+    let slow = Arc::new(SlowSink {
+        blocked: AtomicBool::new(true),
+        release: tokio::sync::Notify::new(),
+        acked: AtomicUsize::new(0),
+    });
+    let (ingress, _, _, _) = fixture_with_sink(
+        None,
+        Some(slow.clone()),
+        Some(Limits {
+            global_event_max_count: 16,
+            sink_queue_max_count: 16,
+            requests_per_second: 10000,
+            messages_per_device_second: 10000,
+            messages_per_tenant_second: 10000,
+            ..Limits::default()
+        }),
+    );
+    for _ in 0..4 {
+        for f in FORMATS {
+            ingress
+                .ingest(
+                    &identity(f, "tcp"),
+                    IngressEnvelope {
+                        transport: Transport::Tcp,
+                        payload: &payload(f),
+                        require_command_ack: false,
+                        validated_at: std::time::Instant::now(),
+                        validation_us: 0,
+                    },
+                )
+                .await
+                .unwrap();
+        }
+    }
+    let before = ingress.events.usage().unwrap();
+    assert_eq!(before.pending_required, 16);
+    assert!(matches!(
+        ingress
+            .ingest(
+                &identity("json", "tcp"),
+                IngressEnvelope {
+                    transport: Transport::Tcp,
+                    payload: &payload("json"),
+                    require_command_ack: false,
+                    validated_at: std::time::Instant::now(),
+                    validation_us: 0,
+                }
+            )
+            .await,
+        Err(Error::Overloaded)
+    ));
+    assert_eq!(ingress.events.usage().unwrap(), before);
+    ingress
+        .apply_control_snapshot(control_snapshot(&ingress, 2))
+        .unwrap();
+    let retained = ingress.events.spool_records().unwrap();
+    assert_eq!(retained.len(), 16);
+    assert!(retained.iter().all(|r| r.routing_revision == 1));
+    slow.blocked.store(false, Ordering::SeqCst);
+    slow.release.notify_waiters();
+    tokio::time::timeout(Duration::from_secs(3), async {
+        while ingress.events.usage().unwrap().events != 0 {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .unwrap();
+    assert_eq!(ingress.events.usage().unwrap(), EventBusUsage::default());
+    assert_eq!(slow.acked.load(Ordering::SeqCst), 16);
+    ingress.events.stop_workers().await.unwrap();
+}
+
+#[tokio::test]
+async fn management_snapshot_and_route_endpoints_use_joint_commit() {
+    let (ingress, mut services, _, _) = fixture(None);
+    let secret = "ab".repeat(32);
+    Arc::get_mut(&mut services).unwrap().admin = Some(Arc::new(
+        AdminAccess::new(&secret, Default::default(), &ingress.limits).unwrap(),
+    ));
+    ingress.events.stop_workers().await.unwrap();
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let stop = CancellationToken::new();
+    let owner = tokio::spawn(netbaiot_transports::serve_management_http(
+        listener,
+        services,
+        None,
+        stop.clone(),
+    ));
+    async fn put(address: std::net::SocketAddr, secret: &str, path: &str, body: Vec<u8>) -> bool {
+        tokio::time::timeout(Duration::from_secs(3), async {
+            let mut stream = TcpStream::connect(address).await.unwrap();
+            let header = format!("PUT /api/v1/{path} HTTP/1.1\r\nHost: localhost\r\nAuthorization: Bearer {secret}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n", body.len());
+            stream.write_all(header.as_bytes()).await.unwrap();
+            stream.write_all(&body).await.unwrap();
+            let mut bytes = Vec::new();
+            stream.take(65537).read_to_end(&mut bytes).await.unwrap();
+            assert!(bytes.len() <= 65536);
+            bytes.starts_with(b"HTTP/1.1 204")
+        }).await.unwrap()
+    }
+    let snapshot = control_snapshot(&ingress, 2);
+    assert!(
+        put(
+            address,
+            &secret,
+            "control/snapshot",
+            serde_json::to_vec(&snapshot).unwrap()
+        )
+        .await
+    );
+    let routes = RoutesUpdate {
+        revision: 3,
+        routes: snapshot.routes,
+    };
+    assert!(
+        put(
+            address,
+            &secret,
+            "routes",
+            serde_json::to_vec(&routes).unwrap()
+        )
+        .await
+    );
+    let mut invalid = control_snapshot(&ingress, 4);
+    invalid.routes[0].sinks = vec![SinkId::new("unknown").unwrap()];
+    assert!(
+        !put(
+            address,
+            &secret,
+            "control/snapshot",
+            serde_json::to_vec(&invalid).unwrap()
+        )
+        .await
+    );
+    assert_eq!(ingress.control.revision().unwrap(), 3);
+    ingress
+        .events
+        .publish(DeviceEvent {
+            event_id: EventId::generate(),
+            source_message_id: SourceMessageId::new("http:3").unwrap(),
+            device: identity("json", "d").device_key,
+            received_at: 1,
+            occurred_at: None,
+            kind: DeviceEventKind::Heartbeat(Heartbeat { sequence: 1 }),
+        })
+        .unwrap();
+    assert_eq!(
+        ingress.events.spool_records().unwrap()[0].routing_revision,
+        3
+    );
+    stop.cancel();
+    owner.await.unwrap().unwrap();
 }
 fn mqtt_string(v: &str, out: &mut Vec<u8>) {
     out.extend_from_slice(&(v.len() as u16).to_be_bytes());
@@ -255,13 +581,16 @@ fn command(a: &AuthenticatedDevice) -> DeviceCommand {
     }
 }
 fn datagram(f: &str, p: &[u8]) -> Vec<u8> {
+    datagram_sequence(f, p, 1)
+}
+fn datagram_sequence(f: &str, p: &[u8], sequence: u64) -> Vec<u8> {
     let id = format!("{f}-udp");
     let mut v = b"NBI1".to_vec();
     v.push(id.len() as u8);
     v.extend_from_slice(id.as_bytes());
     v.extend_from_slice(&1u32.to_be_bytes());
     v.extend_from_slice(&[3; 16]);
-    v.extend_from_slice(&1u64.to_be_bytes());
+    v.extend_from_slice(&sequence.to_be_bytes());
     v.extend_from_slice(&now_ms().to_be_bytes());
     v.extend_from_slice(&(p.len() as u16).to_be_bytes());
     v.extend_from_slice(p);
@@ -269,6 +598,111 @@ fn datagram(f: &str, p: &[u8]) -> Vec<u8> {
     mac.update(&v);
     v.extend_from_slice(&mac.finalize().into_bytes());
     v
+}
+
+#[tokio::test]
+#[ignore = "bounded 60-second real-network mixed-codec reconnect soak"]
+async fn mixed_codec_reconnect_and_control_soak() {
+    let (ingress, services, sink, stop) = fixture_with_sink(
+        None,
+        None,
+        Some(Limits {
+            requests_per_second: 10000,
+            requests_per_ip_second: 10000,
+            messages_per_device_second: 10000,
+            messages_per_tenant_second: 10000,
+            ..Limits::default()
+        }),
+    );
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let udp_socket = UdpSocket::bind(address).await.unwrap();
+    let tcp_owner = tokio::spawn(serve_device_ingress(
+        listener,
+        services.clone(),
+        None,
+        stop.clone(),
+    ));
+    let udp_owner = tokio::spawn(udp::serve(udp_socket, services.clone(), stop.clone()));
+    let started = tokio::time::Instant::now();
+    // The gateway's persistent churn is under test, rather than exhaustion of
+    // the load host's ephemeral ports. Bound reconnect cycles to four per second.
+    let mut pace = tokio::time::interval(Duration::from_millis(250));
+    pace.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+    let mut cycle = 0u64;
+    while started.elapsed() < Duration::from_secs(60) {
+        pace.tick().await;
+        cycle += 1;
+        for f in FORMATS {
+            let auth = identity(f, "mqtt");
+            let v5 = cycle.is_multiple_of(2);
+            let payload = payload(f);
+            let mut mqtt = mqtt_connect(address, &auth, v5).await;
+            for qos in [1, 2] {
+                mqtt.write_all(&publish(&auth, &payload, qos, v5))
+                    .await
+                    .unwrap();
+                assert_eq!(
+                    read_mqtt(&mut mqtt).await.0,
+                    if qos == 1 { 0x40 } else { 0x50 }
+                );
+                if qos == 2 {
+                    mqtt.write_all(&[0x62, 2, 0, 2]).await.unwrap();
+                    assert_eq!(read_mqtt(&mut mqtt).await.0, 0x70);
+                }
+            }
+            mqtt.write_all(&[0xe0, 0]).await.unwrap();
+            let mut tcp = TcpStream::connect(address).await.unwrap();
+            let hello = serde_json::to_vec(
+                &serde_json::json!({"credential_id":format!("{f}-tcp"),"secret":"07".repeat(32)}),
+            )
+            .unwrap();
+            for part in frame(&hello).chunks(3) {
+                tcp.write_all(part).await.unwrap();
+            }
+            assert_eq!(read_tcp(&mut tcp).await, br#"{"authenticated":true}"#);
+            for part in frame(&payload).chunks(3) {
+                tcp.write_all(part).await.unwrap();
+            }
+            let _: EventAcceptance = serde_json::from_slice(&read_tcp(&mut tcp).await).unwrap();
+            let udp = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+            let data = datagram_sequence(f, &payload, cycle);
+            udp.send_to(&data, address).await.unwrap();
+            let mut ack = [0; 65];
+            let (n, _) = tokio::time::timeout(Duration::from_secs(3), udp.recv_from(&mut ack))
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(n, 64);
+            assert_eq!(&ack[24..32], &cycle.to_be_bytes());
+        }
+        tokio::time::timeout(Duration::from_secs(3), async {
+            while ingress.events.usage().unwrap().events != 0 {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        assert_eq!(ingress.events.usage().unwrap(), EventBusUsage::default());
+        let mut captured = sink.0.lock().unwrap();
+        assert_eq!(captured.len(), 16);
+        captured.clear(); // Test evidence itself never grows with soak duration.
+        drop(captured);
+        ingress
+            .apply_control_snapshot(control_snapshot(&ingress, cycle + 1))
+            .unwrap();
+        assert!(ingress.sessions.list(0, 32).unwrap().len() <= 8);
+    }
+    stop.cancel();
+    tcp_owner.await.unwrap().unwrap();
+    udp_owner.await.unwrap().unwrap();
+    assert!(ingress.sessions.list(0, 32).unwrap().is_empty());
+    ingress.events.stop_workers().await.unwrap();
+    println!(
+        "cycles={cycle}, accepted_events={}, duration_seconds={:.2}",
+        cycle * 16,
+        started.elapsed().as_secs_f64()
+    );
 }
 #[tokio::test]
 async fn four_codecs_coexist_on_real_mqtt_tcp_udp_with_binary_commands() {
@@ -500,6 +934,8 @@ async fn registry_profiles_control_rollback_and_stale_candidates() {
         ingress.register_session(conflict, Transport::Tcp),
         Err(Error::Forbidden)
     ));
+    assert_eq!(ingress.metrics.get(Metric::CodecProfileUnsupported), 2);
+    assert_eq!(ingress.metrics.get(Metric::CodecProfileMismatch), 1);
     let product = |a: AuthenticatedDevice| ProductRuntimeConfig {
         tenant_id: a.device_key.tenant_id,
         product_id: a.device_key.product_id,

@@ -1,0 +1,134 @@
+name: Native codec fuzz and reliability smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      compare:
+        description: "Run the isolated Linux before/after performance matrix"
+        type: boolean
+        default: false
+      baseline:
+        description: "Baseline Git revision for the performance comparison"
+        type: string
+        default: "6e16b31"
+  pull_request:
+    paths:
+      - "crates/netbaiot-codecs/**"
+      - "crates/netbaiot-core/**"
+      - "crates/netbaiot-runtime/**"
+      - "crates/netbaiot-transports/**"
+      - "apps/netbaiot-server/**"
+      - "protocol/**"
+      - "schemas/**"
+      - "configs/**"
+      - "fuzz/**"
+      - "tests/multi_codec_interop.py"
+      - "scripts/perf/codec_campaign.py"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/codec-audit.yml"
+  push:
+    branches: [main]
+    paths:
+      - "crates/netbaiot-codecs/**"
+      - "crates/netbaiot-core/**"
+      - "crates/netbaiot-runtime/**"
+      - "crates/netbaiot-transports/**"
+      - "apps/netbaiot-server/**"
+      - "protocol/**"
+      - "schemas/**"
+      - "configs/**"
+      - "fuzz/**"
+      - "tests/multi_codec_interop.py"
+      - "scripts/perf/codec_campaign.py"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/codec-audit.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  fuzz:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [cbor_codec, msgpack_codec, protobuf_codec]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - run: cargo install cargo-fuzz --locked
+      - run: python3 fuzz/seed_corpus.py
+      - name: Bounded ASan smoke
+        working-directory: fuzz
+        run: cargo +nightly fuzz run ${{ matrix.target }} -- -max_total_time=30 -timeout=5 -max_len=65536 -seed=42
+      - name: Retain reproduction inputs (public fixtures and mutations only)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: codec-fuzz-${{ matrix.target }}
+          path: |
+            fuzz/artifacts/${{ matrix.target }}/
+            fuzz/corpus/${{ matrix.target }}/
+          retention-days: 14
+          if-no-files-found: warn
+
+  network:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: sudo apt-get update && sudo apt-get install --yes mosquitto-clients
+      - run: cargo test --locked -p netbaiot-transports --test multi_codec
+      - run: cargo build --locked -p netbaiot-server
+      - run: python3 tests/multi_codec_interop.py
+      - run: python3 scripts/perf/codec_campaign.py --server target/debug/netbaiot-server --output target/performance/codec-smoke --revision "$GITHUB_SHA" --seconds 0.1 --workers 2 --repeats 1
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: codec-network-smoke
+          path: target/performance/codec-smoke/
+          retention-days: 14
+          if-no-files-found: warn
+
+  linux-comparison:
+    if: github.event_name == 'workflow_dispatch' && inputs.compare
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Freeze baseline binary
+        env:
+          BASELINE_REVISION: ${{ inputs.baseline }}
+        run: |
+          git worktree add --detach target/codec-baseline "$BASELINE_REVISION"
+          cargo build --release --locked -p netbaiot-server --manifest-path target/codec-baseline/Cargo.toml --target-dir target/codec-baseline-build
+      - run: cargo build --release --locked -p netbaiot-server
+      - run: cargo bench --locked -p netbaiot-codecs --bench codecs > target/codec-after.csv
+      - name: Use the identical measurement harness with baseline production sources
+        run: cp crates/netbaiot-codecs/benches/codecs.rs target/codec-baseline/crates/netbaiot-codecs/benches/codecs.rs
+      - run: cargo bench --locked -p netbaiot-codecs --bench codecs --manifest-path target/codec-baseline/Cargo.toml --target-dir target/codec-baseline-build > target/codec-before.csv
+      - name: Same-host serialized real-network comparison
+        env:
+          BASELINE_REVISION: ${{ inputs.baseline }}
+        run: |
+          python3 scripts/perf/codec_campaign.py --server target/codec-baseline-build/release/netbaiot-server --output target/performance/codec-before --revision "$BASELINE_REVISION" --seconds 1 --workers 4 --repeats 3
+          python3 scripts/perf/codec_campaign.py --server target/release/netbaiot-server --output target/performance/codec-after --revision "$GITHUB_SHA" --seconds 1 --workers 4 --repeats 3
+      - name: Retain actual environment, configuration and measurements
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: codec-linux-comparison
+          path: |
+            target/performance/codec-before/
+            target/performance/codec-after/
+            target/codec-before.csv
+            target/codec-after.csv
+          retention-days: 14
+          if-no-files-found: warn

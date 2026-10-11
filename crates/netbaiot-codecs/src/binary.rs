@@ -209,3 +209,70 @@ pub(crate) fn preflight(input: &[u8], l: &CodecLimits, format: Format) -> Result
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn lengths_varints_depth_and_budget_boundaries() {
+        let mut r = Reader {
+            bytes: &[0],
+            at: usize::MAX,
+        };
+        assert!(r.take(1).is_err());
+        for input in [
+            &[255; 10][..],
+            &[128; 10][..],
+            &[128; 9][..],
+            &[255, 255, 255, 255, 255, 255, 255, 255, 255, 2][..],
+        ] {
+            assert!(
+                Reader {
+                    bytes: input,
+                    at: 0
+                }
+                .varint()
+                .is_err()
+            );
+        }
+        let mut maximum = [255; 10];
+        maximum[9] = 1;
+        assert_eq!(
+            Reader {
+                bytes: &maximum,
+                at: 0
+            }
+            .varint()
+            .unwrap(),
+            u64::MAX
+        );
+        let limits = CodecLimits {
+            decoded_bytes: 128,
+            ..CodecLimits::default()
+        };
+        let mut budget = Budget::new(&limits, &[]).unwrap();
+        budget.charge(128).unwrap();
+        assert!(budget.charge(1).is_err());
+        assert!(budget.charge(usize::MAX).is_err());
+        for (format, prefix) in [
+            (Format::Cbor, &[0xa1, 0x61, b'x'][..]),
+            (Format::Msgpack, &[0x81, 0xa1, b'x'][..]),
+        ] {
+            for depth in [1, 2, 8, 64, 65] {
+                let mut input = prefix.repeat(depth);
+                input.push(0);
+                let limits = CodecLimits {
+                    nesting_depth: depth,
+                    decoded_bytes: 65536,
+                    ..CodecLimits::default()
+                };
+                assert_eq!(preflight(&input, &limits, format).is_ok(), depth <= 64);
+                let limits = CodecLimits {
+                    nesting_depth: depth - 1,
+                    ..limits
+                };
+                assert!(preflight(&input, &limits, format).is_err());
+            }
+        }
+    }
+}

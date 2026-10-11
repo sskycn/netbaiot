@@ -23,12 +23,17 @@ not call the provider. A payload cannot select or override its trusted codec or
 identity; there is no decoder probing, fallback, or automatic format negotiation.
 UDP retains HMAC, timestamp, credential-version and replay checks for each datagram.
 
-A tenant/product has one codec ID/version. Conflicting static credentials fail
+A configured tenant/product has one codec ID/version. Conflicting static credentials fail
 startup, `config check`, and `doctor`; unknown IDs, zero/unsupported versions and
 duplicate credentials are errors. Existing product profiles must agree with the
 authentication result. When a dynamic provider supplies a product absent from the
 control snapshot, its supported profile is authoritative for the immutable session.
 Adding a product profile that conflicts with a live session fails atomically.
+Without a configured product, two dynamically authenticated devices in that product
+may bind different supported profiles. This is the published V1 device-authority
+behavior, not an implicit product profile or format negotiation. Once a product is
+added, cached authentication and final registration both check that profile;
+incompatible disconnected devices must be reprovisioned before reconnecting.
 
 Control snapshots validate every codec before publication. Revisions and atomic
 replacement remain in effect. V1 rejects changing or removing an established
@@ -38,6 +43,19 @@ Invalidate the affected product authentication and sessions before reprovisionin
 on reconnect, the existing MQTT provenance check resets any recovered session
 whose codec ID/version, credential version, generation or permissions differ.
 Never mutate an established authentication object to switch its encoding.
+
+Live updates use `Ingress::apply_control_snapshot[_admitted]` or
+`Ingress::replace_routes_admitted`. Both management endpoints use these joint
+commits. Candidate control indexes are constructed before the EventBus lock;
+route compilation and control publication then exclude event admission and route
+writers using the existing EventBus lock. Publication of GatewayControl is the
+linearization point, after which only infallible route assignments remain. Failure
+before publication changes neither component. Previously accepted records retain
+their original routing revision. The registration gate fences profile addition
+against session registration/invalidation, and lifecycle admission spans the entire
+commit. No additional lock is acquired by normal MQTT/TCP event admission.
+Standalone `GatewayControl` / `EventBus` mutation APIs remain useful for bootstrap
+and independent library components; live gateway composition must use Ingress.
 
 [configs/multi-codec.json](../configs/multi-codec.json) provisions four separate
 products on one gateway, using only the existing configuration fields. Its public
@@ -157,6 +175,20 @@ output. No parser creates async work, tasks, queues, filesystem or network reque
 QoS2 prevalidation and decode share the same parsing function and semantic rules.
 EventAccepted, required-sink ACK, NBSP v3 and NBMQ v6 are unchanged. Abrupt failure
 can still lose bounded, unspooled memory traffic.
+
+Structural preflight is intentionally a superset of the typed schema; passing it
+is not acceptance. Duplicate keys, illegal kinds and scalar values can still fail
+typed parsing. `validate_payload` and `decode` each run the complete same parser.
+The allocation matrix measures successful, rejected and boundary inputs separately.
+Its cumulative allocated bytes are not peak live heap or RSS; stack, allocator,
+transport and domain identity overhead are separate. ASan fuzz checks memory errors
+and semantic invariants, not a universal process-memory bound.
+
+`codec_profile_unsupported`, `codec_profile_mismatch`, and `command_codec_failures`
+are closed-name counters. `codec_failures` includes QoS2 prevalidation failures.
+The public unit `CodecError` still deliberately does not expose parse/structure-budget
+details; those rejection classes remain combined rather than being guessed from
+payload contents or dynamic labels.
 
 Implement `DeviceCodec` independently under a named/versioned module (vendor
 implementations can use `src/vendor`). Reuse common validators and add a bounded

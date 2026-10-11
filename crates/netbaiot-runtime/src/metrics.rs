@@ -27,6 +27,9 @@ pub enum Metric {
     AuthInvalidations,
     AuthStaleResponses,
     CodecFailures,
+    CodecProfileUnsupported,
+    CodecProfileMismatch,
+    CommandCodecFailures,
     IngressAccepted,
     IngressRejected,
     IngressBytes,
@@ -103,7 +106,7 @@ pub enum BusinessRpcCallResult {
     Invalid,
 }
 
-const NAMES: [&str; 86] = [
+const NAMES: [&str; 89] = [
     "connections_accepted",
     "connections_rejected",
     "mqtt_connect_success",
@@ -126,6 +129,9 @@ const NAMES: [&str; 86] = [
     "auth_invalidations",
     "auth_stale_responses",
     "codec_failures",
+    "codec_profile_unsupported",
+    "codec_profile_mismatch",
+    "command_codec_failures",
     "ingress_accepted",
     "ingress_rejected",
     "ingress_bytes",

@@ -402,3 +402,99 @@ fn exact_command_wire_matches_independent_fixed_vectors() {
         );
     }
 }
+
+#[test]
+fn json_bounded_encoding_preserves_order_floats_and_exact_output_limit() {
+    let k = key();
+    let ctx = EncodeContext { device: &k };
+    for value in [0.0, -0.0, f64::MIN_POSITIVE, f64::MAX, 1.25e-30, -42.5] {
+        let command = DeviceCommand {
+            command_id: CommandId(uuid::Uuid::from_u128(1)),
+            device: k.clone(),
+            expires_at: Some(-1),
+            payload: DeviceCommandPayload {
+                name: "设置".into(),
+                arguments: BTreeMap::from([
+                    ("b".into(), Scalar::Text("quotes\"/\\温度".into())),
+                    ("a".into(), Scalar::Number(value)),
+                ]),
+            },
+        };
+        let original = serde_json::to_vec(&command).unwrap();
+        let codec = JsonV1::new(CodecLimits {
+            decoded_bytes: original.len(),
+            ..CodecLimits::default()
+        });
+        assert_eq!(codec.encode(&ctx, &command).unwrap(), original);
+        let short = JsonV1::new(CodecLimits {
+            decoded_bytes: original.len() - 1,
+            ..CodecLimits::default()
+        });
+        assert!(short.encode(&ctx, &command).is_err());
+    }
+}
+
+#[test]
+fn binary_prevalidation_matrix_uses_identical_semantics_at_every_limit() {
+    let k = key();
+    let ctx = DecodeContext {
+        device: &k,
+        received_at: 1234,
+    };
+    for name in [
+        "types",
+        "heartbeat",
+        "event",
+        "command_ack",
+        "integer_overflow",
+        "nonfinite",
+        "unknown_execution",
+        "bench64",
+    ] {
+        let vectors = fixtures(name);
+        for limits in [
+            CodecLimits::default(),
+            CodecLimits {
+                input_bytes: 32,
+                ..CodecLimits::default()
+            },
+            CodecLimits {
+                decoded_bytes: 512,
+                ..CodecLimits::default()
+            },
+            CodecLimits {
+                fields: 1,
+                ..CodecLimits::default()
+            },
+            CodecLimits {
+                field_bytes: 1,
+                ..CodecLimits::default()
+            },
+            CodecLimits {
+                nesting_depth: 1,
+                ..CodecLimits::default()
+            },
+            CodecLimits {
+                output_messages: 0,
+                ..CodecLimits::default()
+            },
+        ] {
+            let codecs: [Box<dyn DeviceCodec>; 3] = [
+                Box::new(CborV1::new(limits.clone())),
+                Box::new(MsgpackV1::new(limits.clone())),
+                Box::new(ProtobufV1::new(limits)),
+            ];
+            for (codec, (_, input)) in codecs.into_iter().zip(vectors.iter().skip(1)) {
+                let decoded = codec.decode(&ctx, input);
+                let validated = codec.validate_payload(&ctx, input);
+                assert_eq!(decoded.is_ok(), validated.is_ok(), "{name}");
+                if let Ok(events) = decoded {
+                    assert_eq!(events.len(), 1);
+                    assert_eq!(events[0].device, k);
+                    assert_eq!(events[0].received_at, 1234);
+                    assert_eq!(vec![events[0].kind.clone()], validated.unwrap());
+                }
+            }
+        }
+    }
+}

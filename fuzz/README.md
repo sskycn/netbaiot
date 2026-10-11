@@ -34,6 +34,19 @@ files under crates/netbaiot-codecs/tests/fixtures. Each checks arbitrary bytes w
 a 64 KiB input cap, single trusted-device output, telemetry count bounds and
 prevalidation/decode agreement.
 
+Run `python3 fuzz/seed_corpus.py` before fuzzing. Independent vectors include all
+legal kinds, 2/16/64-field boundaries, integer/nonfinite/enum errors, truncated and
+trailing inputs, overflow lengths, duplicate keys and excessive nesting. The shared
+harness checks complete prevalidation/decode semantics, trusted identity/timestamp,
+one-event output, text/count limits, finite Scalars, legal execution states and
+fresh event IDs across separate decodes, with default and tight resource budgets.
+Structural preflight alone is not a semantic acceptance oracle. Binary integer
+range boundaries are also covered by independent numeric fixtures and unit tests.
+
+`.github/workflows/codec-audit.yml` executes all three binary targets in separate
+ASan jobs with 30-second engine budgets and a 20-minute job deadline, retaining
+reproduction artifacts for 14 days. Original JSON/MQTT/TCP/UDP targets are preserved.
+
 ```sh
 cargo +nightly fuzz run cbor_codec -- -max_total_time=30 -max_len=65536
 cargo +nightly fuzz run msgpack_codec -- -max_total_time=30 -max_len=65536

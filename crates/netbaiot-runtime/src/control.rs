@@ -36,6 +36,19 @@ struct SnapshotIndex {
     route_bytes: usize,
 }
 
+pub(crate) struct PreparedSnapshot {
+    next: Arc<SnapshotIndex>,
+    expected_revision: Option<u64>,
+}
+impl PreparedSnapshot {
+    pub(crate) fn revision(&self) -> u64 {
+        self.next.revision
+    }
+    pub(crate) fn routes(&self) -> Arc<Vec<RouteDefinition>> {
+        self.next.routes.clone()
+    }
+}
+
 /// Bounded gateway product profiles and routes, atomically replaced by revision.
 /// Contains no per-device desired/reported state or business configuration.
 pub struct GatewayControl {
@@ -58,6 +71,15 @@ impl GatewayControl {
     }
 
     pub fn apply(&self, snapshot: ControlSnapshot, codecs: &crate::CodecRegistry) -> Result<()> {
+        self.commit(self.prepare(snapshot, codecs)?)
+    }
+
+    // Allocate/validate the bounded candidate before taking the EventBus commit lock.
+    pub(crate) fn prepare(
+        &self,
+        snapshot: ControlSnapshot,
+        codecs: &crate::CodecRegistry,
+    ) -> Result<PreparedSnapshot> {
         if snapshot.products.len() > self.limits.control_max_products
             || snapshot.routes.len() > self.limits.max_routing_filters
         {
@@ -102,8 +124,20 @@ impl GatewayControl {
             bytes,
             route_bytes,
         });
+        Ok(PreparedSnapshot {
+            next,
+            expected_revision: None,
+        })
+    }
+
+    pub(crate) fn commit(&self, prepared: PreparedSnapshot) -> Result<()> {
         let mut current = self.snapshot.write().map_err(|_| Error::Internal)?;
-        if next.revision <= current.revision {
+        let next = prepared.next;
+        if next.revision <= current.revision
+            || prepared
+                .expected_revision
+                .is_some_and(|r| r != current.revision)
+        {
             return Err(Error::Conflict);
         }
         // V1 does not hot-switch/remove established product codec profiles. A planned
@@ -135,10 +169,18 @@ impl GatewayControl {
     }
 
     pub fn replace_routes(&self, revision: u64, routes: Vec<RouteDefinition>) -> Result<()> {
+        self.commit(self.prepare_routes(revision, routes)?)
+    }
+
+    pub(crate) fn prepare_routes(
+        &self,
+        revision: u64,
+        routes: Vec<RouteDefinition>,
+    ) -> Result<PreparedSnapshot> {
         if routes.len() > self.limits.max_routing_filters {
             return Err(Error::Overloaded);
         }
-        let mut current = self.snapshot.write().map_err(|_| Error::Internal)?;
+        let current = self.snapshot.read().map_err(|_| Error::Internal)?.clone();
         if revision <= current.revision {
             return Err(Error::Conflict);
         }
@@ -153,15 +195,17 @@ impl GatewayControl {
         if bytes > self.limits.control_max_bytes {
             return Err(Error::Overloaded);
         }
-        let next = Arc::new(SnapshotIndex {
-            revision,
-            products: current.products.clone(),
-            routes: Arc::new(routes),
-            bytes,
-            route_bytes,
-        });
-        *current = next;
-        Ok(())
+        Ok(PreparedSnapshot {
+            next: Arc::new(SnapshotIndex {
+                revision,
+                products: current.products.clone(),
+                routes: Arc::new(routes),
+                bytes,
+                route_bytes,
+            }),
+            // A concurrent standalone control writer must not lose new product state.
+            expected_revision: Some(current.revision),
+        })
     }
 
     pub fn revision(&self) -> Result<u64> {
@@ -226,6 +270,25 @@ mod tests {
                 sinks: vec![SinkId::new("sink").unwrap()],
             }],
         }
+    }
+
+    #[test]
+    fn prepared_routes_cannot_overwrite_a_concurrent_product_snapshot() {
+        let control = GatewayControl::empty(Arc::new(Limits::default()));
+        control.apply(snapshot(1), &registry()).unwrap();
+        let prepared = control.prepare_routes(3, snapshot(3).routes).unwrap();
+        control.apply(snapshot(2), &registry()).unwrap();
+        assert!(matches!(control.commit(prepared), Err(Error::Conflict)));
+        assert_eq!(control.revision().unwrap(), 2);
+        let p = snapshot(2).products.remove(0);
+        assert_eq!(
+            control
+                .product(&p.tenant_id, &p.product_id)
+                .unwrap()
+                .unwrap()
+                .revision,
+            2
+        );
     }
 
     #[test]
