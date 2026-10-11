@@ -269,15 +269,16 @@ impl BoundedWriter {
     }
 }
 impl Write for BoundedWriter {
+    #[inline]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        if buf.len() > self.maximum.saturating_sub(self.bytes.len()) {
-            return Err(io::Error::other("codec byte limit"));
-        }
         let required = self
             .bytes
             .len()
             .checked_add(buf.len())
             .ok_or_else(|| io::Error::other("codec byte limit"))?;
+        if required > self.maximum {
+            return Err(io::Error::other("codec byte limit"));
+        }
         if required > self.bytes.capacity() {
             let capacity = self
                 .bytes
@@ -293,7 +294,39 @@ impl Write for BoundedWriter {
         self.bytes.extend_from_slice(buf);
         Ok(buf.len())
     }
+    #[inline]
+    fn write_all(&mut self, buf: &[u8]) -> io::Result<()> {
+        // This writer either accepts the entire slice or returns an error. Avoid
+        // std's partial-write loop on serializers' many tiny punctuation writes.
+        self.write(buf).map(|_| ())
+    }
     fn flush(&mut self) -> io::Result<()> {
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod writer_tests {
+    use super::*;
+    #[test]
+    fn whole_slice_writes_preserve_bytes_on_rejection_and_cap_growth() {
+        for limit in [0, 1, 2, 3, 64, 257] {
+            let mut writer = BoundedWriter::new(limit);
+            for _ in 0..limit {
+                writer.write_all(b"x").unwrap();
+                assert!(writer.bytes.capacity() <= limit);
+            }
+            let before = writer.bytes.clone();
+            assert!(writer.write_all(b"yz").is_err());
+            assert_eq!(writer.bytes, before);
+            assert_eq!(writer.bytes.len(), limit);
+            writer.write_all(&[]).unwrap();
+        }
+        let mut writer = BoundedWriter::new(3);
+        writer.write_all(b"ab").unwrap();
+        assert!(writer.write_all(b"cd").is_err());
+        assert_eq!(writer.bytes, b"ab");
+        writer.write_all(b"c").unwrap();
+        assert_eq!(writer.bytes, b"abc");
     }
 }
