@@ -311,8 +311,33 @@ impl Ingress {
         auth: &AuthenticatedDevice,
         envelope: IngressEnvelope<'_>,
     ) -> Result<IngressAcceptance> {
+        self.ingest_with_identity(auth, envelope, None).await
+    }
+
+    /// For an opted-in UDP provider, use the signed envelope identity rather than
+    /// a payload-supplied message ID. Existing MQTT/TCP/UDP behavior is unchanged.
+    pub async fn ingest_monotonic_udp(
+        &self,
+        auth: &AuthenticatedDevice,
+        envelope: IngressEnvelope<'_>,
+        identity: netbaiot_core::security::replay::UdpMessageIdentity,
+    ) -> Result<IngressAcceptance> {
+        if envelope.transport != Transport::Udp {
+            return Err(Error::Invalid);
+        }
+        let source = identity.source_message_id().map_err(|_| Error::Invalid)?;
+        self.ingest_with_identity(auth, envelope, Some(source))
+            .await
+    }
+
+    async fn ingest_with_identity(
+        &self,
+        auth: &AuthenticatedDevice,
+        envelope: IngressEnvelope<'_>,
+        source: Option<SourceMessageId>,
+    ) -> Result<IngressAcceptance> {
         let _timing = self.metrics.timer(Histogram::IngressLatency);
-        let result = self.ingest_inner(auth, envelope).await;
+        let result = self.ingest_inner(auth, envelope, source).await;
         if result.is_err() {
             self.metrics.inc(Metric::IngressRejected);
             self.metrics.inc(Metric::EventsRejected);
@@ -324,6 +349,7 @@ impl Ingress {
         &self,
         auth: &AuthenticatedDevice,
         envelope: IngressEnvelope<'_>,
+        source: Option<SourceMessageId>,
     ) -> Result<IngressAcceptance> {
         let _gate = self.lifecycle.begin_admission()?;
         if !auth.permissions.publish {
@@ -367,7 +393,10 @@ impl Ingress {
         if events.len() != 1 {
             return Err(Error::Codec);
         }
-        let event = events.into_iter().next().ok_or(Error::Codec)?;
+        let mut event = events.into_iter().next().ok_or(Error::Codec)?;
+        if let Some(source) = source {
+            event.source_message_id = source;
+        }
         if event.device != auth.device_key {
             return Err(Error::Forbidden);
         }

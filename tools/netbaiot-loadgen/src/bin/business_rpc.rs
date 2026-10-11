@@ -303,6 +303,7 @@ impl BusinessAuthHandler for Handler {
         Ok(ResolveVerifierResponse {
             identity: identity(&request.credential_id[5..], request.min_auth_revision)?,
             verifier_key_hex: SECRET.into(),
+            replay_policy: Default::default(),
         })
     }
 }

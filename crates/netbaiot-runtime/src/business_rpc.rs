@@ -697,7 +697,8 @@ impl DeviceAuthenticator for BusinessRpcAuthProvider {
         Ok(DeviceVerifier::new(
             checked_identity(response.identity, minimum_revision)?,
             decode_hex_32(&response.verifier_key_hex)?,
-        ))
+        )
+        .with_replay_policy(response.replay_policy))
     }
 }
 

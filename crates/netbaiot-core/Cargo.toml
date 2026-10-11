@@ -10,6 +10,9 @@ schemars = { workspace = true, optional = true }
 netbaiot-protocol.workspace = true
 serde.workspace = true
 thiserror.workspace = true
+hkdf = "0.12"
+sha2.workspace = true
+zeroize = "1"
 
 [lints]
 workspace = true

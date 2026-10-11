@@ -48,6 +48,10 @@ impl VerifiedDatagram {
     pub fn identity(&self) -> &AuthenticatedDevice {
         self.verifier.identity()
     }
+
+    pub fn replay_policy(&self) -> netbaiot_core::business_rpc::UdpReplayPolicy {
+        self.verifier.replay_policy
+    }
 }
 
 /// Identity plus HMAC verification material cached by the gateway. The key is
@@ -56,11 +60,24 @@ impl VerifiedDatagram {
 pub struct DeviceVerifier {
     identity: AuthenticatedDevice,
     key: [u8; 32],
+    replay_policy: netbaiot_core::business_rpc::UdpReplayPolicy,
 }
 
 impl DeviceVerifier {
     pub fn new(identity: AuthenticatedDevice, key: [u8; 32]) -> Self {
-        Self { identity, key }
+        Self {
+            identity,
+            key,
+            replay_policy: Default::default(),
+        }
+    }
+
+    pub fn with_replay_policy(
+        mut self,
+        policy: netbaiot_core::business_rpc::UdpReplayPolicy,
+    ) -> Self {
+        self.replay_policy = policy;
+        self
     }
 
     pub fn identity(&self) -> &AuthenticatedDevice {
@@ -82,15 +99,7 @@ impl DeviceVerifier {
     }
 }
 
-#[async_trait]
-pub trait DeviceAuthenticator: Send + Sync {
-    async fn authenticate(&self, request: AuthenticationRequest<'_>)
-    -> Result<AuthenticatedDevice>;
-
-    /// Resolve stable verifier material once; UDP signatures are verified locally
-    /// for every datagram after this bounded lookup.
-    async fn resolve_verifier(&self, credential_id: &str) -> Result<DeviceVerifier>;
-}
+pub use crate::security::key_provider::DeviceAuthenticator;
 
 #[derive(Clone, Eq, PartialOrd, Ord)]
 struct AuthCacheKey {
