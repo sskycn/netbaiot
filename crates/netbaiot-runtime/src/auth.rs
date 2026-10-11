@@ -695,11 +695,7 @@ fn prune_expired_up_to(state: &mut AuthCacheState, budget: usize) {
     let now = Instant::now();
     let mut removed = false;
     for _ in 0..budget {
-        if !state
-            .expirations
-            .first()
-            .is_some_and(|entry| entry.0 <= now)
-        {
+        if state.expirations.first().is_none_or(|entry| entry.0 > now) {
             break;
         }
         let Some((_, key)) = state.expirations.pop_first() else {

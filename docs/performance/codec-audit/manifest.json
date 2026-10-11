@@ -118,6 +118,10 @@
       "size_bytes": 10492,
       "sha256": "06a881f220b4eaa9c7d722536e05b61e163b8c24c5e32aee60c178a5582e0aac"
     },
+    "target/performance/codec-audit/ci-msrv-before.log": {
+      "size_bytes": 61322,
+      "sha256": "6c102ce9ad011537f5b3a92d0b9ffe6e0b53b258fe26669b8d50970c00fa1899"
+    },
     "target/performance/codec-audit/protobuf_codec-corpus-smoke.log": {
       "size_bytes": 1740,
       "sha256": "74fb9114306a593c533dfc10b54b3e7c260d293f88268e895d9d9db9689bebd8"
@@ -135,12 +139,12 @@
       "sha256": "54f0127b54e39eda1c15294c9dd75cd06dea2b73622ae54175f4963f4fe5cb95"
     },
     "target/performance/codec-audit/msrv.log": {
-      "size_bytes": 458,
-      "sha256": "b8350aa690b8e31cc967f0809d2c8124870eabf2b4e9fe238f44b6a7e09756a9"
+      "size_bytes": 655,
+      "sha256": "9a280c7177b997ab588bbec4bc26b1fe2e1c518fe1c9c093b3de43630e14e9f6"
     },
     "target/performance/codec-audit/clippy.log": {
-      "size_bytes": 458,
-      "sha256": "70c34a533b2b211cc1912adcf4b5bbb50f5317a02b4d2bed9bdbe3ad53f0e030"
+      "size_bytes": 655,
+      "sha256": "2ae6549458100dd29646500208df2f5065f1fe369669dda47fda521071bdce3d"
     },
     "target/performance/codec-audit/multi-codec-tests.log": {
       "size_bytes": 1546,
@@ -194,6 +198,10 @@
       "size_bytes": 459,
       "sha256": "c726627637ae063d0a79bd83d1a46cd3c0930cf39bebb2de5b67f2bb9b9a48a5"
     },
+    "target/performance/codec-audit/clippy-msrv.log": {
+      "size_bytes": 1345,
+      "sha256": "816c6de7ae932d347b2d0460a0c29cdce6a918a785f3c7c3ca57148702ef8e40"
+    },
     "target/performance/codec-audit/protobuf_codec-fuzz.log": {
       "size_bytes": 132341,
       "sha256": "b79ab1c16d4e50bdb83d5a9b2fd0d1b2d2047dcf0fdc390efa83b8afbaf97654"
@@ -211,8 +219,8 @@
       "sha256": "d0dbe979d2782e7fb7d16000311df7fc38ea705ac94fc01f8cd9a67a89d62885"
     },
     "target/performance/codec-audit/workspace-tests.log": {
-      "size_bytes": 59562,
-      "sha256": "4d9bd983400d6c5aa6ebd93fdaa5a1504c5c2cf2c7497c2f1450aeaa57056739"
+      "size_bytes": 59702,
+      "sha256": "480d94bf360a8ee432efb99c94d392d85bc9df605972b3aafe777d3abf1fbe21"
     },
     "target/performance/codec-audit/tcp_frame-fuzz.log": {
       "size_bytes": 1065,

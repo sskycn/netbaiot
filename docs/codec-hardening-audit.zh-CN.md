@@ -22,6 +22,9 @@
 本机副本位于 `target/evidence/multi-codec-baseline/codecs.csv`。未放宽证据门禁。
 该问题也出现在基线的 [GitHub Rust checks](https://github.com/sskycn/netbaiot/actions/runs/38105213071)：
 测试通过后证据检查拒绝该 CSV，与本机复现一致。
+首次本次 CI 的 Rust 1.88 Clippy 又确认基线已有的 `auth.rs` 非最简布尔表达式警告。
+将 `!is_some_and(expired)` 改成等价的 `is_none_or(not_expired)`，不改变缓存过期行为、
+预算或锁；未禁用 lint。额外执行 1.88 Clippy，并重新执行全部本地门禁。
 
 ## 联合提交的正确性边界
 
@@ -98,6 +101,7 @@ Mosquitto 在已安装的 /usr/local/sbin，修正 PATH 后完整门禁通过；
 | `cargo clippy --workspace --all-targets --all-features -- -D warnings` | PASS |
 | `cargo test --workspace --all-features` | PASS：540 个通过，46 个默认忽略，41 个结果套件 |
 | `cargo +1.88.0 check --workspace --all-targets --all-features --locked` | PASS |
+| `cargo +1.88.0 clippy --workspace --all-targets --all-features -- -D warnings` | PASS：修正 CI 发现的既有等价布尔表达式 |
 | `PATH=/usr/local/sbin:$PATH cargo xtask check mqtt` | PASS：原始状态机/协议回归、125/125 normative coverage、MQTT5、Mosquitto、SDK 及 profile measurement |
 | `python3 tests/multi_codec_interop.py` | PASS：40 条确认 Webhook，四种 Codec、两个 MQTT 版本、QoS0/1/2和四类载荷 |
 | `cargo test --locked -p netbaiot-transports --test multi_codec` | PASS：11 个，另一个 soak 默认忽略并单独执行 |
@@ -148,7 +152,7 @@ JSON 正常编码的有界检查仍有小幅微基准耗时成本，应结合在
 - `runtime/control.rs`、`event.rs`、`ingress.rs`、`transports/management_http.rs`：联合提交及并发/错误边界。
 - `codecs/json/v1.rs`、`common.rs`：有界 JSON 与已测量的整段写入优化；`binary.rs` 仅增加边界测试。
 - `codecs/tests`、`benches/codecs.rs`、`transports/tests/multi_codec.rs`：兼容、资源、控制、慢 Sink、实际重连和性能测试。
-- `runtime/metrics.rs`、`commands.rs`：固定错误类别计数，补计 QoS2 预验证错误。
+- `runtime/metrics.rs`、`commands.rs`：固定错误类别计数，补计 QoS2 预验证错误；`auth.rs` 等价表达式兼容 Rust 1.88 lint。
 - `.github/workflows/codec-audit.yml`、`fuzz`：有界 fuzz、共享不变量、可重现 corpus和实际网络 smoke。
 - `scripts/perf/codec_campaign.py`：四编码八路径及在线命令的真实网络测量；`scripts/perf/README.md` 记录方法/限制。
 - `docs/codecs*.md`、历史多 Codec 报告/聚合、本报告及性能目录：协议行为澄清、审核和实际证据。
