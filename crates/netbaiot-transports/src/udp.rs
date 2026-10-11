@@ -1,4 +1,5 @@
 use crate::common::Services;
+use netbaiot_core::business_rpc::UdpReplayPolicy;
 use netbaiot_core::*;
 use netbaiot_runtime::*;
 use std::{
@@ -150,6 +151,26 @@ impl ReplayWindow {
         timestamp: i64,
         now: i64,
     ) -> Result<ReplayDecision> {
+        self.check_with_policy(
+            device,
+            credential_version,
+            boot,
+            seq,
+            (timestamp, now),
+            UdpReplayPolicy::Window64,
+        )
+    }
+
+    pub fn check_with_policy(
+        &mut self,
+        device: &DeviceKey,
+        credential_version: u32,
+        boot: [u8; 16],
+        seq: u64,
+        clock: (i64, i64),
+        policy: UdpReplayPolicy,
+    ) -> Result<ReplayDecision> {
+        let (timestamp, now) = clock;
         if now.abs_diff(timestamp) > self.limits.udp_clock_skew_ms {
             return Err(Error::Authentication);
         }
@@ -163,6 +184,9 @@ impl ReplayWindow {
                 }
                 if entry.bits & (1 << delta) != 0 {
                     return Ok(ReplayDecision::AcceptedDuplicate);
+                }
+                if policy == UdpReplayPolicy::Monotonic {
+                    return Err(Error::Conflict);
                 }
             }
         } else if self.entries.len() >= self.limits.max_replay_entries
@@ -385,27 +409,37 @@ async fn accept_verified(
     if !auth.permissions.publish {
         return Err(Error::Forbidden);
     }
-    match replay.check(
+    match replay.check_with_policy(
         &auth.device_key,
         envelope.credential_version,
         envelope.boot_id,
         envelope.sequence,
-        envelope.timestamp,
-        now_ms(),
+        (envelope.timestamp, now_ms()),
+        verified.replay_policy(),
     )? {
         ReplayDecision::New => {
-            ingress
-                .ingest(
-                    auth,
-                    IngressEnvelope {
-                        transport: Transport::Udp,
-                        payload: envelope.payload,
-                        require_command_ack: false,
-                        validated_at: std::time::Instant::now(),
-                        validation_us: 0,
-                    },
-                )
-                .await?;
+            let input = IngressEnvelope {
+                transport: Transport::Udp,
+                payload: envelope.payload,
+                require_command_ack: false,
+                validated_at: std::time::Instant::now(),
+                validation_us: 0,
+            };
+            if verified.replay_policy() == UdpReplayPolicy::Monotonic {
+                ingress
+                    .ingest_monotonic_udp(
+                        auth,
+                        input,
+                        netbaiot_core::security::replay::UdpMessageIdentity {
+                            credential_version: envelope.credential_version,
+                            boot_id: envelope.boot_id,
+                            sequence: envelope.sequence,
+                        },
+                    )
+                    .await?;
+            } else {
+                ingress.ingest(auth, input).await?;
+            }
             replay.commit(
                 auth.device_key.clone(),
                 envelope.credential_version,

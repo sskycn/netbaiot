@@ -82,6 +82,7 @@ impl BusinessAuthHandler for MemoryAuthority {
         Ok(ResolveVerifierResponse {
             identity: self.wire_identity(),
             verifier_key_hex: self.verifier_key_hex.clone(),
+            replay_policy: Default::default(),
         })
     }
 }

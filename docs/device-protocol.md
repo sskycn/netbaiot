@@ -180,3 +180,6 @@ uplinks, business events, or subscription filters. Query current connection stat
 through `/api/v1/connections` and `/api/v1/devices/connection`; UDP updates
 `last_seen` without creating a connected session. Presence history belongs to the
 business application, not the EventBus.
+
+The opt-in [device key provisioning profile v0.3](device-key-security.md) reuses this
+wire/HMAC contract with HKDF-derived verifiers and monotonic admission.

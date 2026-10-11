@@ -16,6 +16,7 @@ struct Provider {
     calls: AtomicUsize,
     auth: Mutex<AuthenticatedDevice>,
     delay_slow: AtomicBool,
+    monotonic: AtomicBool,
     slow_entered: tokio::sync::Notify,
     slow_release: tokio::sync::Notify,
 }
@@ -37,7 +38,13 @@ impl DeviceAuthenticator for Provider {
         if id == "slow" {
             identity.device_key.device_id = DeviceId::new("slow").unwrap();
         }
-        Ok(DeviceVerifier::new(identity, [7; 32]))
+        Ok(DeviceVerifier::new(identity, [7; 32]).with_replay_policy(
+            if self.monotonic.load(Ordering::Acquire) {
+                UdpReplayPolicy::Monotonic
+            } else {
+                UdpReplayPolicy::Window64
+            },
+        ))
     }
 }
 struct PendingSink;
@@ -69,6 +76,7 @@ fn fixture(limits: Limits) -> (Arc<Ingress>, Arc<Provider>) {
         calls: AtomicUsize::new(0),
         auth: Mutex::new(auth()),
         delay_slow: AtomicBool::new(false),
+        monotonic: AtomicBool::new(false),
         slow_entered: tokio::sync::Notify::new(),
         slow_release: tokio::sync::Notify::new(),
     });
@@ -714,5 +722,63 @@ async fn real_socket_duplicate_receipts_with_4096_cache_entries_use_one_verifier
     assert_eq!(ingress.events.usage().unwrap().pending_required, 1);
     stop.cancel();
     task.await.unwrap().unwrap();
+    ingress.events.stop_workers().await.unwrap();
+}
+
+#[test]
+fn hkdf_keys_reuse_existing_hmac_and_rotation_rejects_old_tags() {
+    use netbaiot_core::security::hkdf::derive_udp_hmac_key;
+    let key = derive_udp_hmac_key(&[9; 32]).unwrap();
+    let old = DeviceVerifier::new(auth(), *key.expose());
+    let message = packet("a", 1, 42, 50000, PAYLOAD);
+    let env = decode(&message, 1200).unwrap();
+    let tag = old.sign(env.signed).unwrap();
+    old.verify(env.signed, &tag).unwrap();
+    let mut corrupt = env.signed.to_vec();
+    for offset in 0..corrupt.len() {
+        corrupt[offset] ^= 1;
+        assert!(old.verify(&corrupt, &tag).is_err());
+        corrupt[offset] ^= 1;
+    }
+    let next = derive_udp_hmac_key(&[10; 32]).unwrap();
+    assert!(
+        DeviceVerifier::new(auth(), *next.expose())
+            .verify(env.signed, &tag)
+            .is_err()
+    );
+}
+
+#[tokio::test]
+async fn monotonic_provider_rejects_unseen_lower_sequence_but_acks_committed_retries() {
+    let (ingress, provider) = fixture(Limits::default());
+    provider.monotonic.store(true, Ordering::Release);
+    let mut replay = ReplayWindow::new(ingress.limits.clone());
+    let now = now_ms();
+    for sequence in [100, 102, 102, 100] {
+        let bytes = packet("a", 1, sequence, now, PAYLOAD);
+        accept_and_ack(&bytes, &ingress, &mut replay, |ack| {
+            assert_ack(ack, 1, sequence);
+            Ok(ack.len())
+        })
+        .await
+        .unwrap();
+    }
+    let lower = packet("a", 1, 101, now, PAYLOAD);
+    assert!(
+        accept_and_ack(&lower, &ingress, &mut replay, |_| panic!(
+            "lower sequence ACK"
+        ))
+        .await
+        .is_err()
+    );
+    let expired = packet("a", 1, 103, now - 30001, PAYLOAD);
+    assert!(
+        accept_and_ack(&expired, &ingress, &mut replay, |_| panic!(
+            "expired timestamp ACK"
+        ))
+        .await
+        .is_err()
+    );
+    assert_eq!(ingress.metrics.get(Metric::EventsAccepted), 2);
     ingress.events.stop_workers().await.unwrap();
 }

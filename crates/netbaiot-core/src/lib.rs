@@ -1,5 +1,7 @@
 //! Internal domain services built on the public protocol model.
 
+pub mod security;
+
 pub use netbaiot_protocol::*;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;

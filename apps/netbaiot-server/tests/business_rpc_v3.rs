@@ -88,6 +88,7 @@ impl BusinessAuthHandler for Handler {
         Ok(ResolveVerifierResponse {
             identity: identity(),
             verifier_key_hex: SECRET.into(),
+            replay_policy: Default::default(),
         })
     }
 }

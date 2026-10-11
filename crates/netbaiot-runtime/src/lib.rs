@@ -13,6 +13,7 @@ pub mod management_auth;
 pub mod metrics;
 pub mod quota;
 pub mod recovery_io;
+pub mod security;
 pub mod sessions;
 pub mod spool;
 pub use auth::*;

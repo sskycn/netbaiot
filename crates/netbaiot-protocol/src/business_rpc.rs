@@ -115,6 +115,24 @@ pub struct ResolveVerifierRequest {
 pub struct ResolveVerifierResponse {
     pub identity: AuthenticatedDeviceWire,
     pub verifier_key_hex: String,
+    /// Omitted for existing providers. It changes admission policy, not UDP wire bytes.
+    #[serde(default, skip_serializing_if = "UdpReplayPolicy::is_window64")]
+    pub replay_policy: UdpReplayPolicy,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum UdpReplayPolicy {
+    #[default]
+    Window64,
+    /// New messages must advance the maximum; committed retries still receive NBA1.
+    Monotonic,
+}
+
+impl UdpReplayPolicy {
+    pub fn is_window64(&self) -> bool {
+        *self == Self::Window64
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -211,5 +229,31 @@ mod tests {
             content_length: (crate::business_rpc_v3::V3_MAX_MESSAGE_BYTES + 1) as u32,
         };
         assert!(oversized.validate().is_err());
+    }
+}
+
+#[cfg(test)]
+mod verifier_compatibility_tests {
+    use super::*;
+    #[test]
+    fn legacy_verifiers_keep_window_policy_and_omit_new_field() {
+        let wire = serde_json::json!({"identity": {
+            "device_key":{"tenant_id":"t","product_id":"p","device_id":"d"},
+            "credential_version":1,"auth_generation":1,"codec_id":"netbaiot-json",
+            "codec_version":1,"publish":true,"commands":false,"auth_revision":0
+        },"verifier_key_hex":"07".repeat(32)});
+        let legacy: ResolveVerifierResponse = serde_json::from_value(wire.clone()).unwrap();
+        assert_eq!(legacy.replay_policy, UdpReplayPolicy::Window64);
+        assert_eq!(serde_json::to_value(legacy).unwrap(), wire);
+        let mut upgraded = wire;
+        upgraded["replay_policy"] = serde_json::json!("monotonic");
+        assert_eq!(
+            serde_json::from_value::<ResolveVerifierResponse>(upgraded.clone())
+                .unwrap()
+                .replay_policy,
+            UdpReplayPolicy::Monotonic
+        );
+        upgraded["replay_policy"] = serde_json::json!("disabled");
+        assert!(serde_json::from_value::<ResolveVerifierResponse>(upgraded).is_err());
     }
 }
