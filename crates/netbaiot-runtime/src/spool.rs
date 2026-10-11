@@ -1,4 +1,5 @@
-use crate::{Error, Limits, Result, SpoolRecord, recovery_io};
+use crate::{Error, Limits, Result, SpoolRecord, event::SpoolSnapshot, recovery_io};
+use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::{
     fs,
@@ -66,6 +67,25 @@ impl RestartSpool {
         tokio::task::spawn_blocking(move || {
             let _owner = owner;
             commit_sync(&directory, &limits, &records)
+        })
+        .await
+        .map_err(|_| Error::Internal)?
+        .map(Some)
+    }
+
+    pub(crate) async fn commit_snapshot(
+        &self,
+        records: Vec<SpoolSnapshot>,
+    ) -> Result<Option<PathBuf>> {
+        if records.is_empty() {
+            return Ok(None);
+        }
+        let directory = self.directory.clone();
+        let limits = self.limits.clone();
+        let owner = self.owner.clone();
+        tokio::task::spawn_blocking(move || {
+            let _owner = owner;
+            commit_serializable_sync(&directory, &limits, &records)
         })
         .await
         .map_err(|_| Error::Internal)?
@@ -152,6 +172,14 @@ impl RestartSpool {
 }
 
 fn commit_sync(directory: &Path, limits: &Limits, records: &[SpoolRecord]) -> Result<PathBuf> {
+    commit_serializable_sync(directory, limits, records)
+}
+
+fn commit_serializable_sync<T: Serialize>(
+    directory: &Path,
+    limits: &Limits,
+    records: &[T],
+) -> Result<PathBuf> {
     if records.len() > limits.spool_max_records {
         return Err(Error::Overloaded);
     }
@@ -446,7 +474,7 @@ fn directory_entry_limit(limits: &Limits) -> Result<usize> {
         .ok_or(Error::Overloaded)
 }
 
-fn encode_record(record: &SpoolRecord, maximum: usize) -> Result<Vec<u8>> {
+fn encode_record(record: &impl Serialize, maximum: usize) -> Result<Vec<u8>> {
     struct Bounded {
         bytes: Vec<u8>,
         maximum: usize,

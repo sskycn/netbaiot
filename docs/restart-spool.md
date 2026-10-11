@@ -26,6 +26,9 @@ Only one bounded record is serialized at a time by the writer.
 Recovery and old-snapshot validation read the file incrementally. Validation before
 replacement deserializes and discards one record at a time; startup recovery keeps
 decoded records private until the complete stream has passed validation.
+At planned shutdown, the EventBus captures shared references to accepted events,
+releases its lock, then counts and serializes the pending required records. The
+public `SpoolRecord` shape and NBSP v3 bytes are unchanged.
 
 `SpoolRecord` contains the complete normalized event, stable `event_id`, pending
 required sink IDs, routing revision, accepted time, and attempt metadata. All file

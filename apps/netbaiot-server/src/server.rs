@@ -540,29 +540,22 @@ pub async fn run_with_credentials_ready(
     } else {
         lifecycle.mark_spooling()?;
         loop {
-            let pending = events.spool_records()?;
-            if pending.is_empty() {
-                events.stop_workers().await?;
-                if !recovered_files.is_empty() {
-                    spool.remove_committed(recovered_files.clone()).await?;
+            match events.commit_required_to_spool(&spool).await {
+                Ok(None) => {
+                    events.stop_workers().await?;
+                    if !recovered_files.is_empty() {
+                        spool.remove_committed(recovered_files.clone()).await?;
+                    }
+                    break;
                 }
-                break;
-            }
-            let encoded_bytes = pending.iter().try_fold(0usize, |total, record| {
-                total
-                    .checked_add(record.encoded_len()?)
-                    .ok_or(Error::Overloaded)
-            })?;
-            let pending_count = pending.len();
-            match spool.commit(pending).await {
-                Ok(_) => {
+                Ok(Some((pending_count, encoded_bytes))) => {
                     events.stop_workers().await?;
                     metrics.add(Metric::SpoolRecords, pending_count as u64);
                     metrics.add(Metric::SpoolBytes, encoded_bytes as u64);
                     break;
                 }
                 Err(error) => {
-                    tracing::error!(error=%error, pending=pending_count, "event spool commit failed; shutdown remains blocked");
+                    tracing::error!(error=%error, "event spool commit failed; shutdown remains blocked");
                     if events.wait_required_drained(retry_delay).await? {
                         events.stop_workers().await?;
                         if !recovered_files.is_empty() {

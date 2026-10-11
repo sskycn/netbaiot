@@ -137,6 +137,21 @@ impl SpoolRecord {
     }
 }
 
+#[derive(Serialize)]
+pub(crate) struct SpoolSnapshot {
+    event: Arc<DeviceEvent>,
+    pending_sinks: Vec<SinkId>,
+    routing_revision: u64,
+    accepted_at: i64,
+    attempts: BTreeMap<SinkId, u32>,
+}
+
+impl SpoolSnapshot {
+    fn encoded_len(&self) -> Result<usize> {
+        bounded_json_bytes(self, usize::MAX)
+    }
+}
+
 pub type EventAcceptance = EventAccepted;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -807,12 +822,26 @@ impl EventBus {
     }
 
     pub fn spool_records(&self) -> Result<Vec<SpoolRecord>> {
+        Ok(self
+            .spool_snapshot()?
+            .into_iter()
+            .map(|snapshot| SpoolRecord {
+                event: (*snapshot.event).clone(),
+                pending_sinks: snapshot.pending_sinks,
+                routing_revision: snapshot.routing_revision,
+                accepted_at: snapshot.accepted_at,
+                attempts: snapshot.attempts,
+            })
+            .collect())
+    }
+
+    fn spool_snapshot(&self) -> Result<Vec<SpoolSnapshot>> {
         let state = self.lock_state(EventBusProbe::Other)?;
         let mut records = Vec::new();
         for active in state.active.values() {
             if !active.required.is_empty() {
-                records.push(SpoolRecord {
-                    event: (*active.event).clone(),
+                records.push(SpoolSnapshot {
+                    event: active.event.clone(),
                     pending_sinks: active.required.iter().cloned().collect(),
                     routing_revision: active.routing_revision,
                     accepted_at: active.accepted_at,
@@ -820,8 +849,29 @@ impl EventBus {
                 });
             }
         }
+        drop(state);
         records.sort_by_key(|record| record.event.event_id.0);
         Ok(records)
+    }
+
+    /// Commit a shared-event view of every required responsibility. The snapshot
+    /// is bounded by admitted EventBus state; serialization runs off its lock.
+    pub async fn commit_required_to_spool(
+        &self,
+        spool: &crate::RestartSpool,
+    ) -> Result<Option<(usize, usize)>> {
+        let pending = self.spool_snapshot()?;
+        if pending.is_empty() {
+            return Ok(None);
+        }
+        let bytes = pending.iter().try_fold(0usize, |total, record| {
+            total
+                .checked_add(record.encoded_len()?)
+                .ok_or(Error::Overloaded)
+        })?;
+        let count = pending.len();
+        spool.commit_snapshot(pending).await?;
+        Ok(Some((count, bytes)))
     }
 
     pub async fn wait_required_drained(&self, timeout: Duration) -> Result<bool> {
@@ -2108,6 +2158,58 @@ mod tests {
         EventBus::new_paused(limits, Arc::new(Metrics::default()), definitions, routes, 7)
     }
 
+    #[tokio::test]
+    async fn shared_required_snapshot_commits_many_events_and_two_sinks() {
+        let limits = Arc::new(Limits::default());
+        let bus = route_bus((*limits).clone(), vec![route(None, &["a", "b"])]).unwrap();
+        let mut ids = Vec::new();
+        for _ in 0..256 {
+            let input = event(2_048);
+            ids.push(input.event_id);
+            bus.publish(input).unwrap();
+        }
+        let directory =
+            std::env::temp_dir().join(format!("netbaiot-shared-snapshot-{}", uuid::Uuid::new_v4()));
+        let spool = crate::RestartSpool::new(directory.clone(), limits);
+        let (count, bytes) = bus.commit_required_to_spool(&spool).await.unwrap().unwrap();
+        assert_eq!(count, 256);
+        assert!(bytes > 256 * 2_048);
+        let recovered = spool.recover().await.unwrap();
+        assert_eq!(recovered.records.len(), 256);
+        let actual = recovered
+            .records
+            .iter()
+            .map(|record| record.event.event_id)
+            .collect::<std::collections::HashSet<_>>();
+        assert!(ids.into_iter().all(|id| actual.contains(&id)));
+        assert!(recovered.records.iter().all(|record| {
+            record.routing_revision == 7
+                && record.pending_sinks == [SinkId::new("a").unwrap(), SinkId::new("b").unwrap()]
+        }));
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    #[ignore = "isolated release recovery snapshot allocation comparison"]
+    fn shared_snapshot_avoids_event_payload_copies() {
+        let bus = route_bus(Limits::default(), vec![route(None, &["a", "b"])]).unwrap();
+        for _ in 0..256 {
+            bus.publish(event(4_096)).unwrap();
+        }
+        let old_region = stats_alloc::Region::new(&stats_alloc::INSTRUMENTED_SYSTEM);
+        let copied = bus.spool_records().unwrap();
+        let old = old_region.change();
+        let shared_region = stats_alloc::Region::new(&stats_alloc::INSTRUMENTED_SYSTEM);
+        let shared = bus.spool_snapshot().unwrap();
+        let new = shared_region.change();
+        assert_eq!(copied.len(), shared.len());
+        assert!(new.bytes_allocated < old.bytes_allocated);
+        println!(
+            "RECOVERY_SNAPSHOT,count=256,payload=4096,deep_copy_allocated_bytes={},shared_allocated_bytes={},deep_copy_allocations={},shared_allocations={}",
+            old.bytes_allocated, new.bytes_allocated, old.allocations, new.allocations
+        );
+    }
+
     #[test]
     fn effective_fanout_rejects_global_and_tenant_aggregate_overflow() {
         for limits in [
@@ -2597,6 +2699,12 @@ mod tests {
             }
             // All entries are inflight, but every required responsibility is still spooled.
             let snapshot = restored.spool_records().unwrap();
+            let shared = restored.spool_snapshot().unwrap();
+            assert!(Arc::ptr_eq(&shared[0].event, &deliveries[0].event));
+            assert_eq!(
+                serde_json::to_vec(&shared[0]).unwrap(),
+                serde_json::to_vec(&snapshot[0]).unwrap()
+            );
             assert_eq!(snapshot[0].pending_sinks, ids);
             assert_eq!(snapshot[0].routing_revision, 7);
             assert_eq!(snapshot[0].accepted_at, acceptance.accepted_at);
