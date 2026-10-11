@@ -275,7 +275,7 @@ def run_case(args, out, codec, transport, scenario, devices, fault):
                     command=['python3', 'scripts/perf/production_readiness.py', '--devices', str(devices), '--codec', codec,
                         '--transport', transport, '--scenario', scenario, '--duration', str(args.duration), '--output', '<fresh-output>'],
                     load_config=load_config, suspected_growth=summary['growth']))
-            server.send_signal(signal.SIGTERM)
+            os.kill(pid, signal.SIGTERM)  # Actual gateway, also when heaptrack owns the wrapper PID.
             try: server.wait(timeout=20)
             except subprocess.TimeoutExpired: raise RuntimeError('gateway retained ownership during shutdown; inspect spool/server.log')
             summary['server_exit_code'] = server.returncode
@@ -297,6 +297,9 @@ def run_case(args, out, codec, transport, scenario, devices, fault):
 
 
 def main():
+    def interrupted(_signal, _frame):
+        raise KeyboardInterrupt('production campaign cancelled')
+    signal.signal(signal.SIGTERM, interrupted)
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--output', type=Path, required=True)
     p.add_argument('--server', type=Path, default=ROOT / 'target/release/netbaiot-server')
