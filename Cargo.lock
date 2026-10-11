@@ -1217,7 +1217,7 @@ checksum = "27b02d87554356db9e9a873add8782d4ea6e3e58ea071a9adb9a2e8ddb884a8b"
 
 [[package]]
 name = "netbaiot-cli"
-version = "0.2.4"
+version = "0.3.0"
 dependencies = [
  "bytes",
  "clap",
@@ -1247,7 +1247,7 @@ dependencies = [
 
 [[package]]
 name = "netbaiot-client"
-version = "0.2.4"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "bytes",
@@ -1268,7 +1268,7 @@ dependencies = [
 
 [[package]]
 name = "netbaiot-codecs"
-version = "0.2.4"
+version = "0.3.0"
 dependencies = [
  "ciborium",
  "netbaiot-core",
@@ -1284,7 +1284,7 @@ dependencies = [
 
 [[package]]
 name = "netbaiot-core"
-version = "0.2.4"
+version = "0.3.0"
 dependencies = [
  "netbaiot-protocol",
  "schemars",
@@ -1294,7 +1294,7 @@ dependencies = [
 
 [[package]]
 name = "netbaiot-device-sdk"
-version = "0.2.4"
+version = "0.3.0"
 dependencies = [
  "bytes",
  "futures-core",
@@ -1312,7 +1312,7 @@ dependencies = [
 
 [[package]]
 name = "netbaiot-loadgen"
-version = "0.2.4"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "bytes",
@@ -1336,14 +1336,14 @@ dependencies = [
 
 [[package]]
 name = "netbaiot-mqtt-wire"
-version = "0.2.4"
+version = "0.3.0"
 dependencies = [
  "bytes",
 ]
 
 [[package]]
 name = "netbaiot-protocol"
-version = "0.2.4"
+version = "0.3.0"
 dependencies = [
  "schemars",
  "serde",
@@ -1354,7 +1354,7 @@ dependencies = [
 
 [[package]]
 name = "netbaiot-runtime"
-version = "0.2.4"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "atomicwrites",
@@ -1384,7 +1384,7 @@ dependencies = [
 
 [[package]]
 name = "netbaiot-server"
-version = "0.2.4"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "futures-util",
@@ -1415,7 +1415,7 @@ dependencies = [
 
 [[package]]
 name = "netbaiot-transports"
-version = "0.2.4"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "bytes",
@@ -1444,7 +1444,7 @@ dependencies = [
 
 [[package]]
 name = "netbaiot-v3-mux"
-version = "0.2.4"
+version = "0.3.0"
 dependencies = [
  "bytes",
  "netbaiot-protocol",
@@ -1454,7 +1454,7 @@ dependencies = [
 
 [[package]]
 name = "netbaiot-xtask"
-version = "0.2.4"
+version = "0.3.0"
 dependencies = [
  "clap",
  "serde_json",
