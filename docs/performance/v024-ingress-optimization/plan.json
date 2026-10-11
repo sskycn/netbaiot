@@ -1,0 +1,242 @@
+[
+  {
+    "name": "mqtt-r0",
+    "seconds": 15,
+    "repeats": 1,
+    "warmup": 3,
+    "ramp": 1,
+    "tls": false,
+    "variant": "baseline",
+    "binary": "baseline",
+    "groups": [
+      {
+        "label": "mqtt",
+        "protocol": "mqtt",
+        "rate": 20000,
+        "workers": 32,
+        "offset": 0,
+        "window": 128
+      }
+    ]
+  },
+  {
+    "name": "mqtt-r0",
+    "seconds": 15,
+    "repeats": 1,
+    "warmup": 3,
+    "ramp": 1,
+    "tls": false,
+    "variant": "candidate",
+    "binary": "candidate",
+    "groups": [
+      {
+        "label": "mqtt",
+        "protocol": "mqtt",
+        "rate": 20000,
+        "workers": 32,
+        "offset": 0,
+        "window": 128
+      }
+    ]
+  },
+  {
+    "name": "mqtt-r1",
+    "seconds": 15,
+    "repeats": 1,
+    "warmup": 3,
+    "ramp": 1,
+    "tls": false,
+    "variant": "candidate",
+    "binary": "candidate",
+    "groups": [
+      {
+        "label": "mqtt",
+        "protocol": "mqtt",
+        "rate": 20000,
+        "workers": 32,
+        "offset": 0,
+        "window": 128
+      }
+    ]
+  },
+  {
+    "name": "mqtt-r1",
+    "seconds": 15,
+    "repeats": 1,
+    "warmup": 3,
+    "ramp": 1,
+    "tls": false,
+    "variant": "baseline",
+    "binary": "baseline",
+    "groups": [
+      {
+        "label": "mqtt",
+        "protocol": "mqtt",
+        "rate": 20000,
+        "workers": 32,
+        "offset": 0,
+        "window": 128
+      }
+    ]
+  },
+  {
+    "name": "tcp-r0",
+    "seconds": 15,
+    "repeats": 1,
+    "warmup": 3,
+    "ramp": 1,
+    "tls": false,
+    "variant": "baseline",
+    "binary": "baseline",
+    "groups": [
+      {
+        "label": "tcp",
+        "protocol": "tcp",
+        "rate": 20000,
+        "workers": 32,
+        "offset": 0,
+        "window": 128
+      }
+    ]
+  },
+  {
+    "name": "tcp-r0",
+    "seconds": 15,
+    "repeats": 1,
+    "warmup": 3,
+    "ramp": 1,
+    "tls": false,
+    "variant": "candidate",
+    "binary": "candidate",
+    "groups": [
+      {
+        "label": "tcp",
+        "protocol": "tcp",
+        "rate": 20000,
+        "workers": 32,
+        "offset": 0,
+        "window": 128
+      }
+    ]
+  },
+  {
+    "name": "tcp-r1",
+    "seconds": 15,
+    "repeats": 1,
+    "warmup": 3,
+    "ramp": 1,
+    "tls": false,
+    "variant": "candidate",
+    "binary": "candidate",
+    "groups": [
+      {
+        "label": "tcp",
+        "protocol": "tcp",
+        "rate": 20000,
+        "workers": 32,
+        "offset": 0,
+        "window": 128
+      }
+    ]
+  },
+  {
+    "name": "tcp-r1",
+    "seconds": 15,
+    "repeats": 1,
+    "warmup": 3,
+    "ramp": 1,
+    "tls": false,
+    "variant": "baseline",
+    "binary": "baseline",
+    "groups": [
+      {
+        "label": "tcp",
+        "protocol": "tcp",
+        "rate": 20000,
+        "workers": 32,
+        "offset": 0,
+        "window": 128
+      }
+    ]
+  },
+  {
+    "name": "udp-r0-fastpath",
+    "seconds": 15,
+    "repeats": 1,
+    "warmup": 3,
+    "ramp": 1,
+    "tls": false,
+    "variant": "baseline",
+    "binary": "baseline",
+    "groups": [
+      {
+        "label": "udp",
+        "protocol": "udp",
+        "rate": 40000,
+        "workers": 32,
+        "offset": 0,
+        "window": 128
+      }
+    ]
+  },
+  {
+    "name": "udp-r0-fastpath",
+    "seconds": 15,
+    "repeats": 1,
+    "warmup": 3,
+    "ramp": 1,
+    "tls": false,
+    "variant": "candidate",
+    "binary": "candidate",
+    "groups": [
+      {
+        "label": "udp",
+        "protocol": "udp",
+        "rate": 40000,
+        "workers": 32,
+        "offset": 0,
+        "window": 128
+      }
+    ]
+  },
+  {
+    "name": "udp-r1-fastpath",
+    "seconds": 15,
+    "repeats": 1,
+    "warmup": 3,
+    "ramp": 1,
+    "tls": false,
+    "variant": "candidate",
+    "binary": "candidate",
+    "groups": [
+      {
+        "label": "udp",
+        "protocol": "udp",
+        "rate": 40000,
+        "workers": 32,
+        "offset": 0,
+        "window": 128
+      }
+    ]
+  },
+  {
+    "name": "udp-r1-fastpath",
+    "seconds": 15,
+    "repeats": 1,
+    "warmup": 3,
+    "ramp": 1,
+    "tls": false,
+    "variant": "baseline",
+    "binary": "baseline",
+    "groups": [
+      {
+        "label": "udp",
+        "protocol": "udp",
+        "rate": 40000,
+        "workers": 32,
+        "offset": 0,
+        "window": 128
+      }
+    ]
+  }
+]
