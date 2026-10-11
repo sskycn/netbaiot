@@ -100,6 +100,12 @@ def quantiles(samples):
 
 
 def usage(pid):
+    if platform.system() == 'Linux':
+        # ps TIME on Linux rounds to whole seconds; procfs retains clock ticks.
+        # comm is parenthesized and may itself contain spaces or parentheses.
+        fields = Path(f'/proc/{pid}/stat').read_text().rsplit(')', 1)[1].split()
+        return dict(cpu_seconds=(int(fields[11])+int(fields[12]))/os.sysconf('SC_CLK_TCK'),
+                    rss_kib=int(fields[21])*os.sysconf('SC_PAGE_SIZE')//1024)
     fields = subprocess.check_output(['ps', '-p', str(pid), '-o', 'time=,rss='], text=True, timeout=2).split()
     cpu = 0
     for part in fields[0].split(':'):
@@ -352,6 +358,7 @@ def main():
         server_sha256=hashlib.sha256(args.server.read_bytes()).hexdigest(), harness_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
         arguments={k:str(v) if isinstance(v,Path) else v for k,v in vars(args).items()},
         timing='socket send to receipt; socket send to webhook response flushed; HTTP command submit to device bytes',
+        cpu_measurement='Linux procfs clock ticks; macOS ps process time',
         limitations=['Python closed loop and shared host, no production capacity claim','RSS sampled at 100ms, not allocator peak',
             'CPU time from ps, 10ms resolution','No application-final-processing measurement','UDP large payload has 4 fields; stream large has 64',
             'QoS0 receipt unavailable; throughput uses observed required webhook responses','No per-connection allocator isolation'])

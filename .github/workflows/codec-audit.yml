@@ -97,7 +97,7 @@ jobs:
           if-no-files-found: warn
 
   linux-comparison:
-    if: (github.event_name == 'workflow_dispatch' && inputs.compare) || (github.event_name == 'push' && contains(github.event.head_commit.message, '[codec-comparison]'))
+    if: (github.event_name == 'workflow_dispatch' && inputs.compare) || (github.event_name == 'push' && (contains(github.event.head_commit.message, '[codec-comparison]') || contains(github.event.head_commit.message, '[codec-followup]')))
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
@@ -116,12 +116,26 @@ jobs:
       - name: Use the identical measurement harness with baseline production sources
         run: cp crates/netbaiot-codecs/benches/codecs.rs target/codec-baseline/crates/netbaiot-codecs/benches/codecs.rs
       - run: cargo bench --locked -p netbaiot-codecs --bench codecs --manifest-path target/codec-baseline/Cargo.toml --target-dir target/codec-baseline-build > target/codec-before.csv
+      - name: Alternate repeated microbenchmarks for the explicit follow-up
+        if: github.event_name == 'push' && contains(github.event.head_commit.message, '[codec-followup]')
+        run: |
+          for round in 1 2 3; do
+            if [ "$round" = 2 ]; then
+              cargo bench --locked -p netbaiot-codecs --bench codecs > "target/codec-after-round${round}.csv"
+              cargo bench --locked -p netbaiot-codecs --bench codecs --manifest-path target/codec-baseline/Cargo.toml --target-dir target/codec-baseline-build > "target/codec-before-round${round}.csv"
+            else
+              cargo bench --locked -p netbaiot-codecs --bench codecs --manifest-path target/codec-baseline/Cargo.toml --target-dir target/codec-baseline-build > "target/codec-before-round${round}.csv"
+              cargo bench --locked -p netbaiot-codecs --bench codecs > "target/codec-after-round${round}.csv"
+            fi
+          done
       - name: Same-host serialized real-network comparison
         env:
           BASELINE_REVISION: ${{ inputs.baseline || '6e16b31' }}
+          CODEC_WINDOW: ${{ contains(github.event.head_commit.message, '[codec-followup]') && '0.2' || '1' }}
+          CODEC_REPEATS: ${{ contains(github.event.head_commit.message, '[codec-followup]') && '1' || '3' }}
         run: |
-          python3 scripts/perf/codec_campaign.py --server target/codec-baseline-build/release/netbaiot-server --output target/performance/codec-audit/before/matrix --revision "$BASELINE_REVISION" --seconds 1 --workers 4 --repeats 3
-          python3 scripts/perf/codec_campaign.py --server target/release/netbaiot-server --output target/performance/codec-audit/after/matrix --revision "$GITHUB_SHA" --seconds 1 --workers 4 --repeats 3
+          python3 scripts/perf/codec_campaign.py --server target/codec-baseline-build/release/netbaiot-server --output target/performance/codec-audit/before/matrix --revision "$BASELINE_REVISION" --seconds "$CODEC_WINDOW" --workers 4 --repeats "$CODEC_REPEATS"
+          python3 scripts/perf/codec_campaign.py --server target/release/netbaiot-server --output target/performance/codec-audit/after/matrix --revision "$GITHUB_SHA" --seconds "$CODEC_WINDOW" --workers 4 --repeats "$CODEC_REPEATS"
       - name: Summarize matching Linux measurements
         run: python3 scripts/perf/codec_audit_summary.py --network-only --root target/performance/codec-audit --output target/performance/codec-audit/summary --print-summary
       - name: Retain actual environment, configuration and measurements
@@ -133,5 +147,6 @@ jobs:
             target/performance/codec-audit/
             target/codec-before.csv
             target/codec-after.csv
+            target/codec-*-round*.csv
           retention-days: 14
           if-no-files-found: warn
