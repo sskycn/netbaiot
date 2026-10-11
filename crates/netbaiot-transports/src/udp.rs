@@ -3,7 +3,9 @@ use netbaiot_core::*;
 use netbaiot_runtime::*;
 use std::{
     collections::{BTreeSet, HashMap},
+    future::Future,
     sync::Arc,
+    task::Poll,
 };
 use tokio::net::UdpSocket;
 use tokio::{sync::Mutex, task::JoinSet};
@@ -288,7 +290,7 @@ pub async fn serve(socket: UdpSocket, s: Arc<Services>, stop: CancellationToken)
         let ingress = s.ingress.clone();
         let replay = replay.clone();
         let socket = socket.clone();
-        tasks.spawn(async move {
+        let mut work = Box::pin(async move {
             if let Err(error) = accept_and_ack_concurrent(&packet, &ingress, &replay, |ack| {
                 socket.try_send_to(ack, peer)
             })
@@ -297,6 +299,16 @@ pub async fn serve(socket: UdpSocket, s: Arc<Services>, stop: CancellationToken)
                 tracing::debug!(%error, "UDP datagram rejected");
             }
         });
+        // A cached verifier and uncongested EventBus usually complete in one poll.
+        // Keep that path on the receive task and transfer ownership only when an
+        // external lookup or admission actually yields. The boxed future remains
+        // pinned after this first poll and the JoinSet still bounds waiting work.
+        if std::future::poll_fn(|cx| Poll::Ready(work.as_mut().poll(cx)))
+            .await
+            .is_pending()
+        {
+            tasks.spawn(work);
+        }
     }
     // Quiesce stops new receipts, while already started admissions retain their
     // guards and complete before the server drains or spools required work.
