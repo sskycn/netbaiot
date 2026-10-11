@@ -1,6 +1,6 @@
 # Business RPC Stream V2 生产就绪门禁
 
-> Historical implementation/measurement evidence from before the current-only cleanup (baseline `21a6945`, 2026-10-07). Commands, old protocol names and compatibility claims below describe their recorded revisions. Current support and upgrade instructions: [protocol matrix](protocol-support.md), [breaking change](migration/current-protocol-only.md).
+> Historical implementation/measurement evidence from before the current-only cleanup (baseline `21a6945`, 2026-10-07). Commands, old protocol names and compatibility claims below describe their recorded revisions. Current support and upgrade instructions: [protocol matrix](protocol-support.zh-CN.md), [breaking change](migration/current-protocol-only.zh-CN.md).
 
 起始代码为 `76c0d658d410e82eecdbfb8c1d31f09d73af42bc`。本页只记录本轮实际运行的负载和验证。**当前结论：尚不能宣称已具备完整公网生产部署依据**。mTLS、本机限速流代理、过载和 60 秒短 soak 已有观测；跨机器公网、Linux `tc netem` 真实丢包、1 小时及 6 小时 soak 尚未运行。长时稳定性和丢包恢复门禁保持 `NOT RUN`。
 

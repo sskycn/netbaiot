@@ -1,6 +1,6 @@
 # Business RPC V2 可靠性与负载门禁
 
-> Historical implementation/measurement evidence from before the current-only cleanup (baseline `21a6945`, 2026-10-07). Commands, old protocol names and compatibility claims below describe their recorded revisions. Current support and upgrade instructions: [protocol matrix](protocol-support.md), [breaking change](migration/current-protocol-only.md).
+> Historical implementation/measurement evidence from before the current-only cleanup (baseline `21a6945`, 2026-10-07). Commands, old protocol names and compatibility claims below describe their recorded revisions. Current support and upgrade instructions: [protocol matrix](protocol-support.zh-CN.md), [breaking change](migration/current-protocol-only.zh-CN.md).
 
 后续 mTLS、双角色拓扑、WAN-like 流延迟、CPU/RSS、证书生命周期与生产门禁记录见 [Business RPC V2 生产就绪门禁](business-rpc-v2-production-readiness.zh-CN.md)。本页以下数字仍是上一阶段的明文 loopback/dev profile 历史测量，不能与新一轮 release/mTLS 数据混写或作为当前生产容量。
 

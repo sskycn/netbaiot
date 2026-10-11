@@ -1,5 +1,7 @@
 # Security overview
 
+[中文](security.zh-CN.md)
+
 For undisclosed vulnerabilities, follow the [Security Policy](../SECURITY.md)
 and use the repository's private reporting form. Do not post exploit details in
 a public issue.

@@ -24,4 +24,4 @@ NBI1/NBA1 以及当前 Business RPC V3 的 wire bytes 均不变。公共客户�
 Rust/JSON 模型和筛选条件中移除了未使用的连接生命周期类型，属于公共 API 破坏性变更。
 请删除旧筛选条件并重新构建客户端；设备 JSON v1 和当前 Business RPC V3 分别保留其 wire bytes。
 参阅[兼容性说明](connection-events-spool-upgrade-cleanup.md)以及
-[当前格式升级步骤](migration/current-protocol-only.md)。
+[当前格式升级步骤](migration/current-protocol-only.zh-CN.md)。

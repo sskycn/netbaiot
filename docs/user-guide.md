@@ -3,7 +3,7 @@
 管理接口的 API Key、JWT、mTLS、Scope、资源授权和旧令牌迁移参阅[管理认证](management-auth.zh-CN.md)。
 
 > 当前职责边界与验证见[设备配置职责移除报告](remove-device-config.md)。<br>
-> Workspace 版本：`0.1.0`；Rust MSRV：`1.88`。
+> Workspace 版本：`0.2.4`；Rust MSRV：`1.88`。
 
 本指南面向第一次部署 NetbaIoT 的开发者、设备开发者和业务系统开发者。它以当前代码、测试和配置 schema 为准；若与更早的文档冲突，以当前代码和链接的迁移报告为准。
 
@@ -71,8 +71,9 @@ else:
 - 可选设备 SDK：`netbaiot-device-sdk`。
 - 当前 codec：`netbaiot-json` version `1`。
 - 业务 sink：required HTTP webhook，或单个 required confirmed TCP/RPC stream；开发配置可使用即时 ACK 的 audit sink。
-- MQTT：3.1.1 QoS0/1/2、CleanSession 0/1、persistent session、exact/`+`/`#`、retain、Will、计划重启恢复。
+- MQTT：3.1.1 与有界 5.0 profile；QoS0/1/2、持久会话、exact/`+`/`#`、retain、Will、计划重启恢复。
+- 当前业务流与恢复格式：Business RPC V3、MQTT NBMQ v6、EventBus NBSP v3；旧版/未知格式不会自动回退或迁移。
 
 ## Reference 文档
 
-教程讲“怎么用”，详细契约仍以 reference 为准：[架构](architecture.zh-CN.md)、[HTTP API](http-api.zh-CN.md)、[设备协议](device-protocol.zh-CN.md)、[MQTT profile](mqtt.zh-CN.md)、[投递语义](delivery-semantics.zh-CN.md)、[公共协议](public-protocol.md)、[资源预算](resource-budgets.md)、[恢复格式](restart-spool.md)、[性能基线](performance-baseline.md)。
+教程讲“怎么用”，详细契约仍以 reference 为准：[中文文档导航](README.zh-CN.md)、[架构](architecture.zh-CN.md)、[协议支持](protocol-support.zh-CN.md)、[HTTP API](http-api.zh-CN.md)、[设备协议](device-protocol.zh-CN.md)、[MQTT profile](mqtt.zh-CN.md)、[投递语义](delivery-semantics.zh-CN.md)、[公共协议](public-protocol.zh-CN.md)、[资源预算](resource-budgets.md)、[恢复格式](restart-spool.zh-CN.md)、[当前协议升级](migration/current-protocol-only.zh-CN.md)、[性能基线](performance-baseline.md)。

@@ -74,7 +74,7 @@ python3 examples/business_http_sink.py
 
 bootstrap 为有界 Hello/Ready JSON；后续是 12-byte header 的二进制 stream framing。Provider、EventSubscription 和在线命令 RPC 分别管理。唯一活动 required sink `tcp-rpc` 所有者每次只有一个事件在途。应用事务成功后调用 ACK，匹配当前 epoch/stream、delivery 与 event identity；socket write 与 WINDOW_UPDATE 都不是业务 ACK。filter 改变不能丢弃已经接受的 required 工作。重连可以重放稳定 EventId，业务必须幂等。
 
-使用下面的官方 Rust 示例，不再保留旧 Python wire 实现。旧客户端和恢复文件必须先完成[升级准备](migration/current-protocol-only.md)。
+使用下面的官方 Rust 示例，不再保留旧 Python wire 实现。旧客户端和恢复文件必须先完成[升级准备](migration/current-protocol-only.zh-CN.md)。
 
 ## 官方 Rust 业务客户端
 

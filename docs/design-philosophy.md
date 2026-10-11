@@ -1,5 +1,7 @@
 # Design philosophy
 
+[中文](design-philosophy.zh-CN.md)
+
 NetbaIoT is an ingress gateway and real-time event router. It connects devices to
 business systems that already own application data and workflows.
 

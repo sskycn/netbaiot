@@ -1,5 +1,7 @@
 # 5-minute Quick Start
 
+[中文](quick-start.zh-CN.md)
+
 Use Linux x86_64 or ARM64 for production. macOS supports development/testing;
 Windows is experimental and has no guaranteed official archive for each version.
 See [platform support and release policy](platform-support.md). This walkthrough

@@ -1,5 +1,7 @@
 # Protocol support
 
+[中文](protocol-support.zh-CN.md)
+
 This page summarizes the profiles implemented by the current workspace. MQTT
 details live in [MQTT profile](mqtt.md); the JSON uplink and TCP/UDP wire formats
 are in [device protocol](device-protocol.md).

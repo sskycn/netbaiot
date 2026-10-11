@@ -17,7 +17,7 @@ Management HTTP（`management_http`，通常为 `127.0.0.1:9090`）和可选的
 
 NetbaIoT 直接实现 MQTT 3.1.1 和 MQTT 5.0，不依赖外部 broker 或数据库。子系统分层包括按版本隔离的增量 packet codec、连接状态机、认证后的会话挂接、有界会话存储、topic trie、retain 存储、QoS 引擎，最后才是 IoT 绑定/EventBus。
 
-支持的控制报文包括 CONNECT/CONNACK、PUBLISH、PUBACK/PUBREC/PUBREL/PUBCOMP、SUBSCRIBE/SUBACK、UNSUBSCRIBE/UNSUBACK、PINGREQ/PINGRESP 和 DISCONNECT。已实现 QoS0、QoS1 以及明确的入站/出站 QoS2 状态机。MQTT 5 支持会话过期、消息过期、Will Delay、接收上限、报文大小上限、订阅选项和有界 PUBLISH 属性。MQTT-SN、WebSocket、共享订阅、Topic Alias、Subscription Identifier、Enhanced Authentication、bridge 模式和 `$SYS` 服务不在当前范围内。详细能力矩阵见[英文 MQTT 文档](mqtt.md#compatibility-and-mqtt-5-profile)。
+支持的控制报文包括 CONNECT/CONNACK、PUBLISH、PUBACK/PUBREC/PUBREL/PUBCOMP、SUBSCRIBE/SUBACK、UNSUBSCRIBE/UNSUBACK、PINGREQ/PINGRESP 和 DISCONNECT。已实现 QoS0、QoS1 以及明确的入站/出站 QoS2 状态机。MQTT 5 支持会话过期、消息过期、Will Delay、接收上限、报文大小上限、订阅选项和有界 PUBLISH 属性。MQTT-SN、WebSocket、共享订阅、Topic Alias、Subscription Identifier、Enhanced Authentication、bridge 模式和 `$SYS` 服务不在当前范围内。详细能力矩阵见[中文协议支持矩阵](protocol-support.zh-CN.md#mqtt-50-属性矩阵)；精确报文行为仍以本页后续说明和实现测试为准。
 
 CONNECT 阶段通过有界 AuthCache 认证一次。得到的 `Arc<AuthenticatedDevice>` 会绑定到连接；后续普通 MQTT 报文不会再调用远程认证。MQTT ClientId 不作为可信身份。持久会话以 `(Authenticated DeviceKey, ClientId)` 为键，因此其他设备或租户不能仅凭复制 ClientId 继承或删除会话。空 ClientId 仅在 CleanSession=1 时接受，并会生成仅对当前连接有效的值。
 

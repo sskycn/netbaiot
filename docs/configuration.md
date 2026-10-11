@@ -1,5 +1,7 @@
 # Configuration and project setup
 
+[中文](configuration.zh-CN.md)
+
 ```bash
 netbaiot init my-gateway
 cd my-gateway

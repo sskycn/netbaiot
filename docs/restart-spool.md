@@ -1,5 +1,7 @@
 # Runtime restart recovery
 
+[中文](restart-spool.zh-CN.md)
+
 The recovery directory has two independent atomic responsibility domains during a
 planned restart: the EventBus authoritative snapshot (`eventbus-recovery.spool`) and the MQTT broker
 snapshot (`mqtt-runtime.state`). Normal traffic never writes either. The auth cache, gateway control

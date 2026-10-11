@@ -1,5 +1,7 @@
 # Benchmarks and measurements
 
+[中文](benchmarks.zh-CN.md)
+
 The [2026-10-08 engineering optimization report](engineering-optimization.md)
 records incremental EventBus responsibility accounting, borrowed HTTP JSON
 serialization, bounded HTTP outage recovery and a MQTT session matrix. Its

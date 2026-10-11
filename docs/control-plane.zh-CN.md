@@ -19,4 +19,4 @@
 在线变更使用普通 MQTT/TCP `DeviceCommand`，结果通过 `CommandAck` 返回。
 网关不解释命令名，也不比较业务 revision。详见[迁移说明](remove-device-config.md)。
 
-控制面 mutation、V2/V3 auth.sync/auth.invalidate、provider 离线撤销、命令提交（含去重重试）与 MQTT/TCP 最终建连均持有 lifecycle admission guard。Quiescing 后拒绝新操作，等待已获准操作完成，再等待 MQTT owner 的 QoS/Will 清理并写入快照。诊断读取和幂等 drain 请求仍可使用。
+控制面 mutation、当前 Business RPC V3 的 auth.sync/auth.invalidate、provider 离线撤销、命令提交（含去重重试）与 MQTT/TCP 最终建连均持有 lifecycle admission guard。Quiescing 后拒绝新操作，等待已获准操作完成，再等待 MQTT owner 的 QoS/Will 清理并写入快照。诊断读取和幂等 drain 请求仍可使用。

@@ -36,7 +36,7 @@ HTTP `/api/v1/devices/commands` 和当前 Business RPC 共用一个 `CommandServ
 }
 ```
 
-客户端显式使用 `BusinessRpcV3ClientConfig` 与 `BusinessRpcV3Client::connect`，在依赖 Provider/订阅前等待 `wait_ready()`。重连有有界退避并重建父流；旧事件句柄受 epoch 栅栏保护，不能在新连接上 ACK。TCP 自身仍有队头阻塞，丢包可能暂停所有流；V3 解决的是应用层整帧写入造成的阻塞。部署当前监听器前必须升级业务客户端，见[兼容性变更与升级](migration/current-protocol-only.md)。`StaleRevision` 会重建 Provider 流并执行 reset sync，事件订阅保持独立所有权。底层 `wait_ready()` 持续等待服务就绪；调用方应配置自己的超时或取消。
+客户端显式使用 `BusinessRpcV3ClientConfig` 与 `BusinessRpcV3Client::connect`，在依赖 Provider/订阅前等待 `wait_ready()`。重连有有界退避并重建父流；旧事件句柄受 epoch 栅栏保护，不能在新连接上 ACK。TCP 自身仍有队头阻塞，丢包可能暂停所有流；V3 解决的是应用层整帧写入造成的阻塞。部署当前监听器前必须升级业务客户端，见[兼容性变更与升级](migration/current-protocol-only.zh-CN.md)。`StaleRevision` 会重建 Provider 流并执行 reset sync，事件订阅保持独立所有权。底层 `wait_ready()` 持续等待服务就绪；调用方应配置自己的超时或取消。
 
 实际 16 KiB Event 限速短测尚未证明默认 256 KiB 流窗口下有稳定、明显的认证尾延迟改善；原因与原始数字见 [V3 生产就绪测量](business-rpc-v3-production-readiness.zh-CN.md)。
 

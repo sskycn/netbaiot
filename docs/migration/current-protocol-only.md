@@ -1,5 +1,7 @@
 # Breaking change: current protocols only
 
+[中文](current-protocol-only.zh-CN.md)
+
 From this cleanup, Business RPC V1 and V2 implementations are removed. Business RPC V3 is the only accepted business stream. MQTT recovery accepts NBMQ v6 only; the independent EventBus spool accepts NBSP v3 only. NBMQ v1–v5 and NBSP v1/v2 readers, JSON recovery, migration paths and historical fixtures are removed. Old/unknown headers fail with `UnsupportedRecoveryVersion(version)` or protocol rejection/connection close. Current framing, payload bytes, checksum/trailer, permissions and resource limits remain in force. MQTT 3.1.1/5.0 and management `/api/v1` remain supported.
 
 ## Clients and configuration

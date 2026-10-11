@@ -33,4 +33,4 @@ while let Some(delivery) = events.next().await {
 
 ## 当前 Business RPC 客户端
 
-`netbaiot-client::business_rpc` 提供 `BusinessRpcV3Client`、当前 `BusinessAuthHandler`、reset sync、失效、手动 ACK 和在线命令。见[当前协议](business-rpc-v3.zh-CN.md)与[可编译示例](../crates/netbaiot-client/examples/business_rpc_current.rs)。底层 `wait_ready()` 持续等待，应由应用设置超时或取消。根事件 façade 使用同一当前 driver；开发环境显式传 `event_token`，生产用 `event_tls(BusinessRpcTls)`，没有管理 token fallback。旧 API 已移除，见[升级要求](migration/current-protocol-only.md)。
+`netbaiot-client::business_rpc` 提供 `BusinessRpcV3Client`、当前 `BusinessAuthHandler`、reset sync、失效、手动 ACK 和在线命令。见[当前协议](business-rpc-v3.zh-CN.md)与[可编译示例](../crates/netbaiot-client/examples/business_rpc_current.rs)。底层 `wait_ready()` 持续等待，应由应用设置超时或取消。根事件 façade 使用同一当前 driver；开发环境显式传 `event_token`，生产用 `event_tls(BusinessRpcTls)`，没有管理 token fallback。旧 API 已移除，见[升级要求](migration/current-protocol-only.zh-CN.md)。

@@ -1,5 +1,7 @@
 # Reliability and recovery
 
+[中文](reliability.zh-CN.md)
+
 This page summarizes the runtime's delivery and shutdown guarantees. It does not
 promise that an arbitrary process or machine failure is lossless.
 

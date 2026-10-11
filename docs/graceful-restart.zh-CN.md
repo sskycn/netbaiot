@@ -14,4 +14,9 @@ MQTT 快照或 EventBus spool 失败会阻止主动关机。结构性 MQTT 恢�
 
 MQTT 恢复会以增量方式写入 NBMQ v6 有界类型记录，并在末尾附上记录数、字节数和整条流的摘要。只读取 NBMQ v6；旧版及未知版本在 payload 解码前明确失败。完成新 broker 状态替换前，会校验 topic/filter 语法、packet ID、各状态允许的 QoS、离线队列中的非 QoS0 消息、retain 一致性、顺序、重复项、授权/codec 来源，以及 session ACL 所有权。
 
+EventBus 恢复只读写 NBSP v3 权威快照，记录完整事件、稳定 `event_id`、待处理 sink、
+路由 revision 与重试元数据，并以逐记录 checksum 和整条流摘要保护。NBSP v1/v2、NBMQ v1–v5
+及未知版本均明确失败；当前进程不包含旧版解析器或自动转换器。升级前必须按
+[当前协议升级指南](migration/current-protocol-only.zh-CN.md)处理旧文件。
+
 控制面 mutation、当前 Business RPC auth.sync/auth.invalidate、provider 离线撤销、命令提交（含去重重试）与 MQTT/TCP 最终建连均持有 lifecycle admission guard。Quiescing 后拒绝新操作，等待已获准操作完成，再等待 MQTT owner 的 QoS/Will 清理并写入快照。诊断读取和幂等 drain 请求仍可使用。

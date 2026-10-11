@@ -1,5 +1,7 @@
 # Platform support / 平台支持
 
+[完整中文说明](platform-support.zh-CN.md)
+
 | Platform | Support level | Release policy |
 | --- | --- | --- |
 | Linux x86_64 / ARM64 (aarch64) | Production / 正式生产 | Both GNU Linux archives required; any Linux gate failure blocks publishing |

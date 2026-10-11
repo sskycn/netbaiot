@@ -3,7 +3,7 @@
 正式生产部署推荐 Linux x86_64 或 ARM64，正式发布在 Ubuntu 24.04 两种架构上原生构建、
 运行并验证 SHA256。其他发行版先确认 loader/glibc、TLS 与恢复目录配置。
 macOS 定位为开发与测试，Windows 为实验性兼容，不提供生产稳定性保证。
-Linux 发布门禁独立于 macOS/Windows 可选检查；详见[平台支持](platform-support.md)。
+Linux 发布门禁独立于 macOS/Windows 可选检查；详见[平台支持](platform-support.zh-CN.md)。
 
 ## 配置模型
 
@@ -30,9 +30,14 @@ netbaiot-server --print-default-limits
 | `device_ingress` | TCP：MQTT/通用 TCP；UDP：NBI1/NBA1 | loopback `8080` | 同号 TCP/UDP `443`；TCP 必须 TLS，UDP 只认证不加密 |
 | `management_http` | `/api/v1/...` listener | loopback `9090` | 优先 loopback/管理网；非 loopback 必须 TLS |
 | `business_tcp` | confirmed stream listener | null | 显式 `business_rpc`；生产 mTLS，开发回环 token；与 webhook 二选一 |
+| `business_rpc` | 唯一当前 Business RPC V3 的 limits、send-ahead、TLS 与 principal | null | 启用 `business_tcp` 时必填；旧 V1/V2 字段会被拒绝 |
+| `device_auth` | `static` / `http` / `business_rpc` 认证源 | 未设置时按 URL 推导为 static | 生产建议显式选择，与对应 provider 配套 |
+| `event_delivery` | `http` / `business_rpc` / `development_audit` | 未设置时按 listener/URL 推导 | 生产必须是已确认 HTTP 或 Business RPC sink |
 | `development` | 强制所有 listener loopback | true | false |
 | `limits` | `Limits` 的覆盖字段 | `{}` 使用默认 | 按测量调优，不可设无界 |
-| `tls` | PEM certificate/private key | null | 对非 loopback management HTTP/MQTT/TCP 必填 |
+| `tls` | 设备 TCP 的 PEM certificate/private key；管理未单配时兼作 fallback | null | 非 loopback 设备 TCP 必填 |
+| `management_tls` | 独立管理证书、可选 client CA 与强制 client cert | null | 公网/管理网建议单独配置；mTLS identity 必须成对设置 |
+| `management_auth` | bootstrap token 开关、API Key、JWT/JWKS、mTLS identity 映射 | 空 scoped provider | 按最小 scope/resource 授权 |
 | `delivery_url` | required webhook | tutorial 为 loopback | HTTPS business endpoint |
 | `auth_provider_url` | 外部认证 provider | null + static credentials | HTTPS provider；loopback 可 HTTP |
 | `spool_directory` | planned-restart recovery | `./var/...` | 独立、本地、受监控、权限受限目录 |
@@ -42,7 +47,7 @@ Environment variables：
 
 | 名称 | 用途 |
 |---|---|
-| `NETBAIOT_ADMIN_SECRET` | 64-hex management bearer；未设置时 loopback management 存活但所有请求 forbidden |
+| `NETBAIOT_ADMIN_SECRET` | 可选 64-hex 全局 bootstrap management bearer；没有任何可用管理 provider 时请求 forbidden |
 | `NETBAIOT_DELIVERY_TOKEN` | webhook bearer |
 | `NETBAIOT_BUSINESS_RPC_TOKEN` | 回环开发 Business RPC token；生产使用 mTLS principal |
 | `RUST_LOG` | tracing filter，如 `info` 或 `netbaiot_server=debug` |
@@ -63,12 +68,17 @@ Environment variables：
   "device_ingress": "0.0.0.0:443",
   "management_http": "127.0.0.1:9090",
   "business_tcp": null,
+  "business_rpc": null,
+  "device_auth": "http",
+  "event_delivery": "http",
   "development": false,
   "limits": {},
   "tls": {
     "certificate": "/etc/netbaiot/tls/server-chain.pem",
     "private_key": "/etc/netbaiot/tls/server-key.pem"
   },
+  "management_tls": null,
+  "management_auth": {},
   "delivery_url": "https://business.internal.example/netbaiot/events",
   "auth_provider_url": "https://identity.internal.example/device-auth",
   "spool_directory": "/var/lib/netbaiot/recovery",
@@ -184,7 +194,13 @@ Quiesce 先让 readiness false、关闭 admission gate、等待活动 guard，�
 
 如果 spool fsync/rename/directory fsync 失败且仍有 accepted work，进程保持存活、unready、有界频率重试，不宣称成功退出。结构性 MQTT recovery failure 不会跳过 EventBus 安全流程，但最终仍会阻止 voluntary exit。
 
-EventBus 当前 writer 为 v2，并可读 legacy v1。MQTT 当前 writer 是 streaming NBMQ v6，读取 v1/v2/v3/v4/v5/v6；snapshot 包含权威 record-count/byte-count/digest trailer。目录默认应为 0700、文件 0600；监控容量、权限、inode 和本地磁盘错误，不要把它当 hot-path queue 或一般 event store。
+EventBus 当前只读写 NBSP v3；MQTT 当前只读写 streaming NBMQ v6。两种格式都带权威
+record-count/byte-count/whole-stream digest trailer。NBSP v1/v2、NBMQ v1–v5 及未知版本
+都会明确失败，没有旧版解析回退或运行时迁移。升级前必须用能理解旧格式的合适旧版本
+完成责任或转换为当前格式，不能通过删除文件绕过恢复检查。目录默认应为 0700、文件 0600；
+监控容量、权限、inode 和本地磁盘错误，不要把它当 hot-path queue 或一般 event store。
+完整步骤见[当前协议升级指南](migration/current-protocol-only.zh-CN.md)与
+[重启恢复格式](restart-spool.zh-CN.md)。
 
 SIGKILL、process/OS crash、断电可能丢失仍仅在内存中的 bounded recent traffic 和最近 MQTT state。NetbaIoT 不是 crash-durable database；恢复能力只承诺正确完成的 planned shutdown。
 

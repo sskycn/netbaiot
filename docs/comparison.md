@@ -1,5 +1,7 @@
 # Project comparison by intended role
 
+[中文](comparison.zh-CN.md)
+
 These projects solve related but different problems. This is a description of
 their intended roles, not a feature ranking. Product editions and deployment
 options change; check each project's current documentation for requirements.

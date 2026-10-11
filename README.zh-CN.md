@@ -1,5 +1,9 @@
 # NetbaIoT
 
+**当前协议说明：** Business RPC 仅支持 V3；计划重启恢复仅支持 MQTT NBMQ v6 与
+EventBus NBSP v3。MQTT 3.1.1/5.0 和管理接口 `/api/v1` 继续支持。详见
+[协议支持](docs/protocol-support.zh-CN.md)与[升级要求](docs/migration/current-protocol-only.zh-CN.md)。
+
 [English](README.md)
 
 **一个保持网关边界的 IoT 网关。**
@@ -13,9 +17,10 @@ UDP 接入。网关验证并规范化上行数据为 `DeviceEvent`，再路由�
 
 [![CI](https://img.shields.io/github/actions/workflow/status/sskycn/netbaiot/ci.yml?branch=main)](https://github.com/sskycn/netbaiot/actions/workflows/ci.yml)
 [![License](https://img.shields.io/github/license/sskycn/netbaiot)](LICENSE)
+[![Latest release](https://img.shields.io/github/v/release/sskycn/netbaiot)](https://github.com/sskycn/netbaiot/releases)
 [![Rust](https://img.shields.io/badge/rust-1.88%2B-orange?logo=rust)](Cargo.toml)
 
-**快速入口：**[5 分钟 Quick Start](docs/quick-start.md) · [架构](docs/architecture.zh-CN.md) · [协议支持](docs/protocol-support.md) · [投递语义](docs/delivery-semantics.zh-CN.md) · [性能基线](docs/benchmarks.md) · [安全](docs/security.md)
+**快速入口：**[5 分钟快速开始](docs/quick-start.zh-CN.md) · [中文文档导航](docs/README.zh-CN.md) · [架构](docs/architecture.zh-CN.md) · [协议支持](docs/protocol-support.zh-CN.md) · [投递语义](docs/delivery-semantics.zh-CN.md) · [基准与测量](docs/benchmarks.zh-CN.md) · [安全](docs/security.zh-CN.md)
 
 ```mermaid
 flowchart LR
@@ -40,13 +45,17 @@ flowchart LR
 - **多种设备传输，共用一种事件模型。** MQTT、分帧 TCP 和签名 UDP 上行均使用
   配置的版本化 Codec，输出相同的公开 `DeviceEvent` 类型。
 - **接纳边界有明确定义。** 设备回执表示必需 Sink 队列已完成资源接纳和入队，
-  不表示业务数据库已提交。详见[投递语义](docs/delivery-semantics.md)。
+  不表示业务数据库已提交。详见[投递语义](docs/delivery-semantics.zh-CN.md)。
 - **资源有界。** 连接、报文、缓存、事件、队列、Sink、命令、订阅、重放和恢复
   状态都有数量与字节上限。
 - **计划重启恢复语义明确。** 优雅关机时会排空必需投递，或把未完成工作提交到本地
   recovery spool。这不是崩溃持久化；突然故障可能丢失近期内存工作。
 
 ## 快速开始
+
+Linux x86_64 与 ARM64 是正式支持的生产部署平台。macOS x86_64 / Apple Silicon
+用于开发与测试；Windows 属于实验性兼容平台，不保证每个版本都有官方二进制或生产稳定性。
+详见[平台支持](docs/platform-support.zh-CN.md)。
 
 源码用户（Rust 1.88+）：
 
@@ -68,7 +77,7 @@ PUBACK 与业务 sink ACK，再打印包含实际端口的 `mosquitto_pub` 命�
 Python 或 Mosquitto；按 Ctrl-C 排空并清理临时 recovery 目录。演示设备凭据**不可用于生产**。
 
 NetbaIoT 自己实现 MQTT broker，普通 MQTT 客户端仍是一等使用方式。可执行 demo
-打印的命令，或使用 [手动 MQTT 示例](docs/quick-start.md#manual-mqtt-example)中的
+打印的命令，或使用[手动 MQTT 示例](docs/quick-start.zh-CN.md#手动-mqtt-示例)中的
 `mosquitto_pub -V mqttv311`；MQTT 5 改为 `-V mqttv5`。
 
 检查并启动自己的 JSON 配置：
@@ -79,12 +88,12 @@ NetbaIoT 自己实现 MQTT broker，普通 MQTT 客户端仍是一等使用方�
 ```
 
 教程配置需要手动 webhook；只体验设备接入可使用带进程内 audit sink 的
-`configs/development.json`。详见 [CLI](docs/cli.md)、[Quick Start](docs/quick-start.md)
+`configs/development.json`。详见 [CLI](docs/cli.zh-CN.md)、[快速开始](docs/quick-start.zh-CN.md)
 和[运维指南](docs/operations-guide.md)。
 
 可用 `netbaiot init my-gateway` 创建开发项目，进入目录后执行
 `netbaiot config check --config netbaiot.json`、`netbaiot doctor --config netbaiot.json`。
-详见[配置与 IDE](docs/configuration.md)、[环境诊断](docs/doctor.md)及[维护命令](docs/maintenance.md)。
+详见[配置与 IDE](docs/configuration.zh-CN.md)、[环境诊断](docs/doctor.md)及[维护命令](docs/maintenance.md)。
 
 ## 工作方式
 
@@ -135,7 +144,7 @@ NetbaIoT 自己实现 MQTT broker，普通 MQTT 客户端仍是一等使用方�
 | UDP | NBI1 上行使用 HMAC 认证、时间戳检查、重放保护和签名 NBA1 接纳回执；不加密、无下行 |
 | 业务出口 | 已确认 HTTP webhook 或分帧 TCP/RPC 消费端；队列和确认策略相互独立且有界 |
 
-详见[协议支持矩阵](docs/protocol-support.md)和 [MQTT profile](docs/mqtt.md)。UDP 认证不
+详见[协议支持矩阵](docs/protocol-support.zh-CN.md)和 [MQTT profile](docs/mqtt.zh-CN.md)。UDP 认证不
 提供机密性：**经过认证不代表已经加密**。
 
 ## 命令与可靠性
@@ -146,20 +155,20 @@ NetbaIoT 自己实现 MQTT broker，普通 MQTT 客户端仍是一等使用方�
 
 必需 Sink 扇出采用原子接纳。必需 Sink 显式确认投递；尽力而为 Sink 按有界丢弃策略
 处理。投递是 at-least-once，重试和恢复可能造成重复。MQTT PUBACK 表示 `EventAccepted`，
-不表示业务数据库已提交。详见[投递语义](docs/delivery-semantics.md)、[可靠性](docs/reliability.md)
-和[重启恢复](docs/restart-spool.md)。
+不表示业务数据库已提交。详见[投递语义](docs/delivery-semantics.zh-CN.md)、[可靠性](docs/reliability.zh-CN.md)
+和[重启恢复](docs/restart-spool.zh-CN.md)。
 
 ## 安全
 
 MQTT 和 TCP 在连接时认证并绑定设备身份。非 loopback 设备 TCP 必须使用 TLS。管理 HTTP
 使用独立授权边界，设备凭据不能授权管理操作。UDP 使用 HMAC 和重放检查，但不加密载荷。
-应通过受保护的配置或环境注入密钥，不要记录密钥。部署前阅读[安全概述](docs/security.md)
+应通过受保护的配置或环境注入密钥，不要记录密钥。部署前阅读[安全概述](docs/security.zh-CN.md)
 和[运维指南](docs/operations-guide.md)。未公开漏洞请通过[安全报告政策](SECURITY.md)私下报告。
 
 ## 基准测试
 
 仓库保留了 loopback 和子系统实验数据，报告包含环境、构建、负载和局限。部分结果来自
-历史提交，不能证明当前版本或生产环境的容量。[基准概述](docs/benchmarks.md)解释了数据
+历史提交，不能证明当前版本或生产环境的容量。[基准概述](docs/benchmarks.zh-CN.md)解释了数据
 能说明和不能说明的内容；[性能基线](docs/performance-baseline.md)保留原始测量和环境。
 
 ## 当前限制
@@ -174,20 +183,21 @@ MQTT 和 TCP 在连接时认证并绑定设备身份。非 loopback 设备 TCP �
 
 ## 文档
 
-- [5 分钟 Quick Start](docs/quick-start.md) · [10 分钟端到端教程](docs/getting-started.md)
-- [设计理念](docs/design-philosophy.md) · [按项目定位比较](docs/comparison.md)
-- [协议支持](docs/protocol-support.md) · [MQTT 3.1.1/5.0](docs/mqtt.md) · [设备报文格式](docs/device-protocol.zh-CN.md)
-- [投递语义](docs/delivery-semantics.zh-CN.md) · [可靠性](docs/reliability.md) · [重启 spool](docs/restart-spool.md)
-- [安全](docs/security.md) · [运维](docs/operations-guide.md) · [故障排查](docs/troubleshooting.md)
+- [中文文档导航](docs/README.zh-CN.md) · [5 分钟快速开始](docs/quick-start.zh-CN.md) · [10 分钟端到端教程](docs/getting-started.md)
+- [设计理念](docs/design-philosophy.zh-CN.md) · [按项目定位比较](docs/comparison.zh-CN.md)
+- [协议支持](docs/protocol-support.zh-CN.md) · [MQTT 3.1.1/5.0](docs/mqtt.zh-CN.md) · [设备报文格式](docs/device-protocol.zh-CN.md)
+- [投递语义](docs/delivery-semantics.zh-CN.md) · [可靠性](docs/reliability.zh-CN.md) · [重启 spool](docs/restart-spool.zh-CN.md)
+- [安全](docs/security.zh-CN.md) · [运维](docs/operations-guide.md) · [故障排查](docs/troubleshooting.md)
 - [业务集成与客户端](docs/business-integration-guide.md) · [CLI](docs/cli.zh-CN.md) · [设备 SDK](docs/device-sdk.zh-CN.md)
-- [基准概述](docs/benchmarks.md) · [性能基线](docs/performance-baseline.md)
-- [v0.2.4 发布说明](docs/releases/v0.2.4.md) · [发布模板](docs/release-template.md) · [项目介绍和发布草稿](docs/project-description.md)
+- [配置与 IDE](docs/configuration.zh-CN.md) · [平台支持](docs/platform-support.zh-CN.md) · [当前协议升级](docs/migration/current-protocol-only.zh-CN.md)
+- [基准概述](docs/benchmarks.zh-CN.md) · [性能基线](docs/performance-baseline.md)
+- [v0.2.4 中文发布说明](docs/releases/v0.2.4.zh-CN.md) · [发布模板](docs/release-template.md) · [项目介绍和发布草稿](docs/project-description.md)
 
 ## 构建与发布
 
 Linux x86_64 和 ARM64 是正式支持且推荐的生产部署平台。macOS x86_64 / Apple Silicon
 用于开发与测试。Windows 属于实验性兼容平台，保留源码编译和独立手动检查，
-不保证生产稳定性或每次发布都有 Windows 二进制。详见[平台支持](docs/platform-support.md)。
+不保证生产稳定性或每次发布都有 Windows 二进制。详见[平台支持](docs/platform-support.zh-CN.md)。
 
 使用 workspace 最低支持版本构建：
 

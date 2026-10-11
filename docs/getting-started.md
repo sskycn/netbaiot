@@ -10,7 +10,8 @@ Mosquitto。下面保留手动集成教程，用于了解 webhook、标准 MQTT 
 ## 1. 环境要求
 
 - Rust `1.88.0` 或更高；推荐当前 stable。workspace 使用 Rust edition 2024。
-- macOS 或 Linux；Windows 未在本次验证环境中实测。
+- Linux x86_64/ARM64 用于生产；macOS 用于开发/测试；Windows 为实验性兼容。
+  当前发布与验证范围见[平台支持](platform-support.zh-CN.md)。
 - 构建使用 rustls，不要求系统 OpenSSL 开发包。
 - Python 3 用于零依赖教程示例。
 - `curl`；MQTT 示例建议安装 Mosquitto clients (`mosquitto_pub`、`mosquitto_sub`)。
