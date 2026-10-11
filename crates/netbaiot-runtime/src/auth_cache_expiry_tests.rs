@@ -276,6 +276,44 @@ async fn expiry_lookup_removes_only_due_entries_and_equal_deadlines() {
 }
 
 #[tokio::test]
+async fn lookup_cleanup_has_a_budget_and_expired_target_never_hits() {
+    let (cache, provider) = fixture(Limits::default());
+    let keys = (0..96)
+        .map(|index| verifier_cache_key(&format!("expired-{index:03}")).unwrap())
+        .collect::<Vec<_>>();
+    for key in &keys {
+        insert(&cache, key.clone(), CachedAuth::Negative, 1);
+    }
+    insert(
+        &cache,
+        verifier_cache_key("live").unwrap(),
+        CachedAuth::Verifier(DeviceVerifier::new(identity(), [7; 32])),
+        100,
+    );
+    {
+        let mut state = cache.state.lock().unwrap();
+        let due = Instant::now() - Duration::from_secs(1);
+        for key in &keys {
+            set_expiry(&mut state, key, due);
+        }
+    }
+    cache
+        .verify_signed_with_verifier("live", b"datagram", &tag())
+        .await
+        .unwrap();
+    assert_eq!(cache.usage().unwrap().0, 65);
+    provider.mode.store(2, Ordering::SeqCst);
+    assert!(matches!(
+        cache
+            .verify_signed_with_verifier("expired-095", b"datagram", &tag())
+            .await,
+        Err(Error::Unavailable)
+    ));
+    assert_eq!(provider.calls.load(Ordering::SeqCst), 1);
+    consistent(&cache);
+}
+
+#[tokio::test]
 async fn expire_all_and_reinsert_never_grow_indices_or_bytes() {
     let (cache, _) = fixture(Limits {
         auth_cache_max_entries: 512,

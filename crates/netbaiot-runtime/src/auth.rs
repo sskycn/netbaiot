@@ -7,7 +7,10 @@ use sha2::{Digest, Sha256};
 use std::{
     collections::{BTreeSet, HashMap, VecDeque},
     hash::{Hash, Hasher},
-    sync::{Arc, Mutex},
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicU64, Ordering},
+    },
     time::{Duration, Instant},
 };
 use subtle::ConstantTimeEq;
@@ -171,6 +174,7 @@ pub struct AuthCache {
     limits: Arc<Limits>,
     metrics: Arc<Metrics>,
     state: Mutex<AuthCacheState>,
+    epoch: AtomicU64,
     waiters: Arc<tokio::sync::Semaphore>,
 }
 
@@ -194,6 +198,7 @@ impl AuthCache {
                 epoch: 1,
                 next_inflight_id: 1,
             }),
+            epoch: AtomicU64::new(1),
         })
     }
 
@@ -212,7 +217,8 @@ impl AuthCache {
         loop {
             let follower = {
                 let mut state = lock(&self.state)?;
-                prune_expired(&mut state);
+                prune_expired_budgeted(&mut state);
+                expire_target(&mut state, &key);
                 if let Some(entry) = state.entries.get(&key) {
                     match &entry.value {
                         CachedAuth::Positive(auth) => {
@@ -390,16 +396,21 @@ impl AuthCache {
                 let mut state = lock(&self.state)?;
                 #[cfg(test)]
                 let mut state = cache_tests::probe_verifier_lock(lock(&self.state)?);
-                prune_expired(&mut state);
+                prune_expired_budgeted(&mut state);
+                expire_target(&mut state, &key);
                 if let Some(entry) = state.entries.get(&key) {
                     match &entry.value {
                         CachedAuth::Verifier(verifier) => {
+                            let verifier = verifier.clone();
+                            let epoch = state.epoch;
+                            drop(state);
                             verifier.verify(message, tag)?;
+                            if self.epoch.load(Ordering::Acquire) != epoch {
+                                self.metrics.inc(Metric::AuthStaleResponses);
+                                return Err(Error::Unavailable);
+                            }
                             self.metrics.inc(Metric::AuthCacheHits);
-                            return Ok(VerifiedDatagram {
-                                verifier: verifier.clone(),
-                                epoch: state.epoch,
-                            });
+                            return Ok(VerifiedDatagram { verifier, epoch });
                         }
                         CachedAuth::Negative => {
                             self.metrics.inc(Metric::AuthNegativeHits);
@@ -504,12 +515,15 @@ impl AuthCache {
                 bytes,
             );
             let _ = completed.completed.send(true);
+            let epoch = state.epoch;
+            drop(state);
             if let Some(verifier) = verifier {
                 verifier.verify(message, tag)?;
-                return Ok(VerifiedDatagram {
-                    verifier,
-                    epoch: state.epoch,
-                });
+                if self.epoch.load(Ordering::Acquire) != epoch {
+                    self.metrics.inc(Metric::AuthStaleResponses);
+                    return Err(Error::Unavailable);
+                }
+                return Ok(VerifiedDatagram { verifier, epoch });
             }
             return Err(Error::Authentication);
         }
@@ -518,6 +532,7 @@ impl AuthCache {
     pub fn invalidate(&self, invalidation: &AuthInvalidation) -> Result<Vec<DeviceKey>> {
         let mut state = lock(&self.state)?;
         state.epoch = state.epoch.wrapping_add(1).max(1);
+        self.epoch.store(state.epoch, Ordering::Release);
         let mut devices = std::collections::HashSet::new();
         let AuthCacheState {
             entries,
@@ -654,14 +669,39 @@ fn remove_cache_entry(state: &mut AuthCacheState, key: &AuthCacheKey) -> Option<
     Some(entry)
 }
 
+const EXPIRY_PRUNE_BUDGET: usize = 32;
+
+fn expire_target(state: &mut AuthCacheState, key: &AuthCacheKey) {
+    if state
+        .entries
+        .get(key)
+        .is_some_and(|entry| entry.expires <= Instant::now())
+    {
+        remove_cache_entry(state, key);
+        state.order.retain(|old| old != key);
+    }
+}
+
+fn prune_expired_budgeted(state: &mut AuthCacheState) {
+    prune_expired_up_to(state, EXPIRY_PRUNE_BUDGET);
+}
+
+#[cfg(test)]
 fn prune_expired(state: &mut AuthCacheState) {
+    prune_expired_up_to(state, usize::MAX);
+}
+
+fn prune_expired_up_to(state: &mut AuthCacheState, budget: usize) {
     let now = Instant::now();
     let mut removed = false;
-    while state
-        .expirations
-        .first()
-        .is_some_and(|entry| entry.0 <= now)
-    {
+    for _ in 0..budget {
+        if !state
+            .expirations
+            .first()
+            .is_some_and(|entry| entry.0 <= now)
+        {
+            break;
+        }
         let Some((_, key)) = state.expirations.pop_first() else {
             break;
         };

@@ -11,11 +11,11 @@ TTL is five seconds. Entries evict oldest cache order when count or bytes would 
 exceeded. Raw secrets/tags are not retained: keys use credential ID plus SHA-256
 fingerprints and are never logged or labeled.
 
-Expiry uses exactly one ordered deadline record per cache entry. A healthy lookup
-checks only the earliest deadline; it does not scan the cache or build a live-key
-set. Expiration, FIFO eviction, replacement and invalidation remove the matching
-deadline record and byte charge together. FIFO hits do not promote entries. Only
-an actual expiration triggers a single FIFO cleanup pass; no background task runs.
+Expiry uses exactly one ordered deadline record per cache entry. A lookup removes
+at most 32 expired entries and checks the requested entry's own deadline, so a
+partly cleaned cache never returns an expired credential. Expiration, FIFO
+eviction, replacement and invalidation remove the matching deadline record and
+byte charge together. FIFO hits do not promote entries. No background task runs.
 The index is bounded by the entry count, adds fixed node storage, and shares credential
 ID strings through Arc. The 4 MiB estimate remains a logical entry budget, not an RSS
 bound. See the [verified expiry-index measurements](performance/auth-cache-expiry-index/README.md)
@@ -25,14 +25,16 @@ Identical simultaneous misses share one provider operation through a race-safe w
 completion channel. A leader owns an RAII inflight lease: timeout, task cancellation,
 panic unwind, or any early return removes the inflight entry and wakes followers so
 one of them can retry. Miss wait permits are released on every exit. Provider calls
-have a five-second default timeout and bounded concurrency. Provider outage behavior
+have a five-second default timeout and an independent concurrency ceiling of 16
+HTTP requests by default (`max_auth_provider_requests`), separate from event ingress.
+Provider outage behavior
 is fail closed for an unknown/expired miss; an unexpired positive entry or
 already-bound long-lived session continues.
 
 UDP uses a distinct positive cache entry keyed by credential identity. A provider
 lookup returns an opaque `DeviceVerifier` containing the authenticated identity and
 256-bit HMAC verification material. Every datagram is still signature-checked
-locally, then credential version and replay window are checked; the signed message
+locally outside the shared cache lock, then credential version and replay window are checked; the signed message
 and tag are not used as the remote-cache key. Thus 10,000 valid packets within TTL
 perform one provider lookup, not 10,000. The external provider contract uses
 `{"kind":"verifier","credential_id":...}` and returns

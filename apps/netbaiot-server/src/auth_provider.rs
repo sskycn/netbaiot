@@ -65,7 +65,9 @@ impl HttpAuthProvider {
                 .map_err(|_| Error::Configuration)?,
             url,
             authorization,
-            slots: Arc::new(tokio::sync::Semaphore::new(limits.max_ingress)),
+            slots: Arc::new(tokio::sync::Semaphore::new(
+                limits.max_auth_provider_requests,
+            )),
         }))
     }
     fn request(&self) -> reqwest::RequestBuilder {
@@ -268,5 +270,25 @@ mod tests {
         assert!(
             HttpAuthProvider::with_token("https://authority.example/auth", &limits, None).is_ok()
         );
+    }
+
+    #[test]
+    fn auth_http_capacity_does_not_follow_event_ingress_capacity() {
+        let limits = Limits {
+            max_ingress: 1,
+            max_ingress_per_tenant: 1,
+            max_ingress_per_device: 1,
+            max_auth_provider_requests: 3,
+            ..Limits::default()
+        };
+        limits.validate().unwrap();
+        let provider =
+            HttpAuthProvider::with_token("http://127.0.0.1/auth", &limits, None).unwrap();
+        let permits = (0..3)
+            .map(|_| provider.slots.clone().try_acquire_owned().unwrap())
+            .collect::<Vec<_>>();
+        assert!(provider.slots.clone().try_acquire_owned().is_err());
+        drop(permits);
+        assert_eq!(provider.slots.available_permits(), 3);
     }
 }

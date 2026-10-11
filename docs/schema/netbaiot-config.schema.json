@@ -662,6 +662,14 @@
           "minimum": 1,
           "type": "integer"
         },
+        "max_auth_provider_requests": {
+          "default": 16,
+          "description": "Independent concurrency ceiling for outbound HTTP authentication requests.",
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
         "max_client_id_bytes": {
           "default": 64,
           "format": "uint",
@@ -1683,6 +1691,7 @@
         "management_jwks_refresh_min_interval_ms": 30000,
         "management_jwks_ttl_ms": 300000,
         "management_jwt_max_bytes": 16384,
+        "max_auth_provider_requests": 16,
         "max_client_id_bytes": 64,
         "max_command_bytes": 16384,
         "max_connections": 256,

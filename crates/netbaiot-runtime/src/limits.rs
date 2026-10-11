@@ -102,6 +102,8 @@ pub struct Limits {
     pub auth_cache_max_entries: usize,
     pub auth_cache_max_bytes: usize,
     pub auth_cache_max_waiters: usize,
+    /// Independent concurrency ceiling for outbound HTTP authentication requests.
+    pub max_auth_provider_requests: usize,
     pub auth_positive_ttl_ms: u64,
     pub auth_negative_ttl_ms: u64,
     pub management_auth_max_subject_bytes: usize,
@@ -251,6 +253,7 @@ impl Default for Limits {
             auth_cache_max_entries: 4_096,
             auth_cache_max_bytes: 4_194_304,
             auth_cache_max_waiters: 256,
+            max_auth_provider_requests: 16,
             auth_positive_ttl_ms: 300_000,
             auth_negative_ttl_ms: 5_000,
             management_auth_max_subject_bytes: 128,
@@ -367,6 +370,7 @@ impl Limits {
             || self.max_mqtt_user_properties > self.max_mqtt_property_bytes
             || self.max_udp_datagram_size > 1_200
             || self.max_udp_inflight_datagrams > 1_024
+            || self.max_auth_provider_requests > 1_024
             || self.max_http_header_bytes < 8_192
             || self.max_http_header_bytes > max_frame
             || self.max_http_headers > 128
@@ -483,6 +487,24 @@ mod tests {
         for invalid in [0, 1_025] {
             let mut limits = configured.clone();
             limits.max_udp_inflight_datagrams = invalid;
+            assert!(matches!(limits.validate(), Err(Error::Configuration)));
+        }
+    }
+
+    #[test]
+    fn auth_provider_capacity_is_independent_and_old_configs_still_load() {
+        let old: Limits = serde_json::from_str("{}").unwrap();
+        assert_eq!(old.max_auth_provider_requests, 16);
+        let mut limits = Limits {
+            max_ingress: 1,
+            max_ingress_per_tenant: 1,
+            max_ingress_per_device: 1,
+            max_auth_provider_requests: 32,
+            ..Limits::default()
+        };
+        limits.validate().unwrap();
+        for invalid in [0, 1_025] {
+            limits.max_auth_provider_requests = invalid;
             assert!(matches!(limits.validate(), Err(Error::Configuration)));
         }
     }

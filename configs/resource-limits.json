@@ -78,6 +78,7 @@
   "auth_cache_max_entries": 4096,
   "auth_cache_max_bytes": 4194304,
   "auth_cache_max_waiters": 256,
+  "max_auth_provider_requests": 16,
   "auth_positive_ttl_ms": 300000,
   "auth_negative_ttl_ms": 5000,
   "control_max_products": 4096,
