@@ -2327,20 +2327,23 @@ async fn exercise_shared_listener(tls: bool) {
     let (ingress, mut services) = tls_test_services(Limits::default(), stop.clone());
     ingress
         .control
-        .apply(ControlSnapshot {
-            revision: 1,
-            products: vec![ProductRuntimeConfig {
-                tenant_id: TenantId::new("demo").unwrap(),
-                product_id: ProductId::new("sensor").unwrap(),
-                codec_id: CodecId::new("netbaiot-json").unwrap(),
-                codec_version: 1,
+        .apply(
+            ControlSnapshot {
                 revision: 1,
-            }],
-            routes: vec![RouteDefinition {
-                tenant: None,
-                sinks: vec![SinkId::new("tls-test").unwrap()],
-            }],
-        })
+                products: vec![ProductRuntimeConfig {
+                    tenant_id: TenantId::new("demo").unwrap(),
+                    product_id: ProductId::new("sensor").unwrap(),
+                    codec_id: CodecId::new("netbaiot-json").unwrap(),
+                    codec_version: 1,
+                    revision: 1,
+                }],
+                routes: vec![RouteDefinition {
+                    tenant: None,
+                    sinks: vec![SinkId::new("tls-test").unwrap()],
+                }],
+            },
+            &CodecRegistry::new(netbaiot_codecs::builtins(Default::default()).unwrap()).unwrap(),
+        )
         .unwrap();
     let admin = "d".repeat(64);
     Arc::get_mut(&mut services).unwrap().admin = Some(Arc::new(

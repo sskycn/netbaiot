@@ -1,5 +1,7 @@
 # Public protocol and version namespaces
 
+Device payloads support JSON V1, CBOR V1, MessagePack V1 and Protobuf V1. See [codec wire formats, selection and extension](codecs.md).
+
 `netbaiot-protocol` is the authoritative, runtime-independent Rust model for the
 public NetbaIoT wire contracts. Normal dependencies are serialization, UUID, and
 error-model crates. It does not depend on Tokio, HTTP, MQTT, the server, or runtime

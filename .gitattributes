@@ -3,3 +3,8 @@ docs/configuration-fields.md text eol=lf
 docs/performance/**/*.json text eol=lf
 docs/performance/**/*.md text eol=lf
 docs/performance/**/*.excerpt.log text eol=lf
+
+# Native device wire vectors must never undergo newline conversion.
+/crates/netbaiot-codecs/tests/fixtures/*.cbor binary
+/crates/netbaiot-codecs/tests/fixtures/*.msgpack binary
+/crates/netbaiot-codecs/tests/fixtures/*.protobuf binary

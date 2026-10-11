@@ -1,5 +1,7 @@
 # 设备协议：netbaiot-json-v1
 
+本文保留 JSON V1 与 TCP/UDP 信封定义；认证也可选择 [CBOR、MessagePack、Protobuf V1](codecs.zh-CN.md)。TCP 首帧仍为 JSON 认证，后续上行与命令按绑定 Codec 编码，接纳回执保持 JSON。UDP 只改变 NBI1 内部 payload 的编码，签名范围与 NBA1 不变。
+
 ## Single Device Ingress（单设备入口）
 
 `device_ingress` 在同一个地址、相同端口号绑定一个 TCP listener 和一个 UDP socket。
@@ -15,7 +17,7 @@ Management HTTP（`management_http`，通常为 `127.0.0.1:9090`）和可选的
 `device_ingress` 是唯一设备地址，旧分离监听字段会触发配置错误。443 只是部署选择，不代表 HTTPS。
 设备入口收到 HTTP 字节后直接关闭，不返回 HTTP 响应。详见[迁移说明](remove-device-http.md)。
 
-认证过程会选择 codec ID `netbaiot-json`、版本 `1`。MQTT/TCP/UDP 载荷都由同一个同步 codec 解码。设备不能在载荷中自行声明可信身份；未知的信封字段会被拒绝。
+默认示例的认证信息选择 codec ID `netbaiot-json`、版本 `1`。其它已认证编码见 [Codec 规范](codecs.zh-CN.md)。MQTT/TCP/UDP 载荷都由同一个同步 codec 解码。设备不能在载荷中自行声明可信身份；未知的信封字段会被拒绝。
 
 ```json
 {"schema_version":1,"source_message_id":"boot-7:42","kind":"telemetry","data":{"temperature":25.3,"humidity":61.2}}
@@ -43,7 +45,7 @@ Codec 默认限制：输入/编码后字节数 64 KiB、每次输出一条消息
 {"credential_id":"demo-device","secret":"<64-hex-character-key>"}
 ```
 
-服务端返回分帧的 `{"authenticated":true}`。后续帧是 JSON 上行消息。服务端帧包含回执或通用 `DeviceCommand` JSON。命令包含 command_id、device、expires_at 和 `{name,arguments}` 载荷。执行 ACK 使用共享 codec。读取分片时会保留未收全的帧；EOF 会关闭连接并释放连接所属资源。厂商自有分帧格式可单独实现 `TcpFramer`。
+服务端返回分帧的 `{"authenticated":true}`。后续帧是绑定 Codec 编码的上行消息。服务端帧包含 JSON 接纳回执或同一 Codec 编码的 `DeviceCommand`。命令包含 command_id、device、expires_at 和 `{name,arguments}` 载荷。执行 ACK 使用共享 codec。读取分片时会保留未收全的帧；EOF 会关闭连接并释放连接所属资源。厂商自有分帧格式可单独实现 `TcpFramer`。
 
 ## UDP v1.1 签名可靠上行
 
@@ -59,7 +61,7 @@ NBI1（设备 → 网关）请求格式保持不变。不建立 session、endpoi
 | sequence | 8 |
 | Unix 毫秒时间戳（有符号 i64） | 8 |
 | payload 长度 | 2 |
-| JSON v1 payload | length |
+| 认证 Codec payload | length |
 | HMAC-SHA256 | 32 |
 
 HMAC 覆盖此前所有字节，密钥是**解码后的 32 字节 credential key**，不是 hex ASCII。每个包（包括重复包）都必须通过 HMAC、权限、credential version 和时间戳检查；默认时钟偏差为 ±30 秒。

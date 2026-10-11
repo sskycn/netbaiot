@@ -248,6 +248,109 @@ mod tests {
         }
     }
 
+    #[tokio::test]
+    async fn http_auth_profiles_are_checked_before_session_registration() {
+        struct Ack;
+        #[async_trait]
+        impl EventSink for Ack {
+            async fn deliver(
+                &self,
+                _: DeliveryEnvelope,
+            ) -> std::result::Result<SinkAck, SinkError> {
+                Ok(SinkAck)
+            }
+        }
+        for (id, version) in [
+            ("netbaiot-json", 1),
+            ("netbaiot-cbor", 1),
+            ("netbaiot-msgpack", 1),
+            ("netbaiot-protobuf", 1),
+            ("unknown", 1),
+            ("netbaiot-cbor", 2),
+        ] {
+            let identity = AuthenticatedDevice {
+                device_key: DeviceKey {
+                    tenant_id: TenantId::new("t").unwrap(),
+                    product_id: ProductId::new("p").unwrap(),
+                    device_id: DeviceId::new("d").unwrap(),
+                },
+                credential_version: 1,
+                auth_generation: 1,
+                codec_id: CodecId::new(id).unwrap(),
+                codec_version: version,
+                permissions: Permissions {
+                    publish: true,
+                    commands: true,
+                },
+            };
+            let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let address = listener.local_addr().unwrap();
+            let bytes = serde_json::to_vec(&identity).unwrap();
+            let server = tokio::spawn(async move {
+                let (mut stream, _) = listener.accept().await.unwrap();
+                let mut request = [0; 4096];
+                assert!(stream.read(&mut request).await.unwrap() > 0);
+                let header = format!(
+                    "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                    bytes.len()
+                );
+                stream.write_all(header.as_bytes()).await.unwrap();
+                stream.write_all(&bytes).await.unwrap();
+            });
+            let limits = Arc::new(Limits::default());
+            let metrics = Arc::new(Metrics::default());
+            let provider =
+                HttpAuthProvider::with_token(&format!("http://{address}/auth"), &limits, None)
+                    .unwrap();
+            let sink_id = SinkId::new("test").unwrap();
+            let events = EventBus::new(
+                limits.clone(),
+                metrics.clone(),
+                vec![SinkDefinition::bounded(
+                    sink_id.clone(),
+                    SinkDeliveryMode::ConfirmedRequired,
+                    Arc::new(Ack),
+                    &limits,
+                )],
+                vec![RouteDefinition {
+                    tenant: None,
+                    sinks: vec![sink_id],
+                }],
+                1,
+            )
+            .unwrap();
+            let lifecycle = Arc::new(Lifecycle::starting());
+            lifecycle.mark_running().unwrap();
+            let ingress = Ingress::new(
+                limits.clone(),
+                AuthCache::new(provider, limits.clone(), metrics.clone()),
+                crate::bootstrap::codec_registry(&limits).unwrap(),
+                events,
+                GatewayControl::empty(limits.clone()),
+                metrics,
+                Sessions::new(limits),
+                lifecycle,
+            );
+            let result = ingress
+                .authenticate_session(AuthenticationRequest::Secret {
+                    credential_id: "d",
+                    secret: b"secret",
+                })
+                .await;
+            if id == "unknown" || version != 1 {
+                assert!(matches!(result, Err(Error::Codec)));
+                assert!(ingress.sessions.list(0, 10).unwrap().is_empty());
+            } else {
+                let (session, _) = ingress
+                    .register_session(result.unwrap(), Transport::Tcp)
+                    .unwrap();
+                assert_eq!(session.device, identity.device_key);
+            }
+            server.await.unwrap();
+            ingress.events.stop_workers().await.unwrap();
+        }
+    }
+
     #[test]
     fn http_auth_provider_token_validation_preserves_transport_policy() {
         let limits = Limits::default();

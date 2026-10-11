@@ -24,6 +24,10 @@ impl CodecRegistry {
         Ok(Self { codecs })
     }
 
+    pub fn contains(&self, id: &CodecId, version: u16) -> bool {
+        self.codecs.contains_key(&(id.clone(), version))
+    }
+
     pub fn get(&self, auth: &AuthenticatedDevice) -> Result<&Arc<dyn DeviceCodec>> {
         self.codecs
             .get(&(auth.codec_id.clone(), auth.codec_version))
@@ -129,12 +133,30 @@ impl Ingress {
         if !self.lifecycle.ready() {
             return Err(Error::Draining);
         }
-        self.auth_cache
+        let auth = self
+            .auth_cache
             .authenticate(request)
             .await
             .inspect_err(|_| {
                 self.metrics.inc(Metric::AuthFailures);
-            })
+            })?;
+        self.validate_auth_profile(&auth)
+            .inspect_err(|_| self.metrics.inc(Metric::AuthFailures))?;
+        Ok(auth)
+    }
+
+    /// Trusted provider selects the codec; an existing product profile must agree.
+    /// Absent product profiles permit supported dynamic-provider identities.
+    pub fn validate_auth_profile(&self, auth: &AuthenticatedDevice) -> Result<()> {
+        self.codecs.get(auth)?;
+        if let Some(product) = self
+            .control
+            .product(&auth.device_key.tenant_id, &auth.device_key.product_id)?
+            && (product.codec_id != auth.codec_id || product.codec_version != auth.codec_version)
+        {
+            return Err(Error::Forbidden);
+        }
+        Ok(())
     }
 
     pub async fn authenticate_session(
@@ -144,10 +166,14 @@ impl Ingress {
         if !self.lifecycle.ready() {
             return Err(Error::Draining);
         }
-        self.auth_cache
+        let candidate = self
+            .auth_cache
             .authenticate_candidate(request)
             .await
-            .inspect_err(|_| self.metrics.inc(Metric::AuthFailures))
+            .inspect_err(|_| self.metrics.inc(Metric::AuthFailures))?;
+        self.validate_auth_profile(&candidate.auth)
+            .inspect_err(|_| self.metrics.inc(Metric::AuthFailures))?;
+        Ok(candidate)
     }
 
     pub fn register_session(
@@ -190,8 +216,32 @@ impl Ingress {
             self.metrics.inc(Metric::AuthStaleResponses);
             return Err(Error::Unavailable);
         }
+        self.validate_auth_profile(&candidate.auth)
+            .inspect_err(|_| self.metrics.inc(Metric::AuthFailures))?;
         let auth = Arc::new(candidate.auth);
         self.sessions.register_with(auth, transport, finalize)
+    }
+
+    pub fn apply_control_snapshot(&self, snapshot: ControlSnapshot) -> Result<()> {
+        let admission = self.lifecycle.begin_admission()?;
+        self.apply_control_snapshot_admitted(&admission, snapshot)
+    }
+
+    pub fn apply_control_snapshot_admitted(
+        &self,
+        admission: &AdmissionGuard<'_>,
+        snapshot: ControlSnapshot,
+    ) -> Result<()> {
+        admission.check(&self.lifecycle)?;
+        let _gate = lock(&self.auth_registration)?;
+        if snapshot.products.len() > self.limits.control_max_products {
+            return Err(Error::Overloaded);
+        }
+        // Adding a profile must not change the interpretation of existing live sessions.
+        if self.sessions.product_codec_conflicts(&snapshot.products)? {
+            return Err(Error::Conflict);
+        }
+        self.control.apply(snapshot, &self.codecs)
     }
 
     pub fn invalidate_auth(

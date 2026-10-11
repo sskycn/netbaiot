@@ -1,0 +1,85 @@
+{
+  "device_ingress": "127.0.0.1:8080",
+  "management_http": "127.0.0.1:9090",
+  "business_tcp": null,
+  "development": true,
+  "limits": {},
+  "tls": null,
+  "delivery_url": null,
+  "auth_provider_url": null,
+  "spool_directory": "./var/multi-codec-spool",
+  "credentials": [
+    {
+      "credential_id": "json-sensor",
+      "secret_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "identity": {
+        "device_key": {
+          "tenant_id": "demo",
+          "product_id": "json",
+          "device_id": "device-1"
+        },
+        "credential_version": 1,
+        "codec_id": "netbaiot-json",
+        "codec_version": 1,
+        "permissions": {
+          "publish": true,
+          "commands": true
+        }
+      }
+    },
+    {
+      "credential_id": "cbor-sensor",
+      "secret_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "identity": {
+        "device_key": {
+          "tenant_id": "demo",
+          "product_id": "cbor",
+          "device_id": "device-1"
+        },
+        "credential_version": 1,
+        "codec_id": "netbaiot-cbor",
+        "codec_version": 1,
+        "permissions": {
+          "publish": true,
+          "commands": true
+        }
+      }
+    },
+    {
+      "credential_id": "msgpack-sensor",
+      "secret_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "identity": {
+        "device_key": {
+          "tenant_id": "demo",
+          "product_id": "msgpack",
+          "device_id": "device-1"
+        },
+        "credential_version": 1,
+        "codec_id": "netbaiot-msgpack",
+        "codec_version": 1,
+        "permissions": {
+          "publish": true,
+          "commands": true
+        }
+      }
+    },
+    {
+      "credential_id": "protobuf-sensor",
+      "secret_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "identity": {
+        "device_key": {
+          "tenant_id": "demo",
+          "product_id": "protobuf",
+          "device_id": "device-1"
+        },
+        "credential_version": 1,
+        "codec_id": "netbaiot-protobuf",
+        "codec_version": 1,
+        "permissions": {
+          "publish": true,
+          "commands": true
+        }
+      }
+    }
+  ]
+}

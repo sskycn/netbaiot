@@ -185,6 +185,31 @@ impl Sessions {
         })
     }
 
+    /// Bounded control-plane check, under the auth-registration gate. No await.
+    /// One index and one session pass, rather than rescanning sessions per product.
+    pub(crate) fn product_codec_conflicts(
+        &self,
+        products: &[ProductRuntimeConfig],
+    ) -> Result<bool> {
+        let profiles: HashMap<_, _> = products
+            .iter()
+            .map(|p| {
+                (
+                    (&p.tenant_id, &p.product_id),
+                    (&p.codec_id, p.codec_version),
+                )
+            })
+            .collect();
+        Ok(lock(&self.state)?.sessions.values().any(|endpoint| {
+            let auth = &endpoint.auth;
+            profiles
+                .get(&(&auth.device_key.tenant_id, &auth.device_key.product_id))
+                .is_some_and(|(id, version)| {
+                    *id != &auth.codec_id || *version != auth.codec_version
+                })
+        }))
+    }
+
     pub fn register(
         self: &Arc<Self>,
         auth: Arc<AuthenticatedDevice>,

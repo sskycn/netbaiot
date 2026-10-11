@@ -1,0 +1,87 @@
+{
+  "date": "2026-10-11",
+  "base_revision": "7ff7fe4d2cf226757c9137a73ecf87df68f7c4ad",
+  "task_branch": "codex/multi-codec-v1",
+  "toolchain": "rustc 1.99.0 aarch64-apple-darwin",
+  "minimum_rust": "1.88.0",
+  "fuzz": {
+    "cbor": {
+      "runs": 2447657,
+      "seconds": 21,
+      "max_input_bytes": 65536,
+      "failure": false,
+      "sanitizer": "address"
+    },
+    "msgpack": {
+      "runs": 1876384,
+      "seconds": 21,
+      "max_input_bytes": 65536,
+      "failure": false,
+      "sanitizer": "address"
+    },
+    "protobuf": {
+      "runs": 1649153,
+      "seconds": 21,
+      "max_input_bytes": 65536,
+      "failure": false,
+      "sanitizer": "address"
+    }
+  },
+  "mosquitto": {
+    "accepted_webhooks": 40,
+    "codecs": [
+      "json",
+      "cbor",
+      "msgpack",
+      "protobuf"
+    ],
+    "mqtt_versions": [
+      "3.1.1",
+      "5.0"
+    ],
+    "qos": [
+      0,
+      1,
+      2
+    ],
+    "result": "PASS"
+  },
+  "mqtt_conformance": {
+    "total": 77,
+    "pass": 77,
+    "reference_observations": 0,
+    "fail": 0
+  },
+  "mqtt_raw_regressions": "7/7 PASS",
+  "restart_soak": "PASS 64.72 seconds",
+  "tls_outage_soak": "PASS 60.24 seconds",
+  "schema_and_reference_drift": "PASS",
+  "config_check": "PASS",
+  "doctor": "PASS (development loopback, no network auth/sink semantics probe)",
+  "rustsec": {
+    "vulnerability_count": 0,
+    "database_commit": "7eebec69c352c7191b1f13eb95dd510eeca5d1de",
+    "existing_informational_warnings": [
+      {
+        "package": "rustls-pemfile",
+        "id": "RUSTSEC-2025-0134"
+      }
+    ]
+  },
+  "not_run": [
+    "hours/days soak",
+    "production/distributed load and RSS capacity",
+    "before/after real MQTT performance comparison",
+    "external binary payload library interoperability (beyond independent fixed vectors)"
+  ],
+  "workspace_tests": {
+    "passed": 528,
+    "failed": 0,
+    "ignored": 45
+  },
+  "required_gates": [
+    "cargo fmt --all -- --check: PASS",
+    "cargo clippy --workspace --all-targets --all-features -- -D warnings: PASS",
+    "cargo test --workspace --all-features: PASS"
+  ]
+}

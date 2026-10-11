@@ -137,6 +137,28 @@ impl Config {
             } else {
                 DeviceAuthSource::Static
             });
+        let registry = crate::bootstrap::codec_registry(&self.limits);
+        issue(
+            self.credentials.iter().any(|c| {
+                registry
+                    .as_ref()
+                    .map_or(true, |r| r.get(&c.identity).is_err())
+            }),
+            "NBI-CFG-011",
+            "credentials",
+            "A credential refers to an unavailable codec profile.",
+            "Use a registered codec ID and version; version zero is invalid.",
+        );
+        issue(
+            SinkId::new("preflight")
+                .map_err(|_| Error::Configuration)
+                .and_then(|id| crate::bootstrap::bootstrap_snapshot(self, id))
+                .is_err(),
+            "NBI-CFG-011",
+            "credentials",
+            "Static devices in one product have conflicting codec profiles.",
+            "Use one codec ID/version per tenant and product, or provision distinct products.",
+        );
         issue(
             auth == DeviceAuthSource::Static && self.credentials.is_empty(),
             "NBI-CFG-011",
@@ -303,19 +325,6 @@ pub async fn check_config(
             && StaticAuthenticator::new(config.credentials.clone(), &config.limits).is_err()
         {
             out.push(ConfigDiagnostic::new("NBI-CFG-011", "credentials", "Device credentials are invalid, duplicated or exceed capacity.", "Check credential format, identity, version and count limits; secret values are not shown."));
-        }
-        let registry = crate::bootstrap::codec_registry(&config.limits);
-        if config.credentials.iter().any(|c| {
-            registry
-                .as_ref()
-                .map_or(true, |r| r.get(&c.identity).is_err())
-        }) {
-            out.push(ConfigDiagnostic::new(
-                "NBI-CFG-011",
-                "credentials",
-                "A credential refers to an unavailable codec profile.",
-                "Use an implemented server codec profile and version.",
-            ));
         }
         if let Some(url) = config
             .auth_provider_url

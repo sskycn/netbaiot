@@ -1,5 +1,7 @@
 # 设备接入指南
 
+Device payloads support JSON V1, CBOR V1, MessagePack V1 and Protobuf V1. See [codec wire formats, selection and extension](codecs.md).
+
 本章使用 [`configs/tutorial.json`](../configs/tutorial.json) 中的 `demo-device`。除特别注明外，先按[入门教程](getting-started.md)启动 webhook 和 server，并设置：
 
 ```bash

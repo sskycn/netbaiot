@@ -177,7 +177,7 @@ pub async fn run_with_credentials_ready(
     }
     let snapshot = bootstrap_snapshot(&config, sink_id)?;
     let control = GatewayControl::empty(limits.clone());
-    control.apply(snapshot.clone())?;
+    control.apply(snapshot.clone(), &registry)?;
     let events = EventBus::new_paused(
         limits.clone(),
         metrics.clone(),

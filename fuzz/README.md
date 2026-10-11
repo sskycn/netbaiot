@@ -26,3 +26,16 @@ target with ASan. See `docs/correctness-resource-reliability-audit.md` for resul
 
 The `device_classifier` target exercises every partial prefix (at most 12 bytes),
 malformed/ambiguous inputs and frame-limit boundaries without network or allocation.
+
+## Native binary device codecs
+
+Seed cbor_codec, msgpack_codec and protobuf_codec with the corresponding fixed
+files under crates/netbaiot-codecs/tests/fixtures. Each checks arbitrary bytes with
+a 64 KiB input cap, single trusted-device output, telemetry count bounds and
+prevalidation/decode agreement.
+
+```sh
+cargo +nightly fuzz run cbor_codec -- -max_total_time=30 -max_len=65536
+cargo +nightly fuzz run msgpack_codec -- -max_total_time=30 -max_len=65536
+cargo +nightly fuzz run protobuf_codec -- -max_total_time=30 -max_len=65536
+```

@@ -1,5 +1,7 @@
 # Configuration and project setup
 
+Device payloads support JSON V1, CBOR V1, MessagePack V1 and Protobuf V1. See [codec wire formats, selection and extension](codecs.md).
+
 [中文](configuration.zh-CN.md)
 
 ```bash

@@ -1,5 +1,4 @@
 use async_trait::async_trait;
-use netbaiot_codecs::JsonV1;
 use netbaiot_core::*;
 use netbaiot_runtime::*;
 use netbaiot_transports::{

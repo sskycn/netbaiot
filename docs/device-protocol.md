@@ -1,4 +1,4 @@
-# Device protocol: netbaiot-json-v1
+# Device protocol: JSON V1 and transport envelopes
 
 ## Single Device Ingress
 
@@ -18,7 +18,7 @@ requires loopback and permits plaintext for local testing.
 rejected. Port 443 is only a deployment choice, not an HTTPS endpoint. HTTP bytes
 on device ingress close without an HTTP response; see [migration](remove-device-http.md).
 
-Authentication selects codec ID `netbaiot-json`, version `1`. The same synchronous
+The default example selects codec ID `netbaiot-json`, version `1`. Other authenticated profiles use [CBOR, MessagePack or Protobuf V1](codecs.md). The same synchronous
 codec decodes MQTT/TCP/UDP payloads. Devices cannot supply their own trusted
 identity in the payload; unknown envelope fields are rejected.
 
@@ -58,8 +58,8 @@ Every frame is `u32` big-endian payload length followed by payload. Length must 
 {"credential_id":"demo-device","secret":"<64-hex-character-key>"}
 ```
 
-The server returns a framed `{"authenticated":true}`. Subsequent frames are JSON
-uplinks. Server frames contain receipts or common `DeviceCommand` JSON. A command
+The server returns a framed `{"authenticated":true}`. Subsequent frames carry uplinks in the authenticated codec. Server frames contain
+JSON acceptance receipts or `DeviceCommand` encoded in that same codec. A command
 has command_id, device, expires_at, and payload `{name,arguments}`. Execution ACKs
 use the shared codec. Partial frames survive fragmented reads; EOF closes and drops
 connection-owned resources. Vendor framing can implement `TcpFramer` separately.
@@ -80,7 +80,7 @@ bytes. All integer fields use network byte order:
 | sequence | 8 |
 | Unix timestamp in milliseconds (signed i64) | 8 |
 | payload length | 2 |
-| JSON v1 payload | length |
+| Authenticated codec payload | length |
 | HMAC-SHA256 | 32 |
 
 HMAC covers all preceding bytes using the **decoded 32-byte credential key**, not

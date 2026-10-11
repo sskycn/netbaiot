@@ -1,0 +1,1 @@
+{"command_id":"00000000-0000-0000-0000-000000000001","device":{"tenant_id":"t","product_id":"p","device_id":"d"},"expires_at":1000,"payload":{"name":"set","arguments":{"boolean":true,"number":42.0,"text":"温度"}}}

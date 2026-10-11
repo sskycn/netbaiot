@@ -1,5 +1,7 @@
 # 配置与项目初始化
 
+设备载荷支持 JSON V1、CBOR V1、MessagePack V1、Protobuf V1，详见[wire 格式、认证选择与扩展](codecs.zh-CN.md)。
+
 [English](configuration.md)
 
 ```bash

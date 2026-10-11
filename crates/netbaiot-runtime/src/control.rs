@@ -57,7 +57,7 @@ impl GatewayControl {
         })
     }
 
-    pub fn apply(&self, snapshot: ControlSnapshot) -> Result<()> {
+    pub fn apply(&self, snapshot: ControlSnapshot, codecs: &crate::CodecRegistry) -> Result<()> {
         if snapshot.products.len() > self.limits.control_max_products
             || snapshot.routes.len() > self.limits.max_routing_filters
         {
@@ -66,7 +66,7 @@ impl GatewayControl {
         let mut products = HashMap::new();
         for product in snapshot.products {
             if product.revision == 0
-                || product.codec_version == 0
+                || !codecs.contains(&product.codec_id, product.codec_version)
                 || products
                     .insert(
                         (product.tenant_id.clone(), product.product_id.clone()),
@@ -105,6 +105,16 @@ impl GatewayControl {
         let mut current = self.snapshot.write().map_err(|_| Error::Internal)?;
         if next.revision <= current.revision {
             return Err(Error::Conflict);
+        }
+        // V1 does not hot-switch/remove established product codec profiles. A planned
+        // restart with reprovisioning and authentication invalidation is required.
+        for (key, old) in &current.products {
+            let Some(new) = next.products.get(key) else {
+                return Err(Error::Conflict);
+            };
+            if old.codec_id != new.codec_id || old.codec_version != new.codec_version {
+                return Err(Error::Conflict);
+            }
         }
         *current = next;
         Ok(())
@@ -178,6 +188,29 @@ mod tests {
     use super::*;
     use netbaiot_core::{CodecId, SinkId};
 
+    fn registry() -> crate::CodecRegistry {
+        struct Codec;
+        impl netbaiot_core::DeviceCodec for Codec {
+            fn decode(
+                &self,
+                _: &netbaiot_core::DecodeContext<'_>,
+                _: &[u8],
+            ) -> std::result::Result<Vec<netbaiot_core::DeviceEvent>, netbaiot_core::CodecError>
+            {
+                Err(netbaiot_core::CodecError)
+            }
+            fn encode(
+                &self,
+                _: &netbaiot_core::EncodeContext<'_>,
+                _: &netbaiot_core::DeviceCommand,
+            ) -> std::result::Result<Vec<u8>, netbaiot_core::CodecError> {
+                Err(netbaiot_core::CodecError)
+            }
+        }
+        crate::CodecRegistry::new(vec![(CodecId::new("json").unwrap(), 1, Arc::new(Codec))])
+            .unwrap()
+    }
+
     fn snapshot(revision: u64) -> ControlSnapshot {
         ControlSnapshot {
             revision,
@@ -198,24 +231,30 @@ mod tests {
     #[test]
     fn snapshot_replacement_is_validated_atomic_and_shared() {
         let control = GatewayControl::empty(Arc::new(Limits::default()));
-        control.apply(snapshot(1)).unwrap();
+        control.apply(snapshot(1), &registry()).unwrap();
         let product = &snapshot(1).products[0];
         let first = control
             .product(&product.tenant_id, &product.product_id)
             .unwrap()
             .unwrap();
-        assert!(matches!(control.apply(snapshot(1)), Err(Error::Conflict)));
+        assert!(matches!(
+            control.apply(snapshot(1), &registry()),
+            Err(Error::Conflict)
+        ));
         let mut invalid = snapshot(2);
         invalid.products[0].codec_version = 0;
-        assert!(matches!(control.apply(invalid), Err(Error::Configuration)));
+        assert!(matches!(
+            control.apply(invalid, &registry()),
+            Err(Error::Configuration)
+        ));
         let mut duplicate = snapshot(2);
         duplicate.products.push(duplicate.products[0].clone());
         assert!(matches!(
-            control.apply(duplicate),
+            control.apply(duplicate, &registry()),
             Err(Error::Configuration)
         ));
         assert_eq!(control.revision().unwrap(), 1);
-        control.apply(snapshot(2)).unwrap();
+        control.apply(snapshot(2), &registry()).unwrap();
         let second = control
             .product(&product.tenant_id, &product.product_id)
             .unwrap()
@@ -233,11 +272,14 @@ mod tests {
             max_routing_filters: 1,
             ..Limits::default()
         }));
-        control.apply(snapshot(1)).unwrap();
+        control.apply(snapshot(1), &registry()).unwrap();
         let original = control.usage().unwrap();
         let mut too_many = snapshot(2);
         too_many.products.push(too_many.products[0].clone());
-        assert!(matches!(control.apply(too_many), Err(Error::Overloaded)));
+        assert!(matches!(
+            control.apply(too_many, &registry()),
+            Err(Error::Overloaded)
+        ));
         let route = snapshot(2).routes.remove(0);
         assert!(matches!(
             control.replace_routes(2, vec![route.clone(), route]),
@@ -246,7 +288,7 @@ mod tests {
         let mut oversized = snapshot(2);
         oversized.routes[0].sinks = vec![SinkId::new("large-sink").unwrap(); 32];
         assert!(matches!(
-            control.apply(oversized.clone()),
+            control.apply(oversized.clone(), &registry()),
             Err(Error::Overloaded)
         ));
         assert!(matches!(

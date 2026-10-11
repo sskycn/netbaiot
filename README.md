@@ -1,5 +1,7 @@
 # NetbaIoT
 
+Device payloads support JSON V1, CBOR V1, MessagePack V1 and Protobuf V1. See [codec wire formats, selection and extension](docs/codecs.md).
+
 Business RPC supports V3 only. Planned restart uses MQTT NBMQ v6 and EventBus NBSP v3 only; MQTT 3.1.1/5.0 and management `/api/v1` remain supported. See [protocol support](docs/protocol-support.md) and [upgrade requirements](docs/migration/current-protocol-only.md).
 
 **An IoT gateway that stays a gateway.**

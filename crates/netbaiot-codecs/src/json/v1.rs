@@ -1,0 +1,385 @@
+//! Bounded netbaiot-json-v1 codec; no transport or runtime dependencies.
+use netbaiot_core::*;
+use serde::Deserialize;
+
+pub struct JsonV1 {
+    limits: CodecLimits,
+}
+impl JsonV1 {
+    pub fn new(limits: CodecLimits) -> Self {
+        Self { limits }
+    }
+}
+impl Default for JsonV1 {
+    fn default() -> Self {
+        Self::new(CodecLimits::default())
+    }
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct WireMessage<'a> {
+    schema_version: u16,
+    source_message_id: SourceMessageId,
+    #[serde(default)]
+    occurred_at: Option<Timestamp>,
+    kind: Kind,
+    #[serde(borrow)]
+    data: &'a serde_json::value::RawValue,
+}
+#[derive(Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum Kind {
+    Telemetry,
+    Event,
+    Heartbeat,
+    CommandAck,
+}
+struct UniqueFields(std::collections::BTreeMap<String, Scalar>);
+impl<'de> Deserialize<'de> for UniqueFields {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        struct Visitor;
+        impl<'de> serde::de::Visitor<'de> for Visitor {
+            type Value = UniqueFields;
+            fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                f.write_str("unique scalar fields")
+            }
+            fn visit_map<M: serde::de::MapAccess<'de>>(
+                self,
+                mut map: M,
+            ) -> Result<Self::Value, M::Error> {
+                let mut out = std::collections::BTreeMap::new();
+                while let Some((key, value)) = map.next_entry::<String, Scalar>()? {
+                    if out.insert(key, value).is_some() {
+                        return Err(serde::de::Error::custom("duplicate field"));
+                    }
+                }
+                Ok(UniqueFields(out))
+            }
+        }
+        deserializer.deserialize_map(Visitor)
+    }
+}
+// Count members before allocation; JSON punctuation inside strings does not count.
+#[cfg(test)]
+fn check_members(input: &[u8], maximum: usize) -> Result<(), CodecError> {
+    let (mut quoted, mut escaped, mut members) = (false, false, 0usize);
+    for byte in input {
+        if quoted {
+            if escaped {
+                escaped = false;
+            } else if *byte == b'\\' {
+                escaped = true;
+            } else if *byte == b'"' {
+                quoted = false;
+            }
+        } else if *byte == b'"' {
+            quoted = true;
+        } else if *byte == b'[' {
+            // JSON v1 has no array-valued fields; reject before untagged scalar buffering.
+            return Err(CodecError);
+        } else if *byte == b':' {
+            members = members.checked_add(1).ok_or(CodecError)?;
+            if members > maximum {
+                return Err(CodecError);
+            }
+        }
+    }
+    Ok(())
+}
+
+// JsonV1 rejects arrays and bounds both nesting and members before serde allocates.
+// Keep the public depth-only helper independent for its other callers.
+fn check_payload_bounds(
+    input: &[u8],
+    maximum_depth: usize,
+    maximum_members: usize,
+) -> Result<(), CodecError> {
+    let (mut depth, mut members, mut quoted, mut escaped) = (0usize, 0usize, false, false);
+    for byte in input {
+        if quoted {
+            if escaped {
+                escaped = false;
+            } else if *byte == b'\\' {
+                escaped = true;
+            } else if *byte == b'"' {
+                quoted = false;
+            }
+        } else {
+            match byte {
+                b'"' => quoted = true,
+                b'[' => return Err(CodecError),
+                b'{' => {
+                    depth = depth.checked_add(1).ok_or(CodecError)?;
+                    if depth > maximum_depth {
+                        return Err(CodecError);
+                    }
+                }
+                b'}' | b']' => {
+                    depth = depth.checked_sub(1).ok_or(CodecError)?;
+                }
+                b':' => {
+                    members = members.checked_add(1).ok_or(CodecError)?;
+                    if members > maximum_members {
+                        return Err(CodecError);
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+    if depth != 0 || quoted {
+        return Err(CodecError);
+    }
+    Ok(())
+}
+
+/// Bound nesting before serde can recurse. Braces inside strings are ignored.
+pub fn check_json_depth(input: &[u8], maximum: usize) -> Result<(), CodecError> {
+    let (mut depth, mut string, mut escape) = (0usize, false, false);
+    for b in input {
+        if string {
+            if escape {
+                escape = false;
+            } else if *b == b'\\' {
+                escape = true;
+            } else if *b == b'"' {
+                string = false;
+            }
+        } else {
+            match b {
+                b'"' => string = true,
+                b'{' | b'[' => {
+                    depth = depth.checked_add(1).ok_or(CodecError)?;
+                    if depth > maximum {
+                        return Err(CodecError);
+                    }
+                }
+                b'}' | b']' => {
+                    depth = depth.checked_sub(1).ok_or(CodecError)?;
+                }
+                _ => {}
+            }
+        }
+    }
+    if depth != 0 || string {
+        return Err(CodecError);
+    }
+    Ok(())
+}
+use crate::common::{scalar, valid_text, validate_kind};
+impl JsonV1 {
+    fn validate(&self, payload: &DeviceEventKind) -> bool {
+        validate_kind(payload, &self.limits)
+    }
+    fn parse_payload(
+        &self,
+        payload: &[u8],
+    ) -> Result<(SourceMessageId, Option<Timestamp>, DeviceEventKind), CodecError> {
+        if payload.len() > self.limits.input_bytes
+            || payload.len() > self.limits.decoded_bytes
+            || self.limits.output_messages == 0
+        {
+            return Err(CodecError);
+        }
+        check_payload_bounds(
+            payload,
+            self.limits.nesting_depth,
+            self.limits.fields.saturating_add(8),
+        )?;
+        let wire: WireMessage<'_> = serde_json::from_slice(payload).map_err(|_| CodecError)?;
+        let decoded = match wire.kind {
+            Kind::Telemetry => DeviceEventKind::Telemetry(
+                serde_json::from_str::<UniqueFields>(wire.data.get())
+                    .map_err(|_| CodecError)?
+                    .0,
+            ),
+            Kind::Event => DeviceEventKind::DeviceEvent(
+                serde_json::from_str(wire.data.get()).map_err(|_| CodecError)?,
+            ),
+            Kind::Heartbeat => DeviceEventKind::Heartbeat(
+                serde_json::from_str(wire.data.get()).map_err(|_| CodecError)?,
+            ),
+            Kind::CommandAck => DeviceEventKind::CommandAck(
+                serde_json::from_str(wire.data.get()).map_err(|_| CodecError)?,
+            ),
+        };
+        if wire.schema_version != 1
+            || !self.validate(&decoded)
+            || wire.occurred_at.is_some_and(|t| t < 0)
+        {
+            return Err(CodecError);
+        }
+        Ok((wire.source_message_id, wire.occurred_at, decoded))
+    }
+}
+impl DeviceCodec for JsonV1 {
+    fn validate_payload(
+        &self,
+        _ctx: &DecodeContext<'_>,
+        payload: &[u8],
+    ) -> Result<Vec<DeviceEventKind>, CodecError> {
+        let (_, _, kind) = self.parse_payload(payload)?;
+        Ok(vec![kind])
+    }
+
+    fn decode(
+        &self,
+        ctx: &DecodeContext<'_>,
+        payload: &[u8],
+    ) -> Result<Vec<netbaiot_core::DeviceEvent>, CodecError> {
+        let (source_message_id, occurred_at, kind) = self.parse_payload(payload)?;
+        Ok(vec![netbaiot_core::DeviceEvent {
+            event_id: EventId::generate(),
+            source_message_id,
+            device: ctx.device.clone(),
+            received_at: ctx.received_at,
+            occurred_at,
+            kind,
+        }])
+    }
+    fn encode(
+        &self,
+        ctx: &EncodeContext<'_>,
+        command: &DeviceCommand,
+    ) -> Result<Vec<u8>, CodecError> {
+        if &command.device != ctx.device
+            || command.payload.name.is_empty()
+            || !valid_text(&command.payload.name, self.limits.field_bytes)
+            || command.payload.arguments.len() > self.limits.fields
+            || !command.payload.arguments.iter().all(|(k, v)| {
+                valid_text(k, self.limits.field_bytes) && scalar(v, self.limits.field_bytes)
+            })
+        {
+            return Err(CodecError);
+        }
+        let data = serde_json::to_vec(command).map_err(|_| CodecError)?;
+        if data.len() > self.limits.decoded_bytes {
+            return Err(CodecError);
+        }
+        Ok(data)
+    }
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    fn key() -> DeviceKey {
+        DeviceKey {
+            tenant_id: TenantId::new("t").unwrap(),
+            product_id: ProductId::new("p").unwrap(),
+            device_id: DeviceId::new("d").unwrap(),
+        }
+    }
+    #[test]
+    fn all_payloads_and_bounds() {
+        let k = key();
+        let ctx = DecodeContext {
+            device: &k,
+            received_at: 1,
+        };
+        let codec = JsonV1::default();
+        for data in [
+            r#""kind":"telemetry","data":{"temperature":25.3}"#,
+            r#""kind":"event","data":{"name":"boot","value":true}"#,
+            r#""kind":"heartbeat","data":{"sequence":1}"#,
+            r#""kind":"command_ack","data":{"command_id":"00000000-0000-0000-0000-000000000001","execution":"succeeded"}"#,
+        ] {
+            let wire = format!(r#"{{"schema_version":1,"source_message_id":"boot:1",{data}}}"#);
+            let first = codec.decode(&ctx, wire.as_bytes()).unwrap();
+            let second = codec.decode(&ctx, wire.as_bytes()).unwrap();
+            assert_eq!(first.len(), 1);
+            assert_eq!(second.len(), 1);
+            assert_ne!(first[0].event_id, second[0].event_id);
+            assert_eq!(first[0].source_message_id, second[0].source_message_id);
+        }
+        for bad in [
+            b"{".as_slice(),
+            b"[]",
+            br#"{"schema_version":1,"source_message_id":"x","kind":"config_ack","data":{}}"#,
+            br#"{"schema_version":1,"source_message_id":"x","kind":"connected","data":{"session_generation":1}}"#,
+            br#"{"schema_version":1,"source_message_id":"x","kind":"disconnected","data":{"session_generation":1}}"#,
+            br#"{"schema_version":1,"source_message_id":"x","kind":"config_ack","data":{"revision":42,"status":"applied"}}"#,
+            b"\xff",
+            b"{\"data\": [[[[[[[[[0]]]]]]]]]}",
+        ] {
+            assert!(codec.decode(&ctx, bad).is_err());
+        }
+        assert!(codec.decode(&ctx, &vec![b' '; 65537]).is_err());
+        assert!(check_json_depth(br#"{"x":"{{{{{{{{{{{{{{"}"#, 2).is_ok());
+    }
+}
+
+#[cfg(test)]
+mod hostile {
+    use super::*;
+    #[test]
+    fn unknown_identity_duplicate_fields_and_huge_maps_are_rejected() {
+        let key = DeviceKey {
+            tenant_id: TenantId::new("t").unwrap(),
+            product_id: ProductId::new("p").unwrap(),
+            device_id: DeviceId::new("d").unwrap(),
+        };
+        let ctx = DecodeContext {
+            device: &key,
+            received_at: 0,
+        };
+        let codec = JsonV1::default();
+        for data in [
+            r#"{"schema_version":1,"source_message_id":"1","device":"spoof","kind":"heartbeat","data":{"sequence":1}}"#,
+            r#"{"schema_version":1,"source_message_id":"1","kind":"telemetry","data":{"x":1,"x":2}}"#,
+        ] {
+            assert!(codec.decode(&ctx, data.as_bytes()).is_err());
+        }
+        let fields = (0..1000)
+            .map(|i| format!("\"f{i}\":0"))
+            .collect::<Vec<_>>()
+            .join(",");
+        let wire = format!(
+            r#"{{"schema_version":1,"source_message_id":"1","kind":"telemetry","data":{{{fields}}}}}"#
+        );
+        assert!(codec.decode(&ctx, wire.as_bytes()).is_err());
+        let fields = (0..64)
+            .map(|i| format!("\"f{i}\":0"))
+            .collect::<Vec<_>>()
+            .join(",");
+        let wire = format!(
+            r#"{{"schema_version":1,"source_message_id":"1","kind":"telemetry","data":{{{fields}}}}}"#
+        );
+        assert!(codec.decode(&ctx, wire.as_bytes()).is_ok());
+    }
+}
+
+#[cfg(test)]
+#[path = "../second_round_bench.rs"]
+mod second_round_bench;
+
+#[cfg(test)]
+mod combined_bounds_tests {
+    use super::*;
+    #[test]
+    fn combined_guard_matches_original_guards_for_arbitrary_bytes_and_limits() {
+        let mut seed = 0x6b38_082c_295a_178du64;
+        let alphabet = b"{}[]:\"\\ abc0123\xff";
+        for length in 0..=256 {
+            for _ in 0..32 {
+                let mut input = Vec::with_capacity(length);
+                for _ in 0..length {
+                    seed ^= seed << 13;
+                    seed ^= seed >> 7;
+                    seed ^= seed << 17;
+                    input.push(alphabet[seed as usize % alphabet.len()]);
+                }
+                for depth in [0, 1, 2, 8] {
+                    for members in [0, 1, 8, 72] {
+                        let expected = check_json_depth(&input, depth)
+                            .and_then(|()| check_members(&input, members));
+                        assert_eq!(
+                            check_payload_bounds(&input, depth, members).is_ok(),
+                            expected.is_ok(),
+                            "{input:?},depth={depth},members={members}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+}

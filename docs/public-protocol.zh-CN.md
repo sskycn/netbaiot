@@ -1,5 +1,7 @@
 # 公共协议与版本命名空间
 
+设备载荷支持 JSON V1、CBOR V1、MessagePack V1、Protobuf V1，详见[wire 格式、认证选择与扩展](codecs.zh-CN.md)。
+
 `netbaiot-protocol` 是 NetbaIoT 公共 wire 契约的权威、独立于 runtime 的 Rust 模型。其正常依赖为序列化、UUID 和错误模型相关 crate，不依赖 Tokio、HTTP、MQTT、服务端或 runtime 内部实现。Crate SemVer 与 wire `PROTOCOL_VERSION` 是两个独立的兼容性维度；设备 JSON 的 `PROTOCOL_VERSION` 为 `1`；Business RPC 独立使用当前版本 3；恢复文件分别为 NBMQ v6 和 NBSP v3，管理 HTTP 保留 `/api/v1`。
 
 强类型公共标识包括 `TenantId`、`ProductId`、`DeviceId`、`DeviceKey`、`EventId`、`DeliveryId`、`CommandId`、`SinkId` 和 `SubscriptionId`。使用前会验证这些标识。UTC 时间戳使用 Unix 毫秒。

@@ -483,13 +483,15 @@ async fn handle_management(
             .map_err(|_| Error::Invalid)?;
             let revision = snapshot.revision;
             let routes = snapshot.routes.clone();
-            let _admission = services.ingress.lifecycle.begin_admission()?;
+            let admission = services.ingress.lifecycle.begin_admission()?;
             let _mutation = services.control_lock.lock().await;
             services
                 .ingress
                 .events
                 .validate_route_update(revision, &routes)?;
-            services.ingress.control.apply(snapshot)?;
+            services
+                .ingress
+                .apply_control_snapshot_admitted(&admission, snapshot)?;
             services.ingress.events.replace_routes(revision, routes)?;
             Ok(response(StatusCode::NO_CONTENT, Vec::new()))
         }

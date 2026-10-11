@@ -1,5 +1,7 @@
 # NetbaIoT
 
+设备载荷支持 JSON V1、CBOR V1、MessagePack V1、Protobuf V1，详见[wire 格式、认证选择与扩展](docs/codecs.zh-CN.md)。
+
 **当前协议说明：** Business RPC 仅支持 V3；计划重启恢复仅支持 MQTT NBMQ v6 与
 EventBus NBSP v3。MQTT 3.1.1/5.0 和管理接口 `/api/v1` 继续支持。详见
 [协议支持](docs/protocol-support.zh-CN.md)与[升级要求](docs/migration/current-protocol-only.zh-CN.md)。

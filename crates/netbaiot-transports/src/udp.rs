@@ -370,6 +370,7 @@ async fn accept_verified(
     replay: &mut ReplayWindow,
 ) -> Result<()> {
     let auth = verified.identity();
+    ingress.validate_auth_profile(auth)?;
     if auth.credential_version != envelope.credential_version {
         return Err(Error::Authentication);
     }

@@ -1,0 +1,1 @@
+{"schema_version":1,"source_message_id":"sample:1","occurred_at":1000,"kind":"telemetry","data":{"number":-42,"boolean":true,"text":"温度"}}

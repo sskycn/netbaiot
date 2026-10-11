@@ -1,5 +1,7 @@
 # Architecture
 
+Device payloads support JSON V1, CBOR V1, MessagePack V1 and Protobuf V1. See [codec wire formats, selection and extension](codecs.md).
+
 ## Single Device Ingress
 
 `device_ingress` binds one TCP listener and one UDP socket at the same address and

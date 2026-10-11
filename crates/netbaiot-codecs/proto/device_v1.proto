@@ -1,0 +1,41 @@
+syntax = "proto3";
+package netbaiot.device.v1;
+// Codec version and schema_version are 1, independent of crate SemVer.
+// Never reuse field numbers or enum values. Unknown fields are bounded and ignored;
+// unknown enum values/kinds and duplicate known singular/oneof fields are rejected.
+message Scalar {
+  oneof value {
+    double number = 1;
+    bool boolean = 2;
+    string text = 3;
+    sint64 signed_integer = 4;
+    uint64 unsigned_integer = 5;
+  }
+}
+// Repeated entries (rather than a protobuf map) make duplicate names detectable.
+message Field { string name = 1; Scalar value = 2; }
+message Telemetry { repeated Field fields = 1; }
+message DeviceEvent { string name = 1; Scalar value = 2; }
+message Heartbeat { uint64 sequence = 1; }
+enum Execution { EXECUTION_UNKNOWN = 0; EXECUTION_RUNNING = 1; EXECUTION_SUCCEEDED = 2; EXECUTION_FAILED = 3; }
+message CommandAck { string command_id = 1; Execution execution = 2; }
+message Uplink {
+  uint32 schema_version = 1;
+  string source_message_id = 2;
+  optional int64 occurred_at = 3;
+  oneof kind {
+    Telemetry telemetry = 10;
+    DeviceEvent event = 11;
+    Heartbeat heartbeat = 12;
+    CommandAck command_ack = 13;
+  }
+}
+message DeviceKey { string tenant_id = 1; string product_id = 2; string device_id = 3; }
+message DeviceCommand {
+  uint32 schema_version = 1;
+  string command_id = 2;
+  DeviceKey device = 3;
+  optional int64 expires_at = 4;
+  string name = 5;
+  repeated Field arguments = 6;
+}
