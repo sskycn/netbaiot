@@ -360,7 +360,7 @@ def main():
         timing='socket send to receipt; socket send to webhook response flushed; HTTP command submit to device bytes',
         cpu_measurement='Linux procfs clock ticks; macOS ps process time',
         limitations=['Python closed loop and shared host, no production capacity claim','RSS sampled at 100ms, not allocator peak',
-            'CPU time from ps, 10ms resolution','No application-final-processing measurement','UDP large payload has 4 fields; stream large has 64',
+            'CPU clock resolution is platform dependent; short windows are noisy','No application-final-processing measurement','UDP large payload has 4 fields; stream large has 64',
             'QoS0 receipt unavailable; throughput uses observed required webhook responses','No per-connection allocator isolation'])
     (args.output/'environment.json').write_text(json.dumps(environment,indent=2))
     try:

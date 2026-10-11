@@ -2,6 +2,8 @@
 
 日期：2026-10-11。基线为实际 `main` HEAD `6e16b31`，开始时工作区干净。
 实现提交：`adb9f09`（联合提交、测试和自动化）、`fb37a3c`（有界写入优化）。
+补充提交：`2ead168`（报告/实测/CI）、`6a21ee2`（等价 MSRV lint 修正）、
+`55ab419`（Linux CPU 精度与交替补测工具）。
 本报告覆盖 JSON/CBOR/MessagePack/Protobuf V1，未增加 Codec 或修改 wire 版本。
 
 ## 风险结论
@@ -113,6 +115,9 @@ Mosquitto 在已安装的 /usr/local/sbin，修正 PATH 后完整门禁通过；
 | JSON、MQTT packet、MQTT5 publish、TCP frame、UDP envelope、restart spool 各 `-runs=10000` | PASS，共 60,000 次 |
 | `cargo xtask check evidence` | PASS，既有 CSV 门禁问题已按规则修复 |
 | Python py_compile（workspace 内 pycache）与 Git diff 检查 | PASS |
+| GitHub Actions `55ab419`：Rust checks、Native recovery、Native developer experience | PASS：包括 stable/MSRV、MQTT 与 Linux x86_64/ARM64 原生质量回归；ARM64 非性能对照 |
+| GitHub Actions `38110812037`：三个 Codec fuzz、网络 smoke、Linux 成对性能 | PASS：binary ASan 共 4,170,257 次；完整网络/微基准 artifact 已下载验证 |
+| GitHub Actions `38111901825`：交替微基准、正确 CPU 补测及 fuzz/network | PASS：性能回归与测量精度问题已如实记录 |
 
 原始命令输出在 `target/performance/codec-audit/`，聚合与校验值在
 [性能证据](performance/codec-audit/README.md)。ASan 在 macOS 有 atos 符号化警告，
@@ -136,13 +141,22 @@ JSON 超限累计分配 32,792→400 B（−98.78%），正常 64 数字参数�
 2 参数为 +25.72%（绝对增加约 64ns）；CBOR/MessagePack 64 参数编码耗时分别
 −34.51%/−35.75%。这是下行局部收益与资源安全取舍，不是生产上报容量结论。
 
-没有实际执行 Linux x86_64/ARM64 成对测量。本机为 macOS ARM64；新增 opt-in Linux
-工作流能用指定基线在同一 x86_64 runner 构建、串行执行并保存真实结果，配置工作流
-不是已获得 Linux 数字。未做跨主机容量、TLS 全矩阵、小时/天级 soak、SIGKILL 损失
+Linux x86_64 成对测量已实际执行并成功：4 CPU Azure runner，相同工具和资源配置，
+每场景 1 秒×3 次，前后各 324 轮，确认 605,790/608,916 条事件和 13,438/13,435 条
+命令，错误均为 0；场景速率变化中位数 +0.473%。初次 Linux 大文本 JSON 编码
+存在 +77.53% 时间差，交替顺序重复微基准确认为 +77.12%；首次 ps CPU 精度问题已修正为
+procfs tick，旧 CPU 数字明确不作精细结论。原始 artifact 已下载并验证 digest。
+本机 macOS ARM64 与 Linux 各自的完整差异在性能报告，不跨平台混比。
+Linux 交替补测还观察到 CBOR/MessagePack 文本 +17.28%/+16.98%、未改源码的
+Protobuf 文本 +22.33%，数字编码收益不能代表所有负载。已考虑回退，按资源安全
+优先级保留有界输出并承担成本；尚未完成无统计分配器的 CPU profiling，不能唯一
+定位全部代码生成/运行差异。正确 procfs CPU 补测的全部 108 场景也实际通过，旧/新
+确认 38,279/38,488 条事件、899/887 条命令，无错误且队列清零；不作短窗口容量结论。
+未实际执行 Linux ARM64 成对性能、跨主机容量、TLS 全矩阵、小时/天级 soak、SIGKILL 损失
 campaign、峰值活跃堆 profiling或最大全控制快照高频更新下的吞吐认证。短矩阵、累计
 分配及 60 秒测试不能替代这些证据。
 
-JSON 正常编码的有界检查仍有小幅微基准耗时成本，应结合在线命令比例评估；保留
+JSON 正常编码的有界检查有明确微基准耗时成本，应结合在线命令比例评估；保留
 该资源边界符合项目优先级，不能为吞吐退回超限后才检查的实现。Protobuf 复制优化
 仍可作为独立测量任务；本次没有以理论零复制替代已验证 prost。必需投递、业务 ACK、
 离线命令限制和 at-least-once 均未降级，计划重启 spool 不提供意外断电持久性。

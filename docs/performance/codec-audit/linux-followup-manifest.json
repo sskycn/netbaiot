@@ -1,0 +1,91 @@
+{
+  "version": 1,
+  "run_id": 38111901825,
+  "job_id": 114389022560,
+  "artifact_id": 11692137281,
+  "artifact_url": "https://github.com/sskycn/netbaiot/actions/runs/38111901825/artifacts/11692137281",
+  "expires_at": "2026-10-25T04:39:18Z",
+  "archive": {
+    "path": "target/performance/codec-audit/ci-linux-followup.zip",
+    "size_bytes": 86411,
+    "sha256": "5d3184bf8d21b41d13445abd3801dc5063ad94b90da1c696be5a236d7b1baa6d"
+  },
+  "files": {
+    "target/performance/codec-audit/linux-followup/codec-after-round1.csv": {
+      "size_bytes": 4282,
+      "sha256": "5e697c777e43d21cc1e28ea65103e1f1d5e334b55ec434b45bb4f3c3a27b990f"
+    },
+    "target/performance/codec-audit/linux-followup/codec-after-round3.csv": {
+      "size_bytes": 4282,
+      "sha256": "fadba3f6b611f2fbed6e01f9529a1a92a1b6d4810ab3d4ceb436af8b37801cb1"
+    },
+    "target/performance/codec-audit/linux-followup/codec-after-round2.csv": {
+      "size_bytes": 4282,
+      "sha256": "779082652654e321d4ca2046b76cf2d9fdd3e42e3ed8dc305e144eef90722f88"
+    },
+    "target/performance/codec-audit/linux-followup/codec-after.csv": {
+      "size_bytes": 4282,
+      "sha256": "0a04446304b08d8e4f8a9ede58366eefd6d598871def669aefc5b27c08cd9d06"
+    },
+    "target/performance/codec-audit/linux-followup/codec-before-round1.csv": {
+      "size_bytes": 4291,
+      "sha256": "f917e776c80c441b369f6996bc1a4f24db71470fc93600e72eeb7563c863f587"
+    },
+    "target/performance/codec-audit/linux-followup/codec-before-round2.csv": {
+      "size_bytes": 4291,
+      "sha256": "abf41a35ab2edf6a6fe736e9c114d62de746d2210fbad824fbef0ddbba77a325"
+    },
+    "target/performance/codec-audit/linux-followup/codec-before-round3.csv": {
+      "size_bytes": 4291,
+      "sha256": "f5015cfd54a9d94eb336d2e03a3c6b0da6c90d1f3ec6d4b38e2d60a9a0a01784"
+    },
+    "target/performance/codec-audit/linux-followup/codec-before.csv": {
+      "size_bytes": 4291,
+      "sha256": "24e054a3f2bcd6627b4eaf606556f1582170ca364ec62ed67c0c479f1f449c75"
+    },
+    "target/performance/codec-audit/linux-followup/performance/codec-audit/after/matrix/environment.json": {
+      "size_bytes": 1679,
+      "sha256": "f05603cbd600ef90b93849539af02d48802df6cd79f0ad83ec6d8af2cf1b1f52"
+    },
+    "target/performance/codec-audit/linux-followup/performance/codec-audit/after/matrix/server.json": {
+      "size_bytes": 6320,
+      "sha256": "061fa5d0431b18d59378a7ff05011f6f53e5318b64029e0649ee0b116eb1285c"
+    },
+    "target/performance/codec-audit/linux-followup/performance/codec-audit/after/matrix/server.log": {
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "target/performance/codec-audit/linux-followup/performance/codec-audit/after/matrix/summary.json": {
+      "size_bytes": 316328,
+      "sha256": "e692fe801b126060a1abb122ded20a8a1bf2478296d8011afc1fe73affd12c4f"
+    },
+    "target/performance/codec-audit/linux-followup/performance/codec-audit/before/matrix/environment.json": {
+      "size_bytes": 1635,
+      "sha256": "a15e02a240e3a5e8bdb44c02b55cda2c4eb8a9565ab81a54d4942dee237ebda0"
+    },
+    "target/performance/codec-audit/linux-followup/performance/codec-audit/before/matrix/server.json": {
+      "size_bytes": 6321,
+      "sha256": "c795bf1d65a0215810e07d27183443c48abfd3be8d990c56d7a082434a5e1f4d"
+    },
+    "target/performance/codec-audit/linux-followup/performance/codec-audit/before/matrix/server.log": {
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "target/performance/codec-audit/linux-followup/performance/codec-audit/before/matrix/summary.json": {
+      "size_bytes": 316136,
+      "sha256": "303755016dc868ddf71e315d877a04efc44bc6399e4ddcdae852f27b92815720"
+    },
+    "target/performance/codec-audit/linux-followup/performance/codec-audit/summary/environment.json": {
+      "size_bytes": 4603,
+      "sha256": "a5b6511e5145b7dc2a06eaa59eed89fb5bd7c3b5f6ebdac2072fac3616e3c70c"
+    },
+    "target/performance/codec-audit/linux-followup/performance/codec-audit/summary/manifest.json": {
+      "size_bytes": 2421,
+      "sha256": "60a1be4e1ed8576a7ed4b820bd0e279b0c6f195cbe5483d1e05b9e5350480641"
+    },
+    "target/performance/codec-audit/linux-followup/performance/codec-audit/summary/summary.json": {
+      "size_bytes": 146229,
+      "sha256": "270733128bf959eca2d9e31a6a54bfa7f14ae2277c0489a0602906001e9a8830"
+    }
+  }
+}

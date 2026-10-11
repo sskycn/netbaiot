@@ -323,8 +323,8 @@
       "sha256": "a12fd9f9e0be2b6f656f94352e3c0f07e03b655c532a933a90d8a0a4892a1c67"
     },
     "scripts/perf/codec_campaign.py": {
-      "size_bytes": 20484,
-      "sha256": "8159bade4aed772761bce84ce9978f866008e309ec4c3650d106ffe76cb4a135"
+      "size_bytes": 21039,
+      "sha256": "5378413c2b1d70bc25234c797e62756e37614d92fe19bdd9028d40fa4b3860bf"
     },
     "scripts/perf/codec_audit_summary.py": {
       "size_bytes": 10088,

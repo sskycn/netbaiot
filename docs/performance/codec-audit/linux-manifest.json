@@ -1,0 +1,67 @@
+{
+  "version": 1,
+  "run_id": 38110812037,
+  "job_id": 114385804665,
+  "artifact_id": 11691881407,
+  "artifact_url": "https://github.com/sskycn/netbaiot/actions/runs/38110812037/artifacts/11691881407",
+  "expires_at": "2026-10-25T04:27:35Z",
+  "archive": {
+    "path": "target/performance/codec-audit/ci-linux-comparison.zip",
+    "size_bytes": 180847,
+    "sha256": "ba4ea0b2f04381f1fe003b383cf85953a3aefa0dbc1885a2a99132ae70abf349"
+  },
+  "files": {
+    "target/performance/codec-audit/linux/performance/codec-audit/after/matrix/server.json": {
+      "size_bytes": 6320,
+      "sha256": "dfb31cc0e7428353c01864488f186a5e875989516604e7195f57af6e352db967"
+    },
+    "target/performance/codec-audit/linux/performance/codec-audit/after/matrix/server.log": {
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "target/performance/codec-audit/linux/performance/codec-audit/after/matrix/environment.json": {
+      "size_bytes": 1607,
+      "sha256": "99b011cc4dcc478d22608be144565dce703d7fbc41de7c97d679564b7342efbf"
+    },
+    "target/performance/codec-audit/linux/performance/codec-audit/after/matrix/summary.json": {
+      "size_bytes": 960369,
+      "sha256": "30dcbeba145823e2e6f79f000f09e81168562a43cb14b2f1d6e38ed9f9530ed8"
+    },
+    "target/performance/codec-audit/linux/performance/codec-audit/before/matrix/environment.json": {
+      "size_bytes": 1563,
+      "sha256": "629983eab528b5d3d962e7d4406b1592933f30a329bbfe6b4979909b111d7a46"
+    },
+    "target/performance/codec-audit/linux/performance/codec-audit/before/matrix/server.json": {
+      "size_bytes": 6321,
+      "sha256": "870ccc418c1f892b70bd21481981471891fbec2e24cc93515868aafa0e5e2de0"
+    },
+    "target/performance/codec-audit/linux/performance/codec-audit/before/matrix/server.log": {
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "target/performance/codec-audit/linux/performance/codec-audit/before/matrix/summary.json": {
+      "size_bytes": 960742,
+      "sha256": "0179b769b29f1d5078edfe049322d7afc9a0415e92e6cb0e2df3588dcc45c04a"
+    },
+    "target/performance/codec-audit/linux/performance/codec-audit/summary/environment.json": {
+      "size_bytes": 4447,
+      "sha256": "f1ec97966bc8d730d9e7b6ca32d935c1aea7a2cac80b9776806a823bf7dcfd24"
+    },
+    "target/performance/codec-audit/linux/performance/codec-audit/summary/manifest.json": {
+      "size_bytes": 2421,
+      "sha256": "4f08851ea6cf7633e246bde3376c342109db6692bcfdf0bd7c13ce9cede5e16a"
+    },
+    "target/performance/codec-audit/linux/performance/codec-audit/summary/summary.json": {
+      "size_bytes": 144489,
+      "sha256": "fbb970d2dd1baf366bacf538f4d9a72dc1b46cb2fd8fe6daae6c6295ed10dedd"
+    },
+    "target/performance/codec-audit/linux/codec-before.csv": {
+      "size_bytes": 4291,
+      "sha256": "b47f853851b9b56be7ff2fb9d9db397ef3dfe75d1577791d066700ec78e54d0d"
+    },
+    "target/performance/codec-audit/linux/codec-after.csv": {
+      "size_bytes": 4282,
+      "sha256": "f67a6a13c194adadd25a89dd87aa28e4bbcdacec766f219987aee9aa33d161e4"
+    }
+  }
+}

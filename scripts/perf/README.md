@@ -134,8 +134,10 @@ The rate denominator includes connection setup and bounded result polling; laten
 starts after payload encoding immediately before socket send. QoS0 has no receipt;
 QoS2 reports complete PUBCOMP exchange. Webhook timing ends when the test handler
 flushes its 2xx response, rather than when the gateway observes ACK or business
-finally completes. Commands report reception, never execution. CPU uses `ps` process
-time, RSS is sampled at 100ms and does not measure allocation peak or isolate
+finally completes. Commands report reception, never execution. CPU uses Linux
+procfs clock ticks or macOS `ps` fractional process time; Linux `ps TIME` has only
+whole-second precision and is unsuitable for short measurements. RSS is sampled
+at 100ms and does not measure allocation peak or isolate
 per-connection memory. Source/configuration and executable SHA-256 are retained.
 
 This is a short regression matrix, not a sustainable production capacity or soak
@@ -153,6 +155,9 @@ explicit baseline revision. An explicitly tagged main commit containing
 `[codec-comparison]` also requests this bounded comparison, using `6e16b31` as the
 baseline. Ordinary PR and push smoke do not run the longer comparison. Merely
 configuring this job is not execution evidence.
+`[codec-followup]` requests alternating before/after microbench repeats and a
+0.2-second one-repeat full matrix, keeping CPU sampling correction separate from
+the longer matrix. Compare only matching versions within each campaign.
 
 `codec_audit_summary.py --root target/performance/codec-audit --output
 docs/performance/codec-audit` validates matching harness/configuration, complete

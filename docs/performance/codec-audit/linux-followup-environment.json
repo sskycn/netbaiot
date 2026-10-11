@@ -1,0 +1,116 @@
+{
+  "matrix": {
+    "versions": {
+      "before": {
+        "platform": "Linux-6.17.0-1022-azure-x86_64-with-glibc2.39",
+        "machine": "x86_64",
+        "cpu_count": 4,
+        "rust": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: x86_64-unknown-linux-gnu\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+        "revision": "6e16b31",
+        "server_sha256": "3cd425acbc97b99f79012b6e855fd370e9575ebc37a57f99c60b7f7678d8d00d",
+        "harness_sha256": "31cba6c066d08aeedf5f3e13676b0a4caec3cdda5cad8cd38a37031e20075947",
+        "arguments": {
+          "server": "target/codec-baseline-build/release/netbaiot-server",
+          "output": "target/performance/codec-audit/before/matrix",
+          "revision": "6e16b31",
+          "seconds": 0.2,
+          "workers": 4,
+          "repeats": 1,
+          "sink_delay_ms": 0,
+          "codecs": [
+            "json",
+            "cbor",
+            "msgpack",
+            "protobuf"
+          ],
+          "protocols": [
+            "mqtt",
+            "tcp",
+            "udp"
+          ],
+          "workloads": [
+            "small",
+            "large",
+            "heartbeat",
+            "command"
+          ]
+        },
+        "timing": "socket send to receipt; socket send to webhook response flushed; HTTP command submit to device bytes",
+        "cpu_measurement": "Linux procfs clock ticks; macOS ps process time",
+        "limitations": [
+          "Python closed loop and shared host, no production capacity claim",
+          "RSS sampled at 100ms, not allocator peak",
+          "CPU time from ps, 10ms resolution",
+          "No application-final-processing measurement",
+          "UDP large payload has 4 fields; stream large has 64",
+          "QoS0 receipt unavailable; throughput uses observed required webhook responses",
+          "No per-connection allocator isolation"
+        ]
+      },
+      "after": {
+        "platform": "Linux-6.17.0-1022-azure-x86_64-with-glibc2.39",
+        "machine": "x86_64",
+        "cpu_count": 4,
+        "rust": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: x86_64-unknown-linux-gnu\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+        "revision": "55ab4199c9f240b572b6173e7c03d674244c6106",
+        "server_sha256": "1b7f935950ce0e0b3212a12b4901386112ef0adf12d188f9fa0c6108b9bd1a6e",
+        "harness_sha256": "31cba6c066d08aeedf5f3e13676b0a4caec3cdda5cad8cd38a37031e20075947",
+        "arguments": {
+          "server": "target/release/netbaiot-server",
+          "output": "target/performance/codec-audit/after/matrix",
+          "revision": "55ab4199c9f240b572b6173e7c03d674244c6106",
+          "seconds": 0.2,
+          "workers": 4,
+          "repeats": 1,
+          "sink_delay_ms": 0,
+          "codecs": [
+            "json",
+            "cbor",
+            "msgpack",
+            "protobuf"
+          ],
+          "protocols": [
+            "mqtt",
+            "tcp",
+            "udp"
+          ],
+          "workloads": [
+            "small",
+            "large",
+            "heartbeat",
+            "command"
+          ]
+        },
+        "timing": "socket send to receipt; socket send to webhook response flushed; HTTP command submit to device bytes",
+        "cpu_measurement": "Linux procfs clock ticks; macOS ps process time",
+        "limitations": [
+          "Python closed loop and shared host, no production capacity claim",
+          "RSS sampled at 100ms, not allocator peak",
+          "CPU time from ps, 10ms resolution",
+          "No application-final-processing measurement",
+          "UDP large payload has 4 fields; stream large has 64",
+          "QoS0 receipt unavailable; throughput uses observed required webhook responses",
+          "No per-connection allocator isolation"
+        ]
+      }
+    },
+    "configuration": {
+      "development": true,
+      "limits": {
+        "max_connections_per_ip": 256,
+        "requests_per_second": 100000,
+        "requests_per_ip_second": 100000,
+        "messages_per_device_second": 100000,
+        "messages_per_tenant_second": 100000,
+        "sink_delivery_concurrency": 4,
+        "max_replay_entries_per_device": 32,
+        "max_replay_entries_per_tenant": 4096,
+        "max_replay_entries": 4096,
+        "command_dedup_ttl_ms": 1000
+      },
+      "credential_count": 16,
+      "credential_scope": "public synthetic fixtures only",
+      "network": "plaintext loopback, independent required HTTP 2xx ACK sink"
+    }
+  }
+}
