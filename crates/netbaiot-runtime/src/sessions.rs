@@ -2,7 +2,8 @@ use crate::*;
 use netbaiot_core::*;
 use serde::Serialize;
 use std::{
-    collections::HashMap,
+    cmp::Ordering as CmpOrdering,
+    collections::{BTreeSet, HashMap},
     sync::{
         Arc, Weak,
         atomic::{AtomicBool, AtomicUsize, Ordering},
@@ -119,8 +120,30 @@ impl Default for TenantState {
 struct SessionState {
     generation: u64,
     sessions: HashMap<DeviceKey, SessionEndpoint>,
+    ordered_sessions: BTreeSet<OrderedDeviceKey>,
     tenants: HashMap<TenantId, TenantState>,
     presence: HashMap<DeviceKey, Presence>,
+}
+
+// The public DeviceKey has no Ord contract. Keep the list's existing tuple order
+// private to this registry, with one index node per live session.
+#[derive(Clone, Eq, PartialEq)]
+struct OrderedDeviceKey(DeviceKey);
+
+impl Ord for OrderedDeviceKey {
+    fn cmp(&self, other: &Self) -> CmpOrdering {
+        (&self.0.tenant_id, &self.0.product_id, &self.0.device_id).cmp(&(
+            &other.0.tenant_id,
+            &other.0.product_id,
+            &other.0.device_id,
+        ))
+    }
+}
+
+impl PartialOrd for OrderedDeviceKey {
+    fn partial_cmp(&self, other: &Self) -> Option<CmpOrdering> {
+        Some(self.cmp(other))
+    }
 }
 
 pub struct Sessions {
@@ -151,6 +174,7 @@ impl Sessions {
             state: Mutex::new(SessionState {
                 generation: 0,
                 sessions: HashMap::new(),
+                ordered_sessions: BTreeSet::new(),
                 tenants: HashMap::new(),
                 presence: HashMap::new(),
             }),
@@ -246,6 +270,10 @@ impl Sessions {
                 "session takeover diagnostic"
             );
             old.cancel.cancel();
+        } else {
+            state
+                .ordered_sessions
+                .insert(OrderedDeviceKey(device.clone()));
         }
         state.generation = generation;
         let connected_at = now_ms();
@@ -335,30 +363,30 @@ impl Sessions {
         if limit == 0 || limit > 256 {
             return Err(Error::Invalid);
         }
+        #[cfg(test)]
+        let mut timing = crate::hotspot_bench::LockClock::start();
         let state = lock(&self.state)?;
-        let mut values = state
-            .sessions
+        #[cfg(test)]
+        timing.acquired();
+        state
+            .ordered_sessions
             .iter()
-            .filter(|(device, _)| allowed(device))
-            .map(|(device, endpoint)| ConnectionSummary {
-                device: device.clone(),
-                generation: endpoint.generation,
-                transport: endpoint.transport,
+            .filter(|key| allowed(&key.0))
+            .skip(offset)
+            .take(limit)
+            .map(|key| {
+                state
+                    .sessions
+                    .get(&key.0)
+                    .map_or(Err(Error::Internal), |endpoint| {
+                        Ok(ConnectionSummary {
+                            device: key.0.clone(),
+                            generation: endpoint.generation,
+                            transport: endpoint.transport,
+                        })
+                    })
             })
-            .collect::<Vec<_>>();
-        values.sort_by(|a, b| {
-            (
-                &a.device.tenant_id,
-                &a.device.product_id,
-                &a.device.device_id,
-            )
-                .cmp(&(
-                    &b.device.tenant_id,
-                    &b.device.product_id,
-                    &b.device.device_id,
-                ))
-        });
-        Ok(values.into_iter().skip(offset).take(limit).collect())
+            .collect()
     }
 
     pub fn touch(&self, device: &DeviceKey, transport: Transport) -> Result<()> {
@@ -521,6 +549,9 @@ impl Drop for SessionLease {
             tracing::debug!(device=?self.device, generation=self.generation,
                 cancelled=self.cancel.is_cancelled(), "current session lease dropped");
             state.sessions.remove(&self.device);
+            state
+                .ordered_sessions
+                .remove(&OrderedDeviceKey(self.device.clone()));
             self.cancel.cancel();
             if let Some(tenant) = state.tenants.get_mut(&self.device.tenant_id) {
                 tenant.connections = tenant.connections.saturating_sub(1);
@@ -823,6 +854,117 @@ mod tests {
                 .is_empty()
         );
         drop((other_lease, one, two));
+    }
+
+    #[test]
+    fn large_connection_pages_filter_tenants_and_remove_replaced_lease() {
+        let sessions = Sessions::new(Arc::new(Limits {
+            max_connections: 1_024,
+            max_connections_per_tenant: 512,
+            max_devices: 1_024,
+            max_devices_per_tenant: 512,
+            ..Limits::default()
+        }));
+        let mut leases = Vec::new();
+        for index in (0..800).rev() {
+            let mut identity = (*auth(&format!("device-{index:04}"))).clone();
+            identity.device_key.tenant_id =
+                TenantId::new(if index % 2 == 0 { "a" } else { "b" }).unwrap();
+            leases.push(
+                sessions
+                    .register(Arc::new(identity), Transport::Mqtt)
+                    .unwrap()
+                    .0,
+            );
+        }
+        let allowed = |key: &DeviceKey| key.tenant_id.as_str() == "b";
+        assert_eq!(sessions.list_filtered(0, 256, allowed).unwrap().len(), 256);
+        let tail = sessions.list_filtered(399, 256, allowed).unwrap();
+        assert_eq!(tail.len(), 1);
+        assert_eq!(tail[0].device.device_id.as_str(), "device-0799");
+        assert!(sessions.list_filtered(400, 1, allowed).unwrap().is_empty());
+        assert!(matches!(sessions.list(0, 257), Err(Error::Invalid)));
+
+        let old = leases.remove(0);
+        let mut identity = (*auth("device-0799")).clone();
+        identity.device_key.tenant_id = TenantId::new("b").unwrap();
+        let replacement = sessions
+            .register(Arc::new(identity), Transport::Tcp)
+            .unwrap()
+            .0;
+        assert_eq!(sessions.list_filtered(399, 1, allowed).unwrap().len(), 1);
+        drop(old);
+        assert_eq!(sessions.list_filtered(399, 1, allowed).unwrap().len(), 1);
+        drop(replacement);
+        assert!(sessions.list_filtered(399, 1, allowed).unwrap().is_empty());
+        drop(leases);
+        let state = sessions.state.lock().unwrap();
+        assert!(state.sessions.is_empty());
+        assert!(state.ordered_sessions.is_empty());
+    }
+
+    #[test]
+    fn concurrent_takeovers_and_queries_never_leave_stale_index_entries() {
+        let sessions = Sessions::new(Arc::new(Limits::default()));
+        std::thread::scope(|scope| {
+            for worker in 0..4 {
+                let sessions = sessions.clone();
+                scope.spawn(move || {
+                    let identity = auth(&format!("worker-{worker}"));
+                    for _ in 0..200 {
+                        let (old, _) = sessions
+                            .register(identity.clone(), Transport::Mqtt)
+                            .unwrap();
+                        let (new, _) = sessions.register(identity.clone(), Transport::Tcp).unwrap();
+                        drop(old);
+                        assert!(
+                            sessions
+                                .list(0, 256)
+                                .unwrap()
+                                .iter()
+                                .any(|item| item.device == identity.device_key)
+                        );
+                        drop(new);
+                    }
+                });
+            }
+        });
+        let state = sessions.state.lock().unwrap();
+        assert_eq!(state.sessions.len(), state.ordered_sessions.len());
+        assert!(state.sessions.is_empty());
+    }
+
+    #[test]
+    #[ignore = "isolated serial release connection list benchmark"]
+    fn connection_list_scaling() {
+        for size in [256, 1_024, 4_096] {
+            let sessions = Sessions::new(Arc::new(Limits {
+                max_connections: size + 1,
+                max_connections_per_tenant: size + 1,
+                max_devices: size + 1,
+                max_devices_per_tenant: size + 1,
+                ..Limits::default()
+            }));
+            let leases = (0..size)
+                .map(|index| {
+                    sessions
+                        .register(auth(&format!("list-{index:05}")), Transport::Mqtt)
+                        .unwrap()
+                        .0
+                })
+                .collect::<Vec<_>>();
+            for offset in [0, size / 2, size.saturating_sub(32)] {
+                crate::hotspot_bench::measure(
+                    "connection_list",
+                    size,
+                    200,
+                    || (),
+                    |_| sessions.list(offset, 32).unwrap(),
+                    |_| {},
+                );
+            }
+            drop(leases);
+        }
     }
 
     #[test]
