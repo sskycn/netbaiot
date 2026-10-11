@@ -60,6 +60,7 @@ pub enum Metric {
     UdpAckSendFailures,
     UdpAcceptedDuplicates,
     UdpAccepted,
+    UdpOverloadDrops,
     BusinessRpcConnections,
     BusinessRpcAbnormalClosures,
     BusinessRpcProviderSyncSuccess,
@@ -102,7 +103,7 @@ pub enum BusinessRpcCallResult {
     Invalid,
 }
 
-const NAMES: [&str; 85] = [
+const NAMES: [&str; 86] = [
     "connections_accepted",
     "connections_rejected",
     "mqtt_connect_success",
@@ -158,6 +159,7 @@ const NAMES: [&str; 85] = [
     "udp_ack_send_failures",
     "udp_accepted_duplicates",
     "udp_accepted",
+    "udp_overload_drops",
     "business_rpc_connections",
     "business_rpc_abnormal_closures",
     "business_rpc_provider_sync_success",

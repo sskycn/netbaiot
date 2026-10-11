@@ -10,6 +10,7 @@
   "max_http_headers": 32,
   "max_tcp_frame_size": 65536,
   "max_udp_datagram_size": 1200,
+  "max_udp_inflight_datagrams": 64,
   "max_client_id_bytes": 64,
   "max_username_bytes": 64,
   "max_password_bytes": 128,

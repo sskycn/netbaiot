@@ -1160,6 +1160,14 @@
           "minimum": 1,
           "type": "integer"
         },
+        "max_udp_inflight_datagrams": {
+          "default": 64,
+          "description": "UDP datagrams being authenticated or admitted; excess datagrams are dropped.",
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
         "max_username_bytes": {
           "default": 64,
           "format": "uint",
@@ -1746,6 +1754,7 @@
         "max_topic_bytes": 256,
         "max_topic_depth": 8,
         "max_udp_datagram_size": 1200,
+        "max_udp_inflight_datagrams": 64,
         "max_username_bytes": 64,
         "max_will_payload_bytes": 65536,
         "max_write_buffer_per_connection": 65536,

@@ -86,6 +86,11 @@ bytes. All integer fields use network byte order:
 HMAC covers all preceding bytes using the **decoded 32-byte credential key**, not
 ASCII hex. Credential version must match provisioning. Every datagram, including
 retries, must pass HMAC, authorization, and timestamp skew (default ±30 seconds).
+The receiver processes at most `max_udp_inflight_datagrams` datagrams concurrently
+(default 64). It has no waiting datagram queue; excess datagrams are silently
+dropped, and clients may retry. Retained datagram bytes are bounded by this count
+times `max_udp_datagram_size`. Authentication can run concurrently, while replay
+checking, event acceptance and replay commit retain one ordered owner.
 
 Each `(DeviceKey, credential_version, boot_id)` has a bounded 64-sequence bitmap.
 A new sequence enters the codec/Ingress/EventBus, then commits replay **only after

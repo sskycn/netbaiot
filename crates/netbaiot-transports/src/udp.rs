@@ -6,6 +6,7 @@ use std::{
     sync::Arc,
 };
 use tokio::net::UdpSocket;
+use tokio::{sync::Mutex, task::JoinSet};
 use tokio_util::sync::CancellationToken;
 pub const ACK_SIZE: usize = 64;
 pub const MIN_ENVELOPE_SIZE: usize = 76;
@@ -173,7 +174,7 @@ impl ReplayWindow {
         Ok(ReplayDecision::New)
     }
     /// Called only after a successful New check and EventAccepted, with no intervening
-    /// replay mutation. The single UDP receive-loop owner guarantees this ordering.
+    /// replay mutation. The UDP replay mutex owns this ordering across the await.
     pub fn commit(
         &mut self,
         device: DeviceKey,
@@ -251,25 +252,67 @@ mod replay_tests;
 pub async fn serve(socket: UdpSocket, s: Arc<Services>, stop: CancellationToken) -> Result<()> {
     let l = &s.ingress.limits;
     let mut input = vec![0; l.max_udp_datagram_size + 1];
-    let mut replay = ReplayWindow::new(l.clone());
+    let socket = Arc::new(socket);
+    let replay = Arc::new(Mutex::new(ReplayWindow::new(l.clone())));
+    // There is no waiting datagram queue. Both task count and retained datagram
+    // bytes are bounded by this ceiling times max_udp_datagram_size.
+    let mut tasks = JoinSet::new();
+    let mut receive_error = None;
     loop {
-        let (len, peer) = tokio::select! {biased;_=stop.cancelled()=>break,result=socket.recv_from(&mut input)=>result.map_err(|_|Error::Unavailable)?};
+        let (len, peer) = tokio::select! {
+            biased;
+            _ = stop.cancelled() => break,
+            Some(result) = tasks.join_next(), if !tasks.is_empty() => {
+                if result.is_err() {
+                    tracing::error!("UDP datagram worker failed");
+                }
+                continue;
+            }
+            result = socket.recv_from(&mut input) => match result {
+                Ok(received) => received,
+                Err(_) => {
+                    receive_error = Some(Error::Unavailable);
+                    break;
+                }
+            },
+        };
         s.ingress.metrics.inc(Metric::UdpDatagrams);
         if s.rates.take(peer.ip()).is_err() {
             continue;
         }
-        let result = accept_and_ack(&input[..len], &s.ingress, &mut replay, |ack| {
-            socket.try_send_to(ack, peer)
-        })
-        .await;
-        if let Err(e) = result {
-            tracing::debug!(error=%e,"UDP datagram rejected");
+        if len > l.max_udp_datagram_size || tasks.len() >= l.max_udp_inflight_datagrams {
+            s.ingress.metrics.inc(Metric::UdpOverloadDrops);
+            continue;
+        }
+        let packet = input[..len].to_vec();
+        let ingress = s.ingress.clone();
+        let replay = replay.clone();
+        let socket = socket.clone();
+        tasks.spawn(async move {
+            if let Err(error) = accept_and_ack_concurrent(&packet, &ingress, &replay, |ack| {
+                socket.try_send_to(ack, peer)
+            })
+            .await
+            {
+                tracing::debug!(%error, "UDP datagram rejected");
+            }
+        });
+    }
+    // Quiesce stops new receipts, while already started admissions retain their
+    // guards and complete before the server drains or spools required work.
+    while let Some(result) = tasks.join_next().await {
+        if result.is_err() {
+            tracing::error!("UDP datagram worker failed during shutdown");
         }
     }
-    Ok(())
+    match receive_error {
+        Some(error) => Err(error),
+        None => Ok(()),
+    }
 }
 /// The send boundary is synchronous and injectable for deterministic socket-pressure tests.
-/// It owns no queue/task; send failure is deliberately outside acceptance error semantics.
+/// Send failure is deliberately outside acceptance error semantics.
+#[cfg(test)]
 async fn accept_and_ack(
     input: &[u8],
     ingress: &Ingress,
@@ -283,6 +326,37 @@ async fn accept_and_ack(
         .auth_cache
         .verify_signed_with_verifier(envelope.credential_id, envelope.signed, envelope.tag)
         .await?;
+    accept_verified(&envelope, &verified, ingress, replay).await?;
+    send_ack(&envelope, &verified, ingress, send);
+    Ok(())
+}
+
+async fn accept_and_ack_concurrent(
+    input: &[u8],
+    ingress: &Ingress,
+    replay: &Mutex<ReplayWindow>,
+    send: impl FnOnce(&[u8]) -> std::io::Result<usize>,
+) -> Result<()> {
+    let _admission = ingress.lifecycle.begin_admission()?;
+    let envelope = decode(input, ingress.limits.max_udp_datagram_size)?;
+    let verified = ingress
+        .auth_cache
+        .verify_signed_with_verifier(envelope.credential_id, envelope.signed, envelope.tag)
+        .await?;
+    {
+        let mut replay = replay.lock().await;
+        accept_verified(&envelope, &verified, ingress, &mut replay).await?;
+    }
+    send_ack(&envelope, &verified, ingress, send);
+    Ok(())
+}
+
+async fn accept_verified(
+    envelope: &Envelope<'_>,
+    verified: &VerifiedDatagram,
+    ingress: &Ingress,
+    replay: &mut ReplayWindow,
+) -> Result<()> {
     let auth = verified.identity();
     if auth.credential_version != envelope.credential_version {
         return Err(Error::Authentication);
@@ -324,6 +398,15 @@ async fn accept_and_ack(
             ingress.metrics.inc(Metric::UdpAcceptedDuplicates);
         }
     }
+    Ok(())
+}
+
+fn send_ack(
+    envelope: &Envelope<'_>,
+    verified: &VerifiedDatagram,
+    ingress: &Ingress,
+    send: impl FnOnce(&[u8]) -> std::io::Result<usize>,
+) {
     // Invalidation during admission must not leave an old signer usable for a receipt.
     let receipt = ingress
         .auth_cache
@@ -348,7 +431,6 @@ async fn accept_and_ack(
         tracing::debug!(%error, "UDP acceptance ACK suppressed");
     }
     // Acceptance is irrevocable, including when invalidation suppresses the receipt.
-    Ok(())
 }
 
 #[cfg(test)]

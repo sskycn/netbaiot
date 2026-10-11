@@ -28,6 +28,8 @@ pub struct Limits {
     pub max_http_headers: usize,
     pub max_tcp_frame_size: usize,
     pub max_udp_datagram_size: usize,
+    /// UDP datagrams being authenticated or admitted; excess datagrams are dropped.
+    pub max_udp_inflight_datagrams: usize,
     pub max_client_id_bytes: usize,
     pub max_username_bytes: usize,
     pub max_password_bytes: usize,
@@ -176,6 +178,7 @@ impl Default for Limits {
             max_http_headers: 32,
             max_tcp_frame_size: 65_536,
             max_udp_datagram_size: 1_200,
+            max_udp_inflight_datagrams: 64,
             max_client_id_bytes: 64,
             max_username_bytes: 64,
             max_password_bytes: 128,
@@ -363,6 +366,7 @@ impl Limits {
             || self.max_mqtt_correlation_data_bytes > self.max_mqtt_property_bytes
             || self.max_mqtt_user_properties > self.max_mqtt_property_bytes
             || self.max_udp_datagram_size > 1_200
+            || self.max_udp_inflight_datagrams > 1_024
             || self.max_http_header_bytes < 8_192
             || self.max_http_header_bytes > max_frame
             || self.max_http_headers > 128
@@ -467,5 +471,19 @@ mod tests {
         let mut limits = Limits::default();
         limits.max_mqtt_user_property_bytes = limits.max_mqtt_property_bytes + 1;
         assert!(limits.validate().is_err());
+    }
+
+    #[test]
+    fn udp_worker_ceiling_defaults_for_old_configs_and_is_bounded() {
+        let old: Limits = serde_json::from_str("{}").unwrap();
+        assert_eq!(old.max_udp_inflight_datagrams, 64);
+        let configured: Limits =
+            serde_json::from_str(r#"{"max_udp_inflight_datagrams":8}"#).unwrap();
+        configured.validate().unwrap();
+        for invalid in [0, 1_025] {
+            let mut limits = configured.clone();
+            limits.max_udp_inflight_datagrams = invalid;
+            assert!(matches!(limits.validate(), Err(Error::Configuration)));
+        }
     }
 }

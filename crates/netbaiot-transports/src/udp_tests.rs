@@ -7,7 +7,7 @@ use std::{
     io,
     sync::{
         Mutex,
-        atomic::{AtomicUsize, Ordering},
+        atomic::{AtomicBool, AtomicUsize, Ordering},
     },
     time::Duration,
 };
@@ -15,6 +15,9 @@ use std::{
 struct Provider {
     calls: AtomicUsize,
     auth: Mutex<AuthenticatedDevice>,
+    delay_slow: AtomicBool,
+    slow_entered: tokio::sync::Notify,
+    slow_release: tokio::sync::Notify,
 }
 #[async_trait]
 impl DeviceAuthenticator for Provider {
@@ -23,13 +26,18 @@ impl DeviceAuthenticator for Provider {
     }
     async fn resolve_verifier(&self, id: &str) -> Result<DeviceVerifier> {
         self.calls.fetch_add(1, Ordering::Relaxed);
-        if id != "a" {
+        if id != "a" && id != "slow" {
             return Err(Error::Authentication);
         }
-        Ok(DeviceVerifier::new(
-            self.auth.lock().unwrap().clone(),
-            [7; 32],
-        ))
+        if id == "slow" && self.delay_slow.load(Ordering::Acquire) {
+            self.slow_entered.notify_one();
+            self.slow_release.notified().await;
+        }
+        let mut identity = self.auth.lock().unwrap().clone();
+        if id == "slow" {
+            identity.device_key.device_id = DeviceId::new("slow").unwrap();
+        }
+        Ok(DeviceVerifier::new(identity, [7; 32]))
     }
 }
 struct PendingSink;
@@ -60,6 +68,9 @@ fn fixture(limits: Limits) -> (Arc<Ingress>, Arc<Provider>) {
     let provider = Arc::new(Provider {
         calls: AtomicUsize::new(0),
         auth: Mutex::new(auth()),
+        delay_slow: AtomicBool::new(false),
+        slow_entered: tokio::sync::Notify::new(),
+        slow_release: tokio::sync::Notify::new(),
     });
     let limits = Arc::new(limits);
     let metrics = Arc::new(Metrics::default());
@@ -252,6 +263,94 @@ async fn send_failure_commits_and_ten_thousand_duplicates_do_not_ingest() {
         Err(Error::Draining)
     ));
     assert_eq!(ingress.events.usage().unwrap().pending_required, 1);
+    ingress.events.stop_workers().await.unwrap();
+}
+
+#[tokio::test]
+async fn concurrent_duplicate_packets_have_one_event_accepted_owner() {
+    let (ingress, provider) = fixture(Limits::default());
+    let replay = Arc::new(tokio::sync::Mutex::new(ReplayWindow::new(
+        ingress.limits.clone(),
+    )));
+    let bytes = packet("a", 1, 42, now_ms(), PAYLOAD);
+    let mut tasks = JoinSet::new();
+    for _ in 0..32 {
+        let ingress = ingress.clone();
+        let replay = replay.clone();
+        let bytes = bytes.clone();
+        tasks.spawn(async move {
+            accept_and_ack_concurrent(&bytes, &ingress, &replay, |ack| Ok(ack.len())).await
+        });
+    }
+    while let Some(result) = tasks.join_next().await {
+        result.unwrap().unwrap();
+    }
+    assert_eq!(ingress.metrics.get(Metric::EventsAccepted), 1);
+    assert_eq!(ingress.metrics.get(Metric::UdpAcceptedDuplicates), 31);
+    assert_eq!(provider.calls.load(Ordering::Relaxed), 1);
+    ingress.events.stop_workers().await.unwrap();
+}
+
+#[tokio::test]
+async fn slow_authentication_does_not_hold_replay_owner_for_other_devices() {
+    let (ingress, provider) = fixture(Limits::default());
+    provider.delay_slow.store(true, Ordering::Release);
+    let replay = Arc::new(tokio::sync::Mutex::new(ReplayWindow::new(
+        ingress.limits.clone(),
+    )));
+    let entered = provider.slow_entered.notified();
+    let slow_ingress = ingress.clone();
+    let slow_replay = replay.clone();
+    let slow = tokio::spawn(async move {
+        let bytes = packet("slow", 1, 1, now_ms(), PAYLOAD);
+        accept_and_ack_concurrent(&bytes, &slow_ingress, &slow_replay, |ack| Ok(ack.len())).await
+    });
+    entered.await;
+    let fast = packet("a", 1, 1, now_ms(), PAYLOAD);
+    tokio::time::timeout(
+        Duration::from_secs(1),
+        accept_and_ack_concurrent(&fast, &ingress, &replay, |ack| Ok(ack.len())),
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    assert_eq!(ingress.metrics.get(Metric::EventsAccepted), 1);
+    provider.slow_release.notify_one();
+    slow.await.unwrap().unwrap();
+    assert_eq!(ingress.metrics.get(Metric::EventsAccepted), 2);
+    ingress.events.stop_workers().await.unwrap();
+}
+
+#[tokio::test]
+async fn real_socket_saturation_drops_without_waiting_and_shutdown_joins_worker() {
+    let (ingress, provider) = fixture(Limits {
+        max_udp_inflight_datagrams: 1,
+        ..Limits::default()
+    });
+    provider.delay_slow.store(true, Ordering::Release);
+    let (client, stop, task) = sockets(ingress.clone()).await;
+    let entered = provider.slow_entered.notified();
+    client
+        .send(&packet("slow", 1, 1, now_ms(), PAYLOAD))
+        .await
+        .unwrap();
+    entered.await;
+    client
+        .send(&packet("a", 1, 1, now_ms(), PAYLOAD))
+        .await
+        .unwrap();
+    tokio::time::timeout(Duration::from_secs(1), async {
+        while ingress.metrics.get(Metric::UdpOverloadDrops) == 0 {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .unwrap();
+    assert_eq!(ingress.metrics.get(Metric::EventsAccepted), 0);
+    stop.cancel();
+    provider.slow_release.notify_one();
+    task.await.unwrap().unwrap();
+    assert_eq!(ingress.metrics.get(Metric::EventsAccepted), 1);
     ingress.events.stop_workers().await.unwrap();
 }
 #[tokio::test]
