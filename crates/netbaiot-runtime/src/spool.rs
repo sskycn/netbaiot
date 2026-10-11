@@ -738,6 +738,31 @@ mod tests {
         fs::remove_dir_all(directory).unwrap();
     }
 
+    #[test]
+    fn streamed_and_fuzzable_decoders_agree_on_truncation_and_bit_flips() {
+        let directory =
+            std::env::temp_dir().join(format!("netbaiot-stream-parity-{}", Uuid::new_v4()));
+        let limits = Limits::default();
+        let path = commit_sync(&directory, &limits, &[record()]).unwrap();
+        let image = fs::read(&path).unwrap();
+        let check = |bytes: &[u8]| {
+            fs::write(&path, bytes).unwrap();
+            let streamed = read_segment_stream(fs::File::open(&path).unwrap(), &limits, true);
+            let buffered = decode_spool_records(bytes, &limits);
+            assert_eq!(streamed.is_ok(), buffered.is_ok(), "length={}", bytes.len());
+        };
+        check(&image);
+        for length in 0..image.len() {
+            check(&image[..length]);
+        }
+        for offset in 0..image.len() {
+            let mut mutated = image.clone();
+            mutated[offset] ^= 0x5a;
+            check(&mutated);
+        }
+        fs::remove_dir_all(directory).unwrap();
+    }
+
     #[tokio::test]
     async fn empty_or_absent_spool_recovers_no_work() {
         let directory =
