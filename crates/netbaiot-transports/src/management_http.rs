@@ -61,6 +61,7 @@ fn api_error(
 
 fn error(error: Error, request_id: &str) -> Response<Full<Bytes>> {
     let status = match &error {
+        Error::Configuration | Error::Invalid | Error::Codec => StatusCode::BAD_REQUEST,
         Error::Authentication => StatusCode::UNAUTHORIZED,
         Error::Forbidden => StatusCode::FORBIDDEN,
         Error::Conflict => StatusCode::CONFLICT,
@@ -70,9 +71,98 @@ fn error(error: Error, request_id: &str) -> Response<Full<Bytes>> {
         | Error::Storage
         | Error::UnsupportedRecoveryVersion(_)
         | Error::Unavailable => StatusCode::SERVICE_UNAVAILABLE,
-        _ => StatusCode::BAD_REQUEST,
+        Error::Internal => StatusCode::INTERNAL_SERVER_ERROR,
     };
-    api_error(status, error_code(&error), &error.to_string(), request_id)
+    let message = match &error {
+        Error::Internal => "internal server error".to_owned(),
+        _ => error.to_string(),
+    };
+    api_error(status, error_code(&error), &message, request_id)
+}
+
+#[cfg(test)]
+mod error_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn every_runtime_error_has_matching_http_status_and_json_code() {
+        let cases = [
+            (
+                Error::Configuration,
+                StatusCode::BAD_REQUEST,
+                ErrorCode::InvalidRequest,
+            ),
+            (
+                Error::Authentication,
+                StatusCode::UNAUTHORIZED,
+                ErrorCode::Unauthenticated,
+            ),
+            (
+                Error::Forbidden,
+                StatusCode::FORBIDDEN,
+                ErrorCode::Forbidden,
+            ),
+            (
+                Error::Invalid,
+                StatusCode::BAD_REQUEST,
+                ErrorCode::InvalidRequest,
+            ),
+            (
+                Error::Overloaded,
+                StatusCode::TOO_MANY_REQUESTS,
+                ErrorCode::Overloaded,
+            ),
+            (Error::Conflict, StatusCode::CONFLICT, ErrorCode::Conflict),
+            (
+                Error::Timeout,
+                StatusCode::GATEWAY_TIMEOUT,
+                ErrorCode::Timeout,
+            ),
+            (
+                Error::Draining,
+                StatusCode::SERVICE_UNAVAILABLE,
+                ErrorCode::ServiceDraining,
+            ),
+            (
+                Error::Storage,
+                StatusCode::SERVICE_UNAVAILABLE,
+                ErrorCode::ServerUnavailable,
+            ),
+            (
+                Error::UnsupportedRecoveryVersion(2),
+                StatusCode::SERVICE_UNAVAILABLE,
+                ErrorCode::ServerUnavailable,
+            ),
+            (
+                Error::Unavailable,
+                StatusCode::SERVICE_UNAVAILABLE,
+                ErrorCode::ServerUnavailable,
+            ),
+            (
+                Error::Internal,
+                StatusCode::INTERNAL_SERVER_ERROR,
+                ErrorCode::Internal,
+            ),
+            (
+                Error::Codec,
+                StatusCode::BAD_REQUEST,
+                ErrorCode::InvalidRequest,
+            ),
+        ];
+        for (cause, status, code) in cases {
+            let response = error(cause, "request-123");
+            assert_eq!(response.status(), status);
+            assert_eq!(response.headers()["x-request-id"], "request-123");
+            let body = response.into_body().collect().await.unwrap().to_bytes();
+            let body: ApiError = serde_json::from_slice(&body).unwrap();
+            assert_eq!(body.code, code);
+            assert_eq!(body.request_id.as_deref(), Some("request-123"));
+            assert!(!body.message.is_empty());
+            if code == ErrorCode::Internal {
+                assert_eq!(body.message, "internal server error");
+            }
+        }
+    }
 }
 
 fn authorization(req: &Request<Incoming>) -> Result<Option<&str>> {
