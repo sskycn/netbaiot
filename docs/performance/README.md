@@ -1,37 +1,24 @@
 # Performance evidence policy
 
-Recorded measurements describe their named commit, workload and environment. Historical protocol/config/tool names are preserved as evidence, including removed RPC and recovery versions. Use the [current protocol matrix](../protocol-support.md) and [upgrade guide](../migration/current-protocol-only.md) for current deployments; historical results are not current capacity claims.
+Keep reviewed measurements with their source revision, workload, duration,
+configuration, environment and executable SHA256. Record what was actually run
+and what remains unverified. A configured limit or short regression is not a
+production capacity result; see [measurement requirements](../benchmarks.md).
 
-This directory keeps the evidence needed to understand and reproduce performance
-decisions: methods, source and commands, environment metadata, compact summaries,
-provenance manifests, and small regression fixtures. Raw per-request samples,
-profiling output, generated traces, and full run logs do not belong in Git.
+This directory retains compact [codec comparisons](codec-audit/README.md) and
+[capacity/stability results](../production-readiness.zh-CN.md). Superseded experiments,
+process logs and task reports are available in Git history rather than the active
+documentation tree.
 
-Write new raw output under `target/performance/` or `target/evidence/`. These paths
-are ignored by Git. CI uploads available output as GitHub Actions Artifacts with a
-14-day retention period; normal CI retention is intentionally temporary. Artifacts
-may expire, so do not describe an artifact as permanent evidence. For a formal,
-long-term release record, a maintainer should attach the reviewed summary and any
-required raw evidence to the corresponding GitHub Release Asset. This policy does
-not publish or create releases automatically.
+Write raw logs, per-request samples, traces and heap/perf captures under ignored
+`target/performance/` or `target/evidence/`. CI artifacts have limited retention;
+use reviewed release assets when permanent external evidence is required.
 
-Keep an experiment's `README.md`, run plan, environment, aggregate `summary.json`,
-and checksum manifest in Git. Keep ordinary summary JSON at or below 256 KiB,
-curated `*.excerpt.log` at or below 64 KiB. A larger historical aggregate JSON must
-have an exact path, maximum size, and reason in `evidence-allowlist.json`; raw sample
-arrays remain prohibited. The archive manifest and all other files stay below the
-1 MiB per-file limit. The repository gate permits at most 20 MiB total under this
-directory.
+Before committing evidence, remove local paths with `scripts/scrub_paths.py` and
+review it for secrets. Path scrubbing does not redact credentials. Never publish
+live gateway configurations, device payloads or private recovery records.
 
-Run `cargo xtask check evidence` before committing. The standard
-`cargo xtask check` and release Rust gate run the same check. It rejects oversized
-files, raw file patterns, full logs, large JSON sample arrays, and oversized text
-embedded in JSON. Error messages show the path, observed size, limit, and the expected
-artifact location.
-
-`archive-manifest.json` records the original path, exact size, SHA-256, category,
-source commit, and availability for files removed from the tracked tree; embedded
-raw JSON fields use a JSON pointer. No Actions run or artifact identifier is recorded
-unless it is known. Historical cleanup rewrites Git refs; the local
-`local-performance-archive/` copy and bundle are deliberately ignored by Git and
-preserve the pre-cleanup files on this computer.
+`cargo xtask check evidence` enforces the repository evidence budget: JSON files
+at most 256 KiB, individual files at most 1 MiB, and tracked evidence at most
+20 MiB. The required `evidence-allowlist.json` has no current exceptions. Keep
+source/environment manifests beside their summaries; remove superseded copies.

@@ -15,7 +15,7 @@ Management HTTP（`management_http`，通常为 `127.0.0.1:9090`）和可选的
 非 loopback TCP 入口必须配置 TLS；开发模式强制 loopback，允许本地明文测试。
 
 `device_ingress` 是唯一设备地址，旧分离监听字段会触发配置错误。443 只是部署选择，不代表 HTTPS。
-设备入口收到 HTTP 字节后直接关闭，不返回 HTTP 响应。详见[迁移说明](remove-device-http.md)。
+设备入口收到 HTTP 字节后直接关闭，不返回 HTTP 响应。详见[协议支持](protocol-support.zh-CN.md)。
 
 默认示例的认证信息选择 codec ID `netbaiot-json`、版本 `1`。其它已认证编码见 [Codec 规范](codecs.zh-CN.md)。MQTT/TCP/UDP 载荷都由同一个同步 codec 解码。设备不能在载荷中自行声明可信身份；未知的信封字段会被拒绝。
 
@@ -102,4 +102,4 @@ NBA1 固定 64 字节，最小结构有效 NBI1 为 76 字节，载荷字节放�
 
 当前 0.x 版本的破坏性清理已移除 `config_ack`，旧载荷会被拒绝，不保留兼容别名。
 信封结构未变，继续使用 `schema_version=1`。应用配置操作通过普通 MQTT/TCP 命令与
-`command_ack` 表达。详见[迁移说明](remove-device-config.md)。
+`command_ack` 表达。详见[职责边界](architecture.zh-CN.md)。

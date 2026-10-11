@@ -165,4 +165,4 @@ cargo +nightly fuzz run protobuf_codec -- -max_total_time=30 -max_len=65536
 真实 confirmed webhook；网关运行时没有外部 Broker。可选 SDK 的 JSON 便捷接口
 保持原样，二进制设备使用标准 MQTT 原始 payload 即可。
 
-实际验证与微基准见[开发报告](multi-codec-report.zh-CN.md)。
+实际测量与适用范围见[基准与测量](benchmarks.zh-CN.md)。

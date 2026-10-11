@@ -1,7 +1,9 @@
 # Test fixtures
 
-Historical EventBus spool compatibility fixtures and their reproducible generator
-are documented in [restart-spool/README.md](restart-spool/README.md).
+Current MQTT recovery golden files are documented in
+[the NBMQ v6 fixture guide](../mqtt_conformance/fixtures/mqtt_recovery/README.md).
+EventBus recovery tests cover the current NBSP v3 format; historical compatibility
+fixtures and their generator are not part of the current tree.
 
 ## Test-only TLS fixture
 

@@ -169,9 +169,9 @@ MQTT 和 TCP 在连接时认证并绑定设备身份。非 loopback 设备 TCP �
 
 ## 基准测试
 
-仓库保留了 loopback 和子系统实验数据，报告包含环境、构建、负载和局限。部分结果来自
-历史提交，不能证明当前版本或生产环境的容量。[基准概述](docs/benchmarks.zh-CN.md)解释了数据
-能说明和不能说明的内容；[性能基线](docs/performance-baseline.md)保留原始测量和环境。
+[基准概述](docs/benchmarks.zh-CN.md)汇总精简的 Codec 与 loopback 测量及环境限制。
+当前生产容量尚未建立；[容量与稳定性测试](docs/production-readiness.zh-CN.md)介绍负载工具
+和实际验证范围。
 
 ## 当前限制
 
@@ -192,8 +192,8 @@ MQTT 和 TCP 在连接时认证并绑定设备身份。非 loopback 设备 TCP �
 - [安全](docs/security.zh-CN.md) · [运维](docs/operations-guide.md) · [故障排查](docs/troubleshooting.md)
 - [业务集成与客户端](docs/business-integration-guide.md) · [CLI](docs/cli.zh-CN.md) · [设备 SDK](docs/device-sdk.zh-CN.md)
 - [配置与 IDE](docs/configuration.zh-CN.md) · [平台支持](docs/platform-support.zh-CN.md) · [当前协议升级](docs/migration/current-protocol-only.zh-CN.md)
-- [基准概述](docs/benchmarks.zh-CN.md) · [性能基线](docs/performance-baseline.md)
-- [v0.2.4 中文发布说明](docs/releases/v0.2.4.zh-CN.md) · [发布模板](docs/release-template.md) · [项目介绍和发布草稿](docs/project-description.md)
+- [基准概述](docs/benchmarks.zh-CN.md) · [容量与稳定性测试](docs/production-readiness.zh-CN.md)
+- [v0.2.4 中文发布说明](docs/releases/v0.2.4.zh-CN.md) · [发布模板](docs/release-template.md)
 
 ## 构建与发布
 

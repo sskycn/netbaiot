@@ -214,4 +214,4 @@ cargo run -p netbaiot-cli -- command send device-1 \
 NetbaIoT 不持有或持久化设备期望配置。业务系统负责 desired/reported 状态、版本历史、
 重试、发布/回滚及离线协调。配置变更可作为普通 `DeviceCommand` 发往在线 MQTT/TCP 设备，
 设备通过 `CommandAck` 返回执行结果；是否收敛由业务系统判断。命令仅支持在线投递，
-UDP 无会话且没有下行。参阅[职责迁移](remove-device-config.md)。
+UDP 无会话且没有下行。参阅[职责边界](architecture.zh-CN.md)。

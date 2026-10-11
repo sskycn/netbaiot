@@ -2,7 +2,7 @@
 
 管理接口的 API Key、JWT、mTLS、Scope、资源授权和旧令牌迁移参阅[管理认证](management-auth.zh-CN.md)。
 
-> 当前职责边界与验证见[设备配置职责移除报告](remove-device-config.md)。<br>
+> 当前职责边界见[架构](architecture.zh-CN.md)。<br>
 > Workspace 版本：`0.2.4`；Rust MSRV：`1.88`。
 
 本指南面向第一次部署 NetbaIoT 的开发者、设备开发者和业务系统开发者。它以当前代码、测试和配置 schema 为准；若与更早的文档冲突，以当前代码和链接的迁移报告为准。
@@ -76,4 +76,4 @@ else:
 
 ## Reference 文档
 
-教程讲“怎么用”，详细契约仍以 reference 为准：[中文文档导航](README.zh-CN.md)、[架构](architecture.zh-CN.md)、[协议支持](protocol-support.zh-CN.md)、[HTTP API](http-api.zh-CN.md)、[设备协议](device-protocol.zh-CN.md)、[MQTT profile](mqtt.zh-CN.md)、[投递语义](delivery-semantics.zh-CN.md)、[公共协议](public-protocol.zh-CN.md)、[资源预算](resource-budgets.md)、[恢复格式](restart-spool.zh-CN.md)、[当前协议升级](migration/current-protocol-only.zh-CN.md)、[性能基线](performance-baseline.md)。
+教程讲“怎么用”，详细契约仍以 reference 为准：[中文文档导航](README.zh-CN.md)、[架构](architecture.zh-CN.md)、[协议支持](protocol-support.zh-CN.md)、[HTTP API](http-api.zh-CN.md)、[设备协议](device-protocol.zh-CN.md)、[MQTT profile](mqtt.zh-CN.md)、[投递语义](delivery-semantics.zh-CN.md)、[公共协议](public-protocol.zh-CN.md)、[资源预算](resource-budgets.md)、[恢复格式](restart-spool.zh-CN.md)、[当前协议升级](migration/current-protocol-only.zh-CN.md)、[基准与测量](benchmarks.zh-CN.md)。

@@ -38,6 +38,6 @@ HTTP `/api/v1/devices/commands` 和当前 Business RPC 共用一个 `CommandServ
 
 客户端显式使用 `BusinessRpcV3ClientConfig` 与 `BusinessRpcV3Client::connect`，在依赖 Provider/订阅前等待 `wait_ready()`。重连有有界退避并重建父流；旧事件句柄受 epoch 栅栏保护，不能在新连接上 ACK。TCP 自身仍有队头阻塞，丢包可能暂停所有流；V3 解决的是应用层整帧写入造成的阻塞。部署当前监听器前必须升级业务客户端，见[兼容性变更与升级](migration/current-protocol-only.zh-CN.md)。`StaleRevision` 会重建 Provider 流并执行 reset sync，事件订阅保持独立所有权。底层 `wait_ready()` 持续等待服务就绪；调用方应配置自己的超时或取消。
 
-实际 16 KiB Event 限速短测尚未证明默认 256 KiB 流窗口下有稳定、明显的认证尾延迟改善；原因与原始数字见 [V3 生产就绪测量](business-rpc-v3-production-readiness.zh-CN.md)。
+多流复用不代表已证明生产容量或认证尾延迟保证。部署前应在目标硬件上测量实际事件大小、流窗口和业务 consumer，详见[测量要求](benchmarks.zh-CN.md)。
 
 进程内回执使用现有 Queued/Dispatching/Sent/Received/Expired/Failed 状态。未开始发送的命令按实际 TTL 过期并计入 CommandFailed；已开始写入或等待 receipt 的命令不会因 TTL 被误标 Expired。发送前 admission 失败释放 ID，已接受命令的后续传输失败保留状态至去重 TTL 结束。不会自动重试、持久化命令历史或把传输状态当作执行结果。

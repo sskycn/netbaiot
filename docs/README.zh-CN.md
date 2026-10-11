@@ -1,7 +1,7 @@
 # NetbaIoT 中文文档导航
 
 本页按使用场景组织中文文档。当前 workspace 版本为 `0.2.4`，最低 Rust 版本为
-`1.88`。除明确标注为历史报告的页面外，以下文档描述当前实现。
+`1.88`。以下指南描述当前实现；测量结果只适用于其标注的环境和版本。
 
 > 当前只支持 Business RPC V3、MQTT 恢复 NBMQ v6 和 EventBus 恢复 NBSP v3。
 > 旧版或未知协议/恢复文件不会自动回退或迁移。升级现有部署前先阅读
@@ -19,6 +19,7 @@
 
 - [设备接入指南](device-integration-guide.md)：身份、codec、MQTT/TCP/UDP 和设备 SDK。
 - [协议支持矩阵](protocol-support.zh-CN.md)：当前支持与明确不支持的能力。
+- [设备 Codec](codecs.zh-CN.md)：JSON、CBOR、MessagePack、Protobuf V1 wire 格式。
 - [MQTT 3.1.1 / 5.0 profile](mqtt.zh-CN.md)与[设备 wire 格式](device-protocol.zh-CN.md)。
 - [业务系统集成指南](business-integration-guide.md)：webhook、Business RPC V3、命令和错误处理。
 - [业务 RPC V3](business-rpc-v3.zh-CN.md)、[业务客户端](client.zh-CN.md)、
@@ -40,13 +41,12 @@
 - [架构](architecture.zh-CN.md)、[设计理念](design-philosophy.zh-CN.md)、
   [按项目定位比较](comparison.zh-CN.md)。
 - [公共协议](public-protocol.zh-CN.md)与[配置字段参考](configuration-fields.md)。
-- [基准与测量说明](benchmarks.zh-CN.md)。历史性能和审计报告只证明其标注的
-  commit、环境与负载，不能当作当前生产容量。
+- [基准与测量说明](benchmarks.zh-CN.md)、[容量与稳定性测试](production-readiness.zh-CN.md)。
+  当前生产容量与完整长测尚未验证。
 - [v0.2.4 中文发布说明](releases/v0.2.4.zh-CN.md)。
 
 ## 文档约定
 
 部分早期中文主文档沿用不带 `.zh-CN` 的文件名，例如 `getting-started.md`、
-`operations-guide.md` 和 `troubleshooting.md`；它们仍是中文当前文档。带日期、
-baseline、audit、report 或 performance 路径的页面通常是历史证据，保留当时术语与
-数据。部署决策应以本导航中的当前文档、代码、配置 schema 和测试为准。
+`operations-guide.md` 和 `troubleshooting.md`；它们仍是中文当前文档。旧实施计划、阶段验收、审计流水与已结束的实验记录保留在 Git 历史中。
+部署决策应以本导航中的当前文档、代码、配置 schema 和实际验证结果为准。

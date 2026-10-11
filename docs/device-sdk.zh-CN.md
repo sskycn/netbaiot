@@ -11,7 +11,7 @@ Builder 必须配置 `mqtt_endpoint`；SDK 定位为 MQTT 便捷客户端。SDK 
 NetbaIoT 不持有或持久化设备期望配置。业务系统负责 desired/reported 状态、版本历史、
 重试、发布/回滚及离线协调。配置变更可作为普通 `DeviceCommand` 发往在线 MQTT/TCP 设备，
 设备通过 `CommandAck` 返回执行结果；是否收敛由业务系统判断。命令仅支持在线投递，
-UDP 无会话且没有下行。参阅[职责迁移](remove-device-config.md)。
+UDP 无会话且没有下行。参阅[职责边界](architecture.zh-CN.md)。
 
 丢弃最后一个客户端会取消唯一的 MQTT event-loop 任务。命令缓冲默认最多 16 条。命令格式错误或命令队列溢出会强制断开连接，且不确认 MQTT 投递。持久会话中的 QoS1 命令可由 broker 重新投递；QoS0 没有这个保证。
 
@@ -70,4 +70,4 @@ SDK 不把客户端会话状态持久化到磁盘，设备进程重启不是完�
 设置 `NETBAIOT_WAIT_COMMAND=1` 可等待一条命令；示例只执行 `example_noop`，并用
 `ack_command` 回报结果。`NETBAIOT_RECONNECT_CHECK=1` 用于 broker 重启验证。
 [Mosquitto 测试](../tests/run_device_profile_mosquitto.py)覆盖双版本 TCP/TLS、持久重连，以及未受信、主机名不符和过期证书拒绝。
-[验证记录](device-profile-validation.md)包含本机 RSS、线程、QoS1 延迟与重连测量及复现命令。
+当前验证命令与所需外部工具见[维护指南](maintenance.md)。

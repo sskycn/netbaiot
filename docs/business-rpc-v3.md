@@ -44,7 +44,7 @@ For a loopback development setup, add an explicit `business_tcp` listener and th
 
 Use `BusinessRpcV3ClientConfig` and `BusinessRpcV3Client::connect` then `wait_ready()` before relying on provider or subscription service. The client reconnects with bounded backoff and rebuilds parent streams. An old delivery handle is fenced by its connection epoch and cannot ACK on a replacement connection. TCP still has transport-level head-of-line blocking and packet loss can stall all streams; V3 only interleaves application DATA frames. Upgrade all business clients before deploying the current-only listener. See the [breaking-change upgrade guide](migration/current-protocol-only.md). A failed auth revision with `StaleRevision` resets the Provider stream and performs reset sync while preserving the separately owned event subscription. Low-level `wait_ready()` waits for service readiness; callers should apply their own timeout or cancellation.
 
-The measured 16 KiB Event workload has not yet shown a stable, material authentication tail-latency improvement with the default 256 KiB stream window. See the [V3 readiness measurements](business-rpc-v3-production-readiness.zh-CN.md) before making a deployment decision.
+Stream multiplexing does not establish production capacity or an authentication latency guarantee. Measure the intended event sizes, stream windows and consumers on the deployment hardware; see [measurement requirements](benchmarks.md).
 
 Dedup receipts report the latest process-local transport state using the existing
 `queued`, `dispatching`, `sent`, `received`, `expired`, and `failed` values. An unsent

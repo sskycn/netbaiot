@@ -16,7 +16,7 @@ requires loopback and permits plaintext for local testing.
 
 `device_ingress` is the only device address. Legacy separate-listener fields are
 rejected. Port 443 is only a deployment choice, not an HTTPS endpoint. HTTP bytes
-on device ingress close without an HTTP response; see [migration](remove-device-http.md).
+on device ingress close without an HTTP response; see [protocol support](protocol-support.md).
 
 NetbaIoT implements MQTT 3.1.1 and MQTT 5.0 directly. It does not require an external broker or
 database. The subsystem is layered as incremental packet codec, connection state

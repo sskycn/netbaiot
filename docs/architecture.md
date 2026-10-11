@@ -18,7 +18,7 @@ requires loopback and permits plaintext for local testing.
 
 `device_ingress` is the only device address. Legacy separate-listener fields are
 rejected. Port 443 is only a deployment choice, not an HTTPS endpoint. HTTP bytes
-on device ingress close without an HTTP response; see [migration](remove-device-http.md).
+on device ingress close without an HTTP response; see [protocol support](protocol-support.md).
 
 NetbaIoT is a database-free, event-driven IoT gateway. Its runtime path is:
 
@@ -146,7 +146,7 @@ and offline reconciliation. Configuration changes can travel to online MQTT/TCP
 devices as ordinary `DeviceCommand` values. Devices return `CommandAck`; the
 application decides whether its desired state has converged. Commands remain
 online-only; UDP remains sessionless with no downlink. See the
-[ownership migration](remove-device-config.md).
+[runtime responsibilities](architecture.md).
 
 Connection presence is control-plane/runtime state, not a `DeviceEvent`.
 `Sessions`, presence timestamps, session generations, and management connection

@@ -43,4 +43,4 @@ The 0.x device-HTTP removal is an intentional source/control-API breaking change
 are now `mqtt`, `tcp`, `udp`; the status summary serializes exactly those three
 counts and excludes management connections. UDP remains sessionless (active count
 zero). Device JSON v1, MQTT 3.1.1, TCP framing, NBI1/NBA1 and the current Business RPC V3 wire bytes remain unchanged. Rebuild public clients
-together with the server. See [migration](remove-device-http.md).
+together with the server. See [protocol support](protocol-support.md).

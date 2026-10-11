@@ -71,11 +71,8 @@ one entry per represented identity. Refresh replaces the old expiry entry;
 expiration removes zero counters. Every index is bounded by the admitted replay
 record count, and identity lengths retain their protocol bounds. Tree nodes,
 duplicated bounded identity strings, hash capacity and allocator overhead add
-memory; the historical 96-byte replay-map bucket measurement in
-[UDP ACK measurements](udp-reliable-ack.md) is not the complete footprint of this
-implementation. Current paired timing measurements and their limitations are in
-[the hardening report](lifecycle-command-hardening.md). No current replay RSS
-bound is claimed.
+memory. Logical record accounting is not the complete process footprint; no
+current replay RSS bound is claimed. See [measurement requirements](benchmarks.md).
 
 Device ingress admission has a connection-level anti-monopoly ceiling. MQTT
 and TCP each default to at most 192 classified device connections. Pending TLS and
@@ -92,7 +89,7 @@ applies, so a protocol ceiling above it has no additional effect. Raising
 both explicitly. Multiple protocols, unclassified clients, or tighter shared IP
 limits can still exhaust available capacity. A separately reduced pending pool was
 rejected after paired measurements worsened legitimate new-connection admission.
-See the mixed-ingress audit for measured scope and remaining limitations.
+See [measurement requirements](benchmarks.md) before sizing a deployment.
 
 `control_max_products` and `control_max_bytes` bound only gateway product/codec
 profiles and routes. No per-device desired state is stored. The 16 MiB ceiling is

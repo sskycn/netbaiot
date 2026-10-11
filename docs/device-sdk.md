@@ -37,7 +37,7 @@ and offline reconciliation. Configuration changes can travel to online MQTT/TCP
 devices as ordinary `DeviceCommand` values. Devices return `CommandAck`; the
 application decides whether its desired state has converged. Commands remain
 online-only; UDP remains sessionless with no downlink. See the
-[ownership migration](remove-device-config.md).
+[runtime responsibilities](architecture.md).
 
 Dropping the final client cancels the one MQTT event-loop task. Command buffering is
 16 items by default. Malformed commands or command overflow force disconnect without
@@ -117,5 +117,5 @@ the example executes `example_noop` and reports its result with `ack_command`.
 [Mosquitto test](../tests/run_device_profile_mosquitto.py) exercises both
 versions over TCP/TLS, persistent reconnect, and untrusted, wrong-host, and
 expired certificate rejection.
-The [validation record](device-profile-validation.md) includes local RSS,
-thread, QoS1 latency, and reconnect measurements with reproduction commands.
+Current validation commands and required external tools are listed in
+[maintenance](maintenance.md).

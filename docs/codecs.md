@@ -220,4 +220,4 @@ The example shows the same temperature/humidity data normalized across all four
 formats. The Mosquitto tool sends native files through MQTT 3.1.1/5.0 QoS0/1/2 and
 checks a real confirmed webhook. Generic MQTT clients remain first-class; the
 optional SDK's JSON convenience API does not automatically encode binary formats.
-See the [implementation and measurement report](multi-codec-report.zh-CN.md).
+See [benchmarks and measurement limits](benchmarks.md).

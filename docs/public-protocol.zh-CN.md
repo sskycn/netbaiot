@@ -20,10 +20,9 @@
 `ConnectionCounts.http`，传输字符串只剩 `mqtt`、`tcp`、`udp`；status 只输出这三项，
 不包含管理连接。UDP 无会话，活动连接数为零。设备 JSON v1、MQTT 3.1.1、TCP 分帧、
 NBI1/NBA1 以及当前 Business RPC V3 的 wire bytes 均不变。公共客户端应与服务器一起重新构建。
-详见[迁移说明](remove-device-http.md)。
+详见[协议支持](protocol-support.zh-CN.md)。
 
 连接 presence 属于 Sessions 和管理连接查询，不是业务事件。此次 0.x 清理从公共
 Rust/JSON 模型和筛选条件中移除了未使用的连接生命周期类型，属于公共 API 破坏性变更。
 请删除旧筛选条件并重新构建客户端；设备 JSON v1 和当前 Business RPC V3 分别保留其 wire bytes。
-参阅[兼容性说明](connection-events-spool-upgrade-cleanup.md)以及
-[当前格式升级步骤](migration/current-protocol-only.zh-CN.md)。
+参阅[当前格式升级步骤](migration/current-protocol-only.zh-CN.md)。

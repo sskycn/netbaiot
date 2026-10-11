@@ -188,12 +188,10 @@ vulnerabilities through the [Security Policy](SECURITY.md).
 
 ## Benchmarks
 
-The repository contains measured loopback and subsystem experiments, with host,
-build, load, and caveats in the reports. Several results are historical and do not
-establish capacity for the current revision or a production deployment. The
-[benchmark overview](docs/benchmarks.md) explains what the numbers do and do not
-show; the detailed [performance baseline](docs/performance-baseline.md) preserves
-the original measurements and setup.
+The [benchmark overview](docs/benchmarks.md) links compact codec and loopback
+measurements with their environment and limitations. Current production capacity
+has not been established. See [capacity and stability testing](docs/production-readiness.zh-CN.md)
+for the load tools and validation scope.
 
 ## Current limitations
 
@@ -220,8 +218,8 @@ the original measurements and setup.
 - [Delivery semantics](docs/delivery-semantics.md) · [Reliability](docs/reliability.md) · [Restart spool](docs/restart-spool.md)
 - [Security](docs/security.md) · [Operations](docs/operations-guide.md) · [Troubleshooting](docs/troubleshooting.md)
 - [Business integration and clients](docs/business-integration-guide.md) · [CLI](docs/cli.md) · [Device SDK](docs/device-sdk.md)
-- [Benchmark overview](docs/benchmarks.md) · [Performance baseline](docs/performance-baseline.md)
-- [v0.2.4 release notes](docs/releases/v0.2.4.md) · [Release notes template](docs/release-template.md) · [Project descriptions and launch drafts](docs/project-description.md)
+- [Benchmark overview](docs/benchmarks.md) · [Capacity and stability testing](docs/production-readiness.zh-CN.md)
+- [v0.2.4 release notes](docs/releases/v0.2.4.md) · [Release notes template](docs/release-template.md)
 
 ## Build and release
 

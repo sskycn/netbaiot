@@ -18,8 +18,8 @@ eviction, replacement and invalidation remove the matching deadline record and
 byte charge together. FIFO hits do not promote entries. No background task runs.
 The index is bounded by the entry count, adds fixed node storage, and shares credential
 ID strings through Arc. The 4 MiB estimate remains a logical entry budget, not an RSS
-bound. See the [verified expiry-index measurements](performance/auth-cache-expiry-index/README.md)
-for retained memory, hit allocations, expiry cost and real UDP comparisons.
+bound. Measure retained memory and expiry cost with the intended workload; see
+[measurement requirements](benchmarks.md).
 
 Identical simultaneous misses share one provider operation through a race-safe watch
 completion channel. A leader owns an RAII inflight lease: timeout, task cancellation,

@@ -13,7 +13,7 @@ Management HTTP（`management_http`，通常为 `127.0.0.1:9090`）和可选的
 非 loopback TCP 入口必须配置 TLS；开发模式强制 loopback，允许本地明文测试。
 
 `device_ingress` 是唯一设备地址，旧分离监听字段会触发配置错误。443 只是部署选择，不代表 HTTPS。
-设备入口收到 HTTP 字节后直接关闭，不返回 HTTP 响应。详见[迁移说明](remove-device-http.md)。
+设备入口收到 HTTP 字节后直接关闭，不返回 HTTP 响应。详见[协议支持](protocol-support.zh-CN.md)。
 
 NetbaIoT 直接实现 MQTT 3.1.1 和 MQTT 5.0，不依赖外部 broker 或数据库。子系统分层包括按版本隔离的增量 packet codec、连接状态机、认证后的会话挂接、有界会话存储、topic trie、retain 存储、QoS 引擎，最后才是 IoT 绑定/EventBus。
 

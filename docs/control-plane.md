@@ -26,7 +26,7 @@ Device configuration persistence, desired/reported revisions, history, retries,
 rollout/rollback and offline reconciliation belong to business applications.
 Online changes use ordinary `DeviceCommand` over MQTT/TCP and return `CommandAck`.
 The gateway neither interprets command names nor compares application revisions.
-See [migration](remove-device-config.md).
+See [runtime responsibilities](architecture.md).
 
 Control mutations acquire lifecycle admission before their first side effect and
 retain it through completion: HTTP auth invalidation, control/routes replacement,

@@ -168,19 +168,17 @@ default 300000ms dedup window; compare versions within a campaign, not across
 campaigns with different options. Raw outputs remain in ignored local directories
 or GitHub Actions artifacts.
 
-## Device protocol removal comparison
+## Capacity and stability workloads
 
-`device_protocol_benchmark.py` measures MQTT, framed TCP and signed UDP NBA1
-receipts, with optional verified TLS for MQTT/TCP. The load generator explicitly
-runs four Tokio workers; changing `TOKIO_WORKER_THREADS` does not override that.
-The server uses ten workers in this loopback harness. Freeze the same generator
-binary for both sides; run serialized without compilation or concurrent tests.
+`production_readiness.py` runs the four fixed Codec formats over real MQTT
+3.1.1/5.0, TCP and signed UDP sockets, with bounded observation and confirmed
+business ACKs. Use sensor, 16/64-field telemetry and abnormal-device scenarios.
 
 ```bash
-python3 scripts/perf/device_protocol_benchmark.py --server target/remove-device-http/before-server --loadgen target/remove-device-http/loadgen --plan docs/performance/remove-device-http/before-plan.json --label before --output target/performance/remove-device-http
+python3 scripts/perf/production_readiness.py --devices 100 --scenario sensor --duration 60 --tls --output target/performance/production-readiness/sensor
 ```
 
-See [results and limits](../../docs/remove-device-http.md). The old four-protocol
-and Device HTTP comparison runners were removed; historical measurements and their
-exact tools remain reproducible from baseline `945fe5e386d623c32e2c7d2d0568fe0c058107ec`.
-Those measurements are not current protocol capacity claims.
+See [capacity and stability testing](../../docs/production-readiness.zh-CN.md) for
+100/1000/5000/10000-device matrices, owned 6/24-hour runs, report definitions and
+unverified production coverage. Use a fresh output directory and preserve failed
+results. Existing test fixtures are for loopback testing only.

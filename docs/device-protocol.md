@@ -16,7 +16,7 @@ requires loopback and permits plaintext for local testing.
 
 `device_ingress` is the only device address. Legacy separate-listener fields are
 rejected. Port 443 is only a deployment choice, not an HTTPS endpoint. HTTP bytes
-on device ingress close without an HTTP response; see [migration](remove-device-http.md).
+on device ingress close without an HTTP response; see [protocol support](protocol-support.md).
 
 The default example selects codec ID `netbaiot-json`, version `1`. Other authenticated profiles use [CBOR, MessagePack or Protobuf V1](codecs.md). The same synchronous
 codec decodes MQTT/TCP/UDP payloads. Devices cannot supply their own trusted
@@ -169,7 +169,7 @@ receipt at the device. No device IDs or other high-cardinality labels are added.
 Breaking cleanup in the current 0.x release: `config_ack` is no longer a supported
 DeviceEvent kind and is rejected. `schema_version=1` remains the unchanged envelope
 version; there is no compatibility alias. Application configuration operations use
-ordinary MQTT/TCP commands and `command_ack`. See [migration](remove-device-config.md).
+ordinary MQTT/TCP commands and `command_ack`. See [runtime responsibilities](architecture.md).
 
 ## Connection presence
 

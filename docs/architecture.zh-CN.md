@@ -13,7 +13,7 @@ Management HTTP（`management_http`，通常为 `127.0.0.1:9090`）和可选的
 非 loopback TCP 入口必须配置 TLS；开发模式强制 loopback，允许本地明文测试。
 
 `device_ingress` 是唯一设备地址，旧分离监听字段会触发配置错误。443 只是部署选择，不代表 HTTPS。
-设备入口收到 HTTP 字节后直接关闭，不返回 HTTP 响应。详见[迁移说明](remove-device-http.md)。
+设备入口收到 HTTP 字节后直接关闭，不返回 HTTP 响应。详见[协议支持](protocol-support.zh-CN.md)。
 
 NetbaIoT 是一个无数据库、事件驱动的 IoT 网关。运行路径如下：
 
@@ -101,6 +101,6 @@ Device -- CommandAck --> NetbaIoT -- DeviceEvent --> Business System
 NetbaIoT 不持有或持久化设备期望配置。业务系统负责 desired/reported 状态、版本历史、
 重试、发布/回滚及离线协调。配置变更可作为普通 `DeviceCommand` 发往在线 MQTT/TCP 设备，
 设备通过 `CommandAck` 返回执行结果；是否收敛由业务系统判断。命令仅支持在线投递，
-UDP 无会话且没有下行。参阅[职责迁移](remove-device-config.md)。
+UDP 无会话且没有下行。参阅[职责边界](architecture.zh-CN.md)。
 
 连接 presence 属于 Sessions 和控制面的运行时状态，不属于 `DeviceEvent`。MQTT/TCP 的连接状态、session generation、管理连接查询，以及 UDP 的 `last_seen` 继续保留。业务事件流仅包含遥测、设备事件、设备主动心跳和命令执行确认。NetbaIoT 不提供可靠、持久的上下线事件流；需要在线历史的应用应自行通过业务心跳、管理 API 轮询、外部监控或业务 presence 逻辑维护。
