@@ -15,6 +15,7 @@ on:
     paths:
       - "crates/netbaiot-codecs/**"
       - "crates/netbaiot-core/**"
+      - "crates/netbaiot-protocol/**"
       - "crates/netbaiot-runtime/**"
       - "crates/netbaiot-transports/**"
       - "apps/netbaiot-server/**"
@@ -32,6 +33,7 @@ on:
     paths:
       - "crates/netbaiot-codecs/**"
       - "crates/netbaiot-core/**"
+      - "crates/netbaiot-protocol/**"
       - "crates/netbaiot-runtime/**"
       - "crates/netbaiot-transports/**"
       - "apps/netbaiot-server/**"
@@ -95,7 +97,7 @@ jobs:
           if-no-files-found: warn
 
   linux-comparison:
-    if: github.event_name == 'workflow_dispatch' && inputs.compare
+    if: (github.event_name == 'workflow_dispatch' && inputs.compare) || (github.event_name == 'push' && contains(github.event.head_commit.message, '[codec-comparison]'))
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
@@ -105,7 +107,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - name: Freeze baseline binary
         env:
-          BASELINE_REVISION: ${{ inputs.baseline }}
+          BASELINE_REVISION: ${{ inputs.baseline || '6e16b31' }}
         run: |
           git worktree add --detach target/codec-baseline "$BASELINE_REVISION"
           cargo build --release --locked -p netbaiot-server --manifest-path target/codec-baseline/Cargo.toml --target-dir target/codec-baseline-build
@@ -116,18 +118,19 @@ jobs:
       - run: cargo bench --locked -p netbaiot-codecs --bench codecs --manifest-path target/codec-baseline/Cargo.toml --target-dir target/codec-baseline-build > target/codec-before.csv
       - name: Same-host serialized real-network comparison
         env:
-          BASELINE_REVISION: ${{ inputs.baseline }}
+          BASELINE_REVISION: ${{ inputs.baseline || '6e16b31' }}
         run: |
-          python3 scripts/perf/codec_campaign.py --server target/codec-baseline-build/release/netbaiot-server --output target/performance/codec-before --revision "$BASELINE_REVISION" --seconds 1 --workers 4 --repeats 3
-          python3 scripts/perf/codec_campaign.py --server target/release/netbaiot-server --output target/performance/codec-after --revision "$GITHUB_SHA" --seconds 1 --workers 4 --repeats 3
+          python3 scripts/perf/codec_campaign.py --server target/codec-baseline-build/release/netbaiot-server --output target/performance/codec-audit/before/matrix --revision "$BASELINE_REVISION" --seconds 1 --workers 4 --repeats 3
+          python3 scripts/perf/codec_campaign.py --server target/release/netbaiot-server --output target/performance/codec-audit/after/matrix --revision "$GITHUB_SHA" --seconds 1 --workers 4 --repeats 3
+      - name: Summarize matching Linux measurements
+        run: python3 scripts/perf/codec_audit_summary.py --network-only --root target/performance/codec-audit --output target/performance/codec-audit/summary --print-summary
       - name: Retain actual environment, configuration and measurements
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: codec-linux-comparison
           path: |
-            target/performance/codec-before/
-            target/performance/codec-after/
+            target/performance/codec-audit/
             target/codec-before.csv
             target/codec-after.csv
           retention-days: 14

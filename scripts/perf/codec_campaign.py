@@ -288,6 +288,8 @@ def client(device, management_address, receiver, fmt, protocol, qos, version, wo
             finally:
                 with receiver.condition:
                     receiver.pending.pop(source, None)
+    except urllib.error.HTTPError as exc:
+        failures[f'HTTP_{exc.code}'] = 1
     except (OSError, EOFError) as exc:
         failures[type(exc).__name__] = 1
     finally:
@@ -318,9 +320,14 @@ def main():
     p.add_argument('--workers', type=int, default=4)
     p.add_argument('--repeats', type=int, default=3)
     p.add_argument('--sink-delay-ms', type=float, default=0)
+    p.add_argument('--codecs', nargs='+', choices=FORMATS, default=FORMATS)
+    p.add_argument('--protocols', nargs='+', choices=('mqtt', 'tcp', 'udp'), default=('mqtt', 'tcp', 'udp'))
+    p.add_argument('--workloads', nargs='+', choices=('small', 'large', 'heartbeat', 'command'), default=('small', 'large', 'heartbeat', 'command'))
     args = p.parse_args()
     if not (0.05<=args.seconds<=3600 and 1<=args.workers<=32 and 1<=args.repeats<=10 and 0<=args.sink_delay_ms<=500):
         p.error('bounded arguments required')
+    if all(w == 'command' for w in args.workloads) and all(t == 'udp' for t in args.protocols):
+        p.error('commands require a live MQTT/TCP session')
     args.output.mkdir(parents=True, exist_ok=False)
     receiver = Receiver(args.sink_delay_ms/1000)
     owner = threading.Thread(target=receiver.serve_forever)
@@ -332,7 +339,10 @@ def main():
         spool_directory=str(args.output.resolve()/'spool'), delivery_url=f'http://127.0.0.1:{receiver.server_port}/events',
         limits=dict(max_connections_per_ip=256, requests_per_second=100000, requests_per_ip_second=100000,
             messages_per_device_second=100000, messages_per_tenant_second=100000, sink_delivery_concurrency=4,
-            max_replay_entries_per_device=32, max_replay_entries_per_tenant=4096, max_replay_entries=4096),
+            max_replay_entries_per_device=32, max_replay_entries_per_tenant=4096, max_replay_entries=4096,
+            # Unique synthetic commands need a short, explicit bounded retention
+            # window during long sweeps; keep the 4096-entry admission limit.
+            command_dedup_ttl_ms=1000),
         credentials=[dict(credential_id=f'{f}-{i}',secret_hex=KEY.hex(),identity=dict(device_key=dict(tenant_id='demo',product_id=f,device_id=f'd{i}'),
             credential_version=1,auth_generation=1,codec_id=f'netbaiot-{f}',codec_version=1,permissions=dict(publish=True,commands=True))) for f in FORMATS for i in range(args.workers)])
     path=args.output/'server.json';path.write_text(json.dumps(config))
@@ -360,9 +370,10 @@ def main():
             else:raise TimeoutError('readiness')
             cases=[('mqtt',v,q) for v in (4,5) for q in (0,1,2)]+[('tcp',4,0),('udp',4,0)]
             for repeat in range(args.repeats):
-                for fmt in FORMATS:
+                for fmt in dict.fromkeys(args.codecs):
                     for protocol,version,qos in cases:
-                        for workload in ('small','large','heartbeat','command'):
+                        if protocol not in args.protocols:continue
+                        for workload in dict.fromkeys(args.workloads):
                             if workload=='command' and (protocol=='udp' or (protocol=='mqtt' and qos!=1)):continue
                             before=usage(server.pid);initial=counters(management_address);at=time.perf_counter();samples=[]
                             run=uuid.uuid4().hex[:12]
@@ -384,6 +395,7 @@ def main():
                             rows.append(row)
                             (args.output/'summary.json').write_text(json.dumps(rows,indent=2))
                             print(json.dumps({k:row[k] for k in ('codec','protocol','qos','workload','events','command_count','errors')}),flush=True)
+                            assert not row['errors'], 'client errors; inspect summary.json and counter_delta'
                             assert row['events'] or row['command_count'], 'no successful work; inspect summary.json'
             server.terminate()
             assert server.wait(timeout=40)==0, 'graceful shutdown failed'

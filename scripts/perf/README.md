@@ -142,9 +142,26 @@ This is a short regression matrix, not a sustainable production capacity or soak
 claim. Use `--sink-delay-ms 10` for closed-loop slow-sink measurements; this controls
 offered work and does not itself force queue overload. The mixed-codec bounded
 backpressure regression explicitly fills required capacity and checks rollback and
-complete byte/count cleanup. The workflow's opt-in `linux-comparison` job builds
+complete byte/count cleanup. `--codecs`, `--protocols` and `--workloads` select
+focused cases for longer repeat measurements. Synthetic unique commands use an
+explicit 1000ms dedup retention window while preserving the 4096-entry hard limit;
+this keeps long sweeps from filling retained command history. Client errors fail
+the campaign and retain the partial result, including HTTP status and counters.
+The workflow's opt-in `linux-comparison` job builds
 both revisions on the same Linux x86_64 runner; dispatch with `compare=true` and an
-explicit baseline revision. Merely configuring this job is not execution evidence.
+explicit baseline revision. An explicitly tagged main commit containing
+`[codec-comparison]` also requests this bounded comparison, using `6e16b31` as the
+baseline. Ordinary PR and push smoke do not run the longer comparison. Merely
+configuring this job is not execution evidence.
+
+`codec_audit_summary.py --root target/performance/codec-audit --output
+docs/performance/codec-audit` validates matching harness/configuration, complete
+repeat groups and error-free results, then emits compact per-case medians,
+environment and raw-file SHA-256 manifests. Percentiles are medians of each run's
+percentiles, not pooled percentiles. The original matrix used the older harness's
+default 300000ms dedup window; compare versions within a campaign, not across
+campaigns with different options. Raw outputs remain in ignored local directories
+or GitHub Actions artifacts.
 
 ## Device protocol removal comparison
 

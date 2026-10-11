@@ -19,7 +19,10 @@ pub fn check(codec: &dyn DeviceCodec, limits: &CodecLimits, data: &[u8]) {
         product_id: ProductId::new("p").unwrap(),
         device_id: DeviceId::new("d").unwrap(),
     };
-    let ctx = DecodeContext { device: &key, received_at: 1234 };
+    let ctx = DecodeContext {
+        device: &key,
+        received_at: 1234,
+    };
     let decoded = codec.decode(&ctx, data);
     let validated = codec.validate_payload(&ctx, data);
     assert_eq!(decoded.is_ok(), validated.is_ok());
@@ -48,7 +51,9 @@ pub fn check(codec: &dyn DeviceCodec, limits: &CodecLimits, data: &[u8]) {
                 DeviceEventKind::DeviceEvent(e) => {
                     assert!(!e.name.is_empty());
                     text(&e.name, limits.field_bytes);
-                    if let Some(v) = &e.value { scalar(v, limits.field_bytes); }
+                    if let Some(v) = &e.value {
+                        scalar(v, limits.field_bytes);
+                    }
                 }
                 DeviceEventKind::Heartbeat(_) => {}
                 DeviceEventKind::CommandAck(a) => assert_ne!(a.execution, ExecutionState::Unknown),

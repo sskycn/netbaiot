@@ -1,0 +1,291 @@
+{
+  "matrix": {
+    "versions": {
+      "before": {
+        "platform": "macOS-27.0.1-arm64-arm-64bit",
+        "machine": "arm64",
+        "cpu_count": 10,
+        "rust": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+        "revision": "6e16b31",
+        "server_sha256": "918ea554d9f4458eddce8501248f485a29e89a27fd2ee5231013ffbbfa2de9c1",
+        "harness_sha256": "1e4fe19eb68ab084e9a4b0e673b22f11803e1206f98339a834113e82685573e1",
+        "arguments": {
+          "server": "target/performance/codec-audit/before/server",
+          "output": "target/performance/codec-audit/before/matrix",
+          "revision": "6e16b31",
+          "seconds": 0.3,
+          "workers": 4,
+          "repeats": 3,
+          "sink_delay_ms": 0
+        },
+        "timing": "socket send to receipt; socket send to webhook response flushed; HTTP command submit to device bytes",
+        "limitations": [
+          "Python closed loop and shared host, no production capacity claim",
+          "RSS sampled at 100ms, not allocator peak",
+          "CPU time from ps, 10ms resolution",
+          "No application-final-processing measurement",
+          "UDP large payload has 4 fields; stream large has 64",
+          "QoS0 receipt unavailable; throughput uses observed required webhook responses",
+          "No per-connection allocator isolation"
+        ]
+      },
+      "after": {
+        "platform": "macOS-27.0.1-arm64-arm-64bit",
+        "machine": "arm64",
+        "cpu_count": 10,
+        "rust": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+        "revision": "fb37a3c",
+        "server_sha256": "a7ff05540950211532fdbf6c21c3894590b751caf137d0f9b046046f9a3bc8c5",
+        "harness_sha256": "1e4fe19eb68ab084e9a4b0e673b22f11803e1206f98339a834113e82685573e1",
+        "arguments": {
+          "server": "target/performance/codec-audit/after/server",
+          "output": "target/performance/codec-audit/after/matrix",
+          "revision": "fb37a3c",
+          "seconds": 0.3,
+          "workers": 4,
+          "repeats": 3,
+          "sink_delay_ms": 0
+        },
+        "timing": "socket send to receipt; socket send to webhook response flushed; HTTP command submit to device bytes",
+        "limitations": [
+          "Python closed loop and shared host, no production capacity claim",
+          "RSS sampled at 100ms, not allocator peak",
+          "CPU time from ps, 10ms resolution",
+          "No application-final-processing measurement",
+          "UDP large payload has 4 fields; stream large has 64",
+          "QoS0 receipt unavailable; throughput uses observed required webhook responses",
+          "No per-connection allocator isolation"
+        ]
+      }
+    },
+    "configuration": {
+      "development": true,
+      "limits": {
+        "max_connections_per_ip": 256,
+        "requests_per_second": 100000,
+        "requests_per_ip_second": 100000,
+        "messages_per_device_second": 100000,
+        "messages_per_tenant_second": 100000,
+        "sink_delivery_concurrency": 4,
+        "max_replay_entries_per_device": 32,
+        "max_replay_entries_per_tenant": 4096,
+        "max_replay_entries": 4096
+      },
+      "credential_count": 16,
+      "credential_scope": "public synthetic fixtures only",
+      "network": "plaintext loopback, independent required HTTP 2xx ACK sink"
+    }
+  },
+  "commands-bounded": {
+    "versions": {
+      "before": {
+        "platform": "macOS-27.0.1-arm64-arm-64bit",
+        "machine": "arm64",
+        "cpu_count": 10,
+        "rust": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+        "revision": "6e16b31",
+        "server_sha256": "918ea554d9f4458eddce8501248f485a29e89a27fd2ee5231013ffbbfa2de9c1",
+        "harness_sha256": "8159bade4aed772761bce84ce9978f866008e309ec4c3650d106ffe76cb4a135",
+        "arguments": {
+          "server": "target/performance/codec-audit/before/server",
+          "output": "target/performance/codec-audit/before/commands-bounded",
+          "revision": "6e16b31",
+          "seconds": 2.0,
+          "workers": 4,
+          "repeats": 3,
+          "sink_delay_ms": 0,
+          "codecs": [
+            "json",
+            "cbor",
+            "msgpack",
+            "protobuf"
+          ],
+          "protocols": [
+            "mqtt",
+            "tcp",
+            "udp"
+          ],
+          "workloads": [
+            "command"
+          ]
+        },
+        "timing": "socket send to receipt; socket send to webhook response flushed; HTTP command submit to device bytes",
+        "limitations": [
+          "Python closed loop and shared host, no production capacity claim",
+          "RSS sampled at 100ms, not allocator peak",
+          "CPU time from ps, 10ms resolution",
+          "No application-final-processing measurement",
+          "UDP large payload has 4 fields; stream large has 64",
+          "QoS0 receipt unavailable; throughput uses observed required webhook responses",
+          "No per-connection allocator isolation"
+        ]
+      },
+      "after": {
+        "platform": "macOS-27.0.1-arm64-arm-64bit",
+        "machine": "arm64",
+        "cpu_count": 10,
+        "rust": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+        "revision": "fb37a3c",
+        "server_sha256": "a7ff05540950211532fdbf6c21c3894590b751caf137d0f9b046046f9a3bc8c5",
+        "harness_sha256": "8159bade4aed772761bce84ce9978f866008e309ec4c3650d106ffe76cb4a135",
+        "arguments": {
+          "server": "target/performance/codec-audit/after/server",
+          "output": "target/performance/codec-audit/after/commands-bounded",
+          "revision": "fb37a3c",
+          "seconds": 2.0,
+          "workers": 4,
+          "repeats": 3,
+          "sink_delay_ms": 0,
+          "codecs": [
+            "json",
+            "cbor",
+            "msgpack",
+            "protobuf"
+          ],
+          "protocols": [
+            "mqtt",
+            "tcp",
+            "udp"
+          ],
+          "workloads": [
+            "command"
+          ]
+        },
+        "timing": "socket send to receipt; socket send to webhook response flushed; HTTP command submit to device bytes",
+        "limitations": [
+          "Python closed loop and shared host, no production capacity claim",
+          "RSS sampled at 100ms, not allocator peak",
+          "CPU time from ps, 10ms resolution",
+          "No application-final-processing measurement",
+          "UDP large payload has 4 fields; stream large has 64",
+          "QoS0 receipt unavailable; throughput uses observed required webhook responses",
+          "No per-connection allocator isolation"
+        ]
+      }
+    },
+    "configuration": {
+      "development": true,
+      "limits": {
+        "max_connections_per_ip": 256,
+        "requests_per_second": 100000,
+        "requests_per_ip_second": 100000,
+        "messages_per_device_second": 100000,
+        "messages_per_tenant_second": 100000,
+        "sink_delivery_concurrency": 4,
+        "max_replay_entries_per_device": 32,
+        "max_replay_entries_per_tenant": 4096,
+        "max_replay_entries": 4096,
+        "command_dedup_ttl_ms": 1000
+      },
+      "credential_count": 16,
+      "credential_scope": "public synthetic fixtures only",
+      "network": "plaintext loopback, independent required HTTP 2xx ACK sink"
+    }
+  },
+  "slow32": {
+    "versions": {
+      "before": {
+        "platform": "macOS-27.0.1-arm64-arm-64bit",
+        "machine": "arm64",
+        "cpu_count": 10,
+        "rust": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+        "revision": "6e16b31",
+        "server_sha256": "918ea554d9f4458eddce8501248f485a29e89a27fd2ee5231013ffbbfa2de9c1",
+        "harness_sha256": "8159bade4aed772761bce84ce9978f866008e309ec4c3650d106ffe76cb4a135",
+        "arguments": {
+          "server": "target/performance/codec-audit/before/server",
+          "output": "target/performance/codec-audit/before/slow32",
+          "revision": "6e16b31",
+          "seconds": 0.2,
+          "workers": 32,
+          "repeats": 1,
+          "sink_delay_ms": 10.0,
+          "codecs": [
+            "json",
+            "cbor",
+            "msgpack",
+            "protobuf"
+          ],
+          "protocols": [
+            "mqtt",
+            "tcp",
+            "udp"
+          ],
+          "workloads": [
+            "small"
+          ]
+        },
+        "timing": "socket send to receipt; socket send to webhook response flushed; HTTP command submit to device bytes",
+        "limitations": [
+          "Python closed loop and shared host, no production capacity claim",
+          "RSS sampled at 100ms, not allocator peak",
+          "CPU time from ps, 10ms resolution",
+          "No application-final-processing measurement",
+          "UDP large payload has 4 fields; stream large has 64",
+          "QoS0 receipt unavailable; throughput uses observed required webhook responses",
+          "No per-connection allocator isolation"
+        ]
+      },
+      "after": {
+        "platform": "macOS-27.0.1-arm64-arm-64bit",
+        "machine": "arm64",
+        "cpu_count": 10,
+        "rust": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+        "revision": "fb37a3c",
+        "server_sha256": "a7ff05540950211532fdbf6c21c3894590b751caf137d0f9b046046f9a3bc8c5",
+        "harness_sha256": "8159bade4aed772761bce84ce9978f866008e309ec4c3650d106ffe76cb4a135",
+        "arguments": {
+          "server": "target/performance/codec-audit/after/server",
+          "output": "target/performance/codec-audit/after/slow32",
+          "revision": "fb37a3c",
+          "seconds": 0.2,
+          "workers": 32,
+          "repeats": 1,
+          "sink_delay_ms": 10.0,
+          "codecs": [
+            "json",
+            "cbor",
+            "msgpack",
+            "protobuf"
+          ],
+          "protocols": [
+            "mqtt",
+            "tcp",
+            "udp"
+          ],
+          "workloads": [
+            "small"
+          ]
+        },
+        "timing": "socket send to receipt; socket send to webhook response flushed; HTTP command submit to device bytes",
+        "limitations": [
+          "Python closed loop and shared host, no production capacity claim",
+          "RSS sampled at 100ms, not allocator peak",
+          "CPU time from ps, 10ms resolution",
+          "No application-final-processing measurement",
+          "UDP large payload has 4 fields; stream large has 64",
+          "QoS0 receipt unavailable; throughput uses observed required webhook responses",
+          "No per-connection allocator isolation"
+        ]
+      }
+    },
+    "configuration": {
+      "development": true,
+      "limits": {
+        "max_connections_per_ip": 256,
+        "requests_per_second": 100000,
+        "requests_per_ip_second": 100000,
+        "messages_per_device_second": 100000,
+        "messages_per_tenant_second": 100000,
+        "sink_delivery_concurrency": 4,
+        "max_replay_entries_per_device": 32,
+        "max_replay_entries_per_tenant": 4096,
+        "max_replay_entries": 4096,
+        "command_dedup_ttl_ms": 1000
+      },
+      "credential_count": 128,
+      "credential_scope": "public synthetic fixtures only",
+      "network": "plaintext loopback, independent required HTTP 2xx ACK sink"
+    }
+  }
+}
