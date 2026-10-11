@@ -26,6 +26,7 @@ pub enum Metric {
     AuthEvictions,
     AuthInvalidations,
     AuthStaleResponses,
+    CodecDecode,
     CodecFailures,
     CodecProfileUnsupported,
     CodecProfileMismatch,
@@ -106,7 +107,7 @@ pub enum BusinessRpcCallResult {
     Invalid,
 }
 
-const NAMES: [&str; 89] = [
+const NAMES: [&str; 90] = [
     "connections_accepted",
     "connections_rejected",
     "mqtt_connect_success",
@@ -128,6 +129,7 @@ const NAMES: [&str; 89] = [
     "auth_evictions",
     "auth_invalidations",
     "auth_stale_responses",
+    "codec_decode",
     "codec_failures",
     "codec_profile_unsupported",
     "codec_profile_mismatch",
@@ -255,9 +257,14 @@ pub enum Histogram {
     BusinessRpcQueueWait,
     BusinessRpcV3SchedulerWait,
     BusinessRpcV3WriterWait,
+    Authentication,
+    CodecLatency,
+    IngressLatency,
+    SinkLatency,
+    EventBusQueueLatency,
 }
 
-const HISTOGRAM_NAMES: [&str; 23] = [
+const HISTOGRAM_NAMES: [&str; 28] = [
     "mqtt_protocol_validation_us",
     "validation_to_admission_us",
     "admission_wait_us",
@@ -281,6 +288,11 @@ const HISTOGRAM_NAMES: [&str; 23] = [
     "business_rpc_queue_wait_us",
     "business_rpc_v3_scheduler_wait_us",
     "business_rpc_v3_writer_wait_us",
+    "authentication_us",
+    "codec_latency_us",
+    "ingress_latency_us",
+    "sink_latency_us",
+    "eventbus_queue_latency_us",
 ];
 const BOUNDS: [u64; 16] = [
     10, 25, 50, 100, 250, 500, 1_000, 2_500, 5_000, 10_000, 25_000, 50_000, 100_000, 500_000,
@@ -446,6 +458,20 @@ impl Default for HistogramState {
     }
 }
 
+pub struct MetricTimer<'a> {
+    metrics: &'a Metrics,
+    histogram: Histogram,
+    started: std::time::Instant,
+}
+impl Drop for MetricTimer<'_> {
+    fn drop(&mut self) {
+        self.metrics.observe(
+            self.histogram,
+            self.started.elapsed().as_micros().min(u128::from(u64::MAX)) as u64,
+        );
+    }
+}
+
 pub struct Metrics {
     values: [AtomicU64; NAMES.len()],
     business_rpc_active: AtomicU64,
@@ -505,6 +531,14 @@ impl Default for Metrics {
 }
 
 impl Metrics {
+    /// Measures success and error exits without allocating or changing admission semantics.
+    pub fn timer(&self, histogram: Histogram) -> MetricTimer<'_> {
+        MetricTimer {
+            metrics: self,
+            histogram,
+            started: std::time::Instant::now(),
+        }
+    }
     pub(crate) fn sink_failure(&self, reason: crate::SinkFailureReason) {
         self.sink_failures_by_reason[reason as usize].fetch_add(1, Ordering::Relaxed);
     }
@@ -684,6 +718,16 @@ impl Metrics {
                 format!("netbaiot_{name}_total {}\n", value.load(Ordering::Relaxed))
             })
             .collect();
+        for (name, metric) in [
+            ("connections", Metric::ConnectionsAccepted),
+            ("ingress", Metric::IngressAccepted),
+            ("ingress_error", Metric::IngressRejected),
+            ("codec_error", Metric::CodecFailures),
+            ("eventbus_rejected", Metric::EventsRejected),
+            ("sink_failed", Metric::SinkFailures),
+        ] {
+            output.push_str(&format!("netbaiot_{name}_total {}\n", self.get(metric)));
+        }
         for (reason, value) in [
             "other",
             "network",
@@ -875,6 +919,22 @@ impl Metrics {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn production_timings_count_error_exits_and_have_no_dynamic_labels() {
+        let metrics = Metrics::default();
+        fn failed(metrics: &Metrics) -> Result<(), ()> {
+            let _timer = metrics.timer(Histogram::CodecLatency);
+            Err(())
+        }
+        assert!(failed(&metrics).is_err());
+        metrics.inc(Metric::CodecDecode);
+        let rendered = metrics.render();
+        assert!(rendered.contains("netbaiot_codec_latency_us_count 1\n"));
+        assert!(rendered.contains("netbaiot_codec_decode_total 1\n"));
+        for label in ["device_id", "event_id", "client_id", "codec_id", "sink_id"] {
+            assert!(!rendered.contains(label));
+        }
+    }
 
     #[test]
     fn business_rpc_remote_error_labels_match_every_wire_code() {

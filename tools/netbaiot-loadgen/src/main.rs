@@ -1,5 +1,6 @@
 //! Separate, bounded real-network workload process. Test credentials only.
 mod mixed;
+mod production;
 use bytes::{Buf, BytesMut};
 use hmac::{Hmac, Mac};
 use serde::{Deserialize, Serialize};
@@ -27,6 +28,10 @@ const MAX_PACKET: usize = 65536;
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(default, deny_unknown_fields)]
 struct Config {
+    codec: String,
+    scenario: String,
+    fault: String,
+    business_sink: Option<String>,
     audit_open_loop: bool,
     tls_server_name: String,
     transport: String,
@@ -75,6 +80,10 @@ struct Phase {
 impl Default for Config {
     fn default() -> Self {
         Self {
+            codec: "netbaiot-json".into(),
+            scenario: "legacy".into(),
+            fault: "none".into(),
+            business_sink: None,
             audit_open_loop: false,
             tls_server_name: "localhost".into(),
             transport: "mqtt".into(),
@@ -118,6 +127,7 @@ impl Default for Config {
 }
 impl Config {
     fn validate(&self) -> Result<()> {
+        production::validate(self)?;
         if self.connections == 0
             || self.connections > 50000
             || self.offset > 50000
@@ -287,6 +297,7 @@ struct Stats {
     errors: Vec<String>,
     inflight: usize,
     inflight_peak: usize,
+    business_pending: HashMap<String, Instant>,
 }
 type Shared = Arc<Mutex<Stats>>;
 fn count(s: &Shared, k: &'static str, n: u64) {
@@ -365,17 +376,21 @@ fn tls(c: &Config) -> Result<Option<TlsConnector>> {
     }
     Ok(Some(TlsConnector::from(Arc::new(client))))
 }
-async fn connect(c: &Config, connector: &Option<TlsConnector>) -> Result<Stream> {
+async fn connect(c: &Config, connector: &Option<TlsConnector>, stats: &Shared) -> Result<Stream> {
+    let started = Instant::now();
     let socket = TcpStream::connect(&c.address).await?;
+    observe(stats, "tcp_connect", started.elapsed());
     socket.set_nodelay(true)?;
     if let Some(tls) = connector {
-        Ok(Box::new(
-            tls.connect(
+        let started = Instant::now();
+        let stream = tls
+            .connect(
                 rustls::pki_types::ServerName::try_from(c.tls_server_name.clone())?,
                 socket,
             )
-            .await?,
-        ))
+            .await?;
+        observe(stats, "tls_handshake", started.elapsed());
+        Ok(Box::new(stream))
     } else {
         Ok(Box::new(socket))
     }
@@ -554,9 +569,25 @@ async fn mqtt_or_tcp(
     let started = Instant::now();
     let mut stream = timeout(
         Duration::from_secs_f64(c.timeout_secs),
-        connect(c, connector),
+        connect(c, connector, s),
     )
     .await??;
+    if c.fault == "half_connection" {
+        write(
+            &mut stream,
+            if mqtt {
+                &[0x10, 20, 0][..]
+            } else {
+                &[0, 0, 0, 20, b'{'][..]
+            },
+            s,
+        )
+        .await?;
+        sleep_until(end.min(Instant::now() + Duration::from_secs_f64(c.timeout_secs))).await;
+        count(s, "half_connections", 1);
+        return Ok(());
+    }
+    let auth_started = Instant::now();
     let mut buffer = BytesMut::with_capacity(4096);
     let auth = if c.bad_auth {
         "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
@@ -628,6 +659,7 @@ async fn mqtt_or_tcp(
             return Err("TCP auth failed".into());
         }
     }
+    observe(s, "authentication_round_trip", auth_started.elapsed());
     observe(s, "connect", started.elapsed());
     count(s, "connected", 1);
     if !mqtt && c.partial_frame {
@@ -753,6 +785,9 @@ async fn mqtt_or_tcp(
                         );
                     }
                     count(s, "pubacks", 1);
+                    if !p.command {
+                        count(s, "event_accepted_receipts", 1);
+                    }
                 }
             } else if first == 0x50 && (b.len() == 2 || (c.mqtt_version == 5 && b.len() >= 3)) {
                 let id = u16::from_be_bytes([b[0], b[1]]);
@@ -774,6 +809,9 @@ async fn mqtt_or_tcp(
                         observe(s, "pubcomp", p.at.elapsed());
                     }
                     count(s, "pubcomps", 1);
+                    if !p.command {
+                        count(s, "event_accepted_receipts", 1);
+                    }
                 }
             } else if matches!(first, 0x62 | 0x6a) && b.len() >= 2 {
                 received_qos2.remove(&u16::from_be_bytes([b[0], b[1]]));
@@ -823,6 +861,35 @@ async fn mqtt_or_tcp(
                     &b
                 };
                 let v: Value = serde_json::from_slice(payload)?;
+                if !mqtt && v.get("event_id").is_some() {
+                    // The fixed TCP EventAccepted receipt has no source_message_id.
+                    // Frames and their receipts are ordered on this connection.
+                    let _: netbaiot_core::EventAccepted = serde_json::from_slice(payload)?;
+                    let source = pending
+                        .iter()
+                        .min_by_key(|(_, p)| p.at)
+                        .map(|(source, _)| source.clone());
+                    if let Some(source) = source
+                        && let Some(p) = pending.remove(&source)
+                    {
+                        observe(s, "application_ack", p.at.elapsed());
+                        count(
+                            s,
+                            if p.command {
+                                "command_acks"
+                            } else {
+                                "accepted"
+                            },
+                            1,
+                        );
+                        if !p.command {
+                            count(s, "event_accepted_receipts", 1);
+                        }
+                    } else {
+                        return Err("unexpected TCP acceptance receipt".into());
+                    }
+                    continue;
+                }
                 if let Some(source) = v["source_message_id"].as_str() {
                     if let Some(p) = pending.remove(source) {
                         if !p.command && !c.phases.is_empty() {
@@ -848,6 +915,9 @@ async fn mqtt_or_tcp(
                             },
                             1,
                         );
+                        if !p.command {
+                            count(s, "event_accepted_receipts", 1);
+                        }
                         if v["duplicate"] == true {
                             count(s, "duplicates", 1);
                         }
@@ -939,7 +1009,7 @@ async fn mqtt_or_tcp(
                         now.saturating_duration_since(due),
                     );
                 }
-                if c.audit_open_loop {
+                if c.audit_open_loop || c.scenario != "legacy" {
                     let (next, slots) = advance_open_loop(due, now, step);
                     due = next;
                     count(s, "scheduled_slots", slots);
@@ -956,9 +1026,14 @@ async fn mqtt_or_tcp(
                 if pending.len() < c.window && ids.len() < c.window {
                     seq += 1;
                     let unique = format!("{run}.{generation}");
-                    let payload = body(&unique, id, seq, c.payload_bytes, c.heartbeat_every);
+                    let encoding = Instant::now();
+                    let payload = production::body(c, &unique, id, seq)?;
+                    if c.scenario != "legacy" {
+                        observe(s, "generator_codec_encode", encoding.elapsed());
+                    }
                     let source = format!("{unique}:{id}:{seq}");
                     let at = Instant::now();
+                    production::sent(c, s, &source, at)?;
                     if c.subscribe || !mqtt {
                         pending.insert(
                             source,
@@ -1053,6 +1128,9 @@ async fn stateless(
     end: Instant,
     run: &str,
 ) -> Result<()> {
+    if c.scenario != "legacy" {
+        return production::udp(c, id, relative, s, measure, end, run).await;
+    }
     let socket = UdpSocket::bind("127.0.0.1:0").await?;
     let mut seq = 0;
     let mut due = measure + Duration::from_secs_f64(relative as f64 / c.rate(0.0).max(1.0));
@@ -1320,6 +1398,22 @@ async fn main() -> Result<()> {
         "{}",
         json!({"event":"start","pid":std::process::id(),"config":&*c,"run":run,"epoch_ms":now_ms()})
     );
+    let sink = if let Some(address) = &c.business_sink {
+        let listener = tokio::net::TcpListener::bind(address).await?;
+        let stats = s.clone();
+        let (stop, stopped) = watch::channel(false);
+        Some((
+            stop,
+            tokio::spawn(production::sink(
+                listener,
+                stats,
+                end + Duration::from_secs(6),
+                stopped,
+            )),
+        ))
+    } else {
+        None
+    };
     for relative in 0..c.connections {
         let (c, s, connector, run) = (c.clone(), s.clone(), connector.clone(), run.clone());
         tasks.spawn(async move {
@@ -1331,10 +1425,10 @@ async fn main() -> Result<()> {
                 Instant::now().saturating_duration_since(due),
             );
             if c.transport == "udp" {
-                if stateless(&c, c.offset + relative, relative, &s, measure, end, &run)
-                    .await
-                    .is_err()
+                if let Err(error) =
+                    stateless(&c, c.offset + relative, relative, &s, measure, end, &run).await
                 {
+                    error_sample(&s, &error);
                     count(&s, "client_errors", 1);
                 }
                 return;
@@ -1369,6 +1463,7 @@ async fn main() -> Result<()> {
                 if c.reconnect_every_secs == 0.0 && !c.retry_connections {
                     break;
                 }
+                count(&s, "reconnects", 1);
                 sleep_until((Instant::now() + Duration::from_millis(100)).min(end)).await;
             }
         });
@@ -1394,7 +1489,14 @@ async fn main() -> Result<()> {
     let mut tick = tokio::time::interval(Duration::from_secs_f64(c.report_every_secs));
     let final_deadline = end + Duration::from_secs(6);
     while !tasks.is_empty() {
-        tokio::select! {r=tasks.join_next()=>{if r.is_some_and(|r|r.is_err()){return Err("load task panicked".into());}},_=tick.tick()=>println!("{}",json!({"event":"sample","elapsed_s":start.elapsed().as_secs_f64(),"measurement_s":Instant::now().saturating_duration_since(measure).as_secs_f64(),"epoch_ms":now_ms(),"tasks":tokio::runtime::Handle::current().metrics().num_alive_tasks(),"stats":snapshot(&s)})),_=sleep_until(final_deadline)=>{tasks.abort_all();while tasks.join_next().await.is_some(){} count(&s,"forced_tasks",1);break;}}
+        tokio::select! {r=tasks.join_next()=>{if r.is_some_and(|r|r.is_err()){count(&s,"panicked_tasks",1);}},_=tick.tick()=>{production::expire(&s); println!("{}",json!({"event":"sample","elapsed_s":start.elapsed().as_secs_f64(),"measurement_s":Instant::now().saturating_duration_since(measure).as_secs_f64(),"epoch_ms":now_ms(),"tasks":tokio::runtime::Handle::current().metrics().num_alive_tasks(),"stats":snapshot(&s)}));},_=sleep_until(final_deadline)=>{tasks.abort_all();while tasks.join_next().await.is_some(){} count(&s,"forced_tasks",1);break;}}
+    }
+    if let Some((stop, sink)) = sink {
+        tokio::time::sleep(Duration::from_millis(250)).await;
+        let _ = stop.send(true);
+        if !matches!(sink.await, Ok(Ok(()))) {
+            count(&s, "sink_owner_errors", 1);
+        }
     }
     println!(
         "{}",

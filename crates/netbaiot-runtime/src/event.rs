@@ -540,7 +540,8 @@ impl EventBus {
             diagnostics.iter().map(get).fold(0u64, u64::saturating_add)
         };
         Ok(format!(
-            "netbaiot_sink_queue_count {}\nnetbaiot_sink_queue_bytes {}\nnetbaiot_sink_inflight {}\nnetbaiot_sink_paused {}\nnetbaiot_sink_retry_after_used_total {}\nnetbaiot_sink_oldest_pending_age_ms {}\n",
+            "netbaiot_sink_pending {}\nnetbaiot_sink_queue_count {}\nnetbaiot_sink_queue_bytes {}\nnetbaiot_sink_inflight {}\nnetbaiot_sink_paused {}\nnetbaiot_sink_retry_after_used_total {}\nnetbaiot_sink_oldest_pending_age_ms {}\n",
+            sum(|s| s.queue_count as u64),
             sum(|s| s.queue_count as u64),
             sum(|s| s.queue_bytes as u64),
             sum(|s| s.inflight as u64),
@@ -955,7 +956,18 @@ impl EventBus {
                 let sink = definition.sink.clone();
                 let sink_id = id.clone();
                 let timeout = definition.timeout;
+                let metrics = self.metrics.clone();
+                // Time eligible for delivery before selection; excludes retry backoff.
+                metrics.observe(
+                    Histogram::EventBusQueueLatency,
+                    record
+                        .next_attempt
+                        .elapsed()
+                        .as_micros()
+                        .min(u128::from(u64::MAX)) as u64,
+                );
                 inflight.spawn(async move {
+                    let _timing = metrics.timer(Histogram::SinkLatency);
                     let envelope = DeliveryEnvelope {
                         event: record.event.clone(),
                         sink_id,

@@ -133,6 +133,7 @@ impl Ingress {
         &self,
         request: AuthenticationRequest<'_>,
     ) -> Result<AuthenticatedDevice> {
+        let _timing = self.metrics.timer(Histogram::Authentication);
         if !self.lifecycle.ready() {
             return Err(Error::Draining);
         }
@@ -169,6 +170,7 @@ impl Ingress {
         &self,
         request: AuthenticationRequest<'_>,
     ) -> Result<AuthenticatedSessionCandidate> {
+        let _timing = self.metrics.timer(Histogram::Authentication);
         if !self.lifecycle.ready() {
             return Err(Error::Draining);
         }
@@ -309,6 +311,7 @@ impl Ingress {
         auth: &AuthenticatedDevice,
         envelope: IngressEnvelope<'_>,
     ) -> Result<IngressAcceptance> {
+        let _timing = self.metrics.timer(Histogram::IngressLatency);
         let result = self.ingest_inner(auth, envelope).await;
         if result.is_err() {
             self.metrics.inc(Metric::IngressRejected);
@@ -344,6 +347,8 @@ impl Ingress {
         self.metrics
             .observe(Histogram::AdmissionLockHold, admission.lock_hold_us());
         let codec_started = Instant::now();
+        self.metrics.inc(Metric::CodecDecode);
+        let codec_timing = self.metrics.timer(Histogram::CodecLatency);
         let events = self
             .codecs
             .get(auth)?
@@ -358,6 +363,7 @@ impl Ingress {
                 self.metrics.inc(Metric::CodecFailures);
                 Error::Codec
             })?;
+        drop(codec_timing);
         if events.len() != 1 {
             return Err(Error::Codec);
         }

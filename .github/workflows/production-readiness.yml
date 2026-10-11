@@ -1,0 +1,99 @@
+name: Production readiness real load
+on:
+  push:
+    branches: [main, codex/production-readiness]
+    paths:
+      - 'tools/netbaiot-loadgen/**'
+      - 'scripts/perf/*production*'
+      - 'crates/netbaiot-runtime/src/metrics.rs'
+      - 'crates/netbaiot-runtime/src/ingress.rs'
+      - 'crates/netbaiot-runtime/src/event.rs'
+      - 'crates/netbaiot-transports/src/udp.rs'
+      - 'crates/netbaiot-transports/src/management_http.rs'
+      - '.github/workflows/production-readiness.yml'
+  pull_request:
+    paths: ['tools/netbaiot-loadgen/**', 'scripts/perf/*production*', '.github/workflows/production-readiness.yml']
+  workflow_dispatch:
+    inputs:
+      capacity:
+        description: '192 real cases per native architecture, up to 10,000 devices'
+        type: boolean
+        default: false
+permissions:
+  contents: read
+jobs:
+  native-load:
+    name: Real load ${{ matrix.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {runner: ubuntu-24.04, arch: x86_64}
+          - {runner: ubuntu-24.04-arm, arch: aarch64}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 180
+    env:
+      CARGO_PROFILE_RELEASE_DEBUG: 1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Assert native execution and build
+        run: |
+          test "$(uname -m)" = "${{ matrix.arch }}"
+          cargo build --locked --release -p netbaiot-server -p netbaiot-loadgen --bin netbaiot-server --bin netbaiot-loadgen
+          cargo test --locked -p netbaiot-loadgen --bin netbaiot-loadgen
+          python3 -m unittest discover -s scripts/perf -p test_production_readiness.py
+      - name: Actual codec microbenchmark, kept separate from E2E
+        run: cargo bench --locked -p netbaiot-codecs --bench codecs > target/production-codecs.csv
+      - name: TLS real capacity or bounded smoke
+        env:
+          CAPACITY: ${{ inputs.capacity || contains(github.event.head_commit.message, '[production-capacity]') }}
+        run: |
+          if [ "$CAPACITY" = true ]; then
+            python3 scripts/perf/production_readiness.py --devices 100 1000 5000 10000 --scenario sensor telemetry16 telemetry64 --duration 30 --sample-interval 5 --tls --output target/performance/production-readiness/native
+          else
+            python3 scripts/perf/production_readiness.py --devices 100 --scenario telemetry16 --duration 10 --sample-interval 1 --tls --output target/performance/production-readiness/native
+          fi
+      - name: Abnormal device real sockets
+        run: |
+          for fault in wrong_hmac wrong_version wrong_codec_version oversize repeat_sequence reconnect half_connection; do
+            python3 scripts/perf/production_readiness.py --devices 100 --scenario telemetry16 --duration 10 --sample-interval 1 --fault "$fault" --output "target/performance/production-readiness/fault-$fault"
+          done
+      - name: Install test-only profilers
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes linux-tools-common linux-tools-generic heaptrack
+          cargo install --locked inferno --version 0.12.4
+      - name: Actual CPU stacks and flamegraph
+        run: |
+          python3 scripts/perf/production_readiness.py --devices 1000 --codec json --transport mqtt5 --scenario telemetry64 --duration 60 --sample-interval 5 --tls --output target/performance/production-readiness/cpu-profile &
+          owner=$!
+          pidfile=target/performance/production-readiness/cpu-profile/1000-json-mqtt5-telemetry64-none/pid.json
+          for attempt in $(seq 1 100); do
+            if [ -f "$pidfile" ]; then break; fi
+            sleep 0.1
+          done
+          pid=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["server"])' "$pidfile")
+          mkdir -p target/performance/production-readiness/profile
+          profiler=$(find /usr/lib/linux-tools -type f -name perf | head -1)
+          test -n "$profiler"
+          sudo "$profiler" record -F 99 -g --call-graph dwarf -p "$pid" -o target/performance/production-readiness/profile/perf.data -- sleep 20
+          wait "$owner"
+          sudo "$profiler" script -i target/performance/production-readiness/profile/perf.data > target/performance/production-readiness/profile/perf.stacks
+          inferno-collapse-perf < target/performance/production-readiness/profile/perf.stacks > target/performance/production-readiness/profile/cpu.folded
+          inferno-flamegraph < target/performance/production-readiness/profile/cpu.folded > target/performance/production-readiness/profile/cpu.svg
+      - name: Actual heap allocation profile
+        run: |
+          python3 scripts/perf/production_readiness.py --devices 1000 --codec json --transport mqtt5 --scenario telemetry64 --duration 30 --sample-interval 5 --tls --heaptrack --output target/performance/production-readiness/heap-profile
+          heap=$(find target/performance/production-readiness/heap-profile -name 'heaptrack*.gz' -o -name 'heaptrack*.zst' | head -1)
+          test -n "$heap"
+          heaptrack_print "$heap" > target/performance/production-readiness/profile/heap.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: production-load-${{ matrix.arch }}
+          path: |
+            target/performance/production-readiness/
+            target/production-codecs.csv
+          retention-days: 14
+          if-no-files-found: error

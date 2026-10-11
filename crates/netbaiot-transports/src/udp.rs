@@ -334,10 +334,14 @@ async fn accept_and_ack(
     // Also gates duplicates: quiescing does not start new receipt work.
     let _admission = ingress.lifecycle.begin_admission()?;
     let envelope = decode(input, ingress.limits.max_udp_datagram_size)?;
+    let auth_timing = ingress
+        .metrics
+        .timer(netbaiot_runtime::Histogram::Authentication);
     let verified = ingress
         .auth_cache
         .verify_signed_with_verifier(envelope.credential_id, envelope.signed, envelope.tag)
         .await?;
+    drop(auth_timing);
     accept_verified(&envelope, &verified, ingress, replay).await?;
     send_ack(&envelope, &verified, ingress, send);
     Ok(())
@@ -351,10 +355,14 @@ async fn accept_and_ack_concurrent(
 ) -> Result<()> {
     let _admission = ingress.lifecycle.begin_admission()?;
     let envelope = decode(input, ingress.limits.max_udp_datagram_size)?;
+    let auth_timing = ingress
+        .metrics
+        .timer(netbaiot_runtime::Histogram::Authentication);
     let verified = ingress
         .auth_cache
         .verify_signed_with_verifier(envelope.credential_id, envelope.signed, envelope.tag)
         .await?;
+    drop(auth_timing);
     {
         let mut replay = replay.lock().await;
         accept_verified(&envelope, &verified, ingress, &mut replay).await?;

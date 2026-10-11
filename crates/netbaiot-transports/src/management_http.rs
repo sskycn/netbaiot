@@ -278,6 +278,8 @@ async fn handle_management(
                     "business_auth_serving": services.business_auth.as_ref().is_some_and(|registry| registry.is_serving()),
                     "business_rpc_pending": services.business_auth.as_ref().map_or(0, |registry| registry.pending_usage()),
                     "runtime_tasks": tokio::runtime::Handle::current().metrics().num_alive_tasks(),
+                    "active_sessions": services.ingress.sessions.registry_counts()?.0,
+                    "process_id": std::process::id(),
                     "active_connections": active_connections,
                 }))
                 .map_err(|_| Error::Internal)?,
@@ -286,6 +288,10 @@ async fn handle_management(
         (hyper::Method::GET, "/api/v1/metrics") => {
             let mut body = services.ingress.metrics.render();
             body.push_str(&services.ingress.events.render_sink_metrics()?);
+            let usage = services.ingress.events.usage()?;
+            body.push_str(&format!("netbaiot_active_sessions {}\nnetbaiot_eventbus_pending {}\nnetbaiot_eventbus_pending_bytes {}\nnetbaiot_runtime_tasks {}\n",
+                services.ingress.sessions.registry_counts()?.0, usage.events, usage.bytes,
+                tokio::runtime::Handle::current().metrics().num_alive_tasks()));
             if let Ok((total, inflight)) = services.commands.usage() {
                 body.push_str(&format!(
                     "netbaiot_command_dedup_entries {}\nnetbaiot_command_dedup_inflight {}\nnetbaiot_command_dedup_accepted {}\n",
