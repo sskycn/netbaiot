@@ -1,5 +1,5 @@
 {
-  "raw_root": "/Users/sam/Dev/work/sskycn/netbaiot/target/performance/production-readiness/long-preflight",
+  "raw_root": "<repo>/target/performance/production-readiness/long-preflight",
   "files": [
     {
       "case": "1000-cbor-mqtt311-sensor-none",

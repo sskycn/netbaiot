@@ -1,4 +1,4 @@
-# NetbaIoT 生产验证（进行中）
+# NetbaIoT 生产验证（已按用户要求停止测试）
 
 基线 `1458400`。本阶段不增加 Codec/传输，不修改 V1 字段编号、MQTT 状态机、TCP framing、NBI1/NBA1 或 EventAccepted。
 生产资格必须由已完成的实际负载、故障和长期运行证据决定。配置允许 10,000 台不等于已经证明可长期服务 10,000 台。
@@ -84,25 +84,40 @@ tokio-console 需要专门 runtime instrumentation，当前使用稳定 runtime 
 
 ## 生产结论与部署规格
 
-最终报告必须填充以下实测项目，尚未完成的运行保持“进行中/未验证”，不能以配置值或历史数据库时代报告补齐：
+用户于 2026-10-11 要求“先不测试了，尽快结束”。本机长测、云端运行和后续自动跟进已停止；本阶段交付测试系统与指标，生产资格验证未完成。不能以配置值或历史数据库时代报告补齐。
 
 | 项目 | 当前结论 |
 | --- | --- |
-| 最大长期稳定设备数量 | 等待容量与完整 soak 证据 |
-| 最大稳定吞吐、P95/P99、CPU/RSS | 等待完整容量 case，不使用短 smoke 推算 |
-| Linux x86_64 与 ARM64 | 等待本阶段原生真实负载 artifact |
-| 6 小时/24 小时 | 等待真实完整运行，不能加速时钟代替 |
-| 1000/5000/10000 部署 CPU/内存/网络规格 | 等待对应平台及负载的实测，暂不提供估算 |
+| 最大长期稳定设备数量 | 未证明长期稳定上限；已完成 1000 台短期 loopback 预检 |
+| 最大稳定吞吐、P95/P99、CPU/RSS | 见下方短期实测；尚无最大稳定吞吐结论 |
+| Linux x86_64 与 ARM64 | 完整矩阵已取消；不作为平台容量对比结论 |
+| 6 小时/24 小时 | 八组长测运行约 14 分钟后取消，6/24 小时均未完成 |
+| 1000/5000/10000 部署 CPU/内存/网络规格 | 尚未验证，暂不提供估算 |
 | 未覆盖风险 | 同机测量、真实 WAN/NIC、外部认证/业务 ACK 服务、真实设备差异、长期开机与断电恢复 |
 
 已完成的本阶段预检：[本机摘要](performance/production-readiness/local-preflight.json)、[来源 manifest](performance/production-readiness/local-manifest.json)。
 macOS ARM64 同机 TLS MQTT 3.1.1、每例 1000 台传感器、12 秒：四 Codec 均 1200 条发送/接纳/业务确认，连接成功率 100%，最终 session/required queue 为零。
 设备发送至业务 ACK P95 0.33–0.35 ms，P99 0.53–0.71 ms；这些是短期 loopback 预检，不能推导 Linux 部署规格。
 本阶段完整 workspace 542 项通过、46 项既有 ignored；另外实际执行 TLS outage 60.67 秒、混合 Codec 重连 60.02 秒、子进程重启 64.36 秒，均通过。
-6/24 小时正在本机用冻结二进制执行：四 Codec/传输配对，每台独立网关 1000 设备；逐分钟采样。八台同机测试网关不是单网关 8000 台容量证据。
-Linux x86_64/ARM64 的完整真实矩阵见 [Actions](https://github.com/sskycn/netbaiot/actions/runs/38113863601)，运行尚未完成时不写成 PASS。
+6/24 小时本机冻结二进制长测已取消：四 Codec/传输配对，每台独立网关 1000 设备，控制器运行 846.81 秒，每组保留 14 次资源采样。八台同机测试网关不是单网关 8000 台容量证据。所有所属进程已经退出，部分采样不能证明长期无泄漏。
+Linux x86_64/ARM64 的完整真实矩阵见 [Actions](https://github.com/sskycn/netbaiot/actions/runs/38113863601)，已取消；另一个短矩阵/异常设备运行也已取消。Linux profiling 作业退出失败，未取得可用于热点优化的完整证据。`vm-oc` 尚未执行测试。
 
 部署时按 [运维指南](operations-guide.md) 配置独立管理授权、验证服务器 TLS 证书、限制暴露端口与管理网，设置有界 count/byte、ACK/retry/timeout 与恢复 spool。
 FD 的实际峰值和服务启动 `RLIMIT_NOFILE` 必须一起验证；工具只尝试调整自有进程的 soft limit，不修改系统参数。
 不提供未经实际 NIC/专用服务器测量的 sysctl 调优数字。应用以 event_id 幂等处理可能重复的投递与恢复。
 计划重启 drain/spool 成功才可退出；突然崩溃可能丢失尚未 spooled 的有界内存流量。生产容量建议必须同时满足可靠性约束。
+
+## 本阶段最终报告（验证未完成）
+
+数据来源：[停止摘要](performance/production-readiness/stopped-summary.json)与上述预检 manifest。以下仅报告已发生的测量。
+
+1. **最大设备数量**：未取得长期稳定上限。已完成单网关 1000 台短期实测；100/1000/5000/10000 是工具支持的测试规模。
+2. **最大稳定吞吐**：未验证。已完成 JSON/MQTT 5.0/TLS、1000 台、64 字段、35 秒对照运行：34,999 条发送、接纳、Sink 确认，实测 999.97 条/秒，无丢弃，最终队列/session 归零。此值不是最大生产吞吐。
+3. **P95/P99**：上述对照运行，设备发送至测试业务 ACK 的 P50 0.18 ms、P95 0.41 ms、P99 3.23 ms；同机 loopback，不包含业务持久化。四 Codec 传感器预检的口径与数值见上文。
+4. **CPU/RSS**：上述对照运行网关 CPU 中位数 11.43%（一个 CPU 核为 100%），RSS 峰值 55,040 KiB，FD 峰值 1020、runtime tasks 峰值 1014；同时运行本机测试进程，不能推导专用服务器规格。
+5. **ARM64**：本机 macOS ARM64 已运行真实 socket 预检；Linux ARM64 的完整负载、异常设备和 profiling 验证未完成。没有可报告的完整 Linux 架构容量比较。
+6. **6/24 小时**：均未完成。八组被取消的运行各保留 14 次资源采样，最后采样时 EventBus/Sink pending 均为零；不足以证明长期无内存/session/task/queue 泄漏。
+7. **已发现问题**：原 TCP 负载工具错误地要求 EventAccepted 含 source_message_id；新增 UDP ACK 探针初版 HMAC 范围错误；初版采样器误解资源返回类型；64 字段 Protobuf 模型初版超出 UDP 硬限制。profiling 本机运行出现 365 次 admission 拒绝，对照无拒绝；Linux profiling 作业失败，原因未完成定位。发布预检发现新摘要包含本机绝对路径。
+8. **修复内容**：修正 TCP 结构化接纳 receipt 匹配、UDP 签名 ACK 边界和采样读取；用现有 Protobuf uint 字段表达高频模型同值数据并验证合法 UDP 长度；测试进程/业务 sink 任务有界且由根进程取消并 join；增加固定低基数阶段指标、实际负载报告与增长候选复现输出；清理发布摘要本机路径，清理后未重跑发布预检。未进行缺乏 CPU/heap 证据的优化，协议与 EventAccepted 语义保持不变。
+9. **未覆盖风险**：完整 Linux 容量与异常矩阵、专用 Linux/NIC/WAN、6/24 小时、tokio-console、新一轮 fuzz、确认最小泄漏复现及修复重跑均未完成。Mac live heap 快照报告 0 leaks/0 bytes，仅代表该快照。Linux perf/heaptrack 仍待验证。本阶段已完成 fmt、stable/MSRV clippy、workspace 542 项测试（46 项既有 ignored）、MQTT/Mosquitto gates，以及上述 outage、混合 Codec、子进程重启短 soak；用户停止后未继续运行测试。
+10. **推荐生产部署规格**：缺少 1000/5000/10000 对应专用 Linux 与实际网络长期负载证据，暂不给出 CPU/内存/网络数值，不认定本阶段已经达到生产部署要求。TLS、管理授权、FD、资源边界和恢复要求见运维指南。
