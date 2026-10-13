@@ -78,6 +78,14 @@ jobs:
             exit 1
           fi
           "$profiler" --version
+          registers=()
+          if [ "$(uname -m)" = aarch64 ]; then
+            # perf 6.8 probes SVE VG support on the hardware PMU, then adds
+            # VG to DWARF samples even for cpu-clock. The software PMU rejects
+            # extended registers; ordinary ARM64 registers can unwind Rust.
+            arm64_registers=$(printf 'x%s,' {0..29})
+            registers=("--user-regs=${arm64_registers}lr,sp,pc")
+          fi
           python3 scripts/perf/production_readiness.py --devices 1000 --codec json --transport mqtt5 --scenario telemetry64 --duration 60 --sample-interval 5 --tls --profiling --output target/performance/production-readiness/cpu-profile &
           owner=$!
           cleanup() {
@@ -102,7 +110,7 @@ jobs:
           pid=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["server"])' "$pidfile")
           mkdir -p target/performance/production-readiness/profile
           # Software CPU samples work on hosted VMs without a hardware PMU.
-          python3 scripts/ci_annotate.py --title "CPU stack sampling failed" -- sudo "$profiler" record -e cpu-clock -F 99 -g --call-graph dwarf -p "$pid" -o target/performance/production-readiness/profile/perf.data -- sleep 20
+          python3 scripts/ci_annotate.py --title "CPU stack sampling failed" -- sudo "$profiler" record -e cpu-clock -F 99 -g --call-graph dwarf "${registers[@]}" -p "$pid" -o target/performance/production-readiness/profile/perf.data -- sleep 20
           wait "$owner"
           owner=""
           sudo "$profiler" script -i target/performance/production-readiness/profile/perf.data > target/performance/production-readiness/profile/perf.stacks
