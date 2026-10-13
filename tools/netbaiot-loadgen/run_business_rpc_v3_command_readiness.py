@@ -7,7 +7,6 @@ import hashlib
 import json
 import os
 import platform
-import signal
 import socket
 import ssl
 import subprocess
@@ -19,7 +18,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts"))
-from scrub_paths import scrub_text, scrub_tree
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from scrub_paths import scrub_text
+from business_rpc_harness_support import scrub_evidence, shutdown_gateway, write_shutdown
 FIXTURES = ROOT / "tests" / "fixtures"
 ADMIN_SECRET = "a" * 64
 V3_LIMITS = {
@@ -114,7 +115,7 @@ def run():
     output.mkdir(parents=True, exist_ok=True)
     # Live configs need actual paths. Sanitize evidence only after child owners
     # have stopped, including startup/validation failures.
-    atexit.register(scrub_tree, output, repo_root=ROOT, write=True)
+    atexit.register(scrub_evidence, output, repo_root=ROOT, write=True)
     device_port, admin_port, business_port = free_port(), free_port(), free_port()
     if len({device_port, admin_port, business_port}) != 3:
         raise RuntimeError("port reservation collision")
@@ -211,6 +212,8 @@ def run():
     environment = os.environ.copy()
     environment["NETBAIOT_ADMIN_SECRET"] = ADMIN_SECRET
     start = time.time()
+    summary = None
+    final_status = None
     with (output / "gateway.log").open("wb") as gateway_log:
         server = subprocess.Popen(
             [str(server_bin), str(output / "gateway-config.json")],
@@ -356,17 +359,16 @@ def run():
                 "checks": checks,
                 "pass": all(checks.values()),
             }
-            (output / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
-            print(scrub_text(json.dumps(summary, indent=2), repo_root=ROOT))
-            return 0 if summary["pass"] else 1
         finally:
-            if server.poll() is None:
-                server.send_signal(signal.SIGTERM)
-                try:
-                    server.wait(timeout=30)
-                except subprocess.TimeoutExpired:
-                    server.kill()
-                    server.wait()
+            shutdown = shutdown_gateway(server, gateway, output / "committed-spool", final_status)
+            write_shutdown(output / "shutdown.json", shutdown)
+            if summary is not None:
+                summary["shutdown"] = shutdown
+                summary["checks"]["durable_shutdown"] = shutdown["durable_shutdown"]
+                summary["pass"] = all(summary["checks"].values())
+    (output / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
+    print(scrub_text(json.dumps(summary, indent=2), repo_root=ROOT))
+    return 0 if summary["pass"] else 1
 
 
 if __name__ == "__main__":

@@ -10,7 +10,14 @@ import tempfile
 import time
 
 from connection_memory import fd_count, free_port, rss_kib, status
-from event_load import ROOT, credential, last_json, management_get
+from event_load import (
+    ROOT,
+    add_server_workers_argument,
+    credential,
+    last_json,
+    management_get,
+    server_environment,
+)
 
 
 def process_cpu(process):
@@ -50,6 +57,7 @@ def main():
     parser.add_argument("--sample-every", type=float, default=5)
     parser.add_argument("--profile-output")
     parser.add_argument("--profile-seconds", type=int, default=10)
+    add_server_workers_argument(parser)
     parser.add_argument(
         "--scenario", choices=("mixed", "route-fairness"), default="mixed"
     )
@@ -74,6 +82,7 @@ def main():
     maximum = 1100 if args.scenario == "mixed" else 256
     limits = {
         "max_connections": maximum,
+        "max_device_connections_per_protocol": maximum,
         "max_connections_per_ip": maximum,
         "max_connections_per_tenant": maximum,
         "max_devices": maximum,
@@ -176,7 +185,7 @@ def main():
                 json.dump(workload, output)
             workload_paths.append((name, path))
 
-        environment = os.environ.copy()
+        environment = server_environment(os.environ, args.server_workers)
         environment["NETBAIOT_ADMIN_SECRET"] = "ab" * 32
         environment["NETBAIOT_PERF_LOCK_METRICS"] = "1"
         environment["NO_PROXY"] = "127.0.0.1,localhost"
@@ -287,6 +296,8 @@ def main():
                         "cooldown_seconds": args.cooldown,
                         "scenario": args.scenario,
                         "connections": connection_count,
+                        "server_workers_requested": args.server_workers,
+                        "server_worker_threads_env": environment.get("TOKIO_WORKER_THREADS"),
                         "nominal_message_mix": (
                             {"qos0": 0.6, "qos1": 0.3, "qos2": 0.1}
                             if args.scenario == "mixed"

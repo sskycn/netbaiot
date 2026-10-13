@@ -84,8 +84,25 @@ The `route-fairness` scenario instead runs one saturated QoS1 publisher beside
 drivers accept `--server-bin` and `--loadgen-bin`, which permits an exact-SHA
 comparison binary from an isolated worktree without moving the current checkout.
 
+Both drivers accept `--server-workers N` (1..64). It sets
+`TOKIO_WORKER_THREADS` only for the server; sink and load-generator runtimes are
+unchanged. Results record the requested count and the environment passed to the
+server, not an independently observed worker count. Keep this value identical
+between builds when measuring a code change. Compare worker configurations
+separately and include CPU, tail latency and fairness.
+
 The event and mixed drivers set `NETBAIOT_PERF_LOCK_METRICS=1` for the child
 server. Broker/EventBus lock timing is disabled by default outside these drivers.
+
+The V3 HOL and command-readiness harnesses wait for the configured gateway
+shutdown deadline plus five seconds. They retain the authoritative recovery
+directory and copy committed files with permissions, byte counts and SHA256
+metadata. A forced exit, missing MQTT snapshot or failed evidence copy fails the
+durability check. The snapshot check supplements the gateway's successful exit;
+it does not independently decode or verify the recovery format.
+These harnesses scrub only their top-level text artifacts. Never recursively run
+`scrub_paths.py --write` on a directory containing recovery files: they are opaque
+checksummed data, including when their bytes happen to be valid UTF-8.
 
 The ignored restart soak runs 12 healthy process generations with a five-second
 dwell per generation after the initial forced-spool/recovery pair. Each generation

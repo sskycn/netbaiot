@@ -17,6 +17,35 @@ from connection_memory import SECRET, fd_count, free_ports, rss_kib, status
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
 
 
+def server_worker_count(value):
+    try:
+        workers = int(value)
+    except (TypeError, ValueError) as error:
+        raise argparse.ArgumentTypeError(
+            "server workers must be an integer in 1..64"
+        ) from error
+    if not 1 <= workers <= 64:
+        raise argparse.ArgumentTypeError("server workers must be an integer in 1..64")
+    return workers
+
+
+def add_server_workers_argument(parser):
+    parser.add_argument(
+        "--server-workers",
+        type=server_worker_count,
+        metavar="N",
+        help="set TOKIO_WORKER_THREADS only for the server (1..64; default inherits environment)",
+    )
+
+
+def server_environment(base_environment, workers):
+    """Return a server-only copy; other child processes retain the caller environment."""
+    environment = base_environment.copy()
+    if workers is not None:
+        environment["TOKIO_WORKER_THREADS"] = str(server_worker_count(workers))
+    return environment
+
+
 def credential(index):
     return {
         "credential_id": f"a{index}",
@@ -114,6 +143,7 @@ def main():
     parser.add_argument("--mqtt-metadata", action="store_true")
     parser.add_argument("--audit-open-loop", action="store_true")
     parser.add_argument("--lock-metrics", action=argparse.BooleanOptionalAction, default=True)
+    add_server_workers_argument(parser)
     parser.add_argument(
         "--server-bin", default=os.path.join(ROOT, "target/release/netbaiot-server")
     )
@@ -221,7 +251,7 @@ def main():
             if args.tls:
                 workload["tls_ca"] = os.path.join(ROOT, "tests/fixtures/localhost-cert.pem")
             json.dump(workload, output)
-        environment = os.environ.copy()
+        environment = server_environment(os.environ, args.server_workers)
         environment["NETBAIOT_ADMIN_SECRET"] = "ab" * 32
         environment["NETBAIOT_PERF_LOCK_METRICS"] = "1" if args.lock_metrics else "0"
         environment["NO_PROXY"] = "127.0.0.1,localhost"
@@ -346,6 +376,8 @@ def main():
                 "mqtt_metadata": args.mqtt_metadata,
                 "audit_open_loop": args.audit_open_loop,
                 "lock_metrics": args.lock_metrics,
+                "server_workers_requested": args.server_workers,
+                "server_worker_threads_env": environment.get("TOKIO_WORKER_THREADS"),
                 "sink_delay_ms": args.sink_delay_ms,
                 "sink_outage_seconds": args.sink_outage_seconds,
                 "sink_outage_phases": outage_phases,
@@ -363,7 +395,14 @@ def main():
             }
             print(json.dumps(result, sort_keys=True))
         except Exception as error:
-            print(json.dumps({"setup_failure": str(error), "ports": [device_ingress, management, sink_port]}))
+            print(json.dumps(
+                {
+                    "setup_failure": str(error),
+                    "ports": [device_ingress, management, sink_port],
+                    "server_workers_requested": args.server_workers,
+                    "server_worker_threads_env": environment.get("TOKIO_WORKER_THREADS"),
+                }
+            ))
             raise
         finally:
             for process in (load, server, sink):
