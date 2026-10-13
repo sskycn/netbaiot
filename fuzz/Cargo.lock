@@ -400,6 +400,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
 
 [[package]]
+name = "hkdf"
+version = "0.12.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7b5f8eb2ad728638ea2c7d47a21db23b7b58a72ed6a38256b8a1849f15fbbdf7"
+dependencies = [
+ "hmac",
+]
+
+[[package]]
 name = "hmac"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -764,7 +773,7 @@ checksum = "1d87ecb2933e8aeadb3e3a02b828fed80a7528047e68b4f424523a0981a3a084"
 
 [[package]]
 name = "netbaiot-codecs"
-version = "0.2.4"
+version = "0.3.1"
 dependencies = [
  "ciborium",
  "netbaiot-core",
@@ -779,11 +788,14 @@ dependencies = [
 
 [[package]]
 name = "netbaiot-core"
-version = "0.2.4"
+version = "0.3.1"
 dependencies = [
+ "hkdf",
  "netbaiot-protocol",
  "serde",
+ "sha2",
  "thiserror",
+ "zeroize",
 ]
 
 [[package]]
@@ -804,14 +816,14 @@ dependencies = [
 
 [[package]]
 name = "netbaiot-mqtt-wire"
-version = "0.2.4"
+version = "0.3.1"
 dependencies = [
  "bytes",
 ]
 
 [[package]]
 name = "netbaiot-protocol"
-version = "0.2.4"
+version = "0.3.1"
 dependencies = [
  "serde",
  "thiserror",
@@ -820,7 +832,7 @@ dependencies = [
 
 [[package]]
 name = "netbaiot-runtime"
-version = "0.2.4"
+version = "0.3.1"
 dependencies = [
  "async-trait",
  "atomicwrites",
@@ -846,7 +858,7 @@ dependencies = [
 
 [[package]]
 name = "netbaiot-transports"
-version = "0.2.4"
+version = "0.3.1"
 dependencies = [
  "async-trait",
  "bytes",
@@ -872,7 +884,7 @@ dependencies = [
 
 [[package]]
 name = "netbaiot-v3-mux"
-version = "0.2.4"
+version = "0.3.1"
 dependencies = [
  "bytes",
  "netbaiot-protocol",
