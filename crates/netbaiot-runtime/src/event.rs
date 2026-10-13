@@ -3745,4 +3745,5 @@ mod tests {
     }
     include!("second_round_event_bench.rs");
     include!("event_accounting_bench.rs");
+    include!("identifier_serialization_bench.rs");
 }

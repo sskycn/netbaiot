@@ -816,6 +816,15 @@ fn no_subscriber_route_allocations() {
 #[test]
 #[ignore = "serial release allocation benchmark"]
 fn fanout_route_allocations() {
+    println!(
+        "MQTT_LAYOUT,permit={},vec={},array={},delivery={},target={},retained_admission={}",
+        std::mem::size_of::<BytesPermit>(),
+        std::mem::size_of::<Vec<BytesPermit>>(),
+        std::mem::size_of::<[BytesPermit; 3]>(),
+        std::mem::size_of::<BrokerDelivery>(),
+        std::mem::size_of::<PlannedRouteTarget>(),
+        std::mem::size_of::<RetainedReplayAdmission>(),
+    );
     let auth = identity(0);
     let topic = "v1/t/tenant/p/product/d/device-0/down";
     for subscribers in [1, 10, 100, 1000] {

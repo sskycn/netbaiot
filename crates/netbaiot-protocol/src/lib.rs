@@ -503,6 +503,63 @@ mod tests {
     use super::*;
 
     #[test]
+    fn typed_identifiers_preserve_string_serialization_and_validation() {
+        macro_rules! check_identifier {
+            ($kind:ty) => {
+                for text in [
+                    "a",
+                    "tenant_1.product-2:device.3",
+                    &"a".repeat(MAX_IDENTIFIER_BYTES),
+                ] {
+                    let identifier = <$kind>::new(text).unwrap();
+                    let wire = serde_json::to_string(&identifier).unwrap();
+                    assert_eq!(wire, serde_json::to_string(text).unwrap());
+                    assert_eq!(serde_json::from_str::<$kind>(&wire).unwrap(), identifier);
+                    assert_eq!(String::from(identifier), text);
+                }
+                for invalid in [
+                    "",
+                    "a/b",
+                    "+",
+                    "#",
+                    "a\0b",
+                    "设备",
+                    &"a".repeat(MAX_IDENTIFIER_BYTES + 1),
+                ] {
+                    assert!(serde_json::from_value::<$kind>(serde_json::json!(invalid)).is_err());
+                }
+                for invalid in [
+                    serde_json::json!(null),
+                    serde_json::json!(7),
+                    serde_json::json!({}),
+                ] {
+                    assert!(serde_json::from_value::<$kind>(invalid).is_err());
+                }
+            };
+        }
+        check_identifier!(TenantId);
+        check_identifier!(ProductId);
+        check_identifier!(DeviceId);
+        check_identifier!(SourceMessageId);
+        check_identifier!(CodecId);
+        check_identifier!(SinkId);
+    }
+
+    #[test]
+    fn typed_identifier_map_keys_preserve_json_wire_shape() {
+        let attempts = BTreeMap::from([
+            (SinkId::new("a").unwrap(), 2_u32),
+            (SinkId::new("b-2").unwrap(), u32::MAX),
+        ]);
+        let wire = serde_json::to_string(&attempts).unwrap();
+        assert_eq!(wire, r#"{"a":2,"b-2":4294967295}"#);
+        assert_eq!(
+            serde_json::from_str::<BTreeMap<SinkId, u32>>(&wire).unwrap(),
+            attempts
+        );
+    }
+
+    #[test]
     fn generated_event_ids_keep_uuid_v4_and_canonical_serde_contract() {
         let first = EventId::generate();
         let second = EventId::generate();

@@ -106,6 +106,8 @@ def run():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("profile", type=Path)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--server-bin", type=Path, default=ROOT / "target/release/netbaiot-server")
+    parser.add_argument("--loadgen-bin", type=Path, default=ROOT / "target/release/business_rpc")
     args = parser.parse_args()
     profile = json.loads(args.profile.read_text())
     output = args.output.resolve()
@@ -200,10 +202,10 @@ def run():
         ),
         "topology": profile.get("topology", "v3"),
         "network_profile": "local_mtls",
-        "event_payload_bytes": 1024,
+        "event_payload_bytes": profile.get("event_payload_bytes", 1024),
     }
-    server_bin = ROOT / "target" / "release" / "netbaiot-server"
-    load_bin = ROOT / "target" / "release" / "business_rpc"
+    server_bin = args.server_bin.resolve()
+    load_bin = args.loadgen_bin.resolve()
     if not server_bin.exists() or not load_bin.exists():
         raise RuntimeError("build release binaries first: cargo build --locked --release -p netbaiot-server -p netbaiot-loadgen --bins")
     environment = os.environ.copy()
@@ -312,6 +314,16 @@ def run():
                 "git_sha": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
                 "branch": subprocess.check_output(["git", "branch", "--show-current"], cwd=ROOT, text=True).strip(),
                 "dirty": bool(subprocess.check_output(["git", "status", "--porcelain"], cwd=ROOT)),
+                "binaries": {
+                    "gateway": {
+                        "path": str(server_bin),
+                        "sha256": hashlib.sha256(server_bin.read_bytes()).hexdigest(),
+                    },
+                    "loadgen": {
+                        "path": str(load_bin),
+                        "sha256": hashlib.sha256(load_bin.read_bytes()).hexdigest(),
+                    },
+                },
                 "environment": {
                     "os": platform.platform(),
                     "kernel": platform.release(),

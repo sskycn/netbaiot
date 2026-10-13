@@ -199,6 +199,60 @@ fn second_round_topic() {
 }
 
 #[test]
+#[ignore = "serial release canonical MQTT authorization allocation measurement"]
+fn second_round_publish_acl() {
+    if !enabled() {
+        return;
+    }
+    use crate::mqtt::topics::{TopicKind, publish_acl, topic};
+
+    for identity_bytes in [1, 16, 64] {
+        let mut identity = auth(0, 1);
+        identity.device_key = DeviceKey {
+            tenant_id: TenantId::new("t".repeat(identity_bytes)).unwrap(),
+            product_id: ProductId::new("p".repeat(identity_bytes)).unwrap(),
+            device_id: DeviceId::new("d".repeat(identity_bytes)).unwrap(),
+        };
+        let up = topic(&identity.device_key, TopicKind::Up);
+        let down_ack = topic(&identity.device_key, TopicKind::DownAck);
+        let mut other_device = identity.device_key.clone();
+        other_device.device_id = DeviceId::new("x".repeat(identity_bytes)).unwrap();
+        let other = topic(&other_device, TopicKind::Up);
+        let extra_level = format!("{up}/extra");
+        for (name, value, expected, checks) in [
+            ("up", up.as_str(), Some(TopicKind::Up), 1),
+            ("down_ack", down_ack.as_str(), Some(TopicKind::DownAck), 1),
+            ("cross_device", other.as_str(), None, 1),
+            ("extra_level", extra_level.as_str(), None, 1),
+            ("up_three_checks", up.as_str(), Some(TopicKind::Up), 3),
+            (
+                "down_ack_three_checks",
+                down_ack.as_str(),
+                Some(TopicKind::DownAck),
+                3,
+            ),
+        ] {
+            assert_eq!(publish_acl(&identity, value).ok(), expected);
+            probe(
+                &format!("publish_acl_{name}"),
+                identity_bytes,
+                1024,
+                64,
+                || (),
+                |_| {
+                    for _ in 0..64 {
+                        for _ in 0..checks {
+                            let _ = black_box(publish_acl(black_box(&identity), black_box(value)));
+                        }
+                    }
+                },
+                |_| {},
+            );
+        }
+    }
+}
+
+#[test]
 #[ignore = "serial second-round release measurement"]
 fn second_round_preflight() {
     if !enabled() {

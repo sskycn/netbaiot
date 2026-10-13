@@ -62,6 +62,14 @@ cargo test -p netbaiot-server --test server subprocess_graceful_restart_sixty_se
 MQTT and auth-cache state remains. Broker logical session bytes are printed by the
 foundation benchmark; RSS additionally includes hash tables, allocator capacity,
 credentials/auth cache, metrics, runtime, and process overhead.
+The memory fixture raises the device protocol ceiling together with the global
+connection ceiling. It requires the entire requested population to establish and
+the load generator to finish without errors; partial admission emits diagnostic
+JSON with `measurement_valid=false`, null per-population ratios, and a failed exit.
+Active ratios use the observed active device count. Disconnected ratios are named
+`rss_delta_bytes_per_established_persistent_session` and use the successfully
+established unique-client population; there is no public broker gauge for the
+retained-session collection length.
 
 `mixed_load.py` uses 1,000 MQTT devices (70% idle, 20% at 1 msg/s, 9% at
 10 msg/s, and 1% bursty), an approximately 60/30/10 QoS0/QoS1/QoS2 event mix,

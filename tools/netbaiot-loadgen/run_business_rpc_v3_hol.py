@@ -7,6 +7,7 @@ Optional capture stores V3 frame headers only, without tokens or Event bodies.
 """
 import argparse
 import atexit
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -147,6 +148,16 @@ def run_mode(mode, args):
             environment["NETBAIOT_V3_SOCKET_TRACE"] = "1"
         (output / f"{mode}-experiment.json").write_text(json.dumps({
             "git_sha": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
+            "binaries": {
+                "gateway": {
+                    "path": str(GATEWAY.resolve()),
+                    "sha256": hashlib.sha256(GATEWAY.read_bytes()).hexdigest(),
+                },
+                "loadgen": {
+                    "path": str(LOADGEN.resolve()),
+                    "sha256": hashlib.sha256(LOADGEN.read_bytes()).hexdigest(),
+                },
+            },
             "gateway_config": gateway_config["business_rpc"],
             "load_config": load_config,
             "proxy": None if args.no_proxy else {
@@ -205,7 +216,10 @@ def run_mode(mode, args):
 
 
 def main():
+    global GATEWAY, LOADGEN
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--server-bin", type=Path, default=GATEWAY)
+    parser.add_argument("--loadgen-bin", type=Path, default=LOADGEN)
     parser.add_argument("--duration-secs", type=int, default=10)
     parser.add_argument("--event-payload-bytes", type=int, default=16384)
     parser.add_argument("--event-rate", type=int, default=1)
@@ -227,6 +241,8 @@ def main():
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--modes", nargs="+", choices=MODES, default=MODES)
     args = parser.parse_args()
+    GATEWAY = args.server_bin.resolve()
+    LOADGEN = args.loadgen_bin.resolve()
     if not 2 <= args.duration_secs <= 120:
         parser.error("duration must be 2–120 seconds")
     if not 1 <= args.event_payload_bytes <= 16_384:

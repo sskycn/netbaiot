@@ -46,5 +46,10 @@ name = "mqtt_broker_scale"
 path = "../../benches/mqtt_broker_scale.rs"
 harness = false
 
+[[bench]]
+name = "business_event"
+path = "../../benches/business_event.rs"
+harness = false
+
 [features]
 schema = ["dep:schemars", "netbaiot-core/schema", "netbaiot-runtime/schema"]

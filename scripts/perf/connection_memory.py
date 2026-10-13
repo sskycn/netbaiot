@@ -3,6 +3,7 @@
 
 import argparse
 import json
+import math
 import os
 import signal
 import socket
@@ -84,6 +85,55 @@ def credential(index):
     }
 
 
+def active_connection_count(snapshot):
+    active = snapshot.get("active_connections", {})
+    counts = active.values() if isinstance(active, dict) else active
+    return sum(counts)
+
+
+def parse_load_final(stdout):
+    """Use the final cumulative counters, never a requested population or sample."""
+    final = None
+    for line in stdout.splitlines():
+        try:
+            record = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if record.get("event") == "final":
+            final = record.get("stats")
+    return final
+
+
+def validate_population(requested, active, disconnected, final, returncode):
+    """Validate the held-socket sample and the completed unique-client workload."""
+    errors = []
+    expected_active = 0 if disconnected else requested
+    if active != expected_active:
+        errors.append(f"sample has {active} active connections; expected {expected_active}")
+    if returncode != 0:
+        errors.append(f"load generator exited with {returncode}")
+    if not isinstance(final, dict):
+        errors.append("load generator did not emit final counters")
+        return None, errors
+    counters = final.get("counters", {})
+    established = counters.get("connected", 0)
+    if established != requested:
+        errors.append(f"load generator established {established} connections; expected {requested}")
+    if counters.get("connect_attempts", 0) != requested:
+        errors.append("connection attempts do not match the unique requested population")
+    if counters.get("disconnected", 0) != established:
+        errors.append("not all established connections completed their owned shutdown")
+    for name in ["client_errors", "connect_rejected", "forced_tasks", "panicked_tasks", "reconnects"]:
+        if counters.get(name, 0):
+            errors.append(f"load generator reported {name}={counters[name]}")
+    if final.get("error_samples"):
+        errors.append("load generator reported error samples")
+    # No public broker gauge reports retained MQTT session count. For the
+    # disconnected probe this is the successfully established unique persistent
+    # population, not a claim about a directly measured broker collection length.
+    return established if disconnected else active, errors
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--transport", choices=("mqtt", "tcp"), required=True)
@@ -98,14 +148,17 @@ def main():
     args = parser.parse_args()
     if not 1 <= args.connections <= 10000:
         raise SystemExit("connections must be 1..10000")
+    if not math.isfinite(args.hold_seconds) or args.hold_seconds <= 0:
+        raise SystemExit("hold-seconds must be finite and positive")
     if args.disconnected and (args.transport != "mqtt" or not args.persistent):
         raise SystemExit("--disconnected requires --transport mqtt --persistent")
 
-    device_ingress, management = [free_port() for _ in range(2)]
+    device_ingress, management = free_ports(2)
     stream_port = device_ingress
     maximum = max(128, args.connections + 32)
     limits = {
         "max_connections": maximum,
+        "max_device_connections_per_protocol": maximum,
         "max_connections_per_ip": maximum,
         "max_connections_per_tenant": maximum,
         "max_devices": maximum,
@@ -207,18 +260,34 @@ def main():
             base_fds = fd_count(server.pid)
             load = subprocess.Popen([args.loadgen, load_config], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
             if args.disconnected:
-                load.communicate(timeout=30 + args.connections / 1000)
+                load_stdout, load_stderr = load.communicate(timeout=args.hold_seconds + 30 + args.connections / 1000)
                 time.sleep(1)
             else:
                 time.sleep(4 + args.connections / min(1500, args.connections))
             loaded_status = status(management, args.tls)
             loaded_rss = rss_kib(server.pid)
             loaded_fds = fd_count(server.pid)
-            active_connections = loaded_status.get("active_connections", {})
-            if isinstance(active_connections, dict):
-                active_connection_count = sum(active_connections.values())
-            else:
-                active_connection_count = sum(active_connections)
+            active = active_connection_count(loaded_status)
+            if not args.disconnected:
+                # Keep the RSS snapshot from the held-connection phase, then wait
+                # for normal completion so authentication failures and incomplete
+                # connection establishment cannot be hidden by SIGINT.
+                load_stdout, load_stderr = load.communicate(timeout=args.hold_seconds + 30 + args.connections / 1000)
+            load_final = parse_load_final(load_stdout)
+            denominator, validation_errors = validate_population(
+                args.connections, active, args.disconnected, load_final, load.returncode
+            )
+            valid = not validation_errors
+            rss_per_population = (
+                round((loaded_rss - base_rss) * 1024 / denominator, 1)
+                if valid and denominator
+                else None
+            )
+            tasks_per_population = (
+                round((loaded_status["runtime_tasks"] - base_status["runtime_tasks"]) / denominator, 3)
+                if valid and denominator
+                else None
+            )
             result = {
                 "transport": args.transport,
                 "tls": args.tls,
@@ -227,24 +296,31 @@ def main():
                 "measurement_state": "disconnected" if args.disconnected else "active",
                 "connections_requested": args.connections,
                 # Management leases are excluded from device connection counts.
-                "connections_active": active_connection_count,
+                "connections_active": active,
+                "connections_established": (load_final or {}).get("counters", {}).get("connected", 0),
+                "population_denominator": denominator,
+                "population_kind": "established_persistent_sessions" if args.disconnected else "active_connections",
+                "measurement_valid": valid,
+                "validation_errors": validation_errors,
+                "load_returncode": load.returncode,
+                "load_final": load_final,
+                "load_stderr": load_stderr,
                 "rss_base_kib": base_rss,
                 "rss_loaded_kib": loaded_rss,
                 "rss_delta_kib": loaded_rss - base_rss,
-                "rss_delta_bytes_per_connection": round((loaded_rss - base_rss) * 1024 / args.connections, 1),
+                "rss_delta_bytes_per_connection": None if args.disconnected else rss_per_population,
+                "rss_delta_bytes_per_established_persistent_session": rss_per_population if args.disconnected else None,
                 "fd_base": base_fds,
                 "fd_loaded": loaded_fds,
                 "runtime_tasks_base": base_status["runtime_tasks"],
                 "runtime_tasks_loaded": loaded_status["runtime_tasks"],
-                "tasks_delta_per_connection": round(
-                    (loaded_status["runtime_tasks"] - base_status["runtime_tasks"]) / args.connections, 3
-                ),
+                "tasks_delta_per_connection": None if args.disconnected else tasks_per_population,
+                "tasks_delta_per_established_persistent_session": tasks_per_population if args.disconnected else None,
                 "logical_bytes_per_connection": logical_bytes_per_connection,
             }
             print(json.dumps(result, sort_keys=True))
-            if load.poll() is None:
-                load.send_signal(signal.SIGINT)
-                load.communicate(timeout=10)
+            if not valid:
+                raise SystemExit("connection population validation failed; diagnostic JSON retained above")
         finally:
             if load is not None and load.poll() is None:
                 load.kill()
