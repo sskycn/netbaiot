@@ -7,9 +7,9 @@ use netbaiot_client::business_rpc::{
     BusinessRpcV3ClientConfig, BusinessRpcV3Delivery,
 };
 use netbaiot_core::{
-    AuthInvalidation, CodecId, CommandAck, CommandId, DeliveryState, DeviceCommand,
-    DeviceCommandPayload, DeviceEventKind, DeviceId, DeviceKey, DeviceUplink, DeviceUplinkKind,
-    ExecutionState, Heartbeat, ProductId, Scalar, SourceMessageId, TenantId,
+    AuthInvalidation, CodecId, CommandAck, CommandDispatch, CommandId, DeliveryState,
+    DeviceCommand, DeviceCommandPayload, DeviceEventKind, DeviceId, DeviceKey, DeviceUplink,
+    DeviceUplinkKind, ExecutionState, Heartbeat, ProductId, Scalar, SourceMessageId, TenantId,
     business_rpc::{
         AuthenticatedDeviceWire, BusinessRole, DeviceAuthenticateRequest, ResolveVerifierRequest,
         ResolveVerifierResponse, RpcError, RpcErrorCode,
@@ -37,6 +37,17 @@ use tokio::{
 
 type Result<T> = std::result::Result<T, Box<dyn Error + Send + Sync>>;
 const SECRET: &str = "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f";
+
+fn healthy_command_retry(
+    result: std::result::Result<CommandDispatch, BusinessRpcClientError>,
+    expected_id: CommandId,
+) -> bool {
+    // Dedup reports current transport progress, which may advance after the
+    // first Queued receipt. Execution still needs the separately observed ACK.
+    matches!(result, Ok(receipt) if receipt.command_id == expected_id
+        && matches!(receipt.state, DeliveryState::Queued | DeliveryState::Dispatching
+            | DeliveryState::Sent | DeliveryState::Received))
+}
 
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -870,10 +881,10 @@ async fn event_load(
                                     trace.attempts += 1;
                                 }
                             }
-                            let retry_ok = matches!(client.send_command(&command).await, Ok(retry) if retry == receipt);
+                            let retry_ok = healthy_command_retry(client.send_command(&command).await, command.command_id);
                             let mut state = stats.lock().unwrap();
                             if let Some(trace) = state.command_traces.get_mut(&command.command_id) {
-                                trace.rpc_outcomes.push(if retry_ok { "dedup_queued" } else { "retry_error" });
+                                trace.rpc_outcomes.push(if retry_ok { "dedup_progress" } else { "retry_error" });
                             }
                             if !retry_ok {
                                 state.counts.command_errors += 1;
@@ -890,7 +901,7 @@ async fn event_load(
                                 trace.attempts += 1;
                             }
                         }
-                        let retry_ok = client.send_command(&command).await.is_ok();
+                        let retry_ok = healthy_command_retry(client.send_command(&command).await, command.command_id);
                         let mut state = stats.lock().unwrap();
                         if let Some(trace) = state.command_traces.get_mut(&command.command_id) {
                             trace.rpc_outcomes.push(if retry_ok { "queued_after_unknown" } else { "retry_error" });
@@ -1173,6 +1184,54 @@ async fn verifier_probe(config: Config, stats: SharedStats, until: Instant) -> R
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod command_retry_tests {
+    use super::*;
+
+    #[test]
+    fn dedup_accepts_same_command_progress_and_rejects_failures() {
+        let expected = CommandId::generate();
+        for state in [
+            DeliveryState::Queued,
+            DeliveryState::Dispatching,
+            DeliveryState::Sent,
+            DeliveryState::Received,
+        ] {
+            assert!(healthy_command_retry(
+                Ok(CommandDispatch {
+                    command_id: expected,
+                    state
+                }),
+                expected
+            ));
+            assert!(!healthy_command_retry(
+                Ok(CommandDispatch {
+                    command_id: CommandId::generate(),
+                    state
+                }),
+                expected
+            ));
+        }
+        for state in [DeliveryState::Expired, DeliveryState::Failed] {
+            assert!(!healthy_command_retry(
+                Ok(CommandDispatch {
+                    command_id: expected,
+                    state
+                }),
+                expected
+            ));
+        }
+        assert!(!healthy_command_retry(
+            Err(BusinessRpcClientError::Unavailable),
+            expected
+        ));
+        assert!(!healthy_command_retry(
+            Err(BusinessRpcClientError::OutcomeUnknown),
+            expected
+        ));
+    }
 }
 
 async fn verifier_load(config: &Config, stats: SharedStats) -> Result<(u64, u64)> {
