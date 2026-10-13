@@ -1578,7 +1578,10 @@ mod tests {
         assert_eq!(records.len(), 1);
         assert_eq!(records[0].event.event_id, event_id);
         assert_eq!(records[0].pending_sinks, vec![b.clone()]);
-        assert_eq!(records[0].attempts, BTreeMap::from([(a, 1), (b.clone(), 1)]));
+        assert_eq!(
+            records[0].attempts,
+            BTreeMap::from([(a, 1), (b.clone(), 1)])
+        );
         assert_eq!(checked_usage(&bus).pending_required, 1);
         tokio::time::sleep(Duration::from_millis(5)).await;
         let retry = bus.take_ready(&b).unwrap().unwrap();
