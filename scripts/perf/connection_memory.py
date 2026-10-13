@@ -99,9 +99,18 @@ def parse_load_final(stdout):
             record = json.loads(line)
         except json.JSONDecodeError:
             continue
-        if record.get("event") == "final":
+        if isinstance(record, dict) and record.get("event") == "final":
             final = record.get("stats")
     return final
+
+
+def finish_load(load, timeout):
+    try:
+        return load.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        load.kill()
+        stdout, stderr = load.communicate(timeout=10)
+        return stdout, stderr + "\nload generator exceeded its owned completion deadline\n"
 
 
 def validate_population(requested, active, disconnected, final, returncode):
@@ -260,7 +269,7 @@ def main():
             base_fds = fd_count(server.pid)
             load = subprocess.Popen([args.loadgen, load_config], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
             if args.disconnected:
-                load_stdout, load_stderr = load.communicate(timeout=args.hold_seconds + 30 + args.connections / 1000)
+                load_stdout, load_stderr = finish_load(load, args.hold_seconds + 30 + args.connections / 1000)
                 time.sleep(1)
             else:
                 time.sleep(4 + args.connections / min(1500, args.connections))
@@ -272,7 +281,7 @@ def main():
                 # Keep the RSS snapshot from the held-connection phase, then wait
                 # for normal completion so authentication failures and incomplete
                 # connection establishment cannot be hidden by SIGINT.
-                load_stdout, load_stderr = load.communicate(timeout=args.hold_seconds + 30 + args.connections / 1000)
+                load_stdout, load_stderr = finish_load(load, args.hold_seconds + 30 + args.connections / 1000)
             load_final = parse_load_final(load_stdout)
             denominator, validation_errors = validate_population(
                 args.connections, active, args.disconnected, load_final, load.returncode

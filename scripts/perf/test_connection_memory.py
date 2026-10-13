@@ -28,7 +28,7 @@ class PopulationTests(unittest.TestCase):
         import json
         self.assertIsNone(memory.parse_load_final(json.dumps(sample)))
         self.assertEqual(
-            memory.parse_load_final("not json\n" + json.dumps(sample) + "\n" + json.dumps(complete)),
+            memory.parse_load_final("not json\nfalse\n[]\n" + json.dumps(sample) + "\n" + json.dumps(complete)),
             final(192),
         )
 
