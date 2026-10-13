@@ -36,8 +36,8 @@ pub struct ProtocolError;
 
 macro_rules! identifier {
     ($name:ident) => {
-        #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-        #[serde(try_from = "String", into = "String")]
+        #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Deserialize)]
+        #[serde(try_from = "String")]
         #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
         #[cfg_attr(feature = "schema", schemars(with = "String"))]
         pub struct $name(Arc<str>);
@@ -58,6 +58,12 @@ macro_rules! identifier {
 
             pub fn as_str(&self) -> &str {
                 &self.0
+            }
+        }
+
+        impl Serialize for $name {
+            fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+                serializer.serialize_str(self.as_str())
             }
         }
 
