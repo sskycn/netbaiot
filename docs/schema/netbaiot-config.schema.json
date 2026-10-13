@@ -1026,7 +1026,7 @@
         },
         "max_read_buffer_per_connection": {
           "default": 65540,
-          "description": "Actual capacity of all live reader allocations, including shared frames.\nIncludes the four-byte TCP framing envelope.",
+          "description": "Stable capacity of live reader allocations, including shared frames and\nthe four-byte TCP envelope. Exclusive replacement may temporarily hold\ntwice this capacity; both allocations still obey global/tenant budgets.",
           "format": "uint",
           "maximum": 4294967295,
           "minimum": 1,

@@ -1,7 +1,8 @@
 //! Isolated allocation and future-layout measurement; these are not RSS or
 //! kernel socket measurements. Run this binary alone to avoid allocator noise.
-use netbaiot_core::Transport;
-use netbaiot_runtime::{Connections, Limits, Metrics};
+use bytes::BytesMut;
+use netbaiot_core::{DeviceId, DeviceKey, ProductId, TenantId, Transport};
+use netbaiot_runtime::{Connections, Error, Limits, Metrics};
 use netbaiot_transports::Reader;
 use stats_alloc::{INSTRUMENTED_SYSTEM, Region, StatsAlloc};
 use std::{alloc::System, mem::size_of, sync::Arc, time::Duration};
@@ -104,4 +105,152 @@ fn reader_memory_profile() {
             assert_eq!(reader.buffer.capacity(), 0);
         }
     });
+}
+
+#[test]
+#[ignore = "isolated requested heap peak experiment; run alone with --ignored --nocapture"]
+fn reader_replacement_requested_heap_peak() {
+    const MAXIMUM: usize = 65_540;
+    const PREFIXES: [usize; 5] = [9, 64, 4096, 32_768, 65_539];
+    let mut measurements = Vec::with_capacity(PREFIXES.len());
+    for prefix in PREFIXES {
+        let fixed = Limits::default().connection_memory_reservation;
+        let aggregate = 2 * fixed + prefix + MAXIMUM;
+        let limits = Arc::new(Limits {
+            max_connections: 3,
+            max_connections_per_ip: 3,
+            max_connections_per_tenant: 2,
+            max_connections_per_device: 1,
+            max_ingress_waiters: 3,
+            global_connection_logical_bytes: aggregate,
+            max_connection_bytes_per_tenant: aggregate,
+            max_read_buffer_per_connection: MAXIMUM,
+            ..Limits::default()
+        });
+        limits.validate().unwrap();
+        let owner = Connections::new(limits, Arc::new(Metrics::default()));
+        let peer = "127.0.0.1".parse().unwrap();
+        let first_key = DeviceKey {
+            tenant_id: TenantId::new("peak").unwrap(),
+            product_id: ProductId::new("p").unwrap(),
+            device_id: DeviceId::new("first").unwrap(),
+        };
+        let second_key = DeviceKey {
+            device_id: DeviceId::new("second").unwrap(),
+            ..first_key.clone()
+        };
+        let mut first = owner.acquire(peer, Transport::Tcp).unwrap();
+        let mut second = owner.acquire(peer, Transport::Tcp).unwrap();
+        first.authenticate(&first_key).unwrap();
+        second.authenticate(&second_key).unwrap();
+        let mut budget = first.read_budget();
+        let mut other_budget = second.read_budget();
+        let mut old_permit = budget.reserve_allocation(prefix).unwrap();
+        // Warm the allocator thread's semaphore-release bookkeeping before
+        // measuring payload storage, including the otherwise spare slot.
+        let warm_bytes = other_budget.reserve_allocation(1).unwrap();
+        drop(warm_bytes);
+        let warm_connection = owner.acquire_pending(peer).unwrap();
+        drop(warm_connection);
+
+        // All account, index, and output storage exists before this region.
+        // Only the two byte allocations contribute to the requested heap peak.
+        let region = Region::new(ALLOCATOR);
+        let mut old = BytesMut::with_capacity(prefix);
+        assert_eq!(old.capacity(), prefix);
+        old.resize(prefix, 7);
+        let replacement = budget
+            .reserve_replacement(MAXIMUM, &mut old_permit)
+            .unwrap();
+        let mut new = BytesMut::with_capacity(MAXIMUM);
+        assert_eq!(new.capacity(), MAXIMUM);
+        new.extend_from_slice(&old);
+        new.resize(MAXIMUM, 8);
+        let peak = region.change();
+        let peak_live = peak.bytes_allocated - peak.bytes_deallocated;
+        let peak_charged = budget.capacity().unwrap();
+        assert_eq!(peak_live, old.capacity() + new.capacity());
+        assert_eq!(peak_charged, peak_live);
+        assert_eq!(peak.allocations, 2);
+        assert_eq!(peak.reallocations, 0);
+        // The other reader has no local transition. Its next byte fails at the
+        // tenant ceiling; the spare connection slot fails at global bytes.
+        assert!(matches!(
+            other_budget.reserve_allocation(1),
+            Err(Error::Overloaded)
+        ));
+        assert!(matches!(
+            owner.acquire_pending(peer),
+            Err(Error::Overloaded)
+        ));
+        assert_eq!(budget.capacity().unwrap(), peak_charged);
+        assert_eq!(other_budget.capacity().unwrap(), 0);
+
+        drop(old);
+        drop(old_permit);
+        let new_permit = match replacement.commit() {
+            Ok(permit) => permit,
+            Err(_) => panic!("the old allocation and permit have been released"),
+        };
+        let stable = region.change();
+        let stable_live = stable.bytes_allocated - stable.bytes_deallocated;
+        let stable_charged = budget.capacity().unwrap();
+        assert_eq!(
+            stable_live, MAXIMUM,
+            "prefix={prefix} peak={peak:?} stable={stable:?}"
+        );
+        assert_eq!(stable_charged, MAXIMUM);
+        // Exactly the old allocation's bytes are reusable by another reader.
+        let reused = other_budget.reserve_allocation(prefix).unwrap();
+        assert!(matches!(
+            other_budget.reserve_allocation(1),
+            Err(Error::Overloaded)
+        ));
+        drop(reused);
+
+        drop(new);
+        drop(new_permit);
+        let cleanup = region.change();
+        let cleanup_live = cleanup.bytes_allocated - cleanup.bytes_deallocated;
+        assert_eq!(cleanup_live, 0);
+        assert_eq!(budget.capacity().unwrap(), 0);
+        assert_eq!(other_budget.capacity().unwrap(), 0);
+        assert_eq!(cleanup.allocations, 2);
+        assert_eq!(cleanup.deallocations, 2);
+        assert_eq!(cleanup.reallocations, 0);
+
+        // These auxiliary allocations predate the measurement region. Reuse
+        // the same IP, tenant, and devices after disconnect, then fill both
+        // aggregate budgets exactly to detect stale count or byte ownership.
+        drop((budget, other_budget, first, second));
+        assert_eq!(owner.active().unwrap(), [0; 3]);
+        let mut first = owner.acquire(peer, Transport::Tcp).unwrap();
+        let mut second = owner.acquire(peer, Transport::Tcp).unwrap();
+        first.authenticate(&first_key).unwrap();
+        second.authenticate(&second_key).unwrap();
+        let mut budget = first.read_budget();
+        let mut other_budget = second.read_budget();
+        let full = budget.reserve_allocation(MAXIMUM).unwrap();
+        let rest = other_budget.reserve_allocation(prefix).unwrap();
+        assert!(matches!(
+            other_budget.reserve_allocation(1),
+            Err(Error::Overloaded)
+        ));
+        drop((full, rest, budget, other_budget, first, second));
+        assert_eq!(owner.active().unwrap(), [0; 3]);
+        measurements.push((
+            prefix,
+            peak_live,
+            peak_charged,
+            stable_live,
+            stable_charged,
+            cleanup_live,
+        ));
+    }
+    for (prefix, peak_live, peak_charged, stable_live, stable_charged, cleanup_live) in measurements
+    {
+        println!(
+            "reader_replacement_heap prefix={prefix} maximum={MAXIMUM} peak_requested_live={peak_live} peak_charged={peak_charged} stable_requested_live={stable_live} stable_charged={stable_charged} cleanup_requested_live={cleanup_live} cleanup_charged=0 allocation_count=2 reallocation_count=0 aggregate_limits_unchanged=true aggregate_peak_full=true index_reuse_verified=true"
+        );
+    }
 }

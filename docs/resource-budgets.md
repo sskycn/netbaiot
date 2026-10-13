@@ -12,7 +12,7 @@ spool relationship values.
 | Connection memory admission | 16 KiB fixed allowance / 64 MiB authenticated tenant / 128 MiB global; reader capacity charged on demand |
 | TLS handshake concurrency | 64; excess closes immediately |
 | MQTT/TCP frame and management HTTP body maximum | 64 KiB |
-| Idle stream read buffer | zero retained packet allocation; 65,540 B actual capacity ceiling including TCP envelope and live frame aliases |
+| Idle stream read buffer | zero retained packet allocation; 65,540 B stable capacity ceiling including TCP envelope and live frame aliases; exclusive synchronous replacement peak at most twice this ceiling, fully charged to unchanged tenant/global accounts |
 | UDP datagram | 1,200 B |
 | Ingress active | 16 / 2 MiB; tenant 4; device 1 |
 | Ingress wait | 16 / 2 MiB / 25 ms, inside existing owner task |

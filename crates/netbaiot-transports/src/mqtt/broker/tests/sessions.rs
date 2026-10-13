@@ -1,5 +1,149 @@
 use super::*;
 
+fn exhausted_packet_identifier_fixture(
+    version: MqttVersion,
+) -> (Arc<MqttBroker>, Attachment, BrokerMessage) {
+    // QoS1 and QoS2 have separate resource ceilings, but share one 16-bit
+    // outbound Packet Identifier space. A resumed AwaitPubcomp consumes no
+    // PUBLISH window on its new connection.
+    let limits = Arc::new(Limits {
+        max_inflight_qos1_per_session: usize::from(u16::MAX),
+        max_inflight_qos1_per_tenant: usize::from(u16::MAX),
+        max_inflight_qos2_per_session: 1,
+        max_outbound_messages_per_connection: usize::from(u16::MAX) + 1,
+        max_mqtt_session_state_bytes: 16 * 1024 * 1024,
+        max_outbound_bytes_per_connection: 16 * 1024 * 1024,
+        max_outbound_bytes_per_tenant: 16 * 1024 * 1024,
+        max_outbound_bytes: 16 * 1024 * 1024,
+        ..Limits::default()
+    });
+    limits.validate().unwrap();
+    let broker = MqttBroker::new(limits);
+    let identity = auth("packet-id-exhaustion");
+    let attachment = match version {
+        MqttVersion::V311 => broker.attach(&identity, "client".into(), false),
+        MqttVersion::V5 => broker.attach_v5(&identity, "client".into(), false, 60, u16::MAX),
+    }
+    .unwrap();
+    let message = BrokerMessage {
+        topic: "v1/t/t/p/p/d/packet-id-exhaustion/up".into(),
+        payload: b"pending".to_vec().into(),
+        qos: 1,
+        retain: false,
+        properties: Default::default(),
+    };
+    broker
+        .subscribe(&attachment.key, attachment.generation, &message.topic, 1)
+        .unwrap();
+    {
+        let mut state = broker.state.lock().unwrap();
+        let session = state.sessions.get_mut(&attachment.key).unwrap();
+        for packet_id in 1..=u16::MAX {
+            let outbound = if packet_id == u16::MAX {
+                OutboundState::AwaitPubcomp(BrokerMessage {
+                    qos: 2,
+                    ..message.clone()
+                })
+            } else {
+                session.send_window.insert(packet_id);
+                OutboundState::AwaitPuback(message.clone())
+            };
+            session.insert_outbound(packet_id, outbound);
+            session.sent.insert(packet_id);
+            session.started_outbound.insert(packet_id);
+        }
+        let additional = message.bytes() * (usize::from(u16::MAX) + 1);
+        session.state_bytes += additional;
+        session.offline.push_back(message.clone());
+        session.offline_bytes = message.bytes();
+        state.session_bytes += additional;
+        state.offline_count = 1;
+        state.offline_bytes = message.bytes();
+        sync_session_usage(&mut state, &attachment.key).unwrap();
+        assert_accounting_consistent(&state);
+    }
+    (broker, attachment, message)
+}
+
+#[test]
+fn packet_identifier_exhaustion_preserves_offline_during_promotion() {
+    for version in [MqttVersion::V311, MqttVersion::V5] {
+        let (broker, mut attachment, message) = exhausted_packet_identifier_fixture(version);
+        let active = broker.state.lock().unwrap().active[&attachment.key].clone();
+        let available = || {
+            [
+                active.connection_bytes.available(),
+                active.tenant_bytes.available(),
+                active.global_bytes.available(),
+            ]
+        };
+        let before = available();
+        let result = broker.next_offline(&attachment.key, attachment.generation);
+        assert_eq!(available(), before);
+        {
+            let state = broker.state.lock().unwrap();
+            let session = &state.sessions[&attachment.key];
+            assert_eq!(session.offline.front(), Some(&message));
+            assert_eq!(session.offline_bytes, message.bytes());
+            assert_accounting_consistent(&state);
+        }
+        assert!(
+            matches!(result, Ok(None)),
+            "exhaustion must defer promotion"
+        );
+        broker
+            .puback(&attachment.key, attachment.generation, 1)
+            .unwrap();
+        let BrokerFrame::Publish(promoted) = attachment.receiver.try_recv().unwrap() else {
+            panic!("expected the deferred PUBLISH");
+        };
+        assert_eq!(promoted.packet_id, Some(1));
+        assert_eq!(promoted.message, message);
+        assert_eq!(
+            available(),
+            before.map(|capacity| capacity - message.bytes())
+        );
+        drop(promoted);
+        assert_eq!(available(), before);
+        assert_broker_accounting(&broker);
+    }
+}
+
+#[test]
+fn packet_identifier_exhaustion_preserves_offline_during_reconnect() {
+    for version in [MqttVersion::V311, MqttVersion::V5] {
+        let (broker, mut previous, message) = exhausted_packet_identifier_fixture(version);
+        let identity = auth("packet-id-exhaustion");
+        previous.detach().unwrap();
+        let result = match version {
+            MqttVersion::V311 => broker.attach(&identity, "client".into(), false),
+            MqttVersion::V5 => broker.attach_v5(&identity, "client".into(), false, 60, u16::MAX),
+        };
+        {
+            let state = broker.state.lock().unwrap();
+            let session = &state.sessions[&previous.key];
+            assert_eq!(session.offline.front(), Some(&message));
+            assert_eq!(session.offline_bytes, message.bytes());
+            assert_accounting_consistent(&state);
+        }
+        let mut resumed = result.unwrap();
+        assert!(resumed.session_present);
+        let BrokerFrame::Publish(first) = resumed.receiver.try_recv().unwrap() else {
+            panic!("expected the oldest retransmitted PUBLISH");
+        };
+        assert_eq!(first.packet_id, Some(1));
+        drop(first);
+        broker.puback(&resumed.key, resumed.generation, 1).unwrap();
+        let state = broker.state.lock().unwrap();
+        let session = &state.sessions[&resumed.key];
+        assert!(session.offline.is_empty());
+        assert_eq!(session.offline_bytes, 0);
+        assert_eq!(state.offline_count, 0);
+        assert_eq!(session.outbound_order.back(), Some(&1));
+        assert_accounting_consistent(&state);
+    }
+}
+
 #[test]
 fn generated_client_id_never_replaces_explicit_or_recovered_session() {
     let broker = MqttBroker::new(Arc::new(Limits::default()));

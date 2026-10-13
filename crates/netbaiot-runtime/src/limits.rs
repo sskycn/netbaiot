@@ -111,8 +111,9 @@ pub struct Limits {
     pub max_mqtt_session_state_bytes_per_tenant: usize,
     pub global_mqtt_session_bytes: usize,
     pub mqtt_session_idle_ttl_ms: u64,
-    /// Actual capacity of all live reader allocations, including shared frames.
-    /// Includes the four-byte TCP framing envelope.
+    /// Stable capacity of live reader allocations, including shared frames and
+    /// the four-byte TCP envelope. Exclusive replacement may temporarily hold
+    /// twice this capacity; both allocations still obey global/tenant budgets.
     pub max_read_buffer_per_connection: usize,
     pub max_write_buffer_per_connection: usize,
     pub max_outbound_messages_per_connection: usize,

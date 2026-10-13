@@ -106,6 +106,7 @@ pub struct ConnectionReadBudget {
 struct ReadAllocationState {
     tenant: Option<TenantId>,
     capacity: usize,
+    replacing: bool,
 }
 /// Keep this permit alive for every alias of the charged allocation. The
 /// transport can share it through the owner of an immutable byte buffer.
@@ -115,6 +116,55 @@ pub struct ReadAllocationPermit {
     capacity: usize,
     _bytes: BytesPermit,
 }
+impl ReadAllocationPermit {
+    pub fn capacity(&self) -> usize {
+        self.capacity
+    }
+}
+/// One synchronous, exclusive buffer replacement. Both allocations remain
+/// charged globally and to the tenant until their actual owners release them.
+/// Ordinary allocations cannot enter this connection account during the copy.
+#[must_use]
+pub struct ReadAllocationReplacement {
+    state: Arc<Mutex<ReadAllocationState>>,
+    maximum: usize,
+    allocation: Option<ReadAllocationPermit>,
+    active: bool,
+}
+impl ReadAllocationReplacement {
+    /// Publish the replacement only after all retained allocations fit the
+    /// stable ceiling again. On failure the caller receives this owner back
+    /// so it can free the new bytes before dropping their quota reservation.
+    pub fn commit(mut self) -> std::result::Result<ReadAllocationPermit, (Error, Self)> {
+        let result = (|| {
+            let mut state = lock(&self.state)?;
+            if state.capacity > self.maximum {
+                return Err(Error::Invalid);
+            }
+            let allocation = self.allocation.take().ok_or(Error::Internal)?;
+            state.replacing = false;
+            self.active = false;
+            Ok(allocation)
+        })();
+        result.map_err(|error| (error, self))
+    }
+}
+impl Drop for ReadAllocationReplacement {
+    fn drop(&mut self) {
+        // Never hold the reader lock while dropping a permit: permits acquire
+        // counts then reader state. Abort first releases the new reservation.
+        drop(self.allocation.take());
+        if self.active {
+            let mut state = self.state.lock().unwrap_or_else(|error| error.into_inner());
+            state.replacing = false;
+            // Preserve poison: cleanup never reopens poisoned admission.
+        }
+    }
+}
+
+#[cfg(test)]
+#[path = "quota_reader_tests.rs"]
+mod reader_audit;
 impl Connections {
     pub fn new(limits: Arc<Limits>, metrics: Arc<Metrics>) -> Arc<Self> {
         Arc::new(Self {
@@ -277,6 +327,7 @@ impl ConnectionLease {
                 Arc::new(Mutex::new(ReadAllocationState {
                     tenant: self.device.as_ref().map(|device| device.tenant_id.clone()),
                     capacity: 0,
+                    replacing: false,
                 }))
             })
             .clone();
@@ -324,14 +375,101 @@ impl ConnectionReadBudget {
     /// old and new live allocations; decoded frame aliases keep their charge
     /// until their last owner is dropped. There is no task or quota waiter.
     pub fn reserve_allocation(&mut self, capacity: usize) -> Result<ReadAllocationPermit> {
+        self.reserve_allocation_inner(capacity, None)
+    }
+
+    /// Replace an exclusively owned allocation without treating its temporary
+    /// coexistence as retained frame capacity. The stable capacity still obeys
+    /// the configured per-connection ceiling; the copy peak is at most twice
+    /// that ceiling and must fit the unchanged global and tenant byte budgets.
+    /// The caller must keep this guard until the old bytes and permit are gone,
+    /// or drop the new allocation on failure. A shared frame cannot be replaced.
+    pub fn reserve_replacement(
+        &mut self,
+        capacity: usize,
+        previous: &mut ReadAllocationPermit,
+    ) -> Result<ReadAllocationReplacement> {
+        if !Arc::ptr_eq(&self.owner, &previous.owner) || !Arc::ptr_eq(&self.state, &previous.state)
+        {
+            return Err(Error::Invalid);
+        }
+        let allocation = self.reserve_allocation_inner(capacity, Some(previous.capacity))?;
+        Ok(ReadAllocationReplacement {
+            state: self.state.clone(),
+            maximum: self.owner.limits.max_read_buffer_per_connection,
+            allocation: Some(allocation),
+            active: true,
+        })
+    }
+
+    /// Reserve an exclusive allocation's larger capacity before replacing its
+    /// old bytes through a small inline prefix. This has no two-heap copy peak.
+    /// The caller must free the old bytes before allocating the larger buffer.
+    pub fn expand_allocation(
+        &mut self,
+        previous: &mut ReadAllocationPermit,
+        capacity: usize,
+    ) -> Result<()> {
+        if !Arc::ptr_eq(&self.owner, &previous.owner) || !Arc::ptr_eq(&self.state, &previous.state)
+        {
+            return Err(Error::Invalid);
+        }
+        let additional = capacity
+            .checked_sub(previous.capacity)
+            .ok_or(Error::Invalid)?;
+        let mut counts = lock(&self.owner.counts)?;
+        let mut state = lock(&self.state)?;
+        let next = state
+            .capacity
+            .checked_add(additional)
+            .ok_or(Error::Overloaded)?;
+        if state.replacing || next > self.owner.limits.max_read_buffer_per_connection {
+            return Err(Error::Overloaded);
+        }
+        if let Some(id) = &state.tenant {
+            let tenant = counts.tenants.get(id).ok_or(Error::Invalid)?;
+            let bytes = tenant
+                .read_bytes
+                .checked_add(additional)
+                .ok_or(Error::Overloaded)?;
+            check_connection_tenant_bytes(&self.owner.limits, tenant.connections, bytes)?;
+        }
+        let bytes = self.owner.memory.reserve(additional)?;
+        // Identity checks above ensure these permits own the same semaphore.
+        previous._bytes._permit.merge(bytes._permit);
+        previous.capacity = capacity;
+        state.capacity = next;
+        if let Some(id) = &state.tenant {
+            counts
+                .tenants
+                .get_mut(id)
+                .ok_or(Error::Internal)?
+                .read_bytes += additional;
+        }
+        Ok(())
+    }
+
+    fn reserve_allocation_inner(
+        &mut self,
+        capacity: usize,
+        previous: Option<usize>,
+    ) -> Result<ReadAllocationPermit> {
         let shared = self.state.clone();
         let mut counts = lock(&self.owner.counts)?;
         let mut state = lock(&shared)?;
+        if state.replacing {
+            return Err(Error::Overloaded);
+        }
         let next_capacity = state
             .capacity
             .checked_add(capacity)
             .ok_or(Error::Overloaded)?;
-        if next_capacity > self.owner.limits.max_read_buffer_per_connection {
+        let stable_capacity = next_capacity
+            .checked_sub(previous.unwrap_or(0))
+            .ok_or(Error::Invalid)?;
+        if capacity > self.owner.limits.max_read_buffer_per_connection
+            || stable_capacity > self.owner.limits.max_read_buffer_per_connection
+        {
             return Err(Error::Overloaded);
         }
         if let Some(id) = &state.tenant {
@@ -353,6 +491,7 @@ impl ConnectionReadBudget {
                 .read_bytes += capacity;
         }
         state.capacity = next_capacity;
+        state.replacing = previous.is_some();
         drop(state);
         Ok(ReadAllocationPermit {
             owner: self.owner.clone(),
@@ -378,9 +517,13 @@ fn check_connection_tenant_bytes(
 }
 impl Drop for ReadAllocationPermit {
     fn drop(&mut self) {
-        if let Ok(mut counts) = self.owner.counts.lock()
-            && let Ok(mut state) = self.state.lock()
         {
+            let mut counts = self
+                .owner
+                .counts
+                .lock()
+                .unwrap_or_else(|error| error.into_inner());
+            let mut state = self.state.lock().unwrap_or_else(|error| error.into_inner());
             state.capacity = state.capacity.saturating_sub(self.capacity);
             if let Some(id) = &state.tenant {
                 if let Some(tenant) = counts.tenants.get_mut(id) {
@@ -390,8 +533,8 @@ impl Drop for ReadAllocationPermit {
                 prune_connection_tenant(&mut counts, id);
             }
         }
-        // The owned global permit releases even if accounting was poisoned;
-        // subsequent admissions cannot pass that poisoned mutex.
+        // Recover known ownership even after poison, retaining the poison bit
+        // so subsequent admissions still fail closed.
     }
 }
 fn prune_connection_tenant(counts: &mut ConnectionCounts, id: &TenantId) {
@@ -413,7 +556,12 @@ fn decrement<K: Eq + std::hash::Hash>(map: &mut HashMap<K, usize>, key: &K) {
 }
 impl Drop for ConnectionLease {
     fn drop(&mut self) {
-        if let Ok(mut counts) = self.owner.counts.lock() {
+        {
+            let mut counts = self
+                .owner
+                .counts
+                .lock()
+                .unwrap_or_else(|error| error.into_inner());
             decrement(&mut counts.ips, &self.ip);
             if let Some(device) = &self.device {
                 if let Some(tenant) = counts.tenants.get_mut(&device.tenant_id) {

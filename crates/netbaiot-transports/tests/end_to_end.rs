@@ -945,7 +945,7 @@ async fn read_mqtt_packet(stream: &mut tokio::io::DuplexStream) -> Vec<u8> {
     packet
 }
 
-async fn read_mqtt_frame(stream: &mut tokio::io::DuplexStream) -> (u8, Vec<u8>) {
+async fn read_mqtt_frame(stream: &mut (impl tokio::io::AsyncRead + Unpin)) -> (u8, Vec<u8>) {
     let mut first = [0u8; 1];
     stream.read_exact(&mut first).await.unwrap();
     let mut remaining = 0usize;
@@ -1628,6 +1628,199 @@ async fn fragmented_mqtt_qos1_puback_follows_event_acceptance() {
     assert_eq!(provider.calls.load(Ordering::Relaxed), 1);
     stop.cancel();
     task.await.unwrap().unwrap();
+}
+
+#[tokio::test]
+async fn delayed_authentication_preserves_a_full_pipelined_maximum_tcp_frame() {
+    let provider = Arc::new(CountingProvider {
+        calls: AtomicUsize::new(0),
+        auth: auth(),
+        delay: true,
+    });
+    let limits = Limits::default();
+    let (ingress, services, stop) = runtime(limits.clone(), provider.clone());
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let task = tokio::spawn(serve_stream(
+        listener,
+        Transport::Tcp,
+        services,
+        None,
+        stop.clone(),
+    ));
+    let mut stream = TcpStream::connect(address).await.unwrap();
+    let hello = br#"{"credential_id":"a","secret":"secret"}"#;
+    let mut body = payload(1);
+    body.resize(limits.max_tcp_frame_size, b' ');
+    let mut pipeline = Vec::new();
+    pipeline.extend_from_slice(&(hello.len() as u32).to_be_bytes());
+    pipeline.extend_from_slice(hello);
+    pipeline.extend_from_slice(&(body.len() as u32).to_be_bytes());
+    pipeline.extend_from_slice(&body);
+    stream.write_all(&pipeline).await.unwrap();
+    let result = tokio::time::timeout(std::time::Duration::from_secs(2), async {
+        for _ in 0..2 {
+            let mut length = [0; 4];
+            stream.read_exact(&mut length).await?;
+            let size = u32::from_be_bytes(length) as usize;
+            assert!(size <= 1024);
+            let mut reply = vec![0; size];
+            stream.read_exact(&mut reply).await?;
+        }
+        std::io::Result::Ok(())
+    })
+    .await;
+    stop.cancel();
+    task.await.unwrap().unwrap();
+    assert!(matches!(result, Ok(Ok(()))), "pipeline failed: {result:?}");
+    assert_eq!(provider.calls.load(Ordering::Relaxed), 1);
+    assert_eq!(ingress.metrics.get(Metric::EventsAccepted), 1);
+}
+
+#[tokio::test]
+async fn delayed_authentication_preserves_maximum_mqtt_publish_for_both_versions() {
+    use netbaiot_transports::mqtt::codec::v5;
+    for mqtt5 in [false, true] {
+        let provider = Arc::new(CountingProvider {
+            calls: AtomicUsize::new(0),
+            auth: auth(),
+            delay: true,
+        });
+        let limits = Limits::default();
+        let (ingress, services, stop) = runtime(limits.clone(), provider.clone());
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let task = tokio::spawn(serve_stream(
+            listener,
+            Transport::Mqtt,
+            services,
+            None,
+            stop.clone(),
+        ));
+        let mut stream = TcpStream::connect(address).await.unwrap();
+        let topic = "v1/t/t/p/p/d/a/up";
+        let overhead = 4 + 2 + topic.len() + 2 + usize::from(mqtt5);
+        let mut body = payload(1);
+        body.resize(limits.max_mqtt_packet_size - overhead, b' ');
+        let publish = if mqtt5 {
+            v5::publish(
+                v5::OutboundPublish {
+                    topic,
+                    payload: &body,
+                    qos: 1,
+                    packet_id: Some(7),
+                    retain: false,
+                    dup: false,
+                    properties: &v5::Properties::default(),
+                },
+                limits.max_mqtt_packet_size,
+            )
+            .unwrap()
+        } else {
+            publish_packet_with_id(&body, 7)
+        };
+        assert_eq!(publish.len(), limits.max_mqtt_packet_size);
+        let mut pipeline = if mqtt5 {
+            connect_packet_v5()
+        } else {
+            connect_packet()
+        };
+        pipeline.extend_from_slice(&publish);
+        stream.write_all(&pipeline).await.unwrap();
+        let result = tokio::time::timeout(std::time::Duration::from_secs(2), async {
+            let (kind, body) = read_mqtt_frame(&mut stream).await;
+            assert_eq!(kind, 0x20);
+            assert_eq!(&body[..2], &[0, 0]);
+            let (kind, body) = read_mqtt_frame(&mut stream).await;
+            assert_eq!(kind, 0x40);
+            assert_eq!(&body[..2], &[0, 7]);
+        })
+        .await;
+        stop.cancel();
+        task.await.unwrap().unwrap();
+        assert!(result.is_ok(), "MQTT5={mqtt5} pipeline timed out");
+        assert_eq!(provider.calls.load(Ordering::Relaxed), 1);
+        assert_eq!(ingress.metrics.get(Metric::EventsAccepted), 1);
+    }
+}
+
+#[tokio::test(start_paused = true)]
+async fn full_preauth_reader_observes_eof_overload_shutdown_and_packet_deadline() {
+    use netbaiot_transports::{BoxStream, Reader, authenticate_stream};
+    use std::{future::Future, task::Poll};
+    for case in [0, 1, 2, 3, 4, 5] {
+        let provider = Arc::new(CountingProvider {
+            calls: AtomicUsize::new(0),
+            auth: auth(),
+            delay: true,
+        });
+        let (_, services, stop) = runtime(Limits::default(), provider);
+        let mut lease = services
+            .connections
+            .acquire("127.0.0.1".parse().unwrap(), Transport::Tcp)
+            .unwrap();
+        let tracking = lease.read_budget();
+        let mut reader = Reader::with_budget(8, 5, lease.read_budget());
+        let mut source = &[7; 8][..];
+        reader
+            .read_more_to(
+                &mut source,
+                tokio::time::Instant::now() + std::time::Duration::from_secs(1),
+                8,
+            )
+            .await
+            .unwrap();
+        let (mut peer, stream) = tokio::io::duplex(8);
+        let mut stream: BoxStream = Box::new(stream);
+        match case {
+            0 => {
+                peer.shutdown().await.unwrap();
+            }
+            1 => {
+                peer.write_all(&[7]).await.unwrap();
+            }
+            2 => {
+                stop.cancel();
+            }
+            4 => {
+                tokio::time::advance(std::time::Duration::from_millis(6)).await;
+            }
+            _ => {}
+        }
+        let mut authenticate = Box::pin(authenticate_stream(
+            &services,
+            AuthenticationRequest::Secret {
+                credential_id: "a",
+                secret: b"secret",
+            },
+            &mut reader,
+            &mut stream,
+            &stop,
+        ));
+        if case == 5 {
+            std::future::poll_fn(|context| {
+                assert!(authenticate.as_mut().poll(context).is_pending());
+                Poll::Ready(())
+            })
+            .await;
+            tokio::time::advance(std::time::Duration::from_millis(25)).await;
+        }
+        let result = authenticate.await;
+        assert!(
+            matches!(
+                (&result, case),
+                (Err(Error::Unavailable), 0)
+                    | (Err(Error::Overloaded), 1)
+                    | (Err(Error::Draining), 2)
+                    | (Err(Error::Timeout), 3..=5)
+            ),
+            "case {case}"
+        );
+        assert_eq!(&reader.buffer[..], &[7; 8]);
+        assert_eq!(tracking.capacity().unwrap(), 8);
+        drop((reader, lease));
+        assert_eq!(tracking.capacity().unwrap(), 0);
+    }
 }
 
 #[tokio::test]
