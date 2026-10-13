@@ -91,7 +91,7 @@ fn shared_payload_cannot_bypass_atomic_fanout_byte_limits() {
         max_offline_bytes_per_session: charge - 1,
         ..Limits::default()
     });
-    let broker = MqttBroker::new(limits);
+    let broker = MqttBroker::new(limits.clone());
     let mut attachments = Vec::new();
     for client in ["one", "two"] {
         let attachment = broker.attach(&device, client.into(), false).unwrap();
@@ -107,6 +107,23 @@ fn shared_payload_cannot_bypass_atomic_fanout_byte_limits() {
     ));
     assert_eq!(broker.usage().unwrap(), before);
     assert_eq!(broker.global_outbound_bytes.available(), charge);
+    {
+        let state = broker.state.lock().unwrap();
+        for active in state.active.values() {
+            assert_eq!(
+                active.connection_bytes.available(),
+                limits.max_outbound_bytes_per_connection
+            );
+            assert_eq!(
+                active.tenant_bytes.available(),
+                limits.max_outbound_bytes_per_tenant
+            );
+            assert_eq!(active.global_bytes.available(), limits.max_outbound_bytes);
+            // A later failed target must drop every earlier preflight reservation as well.
+            let budget = active.reserve_frame(charge).unwrap();
+            drop(budget);
+        }
+    }
     assert!(
         attachments
             .iter_mut()

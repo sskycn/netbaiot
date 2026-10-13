@@ -1,6 +1,88 @@
 use super::*;
 
 #[test]
+fn mqtt_frame_budget_failure_releases_every_partial_reservation() {
+    let charge = 32;
+    for rejected_at in 0..3 {
+        let mut capacities = [charge; 3];
+        capacities[rejected_at] -= 1;
+        let (sender, _receiver) = mpsc::channel(1);
+        let active = ActiveSession {
+            generation: 1,
+            sender,
+            cancel: CancellationToken::new(),
+            connection_bytes: ByteBudget::new(capacities[0]),
+            tenant_bytes: ByteBudget::new(capacities[1]),
+            global_bytes: ByteBudget::new(capacities[2]),
+        };
+        let available = || {
+            [
+                active.connection_bytes.available(),
+                active.tenant_bytes.available(),
+                active.global_bytes.available(),
+            ]
+        };
+        for _ in 0..3 {
+            assert!(matches!(
+                active.reserve_frame(charge),
+                Err(Error::Overloaded)
+            ));
+            assert_eq!(available(), capacities);
+        }
+        // A successful later reservation proves failed earlier layers retained no permits.
+        let budget = active.reserve_frame(charge - 1).unwrap();
+        assert_eq!(
+            available(),
+            capacities.map(|capacity| capacity - (charge - 1))
+        );
+        drop(budget);
+        assert_eq!(available(), capacities);
+    }
+}
+
+#[test]
+fn mqtt_frame_budget_survives_receiver_close_and_session_detach() {
+    let device = auth("frame-owner");
+    let topic = "v1/t/t/p/p/d/frame-owner/up";
+    let message = BrokerMessage {
+        topic: topic.into(),
+        payload: vec![7; 256].into(),
+        qos: 0,
+        retain: false,
+        properties: Default::default(),
+    };
+    let charge = message.bytes();
+    let broker = MqttBroker::new(Arc::new(Limits {
+        max_outbound_bytes_per_connection: charge,
+        max_outbound_bytes_per_tenant: charge,
+        max_outbound_bytes: charge,
+        ..Limits::default()
+    }));
+    let mut attachment = broker.attach(&device, "client".into(), false).unwrap();
+    broker
+        .subscribe(&attachment.key, attachment.generation, topic, 0)
+        .unwrap();
+    assert_eq!(broker.route(&device.device_key, message).unwrap(), 1);
+    let active = broker.state.lock().unwrap().active[&attachment.key].clone();
+    let available = || {
+        [
+            active.connection_bytes.available(),
+            active.tenant_bytes.available(),
+            active.global_bytes.available(),
+        ]
+    };
+    attachment.receiver.close();
+    assert_eq!(available(), [0; 3]);
+    let frame = attachment.receiver.try_recv().unwrap();
+    attachment.detach().unwrap();
+    // A physical frame outside the broker still owns its bytes, like an in-progress socket write.
+    assert_eq!(available(), [0; 3]);
+    drop(frame);
+    assert_eq!(available(), [charge; 3]);
+    assert_broker_accounting(&broker);
+}
+
+#[test]
 fn mqtt_qos0_live_delivery_obeys_byte_budget() {
     let device = auth("byte-budget");
     let topic = "v1/t/t/p/p/d/byte-budget/up";

@@ -268,8 +268,11 @@ pub struct BrokerDelivery {
     unsent_command: UnsentCommandGuard,
     /// Includes the connection, tenant and process charge while this physical
     /// outbound copy waits in the channel or is being written to the socket.
-    pub(super) _budget: Vec<BytesPermit>,
+    pub(super) _budget: FrameBudget,
 }
+
+/// One physical PUBLISH copy owns exactly these connection, tenant and process permits.
+type FrameBudget = [BytesPermit; 3];
 
 #[derive(Debug, Default)]
 struct UnsentCommandGuard(Option<Arc<netbaiot_runtime::CommandProgress>>);
@@ -681,14 +684,13 @@ impl MqttBroker {
 /// Applies the same bounded-state decisions as `enqueue` to a target-session accounting copy,
 /// without touching the global broker or an active connection channel.
 enum RetainedReplayAdmission {
-    Live(Vec<BytesPermit>),
+    Live(FrameBudget),
     Offline,
 }
 
-#[derive(Clone, Copy)]
 enum PlannedRouteMode {
-    Qos0,
-    Live { packet_id: u16 },
+    Qos0 { budget: FrameBudget },
+    Live { packet_id: u16, budget: FrameBudget },
     Offline,
 }
 
@@ -697,7 +699,6 @@ struct PlannedRouteTarget {
     qos: u8,
     retain_as_published: bool,
     mode: PlannedRouteMode,
-    budget: Vec<BytesPermit>,
 }
 
 struct RoutePlan {

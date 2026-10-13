@@ -413,7 +413,7 @@ pub(super) fn enqueue(
     key: &SessionKey,
     message: BrokerMessage,
     limits: &Limits,
-    pre_budget: Option<Vec<BytesPermit>>,
+    pre_budget: Option<FrameBudget>,
     command: bool,
     progress: Option<Arc<netbaiot_runtime::CommandProgress>>,
 ) -> Result<()> {
@@ -592,8 +592,8 @@ pub(super) fn queue_offline(
 }
 
 impl ActiveSession {
-    pub(super) fn reserve_frame(&self, bytes: usize) -> Result<Vec<BytesPermit>> {
-        Ok(vec![
+    pub(super) fn reserve_frame(&self, bytes: usize) -> Result<FrameBudget> {
+        Ok([
             self.connection_bytes.reserve(bytes)?,
             self.tenant_bytes.reserve(bytes)?,
             self.global_bytes.reserve(bytes)?,

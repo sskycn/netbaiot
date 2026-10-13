@@ -94,7 +94,9 @@ fn measure(case: &str, event: &DeviceEvent, borrowed: bool, run: usize) {
 }
 
 fn main() {
-    assert!(!cfg!(debug_assertions), "release measurements only");
+    if cfg!(debug_assertions) {
+        panic!("release measurements only");
+    }
     let device = DeviceKey {
         tenant_id: TenantId::new("tenant").unwrap(),
         product_id: ProductId::new("product").unwrap(),

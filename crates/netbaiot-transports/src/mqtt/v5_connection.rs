@@ -163,7 +163,12 @@ pub(super) async fn send_frame(
                             pending = services.mqtt.next_offline(key, generation)?;
                             continue;
                         }
-                        (bytes, delivery._budget, delivery.command, delivery.progress)
+                        (
+                            bytes,
+                            Some(delivery._budget),
+                            delivery.command,
+                            delivery.progress,
+                        )
                     }
                     Err(Error::Overloaded) => {
                         if let Some(progress) = &delivery.progress {
@@ -189,13 +194,13 @@ pub(super) async fn send_frame(
                     packet_id,
                     maximum,
                 )?,
-                Vec::new(),
+                None,
                 false,
                 None,
             ),
         };
         let sent = send_v5(stream, services, &bytes, maximum, Some(disconnected)).await;
-        let charged = !budget.is_empty();
+        let charged = budget.is_some();
         drop(budget);
         if charged {
             services.mqtt.outbound_bytes_released()?;

@@ -31,7 +31,7 @@ pub(super) fn route_locked(
             ..message.clone()
         };
         match target.mode {
-            PlannedRouteMode::Qos0 => {
+            PlannedRouteMode::Qos0 { budget } => {
                 let Some(active) = state.active.get(&target.key).cloned() else {
                     continue;
                 };
@@ -42,7 +42,7 @@ pub(super) fn route_locked(
                     command: false,
                     progress: None,
                     unsent_command: UnsentCommandGuard::default(),
-                    _budget: target.budget,
+                    _budget: budget,
                 }));
                 if active.sender.try_send(frame).is_ok() {
                     delivered += 1;
@@ -50,7 +50,7 @@ pub(super) fn route_locked(
                     active.cancel.cancel();
                 }
             }
-            PlannedRouteMode::Live { packet_id } => {
+            PlannedRouteMode::Live { packet_id, budget } => {
                 let session = state.sessions.get_mut(&target.key).ok_or(Error::Internal)?;
                 session.next_packet_id = if packet_id == u16::MAX {
                     1
@@ -77,7 +77,7 @@ pub(super) fn route_locked(
                     command: false,
                     progress: None,
                     unsent_command: UnsentCommandGuard::default(),
-                    _budget: target.budget,
+                    _budget: budget,
                 }));
                 if let Some(active) = state.active.get(&target.key)
                     && active.sender.try_send(frame).is_err()
@@ -141,8 +141,7 @@ pub(super) fn preflight_route(
                 key,
                 qos,
                 retain_as_published: subscription.retain_as_published,
-                mode: PlannedRouteMode::Qos0,
-                budget,
+                mode: PlannedRouteMode::Qos0 { budget },
             });
             continue;
         }
@@ -200,7 +199,10 @@ pub(super) fn preflight_route(
             } else {
                 usage.qos2_inflight += 1;
             }
-            PlannedRouteMode::Live { packet_id }
+            PlannedRouteMode::Live {
+                packet_id,
+                budget: live_budget.ok_or(Error::Internal)?,
+            }
         } else {
             if session.offline.len() >= limits.max_offline_messages_per_session
                 || session.offline_bytes.saturating_add(charge)
@@ -225,11 +227,6 @@ pub(super) fn preflight_route(
             qos,
             retain_as_published: subscription.retain_as_published,
             mode,
-            budget: if use_live {
-                live_budget.ok_or(Error::Internal)?
-            } else {
-                Vec::new()
-            },
         });
     }
     Ok(plan)
