@@ -65,6 +65,16 @@ impl Drop for WriterGauge {
     }
 }
 
+// The delivery owner already retains the event through synchronous encoding.
+// Keep the public EventDelivery JSON shape without cloning its payload tree.
+#[derive(Serialize)]
+struct EventDeliveryRef<'a> {
+    delivery_id: netbaiot_core::DeliveryId,
+    subscription_id: SubscriptionId,
+    event: &'a netbaiot_core::DeviceEvent,
+    attempt: u32,
+}
+
 fn decode<T: DeserializeOwned>(frame: &Frame) -> Result<T> {
     if frame.payload.len() > 4096 {
         return Err(Error::Invalid);
@@ -996,7 +1006,7 @@ async fn reader_loop<R: AsyncRead + Unpin + Send + 'static>(
                 let Some((parent, subscription_id, _)) = subscription.as_ref() else { let _ = delivery.result.send(Err(SinkError::Retryable)); continue; };
                 let delivery_id = netbaiot_core::DeliveryId::generate();
                 let event_id = delivery.delivery.event.event_id;
-                let dto = EventDelivery { delivery_id, subscription_id: *subscription_id, event: (*delivery.delivery.event).clone(), attempt: delivery.delivery.attempt };
+                let dto = EventDeliveryRef { delivery_id, subscription_id: *subscription_id, event: delivery.delivery.event.as_ref(), attempt: delivery.delivery.attempt };
                 let bytes = serde_json::to_vec(&dto).map_err(|_| Error::Overloaded)?;
                 let len = u32::try_from(bytes.len()).map_err(|_| Error::Overloaded)?;
                 let open = V3Open::EventDelivery { parent_stream_id: *parent, delivery_id: delivery_id.0, event_id: event_id.0, attempt: dto.attempt, content_length: len };
@@ -1314,6 +1324,67 @@ async fn reader_loop<R: AsyncRead + Unpin + Send + 'static>(
     command_jobs.abort_all();
     drop(provider);
     result
+}
+
+#[cfg(test)]
+mod serialization_tests {
+    use super::*;
+    use netbaiot_core::*;
+
+    #[test]
+    fn borrowed_event_delivery_preserves_public_json_wire_for_every_kind() {
+        let key = DeviceKey {
+            tenant_id: TenantId::new("tenant").unwrap(),
+            product_id: ProductId::new("product").unwrap(),
+            device_id: DeviceId::new("device").unwrap(),
+        };
+        let kinds = [
+            DeviceEventKind::Telemetry(std::collections::BTreeMap::from([
+                ("number".into(), Scalar::Number(1.5)),
+                ("flag".into(), Scalar::Boolean(true)),
+                ("text".into(), Scalar::Text("quoted \" text\\\n设备".into())),
+            ])),
+            DeviceEventKind::DeviceEvent(DeviceEventPayload {
+                name: "boot".into(),
+                value: None,
+            }),
+            DeviceEventKind::Heartbeat(Heartbeat { sequence: u64::MAX }),
+            DeviceEventKind::CommandAck(CommandAck {
+                command_id: CommandId(Uuid::from_u128(3)),
+                execution: ExecutionState::Succeeded,
+            }),
+        ];
+        for kind in kinds {
+            for occurred_at in [None, Some(999)] {
+                let event = DeviceEvent {
+                    event_id: EventId(Uuid::from_u128(4)),
+                    source_message_id: SourceMessageId::new("boot:1").unwrap(),
+                    device: key.clone(),
+                    received_at: 1000,
+                    occurred_at,
+                    kind: kind.clone(),
+                };
+                let reference = EventDeliveryRef {
+                    delivery_id: DeliveryId(Uuid::from_u128(1)),
+                    subscription_id: SubscriptionId(Uuid::from_u128(2)),
+                    event: &event,
+                    attempt: u32::MAX,
+                };
+                let owned = EventDelivery {
+                    delivery_id: reference.delivery_id,
+                    subscription_id: reference.subscription_id,
+                    event: event.clone(),
+                    attempt: reference.attempt,
+                };
+                let encoded = serde_json::to_vec(&reference).unwrap();
+                assert_eq!(encoded, serde_json::to_vec(&owned).unwrap());
+                assert_eq!(
+                    serde_json::from_slice::<EventDelivery>(&encoded).unwrap(),
+                    owned
+                );
+            }
+        }
+    }
 }
 
 #[cfg(test)]

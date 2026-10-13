@@ -2,7 +2,7 @@
 mod v3;
 use crate::mqtt::broker::MqttBroker;
 use netbaiot_core::{
-    AuthInvalidation, EventDelivery, SubscriptionId, TenantId,
+    AuthInvalidation, SubscriptionId, TenantId,
     business_rpc::{
         AuthInvalidateRequest, AuthInvalidateResponse, AuthSyncRequest, AuthSyncResponse,
         BUSINESS_RPC_AUTH_MAX_BYTES, BUSINESS_RPC_HELLO_MAX_BYTES, BUSINESS_RPC_MAX_TOKEN_BYTES,
