@@ -6,7 +6,7 @@ fn mqtt_frame_budget_failure_releases_every_partial_reservation() {
     for rejected_at in 0..3 {
         let mut capacities = [charge; 3];
         capacities[rejected_at] -= 1;
-        let (sender, _receiver) = mpsc::channel(1);
+        let (sender, _receiver) = frame_channel::channel(1);
         let active = ActiveSession {
             generation: 1,
             sender,

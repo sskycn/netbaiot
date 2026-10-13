@@ -9,9 +9,10 @@ spool relationship values.
 |---|---:|
 | Connections | 256 node / 64 tenant / 32 IP / 2 device |
 | Device connections per classified protocol | 192 each; shares the 256 global maximum |
-| Logical connection memory | 512 KiB reservation / 128 MiB global |
+| Connection memory admission | 16 KiB fixed allowance / 64 MiB authenticated tenant / 128 MiB global; reader capacity charged on demand |
+| TLS handshake concurrency | 64; excess closes immediately |
 | MQTT/TCP frame and management HTTP body maximum | 64 KiB |
-| Initial stream read buffer | at most 4 KiB; grows incrementally |
+| Idle stream read buffer | zero retained packet allocation; 65,540 B actual capacity ceiling including TCP envelope and live frame aliases |
 | UDP datagram | 1,200 B |
 | Ingress active | 16 / 2 MiB; tenant 4; device 1 |
 | Ingress wait | 16 / 2 MiB / 25 ms, inside existing owner task |
@@ -41,10 +42,13 @@ Required overload rejects upstream before EventAccepted. Best-effort overload dr
 with a metric. Count/byte permits release on ACK, best-effort terminal failure,
 queue failure, session replacement, receiver closure, or owner drop.
 
-Stream parsers allocate at most 4 KiB initially, never the maximum frame. If a
-processed large frame leaves an empty buffer above 16 KiB capacity, it is replaced
-with the small initial allocation. Idle command channels do not preallocate payload
-byte limits.
+Stream parsers start without a heap packet allocation. Read allocations reserve
+their actual capacity before allocation and keep ownership through any decoded
+frame aliases. Capacity returns when the last allocation owner exits; replacing
+an allocation also charges temporary overlap. Idle command channels do not
+preallocate payload byte limits. The fixed 16 KiB connection allowance is a
+conservative admission setting, not a measured per-connection footprint. Other
+MQTT/session/cache/command/event quotas remain independent.
 
 | Producer → consumer | Overflow behavior |
 |---|---|
@@ -95,4 +99,6 @@ See [measurement requirements](benchmarks.md) before sizing a deployment.
 profiles and routes. No per-device desired state is stored. The 16 MiB ceiling is
 retained for control safety, not preallocated memory; deleting device state does
 not imply a 16 MiB idle RSS reduction. All transport, EventBus, connection, auth
-and spool defaults remain unchanged.
+and spool state remain independently bounded.
+
+The fixed connection admission allowance has a validated 16 KiB minimum, independent of maximum frame size. Actual reader capacities are admitted on demand; logical quotas are not RSS or kernel socket measurements. See [connection density audit](performance/connection-density-20261013.md).

@@ -1,0 +1,13 @@
+
+running 1 test
+test reader_memory_profile ... reader_idle samples=10000 reader_struct=96 allocator_bytes=0 allocations=0 reserved_buffer_capacity=0 per_reader_heap=0 per_reader_capacity=0
+read_more_future_bytes=256
+reader_cleanup_excluding_vector=Stats { allocations: 0, deallocations: 0, reallocations: 0, bytes_allocated: 0, bytes_deallocated: 0, bytes_reallocated: 0 }
+reader_metered_idle samples=10000 allocator_bytes=560000 allocations=10000 per_reader_read_account_heap=56 buffer_capacity=0
+reader_frame length=2 buffer_capacity=2 allocator_bytes=2 allocations=1 reallocations=0 realloc_bytes=0
+reader_frame_reclaimed length=2 buffer_capacity=0 net_requested_heap=0
+reader_frame length=65540 buffer_capacity=65540 allocator_bytes=65548 allocations=2 reallocations=0 realloc_bytes=0
+reader_frame_reclaimed length=65540 buffer_capacity=0 net_requested_heap=0
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s

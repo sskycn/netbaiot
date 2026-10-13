@@ -44,13 +44,13 @@ pub(super) fn write_recovery(
             left.key.device.tenant_id.as_str(),
             left.key.device.product_id.as_str(),
             left.key.device.device_id.as_str(),
-            left.key.client_id.as_str(),
+            left.key.client_id.as_ref(),
         )
             .cmp(&(
                 right.key.device.tenant_id.as_str(),
                 right.key.device.product_id.as_str(),
                 right.key.device.device_id.as_str(),
-                right.key.client_id.as_str(),
+                right.key.client_id.as_ref(),
             ))
     });
     for session in sessions {
@@ -643,7 +643,7 @@ pub(super) fn decode_record(
                     product_id,
                     device_id,
                 },
-                client_id,
+                client_id: client_id.into(),
             };
             let mut session = StoredSession::new(key, incarnation, authorization);
             session.version = version;
@@ -800,7 +800,7 @@ pub(super) fn decode_record(
                             Some((
                                 SessionKey {
                                     device: owner.clone(),
-                                    client_id,
+                                    client_id: client_id.into(),
                                 },
                                 incarnation,
                             )),
@@ -820,7 +820,7 @@ pub(super) fn decode_record(
                     0 => None,
                     1 => Some(SessionKey {
                         device: owner.clone(),
-                        client_id: reader.string(limits.max_client_id_bytes)?,
+                        client_id: reader.string(limits.max_client_id_bytes)?.into(),
                     }),
                     _ => return Err(Error::Invalid),
                 }
@@ -857,7 +857,7 @@ pub(super) fn decode_record(
                             device_id: DeviceId::new(reader.string(64)?)
                                 .map_err(|_| Error::Invalid)?,
                         },
-                        client_id: reader.string(limits.max_client_id_bytes)?,
+                        client_id: reader.string(limits.max_client_id_bytes)?.into(),
                     }),
                     _ => return Err(Error::Invalid),
                 }

@@ -188,7 +188,10 @@ impl Ingress {
         &self,
         candidate: AuthenticatedSessionCandidate,
         transport: Transport,
-    ) -> Result<(SessionLease, tokio::sync::mpsc::Receiver<QueuedCommand>)> {
+    ) -> Result<(
+        SessionLease,
+        tokio::sync::mpsc::Receiver<Box<QueuedCommand>>,
+    )> {
         let (lease, receiver, ()) =
             self.register_session_with(candidate, transport, |_, _| Ok(()))?;
         Ok((lease, receiver))
@@ -201,7 +204,11 @@ impl Ingress {
         candidate: AuthenticatedSessionCandidate,
         transport: Transport,
         finalize: impl FnOnce(&AuthenticatedDevice, u64) -> Result<T>,
-    ) -> Result<(SessionLease, tokio::sync::mpsc::Receiver<QueuedCommand>, T)> {
+    ) -> Result<(
+        SessionLease,
+        tokio::sync::mpsc::Receiver<Box<QueuedCommand>>,
+        T,
+    )> {
         // Admission precedes the auth-registration lock; quiesce waits through
         // freshness validation, broker attachment and live-generation publication.
         let admission = self.lifecycle.begin_admission()?;
@@ -216,7 +223,11 @@ impl Ingress {
         candidate: AuthenticatedSessionCandidate,
         transport: Transport,
         finalize: impl FnOnce(&AuthenticatedDevice, u64) -> Result<T>,
-    ) -> Result<(SessionLease, tokio::sync::mpsc::Receiver<QueuedCommand>, T)> {
+    ) -> Result<(
+        SessionLease,
+        tokio::sync::mpsc::Receiver<Box<QueuedCommand>>,
+        T,
+    )> {
         admission.check(&self.lifecycle)?;
         let _gate = lock(&self.auth_registration)?;
         if !self.auth_cache.candidate_is_current(&candidate)? {

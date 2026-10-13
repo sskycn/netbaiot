@@ -12,7 +12,7 @@ fn future_will_owner_index_handles_shared_deadline_and_due_promotion() {
             let owner = auth(&format!("will-{index}")).device_key;
             let key = SessionKey {
                 device: owner.clone(),
-                client_id: format!("client-{index}"),
+                client_id: format!("client-{index}").into(),
             };
             let pending = PendingWill {
                 owner: owner.clone(),
@@ -81,7 +81,7 @@ fn delayed_will_deadlines_have_bounded_due_work() {
                     cancel_on_resume: Some((
                         SessionKey {
                             device: auth(&format!("will-index-{index}")).device_key,
-                            client_id: format!("client-{index}"),
+                            client_id: format!("client-{index}").into(),
                         },
                         1,
                     )),

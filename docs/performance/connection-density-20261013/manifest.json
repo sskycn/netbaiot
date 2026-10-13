@@ -1,0 +1,239 @@
+{
+  "date": "2026-10-13",
+  "baseline": "1e36f1b",
+  "baseline_is_prior_performance_branch_not_main": true,
+  "maximum_observed_online": 10000,
+  "million_connections_verified": false,
+  "linux": "x86_64;1CPU;474640384B RAM;cgroup v1;fs.file-max38088",
+  "excluded": [
+    "initial unsynchronized heap ticks",
+    "first stale-library Linux candidate",
+    "initial compact heartbeat shutdown error",
+    "Linux TLS while compilation active"
+  ],
+  "records": [
+    {
+      "file": "quiet-baseline-mqtt4-10k.json",
+      "bytes": 2954,
+      "sha256": "2b163fd93cdf3235ccb5c562d4963e0d76f585f85b0d8f97887815294d0d9456",
+      "validated_population": true,
+      "actual_online": 10000,
+      "source_binary": {
+        "loadgen_sha256": "be473ed3c31a3b9c8ac014539e40da94ef799646a5945897f070168fb1968845",
+        "platform": "macOS-27.0.1-arm64-arm-64bit",
+        "server_default_connection_reservation": 524288,
+        "server_sha256": "56f279ae637e959fc2df3c712dbdfeb82bef7c3dde51f541160b3d031544b331"
+      }
+    },
+    {
+      "file": "quiet-final-mqtt4-10k.json",
+      "bytes": 2952,
+      "sha256": "4ff3306ae79cdf616944caec480f8c98637e4f8b98194a1f9953be770bac0b13",
+      "validated_population": true,
+      "actual_online": 10000,
+      "source_binary": {
+        "loadgen_sha256": "e434cd64df302e8797ce8b44e65d9918ace15b8e127c239172c374033692d10e",
+        "platform": "macOS-27.0.1-arm64-arm-64bit",
+        "server_default_connection_reservation": 16384,
+        "server_sha256": "7ea747837fc9af7b0672023316e39c6a90398ba567e08db663b2dbad64676509"
+      }
+    },
+    {
+      "file": "linux-baseline-mqtt4-2k.json",
+      "bytes": 19354,
+      "sha256": "c002a01188ff530b70ce0779c753b779ff7555aff4ca604a02fff0517474b931",
+      "validated_population": true,
+      "actual_online": 2000,
+      "source_binary": null
+    },
+    {
+      "file": "linux-final-mqtt4-2k.json",
+      "bytes": 19983,
+      "sha256": "3eb089fb1170149f41a419894905b0463ab9bc1a5459201fcce1ae68d35ab937",
+      "validated_population": true,
+      "actual_online": 2000,
+      "source_binary": {
+        "loadgen_sha256": "04c62ba33d04c15a7ecf41ab8e8dc0357f2a2d6cf202589f75586890a81c8d30",
+        "platform": "Linux-4.18.0-553.144.1.el8_10.x86_64-x86_64-with-centos-8.10-Green_Obsidian",
+        "server_default_connection_reservation": 16384,
+        "server_sha256": "1bf088c66f3209a48ab3a64d6fe8f6b2cb48e453c5e63b274defb2d9e59742cb"
+      },
+      "heap_baseline_synchronized": false
+    },
+    {
+      "file": "linux-final-mqtt4-idle-10k.json",
+      "bytes": 19800,
+      "sha256": "a6629e2293aa227959fe09e60777ca66e70040a1d1b4e5aeff3c2cbd35521272",
+      "validated_population": true,
+      "actual_online": 10000,
+      "source_binary": {
+        "loadgen_sha256": "04c62ba33d04c15a7ecf41ab8e8dc0357f2a2d6cf202589f75586890a81c8d30",
+        "platform": "Linux-4.18.0-553.144.1.el8_10.x86_64-x86_64-with-centos-8.10-Green_Obsidian",
+        "server_default_connection_reservation": 16384,
+        "server_sha256": "1bf088c66f3209a48ab3a64d6fe8f6b2cb48e453c5e63b274defb2d9e59742cb"
+      },
+      "resident_memory_is_swap_affected": true
+    },
+    {
+      "file": "linux-baseline-tls-1k.json",
+      "bytes": 19433,
+      "sha256": "865ba3c897a5ba44f3ae083b096ec3c054eb7bba1cb34374124918cd31148899",
+      "validated_population": true,
+      "actual_online": 1000,
+      "source_binary": null
+    },
+    {
+      "file": "linux-final-tls-1k.json",
+      "bytes": 20013,
+      "sha256": "39c99e5cc1f0ec8ec20c86808de765237de9d6388b0525596222a5ca9b195e6a",
+      "validated_population": true,
+      "actual_online": 1000,
+      "source_binary": {
+        "loadgen_sha256": "04c62ba33d04c15a7ecf41ab8e8dc0357f2a2d6cf202589f75586890a81c8d30",
+        "platform": "Linux-4.18.0-553.144.1.el8_10.x86_64-x86_64-with-centos-8.10-Green_Obsidian",
+        "server_default_connection_reservation": 16384,
+        "server_sha256": "1bf088c66f3209a48ab3a64d6fe8f6b2cb48e453c5e63b274defb2d9e59742cb"
+      }
+    },
+    {
+      "file": "linux-final-heartbeat-1k.json",
+      "bytes": 19484,
+      "sha256": "0daad46a1ab56d96d14e2bdba851ddb3d2d8e953a3e25f56fc9a428d888a259f",
+      "validated_population": true,
+      "actual_online": 1000,
+      "source_binary": {
+        "loadgen_sha256": "04c62ba33d04c15a7ecf41ab8e8dc0357f2a2d6cf202589f75586890a81c8d30",
+        "platform": "Linux-4.18.0-553.144.1.el8_10.x86_64-x86_64-with-centos-8.10-Green_Obsidian",
+        "server_default_connection_reservation": 16384,
+        "server_sha256": "1bf088c66f3209a48ab3a64d6fe8f6b2cb48e453c5e63b274defb2d9e59742cb"
+      }
+    },
+    {
+      "file": "linux-final-mqtt5-persistent-subscribed-1k.json",
+      "bytes": 19249,
+      "sha256": "328141b4bb12d02e1922739fe61e6e25fb90519d435df9627720341434c0ff1f",
+      "validated_population": true,
+      "actual_online": 1000,
+      "source_binary": {
+        "loadgen_sha256": "04c62ba33d04c15a7ecf41ab8e8dc0357f2a2d6cf202589f75586890a81c8d30",
+        "platform": "Linux-4.18.0-553.144.1.el8_10.x86_64-x86_64-with-centos-8.10-Green_Obsidian",
+        "server_default_connection_reservation": 16384,
+        "server_sha256": "1bf088c66f3209a48ab3a64d6fe8f6b2cb48e453c5e63b274defb2d9e59742cb"
+      }
+    },
+    {
+      "file": "baseline-task-futures.txt",
+      "bytes": 927,
+      "sha256": "999cb86a4a530c346617b5fdbe598a3bc3ae4e251912fe2da71014cc29b82162",
+      "raw_output_sha256": "1d312c70e6c43b7e85820e8038a4fe204983baeb84ca70528aa5e31b698dd66c"
+    },
+    {
+      "file": "final-task-futures.txt",
+      "bytes": 1038,
+      "sha256": "80ce0f3cd50b72ce6b5fcae1e2cebe1028dbfc746b5c727a2bf26efeaf28d180",
+      "raw_output_sha256": "584f4c2837320b02ba4aa37c6ff09f35441d180c9061707b6dba5ee604466294"
+    },
+    {
+      "file": "baseline-broker-allocation.txt",
+      "bytes": 938,
+      "sha256": "ee69df9993c551142172ce78241ca14ac794b9ce3a9a0f7128d87bcfcb2800fa",
+      "raw_output_sha256": "51cf2ee83095646a1e2831b9e2335cefe6442141e1424e7232b8464c3b08714e"
+    },
+    {
+      "file": "final-broker-allocation.txt",
+      "bytes": 1048,
+      "sha256": "73a2de77efa844e53970c36dc9c2438e8733e3d5d359a667ed71b04c3b93fc78",
+      "raw_output_sha256": "6d7c7d77242ea2d69e00e250c2b391a7a359a17185f54e150dbfe2733adb1eb0"
+    },
+    {
+      "file": "baseline-session-allocation.txt",
+      "bytes": 401,
+      "sha256": "c0e8379d4afd849be126cefdfae508f422d7ae818ef44bd3d069a9eeb79f85f7",
+      "raw_output_sha256": "0bb7e3577fdbe77bc2f7f1777b4546927bf4710ed5dc753f2a4a0eec4bd9963a"
+    },
+    {
+      "file": "final-session-allocation.txt",
+      "bytes": 400,
+      "sha256": "5bc1bdefe7f6068948e821457eb7dce0a005dc187d5044d9afa87f32d0d9a3d2",
+      "raw_output_sha256": "8897f854945a0cfbc7842ad6a773bbc5221684c103111c9af6ea6a7686583f6b"
+    },
+    {
+      "file": "final-reader-allocation.txt",
+      "bytes": 962,
+      "sha256": "3fdec4c4ac9728e1b674ab042285d7b126ed8093c84b1aaad87d8beb9f5080d8",
+      "raw_output_sha256": "49f8689e77d0591e4a3e30f387df3e9c53cee18cbda11f3d5cc260c8f63382d7"
+    },
+    {
+      "file": "loadgen-legacy-futures.txt",
+      "bytes": 239,
+      "sha256": "b5d95954249126dd13a0e4ec45e6927c7e4b3a3c6af625409c4d00e76b86aa6f",
+      "raw_output_sha256": "7f1edc4eb110d8177a46a94a6c06f46a1835e841091cd2eb6294cae6f3328823"
+    },
+    {
+      "file": "loadgen-compact-futures.txt",
+      "bytes": 323,
+      "sha256": "d08dee496ab2589c543e166e3c76230a02533291cb25b6320425ee8941175da8",
+      "raw_output_sha256": "176bc42ec9dd2b2cb2338f31494c66842a9715c51ba1af5409e98098945b0c7e"
+    },
+    {
+      "file": "clippy-final.txt",
+      "bytes": 558,
+      "sha256": "acdbd81dab1a278c7b075da47d32e254f3fb155b60110dc5da7d47b179dea49c",
+      "raw_output_sha256": "acdbd81dab1a278c7b075da47d32e254f3fb155b60110dc5da7d47b179dea49c"
+    },
+    {
+      "file": "workspace-tests-final.txt",
+      "bytes": 63977,
+      "sha256": "9493f728be542d9e2e61df4b2a078cce05829101984c43b9ee95972875443653",
+      "raw_output_sha256": "e5a018f86a516d19363e1a627a0762331eae6d2ff7f97dd417232b9b2d33ab38"
+    },
+    {
+      "file": "mqtt-conformance.txt",
+      "bytes": 4313,
+      "sha256": "1f16097a7f3e5bc5da8dc194b8c2c42b647d27297ac1af237c06838869a4a2b9",
+      "raw_output_sha256": "1f16097a7f3e5bc5da8dc194b8c2c42b647d27297ac1af237c06838869a4a2b9"
+    },
+    {
+      "file": "mqtt5-smoke.txt",
+      "bytes": 80,
+      "sha256": "6b84af0aced1681912ef9d4eb4b09ec5918acfbb2ff7261f09534a05e8bbe0be",
+      "raw_output_sha256": "6b84af0aced1681912ef9d4eb4b09ec5918acfbb2ff7261f09534a05e8bbe0be"
+    },
+    {
+      "file": "mqtt5-mosquitto.txt",
+      "bytes": 76,
+      "sha256": "1b839f63ecc77c6dc44a678027538b39a940498f59971a0a7adfe131878e4b78",
+      "raw_output_sha256": "1b839f63ecc77c6dc44a678027538b39a940498f59971a0a7adfe131878e4b78"
+    },
+    {
+      "file": "tls-interop.txt",
+      "bytes": 549,
+      "sha256": "03f1790510772b4d569be4455179897f55fe3e62b97e1453f174ce5f3c4c3709",
+      "raw_output_sha256": "03f1790510772b4d569be4455179897f55fe3e62b97e1453f174ce5f3c4c3709"
+    }
+  ],
+  "fuzz": [
+    {
+      "target_log": "fuzz-mqtt.txt",
+      "completed": true,
+      "runs": 213891,
+      "seconds": 21,
+      "log_sha256": "2a86add85ef912409bf39a68a7fc7c4de4b02996b05145e18a91aa88a4b21cee"
+    },
+    {
+      "target_log": "fuzz-mqtt5.txt",
+      "completed": true,
+      "runs": 222697,
+      "seconds": 21,
+      "log_sha256": "1c754eecb022dbed928f44c187395b4596836aecf6baf1c0736f21e85e2bc28f"
+    },
+    {
+      "target_log": "fuzz-tcp.txt",
+      "completed": true,
+      "runs": 221860,
+      "seconds": 21,
+      "log_sha256": "a4915959e9215768b3e6a964cdc3686d4bb588c85eea1e72ec9907fbff05782c"
+    }
+  ],
+  "text_log_normalization": "Trailing whitespace/newlines trimmed for repository text; raw-output hashes retained."
+}

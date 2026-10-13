@@ -94,13 +94,17 @@ def configs(args, out, codec, transport, scenario, devices, fault):
     device_port, admin_port, sink_port = free_ports(3)
     maximum = max(256, devices + 32)
     # Existing validated test profile; packet/frame hard limits and wire rules stay unchanged.
-    reservation = 65536 if maximum * 524288 > 2**32 - 1 else 524288
+    reservation = 16_384
+    # These aggregate ceilings admit reader allocations on demand, including
+    # TCP framing. They are neither reserved heap nor process RSS measurements.
+    connection_bytes = maximum * (reservation + 65_540)
     limits = dict(max_connections=maximum, max_connections_per_ip=maximum,
         max_device_connections_per_protocol=maximum, max_connections_per_tenant=maximum,
         max_devices=maximum, max_devices_per_tenant=maximum,
         max_persistent_sessions=maximum, max_persistent_sessions_per_tenant=maximum,
         max_subscriptions=maximum * 2, max_subscriptions_per_tenant=maximum * 2,
-        connection_memory_reservation=reservation, global_connection_logical_bytes=maximum * reservation,
+        connection_memory_reservation=reservation, global_connection_logical_bytes=connection_bytes,
+        max_connection_bytes_per_tenant=connection_bytes,
         auth_cache_max_entries=maximum, auth_cache_max_bytes=64 * 1024 * 1024,
         rate_entries=maximum, requests_per_second=100000, requests_per_ip_second=100000,
         messages_per_device_second=100000, messages_per_tenant_second=100000,

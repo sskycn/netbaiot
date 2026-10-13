@@ -334,8 +334,8 @@ fn transaction_accounting(broker: &MqttBroker, key: &SessionKey) -> TransactionA
         inbound_qos2_count: session.inbound_qos2.len(),
         inbound_window_count: session.inbound_window.len(),
         tenant_qos2_inflight: tenant_inflight(&state, &key.device.tenant_id, 2),
-        outbound_order: session.outbound_order.clone(),
-        outbound: session.outbound.clone(),
+        outbound_order: (*session.outbound_order).clone(),
+        outbound: (*session.outbound).clone(),
     }
 }
 

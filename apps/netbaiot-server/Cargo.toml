@@ -23,6 +23,7 @@ tokio-rustls.workspace = true
 rustls-pemfile.workspace = true
 reqwest.workspace = true
 sha2.workspace = true
+stats_alloc = { version = "=0.1.10", optional = true }
 
 [lints]
 workspace = true
@@ -40,6 +41,7 @@ reqwest = { workspace = true, features = ["rustls-tls-native-roots"] }
 
 [features]
 schema = ["dep:schemars", "netbaiot-runtime/schema", "netbaiot-transports/schema"]
+allocation-profile = ["dep:stats_alloc"]
 
 [[bin]]
 name = "netbaiot-schema"

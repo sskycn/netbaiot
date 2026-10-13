@@ -56,25 +56,25 @@ impl StoredSession {
             expires_at_ms: None,
             incarnation,
             authorization,
-            subscriptions: HashMap::new(),
-            offline: VecDeque::new(),
+            subscriptions: Lazy::default(),
+            offline: Lazy::default(),
             offline_bytes: 0,
-            inbound_qos2: HashMap::new(),
-            inbound_operations: HashMap::new(),
-            inbound_reservations: HashMap::new(),
-            outbound: HashMap::new(),
-            command_outbound: HashSet::new(),
-            command_progress: HashMap::new(),
-            outbound_order: VecDeque::new(),
+            inbound_qos2: Lazy::default(),
+            inbound_operations: Lazy::default(),
+            inbound_reservations: Lazy::default(),
+            outbound: Lazy::default(),
+            command_outbound: Lazy::default(),
+            command_progress: Lazy::default(),
+            outbound_order: Lazy::default(),
             next_packet_id: 1,
             state_bytes,
             last_seen_ms: now_ms(),
             active_generation: None,
             send_quota: u16::MAX,
-            sent: HashSet::new(),
-            send_window: HashSet::new(),
-            inbound_window: HashSet::new(),
-            started_outbound: HashSet::new(),
+            sent: Lazy::default(),
+            send_window: Lazy::default(),
+            inbound_window: Lazy::default(),
+            started_outbound: Lazy::default(),
         }
     }
 
@@ -247,7 +247,10 @@ impl MqttBroker {
                 .filter_map(|offset| {
                     let candidate = format!("generated-{}", state.generation.wrapping_add(offset));
                     (candidate.len() <= self.limits.max_client_id_bytes
-                        && !state.sessions.keys().any(|key| key.client_id == candidate))
+                        && !state
+                            .sessions
+                            .keys()
+                            .any(|key| key.client_id.as_ref() == candidate))
                     .then_some(candidate)
                 })
                 .next()
@@ -258,7 +261,7 @@ impl MqttBroker {
         }
         let key = SessionKey {
             device: auth.device_key.clone(),
-            client_id,
+            client_id: client_id.into(),
         };
         if session_expiry_deadline(&state, &key).is_some_and(|deadline| deadline <= now_ms()) {
             remove_session(&mut state, &key)?;
@@ -301,7 +304,7 @@ impl MqttBroker {
         state.generation = state.generation.wrapping_add(1).max(1);
         let generation = state.generation;
         let capacity = self.limits.max_outbound_messages_per_connection;
-        let (sender, receiver) = mpsc::channel(capacity);
+        let (sender, receiver) = frame_channel::channel(capacity);
         let cancel = CancellationToken::new();
         state
             .tenant_outbound_bytes

@@ -17,7 +17,7 @@ fn generated_client_id_never_replaces_explicit_or_recovered_session() {
     let mut assigned = recovered
         .attach_generated_v5(&identity, 60, 4, &|_| Ok(()))
         .unwrap();
-    assert_ne!(assigned.key.client_id, "generated-2");
+    assert_ne!(assigned.key.client_id.as_ref(), "generated-2");
     assigned.detach().unwrap();
     let mut resumed = recovered
         .attach_v5(&identity, "generated-2".into(), false, 60, 4)

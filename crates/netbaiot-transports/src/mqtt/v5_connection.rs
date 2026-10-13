@@ -41,10 +41,23 @@ pub(super) async fn next_v5(
                 ));
             }
         }
-        reader.read_more(stream, idle).await.map_err(|error| {
-            let reason = v5::disconnect_reason(&error);
-            (error, reason)
+        let fixed = fixed_header(&reader.buffer, limits.max_mqtt_packet_size).map_err(|error| {
+            (
+                Error::Invalid,
+                if matches!(error, Error::Overloaded) {
+                    v5::DisconnectReason::PacketTooLarge
+                } else {
+                    v5::DisconnectReason::MalformedPacket
+                },
+            )
         })?;
+        reader
+            .read_more_to(stream, idle, fixed.map_or(5, |(_, _, total)| total))
+            .await
+            .map_err(|error| {
+                let reason = v5::disconnect_reason(&error);
+                (error, reason)
+            })?;
     }
 }
 
@@ -344,8 +357,9 @@ pub(super) async fn connection(
         .await?;
         return Err(error);
     }
+    reader.authenticate(&candidate.auth.device_key)?;
     let auth = Arc::new(candidate.auth.clone());
-    let requested_client_id = connect.client_id.clone();
+    let requested_client_id = std::mem::take(&mut connect.client_id);
     let assigned = requested_client_id.is_empty();
     let clean_start = connect.clean_start;
     let session_expiry = connect.properties.session_expiry.unwrap_or(0);
@@ -394,7 +408,6 @@ pub(super) async fn connection(
                 Ok((attachment, client_id))
             },
         )?;
-    connect.client_id = client_id.clone();
     let mut will_guard = connect
         .will
         .take()
@@ -426,11 +439,19 @@ pub(super) async fn connection(
             Ok::<_, Error>(guard)
         })
         .transpose()?;
+    let keepalive = if connect.keep_alive == 0 {
+        None
+    } else {
+        Some(Duration::from_millis(u64::from(connect.keep_alive) * 1_500))
+    };
+    // Authentication credentials and CONNECT-only properties are never needed
+    // by the established session. In particular, do not retain password Bytes.
+    drop(connect);
     let response = v5::connack(
         attachment.session_present,
         v5::ConnackReason::Success,
         limits,
-        assigned.then_some(client_id.as_str()),
+        assigned.then_some(client_id.as_ref()),
         client_maximum,
     )?;
     send_v5(&mut stream, &services, &response, client_maximum, None).await?;
@@ -443,11 +464,6 @@ pub(super) async fn connection(
             .is_some(),
     )?;
     drop(registration);
-    let keepalive = if connect.keep_alive == 0 {
-        None
-    } else {
-        Some(Duration::from_millis(u64::from(connect.keep_alive) * 1_500))
-    };
     let mut last = Instant::now();
     let mut suppress_will = false;
     let mut error_disconnect_sent = false;

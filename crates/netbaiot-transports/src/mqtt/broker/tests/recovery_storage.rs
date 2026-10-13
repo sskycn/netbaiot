@@ -414,7 +414,7 @@ async fn mqtt_recovery_v6_large_client_id_will_fits_admitted_bounds() {
     let owner = auth("wide-will").device_key;
     let origin = SessionKey {
         device: owner.clone(),
-        client_id: "c".repeat(limits.max_client_id_bytes),
+        client_id: "c".repeat(limits.max_client_id_bytes).into(),
     };
     let pending = PendingWill {
         owner: owner.clone(),
@@ -812,7 +812,7 @@ async fn mqtt_recovery_v6_near_default_capacity_manual() {
             owner.tenant_id = TenantId::new(format!("t{}", index / 32)).unwrap();
             let origin = SessionKey {
                 device: owner.clone(),
-                client_id: "c".repeat(limits.max_client_id_bytes),
+                client_id: "c".repeat(limits.max_client_id_bytes).into(),
             };
             let pending = PendingWill {
                 owner: owner.clone(),

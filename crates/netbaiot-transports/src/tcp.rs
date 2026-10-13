@@ -10,11 +10,26 @@ use tokio_util::sync::CancellationToken;
 pub trait TcpFramer: Send + Sync {
     fn decode(&self, input: &mut BytesMut) -> Result<Option<Bytes>>;
     fn encode(&self, payload: &[u8]) -> Result<Vec<u8>>;
+    /// A validated complete length, or the bounded bytes needed for its header.
+    fn read_target(&self, _input: &[u8]) -> Result<Option<usize>> {
+        Ok(None)
+    }
 }
 pub struct LengthPrefixFramer {
     pub maximum: usize,
 }
 impl TcpFramer for LengthPrefixFramer {
+    fn read_target(&self, input: &[u8]) -> Result<Option<usize>> {
+        if input.len() < 4 {
+            return Ok(Some(4));
+        }
+        let raw = u32::from_be_bytes(input[..4].try_into().map_err(|_| Error::Invalid)?);
+        let length = usize::try_from(raw).map_err(|_| Error::Invalid)?;
+        if length == 0 || length > self.maximum {
+            return Err(Error::Invalid);
+        }
+        Ok(Some(length.checked_add(4).ok_or(Error::Invalid)?))
+    }
     fn decode(&self, input: &mut BytesMut) -> Result<Option<Bytes>> {
         if input.len() < 4 {
             return Ok(None);
@@ -57,10 +72,15 @@ async fn next(
 ) -> Result<Bytes> {
     loop {
         if let Some(frame) = framer.decode(&mut reader.buffer)? {
+            let frame = reader.own_frame(frame);
             reader.consumed();
             return Ok(frame);
         }
-        reader.read_more(stream, idle).await?;
+        if let Some(target) = framer.read_target(&reader.buffer)? {
+            reader.read_more_to(stream, idle, target).await?;
+        } else {
+            reader.read_more(stream, idle).await?;
+        }
     }
 }
 pub async fn connection(
@@ -73,12 +93,19 @@ pub async fn connection(
     let framer = LengthPrefixFramer {
         maximum: l.max_tcp_frame_size,
     };
-    let mut reader = Reader::new(l.max_tcp_frame_size + 4, l.packet_read_timeout_ms);
-    let hello = tokio::select! {_=stop.cancelled()=>return Ok(()),hello=next(&mut reader,&mut stream,&framer,connection.connect_deadline())=>hello?};
-    if hello.len() > l.max_username_bytes + l.max_password_bytes + 128 {
+    let mut reader = Reader::with_budget(
+        l.max_tcp_frame_size.checked_add(4).ok_or(Error::Invalid)?,
+        l.packet_read_timeout_ms,
+        connection.read_budget(),
+    );
+    let hello_frame = tokio::select! {_=stop.cancelled()=>return Ok(()),hello=next(&mut reader,&mut stream,&framer,connection.connect_deadline())=>hello?};
+    if hello_frame.len() > l.max_username_bytes + l.max_password_bytes + 128 {
         return Err(Error::Invalid);
     }
-    let hello: Handshake = serde_json::from_slice(&hello).map_err(|_| Error::Invalid)?;
+    let hello: Handshake = serde_json::from_slice(&hello_frame).map_err(|_| Error::Invalid)?;
+    // Shadowing a Bytes binding would retain its allocation/permit until the
+    // connection exits. No handshake frame belongs in the established reader.
+    drop(hello_frame);
     if hello.credential_id.len() > l.max_username_bytes || hello.secret.len() > l.max_password_bytes
     {
         return Err(Error::Authentication);
@@ -94,7 +121,9 @@ pub async fn connection(
         &stop,
     )
     .await?;
+    drop(hello);
     connection.authenticate(&candidate.auth.device_key)?;
+    reader.authenticate(&candidate.auth.device_key)?;
     let auth = Arc::new(candidate.auth.clone());
     let registration = s.ingress.lifecycle.begin_admission()?;
     let (session, mut outbound, ()) = s.ingress.register_session_admitted_with(

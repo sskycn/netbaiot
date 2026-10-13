@@ -1,0 +1,30 @@
+
+running 1 test
+test mqtt::broker::density_memory::density_memory ... DENSITY_SIZE,StoredSession,776
+DENSITY_SIZE,ActiveSession,48
+DENSITY_SIZE,SessionKey,72
+DENSITY_SIZE,DeviceKey,48
+DENSITY_SIZE,Attachment,120
+DENSITY_SIZE,BrokerFrame,16
+DENSITY_SIZE,HashMap_empty,48
+DENSITY_SIZE,HashSet_empty,48
+DENSITY_SIZE,VecDeque_empty,32
+DENSITY_ALLOC,broker_channel,2,1056,0
+DENSITY_ALLOC,cancel_token,1,120,0
+DENSITY_BROKER,1000,17037,7027,6312168,2670220,3641.948,6935
+DENSITY_CAPACITY,1000,1792,1792,1792
+DENSITY_BROKER,10000,170046,70036,54207392,22270868,3193.652,35561
+DENSITY_CAPACITY,10000,14336,14336,14336
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 212 filtered out; finished in 0.06s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 24 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 12 filtered out; finished in 0.00s

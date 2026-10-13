@@ -820,7 +820,7 @@ async fn legacy_cleanup_recovery_measurement() {
         let sessions = (0..count)
             .map(|index| {
                 let mut value = session(2, 2, "none");
-                value.key.client_id = format!("cleanup-{index}");
+                value.key.client_id = format!("cleanup-{index}").into();
                 value
             })
             .collect();

@@ -422,7 +422,7 @@
         "auth_cache_max_bytes": {
           "default": 4194304,
           "format": "uint",
-          "maximum": 4294967295,
+          "maximum": 9007199254740991,
           "minimum": 1,
           "type": "integer"
         },
@@ -491,10 +491,11 @@
           "type": "integer"
         },
         "connection_memory_reservation": {
-          "default": 524288,
+          "default": 16384,
+          "description": "Fixed connection allowance only. Packet capacity is charged on demand.\nThis is a resource reservation, not measured RSS or kernel socket memory.",
           "format": "uint",
           "maximum": 4294967295,
-          "minimum": 1,
+          "minimum": 16384,
           "type": "integer"
         },
         "control_max_bytes": {
@@ -517,7 +518,7 @@
           "default": 67108864,
           "description": "Serialized outstanding event bytes per tenant, charged once per event.\nThe global byte ceiling also applies. No payload buffer is preallocated.",
           "format": "uint",
-          "maximum": 4294967295,
+          "maximum": 9007199254740991,
           "minimum": 1,
           "type": "integer"
         },
@@ -538,15 +539,16 @@
         },
         "global_connection_logical_bytes": {
           "default": 134217728,
+          "description": "Fixed connection allowances plus actual dynamically allocated read capacity.",
           "format": "uint",
-          "maximum": 4294967295,
+          "maximum": 9007199254740991,
           "minimum": 1,
           "type": "integer"
         },
         "global_event_max_bytes": {
           "default": 67108864,
           "format": "uint",
-          "maximum": 4294967295,
+          "maximum": 9007199254740991,
           "minimum": 1,
           "type": "integer"
         },
@@ -560,7 +562,7 @@
         "global_mqtt_session_bytes": {
           "default": 134217728,
           "format": "uint",
-          "maximum": 4294967295,
+          "maximum": 9007199254740991,
           "minimum": 1,
           "type": "integer"
         },
@@ -681,6 +683,14 @@
           "default": 16384,
           "format": "uint",
           "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_connection_bytes_per_tenant": {
+          "default": 67108864,
+          "description": "Same accounting for authenticated connections of one tenant. Before\nauthentication, global count/IP/fixed/dynamic ceilings still apply.",
+          "format": "uint",
+          "maximum": 9007199254740991,
           "minimum": 1,
           "type": "integer"
         },
@@ -884,7 +894,7 @@
         "max_mqtt_session_state_bytes_per_tenant": {
           "default": 33554432,
           "format": "uint",
-          "maximum": 4294967295,
+          "maximum": 9007199254740991,
           "minimum": 1,
           "type": "integer"
         },
@@ -905,7 +915,7 @@
         "max_offline_bytes": {
           "default": 134217728,
           "format": "uint",
-          "maximum": 4294967295,
+          "maximum": 9007199254740991,
           "minimum": 1,
           "type": "integer"
         },
@@ -919,7 +929,7 @@
         "max_offline_bytes_per_tenant": {
           "default": 33554432,
           "format": "uint",
-          "maximum": 4294967295,
+          "maximum": 9007199254740991,
           "minimum": 1,
           "type": "integer"
         },
@@ -947,7 +957,7 @@
         "max_outbound_bytes": {
           "default": 8388608,
           "format": "uint",
-          "maximum": 4294967295,
+          "maximum": 9007199254740991,
           "minimum": 1,
           "type": "integer"
         },
@@ -961,7 +971,7 @@
         "max_outbound_bytes_per_tenant": {
           "default": 2097152,
           "format": "uint",
-          "maximum": 4294967295,
+          "maximum": 9007199254740991,
           "minimum": 1,
           "type": "integer"
         },
@@ -1015,7 +1025,8 @@
           "type": "integer"
         },
         "max_read_buffer_per_connection": {
-          "default": 65536,
+          "default": 65540,
+          "description": "Actual capacity of all live reader allocations, including shared frames.\nIncludes the four-byte TCP framing envelope.",
           "format": "uint",
           "maximum": 4294967295,
           "minimum": 1,
@@ -1045,14 +1056,14 @@
         "max_retained_bytes": {
           "default": 67108864,
           "format": "uint",
-          "maximum": 4294967295,
+          "maximum": 9007199254740991,
           "minimum": 1,
           "type": "integer"
         },
         "max_retained_bytes_per_tenant": {
           "default": 8388608,
           "format": "uint",
-          "maximum": 4294967295,
+          "maximum": 9007199254740991,
           "minimum": 1,
           "type": "integer"
         },
@@ -1147,6 +1158,14 @@
           "minimum": 1,
           "type": "integer"
         },
+        "max_tls_handshakes": {
+          "default": 64,
+          "description": "Concurrent device/management TLS handshakes. No task waits for a slot.",
+          "format": "uint",
+          "maximum": 4294967295,
+          "minimum": 1,
+          "type": "integer"
+        },
         "max_topic_bytes": {
           "default": 256,
           "format": "uint",
@@ -1214,7 +1233,7 @@
         "mqtt_recovery_max_bytes": {
           "default": 202195044,
           "format": "uint",
-          "maximum": 4294967295,
+          "maximum": 9007199254740991,
           "minimum": 1,
           "type": "integer"
         },
@@ -1327,7 +1346,7 @@
         "sink_queue_max_bytes": {
           "default": 16777216,
           "format": "uint",
-          "maximum": 4294967295,
+          "maximum": 9007199254740991,
           "minimum": 1,
           "type": "integer"
         },
@@ -1348,7 +1367,7 @@
         "spool_max_bytes": {
           "default": 268435456,
           "format": "uint",
-          "maximum": 4294967295,
+          "maximum": 9007199254740991,
           "minimum": 1,
           "type": "integer"
         },
@@ -1667,7 +1686,7 @@
         "command_dedup_ttl_ms": 300000,
         "command_ttl_ms": 300000,
         "connect_timeout_ms": 10000,
-        "connection_memory_reservation": 524288,
+        "connection_memory_reservation": 16384,
         "control_max_bytes": 16777216,
         "control_max_products": 4096,
         "event_queue_max_bytes_per_tenant": 67108864,
@@ -1694,6 +1713,7 @@
         "max_auth_provider_requests": 16,
         "max_client_id_bytes": 64,
         "max_command_bytes": 16384,
+        "max_connection_bytes_per_tenant": 67108864,
         "max_connections": 256,
         "max_connections_per_device": 2,
         "max_connections_per_ip": 32,
@@ -1741,7 +1761,7 @@
         "max_pending_commands_per_tenant": 128,
         "max_persistent_sessions": 4096,
         "max_persistent_sessions_per_tenant": 512,
-        "max_read_buffer_per_connection": 65536,
+        "max_read_buffer_per_connection": 65540,
         "max_replay_entries": 1024,
         "max_replay_entries_per_device": 2,
         "max_replay_entries_per_tenant": 256,
@@ -1760,6 +1780,7 @@
         "max_subscriptions_per_session": 32,
         "max_subscriptions_per_tenant": 128,
         "max_tcp_frame_size": 65536,
+        "max_tls_handshakes": 64,
         "max_topic_bytes": 256,
         "max_topic_depth": 8,
         "max_udp_datagram_size": 1200,

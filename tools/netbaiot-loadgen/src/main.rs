@@ -1,4 +1,5 @@
 //! Separate, bounded real-network workload process. Test credentials only.
+mod density;
 mod mixed;
 mod production;
 use bytes::{Buf, BytesMut};
@@ -1365,6 +1366,9 @@ async fn run_audit(c: Config) -> Result<()> {
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 4)]
 async fn main() -> Result<()> {
+    if std::env::args().nth(1).as_deref() == Some("--density") {
+        return density::run(&std::env::args().nth(2).ok_or("density config required")?).await;
+    }
     if std::env::args().nth(1).as_deref() == Some("--mixed") {
         return mixed::run(
             &std::env::args()
@@ -1507,6 +1511,29 @@ async fn main() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[tokio::test]
+    #[ignore = "isolated release future-size measurement"]
+    async fn density_future_sizes() {
+        let c = Config::default();
+        let s = Arc::new(Mutex::new(Stats::default()));
+        let connector = None;
+        let measure = Instant::now();
+        let end = measure + Duration::from_secs(60);
+        let (socket, _peer) = tokio::io::duplex(64);
+        let mut stream: Stream = Box::new(socket);
+        let mut buffer = BytesMut::with_capacity(4096);
+        println!(
+            "LOADGEN_SIZE,read_more,{}",
+            std::mem::size_of_val(&read_more(&mut stream, &mut buffer))
+        );
+        println!(
+            "LOADGEN_SIZE,mqtt_or_tcp,{}",
+            std::mem::size_of_val(&mqtt_or_tcp(
+                &c, 0, 0, &s, &connector, measure, end, "density", 0, None
+            ))
+        );
+        println!("LOADGEN_READER_CAPACITY,{}", buffer.capacity());
+    }
     #[test]
     fn open_loop_schedule_counts_skips_without_drift() {
         let due = Instant::now();

@@ -25,7 +25,6 @@ use std::{
     },
     time::Instant,
 };
-use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
 const STATE_OVERHEAD: usize = 64;
@@ -38,7 +37,9 @@ const TICK_MAINTENANCE_BUDGET: usize = 1_024;
 #[derive(Clone, Debug, Hash, PartialEq, Eq, Serialize)]
 pub struct SessionKey {
     pub device: DeviceKey,
-    pub client_id: String,
+    // The same key is retained by several bounded ownership/deadline indexes.
+    // Share client bytes just as DeviceKey already shares its identifiers.
+    pub client_id: Arc<str>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
@@ -368,21 +369,21 @@ struct StoredSession {
     expires_at_ms: Option<i64>,
     incarnation: u64,
     authorization: Option<SessionAuthorization>,
-    subscriptions: HashMap<String, Subscription>,
-    offline: VecDeque<BrokerMessage>,
+    subscriptions: Lazy<HashMap<String, Subscription>>,
+    offline: Lazy<VecDeque<BrokerMessage>>,
     offline_bytes: usize,
-    inbound_qos2: HashMap<u16, InboundQos2State>,
+    inbound_qos2: Lazy<HashMap<u16, InboundQos2State>>,
     #[serde(skip)]
-    inbound_operations: HashMap<u16, u64>,
+    inbound_operations: Lazy<HashMap<u16, u64>>,
     #[serde(skip)]
-    inbound_reservations: HashMap<u16, RetainedReservation>,
-    outbound: HashMap<u16, OutboundState>,
+    inbound_reservations: Lazy<HashMap<u16, RetainedReservation>>,
+    outbound: Lazy<HashMap<u16, OutboundState>>,
     #[serde(skip)]
-    command_outbound: HashSet<u16>,
+    command_outbound: Lazy<HashSet<u16>>,
     #[serde(skip)]
-    command_progress: HashMap<u16, Arc<netbaiot_runtime::CommandProgress>>,
+    command_progress: Lazy<HashMap<u16, Arc<netbaiot_runtime::CommandProgress>>>,
     /// Original transmission order for reconnect retransmission (MQTT-4.6.0-1).
-    outbound_order: VecDeque<u16>,
+    outbound_order: Lazy<VecDeque<u16>>,
     next_packet_id: u16,
     state_bytes: usize,
     last_seen_ms: i64,
@@ -391,18 +392,18 @@ struct StoredSession {
     #[serde(skip)]
     send_quota: u16,
     #[serde(skip)]
-    sent: HashSet<u16>,
+    sent: Lazy<HashSet<u16>>,
     /// QoS PUBLISH packets occupying this network connection's Receive Maximum.
     /// A successful QoS2 PUBREC does not release the slot; PUBCOMP does.
     #[serde(skip)]
-    send_window: HashSet<u16>,
+    send_window: Lazy<HashSet<u16>>,
     /// Inbound QoS2 PUBLISH packets admitted on this network connection and
     /// not yet answered with PUBCOMP. Persistent QoS2 state is separate.
     #[serde(skip)]
-    inbound_window: HashSet<u16>,
+    inbound_window: Lazy<HashSet<u16>>,
     /// A QoS PUBLISH whose first transfer has begun must finish its ACK exchange
     /// even after Message Expiry. This state survives disconnect and NBMQ recovery.
-    started_outbound: HashSet<u16>,
+    started_outbound: Lazy<HashSet<u16>>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
@@ -455,7 +456,7 @@ impl PendingWill {
 #[derive(Clone)]
 struct ActiveSession {
     generation: u64,
-    sender: mpsc::Sender<BrokerFrame>,
+    sender: frame_channel::FrameSender,
     cancel: CancellationToken,
     connection_bytes: ByteBudget,
     tenant_bytes: ByteBudget,
@@ -579,7 +580,7 @@ pub struct Attachment {
     pub generation: u64,
     pub session_incarnation: u64,
     pub session_present: bool,
-    pub receiver: mpsc::Receiver<BrokerFrame>,
+    pub receiver: FrameReceiver,
     pub cancel: CancellationToken,
     broker: Arc<MqttBroker>,
     clean_session: bool,
@@ -777,4 +778,11 @@ mod tests;
 #[cfg(test)]
 mod second_round_bench;
 
+mod frame_channel;
+mod lazy;
 mod profiling;
+pub use frame_channel::FrameReceiver;
+use lazy::Lazy;
+
+#[cfg(test)]
+mod density_memory;

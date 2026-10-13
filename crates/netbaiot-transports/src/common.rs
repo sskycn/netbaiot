@@ -1,5 +1,5 @@
 use crate::mqtt::broker::MqttBroker;
-use bytes::BytesMut;
+use bytes::{BufMut, Bytes, BytesMut};
 use netbaiot_core::Transport;
 use netbaiot_runtime::*;
 use std::{net::SocketAddr, sync::Arc, time::Duration};
@@ -21,6 +21,7 @@ pub struct Services {
     pub shutdown: CancellationToken,
     pub control_lock: Arc<tokio::sync::Mutex<()>>,
     pub http_slots: Arc<tokio::sync::Semaphore>,
+    pub tls_handshakes: Arc<tokio::sync::Semaphore>,
     pub ingress: Arc<Ingress>,
     pub router: Arc<CommandRouter>,
     pub commands: Arc<CommandService>,
@@ -52,6 +53,7 @@ impl Services {
             shutdown,
             control_lock: Arc::new(tokio::sync::Mutex::new(())),
             http_slots: Arc::new(tokio::sync::Semaphore::new(limits.max_ingress)),
+            tls_handshakes: Arc::new(tokio::sync::Semaphore::new(limits.max_tls_handshakes)),
             commands: Arc::new(CommandService::new(router.clone())),
             router,
             connections: Connections::new(limits.clone(), ingress.metrics.clone()),
@@ -70,32 +72,100 @@ pub struct Reader {
     started: Option<Instant>,
     maximum: usize,
     read_timeout: Duration,
+    budget: Option<ConnectionReadBudget>,
+    allocation: Option<Arc<ReadAllocationPermit>>,
+}
+struct ReadFrame {
+    bytes: Bytes,
+    _allocation: Arc<ReadAllocationPermit>,
+}
+impl AsRef<[u8]> for ReadFrame {
+    fn as_ref(&self) -> &[u8] {
+        &self.bytes
+    }
 }
 impl Reader {
     pub fn new(maximum: usize, timeout_ms: u64) -> Self {
         Self {
-            buffer: BytesMut::with_capacity(maximum.min(4096)),
+            buffer: BytesMut::new(),
             started: None,
             maximum,
             read_timeout: Duration::from_millis(timeout_ms),
+            budget: None,
+            allocation: None,
         }
+    }
+    pub fn with_budget(maximum: usize, timeout_ms: u64, budget: ConnectionReadBudget) -> Self {
+        Self {
+            budget: Some(budget),
+            ..Self::new(maximum, timeout_ms)
+        }
+    }
+    pub fn authenticate(&mut self, device: &netbaiot_core::DeviceKey) -> Result<()> {
+        if let Some(budget) = &mut self.budget {
+            budget.authenticate(device)?;
+        }
+        Ok(())
+    }
+    /// Decoded zero-copy fields retain the allocation's byte charge until their
+    /// last alias is dropped, even if the reader or connection has gone away.
+    pub fn take_frame(&mut self, length: usize) -> Result<Bytes> {
+        if length > self.buffer.len() {
+            return Err(Error::Invalid);
+        }
+        let frame = self.buffer.split_to(length).freeze();
+        Ok(self.own_frame(frame))
+    }
+    pub fn own_frame(&self, frame: Bytes) -> Bytes {
+        if let Some(allocation) = &self.allocation {
+            Bytes::from_owner(ReadFrame {
+                bytes: frame,
+                _allocation: allocation.clone(),
+            })
+        } else {
+            frame
+        }
+    }
+    fn allocate(
+        &mut self,
+        capacity: usize,
+    ) -> Result<(BytesMut, Option<Arc<ReadAllocationPermit>>)> {
+        if capacity > self.maximum {
+            return Err(Error::Invalid);
+        }
+        let allocation = self
+            .budget
+            .as_mut()
+            .map(|budget| budget.reserve_allocation(capacity).map(Arc::new))
+            .transpose()?;
+        Ok((BytesMut::with_capacity(capacity), allocation))
     }
     pub fn consumed(&mut self) {
         // Buffered tail bytes have already arrived. Processing the preceding
         // packet must not grant them a fresh read budget.
         if self.buffer.is_empty() {
             self.started = None;
-            // A rare large frame must not pin its allocation for the lifetime of
-            // an otherwise idle connection. The threshold avoids churn for normal traffic.
-            if self.buffer.capacity() > 16 * 1024 {
-                self.buffer = BytesMut::with_capacity(self.maximum.min(4096));
-            }
+            // A completed packet must not pin its read allocation for the
+            // lifetime of an otherwise idle connection, including small packets.
+            self.buffer = BytesMut::new();
+            self.allocation = None;
         }
     }
     pub async fn read_more(
         &mut self,
         stream: &mut (impl AsyncRead + Unpin + ?Sized),
         idle_deadline: Instant,
+    ) -> Result<()> {
+        let target = self.buffer.len().saturating_add(4096).min(self.maximum);
+        self.read_more_to(stream, idle_deadline, target).await
+    }
+    /// The protocol validates its header before asking for a complete frame.
+    /// No socket read is allowed to grow beyond this checked target.
+    pub async fn read_more_to(
+        &mut self,
+        stream: &mut (impl AsyncRead + Unpin + ?Sized),
+        idle_deadline: Instant,
+        target: usize,
     ) -> Result<()> {
         let deadline = self
             .started
@@ -107,26 +177,65 @@ impl Reader {
         if Instant::now() >= deadline {
             return Err(Error::Timeout);
         }
-        let room = self
-            .maximum
+        if target > self.maximum {
+            return Err(Error::Invalid);
+        }
+        let room = target
             .checked_sub(self.buffer.len())
             .ok_or(Error::Invalid)?;
         if room == 0 {
             return Err(Error::Invalid);
         }
-        let mut chunk = [0u8; 4096];
-        let n = room.min(chunk.len());
-        let read = tokio::time::timeout_at(deadline, stream.read(&mut chunk[..n]))
-            .await
-            .map_err(|_| Error::Timeout)?
-            .map_err(|_| Error::Unavailable)?;
+        let read = if self.buffer.is_empty() {
+            // The idle future retains eight bytes, and no heap allocation. Most
+            // MQTT control packets fit here. Allocate only after bytes arrive.
+            let mut first = [0u8; 8];
+            let n = room.min(first.len());
+            let read = tokio::time::timeout_at(deadline, stream.read(&mut first[..n]))
+                .await
+                .map_err(|_| Error::Timeout)?
+                .map_err(|_| Error::Unavailable)?;
+            if read != 0 {
+                let (buffer, allocation) = self.allocate(read)?;
+                self.buffer = buffer;
+                self.allocation = allocation;
+                self.buffer.extend_from_slice(&first[..read]);
+            }
+            read
+        } else {
+            if self.buffer.capacity() < target {
+                // BytesMut::reserve may double an old allocation. Use an exact
+                // checked capacity instead; there is no second read chunk copy.
+                let mut prefix = [0u8; 8];
+                let length = self.buffer.len();
+                if length <= prefix.len() {
+                    // A validated MQTT/TCP header fits inline. Release its old
+                    // allocation before admitting a maximum-size legal frame.
+                    prefix[..length].copy_from_slice(&self.buffer);
+                    self.buffer = BytesMut::new();
+                    self.allocation = None;
+                }
+                let (mut next, allocation) = self.allocate(target)?;
+                if length <= prefix.len() {
+                    next.extend_from_slice(&prefix[..length]);
+                } else {
+                    next.extend_from_slice(&self.buffer);
+                }
+                self.buffer = next;
+                self.allocation = allocation;
+            }
+            let mut destination = (&mut self.buffer).limit(room);
+            tokio::time::timeout_at(deadline, stream.read_buf(&mut destination))
+                .await
+                .map_err(|_| Error::Timeout)?
+                .map_err(|_| Error::Unavailable)?
+        };
         if read == 0 {
             return Err(Error::Unavailable);
         }
         if self.started.is_none() {
             self.started = Some(Instant::now());
         }
-        self.buffer.extend_from_slice(&chunk[..read]);
         Ok(())
     }
 }
@@ -230,7 +339,9 @@ async fn serve_listener(
                     services.connections.acquire_pending(peer.ip())
                 };
                 let lease=match reservation{Ok(l)=>l,Err(_)=>{services.ingress.metrics.inc(Metric::ConnectionsRejected);continue;}};
-                tasks.spawn(serve_accepted(socket, peer, kind, services.clone(), lease, tls.clone(), stop.child_token()));
+                // Connections observe listener shutdown; live session takeover has
+                // its own cancellation owner. No per-connection child tree is needed.
+                tasks.spawn(serve_accepted(socket, peer, kind, services.clone(), lease, tls.clone(), stop.clone()));
             }
         }
     }
@@ -259,6 +370,13 @@ async fn serve_accepted(
     let result = async {
         let deadline = lease.connect_deadline();
         let (stream, certificate): (BoxStream, Option<Vec<u8>>) = if let Some(tls) = tls {
+            // Do not create tasks waiting for handshake capacity. Established TLS
+            // connections release this slot before authentication and normal reads.
+            let _handshake = services.tls_handshakes.clone().try_acquire_owned()
+                .map_err(|_| {
+                    services.ingress.metrics.inc(Metric::ConnectionsRejected);
+                    Error::Overloaded
+                })?;
             tokio::select! {
                 biased;
                 _ = stop.cancelled() => return Err(Error::Draining),
@@ -324,17 +442,100 @@ pub fn local_addr(listener: &TcpListener) -> Result<SocketAddr> {
 }
 
 #[cfg(test)]
+#[path = "connection_density_profile.rs"]
+mod connection_density_profile;
+
+#[cfg(test)]
 mod audit_deadlines {
     use super::*;
     #[test]
-    fn large_empty_read_buffer_is_replaced_with_small_initial_capacity() {
+    fn empty_read_buffer_releases_every_allocation() {
         let mut reader = Reader::new(65_536, 30);
-        assert!(reader.buffer.capacity() <= 4_096);
+        assert_eq!(reader.buffer.capacity(), 0);
         reader.buffer.reserve(32_768);
         reader.buffer.extend_from_slice(&[0; 32_768]);
         reader.buffer.clear();
         reader.consumed();
-        assert!(reader.buffer.capacity() <= 4_096);
+        assert_eq!(reader.buffer.capacity(), 0);
+    }
+    #[tokio::test]
+    async fn maximum_frame_growth_admits_after_releasing_inline_header_and_alias_keeps_charge() {
+        let limits = Arc::new(Limits::default());
+        let maximum = limits.max_read_buffer_per_connection;
+        let connections = Connections::new(limits, Arc::new(Metrics::default()));
+        let mut lease = connections
+            .acquire("127.0.0.1".parse().unwrap(), Transport::Tcp)
+            .unwrap();
+        let tracking = lease.read_budget();
+        let mut reader = Reader::with_budget(maximum, 30_000, lease.read_budget());
+        let payload = vec![7; maximum];
+        let mut stream = payload.as_slice();
+        let idle = Instant::now() + Duration::from_secs(10);
+        reader.read_more_to(&mut stream, idle, 4).await.unwrap();
+        assert_eq!(reader.buffer.capacity(), 4);
+        assert_eq!(tracking.capacity().unwrap(), 4);
+        reader
+            .read_more_to(&mut stream, idle, maximum)
+            .await
+            .unwrap();
+        assert_eq!(reader.buffer.len(), maximum);
+        assert_eq!(reader.buffer.capacity(), maximum);
+        assert_eq!(tracking.capacity().unwrap(), maximum);
+        let frame = reader.take_frame(maximum).unwrap();
+        let alias = frame.slice(5..10);
+        reader.consumed();
+        assert_eq!(reader.buffer.capacity(), 0);
+        drop(reader);
+        drop(lease);
+        drop(frame);
+        assert_eq!(tracking.capacity().unwrap(), maximum);
+        assert_eq!(&alias[..], &[7; 5]);
+        drop(alias);
+        assert_eq!(tracking.capacity().unwrap(), 0);
+    }
+    #[tokio::test]
+    async fn checked_target_rejects_oversize_without_allocation() {
+        let mut reader = Reader::new(8, 30_000);
+        let mut stream = &[1; 9][..];
+        let idle = Instant::now() + Duration::from_secs(10);
+        assert!(matches!(
+            reader.read_more_to(&mut stream, idle, 9).await,
+            Err(Error::Invalid)
+        ));
+        assert_eq!(reader.buffer.capacity(), 0);
+        reader.read_more_to(&mut stream, idle, 8).await.unwrap();
+        assert!(matches!(
+            reader.read_more_to(&mut stream, idle, 8).await,
+            Err(Error::Invalid)
+        ));
+        assert_eq!(&reader.buffer[..], &[1; 8]);
+    }
+    #[tokio::test(start_paused = true)]
+    async fn cancelled_direct_read_keeps_prefix_and_packet_deadline() {
+        let (mut peer, mut stream) = tokio::io::duplex(64);
+        let mut reader = Reader::new(64, 30);
+        let idle = Instant::now() + Duration::from_secs(10);
+        peer.write_all(b"head").await.unwrap();
+        reader.read_more_to(&mut stream, idle, 4).await.unwrap();
+        assert!(
+            tokio::time::timeout(
+                Duration::from_millis(10),
+                reader.read_more_to(&mut stream, idle, 32),
+            )
+            .await
+            .is_err()
+        );
+        assert_eq!(&reader.buffer[..], b"head");
+        peer.write_all(b"tail").await.unwrap();
+        reader.read_more_to(&mut stream, idle, 32).await.unwrap();
+        assert_eq!(&reader.buffer[..], b"headtail");
+        tokio::time::advance(Duration::from_millis(21)).await;
+        peer.write_all(b"late").await.unwrap();
+        assert!(matches!(
+            reader.read_more_to(&mut stream, idle, 32).await,
+            Err(Error::Timeout)
+        ));
+        assert_eq!(&reader.buffer[..], b"headtail");
     }
     #[tokio::test(start_paused = true)]
     async fn audit_expired_packet_rejects_even_ready_socket_bytes() {

@@ -140,7 +140,7 @@ fn sample_will(index: usize) -> PendingWill {
     let owner = identity(index).device_key;
     let key = SessionKey {
         device: owner.clone(),
-        client_id: format!("client-{index}"),
+        client_id: format!("client-{index}").into(),
     };
     PendingWill {
         owner,

@@ -1572,8 +1572,14 @@ async fn active_tcp_connection_reuses_bound_auth_context_for_frames() {
     stream.read_exact(&mut length).await.unwrap();
     let mut reply = vec![0; u32::from_be_bytes(length) as usize];
     stream.read_exact(&mut reply).await.unwrap();
-    for sequence in 0..100 {
-        let body = payload(sequence);
+    for sequence in 0..101 {
+        let mut body = payload(sequence);
+        if sequence == 100 {
+            // A retained authentication frame must not consume the read quota
+            // needed by the next maximum-size legal TCP frame. JSON permits
+            // trailing whitespace; the event still traverses normal admission.
+            body.resize(Limits::default().max_tcp_frame_size, b' ');
+        }
         stream
             .write_all(&(body.len() as u32).to_be_bytes())
             .await

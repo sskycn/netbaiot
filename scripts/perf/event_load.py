@@ -145,7 +145,11 @@ def main():
         "requests_per_ip_second": 1000000,
         "messages_per_device_second": 1000000,
         "messages_per_tenant_second": 1000000,
-        "global_connection_logical_bytes": maximum * 524288,
+        # A ceiling, not preallocated or measured memory. Reader capacity is
+        # charged on demand, separately from the fixed connection allowance.
+        "connection_memory_reservation": 16_384,
+        "global_connection_logical_bytes": maximum * (16_384 + 65_540),
+        "max_connection_bytes_per_tenant": maximum * (16_384 + 65_540),
         "max_ingress": maximum,
         "max_ingress_per_tenant": maximum,
         "max_ingress_per_device": 4,

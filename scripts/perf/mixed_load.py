@@ -74,6 +74,7 @@ def main():
     maximum = 1100 if args.scenario == "mixed" else 256
     limits = {
         "max_connections": maximum,
+        "max_device_connections_per_protocol": maximum,
         "max_connections_per_ip": maximum,
         "max_connections_per_tenant": maximum,
         "max_devices": maximum,
@@ -89,7 +90,11 @@ def main():
         "requests_per_ip_second": 1_000_000,
         "messages_per_device_second": 1_000_000,
         "messages_per_tenant_second": 1_000_000,
-        "global_connection_logical_bytes": maximum * 524_288,
+        # A ceiling, not preallocated or measured memory. Reader capacity is
+        # charged on demand, separately from the fixed connection allowance.
+        "connection_memory_reservation": 16_384,
+        "global_connection_logical_bytes": maximum * (16_384 + 65_540),
+        "max_connection_bytes_per_tenant": maximum * (16_384 + 65_540),
         "max_ingress": maximum,
         "max_ingress_per_tenant": maximum,
         "max_ingress_per_device": 4,

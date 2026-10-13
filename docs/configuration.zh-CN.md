@@ -32,7 +32,9 @@ netbaiot serve --config netbaiot.json
 
 [生成的 JSON Schema](schema/netbaiot-config.schema.json)通过可选 `schema` feature 从真实
 Rust `Config`/serde 类型生成，遵循 serde default、enum 拼写和 `deny_unknown_fields`。
-资源标量限制与 runtime 的正数/u32 范围一致；`secret_hex` 标记为 `writeOnly` 且必须为
+资源标量必须为正数，通常受 u32 上限约束；聚合字节配额可超过 4 GiB，
+但不得超过 Tokio semaphore 的表示上限和 JSON 精确整数范围。单次分配和报文长度
+仍保留更严格的上限。`secret_hex` 标记为 `writeOnly` 且必须为
 64 个十六进制字符。生产 server/client binary 默认不启用 schema 生成。
 `netbaiot config schema` 可直接打印仓库提交的生成产物，不需要 compiler。
 

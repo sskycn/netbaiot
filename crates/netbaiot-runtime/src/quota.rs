@@ -65,9 +65,14 @@ impl ByteBudget {
     }
 }
 #[derive(Default)]
+struct TenantConnections {
+    connections: usize,
+    read_bytes: usize,
+}
+#[derive(Default)]
 struct ConnectionCounts {
     ips: HashMap<IpAddr, usize>,
-    tenants: HashMap<TenantId, usize>,
+    tenants: HashMap<TenantId, TenantConnections>,
     devices: HashMap<DeviceKey, usize>,
     transports: [usize; 3],
     device_transports: [usize; 3],
@@ -87,6 +92,27 @@ pub struct ConnectionLease {
     device_ingress: bool,
     connect_deadline: tokio::time::Instant,
     _slot: OwnedSemaphorePermit,
+    _bytes: BytesPermit,
+    read_state: Option<Arc<Mutex<ReadAllocationState>>>,
+}
+/// A lazy, connection-local account for actual read-buffer allocation capacity.
+/// Every allocation owns a permit, including allocations shared by decoded
+/// packets after their reader has moved on to another frame.
+pub struct ConnectionReadBudget {
+    owner: Arc<Connections>,
+    state: Arc<Mutex<ReadAllocationState>>,
+}
+#[derive(Default)]
+struct ReadAllocationState {
+    tenant: Option<TenantId>,
+    capacity: usize,
+}
+/// Keep this permit alive for every alias of the charged allocation. The
+/// transport can share it through the owner of an immutable byte buffer.
+pub struct ReadAllocationPermit {
+    owner: Arc<Connections>,
+    state: Arc<Mutex<ReadAllocationState>>,
+    capacity: usize,
     _bytes: BytesPermit,
 }
 impl Connections {
@@ -141,6 +167,7 @@ impl Connections {
                 + Duration::from_millis(self.limits.connect_timeout_ms),
             _slot: slot,
             _bytes: bytes,
+            read_state: None,
         }))
     }
     pub fn active(&self) -> Result<[usize; 3]> {
@@ -193,17 +220,187 @@ impl ConnectionLease {
             return Err(Error::Forbidden);
         }
         let mut counts = lock(&self.owner.counts)?;
-        if counts.tenants.get(&device.tenant_id).copied().unwrap_or(0)
+        if counts
+            .tenants
+            .get(&device.tenant_id)
+            .map_or(0, |tenant| tenant.connections)
             >= self.owner.limits.max_connections_per_tenant
             || counts.devices.get(device).copied().unwrap_or(0)
                 >= self.owner.limits.max_connections_per_device
         {
             return Err(Error::Overloaded);
         }
-        *counts.tenants.entry(device.tenant_id.clone()).or_default() += 1;
+        let mut read_state = self
+            .read_state
+            .as_ref()
+            .map(|state| lock(state))
+            .transpose()?;
+        let newly_bound_bytes = if let Some(state) = &read_state {
+            match &state.tenant {
+                Some(id) if id == &device.tenant_id => 0,
+                Some(_) => return Err(Error::Forbidden),
+                None => state.capacity,
+            }
+        } else {
+            0
+        };
+        let (tenant_connections, read_bytes) = counts
+            .tenants
+            .get(&device.tenant_id)
+            .map_or((0, 0), |tenant| (tenant.connections, tenant.read_bytes));
+        let new_read_bytes = read_bytes
+            .checked_add(newly_bound_bytes)
+            .ok_or(Error::Overloaded)?;
+        let next = tenant_connections
+            .checked_add(1)
+            .and_then(|count| count.checked_mul(self.owner.limits.connection_memory_reservation))
+            .and_then(|fixed| fixed.checked_add(new_read_bytes))
+            .ok_or(Error::Overloaded)?;
+        if next > self.owner.limits.max_connection_bytes_per_tenant {
+            return Err(Error::Overloaded);
+        }
+        let tenant = counts.tenants.entry(device.tenant_id.clone()).or_default();
+        tenant.connections += 1;
+        tenant.read_bytes = new_read_bytes;
+        if let Some(state) = &mut read_state {
+            state.tenant = Some(device.tenant_id.clone());
+        }
         *counts.devices.entry(device.clone()).or_default() += 1;
         self.device = Some(device.clone());
         Ok(())
+    }
+    /// A reader has exactly one owner and no initial allocation or semaphore.
+    pub fn read_budget(&mut self) -> ConnectionReadBudget {
+        let state = self
+            .read_state
+            .get_or_insert_with(|| {
+                Arc::new(Mutex::new(ReadAllocationState {
+                    tenant: self.device.as_ref().map(|device| device.tenant_id.clone()),
+                    capacity: 0,
+                }))
+            })
+            .clone();
+        ConnectionReadBudget {
+            owner: self.owner.clone(),
+            state,
+        }
+    }
+}
+impl ConnectionReadBudget {
+    /// Current charged capacity, including allocations shared by decoded frames.
+    pub fn capacity(&self) -> Result<usize> {
+        Ok(lock(&self.state)?.capacity)
+    }
+
+    /// Bind all live pre-authentication allocations to the authenticated tenant.
+    /// A failed bind leaves every allocation charged globally. Call this before
+    /// registering the authenticated session.
+    pub fn authenticate(&mut self, device: &DeviceKey) -> Result<()> {
+        // All paths use the same order: connection counts, then reader state.
+        let mut counts = lock(&self.owner.counts)?;
+        let mut state = lock(&self.state)?;
+        if let Some(tenant) = &state.tenant {
+            return if tenant == &device.tenant_id {
+                Ok(())
+            } else {
+                Err(Error::Forbidden)
+            };
+        }
+        let tenant = counts
+            .tenants
+            .get_mut(&device.tenant_id)
+            .ok_or(Error::Invalid)?;
+        let bytes = tenant
+            .read_bytes
+            .checked_add(state.capacity)
+            .ok_or(Error::Overloaded)?;
+        check_connection_tenant_bytes(&self.owner.limits, tenant.connections, bytes)?;
+        tenant.read_bytes = bytes;
+        state.tenant = Some(device.tenant_id.clone());
+        Ok(())
+    }
+
+    /// Fail-fast admission *before* allocation. Replacements must charge both
+    /// old and new live allocations; decoded frame aliases keep their charge
+    /// until their last owner is dropped. There is no task or quota waiter.
+    pub fn reserve_allocation(&mut self, capacity: usize) -> Result<ReadAllocationPermit> {
+        let shared = self.state.clone();
+        let mut counts = lock(&self.owner.counts)?;
+        let mut state = lock(&shared)?;
+        let next_capacity = state
+            .capacity
+            .checked_add(capacity)
+            .ok_or(Error::Overloaded)?;
+        if next_capacity > self.owner.limits.max_read_buffer_per_connection {
+            return Err(Error::Overloaded);
+        }
+        if let Some(id) = &state.tenant {
+            let tenant = counts.tenants.get(id).ok_or(Error::Invalid)?;
+            let next_bytes = tenant
+                .read_bytes
+                .checked_add(capacity)
+                .ok_or(Error::Overloaded)?;
+            check_connection_tenant_bytes(&self.owner.limits, tenant.connections, next_bytes)?;
+        }
+        // Global admission follows local/tenant preflight, with both accounting
+        // commits protected by the counts lock. Failure changes no byte counter.
+        let bytes = self.owner.memory.reserve(capacity)?;
+        if let Some(id) = &state.tenant {
+            counts
+                .tenants
+                .get_mut(id)
+                .ok_or(Error::Internal)?
+                .read_bytes += capacity;
+        }
+        state.capacity = next_capacity;
+        drop(state);
+        Ok(ReadAllocationPermit {
+            owner: self.owner.clone(),
+            state: shared,
+            capacity,
+            _bytes: bytes,
+        })
+    }
+}
+fn check_connection_tenant_bytes(
+    limits: &Limits,
+    connections: usize,
+    read_bytes: usize,
+) -> Result<()> {
+    let total = connections
+        .checked_mul(limits.connection_memory_reservation)
+        .and_then(|fixed| fixed.checked_add(read_bytes))
+        .ok_or(Error::Overloaded)?;
+    if total > limits.max_connection_bytes_per_tenant {
+        return Err(Error::Overloaded);
+    }
+    Ok(())
+}
+impl Drop for ReadAllocationPermit {
+    fn drop(&mut self) {
+        if let Ok(mut counts) = self.owner.counts.lock()
+            && let Ok(mut state) = self.state.lock()
+        {
+            state.capacity = state.capacity.saturating_sub(self.capacity);
+            if let Some(id) = &state.tenant {
+                if let Some(tenant) = counts.tenants.get_mut(id) {
+                    tenant.read_bytes = tenant.read_bytes.saturating_sub(self.capacity);
+                }
+                // A frame can outlive its reader and connection lease.
+                prune_connection_tenant(&mut counts, id);
+            }
+        }
+        // The owned global permit releases even if accounting was poisoned;
+        // subsequent admissions cannot pass that poisoned mutex.
+    }
+}
+fn prune_connection_tenant(counts: &mut ConnectionCounts, id: &TenantId) {
+    if counts
+        .tenants
+        .get(id)
+        .is_some_and(|tenant| tenant.connections == 0 && tenant.read_bytes == 0)
+    {
+        counts.tenants.remove(id);
     }
 }
 fn decrement<K: Eq + std::hash::Hash>(map: &mut HashMap<K, usize>, key: &K) {
@@ -219,7 +416,10 @@ impl Drop for ConnectionLease {
         if let Ok(mut counts) = self.owner.counts.lock() {
             decrement(&mut counts.ips, &self.ip);
             if let Some(device) = &self.device {
-                decrement(&mut counts.tenants, &device.tenant_id);
+                if let Some(tenant) = counts.tenants.get_mut(&device.tenant_id) {
+                    tenant.connections = tenant.connections.saturating_sub(1);
+                }
+                prune_connection_tenant(&mut counts, &device.tenant_id);
                 decrement(&mut counts.devices, device);
             }
             if let Some(transport) = self.transport {
@@ -764,12 +964,213 @@ mod tests {
         drop(held);
         assert!(concurrent.reserve(16).is_ok());
     }
+    #[test]
+    fn aggregate_byte_budget_exceeds_u32_without_a_large_allocation() {
+        if usize::BITS < 64 {
+            return;
+        }
+        let request = usize::try_from(u32::MAX).unwrap();
+        let budget = ByteBudget::new(request + 17);
+        let first = budget.reserve(request).unwrap();
+        let last = budget.reserve(17).unwrap();
+        assert_eq!(budget.available(), 0);
+        assert!(matches!(budget.reserve(1), Err(Error::Overloaded)));
+        assert!(matches!(
+            budget.reserve(request + 1),
+            Err(Error::Overloaded)
+        ));
+        drop(first);
+        assert_eq!(budget.available(), request);
+        drop(last);
+        assert_eq!(budget.available(), request + 17);
+    }
     fn key(tenant: &str, device: &str) -> DeviceKey {
         DeviceKey {
             tenant_id: TenantId::new(tenant).unwrap(),
             product_id: ProductId::new("p").unwrap(),
             device_id: DeviceId::new(device).unwrap(),
         }
+    }
+    fn reader_limits(global: usize, tenant: usize, per_reader: usize) -> Arc<Limits> {
+        Arc::new(Limits {
+            max_connections: 4,
+            max_connections_per_ip: 4,
+            max_connections_per_tenant: 4,
+            connection_memory_reservation: 16,
+            global_connection_logical_bytes: global,
+            max_connection_bytes_per_tenant: tenant,
+            max_read_buffer_per_connection: per_reader,
+            ..Limits::default()
+        })
+    }
+
+    #[test]
+    fn reader_growth_charges_actual_capacity_and_all_aliases_hold_it() {
+        let connections =
+            Connections::new(reader_limits(128, 128, 64), Arc::new(Metrics::default()));
+        let mut lease = connections
+            .acquire("127.0.0.1".parse().unwrap(), Transport::Mqtt)
+            .unwrap();
+        let mut reader = lease.read_budget();
+        let mut other_handle = lease.read_budget();
+        assert_eq!(reader.capacity().unwrap(), 0);
+        assert_eq!(connections.memory.available(), 112);
+        let allocation = Arc::new(reader.reserve_allocation(48).unwrap());
+        let alias = allocation.clone();
+        assert_eq!(other_handle.capacity().unwrap(), 48);
+        assert!(matches!(
+            other_handle.reserve_allocation(17),
+            Err(Error::Overloaded)
+        ));
+        lease.authenticate(&key("t", "d")).unwrap();
+        assert_eq!(
+            lock(&connections.counts).unwrap().tenants[&TenantId::new("t").unwrap()].read_bytes,
+            48
+        );
+        drop((reader, other_handle, allocation, lease));
+        // A decoded frame remains live after disconnect. Its allocation still
+        // counts globally and against the tenant until its last alias exits.
+        assert_eq!(connections.memory.available(), 80);
+        assert_eq!(lock(&connections.counts).unwrap().tenants.len(), 1);
+        drop(alias);
+        assert_eq!(connections.memory.available(), 128);
+        assert!(lock(&connections.counts).unwrap().tenants.is_empty());
+    }
+
+    #[test]
+    fn reader_global_and_tenant_failure_roll_back_every_account() {
+        let connections = Connections::new(reader_limits(80, 40, 64), Arc::new(Metrics::default()));
+        let mut a = connections
+            .acquire("127.0.0.1".parse().unwrap(), Transport::Mqtt)
+            .unwrap();
+        let mut b = connections
+            .acquire("127.0.0.1".parse().unwrap(), Transport::Mqtt)
+            .unwrap();
+        a.authenticate(&key("a", "one")).unwrap();
+        b.authenticate(&key("b", "two")).unwrap();
+        let mut a_reader = a.read_budget();
+        let mut b_reader = b.read_budget();
+        let held = a_reader.reserve_allocation(24).unwrap();
+        assert!(matches!(
+            a_reader.reserve_allocation(1),
+            Err(Error::Overloaded)
+        ));
+        assert_eq!(a_reader.capacity().unwrap(), 24);
+        let other = b_reader.reserve_allocation(24).unwrap();
+        assert_eq!(connections.memory.available(), 0);
+        // A different tenant has spare room only after b's first allocation
+        // exits; the exhausted global budget cannot grant capacity to a.
+        drop(other);
+        let mut unauthenticated = connections
+            .acquire("127.0.0.1".parse().unwrap(), Transport::Mqtt)
+            .unwrap();
+        let mut pending_reader = unauthenticated.read_budget();
+        assert!(matches!(
+            pending_reader.reserve_allocation(9),
+            Err(Error::Overloaded)
+        ));
+        assert_eq!(pending_reader.capacity().unwrap(), 0);
+        assert_eq!(connections.memory.available(), 8);
+        let tenant_bytes =
+            lock(&connections.counts).unwrap().tenants[&TenantId::new("a").unwrap()].read_bytes;
+        assert_eq!(tenant_bytes, 24);
+        drop((
+            held,
+            a,
+            b,
+            unauthenticated,
+            a_reader,
+            b_reader,
+            pending_reader,
+        ));
+        assert_eq!(connections.memory.available(), 80);
+        assert!(lock(&connections.counts).unwrap().tenants.is_empty());
+    }
+
+    #[test]
+    fn preauth_binding_overload_does_not_register_or_lose_global_ownership() {
+        let connections =
+            Connections::new(reader_limits(128, 32, 64), Arc::new(Metrics::default()));
+        let mut lease = connections
+            .acquire("127.0.0.1".parse().unwrap(), Transport::Mqtt)
+            .unwrap();
+        let mut reader = lease.read_budget();
+        let allocation = reader.reserve_allocation(32).unwrap();
+        assert!(matches!(
+            lease.authenticate(&key("t", "d")),
+            Err(Error::Overloaded)
+        ));
+        let counts = lock(&connections.counts).unwrap();
+        assert!(counts.tenants.is_empty());
+        assert!(counts.devices.is_empty());
+        drop(counts);
+        assert_eq!(connections.memory.available(), 80);
+        assert_eq!(reader.capacity().unwrap(), 32);
+        drop(allocation);
+        lease.authenticate(&key("t", "d")).unwrap();
+        reader.authenticate(&key("t", "d")).unwrap();
+        let allocated = reader.reserve_allocation(16).unwrap();
+        assert!(matches!(
+            reader.reserve_allocation(1),
+            Err(Error::Overloaded)
+        ));
+        drop((allocated, reader, lease));
+        assert_eq!(connections.memory.available(), 128);
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn concurrent_reader_reservations_cannot_exceed_tenant_bytes() {
+        let connections =
+            Connections::new(reader_limits(256, 64, 64), Arc::new(Metrics::default()));
+        let barrier = Arc::new(tokio::sync::Barrier::new(2));
+        let mut tasks = tokio::task::JoinSet::new();
+        for device in ["a", "b"] {
+            let mut lease = connections
+                .acquire("127.0.0.1".parse().unwrap(), Transport::Mqtt)
+                .unwrap();
+            lease.authenticate(&key("t", device)).unwrap();
+            let mut reader = lease.read_budget();
+            let barrier = barrier.clone();
+            tasks.spawn(async move {
+                barrier.wait().await;
+                let allocation = reader.reserve_allocation(32);
+                (lease, reader, allocation)
+            });
+        }
+        let mut owners = Vec::new();
+        while let Some(owner) = tasks.join_next().await {
+            owners.push(owner.unwrap());
+        }
+        assert_eq!(
+            owners
+                .iter()
+                .filter(|(_, _, allocation)| allocation.is_ok())
+                .count(),
+            1
+        );
+        assert_eq!(connections.memory.available(), 192);
+        assert_eq!(
+            lock(&connections.counts).unwrap().tenants[&TenantId::new("t").unwrap()].read_bytes,
+            32
+        );
+        drop(owners);
+        assert_eq!(connections.memory.available(), 256);
+        assert!(lock(&connections.counts).unwrap().tenants.is_empty());
+    }
+
+    #[test]
+    #[ignore = "reports inline ownership sizes; no connection-capacity claim"]
+    fn connection_ownership_sizes() {
+        println!(
+            "connection_ownership_sizes connection_lease={} pending_connection_lease={} read_budget={} read_state={} read_state_mutex={} read_allocation_permit={} bytes_permit={}",
+            std::mem::size_of::<ConnectionLease>(),
+            std::mem::size_of::<PendingConnectionLease>(),
+            std::mem::size_of::<ConnectionReadBudget>(),
+            std::mem::size_of::<ReadAllocationState>(),
+            std::mem::size_of::<Mutex<ReadAllocationState>>(),
+            std::mem::size_of::<ReadAllocationPermit>(),
+            std::mem::size_of::<BytesPermit>(),
+        );
     }
     #[test]
     fn protocol_packet_budget_charges_count_and_payload_units() {

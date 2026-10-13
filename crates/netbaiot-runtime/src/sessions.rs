@@ -37,7 +37,10 @@ pub struct SessionEndpoint {
     pub transport: Transport,
     pub auth: Arc<AuthenticatedDevice>,
     pub cancel: CancellationToken,
-    sender: mpsc::Sender<QueuedCommand>,
+    // Tokio allocates one 32-slot block when a channel is created. Keeping only
+    // pointers in that idle block avoids reserving full command objects for every
+    // connected device; count and byte permits still precede actual command ownership.
+    sender: mpsc::Sender<Box<QueuedCommand>>,
     connection_slots: Arc<Semaphore>,
     tenant_slots: Arc<Semaphore>,
     global_slots: Arc<Semaphore>,
@@ -88,7 +91,7 @@ impl SessionEndpoint {
         ];
         self.queued.fetch_add(1, Ordering::Relaxed);
         self.sender
-            .try_send(QueuedCommand {
+            .try_send(Box::new(QueuedCommand {
                 command_id: command.command_id,
                 expires_at,
                 progress,
@@ -96,7 +99,7 @@ impl SessionEndpoint {
                 bytes,
                 _bytes: permits,
                 _slots: slots,
-            })
+            }))
             .map_err(|_| Error::Overloaded)
     }
 }
@@ -214,7 +217,7 @@ impl Sessions {
         self: &Arc<Self>,
         auth: Arc<AuthenticatedDevice>,
         transport: Transport,
-    ) -> Result<(SessionLease, mpsc::Receiver<QueuedCommand>)> {
+    ) -> Result<(SessionLease, mpsc::Receiver<Box<QueuedCommand>>)> {
         let (lease, receiver, ()) = self.register_with(auth, transport, |_, _| Ok(()))?;
         Ok((lease, receiver))
     }
@@ -226,7 +229,7 @@ impl Sessions {
         auth: Arc<AuthenticatedDevice>,
         transport: Transport,
         finalize: impl FnOnce(&AuthenticatedDevice, u64) -> Result<T>,
-    ) -> Result<(SessionLease, mpsc::Receiver<QueuedCommand>, T)> {
+    ) -> Result<(SessionLease, mpsc::Receiver<Box<QueuedCommand>>, T)> {
         if !matches!(transport, Transport::Mqtt | Transport::Tcp) {
             return Err(Error::Invalid);
         }
@@ -607,6 +610,62 @@ impl Drop for SessionLease {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    #[ignore = "isolated serial release allocation measurement"]
+    fn density_memory() {
+        if cfg!(debug_assertions) {
+            panic!("release measurements only");
+        }
+        println!(
+            "DENSITY_SIZE,SessionEndpoint,{}",
+            std::mem::size_of::<SessionEndpoint>()
+        );
+        println!(
+            "DENSITY_SIZE,SessionLease,{}",
+            std::mem::size_of::<SessionLease>()
+        );
+        println!(
+            "DENSITY_SIZE,QueuedCommand,{}",
+            std::mem::size_of::<QueuedCommand>()
+        );
+        {
+            let region = stats_alloc::Region::new(&stats_alloc::INSTRUMENTED_SYSTEM);
+            let channel = mpsc::channel::<Box<QueuedCommand>>(64);
+            let stats = region.change();
+            println!(
+                "DENSITY_ALLOC,command_channel,{},{},{}",
+                stats.allocations, stats.bytes_allocated, stats.bytes_deallocated
+            );
+            drop(channel);
+        }
+        for count in [1_000, 10_000] {
+            let sessions = Sessions::new(Arc::new(Limits {
+                max_connections: count,
+                max_connections_per_tenant: count,
+                max_devices: count,
+                ..Limits::default()
+            }));
+            let identities = (0..count)
+                .map(|index| auth(&format!("density-device-{index:07}")))
+                .collect::<Vec<_>>();
+            let mut connections = Vec::with_capacity(count);
+            let region = stats_alloc::Region::new(&stats_alloc::INSTRUMENTED_SYSTEM);
+            for identity in identities {
+                connections.push(sessions.register(identity, Transport::Mqtt).unwrap());
+            }
+            let stats = region.change();
+            println!(
+                "DENSITY_SESSIONS,{count},{},{},{},{},{:.3}",
+                stats.allocations,
+                stats.deallocations,
+                stats.bytes_allocated,
+                stats.bytes_deallocated,
+                (stats.bytes_allocated - stats.bytes_deallocated) as f64 / count as f64
+            );
+            drop(connections);
+        }
+    }
 
     #[test]
     fn invalidated_old_generation_cannot_change_replacement_presence() {

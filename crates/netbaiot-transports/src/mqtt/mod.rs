@@ -62,7 +62,10 @@ async fn next(
             reader.consumed();
             return Ok((packet, validation_us, validated_at));
         }
-        reader.read_more(stream, idle).await?;
+        let header = fixed_header(&reader.buffer, limits.max_mqtt_packet_size)?;
+        reader
+            .read_more_to(stream, idle, header.map_or(5, |(_, _, total)| total))
+            .await?;
     }
 }
 
@@ -215,10 +218,14 @@ pub async fn connection(
         state: ConnectionState::Accepted,
     };
     machine.transition(ConnectionState::AwaitConnect)?;
-    let mut reader = Reader::new(limits.max_mqtt_packet_size, limits.packet_read_timeout_ms);
+    let mut reader = Reader::with_budget(
+        limits.max_mqtt_packet_size,
+        limits.packet_read_timeout_ms,
+        connection.read_budget(),
+    );
     loop {
-        if let Some((first, header, total)) =
-            codec::common::fixed_header(&reader.buffer, limits.max_mqtt_packet_size)?
+        let fixed = codec::common::fixed_header(&reader.buffer, limits.max_mqtt_packet_size)?;
+        if let Some((first, header, total)) = fixed
             && reader.buffer.len() >= total
         {
             if first != 0x10 || total < header + 7 {
@@ -232,7 +239,7 @@ pub async fn connection(
         }
         tokio::select! {
             _ = stop.cancelled() => return Ok(()),
-            result = reader.read_more(&mut stream, connection.connect_deadline()) => result?,
+            result = reader.read_more_to(&mut stream, connection.connect_deadline(), fixed.map_or(5, |(_, _, total)| total)) => result?,
         }
     }
     let (first, _, _) = tokio::select! {
@@ -295,12 +302,13 @@ pub async fn connection(
         send(&mut stream, &services, &connack(false, 3)).await?;
         return Err(error);
     }
+    reader.authenticate(&candidate.auth.device_key)?;
     let auth = Arc::new(candidate.auth.clone());
-    let requested_client_id = connect.client_id.clone();
+    let requested_client_id = std::mem::take(&mut connect.client_id);
     let clean_session = connect.clean_session;
     let mqtt = services.mqtt.clone();
     let registration = services.ingress.lifecycle.begin_admission()?;
-    let (live_session, mut commands, (mut attachment, client_id)) =
+    let (live_session, mut commands, mut attachment) =
         services.ingress.register_session_admitted_with(
             &registration,
             candidate,
@@ -311,11 +319,9 @@ pub async fn connection(
                 } else {
                     mqtt.attach(bound_auth, requested_client_id, clean_session)?
                 };
-                let client_id = attachment.key.client_id.clone();
-                Ok((attachment, client_id))
+                Ok(attachment)
             },
         )?;
-    connect.client_id = client_id;
     let mut will_guard = connect
         .will
         .take()
@@ -337,6 +343,14 @@ pub async fn connection(
         // on every early return, including a failed CONNACK write.
         will.arm();
     }
+    let keepalive = if connect.keep_alive == 0 {
+        None
+    } else {
+        Some(Duration::from_millis(u64::from(connect.keep_alive) * 1500))
+    };
+    // The immutable bound authentication context owns session identity. Release
+    // CONNECT credentials and temporary strings before entering the idle loop.
+    drop(connect);
     send(
         &mut stream,
         &services,
@@ -353,11 +367,6 @@ pub async fn connection(
             .is_some(),
     )?;
     drop(registration);
-    let keepalive = if connect.keep_alive == 0 {
-        None
-    } else {
-        Some(Duration::from_millis(u64::from(connect.keep_alive) * 1500))
-    };
     let mut last = Instant::now();
     let mut normal_disconnect = false;
     let mut fair = FairWork::default();

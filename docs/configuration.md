@@ -37,7 +37,10 @@ otherwise retain the server's current-working-directory semantics.
 [Generated JSON Schema](schema/netbaiot-config.schema.json) comes from the actual
 Rust Config/serde types through the optional `schema` feature. It respects
 serde defaults, enum spellings and deny_unknown_fields. Resource scalar limits
-share the runtime's positive/u32 range; secret_hex is writeOnly and 64 hex digits.
+are positive and normally bounded by u32. Aggregate byte ceilings may exceed
+4 GiB, within Tokio's semaphore representation and JSON's exact integer range;
+individual packet/allocation limits retain their tighter bounds. `secret_hex`
+is writeOnly and 64 hex digits.
 Production server/client binaries do not enable schema generation by default.
 `netbaiot config schema` prints the committed generated artifact without a compiler.
 
@@ -78,3 +81,29 @@ own more than these defaults. Set them lower to reserve global capacity
 for other tenants. Global and sink limits still apply independently; setting a
 tenant limit above the global limit does not increase capacity. Admission and
 restart replay preflight all global, tenant and required sink quotas before commit.
+
+## Connection memory admission
+
+`connection_memory_reservation` defaults to 16 KiB and reserves a conservative
+fixed allowance when the socket is admitted. It does not allocate that many
+bytes or represent exact heap, RSS, TLS or kernel socket memory. MQTT session,
+auth, command and event state retain their independently bounded accounts.
+
+Reader allocation capacity is charged on demand against
+`max_read_buffer_per_connection`, `max_connection_bytes_per_tenant` and
+`global_connection_logical_bytes`. The default reader ceiling is 65,540 bytes,
+including a maximum 65,536-byte TCP frame and its four-byte length envelope.
+Decoded frames that share an allocation keep its charge until their last alias
+is dropped. Replacement allocations must also reserve their temporary overlap.
+Admission fails immediately when a count or byte ceiling is exhausted.
+
+The global connection account combines fixed allowances and live reader capacity;
+the tenant account does the same after authentication. Pre-authentication bytes
+still consume the global account and must fit the tenant account when the
+connection authenticates. Increasing the maximum connection count requires sizing
+both byte ceilings, the per-protocol/IP/tenant counts, and other protocol state
+limits. `max_tls_handshakes` independently bounds concurrent TLS handshakes
+(default 64, maximum 65,536); excess connections close without waiting for a slot.
+Deployment capacity requires measured process and kernel memory.
+
+The fixed connection admission allowance has a validated 16 KiB minimum, independent of maximum frame size. Actual reader capacities are admitted on demand; logical quotas are not RSS or kernel socket measurements. See [connection density audit](performance/connection-density-20261013.md).

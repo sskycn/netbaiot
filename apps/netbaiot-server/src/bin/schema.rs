@@ -4,10 +4,16 @@ fn main() -> std::process::ExitCode {
         .pointer_mut("/$defs/Limits/properties")
         .and_then(serde_json::Value::as_object_mut)
     {
-        for value in properties.values_mut() {
+        for (name, value) in properties.iter_mut() {
             if let Some(object) = value.as_object_mut() {
-                object.insert("minimum".into(), netbaiot_runtime::LIMIT_SCALAR_MIN.into());
-                object.insert("maximum".into(), netbaiot_runtime::LIMIT_SCALAR_MAX.into());
+                object.insert(
+                    "minimum".into(),
+                    netbaiot_runtime::limit_scalar_minimum(name).into(),
+                );
+                object.insert(
+                    "maximum".into(),
+                    netbaiot_runtime::limit_scalar_maximum(name).into(),
+                );
             }
         }
     }

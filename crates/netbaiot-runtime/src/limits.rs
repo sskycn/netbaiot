@@ -3,6 +3,51 @@ use serde::{Deserialize, Serialize};
 
 pub const LIMIT_SCALAR_MIN: u64 = 1;
 pub const LIMIT_SCALAR_MAX: u64 = u32::MAX as u64;
+/// Measured fixed task/session/socket ownership requires a real allowance even
+/// when packet buffers are charged separately. A one-byte configured allowance
+/// must not admit arbitrarily many tasks against a tiny connection byte budget.
+pub const MIN_CONNECTION_MEMORY_RESERVATION: u64 = 16_384;
+pub fn limit_scalar_minimum(name: &str) -> u64 {
+    if name == "connection_memory_reservation" {
+        MIN_CONNECTION_MEMORY_RESERVATION
+    } else {
+        LIMIT_SCALAR_MIN
+    }
+}
+/// Aggregate byte ceilings may exceed 4 GiB. Stay within both Tokio's semaphore
+/// representation and JSON's exact integer range; individual allocations retain
+/// the u32 ceiling required by acquire_many.
+pub const LIMIT_AGGREGATE_BYTES_MAX: u64 = {
+    let exact_json_max = (1u64 << 53) - 1;
+    let semaphore_max = tokio::sync::Semaphore::MAX_PERMITS as u64;
+    if semaphore_max < exact_json_max {
+        semaphore_max
+    } else {
+        exact_json_max
+    }
+};
+
+pub fn limit_scalar_maximum(name: &str) -> u64 {
+    match name {
+        "global_connection_logical_bytes"
+        | "max_connection_bytes_per_tenant"
+        | "max_outbound_bytes_per_tenant"
+        | "max_outbound_bytes"
+        | "max_offline_bytes_per_tenant"
+        | "max_offline_bytes"
+        | "max_retained_bytes_per_tenant"
+        | "max_retained_bytes"
+        | "max_mqtt_session_state_bytes_per_tenant"
+        | "global_mqtt_session_bytes"
+        | "global_event_max_bytes"
+        | "event_queue_max_bytes_per_tenant"
+        | "sink_queue_max_bytes"
+        | "auth_cache_max_bytes"
+        | "spool_max_bytes"
+        | "mqtt_recovery_max_bytes" => LIMIT_AGGREGATE_BYTES_MAX,
+        _ => LIMIT_SCALAR_MAX,
+    }
+}
 
 /// One validated location for every in-process resource ceiling.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -16,6 +61,8 @@ pub struct Limits {
     pub max_connections_per_ip: usize,
     pub max_connections_per_device: usize,
     pub max_connections_per_tenant: usize,
+    /// Concurrent device/management TLS handshakes. No task waits for a slot.
+    pub max_tls_handshakes: usize,
     pub max_mqtt_packet_size: usize,
     pub max_mqtt_property_bytes: usize,
     pub max_mqtt_user_properties: usize,
@@ -64,13 +111,21 @@ pub struct Limits {
     pub max_mqtt_session_state_bytes_per_tenant: usize,
     pub global_mqtt_session_bytes: usize,
     pub mqtt_session_idle_ttl_ms: u64,
+    /// Actual capacity of all live reader allocations, including shared frames.
+    /// Includes the four-byte TCP framing envelope.
     pub max_read_buffer_per_connection: usize,
     pub max_write_buffer_per_connection: usize,
     pub max_outbound_messages_per_connection: usize,
     pub max_outbound_bytes_per_connection: usize,
     pub max_outbound_bytes_per_tenant: usize,
     pub max_outbound_bytes: usize,
+    /// Fixed connection allowances plus actual dynamically allocated read capacity.
     pub global_connection_logical_bytes: usize,
+    /// Same accounting for authenticated connections of one tenant. Before
+    /// authentication, global count/IP/fixed/dynamic ceilings still apply.
+    pub max_connection_bytes_per_tenant: usize,
+    /// Fixed connection allowance only. Packet capacity is charged on demand.
+    /// This is a resource reservation, not measured RSS or kernel socket memory.
     pub connection_memory_reservation: usize,
     pub max_ingress: usize,
     pub max_ingress_per_tenant: usize,
@@ -168,6 +223,7 @@ impl Default for Limits {
             max_connections_per_ip: 32,
             max_connections_per_device: 2,
             max_connections_per_tenant: 64,
+            max_tls_handshakes: 64,
             max_mqtt_packet_size: 65_536,
             max_mqtt_property_bytes: 4_096,
             max_mqtt_user_properties: 16,
@@ -215,7 +271,7 @@ impl Default for Limits {
             max_mqtt_session_state_bytes_per_tenant: 33_554_432,
             global_mqtt_session_bytes: 134_217_728,
             mqtt_session_idle_ttl_ms: 86_400_000,
-            max_read_buffer_per_connection: 65_536,
+            max_read_buffer_per_connection: 65_540,
             max_write_buffer_per_connection: 65_536,
             // Reconnect may need to enqueue every independently bounded QoS1 and QoS2
             // retransmission before it can accept more protocol work.
@@ -224,7 +280,8 @@ impl Default for Limits {
             max_outbound_bytes_per_tenant: 2_097_152,
             max_outbound_bytes: 8_388_608,
             global_connection_logical_bytes: 134_217_728,
-            connection_memory_reservation: 524_288,
+            max_connection_bytes_per_tenant: 67_108_864,
+            connection_memory_reservation: 16_384,
             max_ingress: 16,
             max_ingress_per_tenant: 4,
             max_ingress_per_device: 1,
@@ -349,10 +406,11 @@ impl Limits {
         if value
             .as_object()
             .ok_or(Error::Configuration)?
-            .values()
-            .any(|v| {
-                v.as_u64()
-                    .is_none_or(|number| !(LIMIT_SCALAR_MIN..=LIMIT_SCALAR_MAX).contains(&number))
+            .iter()
+            .any(|(name, v)| {
+                v.as_u64().is_none_or(|number| {
+                    !(limit_scalar_minimum(name)..=limit_scalar_maximum(name)).contains(&number)
+                })
             })
         {
             return Err(Error::Configuration);
@@ -361,7 +419,14 @@ impl Limits {
             .max_mqtt_packet_size
             .max(self.max_http_body_size)
             .max(self.max_tcp_frame_size);
+        let max_read_frame = self
+            .max_tcp_frame_size
+            .checked_add(4)
+            .ok_or(Error::Configuration)?
+            .max(self.max_mqtt_packet_size)
+            .max(self.max_http_body_size);
         if max_frame > 1_048_576
+            || self.max_tls_handshakes > 65_536
             || self.max_mqtt_property_bytes > self.max_mqtt_packet_size
             || self.max_mqtt_user_property_bytes > self.max_mqtt_property_bytes
             || self.max_mqtt_content_type_bytes > self.max_mqtt_property_bytes
@@ -419,9 +484,9 @@ impl Limits {
             || self.spool_record_max_bytes > self.spool_segment_max_bytes
             || self.spool_segment_max_bytes > self.spool_max_bytes
             || self.mqtt_recovery_max_bytes < self.mqtt_recovery_upper_bound()?
-            || self.max_read_buffer_per_connection < max_frame
-            || self.connection_memory_reservation < max_frame
+            || self.max_read_buffer_per_connection < max_read_frame
             || self.global_connection_logical_bytes < self.connection_memory_reservation
+            || self.max_connection_bytes_per_tenant < self.connection_memory_reservation
             || self.max_ingress_bytes < max_frame
             || self.max_ingress_wait_bytes < max_frame
             || self.max_command_bytes > self.max_write_buffer_per_connection
@@ -507,5 +572,71 @@ mod tests {
             limits.max_auth_provider_requests = invalid;
             assert!(matches!(limits.validate(), Err(Error::Configuration)));
         }
+    }
+
+    #[test]
+    fn fixed_connection_allowance_is_independent_of_maximum_frame() {
+        let limits = Limits {
+            connection_memory_reservation: 16_384,
+            max_tcp_frame_size: 1_048_576,
+            max_read_buffer_per_connection: 1_048_580,
+            ..Limits::default()
+        };
+        limits.validate().unwrap();
+        let mut missing_envelope = limits;
+        missing_envelope.max_read_buffer_per_connection = 1_048_576;
+        assert!(matches!(
+            missing_envelope.validate(),
+            Err(Error::Configuration)
+        ));
+    }
+
+    #[test]
+    fn aggregate_bytes_above_four_gib_validate_without_enlarging_allocations() {
+        if usize::BITS < 64 {
+            return;
+        }
+        let large = usize::try_from(64u64 * 1_024 * 1_024 * 1_024).unwrap();
+        let mut limits = Limits {
+            max_connections: 1_000_000,
+            max_device_connections_per_protocol: 1_000_000,
+            max_connections_per_ip: 1_000_000,
+            max_connections_per_tenant: 1_000_000,
+            max_connection_bytes_per_tenant: large,
+            global_connection_logical_bytes: large,
+            mqtt_recovery_max_bytes: 1_073_741_824,
+            connection_memory_reservation: 16_384,
+            ..Limits::default()
+        };
+        limits.validate().unwrap();
+        limits.max_read_buffer_per_connection = large;
+        assert!(matches!(limits.validate(), Err(Error::Configuration)));
+        limits.max_read_buffer_per_connection = 65_540;
+        limits.global_connection_logical_bytes =
+            usize::try_from(LIMIT_AGGREGATE_BYTES_MAX + 1).unwrap();
+        assert!(matches!(limits.validate(), Err(Error::Configuration)));
+    }
+
+    #[test]
+    fn tls_handshakes_are_independently_bounded_and_old_configs_default() {
+        let mut limits: Limits = serde_json::from_str("{}").unwrap();
+        assert_eq!(limits.max_tls_handshakes, 64);
+        for invalid in [0, 65_537] {
+            limits.max_tls_handshakes = invalid;
+            assert!(matches!(limits.validate(), Err(Error::Configuration)));
+        }
+        limits.max_tls_handshakes = 65_536;
+        limits.validate().unwrap();
+    }
+
+    #[test]
+    fn fixed_allowance_cannot_undercharge_measured_connection_ownership() {
+        let mut limits = Limits::default();
+        for bytes in [1, 2_048, 16_383] {
+            limits.connection_memory_reservation = bytes;
+            assert!(matches!(limits.validate(), Err(Error::Configuration)));
+        }
+        limits.connection_memory_reservation = 16_384;
+        limits.validate().unwrap();
     }
 }

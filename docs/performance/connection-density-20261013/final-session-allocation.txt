@@ -1,0 +1,11 @@
+
+running 1 test
+test sessions::tests::density_memory ... DENSITY_SIZE,SessionEndpoint,104
+DENSITY_SIZE,SessionLease,72
+DENSITY_SIZE,QueuedCommand,112
+DENSITY_ALLOC,command_channel,2,800,0
+DENSITY_SESSIONS,1000,7191,19,2236660,519144,1717.516
+DENSITY_SESSIONS,10000,71696,25,20320708,4175192,1614.552
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 165 filtered out; finished in 0.01s

@@ -384,8 +384,11 @@ impl Cursor {
                     result.response_topic = Some(value);
                 }
                 0x09 => {
-                    result.correlation_data =
-                        Some(properties.binary(limits.max_mqtt_correlation_data_bytes)?)
+                    // A small long-lived property must not retain an entire
+                    // CONNECT/PUBLISH reader allocation.
+                    result.correlation_data = Some(Bytes::copy_from_slice(
+                        &properties.binary(limits.max_mqtt_correlation_data_bytes)?,
+                    ))
                 }
                 0x11 => result.session_expiry = Some(properties.integer()?),
                 0x15 => {
@@ -393,8 +396,9 @@ impl Cursor {
                         Some(properties.string(limits.max_mqtt_property_bytes)?)
                 }
                 0x16 => {
-                    result.authentication_data =
-                        Some(properties.binary(limits.max_mqtt_property_bytes)?)
+                    result.authentication_data = Some(Bytes::copy_from_slice(
+                        &properties.binary(limits.max_mqtt_property_bytes)?,
+                    ))
                 }
                 0x17 | 0x19 => {
                     let value = properties.byte()?;
@@ -562,7 +566,9 @@ fn decode_connect(cursor: &mut Cursor, limits: &Limits) -> Result<Packet> {
         None
     };
     let password = if flags & 0x40 != 0 {
-        Some(cursor.binary(limits.max_password_bytes)?)
+        Some(Bytes::copy_from_slice(
+            &cursor.binary(limits.max_password_bytes)?,
+        ))
     } else {
         None
     };
