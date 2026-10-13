@@ -1,0 +1,2196 @@
+{
+  "schema_version": 1,
+  "baseline_production_revision": "cae81a9ffc35e5f19b068014018ed3af27632c82",
+  "candidate_production_revision": "1e36f1b3498761f2569f5aca65529d4cdd8ba8b1",
+  "validated_code_revision": "2484aaf5b17e95a20241bd9766e080f1a688e674",
+  "task_branch": "codex/performance-optimization-20261013",
+  "git_workflow": "local commits only; no merge or push",
+  "source_checkpoints": {
+    "cae81a9": "cae81a9ffc35e5f19b068014018ed3af27632c82",
+    "1a7753f": "1a7753f3d02b5deb69df4a2906d3ba82d16ab741",
+    "9052f85": "9052f85cec6d26c54e1cd319e510d67da12e474f",
+    "e51ec7c": "e51ec7c7938c0f0882decd1c20ab815957913418",
+    "641b00e": "641b00e1029b94b63ba160a90c240c1cbf42cb8b",
+    "6d95f2c": "6d95f2ca7779466e24c6d31ee603a552f14d6122",
+    "4ef4aae": "4ef4aae63a47a2500e4785adc9ec36b8b8de1812",
+    "4003fad": "4003fad6caef6b4886ceb3cbad99f7bcf8f373e9",
+    "1e36f1b": "1e36f1b3498761f2569f5aca65529d4cdd8ba8b1",
+    "442eac8": "442eac8725be5c6c3724bcc5fe94dcf930ce6d2d",
+    "096e25a": "096e25ae34a93de28cae20068e5d1c0b87da97fe",
+    "2484aaf": "2484aaf5b17e95a20241bd9766e080f1a688e674"
+  },
+  "environment": {
+    "os": "macOS27.0.1 build26A434",
+    "cpu": "Apple M4",
+    "architecture": "aarch64-apple-darwin",
+    "logical_cores": 10,
+    "memory_bytes": 17179869184,
+    "rustc": "rustc1.99.0 b940084d7 2026-09-28",
+    "LLVM": "23.1.1",
+    "python": "3.9.6",
+    "profile": "release",
+    "build_command": "cargo build --release --locked -p netbaiot-server -p netbaiot-loadgen --bin netbaiot-server --bin netbaiot-loadgen",
+    "server_workers_primary_env": "10",
+    "server_workers_configuration_env": [
+      "1",
+      "2",
+      "4",
+      "10"
+    ],
+    "loadgen_workers": "4 fixed in source",
+    "network": "same-host loopback",
+    "frequency_affinity_temperature": "not controlled or recorded",
+    "sampling": "ps cumulative CPU time; RSS/tasks/FD via existing tools",
+    "runtime_new_dependency": "none"
+  },
+  "binaries": {
+    "baseline/netbaiot-server": {
+      "source_revision": "cae81a9ffc35e5f19b068014018ed3af27632c82",
+      "sha256": "7f21ad9be6fb9766e0b7e560a3e3987abe07e9e42027dcc7b486f0bc1d2df3dd"
+    },
+    "round1/netbaiot-server": {
+      "source_revision": "9052f85cec6d26c54e1cd319e510d67da12e474f",
+      "sha256": "877429c1e5e6d46c9024d2e1925ddcd0688eecb5671862b2800f3668444e4aed"
+    },
+    "round3/netbaiot-server": {
+      "source_revision": "6d95f2ca7779466e24c6d31ee603a552f14d6122",
+      "sha256": "f5fc3aedcedd49bcb8235382676909714383f828ea298a4940c293103c8c1259"
+    },
+    "round4/netbaiot-server": {
+      "source_revision": "4ef4aae63a47a2500e4785adc9ec36b8b8de1812",
+      "sha256": "2b5a8b5bdc5b2bd596f7f4ee04dceb2dc4147fdcf6a6fa81d2846aff84b7095b"
+    },
+    "round5/netbaiot-server": {
+      "source_revision": "1e36f1b3498761f2569f5aca65529d4cdd8ba8b1",
+      "sha256": "167a3a84cf752548e835576252e08385bc26a29702d810049eb771e1c891cf81"
+    },
+    "baseline/netbaiot-loadgen": {
+      "source_revision": "cae81a9ffc35e5f19b068014018ed3af27632c82",
+      "sha256": "08d0d5acad5242e7875368fde397fcbac2578bcd3456969168d56cddfdf74047"
+    },
+    "baseline/business_rpc": {
+      "source_revision": "cae81a9ffc35e5f19b068014018ed3af27632c82",
+      "sha256": "b4d6bd7bc72543d2735ae72e881d3fcdc9839be4feecc3c0d5873dbeeb404ce1"
+    },
+    "validation/command-fixed/business_rpc": {
+      "source_revision": "096e25ae34a93de28cae20068e5d1c0b87da97fe",
+      "sha256": "8345d65fa8c384ab25595d582a7248317fb6f0d66e364fa6300693e7acc33ed3"
+    }
+  },
+  "tool_source_sha256": {
+    "scripts/perf/event_load.py": "944b2dbd0611a16e61b18202838560904a13fc11531ceeed363ed7010a989833",
+    "scripts/perf/mixed_load.py": "3df3ff695e06d6518437538ef281074a0bd4c12532e868ebd7912fd8d38c5906",
+    "scripts/perf/connection_memory.py": "588e07fc326bb7e340c5355fb8669bb4f2250e8e85372dd46231ca70a0a1cb31",
+    "scripts/perf/sink.py": "299a39baac3827097ac7a756ebebb1f0a9319dad2f00e924ea403864bbe26948",
+    "scripts/perf/codec_campaign.py": "5378413c2b1d70bc25234c797e62756e37614d92fe19bdd9028d40fa4b3860bf",
+    "scripts/perf/production_readiness.py": "d6ff8599c2416c1804cc4500ca96c439152124eea4a5801b8f2b2221eeff7c3d",
+    "tools/netbaiot-loadgen/run_business_rpc_v3_hol.py": "461ff8b8e2d3745e4ab863c9f6eb4e11fef132b4c2636e6157bdc187ab3aa396",
+    "tools/netbaiot-loadgen/run_business_rpc_v3_command_readiness.py": "349d8af18ee446862a4c6490d748adff60b9e94852b2b0114c14d1a0dc6820b4",
+    "tools/netbaiot-loadgen/business_rpc_harness_support.py": "c006e33841e6023201a01a4ba109378e2717ae0d140b5b8315ebc9a6e7713910",
+    "tools/netbaiot-loadgen/src/bin/business_rpc.rs": "bb149e34f26d754ba8d32d8f430790565ff41b2ae24b94945391ac2f4368cabf",
+    "tools/netbaiot-loadgen/src/main.rs": "cf6c8c4ab79a74a97a7468dffdb1f86029ebbc19df8c57bb660be94298a0ba79",
+    "Cargo.lock": "6227915914a800e212c218dc74d682863becd68f2427e2ee76945276faebc0e9",
+    "fuzz/Cargo.lock": "0e47c17bcf0588b18a84b006db9273260ca340891960cf526edcf29e5ac2eb7e"
+  },
+  "serial_worker_scan": {
+    "kind": "serial-worker-calibration",
+    "started_unix": 1791867985.662272,
+    "source_revision": "1e36f1b3498761f2569f5aca65529d4cdd8ba8b1",
+    "environment_worker_threads": null,
+    "runs": [
+      {
+        "name": "worker-10",
+        "command": [
+          "python3",
+          "scripts/perf/event_load.py",
+          "--server-bin",
+          "<repo>/target/performance/optimization-20261013/round5/netbaiot-server",
+          "--loadgen-bin",
+          "<repo>/target/performance/optimization-20261013/baseline/netbaiot-loadgen",
+          "--server-workers",
+          "10",
+          "--rate",
+          "30000",
+          "--duration",
+          "10",
+          "--warmup",
+          "3",
+          "--connections",
+          "64",
+          "--sink-mode",
+          "none",
+          "--qos",
+          "1",
+          "--payload-bytes",
+          "1024",
+          "--subscribe-uplink",
+          "--audit-open-loop",
+          "--no-lock-metrics"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 17.210945249999998
+      },
+      {
+        "name": "worker-2",
+        "command": [
+          "python3",
+          "scripts/perf/event_load.py",
+          "--server-bin",
+          "<repo>/target/performance/optimization-20261013/round5/netbaiot-server",
+          "--loadgen-bin",
+          "<repo>/target/performance/optimization-20261013/baseline/netbaiot-loadgen",
+          "--server-workers",
+          "2",
+          "--rate",
+          "30000",
+          "--duration",
+          "10",
+          "--warmup",
+          "3",
+          "--connections",
+          "64",
+          "--sink-mode",
+          "none",
+          "--qos",
+          "1",
+          "--payload-bytes",
+          "1024",
+          "--subscribe-uplink",
+          "--audit-open-loop",
+          "--no-lock-metrics"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 17.184764875000003
+      },
+      {
+        "name": "worker-4",
+        "command": [
+          "python3",
+          "scripts/perf/event_load.py",
+          "--server-bin",
+          "<repo>/target/performance/optimization-20261013/round5/netbaiot-server",
+          "--loadgen-bin",
+          "<repo>/target/performance/optimization-20261013/baseline/netbaiot-loadgen",
+          "--server-workers",
+          "4",
+          "--rate",
+          "30000",
+          "--duration",
+          "10",
+          "--warmup",
+          "3",
+          "--connections",
+          "64",
+          "--sink-mode",
+          "none",
+          "--qos",
+          "1",
+          "--payload-bytes",
+          "1024",
+          "--subscribe-uplink",
+          "--audit-open-loop",
+          "--no-lock-metrics"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 17.26160325
+      },
+      {
+        "name": "worker-1",
+        "command": [
+          "python3",
+          "scripts/perf/event_load.py",
+          "--server-bin",
+          "<repo>/target/performance/optimization-20261013/round5/netbaiot-server",
+          "--loadgen-bin",
+          "<repo>/target/performance/optimization-20261013/baseline/netbaiot-loadgen",
+          "--server-workers",
+          "1",
+          "--rate",
+          "30000",
+          "--duration",
+          "10",
+          "--warmup",
+          "3",
+          "--connections",
+          "64",
+          "--sink-mode",
+          "none",
+          "--qos",
+          "1",
+          "--payload-bytes",
+          "1024",
+          "--subscribe-uplink",
+          "--audit-open-loop",
+          "--no-lock-metrics"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 17.226517917000002
+      }
+    ]
+  },
+  "serial_controlled_comparison": {
+    "kind": "isolated-serial-comparison",
+    "started_unix": 1791868146.874778,
+    "source_revision": "1e36f1b3498761f2569f5aca65529d4cdd8ba8b1",
+    "runs": [
+      {
+        "name": "primary-1-A-w10",
+        "command": [
+          "python3",
+          "scripts/perf/event_load.py",
+          "--server-bin",
+          "<repo>/target/performance/optimization-20261013/baseline/netbaiot-server",
+          "--loadgen-bin",
+          "<repo>/target/performance/optimization-20261013/baseline/netbaiot-loadgen",
+          "--server-workers",
+          "10",
+          "--rate",
+          "30000",
+          "--duration",
+          "20",
+          "--warmup",
+          "5",
+          "--connections",
+          "64",
+          "--sink-mode",
+          "none",
+          "--qos",
+          "1",
+          "--payload-bytes",
+          "1024",
+          "--subscribe-uplink",
+          "--audit-open-loop",
+          "--no-lock-metrics"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 29.789421209
+      },
+      {
+        "name": "primary-1-B-w10",
+        "command": [
+          "python3",
+          "scripts/perf/event_load.py",
+          "--server-bin",
+          "<repo>/target/performance/optimization-20261013/round5/netbaiot-server",
+          "--loadgen-bin",
+          "<repo>/target/performance/optimization-20261013/baseline/netbaiot-loadgen",
+          "--server-workers",
+          "10",
+          "--rate",
+          "30000",
+          "--duration",
+          "20",
+          "--warmup",
+          "5",
+          "--connections",
+          "64",
+          "--sink-mode",
+          "none",
+          "--qos",
+          "1",
+          "--payload-bytes",
+          "1024",
+          "--subscribe-uplink",
+          "--audit-open-loop",
+          "--no-lock-metrics"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 28.913469875
+      },
+      {
+        "name": "primary-1-B-w2",
+        "command": [
+          "python3",
+          "scripts/perf/event_load.py",
+          "--server-bin",
+          "<repo>/target/performance/optimization-20261013/round5/netbaiot-server",
+          "--loadgen-bin",
+          "<repo>/target/performance/optimization-20261013/baseline/netbaiot-loadgen",
+          "--server-workers",
+          "2",
+          "--rate",
+          "30000",
+          "--duration",
+          "20",
+          "--warmup",
+          "5",
+          "--connections",
+          "64",
+          "--sink-mode",
+          "none",
+          "--qos",
+          "1",
+          "--payload-bytes",
+          "1024",
+          "--subscribe-uplink",
+          "--audit-open-loop",
+          "--no-lock-metrics"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 28.849443750000006
+      },
+      {
+        "name": "primary-2-B-w2",
+        "command": [
+          "python3",
+          "scripts/perf/event_load.py",
+          "--server-bin",
+          "<repo>/target/performance/optimization-20261013/round5/netbaiot-server",
+          "--loadgen-bin",
+          "<repo>/target/performance/optimization-20261013/baseline/netbaiot-loadgen",
+          "--server-workers",
+          "2",
+          "--rate",
+          "30000",
+          "--duration",
+          "20",
+          "--warmup",
+          "5",
+          "--connections",
+          "64",
+          "--sink-mode",
+          "none",
+          "--qos",
+          "1",
+          "--payload-bytes",
+          "1024",
+          "--subscribe-uplink",
+          "--audit-open-loop",
+          "--no-lock-metrics"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 28.880718
+      },
+      {
+        "name": "primary-2-B-w10",
+        "command": [
+          "python3",
+          "scripts/perf/event_load.py",
+          "--server-bin",
+          "<repo>/target/performance/optimization-20261013/round5/netbaiot-server",
+          "--loadgen-bin",
+          "<repo>/target/performance/optimization-20261013/baseline/netbaiot-loadgen",
+          "--server-workers",
+          "10",
+          "--rate",
+          "30000",
+          "--duration",
+          "20",
+          "--warmup",
+          "5",
+          "--connections",
+          "64",
+          "--sink-mode",
+          "none",
+          "--qos",
+          "1",
+          "--payload-bytes",
+          "1024",
+          "--subscribe-uplink",
+          "--audit-open-loop",
+          "--no-lock-metrics"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 28.927708665999987
+      },
+      {
+        "name": "primary-2-A-w10",
+        "command": [
+          "python3",
+          "scripts/perf/event_load.py",
+          "--server-bin",
+          "<repo>/target/performance/optimization-20261013/baseline/netbaiot-server",
+          "--loadgen-bin",
+          "<repo>/target/performance/optimization-20261013/baseline/netbaiot-loadgen",
+          "--server-workers",
+          "10",
+          "--rate",
+          "30000",
+          "--duration",
+          "20",
+          "--warmup",
+          "5",
+          "--connections",
+          "64",
+          "--sink-mode",
+          "none",
+          "--qos",
+          "1",
+          "--payload-bytes",
+          "1024",
+          "--subscribe-uplink",
+          "--audit-open-loop",
+          "--no-lock-metrics"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 28.942097875
+      },
+      {
+        "name": "primary-3-A-w10",
+        "command": [
+          "python3",
+          "scripts/perf/event_load.py",
+          "--server-bin",
+          "<repo>/target/performance/optimization-20261013/baseline/netbaiot-server",
+          "--loadgen-bin",
+          "<repo>/target/performance/optimization-20261013/baseline/netbaiot-loadgen",
+          "--server-workers",
+          "10",
+          "--rate",
+          "30000",
+          "--duration",
+          "20",
+          "--warmup",
+          "5",
+          "--connections",
+          "64",
+          "--sink-mode",
+          "none",
+          "--qos",
+          "1",
+          "--payload-bytes",
+          "1024",
+          "--subscribe-uplink",
+          "--audit-open-loop",
+          "--no-lock-metrics"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 29.030149375000008
+      },
+      {
+        "name": "primary-3-B-w10",
+        "command": [
+          "python3",
+          "scripts/perf/event_load.py",
+          "--server-bin",
+          "<repo>/target/performance/optimization-20261013/round5/netbaiot-server",
+          "--loadgen-bin",
+          "<repo>/target/performance/optimization-20261013/baseline/netbaiot-loadgen",
+          "--server-workers",
+          "10",
+          "--rate",
+          "30000",
+          "--duration",
+          "20",
+          "--warmup",
+          "5",
+          "--connections",
+          "64",
+          "--sink-mode",
+          "none",
+          "--qos",
+          "1",
+          "--payload-bytes",
+          "1024",
+          "--subscribe-uplink",
+          "--audit-open-loop",
+          "--no-lock-metrics"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 28.97751970799999
+      },
+      {
+        "name": "primary-3-B-w2",
+        "command": [
+          "python3",
+          "scripts/perf/event_load.py",
+          "--server-bin",
+          "<repo>/target/performance/optimization-20261013/round5/netbaiot-server",
+          "--loadgen-bin",
+          "<repo>/target/performance/optimization-20261013/baseline/netbaiot-loadgen",
+          "--server-workers",
+          "2",
+          "--rate",
+          "30000",
+          "--duration",
+          "20",
+          "--warmup",
+          "5",
+          "--connections",
+          "64",
+          "--sink-mode",
+          "none",
+          "--qos",
+          "1",
+          "--payload-bytes",
+          "1024",
+          "--subscribe-uplink",
+          "--audit-open-loop",
+          "--no-lock-metrics"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 28.861170249999986
+      },
+      {
+        "name": "primary-4-B-w2",
+        "command": [
+          "python3",
+          "scripts/perf/event_load.py",
+          "--server-bin",
+          "<repo>/target/performance/optimization-20261013/round5/netbaiot-server",
+          "--loadgen-bin",
+          "<repo>/target/performance/optimization-20261013/baseline/netbaiot-loadgen",
+          "--server-workers",
+          "2",
+          "--rate",
+          "30000",
+          "--duration",
+          "20",
+          "--warmup",
+          "5",
+          "--connections",
+          "64",
+          "--sink-mode",
+          "none",
+          "--qos",
+          "1",
+          "--payload-bytes",
+          "1024",
+          "--subscribe-uplink",
+          "--audit-open-loop",
+          "--no-lock-metrics"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 28.82769512499999
+      },
+      {
+        "name": "primary-4-B-w10",
+        "command": [
+          "python3",
+          "scripts/perf/event_load.py",
+          "--server-bin",
+          "<repo>/target/performance/optimization-20261013/round5/netbaiot-server",
+          "--loadgen-bin",
+          "<repo>/target/performance/optimization-20261013/baseline/netbaiot-loadgen",
+          "--server-workers",
+          "10",
+          "--rate",
+          "30000",
+          "--duration",
+          "20",
+          "--warmup",
+          "5",
+          "--connections",
+          "64",
+          "--sink-mode",
+          "none",
+          "--qos",
+          "1",
+          "--payload-bytes",
+          "1024",
+          "--subscribe-uplink",
+          "--audit-open-loop",
+          "--no-lock-metrics"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 28.964264125
+      },
+      {
+        "name": "primary-4-A-w10",
+        "command": [
+          "python3",
+          "scripts/perf/event_load.py",
+          "--server-bin",
+          "<repo>/target/performance/optimization-20261013/baseline/netbaiot-server",
+          "--loadgen-bin",
+          "<repo>/target/performance/optimization-20261013/baseline/netbaiot-loadgen",
+          "--server-workers",
+          "10",
+          "--rate",
+          "30000",
+          "--duration",
+          "20",
+          "--warmup",
+          "5",
+          "--connections",
+          "64",
+          "--sink-mode",
+          "none",
+          "--qos",
+          "1",
+          "--payload-bytes",
+          "1024",
+          "--subscribe-uplink",
+          "--audit-open-loop",
+          "--no-lock-metrics"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 29.00744850000001
+      },
+      {
+        "name": "primary-5-A-w10",
+        "command": [
+          "python3",
+          "scripts/perf/event_load.py",
+          "--server-bin",
+          "<repo>/target/performance/optimization-20261013/baseline/netbaiot-server",
+          "--loadgen-bin",
+          "<repo>/target/performance/optimization-20261013/baseline/netbaiot-loadgen",
+          "--server-workers",
+          "10",
+          "--rate",
+          "30000",
+          "--duration",
+          "20",
+          "--warmup",
+          "5",
+          "--connections",
+          "64",
+          "--sink-mode",
+          "none",
+          "--qos",
+          "1",
+          "--payload-bytes",
+          "1024",
+          "--subscribe-uplink",
+          "--audit-open-loop",
+          "--no-lock-metrics"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 28.933622958
+      },
+      {
+        "name": "primary-5-B-w10",
+        "command": [
+          "python3",
+          "scripts/perf/event_load.py",
+          "--server-bin",
+          "<repo>/target/performance/optimization-20261013/round5/netbaiot-server",
+          "--loadgen-bin",
+          "<repo>/target/performance/optimization-20261013/baseline/netbaiot-loadgen",
+          "--server-workers",
+          "10",
+          "--rate",
+          "30000",
+          "--duration",
+          "20",
+          "--warmup",
+          "5",
+          "--connections",
+          "64",
+          "--sink-mode",
+          "none",
+          "--qos",
+          "1",
+          "--payload-bytes",
+          "1024",
+          "--subscribe-uplink",
+          "--audit-open-loop",
+          "--no-lock-metrics"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 28.945883917000003
+      },
+      {
+        "name": "primary-5-B-w2",
+        "command": [
+          "python3",
+          "scripts/perf/event_load.py",
+          "--server-bin",
+          "<repo>/target/performance/optimization-20261013/round5/netbaiot-server",
+          "--loadgen-bin",
+          "<repo>/target/performance/optimization-20261013/baseline/netbaiot-loadgen",
+          "--server-workers",
+          "2",
+          "--rate",
+          "30000",
+          "--duration",
+          "20",
+          "--warmup",
+          "5",
+          "--connections",
+          "64",
+          "--sink-mode",
+          "none",
+          "--qos",
+          "1",
+          "--payload-bytes",
+          "1024",
+          "--subscribe-uplink",
+          "--audit-open-loop",
+          "--no-lock-metrics"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 28.81927962499998
+      },
+      {
+        "name": "webhook-1-A",
+        "command": [
+          "python3",
+          "scripts/perf/event_load.py",
+          "--server-bin",
+          "<repo>/target/performance/optimization-20261013/baseline/netbaiot-server",
+          "--loadgen-bin",
+          "<repo>/target/performance/optimization-20261013/baseline/netbaiot-loadgen",
+          "--server-workers",
+          "10",
+          "--rate",
+          "1000",
+          "--duration",
+          "15",
+          "--warmup",
+          "5",
+          "--connections",
+          "64",
+          "--sink-mode",
+          "webhook",
+          "--qos",
+          "1",
+          "--audit-open-loop",
+          "--no-lock-metrics"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 24.00470520800002
+      },
+      {
+        "name": "webhook-1-B",
+        "command": [
+          "python3",
+          "scripts/perf/event_load.py",
+          "--server-bin",
+          "<repo>/target/performance/optimization-20261013/round5/netbaiot-server",
+          "--loadgen-bin",
+          "<repo>/target/performance/optimization-20261013/baseline/netbaiot-loadgen",
+          "--server-workers",
+          "10",
+          "--rate",
+          "1000",
+          "--duration",
+          "15",
+          "--warmup",
+          "5",
+          "--connections",
+          "64",
+          "--sink-mode",
+          "webhook",
+          "--qos",
+          "1",
+          "--audit-open-loop",
+          "--no-lock-metrics"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 23.960682332999966
+      },
+      {
+        "name": "webhook-2-B",
+        "command": [
+          "python3",
+          "scripts/perf/event_load.py",
+          "--server-bin",
+          "<repo>/target/performance/optimization-20261013/round5/netbaiot-server",
+          "--loadgen-bin",
+          "<repo>/target/performance/optimization-20261013/baseline/netbaiot-loadgen",
+          "--server-workers",
+          "10",
+          "--rate",
+          "1000",
+          "--duration",
+          "15",
+          "--warmup",
+          "5",
+          "--connections",
+          "64",
+          "--sink-mode",
+          "webhook",
+          "--qos",
+          "1",
+          "--audit-open-loop",
+          "--no-lock-metrics"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 23.948036375000015
+      },
+      {
+        "name": "webhook-2-A",
+        "command": [
+          "python3",
+          "scripts/perf/event_load.py",
+          "--server-bin",
+          "<repo>/target/performance/optimization-20261013/baseline/netbaiot-server",
+          "--loadgen-bin",
+          "<repo>/target/performance/optimization-20261013/baseline/netbaiot-loadgen",
+          "--server-workers",
+          "10",
+          "--rate",
+          "1000",
+          "--duration",
+          "15",
+          "--warmup",
+          "5",
+          "--connections",
+          "64",
+          "--sink-mode",
+          "webhook",
+          "--qos",
+          "1",
+          "--audit-open-loop",
+          "--no-lock-metrics"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 23.93179487499998
+      },
+      {
+        "name": "webhook-3-A",
+        "command": [
+          "python3",
+          "scripts/perf/event_load.py",
+          "--server-bin",
+          "<repo>/target/performance/optimization-20261013/baseline/netbaiot-server",
+          "--loadgen-bin",
+          "<repo>/target/performance/optimization-20261013/baseline/netbaiot-loadgen",
+          "--server-workers",
+          "10",
+          "--rate",
+          "1000",
+          "--duration",
+          "15",
+          "--warmup",
+          "5",
+          "--connections",
+          "64",
+          "--sink-mode",
+          "webhook",
+          "--qos",
+          "1",
+          "--audit-open-loop",
+          "--no-lock-metrics"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 23.942815333999988
+      },
+      {
+        "name": "webhook-3-B",
+        "command": [
+          "python3",
+          "scripts/perf/event_load.py",
+          "--server-bin",
+          "<repo>/target/performance/optimization-20261013/round5/netbaiot-server",
+          "--loadgen-bin",
+          "<repo>/target/performance/optimization-20261013/baseline/netbaiot-loadgen",
+          "--server-workers",
+          "10",
+          "--rate",
+          "1000",
+          "--duration",
+          "15",
+          "--warmup",
+          "5",
+          "--connections",
+          "64",
+          "--sink-mode",
+          "webhook",
+          "--qos",
+          "1",
+          "--audit-open-loop",
+          "--no-lock-metrics"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 23.8927148329999
+      },
+      {
+        "name": "fairness-1-w10",
+        "command": [
+          "python3",
+          "scripts/perf/mixed_load.py",
+          "--server-bin",
+          "<repo>/target/performance/optimization-20261013/round5/netbaiot-server",
+          "--loadgen-bin",
+          "<repo>/target/performance/optimization-20261013/baseline/netbaiot-loadgen",
+          "--server-workers",
+          "10",
+          "--scenario",
+          "route-fairness",
+          "--duration",
+          "15",
+          "--warmup",
+          "5",
+          "--cooldown",
+          "2"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 25.546296041999994
+      },
+      {
+        "name": "fairness-1-w2",
+        "command": [
+          "python3",
+          "scripts/perf/mixed_load.py",
+          "--server-bin",
+          "<repo>/target/performance/optimization-20261013/round5/netbaiot-server",
+          "--loadgen-bin",
+          "<repo>/target/performance/optimization-20261013/baseline/netbaiot-loadgen",
+          "--server-workers",
+          "2",
+          "--scenario",
+          "route-fairness",
+          "--duration",
+          "15",
+          "--warmup",
+          "5",
+          "--cooldown",
+          "2"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 25.543954708
+      },
+      {
+        "name": "fairness-2-w2",
+        "command": [
+          "python3",
+          "scripts/perf/mixed_load.py",
+          "--server-bin",
+          "<repo>/target/performance/optimization-20261013/round5/netbaiot-server",
+          "--loadgen-bin",
+          "<repo>/target/performance/optimization-20261013/baseline/netbaiot-loadgen",
+          "--server-workers",
+          "2",
+          "--scenario",
+          "route-fairness",
+          "--duration",
+          "15",
+          "--warmup",
+          "5",
+          "--cooldown",
+          "2"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 25.509974457999988
+      },
+      {
+        "name": "fairness-2-w10",
+        "command": [
+          "python3",
+          "scripts/perf/mixed_load.py",
+          "--server-bin",
+          "<repo>/target/performance/optimization-20261013/round5/netbaiot-server",
+          "--loadgen-bin",
+          "<repo>/target/performance/optimization-20261013/baseline/netbaiot-loadgen",
+          "--server-workers",
+          "10",
+          "--scenario",
+          "route-fairness",
+          "--duration",
+          "15",
+          "--warmup",
+          "5",
+          "--cooldown",
+          "2"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 25.486464875000024
+      },
+      {
+        "name": "fairness-3-w10",
+        "command": [
+          "python3",
+          "scripts/perf/mixed_load.py",
+          "--server-bin",
+          "<repo>/target/performance/optimization-20261013/round5/netbaiot-server",
+          "--loadgen-bin",
+          "<repo>/target/performance/optimization-20261013/baseline/netbaiot-loadgen",
+          "--server-workers",
+          "10",
+          "--scenario",
+          "route-fairness",
+          "--duration",
+          "15",
+          "--warmup",
+          "5",
+          "--cooldown",
+          "2"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 25.50879829200005
+      },
+      {
+        "name": "fairness-3-w2",
+        "command": [
+          "python3",
+          "scripts/perf/mixed_load.py",
+          "--server-bin",
+          "<repo>/target/performance/optimization-20261013/round5/netbaiot-server",
+          "--loadgen-bin",
+          "<repo>/target/performance/optimization-20261013/baseline/netbaiot-loadgen",
+          "--server-workers",
+          "2",
+          "--scenario",
+          "route-fairness",
+          "--duration",
+          "15",
+          "--warmup",
+          "5",
+          "--cooldown",
+          "2"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 25.530196250000017
+      },
+      {
+        "name": "commands-A",
+        "command": [
+          "python3",
+          "tools/netbaiot-loadgen/run_business_rpc_v3_command_readiness.py",
+          "configs/business-rpc-command-readiness/smoke-60s.json",
+          "--server-bin",
+          "<repo>/target/performance/optimization-20261013/baseline/netbaiot-server",
+          "--loadgen-bin",
+          "<repo>/target/performance/optimization-20261013/baseline/business_rpc",
+          "--output",
+          "<repo>/target/performance/optimization-20261013/isolated/commands-A"
+        ],
+        "exit_code": 1,
+        "elapsed_seconds": 71.44827762500006
+      },
+      {
+        "name": "commands-B",
+        "command": [
+          "python3",
+          "tools/netbaiot-loadgen/run_business_rpc_v3_command_readiness.py",
+          "configs/business-rpc-command-readiness/smoke-60s.json",
+          "--server-bin",
+          "<repo>/target/performance/optimization-20261013/round5/netbaiot-server",
+          "--loadgen-bin",
+          "<repo>/target/performance/optimization-20261013/baseline/business_rpc",
+          "--output",
+          "<repo>/target/performance/optimization-20261013/isolated/commands-B"
+        ],
+        "exit_code": 1,
+        "elapsed_seconds": 73.419359708
+      }
+    ],
+    "binaries": {
+      "baseline/netbaiot-server": "7f21ad9be6fb9766e0b7e560a3e3987abe07e9e42027dcc7b486f0bc1d2df3dd",
+      "round5/netbaiot-server": "167a3a84cf752548e835576252e08385bc26a29702d810049eb771e1c891cf81",
+      "baseline/netbaiot-loadgen": "08d0d5acad5242e7875368fde397fcbac2578bcd3456969168d56cddfdf74047",
+      "baseline/business_rpc": "b4d6bd7bc72543d2735ae72e881d3fcdc9839be4feecc3c0d5873dbeeb404ce1"
+    }
+  },
+  "excluded_shared_checkout_comparison": {
+    "timing_status": "diagnostic only; concurrent same-host activity possible",
+    "plan_raw": "final/plan.json",
+    "code_matrix_and_count_checks": "functional evidence retained; latency/CPU excluded"
+  },
+  "measurement_boundaries": {
+    "primary_rate": "measurement PUBACK count /20sec; not doubled subscriber receipts",
+    "sink_rate": "full gateway SinkACK counter /actual generator elapsed; includes connect,warmup,cooldown",
+    "cpu_event": "cumulative process CPU before shutdown /full gateway EventAccepted",
+    "rss": "max sampled process RSS; excludes kernel socket memory",
+    "percentiles": "median of per-run histogram percentiles, never pooled or summed",
+    "ACL_allocation": "probe allocations+reallocations; varies with identity length",
+    "RPC_event_ack_ms": "consumer decoded-receive to ack-return; not device to ACK",
+    "spool": "opaque original+copy; trusted gateway exit plus MQTT snapshot evidence, not standalone decoder/replay proof"
+  },
+  "raw_evidence_root": "<repo>/target/performance/optimization-20261013",
+  "raw_evidence": [
+    {
+      "file": "baseline/micro/accounting.log",
+      "bytes": 8163,
+      "sha256": "1a61cb9896657ec96032ae663301c969268c88a72c2c8f2e005ef075c0deb583"
+    },
+    {
+      "file": "baseline/micro/acl.log",
+      "bytes": 6475,
+      "sha256": "0e255108ca790ae4cddb5cab5a96f09eab56a94ffe322a01587a332bb30e753d"
+    },
+    {
+      "file": "baseline/micro/business-event.log",
+      "bytes": 6760,
+      "sha256": "4238f5156c3a46d2332d07e08de50d9d5d73a9887a6e17a1fc70c30b2fe1e6cf"
+    },
+    {
+      "file": "baseline/micro/fanout.log",
+      "bytes": 7967,
+      "sha256": "e62a265180dfdd41be6ef8c8756a6667d025f0db6803bd0ef87197ffe6953794"
+    },
+    {
+      "file": "baseline/micro/identifier.log",
+      "bytes": 2913,
+      "sha256": "5ac06388b1ef770f2ef9698f876365b042c3230ae407c412206d5eecf9bd3162"
+    },
+    {
+      "file": "baseline/micro/preflight.log",
+      "bytes": 10210,
+      "sha256": "e869afdd8714c2e7bebf18f9063a6626839c35314723df65455535804cc6d6bd"
+    },
+    {
+      "file": "final/bounded-overload.json",
+      "bytes": 47924,
+      "sha256": "ac97e46795d27b5efc0d59fa5076b1aacc2c9b2127ca451318d939f781536d5c"
+    },
+    {
+      "file": "final/mqtt5-metadata-tls.json",
+      "bytes": 47900,
+      "sha256": "d04afcbce9bd5e6b80f2eed7a7f4c5daaa3e124e0be3cddd75ae46658440b4b8"
+    },
+    {
+      "file": "final/outage.json",
+      "bytes": 47771,
+      "sha256": "3d27edb52e6e589e4f58b13f95878c23ec926c5bbf32d1802c6e57a35c2811e1"
+    },
+    {
+      "file": "final/qos2.json",
+      "bytes": 47843,
+      "sha256": "2a7781f1b51294a60d1ad78caf54a1b1188d824f43da8827abd9166d1622c481"
+    },
+    {
+      "file": "final/slow-sink.json",
+      "bytes": 47382,
+      "sha256": "03d5148b2542581d053a91a532be2676c7002a9d5877728595fad6be04bb513c"
+    },
+    {
+      "file": "isolated/commands-A.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "isolated/commands-A/final-metrics.txt",
+      "bytes": 39455,
+      "sha256": "f35e20c11ef1540b6ff4952800e0d892c4f0d8b5770beb9b07b70fff1275dafa"
+    },
+    {
+      "file": "isolated/commands-A/final-status.json",
+      "bytes": 749,
+      "sha256": "d09da03b010ec15333363d62a93271de62bef18e5573c5372a6b3f133e4d65db"
+    },
+    {
+      "file": "isolated/commands-A/gateway-config.json",
+      "bytes": 2282,
+      "sha256": "97cdcf1b0440971af63f300bb47f3d9b59322e77235d8c88c55bda8d8db1008f"
+    },
+    {
+      "file": "isolated/commands-A/gateway.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "isolated/commands-A/loadgen-config.json",
+      "bytes": 1348,
+      "sha256": "0272304329b699e4b2f30d969f73422ad13a8b7ea212519883a37f1d53443765"
+    },
+    {
+      "file": "isolated/commands-A/loadgen.json",
+      "bytes": 33009,
+      "sha256": "036b7de59a184cfbc900cfc48d81f6d0e3dddd68736e41187463a2a3798be182"
+    },
+    {
+      "file": "isolated/commands-A/loadgen.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "isolated/commands-A/shutdown.json",
+      "bytes": 1483,
+      "sha256": "e53603e09afacc31be82046623b111fedd577d0c50cbcd65f88e5404a829fad9"
+    },
+    {
+      "file": "isolated/commands-A/summary.json",
+      "bytes": 7009,
+      "sha256": "dcf4ea26cd991fcddf3a2e2508c4031e08121f8bd6f1f395f9d0ef3e42ff9750"
+    },
+    {
+      "file": "isolated/commands-B.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "isolated/commands-B/final-metrics.txt",
+      "bytes": 39452,
+      "sha256": "0d2d72b08f83280a12d83ebed00785b7a783ed245c0578d64fcecaa0c9a38e2b"
+    },
+    {
+      "file": "isolated/commands-B/final-status.json",
+      "bytes": 749,
+      "sha256": "177a9fd9775ef88c7666866a714ea6db2d8391edc5bcb8bf6f22c718f4a96f40"
+    },
+    {
+      "file": "isolated/commands-B/gateway-config.json",
+      "bytes": 2282,
+      "sha256": "a1485a21bdf8ba12a8231fa3216abdb290f211b20f5dc79ef3af409229578dff"
+    },
+    {
+      "file": "isolated/commands-B/gateway.log",
+      "bytes": 143,
+      "sha256": "0dee1d2587720f1973ab0d2105e68ffd135e0f411554b6841bf87b2317915810"
+    },
+    {
+      "file": "isolated/commands-B/loadgen-config.json",
+      "bytes": 1348,
+      "sha256": "a34666566a63fd0ed74a61e02c8b4841cab1d5402e9f7e572f249a8572bcca3a"
+    },
+    {
+      "file": "isolated/commands-B/loadgen.json",
+      "bytes": 33143,
+      "sha256": "4d8da5b699b41d50347e5745f7d0e5bc22c0d9b49fb3cfed73fd0d6023109a14"
+    },
+    {
+      "file": "isolated/commands-B/loadgen.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "isolated/commands-B/shutdown.json",
+      "bytes": 1483,
+      "sha256": "7d009551f9c38a7ec60bf97e9b6d8065e2ef1d8f58e568b2c359aadd4a1cf94c"
+    },
+    {
+      "file": "isolated/commands-B/summary.json",
+      "bytes": 7006,
+      "sha256": "f92b87f22e65d49d2abb14b3c187862546b13ccf84c19f159efd69ef6c51c795"
+    },
+    {
+      "file": "isolated/fairness-1-w10.json",
+      "bytes": 103289,
+      "sha256": "7968cb208635cfe55ab8095bf28defef812a34b00e010e3d60169f85165c6f56"
+    },
+    {
+      "file": "isolated/fairness-1-w10.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "isolated/fairness-1-w2.json",
+      "bytes": 103293,
+      "sha256": "1ddc02c5a55fd8359b3c6b1ae1f23d7208e645366fde0c018ac00a718f5dd3d6"
+    },
+    {
+      "file": "isolated/fairness-1-w2.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "isolated/fairness-2-w10.json",
+      "bytes": 103310,
+      "sha256": "d4f92391edfabb9db336b46b30e17ed281e67126abab4429467adbc910ca2ed5"
+    },
+    {
+      "file": "isolated/fairness-2-w10.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "isolated/fairness-2-w2.json",
+      "bytes": 103335,
+      "sha256": "b3a0ed8ef9b55e746eaa5a327283b38ffa853478c6215ece5cf3195db86abe79"
+    },
+    {
+      "file": "isolated/fairness-2-w2.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "isolated/fairness-3-w10.json",
+      "bytes": 103299,
+      "sha256": "96ea007bd8797b9cddd37b2061b3b4aa4fae55131d4d6be2330344f6273e57f1"
+    },
+    {
+      "file": "isolated/fairness-3-w10.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "isolated/fairness-3-w2.json",
+      "bytes": 103297,
+      "sha256": "663a615fb69c95af7c04914a5af38556023e0ffc447dbb4a95473cc5b643c5ea"
+    },
+    {
+      "file": "isolated/fairness-3-w2.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "isolated/primary-1-A-w10.json",
+      "bytes": 49310,
+      "sha256": "be353d8456efe725361f2ed93a33752c5b1260f4b02171398c426a52ba86c4c3"
+    },
+    {
+      "file": "isolated/primary-1-A-w10.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "isolated/primary-1-B-w10.json",
+      "bytes": 49241,
+      "sha256": "73dadcaeec0aafc2a2697a1841c86f626eeec24f1acf7f0ce933c6fb4df5537c"
+    },
+    {
+      "file": "isolated/primary-1-B-w10.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "isolated/primary-1-B-w2.json",
+      "bytes": 49258,
+      "sha256": "70080854c462c72601b163f78f31bcb2054ce41c25a7e1d4f66b3792b626c9b5"
+    },
+    {
+      "file": "isolated/primary-1-B-w2.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "isolated/primary-2-A-w10.json",
+      "bytes": 49300,
+      "sha256": "aca1eba13c8525943d523a608cb41f7117c4f0b12bc90f2b2f95514f869fe47c"
+    },
+    {
+      "file": "isolated/primary-2-A-w10.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "isolated/primary-2-B-w10.json",
+      "bytes": 49290,
+      "sha256": "aebf4c3dd981576d378a02e114f1e03c794a3b75353c918583f44d3f0f839a4d"
+    },
+    {
+      "file": "isolated/primary-2-B-w10.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "isolated/primary-2-B-w2.json",
+      "bytes": 49297,
+      "sha256": "946da1544c84bfd2225ecd2b88d55509e3e70d2888e967594d89536d5b41f3b6"
+    },
+    {
+      "file": "isolated/primary-2-B-w2.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "isolated/primary-3-A-w10.json",
+      "bytes": 49320,
+      "sha256": "89056a36a0c21cfc4dedd925f9598f4e10646adfa96e6f23fb8ec0bed1c39592"
+    },
+    {
+      "file": "isolated/primary-3-A-w10.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "isolated/primary-3-B-w10.json",
+      "bytes": 49305,
+      "sha256": "289fcb7b31216bcc39589bc26f117669ecaadbb2cdc98a5e0578565e3e5b0894"
+    },
+    {
+      "file": "isolated/primary-3-B-w10.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "isolated/primary-3-B-w2.json",
+      "bytes": 49303,
+      "sha256": "6b8f91ade274342e99e74da7f7165070719bdc8a902460b1f2997592a4cc4d97"
+    },
+    {
+      "file": "isolated/primary-3-B-w2.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "isolated/primary-4-A-w10.json",
+      "bytes": 49323,
+      "sha256": "966f0a71dd9784fa683057ea60f1d134f076ec274bdd9a750d735fbafad8d17a"
+    },
+    {
+      "file": "isolated/primary-4-A-w10.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "isolated/primary-4-B-w10.json",
+      "bytes": 49313,
+      "sha256": "a71dbc1dc14b4f421f3c54e08256d07ddea59b97d553e5c1169580953b3e62ee"
+    },
+    {
+      "file": "isolated/primary-4-B-w10.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "isolated/primary-4-B-w2.json",
+      "bytes": 49280,
+      "sha256": "0c49f61af1c22549bb581418703ec9f107a0a1615dd19ecf377acea8267cf79f"
+    },
+    {
+      "file": "isolated/primary-4-B-w2.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "isolated/primary-5-A-w10.json",
+      "bytes": 49320,
+      "sha256": "2d65c0209dc5e536020a9551de39b029ec87a0c04be06893bae09a0f74990dad"
+    },
+    {
+      "file": "isolated/primary-5-A-w10.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "isolated/primary-5-B-w10.json",
+      "bytes": 49312,
+      "sha256": "38884790a61153ce63805876f0255a174aae6237bbd054b106d989f3a5e319e7"
+    },
+    {
+      "file": "isolated/primary-5-B-w10.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "isolated/primary-5-B-w2.json",
+      "bytes": 49267,
+      "sha256": "be8396830a99ca3ea406003c11a40ef6709e61bd1476ac8152c18738f4314612"
+    },
+    {
+      "file": "isolated/primary-5-B-w2.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "isolated/serial-plan.json",
+      "bytes": 26182,
+      "sha256": "5e72fd9227308987695567107dcce6fa52e9e7923ecaf54d75a87519f5520e04"
+    },
+    {
+      "file": "isolated/webhook-1-A.json",
+      "bytes": 47541,
+      "sha256": "edcfdb9a51c2c349ae98ecb6a167807c7657f50ee09c56eea456546ea5931e7f"
+    },
+    {
+      "file": "isolated/webhook-1-A.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "isolated/webhook-1-B.json",
+      "bytes": 47536,
+      "sha256": "37a859ee1b82a34c56b9a21d33b951f6904cba5bb8164b8e1453528fb7731dec"
+    },
+    {
+      "file": "isolated/webhook-1-B.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "isolated/webhook-2-A.json",
+      "bytes": 47539,
+      "sha256": "a135264d64ab3342278298562458b0a172e5af30a878304b6302690195a7dda4"
+    },
+    {
+      "file": "isolated/webhook-2-A.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "isolated/webhook-2-B.json",
+      "bytes": 47538,
+      "sha256": "2f20eea4f63334530918ccca9ed04b8cd3a9ba2207d26fa021f9f2a453ef4e9f"
+    },
+    {
+      "file": "isolated/webhook-2-B.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "isolated/webhook-3-A.json",
+      "bytes": 47536,
+      "sha256": "a47ea135303a773bef04d5a127072f0a865d763f67feb0602b3d570c38006f49"
+    },
+    {
+      "file": "isolated/webhook-3-A.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "isolated/webhook-3-B.json",
+      "bytes": 47541,
+      "sha256": "7f9c835ce0a39a1985c5665a62090ad559b42605fa4667bb535f93446fd18dd7"
+    },
+    {
+      "file": "isolated/webhook-3-B.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "isolated/worker-1.json",
+      "bytes": 47242,
+      "sha256": "e0eb37bb78c63451f37e1d0dbe47ee120a6b7a7e3f3729f11a13ea1eba301b27"
+    },
+    {
+      "file": "isolated/worker-1.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "isolated/worker-10.json",
+      "bytes": 47235,
+      "sha256": "66632ea4638644a1d58dec2850d6995a6e6bdf14b9a8ced651c1bc62754bfd58"
+    },
+    {
+      "file": "isolated/worker-10.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "isolated/worker-2.json",
+      "bytes": 47275,
+      "sha256": "b863201d7e4c55241cbdef0be6bd5ee2c7a2a210649fa4d00dda9f9124c87f7c"
+    },
+    {
+      "file": "isolated/worker-2.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "isolated/worker-4.json",
+      "bytes": 47296,
+      "sha256": "0480302086eeef59792a7e716f2bd444afd2b1b093ab5901b0b202d1695dd55a"
+    },
+    {
+      "file": "isolated/worker-4.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "isolated/worker-plan.json",
+      "bytes": 3961,
+      "sha256": "f31e7a66869d4329ba665752c41f87a31c221541b5c016c7425f6dfdbfaa7968"
+    },
+    {
+      "file": "round1/acl.log",
+      "bytes": 4979,
+      "sha256": "5ff3d133bbfd2a0cfefb7602dc03b7ebf083ec14b7cc56a3564d46bd38b77838"
+    },
+    {
+      "file": "round1/build.log",
+      "bytes": 1197,
+      "sha256": "42f08cb54ac43893ee864d3e8b7b8f751fe8a551fd01a1bffe8f972d40e13d1a"
+    },
+    {
+      "file": "round1/tests.log",
+      "bytes": 1470,
+      "sha256": "f39ce3b10ff7309af03123586b76feefd028e32a12934928316777ee8a6855a0"
+    },
+    {
+      "file": "round2/build.log",
+      "bytes": 1098,
+      "sha256": "6b9ac1eb451ed544af79f2b14bef84f9d4cfd14adf670d4e62baf74280b28311"
+    },
+    {
+      "file": "round2/fanout.log",
+      "bytes": 7570,
+      "sha256": "e82bd03e140558c32610b847d334998558980a11ee45cb7d665baed054195076"
+    },
+    {
+      "file": "round2/preflight.log",
+      "bytes": 9814,
+      "sha256": "89db6dc61b9fa8c6f442b04331841b8e977a5be4f5653a0e1a6023981e703074"
+    },
+    {
+      "file": "round2/tests.log",
+      "bytes": 13037,
+      "sha256": "1e56aaba3456f1c5a246fd8d0fc1c2d5172c3448f8479f7d67b466b0b2262a2a"
+    },
+    {
+      "file": "round3/build.log",
+      "bytes": 1197,
+      "sha256": "99860e16ec8a38bfa212efc2024fa333184840a61ab8ed316cf91081d2de3532"
+    },
+    {
+      "file": "round3/business-event.log",
+      "bytes": 7232,
+      "sha256": "07f5c6d318b5c98a17b699155514b3d5abf6c5b4a87ac2380b4abfb4f15ffee2"
+    },
+    {
+      "file": "round3/identifier.log",
+      "bytes": 2572,
+      "sha256": "0b08cfacaf032687871b9bef6e8eee74a5f9aef8d1076af25f17ed8da76d4183"
+    },
+    {
+      "file": "round3/tests.log",
+      "bytes": 15995,
+      "sha256": "ce2ffca3a6764821c2bf8023cc6d1081554b76f0cb086ec71880162dcd837212"
+    },
+    {
+      "file": "round4/accounting.log",
+      "bytes": 8107,
+      "sha256": "9714c71f2204ca7a37f06a3c7d1f63d6fab20425f2fe673d89a081a1fdac3e51"
+    },
+    {
+      "file": "round4/build.log",
+      "bytes": 1197,
+      "sha256": "04b5607c47d8733d46f01d4395e79f6bd38899ece619192d9b9e26d737d92500"
+    },
+    {
+      "file": "round4/tests.log",
+      "bytes": 4514,
+      "sha256": "22454d703ef1b2543f6bc41aeec998ceccec0ce95dd30a93d37ea3b614a2dda2"
+    },
+    {
+      "file": "round5/build.log",
+      "bytes": 1098,
+      "sha256": "cb739dd96e3fd9c569e060675dcfde8f4d8c51fc272ef61ce3b3310c6d0bf3d0"
+    },
+    {
+      "file": "round5/business-event.log",
+      "bytes": 6746,
+      "sha256": "5a115e606e7975e9545a5e33ce87c68b701859228f855f576dc162c429a56ecd"
+    },
+    {
+      "file": "round5/final-build.log",
+      "bytes": 1197,
+      "sha256": "0f21716d8b7154b53e7d9abfee7e46972c1bf623184951f3d722000e999d9007"
+    },
+    {
+      "file": "round5/tests.log",
+      "bytes": 2536,
+      "sha256": "174f9d1362933c8f75c39e23d1fd86d2ed6f0a9555138161285ccd8d78c00653"
+    },
+    {
+      "file": "rpc-durable/large-1-A.log",
+      "bytes": 56,
+      "sha256": "10a1cef42534dc8329de2746305e8e816ddb9efb399c292f3d26cdd8e969bfae"
+    },
+    {
+      "file": "rpc-durable/large-1-A/shutdown.json",
+      "bytes": 1902,
+      "sha256": "5c8b2a7464469db25ea87a1159f0fb7138c3e1cc3135895ad7b9488168766e82"
+    },
+    {
+      "file": "rpc-durable/large-1-A/v3-8192-experiment.json",
+      "bytes": 1731,
+      "sha256": "b605b9c90676f05cd47cb6d2680a8ee2023fe145faff626e9454d9c8852e197d"
+    },
+    {
+      "file": "rpc-durable/large-1-A/v3-8192-gateway.log",
+      "bytes": 143,
+      "sha256": "663b1158e2d23244f9631139afe16991a6adb234faed613d70b1fbf670655c3d"
+    },
+    {
+      "file": "rpc-durable/large-1-A/v3-8192-loadgen.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "rpc-durable/large-1-A/v3-8192-metrics.txt",
+      "bytes": 39625,
+      "sha256": "fb24365ee89cd92b35e9b290be87777bf966d752b394045e5258042f517f561a"
+    },
+    {
+      "file": "rpc-durable/large-1-A/v3-8192-proxy.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "rpc-durable/large-1-A/v3-8192-shutdown.json",
+      "bytes": 1755,
+      "sha256": "519b403aa77cb7c02c3d926317b7a0fad43a4ac5e8bf820777b42add90417c27"
+    },
+    {
+      "file": "rpc-durable/large-1-A/v3-8192-status.json",
+      "bytes": 763,
+      "sha256": "c7e726c947b0d16eb799cd57ed28c93bfbcf1a2011f308b934dae44f3b6babe0"
+    },
+    {
+      "file": "rpc-durable/large-1-A/v3-8192.json",
+      "bytes": 6407,
+      "sha256": "4c901fc90d2b47b77e2c56891ef58fe3ccdb209730962601c63889cce87eb678"
+    },
+    {
+      "file": "rpc-durable/large-1-B.log",
+      "bytes": 56,
+      "sha256": "976548af83a6b342bc954f2e9a4d57caa6ba0c7123190146e1f28d449fed34fa"
+    },
+    {
+      "file": "rpc-durable/large-1-B/shutdown.json",
+      "bytes": 1910,
+      "sha256": "1e504678ecf4360ad64cecf89cde501976e0bc62dc4862c911c4699127cc7594"
+    },
+    {
+      "file": "rpc-durable/large-1-B/v3-8192-experiment.json",
+      "bytes": 1731,
+      "sha256": "6d300653e06af8322074e7d0e86125b1057bc2190daecb1a53e4e437d153585a"
+    },
+    {
+      "file": "rpc-durable/large-1-B/v3-8192-gateway.log",
+      "bytes": 143,
+      "sha256": "0ccb8aecff1e9255ced8c639e72114f93e251648e5426363e2ef5be6f5497535"
+    },
+    {
+      "file": "rpc-durable/large-1-B/v3-8192-loadgen.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "rpc-durable/large-1-B/v3-8192-metrics.txt",
+      "bytes": 39642,
+      "sha256": "ce8a76efdbfe9820b1998a396501a9b29bec854ea7aae54dd9fd2ffc6d9c6c14"
+    },
+    {
+      "file": "rpc-durable/large-1-B/v3-8192-proxy.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "rpc-durable/large-1-B/v3-8192-shutdown.json",
+      "bytes": 1763,
+      "sha256": "11deeaa402e9995670a4088c9cde9ea84312705c988a12218b8e10bb80b4ecab"
+    },
+    {
+      "file": "rpc-durable/large-1-B/v3-8192-status.json",
+      "bytes": 763,
+      "sha256": "33794ed8f054c3dbe81e240eb6a3a1e88eed5e54794238bd3a3a810d6e1c9cc1"
+    },
+    {
+      "file": "rpc-durable/large-1-B/v3-8192.json",
+      "bytes": 6397,
+      "sha256": "f10f560adc90c934f5719ee0267c8a67a15290f32d32e5b1e3f0aa181d038b74"
+    },
+    {
+      "file": "rpc-durable/large-2-A.log",
+      "bytes": 56,
+      "sha256": "b47e3b7e79f3282d8064b160245111ed7b7df25ca65a873f6c9d75c79f48d048"
+    },
+    {
+      "file": "rpc-durable/large-2-A/shutdown.json",
+      "bytes": 1904,
+      "sha256": "85a371faa5fc2054ab5fda6a7a9f72ec6dce2964b4a031e78122b61b90b11937"
+    },
+    {
+      "file": "rpc-durable/large-2-A/v3-8192-experiment.json",
+      "bytes": 1731,
+      "sha256": "e25a92277ef42caceacfca551d20e9d8632935fb801a8ada5c81c87d476e6132"
+    },
+    {
+      "file": "rpc-durable/large-2-A/v3-8192-gateway.log",
+      "bytes": 143,
+      "sha256": "513c29b1deb10bd734bb7f7fe83727d91e21efd43b4042c7c5a4d25297b71e4c"
+    },
+    {
+      "file": "rpc-durable/large-2-A/v3-8192-loadgen.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "rpc-durable/large-2-A/v3-8192-metrics.txt",
+      "bytes": 39628,
+      "sha256": "367ecd21411b332152f9dca8d80e0dd0c9f819e6fe5b1d1cd0c582b218ebb61e"
+    },
+    {
+      "file": "rpc-durable/large-2-A/v3-8192-proxy.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "rpc-durable/large-2-A/v3-8192-shutdown.json",
+      "bytes": 1757,
+      "sha256": "97987c25658f84efdfbedaeff6cf9fb8a5195ae5b1d2e157cf183deaa5c13235"
+    },
+    {
+      "file": "rpc-durable/large-2-A/v3-8192-status.json",
+      "bytes": 763,
+      "sha256": "23dcb83d0e0413e13c48c9cede32b699b3eb918fa358a5ffed61d8412d129b1c"
+    },
+    {
+      "file": "rpc-durable/large-2-A/v3-8192.json",
+      "bytes": 6399,
+      "sha256": "d3f6ef71964e71918f068584a12965f2cd8ba7f0802f9b50b5e5c1cf52833937"
+    },
+    {
+      "file": "rpc-durable/large-2-B.log",
+      "bytes": 56,
+      "sha256": "7bd66b3b89b2f3d6921c56584767d7e805bb45db010e6b5bafdefce5c5518c38"
+    },
+    {
+      "file": "rpc-durable/large-2-B/shutdown.json",
+      "bytes": 1904,
+      "sha256": "c63b327272a89c981dd77989e54e99d6338d623e83345b82d431647991aaf2d4"
+    },
+    {
+      "file": "rpc-durable/large-2-B/v3-8192-experiment.json",
+      "bytes": 1731,
+      "sha256": "28dc9ec64daebb61a0d65f9bdd8d8aa318e6096908576fec3b40fc7b044537f3"
+    },
+    {
+      "file": "rpc-durable/large-2-B/v3-8192-gateway.log",
+      "bytes": 143,
+      "sha256": "184fdcfb128ff31de98e3ba3f1ea38cbebf8da9e47e61be236e5bcbee7a85798"
+    },
+    {
+      "file": "rpc-durable/large-2-B/v3-8192-loadgen.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "rpc-durable/large-2-B/v3-8192-metrics.txt",
+      "bytes": 39628,
+      "sha256": "d9375a7b029401af0264d169351b352cc43f13bd4e73a5e1686a4c82ffc4de85"
+    },
+    {
+      "file": "rpc-durable/large-2-B/v3-8192-proxy.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "rpc-durable/large-2-B/v3-8192-shutdown.json",
+      "bytes": 1757,
+      "sha256": "484d1526877a345177d046081dda04b94f3745fd2670c89bf3986595bcab7a63"
+    },
+    {
+      "file": "rpc-durable/large-2-B/v3-8192-status.json",
+      "bytes": 763,
+      "sha256": "b8e2c0913d6a6d2086c90360de0b35a534c6a9cfc5dee3bb014fc9a88fb1dfbe"
+    },
+    {
+      "file": "rpc-durable/large-2-B/v3-8192.json",
+      "bytes": 6404,
+      "sha256": "4fe0e888f0853670d6788f96fc58c0cfe20f6de442d0ecb4fdc5a1e205c60e55"
+    },
+    {
+      "file": "rpc-durable/large-3-A.log",
+      "bytes": 56,
+      "sha256": "200ef130eaeb431a94237ca750cc484cab9a36e6f5d34d00d05ba8534f100a5d"
+    },
+    {
+      "file": "rpc-durable/large-3-A/shutdown.json",
+      "bytes": 1904,
+      "sha256": "e57eae6dcea24c15c2400aba96a92ad44d96379492fa9adf6018c0139de980c4"
+    },
+    {
+      "file": "rpc-durable/large-3-A/v3-8192-experiment.json",
+      "bytes": 1731,
+      "sha256": "be49abe54c32f9d143cfbdef0b6a07b07590cfff77f6b7db048338a91343aab9"
+    },
+    {
+      "file": "rpc-durable/large-3-A/v3-8192-gateway.log",
+      "bytes": 143,
+      "sha256": "495822bf86952679245e47a2038ecd4470ccf27b74c20e02e654fbcd47314ac3"
+    },
+    {
+      "file": "rpc-durable/large-3-A/v3-8192-loadgen.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "rpc-durable/large-3-A/v3-8192-metrics.txt",
+      "bytes": 39650,
+      "sha256": "e5621b25b2bdf76f76fdf055c017e165eee5d033b7409c220df15285de08a490"
+    },
+    {
+      "file": "rpc-durable/large-3-A/v3-8192-proxy.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "rpc-durable/large-3-A/v3-8192-shutdown.json",
+      "bytes": 1757,
+      "sha256": "52db0275a085c1d0b1cd39100565d34faacd595998c512dfc1abdad6c3f1ba93"
+    },
+    {
+      "file": "rpc-durable/large-3-A/v3-8192-status.json",
+      "bytes": 763,
+      "sha256": "6ddb1bee195c6f549f293e2d52e308e857a0513fa579b0705387ca4de06674a5"
+    },
+    {
+      "file": "rpc-durable/large-3-A/v3-8192.json",
+      "bytes": 6408,
+      "sha256": "91a0408c68ba2717eabe85061177b155a418904a3f794a6a57c993122c075384"
+    },
+    {
+      "file": "rpc-durable/large-3-B.log",
+      "bytes": 56,
+      "sha256": "a55c983bc395bc06726b239c36e149f36aa3be9fcee22d13b7b44f486d2cbcf5"
+    },
+    {
+      "file": "rpc-durable/large-3-B/shutdown.json",
+      "bytes": 1904,
+      "sha256": "58be2616787b0342fee81cb1588777300cb771e3bf39c6411cec882385c2f00f"
+    },
+    {
+      "file": "rpc-durable/large-3-B/v3-8192-experiment.json",
+      "bytes": 1731,
+      "sha256": "7c1a40a33bc2a96c358340295b3fb5353e354bfc66b24b44913d6d8ea6c02968"
+    },
+    {
+      "file": "rpc-durable/large-3-B/v3-8192-gateway.log",
+      "bytes": 143,
+      "sha256": "f38b1b600b9f9d3bbb607c37d4c4494f71916fb022f6f67e0cc5550945b466a7"
+    },
+    {
+      "file": "rpc-durable/large-3-B/v3-8192-loadgen.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "rpc-durable/large-3-B/v3-8192-metrics.txt",
+      "bytes": 39631,
+      "sha256": "dd51904ed7fe564977ac89e02bb66b170f05ff2be0ec91e976a28f6623ada0cf"
+    },
+    {
+      "file": "rpc-durable/large-3-B/v3-8192-proxy.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "rpc-durable/large-3-B/v3-8192-shutdown.json",
+      "bytes": 1757,
+      "sha256": "7a34f0b3096fecbedb1fef9ed5d01bcbf9ca4453a722bfe812a19c2b97a97df9"
+    },
+    {
+      "file": "rpc-durable/large-3-B/v3-8192-status.json",
+      "bytes": 763,
+      "sha256": "eebee7f0ecd5389af52d92f01e8e58e67be23a8f41d7451dd7bdbc65a609fa91"
+    },
+    {
+      "file": "rpc-durable/large-3-B/v3-8192.json",
+      "bytes": 6406,
+      "sha256": "32c199674bb9d0585a6195e2aafa07a0f3bb24e343bdf4010567c62d33ac0a37"
+    },
+    {
+      "file": "validation/clippy.log",
+      "bytes": 1372,
+      "sha256": "fd6afb97765ed258a7e628dc1ab7b649464329a7f2c8296ee52b10c0bf9f9468"
+    },
+    {
+      "file": "validation/command-fixed/A.log",
+      "bytes": 7029,
+      "sha256": "7fbf393da18376ad29579bc7b525708280db5a23bb8cda47128d348f4c6b545c"
+    },
+    {
+      "file": "validation/command-fixed/A/final-metrics.txt",
+      "bytes": 39460,
+      "sha256": "a4d073cc3c94b22e47fd63583a6bc0576dfe877d09d1188ea0ea8686c5219f0a"
+    },
+    {
+      "file": "validation/command-fixed/A/final-status.json",
+      "bytes": 749,
+      "sha256": "530fce6436f4a4ec8a4964b218d256afcd427a24b11a66194a05c6b93e012e22"
+    },
+    {
+      "file": "validation/command-fixed/A/gateway-config.json",
+      "bytes": 2289,
+      "sha256": "bdca2fcf7a0d9c751ffd32de23daf1e4b702d69e98ead1807395f7cd4fd439af"
+    },
+    {
+      "file": "validation/command-fixed/A/gateway.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "validation/command-fixed/A/loadgen-config.json",
+      "bytes": 1348,
+      "sha256": "13f7b2065b10cb05ae4b6bfa81d86f81ff881738df8c80713856d3aa03445e7b"
+    },
+    {
+      "file": "validation/command-fixed/A/loadgen.json",
+      "bytes": 33379,
+      "sha256": "58db9752b97a06969768522891d59c80d8c077c70b6e528217032991d4a921e6"
+    },
+    {
+      "file": "validation/command-fixed/A/loadgen.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "validation/command-fixed/A/shutdown.json",
+      "bytes": 1490,
+      "sha256": "901e29bccfce3ad90718bddec415bdb2f1671788045f87c09034bcda77d96b69"
+    },
+    {
+      "file": "validation/command-fixed/A/summary.json",
+      "bytes": 7029,
+      "sha256": "7fbf393da18376ad29579bc7b525708280db5a23bb8cda47128d348f4c6b545c"
+    },
+    {
+      "file": "validation/command-fixed/B.log",
+      "bytes": 7030,
+      "sha256": "a2c55a16af46507f725951702c37cf632353c738b60f019dc6917b33464cdcce"
+    },
+    {
+      "file": "validation/command-fixed/B/final-metrics.txt",
+      "bytes": 39454,
+      "sha256": "57e77b2ae7e57ac11d3af2863f08849c01f1c1f10657194997b0331c2c3905d4"
+    },
+    {
+      "file": "validation/command-fixed/B/final-status.json",
+      "bytes": 749,
+      "sha256": "c0f65e255eed680b6c198eb367485131d94af73614ca5420f33b4b0ba7b41f16"
+    },
+    {
+      "file": "validation/command-fixed/B/gateway-config.json",
+      "bytes": 2289,
+      "sha256": "5835b843441d38b3ca29556afffff9c549a2cbee22ea3f13fbbaa410528eaab3"
+    },
+    {
+      "file": "validation/command-fixed/B/gateway.log",
+      "bytes": 143,
+      "sha256": "1beaa11db064a07e6d742eda5b6d5ff6ac072cbf47ecb75442404f9dcbdced8e"
+    },
+    {
+      "file": "validation/command-fixed/B/loadgen-config.json",
+      "bytes": 1348,
+      "sha256": "86869216ce060636d849ed6638a245a1dff039ce9dcd3f14618bdd82ea8d7493"
+    },
+    {
+      "file": "validation/command-fixed/B/loadgen.json",
+      "bytes": 33893,
+      "sha256": "b2632174ea9c5b1ee3d4f301043293a7e27d2a3b488ac120b105247d37b9ddff"
+    },
+    {
+      "file": "validation/command-fixed/B/loadgen.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "validation/command-fixed/B/shutdown.json",
+      "bytes": 1489,
+      "sha256": "796e434029845d75f4b56eec1d4c7ef4868d5dd5b9f6cb15d0ac1fa47ea74713"
+    },
+    {
+      "file": "validation/command-fixed/B/summary.json",
+      "bytes": 7030,
+      "sha256": "a2c55a16af46507f725951702c37cf632353c738b60f019dc6917b33464cdcce"
+    },
+    {
+      "file": "validation/command-fixed/plan.json",
+      "bytes": 2048,
+      "sha256": "e89b7da3269f08670dc91c399c185084107b3a7a9e4c28c5cd6370b7257625bb"
+    },
+    {
+      "file": "validation/final-checks.json",
+      "bytes": 1071,
+      "sha256": "fc5d83b6f92ab3ede679fea8e39e3bd9b2dd7ff9885bfdc387ae41b20cf59caa"
+    },
+    {
+      "file": "validation/final-clippy.log",
+      "bytes": 192,
+      "sha256": "7796721e464d4de9ec8c1bce15e30efa944c6eff5030ccb33965bd60f65a246a"
+    },
+    {
+      "file": "validation/final-fmt.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "validation/final-format.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "validation/final-loadgen-build.log",
+      "bytes": 5335,
+      "sha256": "9fa1b1f5c263b5a0e5f19c32113b2315c1b2b9024818b7e1d9f440740c64bfcc"
+    },
+    {
+      "file": "validation/final-workspace.log",
+      "bytes": 61184,
+      "sha256": "084a2e082982e66fe14be9f45856b5d3d1dc5a9bbcea1b116d575564bfe9867e"
+    },
+    {
+      "file": "validation/fmt.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "validation/fuzz-business_rpc_v3.log",
+      "bytes": 551372,
+      "sha256": "65fe072e5c91c83f84f52a2cad87bd31bf4983f6751745f81d862979558d0a15"
+    },
+    {
+      "file": "validation/fuzz-checks.json",
+      "bytes": 2411,
+      "sha256": "45316833ee0b917676b48b8e9bdc3308e3a40617d7ab039e3f10687f9fcf13cf"
+    },
+    {
+      "file": "validation/fuzz-json_codec.log",
+      "bytes": 717030,
+      "sha256": "7bc9fbb552eb02bfcc256e8d8f3f1ca356f5e918ba0720e31700101818da5139"
+    },
+    {
+      "file": "validation/fuzz-mqtt_packet.log",
+      "bytes": 158974,
+      "sha256": "e05ceccd2eac91f1028c445a9c85910c0a95537749c948f019311b022581a6cc"
+    },
+    {
+      "file": "validation/fuzz-mqtt_v5_packet.log",
+      "bytes": 68522,
+      "sha256": "c78318841cd183c711c998516351a418711d6080ab0601f8bb7e42bb1570f520"
+    },
+    {
+      "file": "validation/fuzz-restart_spool.log",
+      "bytes": 352233,
+      "sha256": "97880b964da4deb7847b5ab290cb491c9b8233de1526f0cdf97fa21b169718eb"
+    },
+    {
+      "file": "validation/fuzz-seeds.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "validation/isolated-clippy.log",
+      "bytes": 9666,
+      "sha256": "59bec41f23cdea9ffd551fe41875d980725a6ba0a45f8f12738ce8b3e14264fd"
+    },
+    {
+      "file": "validation/isolated-fmt.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "validation/isolated-tools-final.log",
+      "bytes": 2722,
+      "sha256": "42d434551cc15ceed54972a1cd7b8bb968ac93241ca0b2140a84468a46effa8a"
+    },
+    {
+      "file": "validation/isolated-tools.log",
+      "bytes": 120,
+      "sha256": "eb60a5e6c63c7ac4882a991e39f6720f63518b2fd507cd1a85d28076ba76c50e"
+    },
+    {
+      "file": "validation/isolated-workspace-retry.log",
+      "bytes": 60975,
+      "sha256": "4a7a96f0b06864083c6ec9cb6a9ba9f0899199439463faa4643688b4c297cd8d"
+    },
+    {
+      "file": "validation/isolated-workspace-tests.log",
+      "bytes": 37795,
+      "sha256": "2552af4643b0110928d4b5b753c76696d24057008669c4d8b4ac363a46ff85df"
+    },
+    {
+      "file": "validation/mosquitto-cli.log",
+      "bytes": 4707,
+      "sha256": "745265e38c5a8e11f9816ce10d940090f38c13042a3aad1667c1bc2192d4cb87"
+    },
+    {
+      "file": "validation/mosquitto-tls.log",
+      "bytes": 186,
+      "sha256": "6b2e87d00830ea11e776cebf622adb8fdd5cf46ffe719432a4b7cff60348e87d"
+    },
+    {
+      "file": "validation/mqtt-conformance.log",
+      "bytes": 2616,
+      "sha256": "4d2ee187f34d4c41079d694f81e103e8b1d993ab05e2589eb1dc1b2c16510831"
+    },
+    {
+      "file": "validation/mqtt5-smoke.log",
+      "bytes": 80,
+      "sha256": "6b84af0aced1681912ef9d4eb4b09ec5918acfbb2ff7261f09534a05e8bbe0be"
+    },
+    {
+      "file": "validation/perf-tools.log",
+      "bytes": 106,
+      "sha256": "698d16d7b93c4bd9707d3cfacda6fb1e0fea99ed0cda6e69bedc42772940540a"
+    },
+    {
+      "file": "validation/restart-soak.log",
+      "bytes": 907,
+      "sha256": "a73a1e1ca82853297f38b89cd4b387d8496d4a0979d154d3bc89ffd9ab0a656e"
+    },
+    {
+      "file": "validation/workspace-tests.log",
+      "bytes": 62249,
+      "sha256": "c9b513d35b321dc217513b266ef7f3b8895a849f6ac94c492208479a6316ca6a"
+    }
+  ]
+}

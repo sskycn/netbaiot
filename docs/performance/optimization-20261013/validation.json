@@ -1,0 +1,690 @@
+{
+  "source_revision": "2484aaf5b17e95a20241bd9766e080f1a688e674",
+  "required_checks": [
+    {
+      "name": "final-format",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.49859487499999994
+    },
+    {
+      "name": "final-fmt",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.46990816599999996
+    },
+    {
+      "name": "final-clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "--workspace",
+        "--all-targets",
+        "--all-features",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 1.12062675
+    },
+    {
+      "name": "final-workspace",
+      "command": [
+        "cargo",
+        "test",
+        "--workspace",
+        "--all-features"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 56.28069075
+    },
+    {
+      "name": "final-loadgen-build",
+      "command": [
+        "cargo",
+        "build",
+        "--release",
+        "--locked",
+        "-p",
+        "netbaiot-loadgen",
+        "--bin",
+        "business_rpc"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 23.0213355
+    }
+  ],
+  "workspace_results": {
+    "passed": 558,
+    "failed": 0,
+    "ignored": 48
+  },
+  "python_perf_tests": {
+    "passed": 23,
+    "command": [
+      "python3",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "scripts/perf",
+      "-p",
+      "test_*.py",
+      "-v"
+    ],
+    "log": "validation/isolated-tools-final.log"
+  },
+  "preserved_transient_failure": {
+    "log": "validation/isolated-workspace-tests.log",
+    "test": "v3_command_real_tcp_short_dedup_ttl_and_shorter_command_ttl",
+    "symptom": "readiness 10 second startup timeout; full retry passed557; final full passed558"
+  },
+  "fuzz": [
+    {
+      "target": "mqtt_packet",
+      "command": [
+        "cargo",
+        "+nightly",
+        "fuzz",
+        "run",
+        "mqtt_packet",
+        "--",
+        "-max_total_time=15",
+        "-max_len=65540",
+        "-rss_limit_mb=2048",
+        "-timeout=5"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 119.99003491600001,
+      "engine_budget_seconds": 15,
+      "sanitizer": "cargo-fuzz default address sanitizer",
+      "max_input_bytes": 65540,
+      "offline": true,
+      "build_jobs": 2,
+      "engine_runs": 152141,
+      "engine_actual_seconds": 16,
+      "log": "validation/fuzz-mqtt_packet.log"
+    },
+    {
+      "target": "mqtt_v5_packet",
+      "command": [
+        "cargo",
+        "+nightly",
+        "fuzz",
+        "run",
+        "mqtt_v5_packet",
+        "--",
+        "-max_total_time=15",
+        "-max_len=65540",
+        "-rss_limit_mb=2048",
+        "-timeout=5"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 17.262704208000002,
+      "engine_budget_seconds": 15,
+      "sanitizer": "cargo-fuzz default address sanitizer",
+      "max_input_bytes": 65540,
+      "offline": true,
+      "build_jobs": 2,
+      "engine_runs": 166644,
+      "engine_actual_seconds": 16,
+      "log": "validation/fuzz-mqtt_v5_packet.log"
+    },
+    {
+      "target": "restart_spool",
+      "command": [
+        "cargo",
+        "+nightly",
+        "fuzz",
+        "run",
+        "restart_spool",
+        "--",
+        "-max_total_time=15",
+        "-max_len=1048576",
+        "-rss_limit_mb=2048",
+        "-timeout=5"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 17.328132041999993,
+      "engine_budget_seconds": 15,
+      "sanitizer": "cargo-fuzz default address sanitizer",
+      "max_input_bytes": 1048576,
+      "offline": true,
+      "build_jobs": 2,
+      "engine_runs": 135380,
+      "engine_actual_seconds": 16,
+      "log": "validation/fuzz-restart_spool.log"
+    },
+    {
+      "target": "business_rpc_v3",
+      "command": [
+        "cargo",
+        "+nightly",
+        "fuzz",
+        "run",
+        "business_rpc_v3",
+        "--",
+        "-max_total_time=15",
+        "-max_len=65540",
+        "-rss_limit_mb=2048",
+        "-timeout=5"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 22.80504291700001,
+      "engine_budget_seconds": 15,
+      "sanitizer": "cargo-fuzz default address sanitizer",
+      "max_input_bytes": 65540,
+      "offline": true,
+      "build_jobs": 2,
+      "engine_runs": 688431,
+      "engine_actual_seconds": 16,
+      "log": "validation/fuzz-business_rpc_v3.log"
+    },
+    {
+      "target": "json_codec",
+      "command": [
+        "cargo",
+        "+nightly",
+        "fuzz",
+        "run",
+        "json_codec",
+        "--",
+        "-max_total_time=15",
+        "-max_len=65537",
+        "-rss_limit_mb=2048",
+        "-timeout=5"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 16.90648141599999,
+      "engine_budget_seconds": 15,
+      "sanitizer": "cargo-fuzz default address sanitizer",
+      "max_input_bytes": 65537,
+      "offline": true,
+      "build_jobs": 2,
+      "engine_runs": 1622951,
+      "engine_actual_seconds": 16,
+      "log": "validation/fuzz-json_codec.log"
+    }
+  ],
+  "fuzz_toolchain": "rustc 1.101.0-nightly (282215592 2026-10-04)",
+  "mqtt_conformance": {
+    "mqtt311_raw": {
+      "passed": 31,
+      "failed": 0,
+      "reference_observations": 0,
+      "log": "validation/mqtt-conformance.log"
+    },
+    "mqtt5_raw_smoke": {
+      "pass": true,
+      "log": "validation/mqtt5-smoke.log"
+    },
+    "mosquitto_cli": {
+      "version": "2.1.2/libmosquitto2.1.0",
+      "mqtt311_pass": true,
+      "tls_pass": true,
+      "logs": [
+        "validation/mosquitto-cli.log",
+        "validation/mosquitto-tls.log"
+      ]
+    },
+    "reference_broker_differential_release_gate": "not run; mosquitto broker unavailable"
+  },
+  "restart_subprocess_soak": {
+    "pass": true,
+    "actual_seconds": 65.18,
+    "healthy_generations": 12,
+    "log": "validation/restart-soak.log"
+  },
+  "command_fixed": [
+    {
+      "label": "A",
+      "file": "validation/command-fixed/A/summary.json",
+      "pass": true,
+      "purpose": "correctness; performance excluded",
+      "counts": {
+        "command_requests": 67,
+        "command_accepted": 60,
+        "command_device_deliveries": 60,
+        "command_device_duplicates": 0,
+        "command_ack_event_acks": 60,
+        "command_errors": 0,
+        "command_outcome_unknown": 0,
+        "command_unavailable": 1,
+        "mqtt_command_device_deliveries": 56,
+        "tcp_command_device_deliveries": 4
+      },
+      "checks": {
+        "loadgen_exit": true,
+        "gateway_alive": true,
+        "real_commands_delivered": true,
+        "mqtt_commands_delivered": true,
+        "tcp_commands_delivered": true,
+        "no_duplicate_device_delivery": true,
+        "no_delivery_after_unavailable": true,
+        "device_application_acks": true,
+        "all_accepted_commands_delivered": true,
+        "all_command_ack_events_acked": true,
+        "all_accepted_events_acked": true,
+        "no_command_errors": true,
+        "no_ingress_rejections": true,
+        "publish_errors_classified": true,
+        "connections_released": true,
+        "streams_released": true,
+        "queued_bytes_released": true,
+        "reassembly_released": true,
+        "rpc_pending_released": true,
+        "required_events_drained": true,
+        "dedup_inflight_released": true,
+        "dedup_bounded": true,
+        "durable_shutdown": true
+      },
+      "shutdown": {
+        "exit_code": 0,
+        "terminated": true,
+        "forced_kill": false,
+        "wait_timeout_seconds": 35.0,
+        "elapsed_seconds": 0.022671666999997342,
+        "spool": {
+          "source_directory_mode": "0o700",
+          "copy_directory_mode": "0o700",
+          "files": [
+            {
+              "name": "mqtt-runtime.state",
+              "bytes": 9553,
+              "sha256": "66229261bbf9ccce76b77ff2612fa4ffd3ac6901795371f213c909d5d88cfbff",
+              "source_file_mode": "0o600",
+              "copy_file_mode": "0o600"
+            }
+          ],
+          "errors": []
+        },
+        "pre_shutdown_status": {
+          "active_connections": {
+            "mqtt": 0,
+            "tcp": 0,
+            "udp": 0
+          },
+          "active_sessions": 0,
+          "auth_cache_bytes": 7618,
+          "auth_cache_entries": 47,
+          "business_auth_serving": false,
+          "business_rpc_pending": 0,
+          "event_bytes": 0,
+          "event_count": 0,
+          "lifecycle": "running",
+          "pending_required": 0,
+          "process_id": 75409,
+          "runtime_tasks": 8,
+          "sink_diagnostics": [
+            {
+              "consecutive_failures": 0,
+              "drop_total": 0,
+              "failure_total": 1,
+              "inflight": 0,
+              "last_failure": null,
+              "oldest_pending_age_ms": 0,
+              "pause_remaining_ms": 0,
+              "paused": false,
+              "queue_bytes": 0,
+              "queue_count": 0,
+              "retry_after_used_total": 0,
+              "retry_total": 1,
+              "sink_id": "tcp-rpc"
+            }
+          ]
+        },
+        "source_spool_directory": "<repo>/target/performance/optimization-20261013/validation/command-fixed/A/spool",
+        "durable_shutdown": true
+      },
+      "loadgen_binary_sha256": "8345d65fa8c384ab25595d582a7248317fb6f0d66e364fa6300693e7acc33ed3"
+    },
+    {
+      "label": "B",
+      "file": "validation/command-fixed/B/summary.json",
+      "pass": true,
+      "purpose": "correctness; performance excluded",
+      "counts": {
+        "command_requests": 67,
+        "command_accepted": 60,
+        "command_device_deliveries": 60,
+        "command_device_duplicates": 0,
+        "command_ack_event_acks": 60,
+        "command_errors": 0,
+        "command_outcome_unknown": 0,
+        "command_unavailable": 1,
+        "mqtt_command_device_deliveries": 56,
+        "tcp_command_device_deliveries": 4
+      },
+      "checks": {
+        "loadgen_exit": true,
+        "gateway_alive": true,
+        "real_commands_delivered": true,
+        "mqtt_commands_delivered": true,
+        "tcp_commands_delivered": true,
+        "no_duplicate_device_delivery": true,
+        "no_delivery_after_unavailable": true,
+        "device_application_acks": true,
+        "all_accepted_commands_delivered": true,
+        "all_command_ack_events_acked": true,
+        "all_accepted_events_acked": true,
+        "no_command_errors": true,
+        "no_ingress_rejections": true,
+        "publish_errors_classified": true,
+        "connections_released": true,
+        "streams_released": true,
+        "queued_bytes_released": true,
+        "reassembly_released": true,
+        "rpc_pending_released": true,
+        "required_events_drained": true,
+        "dedup_inflight_released": true,
+        "dedup_bounded": true,
+        "durable_shutdown": true
+      },
+      "shutdown": {
+        "exit_code": 0,
+        "terminated": true,
+        "forced_kill": false,
+        "wait_timeout_seconds": 35.0,
+        "elapsed_seconds": 0.02261337500000593,
+        "spool": {
+          "source_directory_mode": "0o700",
+          "copy_directory_mode": "0o700",
+          "files": [
+            {
+              "name": "mqtt-runtime.state",
+              "bytes": 9553,
+              "sha256": "310079f8ac05e10fd4aa2a962914550d0661abc3fccf9417ca0d550af77c38cd",
+              "source_file_mode": "0o600",
+              "copy_file_mode": "0o600"
+            }
+          ],
+          "errors": []
+        },
+        "pre_shutdown_status": {
+          "active_connections": {
+            "mqtt": 0,
+            "tcp": 0,
+            "udp": 0
+          },
+          "active_sessions": 0,
+          "auth_cache_bytes": 7618,
+          "auth_cache_entries": 47,
+          "business_auth_serving": false,
+          "business_rpc_pending": 0,
+          "event_bytes": 0,
+          "event_count": 0,
+          "lifecycle": "running",
+          "pending_required": 0,
+          "process_id": 76550,
+          "runtime_tasks": 8,
+          "sink_diagnostics": [
+            {
+              "consecutive_failures": 0,
+              "drop_total": 0,
+              "failure_total": 1,
+              "inflight": 0,
+              "last_failure": null,
+              "oldest_pending_age_ms": 0,
+              "pause_remaining_ms": 0,
+              "paused": false,
+              "queue_bytes": 0,
+              "queue_count": 0,
+              "retry_after_used_total": 0,
+              "retry_total": 1,
+              "sink_id": "tcp-rpc"
+            }
+          ]
+        },
+        "source_spool_directory": "<repo>/target/performance/optimization-20261013/validation/command-fixed/B/spool",
+        "durable_shutdown": true
+      },
+      "loadgen_binary_sha256": "8345d65fa8c384ab25595d582a7248317fb6f0d66e364fa6300693e7acc33ed3"
+    }
+  ],
+  "command_original": [
+    {
+      "label": "A",
+      "file": "isolated/commands-A/summary.json",
+      "pass": false,
+      "purpose": "correctness; performance excluded",
+      "counts": {
+        "command_requests": 66,
+        "command_accepted": 59,
+        "command_device_deliveries": 59,
+        "command_device_duplicates": 0,
+        "command_ack_event_acks": 59,
+        "command_errors": 6,
+        "command_outcome_unknown": 0,
+        "command_unavailable": 1,
+        "mqtt_command_device_deliveries": 55,
+        "tcp_command_device_deliveries": 4
+      },
+      "checks": {
+        "loadgen_exit": true,
+        "gateway_alive": true,
+        "real_commands_delivered": true,
+        "mqtt_commands_delivered": true,
+        "tcp_commands_delivered": true,
+        "no_duplicate_device_delivery": true,
+        "no_delivery_after_unavailable": true,
+        "device_application_acks": true,
+        "all_accepted_commands_delivered": true,
+        "all_command_ack_events_acked": true,
+        "all_accepted_events_acked": true,
+        "no_command_errors": false,
+        "no_ingress_rejections": true,
+        "publish_errors_classified": true,
+        "connections_released": true,
+        "streams_released": true,
+        "queued_bytes_released": true,
+        "reassembly_released": true,
+        "rpc_pending_released": true,
+        "required_events_drained": true,
+        "dedup_inflight_released": true,
+        "dedup_bounded": true,
+        "durable_shutdown": true
+      },
+      "shutdown": {
+        "exit_code": 0,
+        "terminated": true,
+        "forced_kill": false,
+        "wait_timeout_seconds": 35.0,
+        "elapsed_seconds": 0.008830084000010174,
+        "spool": {
+          "source_directory_mode": "0o700",
+          "copy_directory_mode": "0o700",
+          "files": [
+            {
+              "name": "mqtt-runtime.state",
+              "bytes": 9553,
+              "sha256": "2130f3e764c55b76dac39bcfcb4be310120e9fb6ea7ef710d5282a60ad8f5c3b",
+              "source_file_mode": "0o600",
+              "copy_file_mode": "0o600"
+            }
+          ],
+          "errors": []
+        },
+        "pre_shutdown_status": {
+          "active_connections": {
+            "mqtt": 0,
+            "tcp": 0,
+            "udp": 0
+          },
+          "active_sessions": 0,
+          "auth_cache_bytes": 7432,
+          "auth_cache_entries": 46,
+          "business_auth_serving": false,
+          "business_rpc_pending": 0,
+          "event_bytes": 0,
+          "event_count": 0,
+          "lifecycle": "running",
+          "pending_required": 0,
+          "process_id": 70930,
+          "runtime_tasks": 8,
+          "sink_diagnostics": [
+            {
+              "consecutive_failures": 0,
+              "drop_total": 0,
+              "failure_total": 0,
+              "inflight": 0,
+              "last_failure": null,
+              "oldest_pending_age_ms": 0,
+              "pause_remaining_ms": 0,
+              "paused": false,
+              "queue_bytes": 0,
+              "queue_count": 0,
+              "retry_after_used_total": 0,
+              "retry_total": 0,
+              "sink_id": "tcp-rpc"
+            }
+          ]
+        },
+        "source_spool_directory": "<repo>/target/performance/optimization-20261013/isolated/commands-A/spool",
+        "durable_shutdown": true
+      },
+      "loadgen_binary_sha256": "b4d6bd7bc72543d2735ae72e881d3fcdc9839be4feecc3c0d5873dbeeb404ce1"
+    },
+    {
+      "label": "B",
+      "file": "isolated/commands-B/summary.json",
+      "pass": false,
+      "purpose": "correctness; performance excluded",
+      "counts": {
+        "command_requests": 66,
+        "command_accepted": 59,
+        "command_device_deliveries": 59,
+        "command_device_duplicates": 0,
+        "command_ack_event_acks": 59,
+        "command_errors": 6,
+        "command_outcome_unknown": 0,
+        "command_unavailable": 1,
+        "mqtt_command_device_deliveries": 55,
+        "tcp_command_device_deliveries": 4
+      },
+      "checks": {
+        "loadgen_exit": true,
+        "gateway_alive": true,
+        "real_commands_delivered": true,
+        "mqtt_commands_delivered": true,
+        "tcp_commands_delivered": true,
+        "no_duplicate_device_delivery": true,
+        "no_delivery_after_unavailable": true,
+        "device_application_acks": true,
+        "all_accepted_commands_delivered": true,
+        "all_command_ack_events_acked": true,
+        "all_accepted_events_acked": true,
+        "no_command_errors": false,
+        "no_ingress_rejections": true,
+        "publish_errors_classified": true,
+        "connections_released": true,
+        "streams_released": true,
+        "queued_bytes_released": true,
+        "reassembly_released": true,
+        "rpc_pending_released": true,
+        "required_events_drained": true,
+        "dedup_inflight_released": true,
+        "dedup_bounded": true,
+        "durable_shutdown": true
+      },
+      "shutdown": {
+        "exit_code": 0,
+        "terminated": true,
+        "forced_kill": false,
+        "wait_timeout_seconds": 35.0,
+        "elapsed_seconds": 0.018867290999992292,
+        "spool": {
+          "source_directory_mode": "0o700",
+          "copy_directory_mode": "0o700",
+          "files": [
+            {
+              "name": "mqtt-runtime.state",
+              "bytes": 9553,
+              "sha256": "cb729b0e8d995eed90f4f6b3fd6106f0e99585480756f90669ed4ca0eb9bab0f",
+              "source_file_mode": "0o600",
+              "copy_file_mode": "0o600"
+            }
+          ],
+          "errors": []
+        },
+        "pre_shutdown_status": {
+          "active_connections": {
+            "mqtt": 0,
+            "tcp": 0,
+            "udp": 0
+          },
+          "active_sessions": 0,
+          "auth_cache_bytes": 7618,
+          "auth_cache_entries": 47,
+          "business_auth_serving": false,
+          "business_rpc_pending": 0,
+          "event_bytes": 0,
+          "event_count": 0,
+          "lifecycle": "running",
+          "pending_required": 0,
+          "process_id": 71862,
+          "runtime_tasks": 8,
+          "sink_diagnostics": [
+            {
+              "consecutive_failures": 0,
+              "drop_total": 0,
+              "failure_total": 1,
+              "inflight": 0,
+              "last_failure": null,
+              "oldest_pending_age_ms": 0,
+              "pause_remaining_ms": 0,
+              "paused": false,
+              "queue_bytes": 0,
+              "queue_count": 0,
+              "retry_after_used_total": 0,
+              "retry_total": 1,
+              "sink_id": "tcp-rpc"
+            }
+          ]
+        },
+        "source_spool_directory": "<repo>/target/performance/optimization-20261013/isolated/commands-B/spool",
+        "durable_shutdown": true
+      },
+      "loadgen_binary_sha256": "b4d6bd7bc72543d2735ae72e881d3fcdc9839be4feecc3c0d5873dbeeb404ce1"
+    }
+  ],
+  "unrun": [
+    "6/24 hour soak",
+    "Linux x86_64/ARM64 capacity",
+    "multi-host/WAN",
+    "new SIGKILL loss measurements",
+    "5000/10000 connections",
+    "hardware maximum capacity",
+    "independent checksum/replay decoding of RPC durable copied files"
+  ],
+  "evidence_check": {
+    "path_scrub": {
+      "command": [
+        "python3",
+        "scripts/scrub_paths.py",
+        "docs/performance/optimization-20261013"
+      ],
+      "files_needing_sanitization": 0
+    },
+    "metadata_budget_sanity": {
+      "pass": true,
+      "scope": "tracked and unignored docs/performance; regular files, canonical byte budgets, JSON parsing, raw-sample keys, embedded string sizes, raw extensions",
+      "file_limit_bytes": 1048576,
+      "json_limit_bytes": 262144,
+      "total_limit_bytes": 20971520,
+      "embedded_string_limit_bytes": 4096,
+      "cargo_xtask_executed": false,
+      "reason": "CPU window already handed back; no additional compilation"
+    }
+  }
+}
