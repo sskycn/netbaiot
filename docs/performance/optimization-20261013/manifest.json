@@ -4,7 +4,7 @@
   "candidate_production_revision": "1e36f1b3498761f2569f5aca65529d4cdd8ba8b1",
   "validated_code_revision": "2484aaf5b17e95a20241bd9766e080f1a688e674",
   "task_branch": "codex/performance-optimization-20261013",
-  "git_workflow": "local commits only; no merge or push",
+  "git_workflow": "Initial local-only delivery a6a8ca0; user subsequently authorized merge into main, push and task-branch/worktree cleanup.",
   "source_checkpoints": {
     "cae81a9": "cae81a9ffc35e5f19b068014018ed3af27632c82",
     "1a7753f": "1a7753f3d02b5deb69df4a2906d3ba82d16ab741",
@@ -1080,7 +1080,7 @@
     "RPC_event_ack_ms": "consumer decoded-receive to ack-return; not device to ACK",
     "spool": "opaque original+copy; trusted gateway exit plus MQTT snapshot evidence, not standalone decoder/replay proof"
   },
-  "raw_evidence_root": "<repo>/target/performance/optimization-20261013",
+  "raw_evidence_root": "<repo>/target/performance/optimization-20261013-isolated-a6a8ca0",
   "raw_evidence": [
     {
       "file": "baseline/micro/accounting.log",
@@ -2192,5 +2192,12 @@
       "bytes": 62249,
       "sha256": "c9b513d35b321dc217513b266ef7f3b8895a849f6ac94c492208479a6316ca6a"
     }
-  ]
+  ],
+  "cleanup": {
+    "authorization": "提交代码，合并分支并清理。",
+    "preserved_raw_directory": "<repo>/target/performance/optimization-20261013-isolated-a6a8ca0",
+    "source_and_binary_checksums_verified_after_move": true,
+    "historical_commands": "retain the locations recorded at measurement time; resolve archived inputs from raw_evidence_root",
+    "unrelated_density_branch": "preserved"
+  }
 }

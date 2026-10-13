@@ -1,6 +1,6 @@
 本轮保留四项局部优化：MQTT 主题鉴权、标识符序列化、EventBus 最后一次成功 ACK 和 Business RPC 事件编码。分配次数减少有可复现的直接证据；相同 Tokio worker 环境下，尚未证明持续网络吞吐或 CPU/事件获得超出噪声的改善。另一个配置实验在本机降低了 CPU 成本，同时增加尾延迟，不能替代代码收益或作为通用默认值。
 
-代码在 `codex/performance-optimization-20261013` 分支，基线为 `cae81a9ffc35e5f19b068014018ed3af27632c82`，被测候选生产代码为 `1e36f1b3498761f2569f5aca65529d4cdd8ba8b1`。后续提交修正测量工具与证据，没有改变生产优化。没有合并或推送 main。各轮均有独立提交作为回退点；内联 permit 实验已回退。生产改动、资源回滚及测量工具修正均经过独立 Agent 审查，代理没有同时修改同一文件。
+代码在 `codex/performance-optimization-20261013` 分支，基线为 `cae81a9ffc35e5f19b068014018ed3af27632c82`，被测候选生产代码为 `1e36f1b3498761f2569f5aca65529d4cdd8ba8b1`。后续提交修正测量工具与证据，没有改变生产优化。首次交付提交 `a6a8ca0` 按当时要求仅保留本地分支。用户随后明确授权“提交代码，合并分支并清理”，本次按该授权合并并推送 main；分支名称保留作历史记录。各轮均有独立提交作为回退点；内联 permit 实验已回退。生产改动、资源回滚及测量工具修正均经过独立 Agent 审查，代理没有同时修改同一文件。
 
 受控主测在 Apple M4、10 核、16 GiB、macOS 27.0.1 ARM64、Rust 1.99.0 / LLVM 23.1.1 上执行，使用 release 固定二进制；没有添加 allocator、unsafe、平台专用编译标志或生产 runtime 默认值。服务器与负载工具使用 loopback，同机短测不代表 Linux 或生产容量。发现另一聊天使用相同 checkout 后，本任务迁至独立 worktree，并在用户授权的协调窗口内串行测量，暂停其他本地构建和负载；远端工作继续。未控制 CPU 频率、线程亲和性及系统后台活动。
 
@@ -103,7 +103,7 @@ mTLS Command 回归原 frozen loadgen 会将合法 dedup progress 误计错误�
 
 主测中 worker 数对 CPU 的影响是已测事实；把它精确归因于 broker Mutex、Tokio 唤醒、syscall 或 macOS 核调度仍需 profiling。原 macOS sample 以 parked threads 为主，不能按所有采样占比给 CPU 热点排名。下一阶段应在独立 Linux 服务端、外部生成器上测实际 CPU flamegraph、锁 wait/hold、持续最大 ACK 速率和更长稳定窗口，再决定是否缩短 route 临界区或做有界调度优化。现有数据不支持大规模锁拆分、codec 重写、allocator 替换或改变可靠性边界；本轮在可重复收益不足时停止继续增加复杂度。
 
-[manifest.json](manifest.json) 记录 source revision、release binary SHA256、工具源码 SHA256、命令与原始证据文件 SHA256；[summary.json](summary.json) 保存各轮数字和微基准原始 CSV 行。大量日志、二进制及敏感/不透明 recovery 数据只留在忽略的 `target/performance/optimization-20261013/`，不进入 Git。不要对含 spool 的目录递归执行文本路径替换。所有发布 manifest 使用 <repo> 占位路径，重放需替换为自己的路径，并使用同一 compiler/profile/limits 与冻结 loadgen。
+[manifest.json](manifest.json) 记录 source revision、release binary SHA256、工具源码 SHA256、命令与原始证据文件 SHA256；[summary.json](summary.json) 保存各轮数字和微基准原始 CSV 行。清理 worktree 时，全部原始证据及冻结二进制迁移至主工作区忽略的 `target/performance/optimization-20261013-isolated-a6a8ca0/`，迁移后逐项复核字节数与 SHA256。新物理位置见 manifest 的 raw_evidence_root；历史执行命令保留当时的路径。日志、二进制及敏感/不透明 recovery 数据不进入 Git。不要对含 spool 的目录递归执行文本路径替换。所有发布 manifest 使用 <repo> 占位路径，重放需替换为自己的路径，并使用同一 compiler/profile/limits 与冻结 loadgen。
 
 复现主测的单次命令如下。先在两个独立 checkout 分别构建基线与候选，把二进制复制到不可覆盖的比较目录；保持同一 loadgen 和 worker 环境。按 manifest 的顺序串行重复五次，避免构建或其他压测同时运行。
 
