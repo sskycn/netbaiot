@@ -119,18 +119,15 @@ async fn send_broker_frame(
                     pending = services.mqtt.next_offline(key, generation)?;
                     continue;
                 }
-                (
-                    bytes,
-                    Some(delivery._budget),
-                    delivery.command,
-                    delivery.progress,
-                )
+                (bytes, delivery._budget, delivery.command, delivery.progress)
             }
             // PUBREL's MQTT 3.1.1 fixed-header flags are always 0010.
-            BrokerFrame::Pubrel { packet_id, dup: _ } => (ack(0x62, packet_id), None, false, None),
+            BrokerFrame::Pubrel { packet_id, dup: _ } => {
+                (ack(0x62, packet_id), Vec::new(), false, None)
+            }
         };
         let sent = send(stream, services, &bytes).await;
-        let charged = budget.is_some();
+        let charged = !budget.is_empty();
         drop(budget);
         if charged {
             services.mqtt.outbound_bytes_released()?;
