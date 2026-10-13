@@ -102,7 +102,7 @@ jobs:
           pid=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["server"])' "$pidfile")
           mkdir -p target/performance/production-readiness/profile
           # Software CPU samples work on hosted VMs without a hardware PMU.
-          python3 scripts/ci_annotate.py --title "CPU stack sampling failed" -- sudo "$profiler" record -e cpu-clock:u -F 99 -g --call-graph dwarf -p "$pid" -o target/performance/production-readiness/profile/perf.data -- sleep 20
+          python3 scripts/ci_annotate.py --title "CPU stack sampling failed" -- sudo "$profiler" record -e cpu-clock -F 99 -g --call-graph dwarf -p "$pid" -o target/performance/production-readiness/profile/perf.data -- sleep 20
           wait "$owner"
           owner=""
           sudo "$profiler" script -i target/performance/production-readiness/profile/perf.data > target/performance/production-readiness/profile/perf.stacks
@@ -117,6 +117,12 @@ jobs:
           heap=$(find target/performance/production-readiness/heap-profile -name 'heaptrack*.gz' -o -name 'heaptrack*.zst' | head -1)
           test -n "$heap"
           heaptrack_print "$heap" > target/performance/production-readiness/profile/heap.txt
+      - name: Make root-owned profiler output readable for artifact upload
+        if: always()
+        run: |
+          if [ -d target/performance/production-readiness/profile ]; then
+            sudo chown -R "$(id -u):$(id -g)" target/performance/production-readiness/profile
+          fi
       - uses: actions/upload-artifact@v4
         if: always()
         with:
