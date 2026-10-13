@@ -1,8 +1,8 @@
-   Compiling netbaiot-runtime v0.3.1 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-runtime)
-   Compiling netbaiot-transports v0.3.1 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-transports)
-   Compiling netbaiot-loadgen v0.3.1 (/Users/sam/Dev/work/sskycn/netbaiot/tools/netbaiot-loadgen)
-   Compiling netbaiot-server v0.3.1 (/Users/sam/Dev/work/sskycn/netbaiot/apps/netbaiot-server)
-   Compiling netbaiot-cli v0.3.1 (/Users/sam/Dev/work/sskycn/netbaiot/apps/netbaiot-cli)
+   Compiling netbaiot-runtime v0.3.1 (<repo>/crates/netbaiot-runtime)
+   Compiling netbaiot-transports v0.3.1 (<repo>/crates/netbaiot-transports)
+   Compiling netbaiot-loadgen v0.3.1 (<repo>/tools/netbaiot-loadgen)
+   Compiling netbaiot-server v0.3.1 (<repo>/apps/netbaiot-server)
+   Compiling netbaiot-cli v0.3.1 (<repo>/apps/netbaiot-cli)
     Finished `test` profile [unoptimized + debuginfo] target(s) in 7.50s
      Running unittests src/main.rs (target/debug/deps/netbaiot-af1b4970ab2788c6)
 

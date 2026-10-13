@@ -21,7 +21,10 @@ jobs:
       - name: Schema drift and release preflight
         env:
           RELEASE_TAG: ${{ inputs.release-tag }}
-        run: cargo xtask check release --part preflight
+        run: >-
+          python3 scripts/ci_annotate.py
+          --title "Release preflight failed"
+          -- cargo xtask check release --part preflight
 
   rust:
     runs-on: ubuntu-latest
@@ -53,7 +56,10 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - run: cargo install --locked cargo-audit
-      - run: cargo xtask check release --part audit
+      - run: >-
+          python3 scripts/ci_annotate.py
+          --title "Dependency audit failed"
+          -- cargo xtask check release --part audit
 
   mqtt:
     uses: ./.github/workflows/mqtt-interop.yml

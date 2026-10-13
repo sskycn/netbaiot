@@ -69,22 +69,48 @@ jobs:
           cargo install --locked inferno --version 0.12.4
       - name: Actual CPU stacks and flamegraph
         run: |
+          set -euo pipefail
+          # Ubuntu's kernel-specific tools directory contains symlinks to the
+          # actual binaries. Follow them, and avoid head/SIGPIPE under pipefail.
+          profiler=$(find -L /usr/lib/linux-tools -type f -name perf -print -quit)
+          if [ -z "$profiler" ]; then
+            echo "::error title=CPU profiler unavailable::No perf executable found under /usr/lib/linux-tools"
+            exit 1
+          fi
+          "$profiler" --version
           python3 scripts/perf/production_readiness.py --devices 1000 --codec json --transport mqtt5 --scenario telemetry64 --duration 60 --sample-interval 5 --tls --profiling --output target/performance/production-readiness/cpu-profile &
           owner=$!
+          cleanup() {
+            if [ -n "$owner" ] && kill -0 "$owner" 2>/dev/null; then
+              kill -TERM "$owner"
+              if ! wait "$owner"; then
+                echo "Profile campaign stopped after profiling failure"
+              fi
+            fi
+          }
+          trap cleanup EXIT
           pidfile=target/performance/production-readiness/cpu-profile/1000-json-mqtt5-telemetry64-none/pid.json
           for attempt in $(seq 1 100); do
             if [ -f "$pidfile" ]; then break; fi
+            if ! kill -0 "$owner" 2>/dev/null; then
+              wait "$owner"
+              echo "::error title=CPU profile startup failed::Campaign exited before writing the server PID"
+              exit 1
+            fi
             sleep 0.1
           done
           pid=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["server"])' "$pidfile")
           mkdir -p target/performance/production-readiness/profile
-          profiler=$(find /usr/lib/linux-tools -type f -name perf | head -1)
-          test -n "$profiler"
-          sudo "$profiler" record -F 99 -g --call-graph dwarf -p "$pid" -o target/performance/production-readiness/profile/perf.data -- sleep 20
+          # Software CPU samples work on hosted VMs without a hardware PMU.
+          python3 scripts/ci_annotate.py --title "CPU stack sampling failed" -- sudo "$profiler" record -e cpu-clock:u -F 99 -g --call-graph dwarf -p "$pid" -o target/performance/production-readiness/profile/perf.data -- sleep 20
           wait "$owner"
+          owner=""
           sudo "$profiler" script -i target/performance/production-readiness/profile/perf.data > target/performance/production-readiness/profile/perf.stacks
+          test -s target/performance/production-readiness/profile/perf.stacks
           inferno-collapse-perf < target/performance/production-readiness/profile/perf.stacks > target/performance/production-readiness/profile/cpu.folded
+          test -s target/performance/production-readiness/profile/cpu.folded
           inferno-flamegraph < target/performance/production-readiness/profile/cpu.folded > target/performance/production-readiness/profile/cpu.svg
+          test -s target/performance/production-readiness/profile/cpu.svg
       - name: Actual heap allocation profile
         run: |
           python3 scripts/perf/production_readiness.py --devices 1000 --codec json --transport mqtt5 --scenario telemetry64 --duration 30 --sample-interval 5 --tls --profiling --heaptrack --output target/performance/production-readiness/heap-profile

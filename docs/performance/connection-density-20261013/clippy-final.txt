@@ -1,6 +1,6 @@
-    Checking netbaiot-runtime v0.3.1 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-runtime)
-    Checking netbaiot-transports v0.3.1 (/Users/sam/Dev/work/sskycn/netbaiot/crates/netbaiot-transports)
-    Checking netbaiot-loadgen v0.3.1 (/Users/sam/Dev/work/sskycn/netbaiot/tools/netbaiot-loadgen)
-    Checking netbaiot-server v0.3.1 (/Users/sam/Dev/work/sskycn/netbaiot/apps/netbaiot-server)
-    Checking netbaiot-cli v0.3.1 (/Users/sam/Dev/work/sskycn/netbaiot/apps/netbaiot-cli)
+    Checking netbaiot-runtime v0.3.1 (<repo>/crates/netbaiot-runtime)
+    Checking netbaiot-transports v0.3.1 (<repo>/crates/netbaiot-transports)
+    Checking netbaiot-loadgen v0.3.1 (<repo>/tools/netbaiot-loadgen)
+    Checking netbaiot-server v0.3.1 (<repo>/apps/netbaiot-server)
+    Checking netbaiot-cli v0.3.1 (<repo>/apps/netbaiot-cli)
     Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.89s
