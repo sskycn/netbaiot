@@ -21,7 +21,8 @@ import urllib.request
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts"))
-from scrub_paths import scrub_tree
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from business_rpc_harness_support import scrub_evidence, shutdown_gateway, stop, write_shutdown
 GATEWAY = ROOT / "target/release/netbaiot-server"
 LOADGEN = ROOT / "target/release/business_rpc"
 PROXY = ROOT / "tools/netbaiot-loadgen/business_stream_proxy.py"
@@ -41,19 +42,9 @@ def free_ports(count):
             sock.close()
 
 
-def stop(process):
-    if process.poll() is None:
-        process.terminate()
-        try:
-            process.wait(timeout=3)
-        except subprocess.TimeoutExpired:
-            process.kill()
-            process.wait(timeout=3)
-
-
 def run_mode(mode, args):
     duration = args.duration_secs
-    output = args.output
+    output = args.output.resolve()
     event_payload_bytes = args.event_payload_bytes
     stream_window_bytes = args.stream_window_bytes
     disconnect_after_secs = args.disconnect_after_secs
@@ -66,7 +57,9 @@ def run_mode(mode, args):
             "device_ingress": f"127.0.0.1:{device}",
             "management_http": f"127.0.0.1:{management}",
             "business_tcp": f"127.0.0.1:{business}",
-            "spool_directory": str(temporary / "spool"),
+            # Preserve the authoritative source even if the evidence copy fails.
+            # TemporaryDirectory owns configs only, never accepted recovery work.
+            "spool_directory": str(output / f"{mode}-spool"),
             "device_auth": "business_rpc",
             "event_delivery": "business_rpc",
             "business_rpc": {
@@ -181,6 +174,7 @@ def run_mode(mode, args):
                 proxy_args.extend(["--capture-prefix", str(output / mode)])
             proxy = None if args.no_proxy else subprocess.Popen(
                 proxy_args, cwd=ROOT, stdout=subprocess.DEVNULL, stderr=proxy_log)
+            final_status = None
             try:
                 load_config["gateway_pid"] = gateway.pid
                 load_path.write_text(json.dumps(load_config))
@@ -205,14 +199,35 @@ def run_mode(mode, args):
                         (output / f"{mode}-metrics.txt").write_bytes(response.read())
                 except OSError as error:
                     (output / f"{mode}-metrics-error.txt").write_text(str(error))
+                request = urllib.request.Request(
+                    f"http://127.0.0.1:{management}/api/v1/status",
+                    headers={"Authorization": f"Bearer {environment['NETBAIOT_ADMIN_SECRET']}"},
+                )
+                try:
+                    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+                    with opener.open(request, timeout=2) as response:
+                        final_status = json.load(response)
+                    (output / f"{mode}-status.json").write_text(json.dumps(final_status, indent=2) + "\n")
+                except OSError as error:
+                    (output / f"{mode}-status-error.txt").write_text(str(error))
                 counts = result["counts"]
                 print(f"{mode}: auth={counts['success']}/{counts['requests']} "
                       f"acks={counts['event_acks']} p95={counts['latency_ms']['p95']}ms "
                       f"p99={counts['latency_ms']['p99']}ms", flush=True)
             finally:
-                if proxy is not None:
-                    stop(proxy)
-                stop(gateway)
+                shutdown = None
+                try:
+                    shutdown = shutdown_gateway(gateway, gateway_config, output / f"{mode}-committed-spool", final_status)
+                finally:
+                    proxy_shutdown = stop(proxy) if proxy is not None else None
+                shutdown["proxy"] = proxy_shutdown
+                write_shutdown(output / f"{mode}-shutdown.json", shutdown)
+                manifest = output / "shutdown.json"
+                modes = json.loads(manifest.read_text()) if manifest.exists() else {}
+                modes[mode] = shutdown
+                write_shutdown(manifest, modes)
+                if not shutdown["durable_shutdown"]:
+                    raise RuntimeError(f"{mode}: gateway shutdown was not durable; inspect shutdown.json")
 
 
 def main():
@@ -264,7 +279,7 @@ def main():
     if not GATEWAY.is_file() or not LOADGEN.is_file():
         parser.error("build release gateway and loadgen first")
     args.output.mkdir(parents=True, exist_ok=True)
-    atexit.register(scrub_tree, args.output, repo_root=ROOT, write=True)
+    atexit.register(scrub_evidence, args.output, repo_root=ROOT, write=True)
     for mode in args.modes:
         if mode.startswith("v3-") and args.stream_window_bytes is not None:
             if args.stream_window_bytes < int(mode.split("-")[1]):
