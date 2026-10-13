@@ -1202,7 +1202,11 @@ impl EventBus {
             ?result, "delivery completion diagnostic");
         if let Some(active) = state.active.get_mut(&record.event.event_id) {
             active.operations.remove(id);
-            active.attempts.insert(id.clone(), record.attempt);
+            // Successful final completion removes this event below. Keep history
+            // only while another responsibility or a failed attempt can be spooled.
+            if result.is_err() || active.remaining.len() > 1 {
+                active.attempts.insert(id.clone(), record.attempt);
+            }
         }
         let age = now_ms().saturating_sub(record.accepted_at);
         let retry = matches!(
@@ -1543,6 +1547,47 @@ mod tests {
             assert_eventbus_invariants(&bus);
         }
         assert_eq!(checked_usage(&bus), EventBusUsage::default());
+    }
+
+    #[tokio::test]
+    async fn acknowledged_peer_history_survives_last_required_sink_failure() {
+        let bus = route_bus(
+            Limits {
+                retry_base_ms: 1,
+                retry_max_ms: 1,
+                ..Limits::default()
+            },
+            vec![route(None, &["a", "b"])],
+        )
+        .unwrap();
+        let input = event(8);
+        let event_id = input.event_id;
+        bus.publish(input).unwrap();
+        let a = SinkId::new("a").unwrap();
+        let b = SinkId::new("b").unwrap();
+        let definition_a = bus.state.lock().unwrap().sinks[&a].definition.clone();
+        let definition_b = bus.state.lock().unwrap().sinks[&b].definition.clone();
+        let record_a = bus.take_ready(&a).unwrap().unwrap();
+        bus.complete(&a, record_a, Ok(SinkAck), &definition_a)
+            .unwrap();
+        let record_b = bus.take_ready(&b).unwrap().unwrap();
+        let stale = record_b.clone();
+        bus.complete(&b, record_b, Err(SinkError::Permanent), &definition_b)
+            .unwrap();
+        let records = bus.spool_records().unwrap();
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0].event.event_id, event_id);
+        assert_eq!(records[0].pending_sinks, vec![b.clone()]);
+        assert_eq!(records[0].attempts, BTreeMap::from([(a, 1), (b.clone(), 1)]));
+        assert_eq!(checked_usage(&bus).pending_required, 1);
+        tokio::time::sleep(Duration::from_millis(5)).await;
+        let retry = bus.take_ready(&b).unwrap().unwrap();
+        assert_eq!(retry.attempt, 1);
+        bus.complete(&b, stale, Ok(SinkAck), &definition_b).unwrap();
+        assert_eq!(checked_usage(&bus).pending_required, 1);
+        bus.complete(&b, retry, Ok(SinkAck), &definition_b).unwrap();
+        assert_eq!(checked_usage(&bus), EventBusUsage::default());
+        assert!(bus.spool_records().unwrap().is_empty());
     }
 
     #[test]
