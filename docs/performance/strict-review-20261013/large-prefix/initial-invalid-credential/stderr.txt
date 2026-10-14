@@ -1,0 +1,6 @@
+Traceback (most recent call last):
+  File "<tmp>/netbaiot-large-prefix-disconnect.py", line 114, in <module>
+    size = int.from_bytes(exact(s, 4), 'big')
+  File "<tmp>/netbaiot-large-prefix-disconnect.py", line 43, in exact
+    raise RuntimeError('unexpected authentication EOF')
+RuntimeError: unexpected authentication EOF

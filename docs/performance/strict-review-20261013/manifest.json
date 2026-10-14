@@ -1,0 +1,3926 @@
+{
+  "date": "2026-10-13",
+  "baseline_before_correctness_fixes": "fe4770b240e628418102b9c8964ac81d3273b730",
+  "original_optimization_baseline": "cae81a9ffc35e5f19b068014018ed3af27632c82",
+  "candidate_status": "Local correctness review, 24 matched 10K density runs, seven large-wire cases, two real 10K stack samples, large-prefix cleanup and final script/release checks completed. Linked native CI validates b4 runtime and a202 fixtures; a future report/helper commit is not represented as CI-tested.",
+  "rustsec_advisory_db_commit": "6aed84668c23d7f535077a9fe918bf1fa0f6a5bc",
+  "observed_audit": {
+    "current_vulnerabilities": 0,
+    "baseline_vulnerabilities": [
+      "RUSTSEC-2026-0343",
+      "RUSTSEC-2026-0338",
+      "RUSTSEC-2026-0340"
+    ],
+    "reported_warnings": [
+      "RUSTSEC-2025-0134: rustls-pemfile 2.2.0 unmaintained"
+    ],
+    "current_evidence": "completion-before-profiler-owner-fix/audit.txt",
+    "original_baseline_database_commit": "29d1a60c3361576d366b1740bba2254dc6173434"
+  },
+  "host": {
+    "architecture": "arm64",
+    "operating_system": "macOS",
+    "physical_memory_bytes": 17179869184,
+    "logical_cpus": 10,
+    "kern_maxfiles": 122880,
+    "kern_maxfilesperproc": 61440,
+    "inherited_nofile_soft": 1048575,
+    "inherited_nofile_hard": "unlimited",
+    "no_global_configuration_changes": true,
+    "loopback_ephemeral_port_range": [
+      49152,
+      65535
+    ],
+    "loopback_ephemeral_port_count": 16384,
+    "tcp_msl_milliseconds": 15000
+  },
+  "records": [
+    {
+      "file": "cargo-audit-cae81a9.txt",
+      "bytes": 1369,
+      "sha256": "3e9ad87d79743cc36cb4da41feb4df4875506ea3256a918eaafd744353f3713b",
+      "raw_bytes": 1367,
+      "raw_sha256": "2ed8638e9163a493d67839752ea4b93ce52d0b294ebc46c0898f767f0a8ce99c",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "cargo-audit-default.txt",
+      "bytes": 617,
+      "sha256": "b7784542b9ff375929bb662870f7a024eb1f77c401e9b90f49917d5b8a652ff5",
+      "raw_bytes": 625,
+      "raw_sha256": "99a11526a4be7361ddc0f8e15d1a116993e860db7ffea1c1340fc71e773bed7d",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "xtask-audit.txt",
+      "bytes": 667,
+      "sha256": "af54ba2fe7b80a0ee2da02ef958253a4a168e84b480e2bc089d0adc0c7d86ac9",
+      "raw_bytes": 671,
+      "raw_sha256": "c70feaafd4b73afa4f46517aab3280b13395c13aa68889c5389e26fb17da0625",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "xtask-preflight.txt",
+      "bytes": 4269,
+      "sha256": "08ba1c18035f68bf28ca8e38ad3395861b50264d8c0b281bd26b5f867bc89ef5",
+      "raw_bytes": 4327,
+      "raw_sha256": "ac38a01ace03c02f27bf078a49bf09e564e728bcc4fb03f80bb49f98db7454e5",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "python-perf-tests.txt",
+      "bytes": 2722,
+      "sha256": "b5fb2c97776a1052f7b7a3547b3907ab2c9256d8b34240ebf907802e1141c2ad",
+      "raw_bytes": 2722,
+      "raw_sha256": "b5fb2c97776a1052f7b7a3547b3907ab2c9256d8b34240ebf907802e1141c2ad",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "profiling-ci.json",
+      "bytes": 5450,
+      "sha256": "ad4dec7026d05e9ddb11d2c7eaff23b7d16c09bf55df4c1ed4465d06c3becbfc",
+      "raw_bytes": 5450,
+      "raw_sha256": "ad4dec7026d05e9ddb11d2c7eaff23b7d16c09bf55df4c1ed4465d06c3becbfc",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "verify-ci.json",
+      "bytes": 14859,
+      "sha256": "54f4312a656e99bcdd6bba766da840c523e61ddb72a29910e6115487a6b3ab63",
+      "raw_bytes": 14859,
+      "raw_sha256": "54f4312a656e99bcdd6bba766da840c523e61ddb72a29910e6115487a6b3ab63",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "reqwest-enabled-features.txt",
+      "bytes": 3475,
+      "sha256": "6b50240677ca5b052f270aba79f3b9a2e6448d360d61c3202dd4dd1426008fcd",
+      "raw_bytes": 4113,
+      "raw_sha256": "227d0762a67e7e59eaf658ba0433a6d42c9cd3e2e679f40e812e649849cdd663",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "tree-quinn-linux-x86_64.txt",
+      "bytes": 234,
+      "sha256": "a5fa01f5477d948cd7f959d0b8cd5210d52421541bedbc27abd1e0e0548f3c91",
+      "raw_bytes": 234,
+      "raw_sha256": "a5fa01f5477d948cd7f959d0b8cd5210d52421541bedbc27abd1e0e0548f3c91",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "tree-quinn-linux-aarch64.txt",
+      "bytes": 176,
+      "sha256": "4dc8e4fe7f86c681d8b81d94c4e76a3dda13457f37def5513d5850195a7778f6",
+      "raw_bytes": 176,
+      "raw_sha256": "4dc8e4fe7f86c681d8b81d94c4e76a3dda13457f37def5513d5850195a7778f6",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "baseline-build-metadata.json",
+      "bytes": 857,
+      "sha256": "8fdc07d47431a66b3de158e2918685f6fc916139dc2509ead3a128aa40a7dc82",
+      "raw_bytes": 857,
+      "raw_sha256": "8fdc07d47431a66b3de158e2918685f6fc916139dc2509ead3a128aa40a7dc82",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "profile-artifact-evidence.json",
+      "bytes": 2542,
+      "sha256": "ea8b1e264678cf89192dbe642739f68e584af9e23a4d4dc8aee0355d024691f8",
+      "raw_bytes": 2542,
+      "raw_sha256": "ea8b1e264678cf89192dbe642739f68e584af9e23a4d4dc8aee0355d024691f8",
+      "normalization": "machine-local paths replaced with placeholders; results unchanged"
+    },
+    {
+      "file": "profile-sample-summary.json",
+      "bytes": 1162,
+      "sha256": "eca1e2725a097d8211bb2ba852db261d6b7940713f90ce514ff5ee1e1ce4f60d",
+      "raw_bytes": 1162,
+      "raw_sha256": "eca1e2725a097d8211bb2ba852db261d6b7940713f90ce514ff5ee1e1ce4f60d",
+      "normalization": "machine-local paths replaced with placeholders; results unchanged"
+    },
+    {
+      "file": "profiling-artifacts.json",
+      "bytes": 1396,
+      "sha256": "58fa34908753b0c12e56a0b4958474aa153d75027c5a64806bffcb42f273609b",
+      "raw_bytes": 1396,
+      "raw_sha256": "58fa34908753b0c12e56a0b4958474aa153d75027c5a64806bffcb42f273609b",
+      "normalization": "machine-local paths replaced with placeholders; results unchanged"
+    },
+    {
+      "file": "aarch64-heap.txt",
+      "bytes": 941,
+      "sha256": "da678a7f83972bd212cb7ddca10075cecdc3889fe3a4502a4e69dff616fa970b",
+      "raw_bytes": 981,
+      "raw_sha256": "a372b2ae501401bc7db830e7b46dc733a6a1c58aca95bb076f833dae9058445d",
+      "normalization": "machine-local paths replaced with placeholders; results unchanged"
+    },
+    {
+      "file": "before-task-futures.txt",
+      "bytes": 1463,
+      "sha256": "8323e37269c8254fb62f3155bbbe418bda6bdae985242968ca84279426a070bd",
+      "raw_bytes": 1463,
+      "raw_sha256": "8323e37269c8254fb62f3155bbbe418bda6bdae985242968ca84279426a070bd",
+      "normalization": "machine-local paths replaced with placeholders; results unchanged"
+    },
+    {
+      "file": "before-task-futures-sandbox-denial.txt",
+      "bytes": 2071,
+      "sha256": "f0d71ba7c92612c0874172e74b50e133d690074c61b5cc31eb616bd9cf6ab3bf",
+      "raw_bytes": 2113,
+      "raw_sha256": "17e4617d42a678f04840b05ede85fb09d019adfebcb8617801adf7a5a2fad450",
+      "normalization": "machine-local paths replaced with placeholders; results unchanged"
+    },
+    {
+      "file": "before-broker-allocation.txt",
+      "bytes": 1473,
+      "sha256": "d9fce04d1f3a2071a9c260fdffbfb9fa7d53fc6af946ae40605c7b27a63e2dfb",
+      "raw_bytes": 1473,
+      "raw_sha256": "d9fce04d1f3a2071a9c260fdffbfb9fa7d53fc6af946ae40605c7b27a63e2dfb",
+      "normalization": "machine-local paths replaced with placeholders; results unchanged"
+    },
+    {
+      "file": "before-session-allocation.txt",
+      "bytes": 959,
+      "sha256": "3d6959576525a7fef8b74887d3d5a26236e03fad4b3052b0795ef2d6453db9cf",
+      "raw_bytes": 966,
+      "raw_sha256": "e00de93610882c96b5541af6f8d29a9224fa1ac8525cf88e62d15ad0d531c8e3",
+      "normalization": "machine-local paths replaced with placeholders; results unchanged"
+    },
+    {
+      "file": "tree-quinn-native.txt",
+      "bytes": 176,
+      "sha256": "4dc8e4fe7f86c681d8b81d94c4e76a3dda13457f37def5513d5850195a7778f6",
+      "raw_bytes": 176,
+      "raw_sha256": "4dc8e4fe7f86c681d8b81d94c4e76a3dda13457f37def5513d5850195a7778f6",
+      "normalization": "machine-local paths replaced with placeholders; results unchanged"
+    },
+    {
+      "file": "baseline-smoke-mqtt311-1000.json",
+      "bytes": 2402,
+      "sha256": "7dc32bfedb360dee58b45d92bd6aeaede432b90ff31596c9e145e9a109b55e60",
+      "raw_bytes": 2402,
+      "raw_sha256": "7dc32bfedb360dee58b45d92bd6aeaede432b90ff31596c9e145e9a109b55e60",
+      "normalization": "machine-local paths replaced with placeholders; results unchanged"
+    },
+    {
+      "file": "baseline-smoke-mqtt311-1000-sidecar.json",
+      "bytes": 6834,
+      "sha256": "64ac366ad3d215e9d7e25f14d33fde8f9397ba8fb6dae633594a30291121a591",
+      "raw_bytes": 6834,
+      "raw_sha256": "64ac366ad3d215e9d7e25f14d33fde8f9397ba8fb6dae633594a30291121a591",
+      "normalization": "machine-local paths replaced with placeholders; results unchanged"
+    },
+    {
+      "file": "reader-regression-tests.txt",
+      "bytes": 1983,
+      "sha256": "c1c42cf6901fe9731147d2b9d33662fa685e318146c6c55db456fac893937100",
+      "raw_bytes": 2041,
+      "raw_sha256": "164a1e4129b1653052a46a6588ff15271368685a310019b941bebc8936279011",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "quota-reader-tests.txt",
+      "bytes": 1534,
+      "sha256": "2b50e64c8a5e4fbc3f89a70c314d3085c4f2218af734fb4cecdcbcab248a74a6",
+      "raw_bytes": 1563,
+      "raw_sha256": "ff33619d47af8f57036407f9de32094fbd1fffd9803a432077e86de3e56cf763",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "end-to-end-tests.txt",
+      "bytes": 2256,
+      "sha256": "9a23bbac5731824d7f2b18eb5363850b5716a050e0f5a366502eeb0e8d69c4fd",
+      "raw_bytes": 2256,
+      "raw_sha256": "9a23bbac5731824d7f2b18eb5363850b5716a050e0f5a366502eeb0e8d69c4fd",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "candidate-reader-heap.txt",
+      "bytes": 3626,
+      "sha256": "367f6330959687d617122a73daeefa2cb4d70b54de139c02971a1e8339745fec",
+      "raw_bytes": 3655,
+      "raw_sha256": "4de68f1fa6815535166412ed60de0059349b3dec69eee6922401c70183c879ad",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "candidate-build-metadata-1.json",
+      "bytes": 27636,
+      "sha256": "28fc43671c83d24adf2b3a3e093d0c276dc9785dc6bf3b0eed29e198bc3a3d18",
+      "raw_bytes": 27636,
+      "raw_sha256": "28fc43671c83d24adf2b3a3e093d0c276dc9785dc6bf3b0eed29e198bc3a3d18",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "candidate-build-1.txt",
+      "bytes": 6650,
+      "sha256": "d75738ec27a17edc9462378575316ffc7e4c6f345d597a068caec60821619c92",
+      "raw_bytes": 6969,
+      "raw_sha256": "d5da7226db1093a1f9613c75385b079099f4cad525388d263cf6ba819e3bfd91",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "evidence-tools/memory_with_sidecar.py",
+      "bytes": 3291,
+      "sha256": "842948e540fbf9daf705edbf958a7021ad7ea5673a0951cbb5d51db5e5a9193b",
+      "raw_bytes": 3291,
+      "raw_sha256": "842948e540fbf9daf705edbf958a7021ad7ea5673a0951cbb5d51db5e5a9193b",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "evidence-tools/density_campaign.py",
+      "bytes": 4768,
+      "sha256": "b77f7d446b94608289d41d7487b598f65258db32812f02957fbba7cd02b6e468",
+      "raw_bytes": 4768,
+      "raw_sha256": "b77f7d446b94608289d41d7487b598f65258db32812f02957fbba7cd02b6e468",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "evidence-tools/event_with_tcp_override.py",
+      "bytes": 7982,
+      "sha256": "f080500df00555be80b570dc6151098ad29a51046642ba15c265597228560bb8",
+      "raw_bytes": 7982,
+      "raw_sha256": "f080500df00555be80b570dc6151098ad29a51046642ba15c265597228560bb8",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "auth-deadline-before.txt",
+      "bytes": 1118,
+      "sha256": "5b9ff09477440e5777e7bcbafb0bfffe5c7cfce0738ffd82053ff0fb1448004c",
+      "raw_bytes": 1117,
+      "raw_sha256": "2c600b325b2735def69b94b87a2324fb8b0b60b44070ae5451e9cfeabdeb299f",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "candidate-build-metadata-2.json",
+      "bytes": 19939,
+      "sha256": "c1955097a855faf541fa4e4fa41a5859f3e998a5ee497981dad23a260b520fac",
+      "raw_bytes": 19939,
+      "raw_sha256": "c1955097a855faf541fa4e4fa41a5859f3e998a5ee497981dad23a260b520fac",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "candidate-build-2.txt",
+      "bytes": 217,
+      "sha256": "6a6d5a910037d6b653325fd8569786ee7196b0ee29dee67e72bf1b56e444f5d8",
+      "raw_bytes": 275,
+      "raw_sha256": "c64635b3f8f0a546b92ca9d2bc87b472d9246de20e95407251439fbfd5cee62c",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "after-task-futures.txt",
+      "bytes": 2337,
+      "sha256": "591e542683e65d78083f463bcb8e36d4230c29f39e9dbc4304aaf1af3762ca8c",
+      "raw_bytes": 2511,
+      "raw_sha256": "73d5fd6aaa99cfa12880f1ecbd65b8a70e7412ba4d8bdea54ddc566d4bb10edc",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "after-broker-allocation.txt",
+      "bytes": 1528,
+      "sha256": "97ff9e9179a141bc6b30182f67c80aaec2500f7909da1dac72c1aa6ecd33eeda",
+      "raw_bytes": 1528,
+      "raw_sha256": "97ff9e9179a141bc6b30182f67c80aaec2500f7909da1dac72c1aa6ecd33eeda",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "after-session-allocation.txt",
+      "bytes": 974,
+      "sha256": "6b532b9eaaad04e0a212dc95e7cd11e8e8f55ed263afd8885def2abbd3001e34",
+      "raw_bytes": 1003,
+      "raw_sha256": "bb9c40c5f331062554e7882d31d99a7c70b68a68a6a0ea8b2bf3a3315602dc7b",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "baseline-reader-heap.txt",
+      "bytes": 7374,
+      "sha256": "6c537f7f3fed1517851a046ee004007df0d8e159bdedde44f6331fc62ee52143",
+      "raw_bytes": 7423,
+      "raw_sha256": "344356c4f4e375618a328c102f0896aadb2d28318c927fabb9f95e4bc4d48238",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "cargo-audit-final.txt",
+      "bytes": 617,
+      "sha256": "851399a934b37d815048896fc4e63b712bc52ad884d7268eb0b175f85d8a5822",
+      "raw_bytes": 625,
+      "raw_sha256": "6d9cd9f5e2847ad4d2700535986cd7bb7d4ac20ef0c60fa39be8172099689fbb",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "xtask-audit-final.txt",
+      "bytes": 667,
+      "sha256": "3de48bdaf2d3dcf374834e8785b5a0bcc51bd5ceef1219054e7b3edd38bbc641",
+      "raw_bytes": 671,
+      "raw_sha256": "b5e05fcd5037b4fe8479521a8cd3ce17d2053de8de4e53b13a4b59dab0ef0183",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "xtask-preflight-final.txt",
+      "bytes": 4269,
+      "sha256": "ac5da776e55e7206e9ef0f7b577fb0fa6cc62eaa06055c998896db1e46e7812a",
+      "raw_bytes": 4327,
+      "raw_sha256": "e2a41d7c46450b2d13dab2d3060db5d730c72a868d55a84e6e8b3c2729dfb638",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "python-perf-tests-final.txt",
+      "bytes": 2722,
+      "sha256": "b5fb2c97776a1052f7b7a3547b3907ab2c9256d8b34240ebf907802e1141c2ad",
+      "raw_bytes": 2722,
+      "raw_sha256": "b5fb2c97776a1052f7b7a3547b3907ab2c9256d8b34240ebf907802e1141c2ad",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "clippy-before-style-fix.txt",
+      "bytes": 1359,
+      "sha256": "287635c79785809c89d25c2b073a46f02966d131174d00779bcde7f5c224c483",
+      "raw_bytes": 1533,
+      "raw_sha256": "cb1fea5824efc81a7038d2767b705e6cfdfc9a019bb431e5a6773249a520fed7",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "clippy-final.txt",
+      "bytes": 274,
+      "sha256": "aaa0f76d164a40ea8aa7a77d2e0acc1d4f27af84e5b7b74252bb6ddc774daf45",
+      "raw_bytes": 361,
+      "raw_sha256": "a0167822b580b3a5c0d8703fe751ca3ae9473529eea50bbeb8ddf4f760c45bcc",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "cargo-audit-cae81a9-final.txt",
+      "bytes": 1350,
+      "sha256": "851b711d04fa1ee7aa9c7441a9cb086e84ed3b6b589ea4a93d10780a434f9a97",
+      "raw_bytes": 1353,
+      "raw_sha256": "2cac15b5cd73bd02d23dd2b4a3bea9a390edc5d8b036091ac39a50077a948443",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "reader-growth-before.txt",
+      "bytes": 5267,
+      "sha256": "d8e8f5516936af928762f8b8c79487e9a0076000c680d2adffddf90d72834c33",
+      "raw_bytes": 5352,
+      "raw_sha256": "3c3aa651e6f20564cbd6461a0860e299ff8fcff590e4ae332e67e30a195d939a",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "reader-growth-after.txt",
+      "bytes": 411,
+      "sha256": "ddbf8814631d1b45568b41d218835d8b179b1c3eabcad2e0023bb05e728db06a",
+      "raw_bytes": 410,
+      "raw_sha256": "db972845f15db0a11ab0aa839030106b1310660e72f48f352b7570b87f5a142e",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "reader-growth-source-manifest.txt",
+      "bytes": 946,
+      "sha256": "f9b32efbec40b50c6d1828ed73fbfb4efcf7a0b77c8dc38d730059e1556015ba",
+      "raw_bytes": 946,
+      "raw_sha256": "f9b32efbec40b50c6d1828ed73fbfb4efcf7a0b77c8dc38d730059e1556015ba",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "fmt-final.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "raw_bytes": 0,
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "workspace-tests-final.txt",
+      "bytes": 66658,
+      "sha256": "2d35db72f40d43d9b6a522ab85812b9e9fc7684d586465ceed06270a02af2989",
+      "raw_bytes": 66861,
+      "raw_sha256": "50fe1b7831c0b2590e1e950efa6135b0857b22fdc456cbf310a50f0d56f7d4ea",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "mqtt/auth-deadline-after.log",
+      "bytes": 737,
+      "sha256": "7a75b1673b39080a4834b5e6774ca63684654aebe8a62b94df5940239051ef2f",
+      "normalization": "agent paths normalized to placeholders; normalized and original raw hashes independently verified",
+      "raw_bytes": 812,
+      "raw_sha256": "987373025f4a0b9501e70e8e014850f06afbbe991fb5157fac6e1cc13f2eccee",
+      "raw_hash_independently_verified": true
+    },
+    {
+      "file": "mqtt/auth-deadline-before.log",
+      "bytes": 1100,
+      "sha256": "09a331eed6f16452afb80c8d6805c10086221d9d396863f1a92cbfdafcf9ff57",
+      "normalization": "agent paths normalized to placeholders; normalized and original raw hashes independently verified",
+      "raw_bytes": 1117,
+      "raw_sha256": "2c600b325b2735def69b94b87a2324fb8b0b60b44070ae5451e9cfeabdeb299f",
+      "raw_hash_independently_verified": true
+    },
+    {
+      "file": "mqtt/build-server.log",
+      "bytes": 381,
+      "sha256": "cb261cf96d254e9c8536f8c54ed1c6d23deb7301bbb47a33927ca3e865b93d53",
+      "normalization": "agent paths normalized to placeholders; normalized and original raw hashes independently verified",
+      "raw_bytes": 468,
+      "raw_sha256": "d9a472318a3d8cae4c114c41cdb4afb7a260937f80400eb2b17600edf24825a4",
+      "raw_hash_independently_verified": true
+    },
+    {
+      "file": "mqtt/end-to-end.log",
+      "bytes": 2202,
+      "sha256": "1af651dbac64f88aed2ca3ff6c437f7645a0d1242c6c5071951da62b7224a8d2",
+      "normalization": "agent paths normalized to placeholders; normalized and original raw hashes independently verified",
+      "raw_bytes": 2202,
+      "raw_sha256": "1af651dbac64f88aed2ca3ff6c437f7645a0d1242c6c5071951da62b7224a8d2",
+      "raw_hash_independently_verified": true
+    },
+    {
+      "file": "mqtt/evidence-summary.json",
+      "bytes": 7201,
+      "sha256": "f0d12cfbdce462ee76755d66ecf2e60dddec1a0c0835fd8c450a5e2af4594f20",
+      "normalization": "agent paths normalized to placeholders; normalized hash independently verified",
+      "raw_bytes": 7201,
+      "raw_sha256": "f0d12cfbdce462ee76755d66ecf2e60dddec1a0c0835fd8c450a5e2af4594f20",
+      "raw_kind": "already normalized upstream summary"
+    },
+    {
+      "file": "mqtt/manifest.json",
+      "bytes": 4634,
+      "sha256": "2571ef091d637394abfe636bb1d134bb6481aac2fb9abfc94238d4654ad48e0c",
+      "normalization": "agent paths normalized to placeholders; normalized and original raw hashes independently verified",
+      "raw_bytes": 4634,
+      "raw_sha256": "2571ef091d637394abfe636bb1d134bb6481aac2fb9abfc94238d4654ad48e0c",
+      "raw_hash_independently_verified": true
+    },
+    {
+      "file": "mqtt/mqtt-broker-unit.log",
+      "bytes": 15950,
+      "sha256": "f9e6ece2faa439c533151e9f759bdac4a66674ad1bb65dd915828d76afe2c408",
+      "normalization": "agent paths normalized to placeholders; normalized and original raw hashes independently verified",
+      "raw_bytes": 16008,
+      "raw_sha256": "d03e9a732951199d0a20469827996ea7369b0be251e94d1a24bcc9bd6bc3f2d0",
+      "raw_hash_independently_verified": true
+    },
+    {
+      "file": "mqtt/mqtt-protocol-regressions.log",
+      "bytes": 463,
+      "sha256": "3b8c1d302e8849aeda5e2601afb0d850fe03dbee37fb321587fd80e0c0a28698",
+      "normalization": "agent paths normalized to placeholders; normalized and original raw hashes independently verified",
+      "raw_bytes": 494,
+      "raw_sha256": "260c1e0c2caec8caebd79b0b361fe02fab55a442dc45ff1e3b55d9c86c62dcf5",
+      "raw_hash_independently_verified": true
+    },
+    {
+      "file": "mqtt/mqtt-recovery-fuzz.log",
+      "bytes": 98608,
+      "sha256": "c87276779f60995654ce96ac0489f6b3ccb2e5ce4c6ec9e274734a5a696c7b77",
+      "normalization": "agent paths normalized to placeholders; normalized and original raw hashes independently verified",
+      "raw_bytes": 99004,
+      "raw_sha256": "28650e8b595db2db3983c9ec596eeeac0e4e01aa271766e69abb000afb423249",
+      "raw_hash_independently_verified": true
+    },
+    {
+      "file": "mqtt/mqtt-release-gate.log",
+      "bytes": 8993,
+      "sha256": "8da106ca962d2b826e632f71f458fb25223dc8eec32171c046f63332db5cf728",
+      "normalization": "agent paths normalized to placeholders; normalized and original raw hashes independently verified",
+      "raw_bytes": 8993,
+      "raw_sha256": "8da106ca962d2b826e632f71f458fb25223dc8eec32171c046f63332db5cf728",
+      "raw_hash_independently_verified": true
+    },
+    {
+      "file": "mqtt/mqtt-state-fuzz.log",
+      "bytes": 89749,
+      "sha256": "93fb273d19addbfda623c49f0b679115e407c7a6e523b3ab9937db34fdfea7e7",
+      "normalization": "agent paths normalized to placeholders; normalized and original raw hashes independently verified",
+      "raw_bytes": 90058,
+      "raw_sha256": "3d984ba3c84bd799721b76fb6481cfd9126cef44cfdb8cb06404a18c8a933075",
+      "raw_hash_independently_verified": true
+    },
+    {
+      "file": "mqtt/mqtt5-mosquitto.log",
+      "bytes": 76,
+      "sha256": "1b839f63ecc77c6dc44a678027538b39a940498f59971a0a7adfe131878e4b78",
+      "normalization": "agent paths normalized to placeholders; normalized and original raw hashes independently verified",
+      "raw_bytes": 76,
+      "raw_sha256": "1b839f63ecc77c6dc44a678027538b39a940498f59971a0a7adfe131878e4b78",
+      "raw_hash_independently_verified": true
+    },
+    {
+      "file": "mqtt/mqtt5-raw.log",
+      "bytes": 80,
+      "sha256": "6b84af0aced1681912ef9d4eb4b09ec5918acfbb2ff7261f09534a05e8bbe0be",
+      "normalization": "agent paths normalized to placeholders; normalized and original raw hashes independently verified",
+      "raw_bytes": 80,
+      "raw_sha256": "6b84af0aced1681912ef9d4eb4b09ec5918acfbb2ff7261f09534a05e8bbe0be",
+      "raw_hash_independently_verified": true
+    },
+    {
+      "file": "mqtt/packet-id-after.log",
+      "bytes": 1161,
+      "sha256": "f2fe12b3c8fea59f02079bc385f366d47df4bd11f58c91867fb8a48408b447c0",
+      "normalization": "agent paths normalized to placeholders; normalized and original raw hashes independently verified",
+      "raw_bytes": 1190,
+      "raw_sha256": "97a3b368955ffe6b7852d629c419e81990b2a43e17d26191afac792fd9a7c85c",
+      "raw_hash_independently_verified": true
+    },
+    {
+      "file": "mqtt/packet-id-before.log",
+      "bytes": 1994,
+      "sha256": "f21efb0bc53419a755bd6853594de0b84ecebdc07ba77a5523def80062b7ef67",
+      "normalization": "agent paths normalized to placeholders; normalized and original raw hashes independently verified",
+      "raw_bytes": 2023,
+      "raw_sha256": "a4c10018c42406001b72b44c04d6a41b3e0607a1a1e1b810d51baf985dffa766",
+      "raw_hash_independently_verified": true
+    },
+    {
+      "file": "mqtt/protocol-results.json",
+      "bytes": 54455,
+      "sha256": "ee7e22ebbfef28ad550481769ebd01066398783e1d978d6a781ca104d98ca16a",
+      "normalization": "agent paths normalized to placeholders; normalized and original raw hashes independently verified",
+      "raw_bytes": 54484,
+      "raw_sha256": "b62fb74d579a17fe16d074dcf6522039ef5920fcca6ce88609e8ea32cbb750bc",
+      "raw_hash_independently_verified": true
+    },
+    {
+      "file": "mqtt/release-gate-results.json",
+      "bytes": 27187,
+      "sha256": "cc1d7d013cd90eb3e88a5ba2d77e7ef335acb3fab7936bff4f6e94a071b67199",
+      "normalization": "agent paths normalized to placeholders; normalized and original raw hashes independently verified",
+      "raw_bytes": 27187,
+      "raw_sha256": "cc1d7d013cd90eb3e88a5ba2d77e7ef335acb3fab7936bff4f6e94a071b67199",
+      "raw_hash_independently_verified": true
+    },
+    {
+      "file": "candidate-source-commit-match.json",
+      "bytes": 295,
+      "sha256": "bb6a82351778b848e8d72c49663ed132b624e65371a9c4aaa547a23502f60170",
+      "raw_bytes": 295,
+      "raw_sha256": "bb6a82351778b848e8d72c49663ed132b624e65371a9c4aaa547a23502f60170",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "evidence-tools/event_campaign.py",
+      "bytes": 7728,
+      "sha256": "92af0e31a0873bf8c449d7f54a9ee289340c1124a126b4cbbf886850fd38b63c",
+      "raw_bytes": 7728,
+      "raw_sha256": "92af0e31a0873bf8c449d7f54a9ee289340c1124a126b4cbbf886850fd38b63c",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-original/after-mqtt311-heartbeat-10000-1-sidecar.json",
+      "bytes": 6889,
+      "sha256": "2a12af520bdbe922bdf954785f4a0e074b82aafd705cd1a08fe9f49e8967054d",
+      "raw_bytes": 6889,
+      "raw_sha256": "2a12af520bdbe922bdf954785f4a0e074b82aafd705cd1a08fe9f49e8967054d",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-original/after-mqtt311-heartbeat-10000-1-stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "raw_bytes": 0,
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-original/after-mqtt311-heartbeat-10000-1.json",
+      "bytes": 2627,
+      "sha256": "059c1a1517084aea25e6698022e8acfdae73d86c71dee6df095563a9ea3e2b0e",
+      "raw_bytes": 2627,
+      "raw_sha256": "059c1a1517084aea25e6698022e8acfdae73d86c71dee6df095563a9ea3e2b0e",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-original/after-mqtt311-heartbeat-10000-2-sidecar.json",
+      "bytes": 6888,
+      "sha256": "31efc065c0bd853168171a65b6da88e9fec6286280e33afc1cedf1aedffb236d",
+      "raw_bytes": 6888,
+      "raw_sha256": "31efc065c0bd853168171a65b6da88e9fec6286280e33afc1cedf1aedffb236d",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-original/after-mqtt311-heartbeat-10000-2-stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "raw_bytes": 0,
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-original/after-mqtt311-heartbeat-10000-2.json",
+      "bytes": 2636,
+      "sha256": "31d14c4cb47e781cea7a3461704203599b9d8020bc7cac17a98dfd5ac2bf12c6",
+      "raw_bytes": 2636,
+      "raw_sha256": "31d14c4cb47e781cea7a3461704203599b9d8020bc7cac17a98dfd5ac2bf12c6",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-original/after-mqtt311-idle-10000-1-sidecar.json",
+      "bytes": 6872,
+      "sha256": "ec1e0d36f24ca3459721309c9c825cfff0f2a12a11badcd81ae3d70909e537bf",
+      "raw_bytes": 6872,
+      "raw_sha256": "ec1e0d36f24ca3459721309c9c825cfff0f2a12a11badcd81ae3d70909e537bf",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-original/after-mqtt311-idle-10000-1-stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "raw_bytes": 0,
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-original/after-mqtt311-idle-10000-1.json",
+      "bytes": 2436,
+      "sha256": "7bc0a566e852231dc7d1beff535e8a90c31a488d0d5e40977e91769dea39895c",
+      "raw_bytes": 2436,
+      "raw_sha256": "7bc0a566e852231dc7d1beff535e8a90c31a488d0d5e40977e91769dea39895c",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-original/after-mqtt311-idle-10000-2-sidecar.json",
+      "bytes": 6870,
+      "sha256": "31ffe4a0420cb3e02e63ce5ee3fa14ab17e3b985bb504ace36b6439ef219fc76",
+      "raw_bytes": 6870,
+      "raw_sha256": "31ffe4a0420cb3e02e63ce5ee3fa14ab17e3b985bb504ace36b6439ef219fc76",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-original/after-mqtt311-idle-10000-2-stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "raw_bytes": 0,
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-original/after-mqtt311-idle-10000-2.json",
+      "bytes": 2447,
+      "sha256": "cf6dc784ed11c02e8419c1afa51073ae8c5019a6196440a8c7ed503c36daf93e",
+      "raw_bytes": 2447,
+      "raw_sha256": "cf6dc784ed11c02e8419c1afa51073ae8c5019a6196440a8c7ed503c36daf93e",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-original/after-mqtt311-tls-10000-1-sidecar.json",
+      "bytes": 6883,
+      "sha256": "15525ac7829cab82ea0a9a0df8d57dfd649914c6a835efbadbc4fcbf0bdf915f",
+      "raw_bytes": 6883,
+      "raw_sha256": "15525ac7829cab82ea0a9a0df8d57dfd649914c6a835efbadbc4fcbf0bdf915f",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-original/after-mqtt311-tls-10000-1-stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "raw_bytes": 0,
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-original/after-mqtt311-tls-10000-1.json",
+      "bytes": 2441,
+      "sha256": "268334504fc3db900e7d3587657e2890919cb39a5f4c0f212f95eac2b956037b",
+      "raw_bytes": 2441,
+      "raw_sha256": "268334504fc3db900e7d3587657e2890919cb39a5f4c0f212f95eac2b956037b",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-original/after-mqtt311-tls-10000-2-sidecar.json",
+      "bytes": 6887,
+      "sha256": "8122e7d1dbba7306ea36e6277f85d6af72b63032fc3bab2f712b0c4047216e1b",
+      "raw_bytes": 6887,
+      "raw_sha256": "8122e7d1dbba7306ea36e6277f85d6af72b63032fc3bab2f712b0c4047216e1b",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-original/after-mqtt311-tls-10000-2-stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "raw_bytes": 0,
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-original/after-mqtt311-tls-10000-2.json",
+      "bytes": 2449,
+      "sha256": "39fe0788f45fac387fc8ae56c185d59ac91b715090bc78e10fdc25f2220a2f28",
+      "raw_bytes": 2449,
+      "raw_sha256": "39fe0788f45fac387fc8ae56c185d59ac91b715090bc78e10fdc25f2220a2f28",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-original/after-mqtt5-idle-10000-1-sidecar.json",
+      "bytes": 6873,
+      "sha256": "2968091fbfd539b0c148336ce3f36cbefd8f75c9ceaf5e13555f37fd9e7fe887",
+      "raw_bytes": 6873,
+      "raw_sha256": "2968091fbfd539b0c148336ce3f36cbefd8f75c9ceaf5e13555f37fd9e7fe887",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-original/after-mqtt5-idle-10000-1-stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "raw_bytes": 0,
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-original/after-mqtt5-idle-10000-1.json",
+      "bytes": 2448,
+      "sha256": "b2499c28ee754fd3ac546db605411707e606a419dc1b11f26e0cc4df3069bebb",
+      "raw_bytes": 2448,
+      "raw_sha256": "b2499c28ee754fd3ac546db605411707e606a419dc1b11f26e0cc4df3069bebb",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-original/after-mqtt5-idle-10000-2-sidecar.json",
+      "bytes": 6871,
+      "sha256": "b3f27c94585514b6c8ffec7f01bb79f90c63045b592b942f727f33d9cd21d4aa",
+      "raw_bytes": 6871,
+      "raw_sha256": "b3f27c94585514b6c8ffec7f01bb79f90c63045b592b942f727f33d9cd21d4aa",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-original/after-mqtt5-idle-10000-2-stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "raw_bytes": 0,
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-original/after-mqtt5-idle-10000-2.json",
+      "bytes": 2446,
+      "sha256": "42e6023f94c15eb36f9c1ea2f122abbb52d3b821d1b122e2362ab87b97a74760",
+      "raw_bytes": 2446,
+      "raw_sha256": "42e6023f94c15eb36f9c1ea2f122abbb52d3b821d1b122e2362ab87b97a74760",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-original/after-mqtt5-persistent-subscribed-10000-1-sidecar.json",
+      "bytes": 6887,
+      "sha256": "06eb7dcd347e35aa347f0a5cde3814ba95fe367bcf910055ff200dbd6640f408",
+      "raw_bytes": 6887,
+      "raw_sha256": "06eb7dcd347e35aa347f0a5cde3814ba95fe367bcf910055ff200dbd6640f408",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-original/after-mqtt5-persistent-subscribed-10000-1-stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "raw_bytes": 0,
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-original/after-mqtt5-persistent-subscribed-10000-1.json",
+      "bytes": 2436,
+      "sha256": "f23a38e36649c7357f6373e82419bab920650854004dcc8f7d9bb42a4d41e414",
+      "raw_bytes": 2436,
+      "raw_sha256": "f23a38e36649c7357f6373e82419bab920650854004dcc8f7d9bb42a4d41e414",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-original/after-mqtt5-persistent-subscribed-10000-2-sidecar.json",
+      "bytes": 6887,
+      "sha256": "efea5ef9a27f0fc0aeb1539f466f1a34c4c091c9f3f0d6cc4bdaca334db378db",
+      "raw_bytes": 6887,
+      "raw_sha256": "efea5ef9a27f0fc0aeb1539f466f1a34c4c091c9f3f0d6cc4bdaca334db378db",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-original/after-mqtt5-persistent-subscribed-10000-2-stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "raw_bytes": 0,
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-original/after-mqtt5-persistent-subscribed-10000-2.json",
+      "bytes": 2438,
+      "sha256": "879f88f3cde8fc23a698bbac2b948f0e934446a30c4790c655c0dbfd51863a18",
+      "raw_bytes": 2438,
+      "raw_sha256": "879f88f3cde8fc23a698bbac2b948f0e934446a30c4790c655c0dbfd51863a18",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-original/after-tcp-idle-10000-1-sidecar.json",
+      "bytes": 6849,
+      "sha256": "6b86f7fc7b85eb481792716f3ef9eec1ceee91950e484588ed4416cf1ab7e930",
+      "raw_bytes": 6849,
+      "raw_sha256": "6b86f7fc7b85eb481792716f3ef9eec1ceee91950e484588ed4416cf1ab7e930",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-original/after-tcp-idle-10000-1-stderr.txt",
+      "bytes": 72,
+      "sha256": "b4dd36d2adc0d21afbadeadcf4f3d098f0df469d83000df7fba08307ec38393a",
+      "raw_bytes": 72,
+      "raw_sha256": "b4dd36d2adc0d21afbadeadcf4f3d098f0df469d83000df7fba08307ec38393a",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-original/after-tcp-idle-10000-1.json",
+      "bytes": 3163,
+      "sha256": "b2708b29fcbb075dfe94f0c8a6fb286cae98d3d2940ca9d5cad370d282db72d3",
+      "raw_bytes": 3163,
+      "raw_sha256": "b2708b29fcbb075dfe94f0c8a6fb286cae98d3d2940ca9d5cad370d282db72d3",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-original/before-mqtt311-heartbeat-10000-1-sidecar.json",
+      "bytes": 6887,
+      "sha256": "5c5e6a1b01c77bc0d63e97ea279f9a398b434b5cd6f1fd30b1cc5e6ed7a6525e",
+      "raw_bytes": 6887,
+      "raw_sha256": "5c5e6a1b01c77bc0d63e97ea279f9a398b434b5cd6f1fd30b1cc5e6ed7a6525e",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-original/before-mqtt311-heartbeat-10000-1-stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "raw_bytes": 0,
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-original/before-mqtt311-heartbeat-10000-1.json",
+      "bytes": 2624,
+      "sha256": "9712afe80551a9a892feb3d0a1fa9a4e54dfd4438a58010145da094171569a98",
+      "raw_bytes": 2624,
+      "raw_sha256": "9712afe80551a9a892feb3d0a1fa9a4e54dfd4438a58010145da094171569a98",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-original/before-mqtt311-heartbeat-10000-2-sidecar.json",
+      "bytes": 6888,
+      "sha256": "2e89d209886154b2198c62388a502b6822cfe246aacd51ee673090c3358ffc3f",
+      "raw_bytes": 6888,
+      "raw_sha256": "2e89d209886154b2198c62388a502b6822cfe246aacd51ee673090c3358ffc3f",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-original/before-mqtt311-heartbeat-10000-2-stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "raw_bytes": 0,
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-original/before-mqtt311-heartbeat-10000-2.json",
+      "bytes": 2628,
+      "sha256": "e7bc3d9f968eef754b2d50dd00f2ec1c7df120a46ea89e829df5eb146bcdd820",
+      "raw_bytes": 2628,
+      "raw_sha256": "e7bc3d9f968eef754b2d50dd00f2ec1c7df120a46ea89e829df5eb146bcdd820",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-original/before-mqtt311-idle-10000-1-sidecar.json",
+      "bytes": 6871,
+      "sha256": "5ec87945067840dfdd624bfc7fc3b01ae4e4ef7a6da53eb918cb335b98f2eae2",
+      "raw_bytes": 6871,
+      "raw_sha256": "5ec87945067840dfdd624bfc7fc3b01ae4e4ef7a6da53eb918cb335b98f2eae2",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-original/before-mqtt311-idle-10000-1-stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "raw_bytes": 0,
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-original/before-mqtt311-idle-10000-1.json",
+      "bytes": 2436,
+      "sha256": "e03901ea9b3ca39a5fbb9a329da08bb1db534a09b0f542a46b8177cd6dbed60a",
+      "raw_bytes": 2436,
+      "raw_sha256": "e03901ea9b3ca39a5fbb9a329da08bb1db534a09b0f542a46b8177cd6dbed60a",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-original/before-mqtt311-idle-10000-2-sidecar.json",
+      "bytes": 6874,
+      "sha256": "4332e5058f00d0a4255502c075a17d941285e85ae973fd87823cafd006e51241",
+      "raw_bytes": 6874,
+      "raw_sha256": "4332e5058f00d0a4255502c075a17d941285e85ae973fd87823cafd006e51241",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-original/before-mqtt311-idle-10000-2-stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "raw_bytes": 0,
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-original/before-mqtt311-idle-10000-2.json",
+      "bytes": 2436,
+      "sha256": "692ce9641293f2b51c4df562db24431f98e52225a4b0a81e5e9c94078875a701",
+      "raw_bytes": 2436,
+      "raw_sha256": "692ce9641293f2b51c4df562db24431f98e52225a4b0a81e5e9c94078875a701",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-original/before-mqtt311-tls-10000-1-sidecar.json",
+      "bytes": 6885,
+      "sha256": "70b00da1d2943dfff8d8259f98762598f4a39268a9416a9b55fafe1b5351fb0b",
+      "raw_bytes": 6885,
+      "raw_sha256": "70b00da1d2943dfff8d8259f98762598f4a39268a9416a9b55fafe1b5351fb0b",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-original/before-mqtt311-tls-10000-1-stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "raw_bytes": 0,
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-original/before-mqtt311-tls-10000-1.json",
+      "bytes": 2440,
+      "sha256": "545a0324b7f1b21f230451ab1827fa7da6aa3a69ded53131868629c66961dd8b",
+      "raw_bytes": 2440,
+      "raw_sha256": "545a0324b7f1b21f230451ab1827fa7da6aa3a69ded53131868629c66961dd8b",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-original/before-mqtt311-tls-10000-2-sidecar.json",
+      "bytes": 6887,
+      "sha256": "86696decdad4d01a82b32bda01953daeeeac7c26e819d77a4ed60072bea4c0bd",
+      "raw_bytes": 6887,
+      "raw_sha256": "86696decdad4d01a82b32bda01953daeeeac7c26e819d77a4ed60072bea4c0bd",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-original/before-mqtt311-tls-10000-2-stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "raw_bytes": 0,
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-original/before-mqtt311-tls-10000-2.json",
+      "bytes": 2440,
+      "sha256": "e2c9d8e3917727f332157c2efd496f16b0eedff62c136c4c38562b6ef45061f8",
+      "raw_bytes": 2440,
+      "raw_sha256": "e2c9d8e3917727f332157c2efd496f16b0eedff62c136c4c38562b6ef45061f8",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-original/before-mqtt5-idle-10000-1-sidecar.json",
+      "bytes": 6873,
+      "sha256": "3c71df11806a5890680db1052cce2b1b3edb8940fa49b54d6a58a57c1c9c9343",
+      "raw_bytes": 6873,
+      "raw_sha256": "3c71df11806a5890680db1052cce2b1b3edb8940fa49b54d6a58a57c1c9c9343",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-original/before-mqtt5-idle-10000-1-stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "raw_bytes": 0,
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-original/before-mqtt5-idle-10000-1.json",
+      "bytes": 2439,
+      "sha256": "f02146f72d0edfbae08ac3d15398879edf187391ea3086345f19754cc653dddd",
+      "raw_bytes": 2439,
+      "raw_sha256": "f02146f72d0edfbae08ac3d15398879edf187391ea3086345f19754cc653dddd",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-original/before-mqtt5-idle-10000-2-sidecar.json",
+      "bytes": 6875,
+      "sha256": "a21aa4bc639217af4d55ae11848f25ca27baa3154b887ca1ca61c4507a94432c",
+      "raw_bytes": 6875,
+      "raw_sha256": "a21aa4bc639217af4d55ae11848f25ca27baa3154b887ca1ca61c4507a94432c",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-original/before-mqtt5-idle-10000-2-stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "raw_bytes": 0,
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-original/before-mqtt5-idle-10000-2.json",
+      "bytes": 2447,
+      "sha256": "418d3ea9d5335a8c3eec593ebcc384d1c05c819fa7dc74d6f3fa81da8b11ab13",
+      "raw_bytes": 2447,
+      "raw_sha256": "418d3ea9d5335a8c3eec593ebcc384d1c05c819fa7dc74d6f3fa81da8b11ab13",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-original/before-mqtt5-persistent-subscribed-10000-1-sidecar.json",
+      "bytes": 6874,
+      "sha256": "629f0d0522b56874e1b3ba5f8c55409d1f53e542f054b6b847de8028baf39d24",
+      "raw_bytes": 6874,
+      "raw_sha256": "629f0d0522b56874e1b3ba5f8c55409d1f53e542f054b6b847de8028baf39d24",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-original/before-mqtt5-persistent-subscribed-10000-1-stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "raw_bytes": 0,
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-original/before-mqtt5-persistent-subscribed-10000-1.json",
+      "bytes": 2437,
+      "sha256": "e85b4b63f2fda03be79d0cc3bae64a2ed887cb792d1e2e2d988583d4329c8343",
+      "raw_bytes": 2437,
+      "raw_sha256": "e85b4b63f2fda03be79d0cc3bae64a2ed887cb792d1e2e2d988583d4329c8343",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-original/before-mqtt5-persistent-subscribed-10000-2-sidecar.json",
+      "bytes": 6889,
+      "sha256": "cc145e9ce56be3eaafbf0b174615347ea4da87dd7dbed24bfeaccd4469742265",
+      "raw_bytes": 6889,
+      "raw_sha256": "cc145e9ce56be3eaafbf0b174615347ea4da87dd7dbed24bfeaccd4469742265",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-original/before-mqtt5-persistent-subscribed-10000-2-stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "raw_bytes": 0,
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-original/before-mqtt5-persistent-subscribed-10000-2.json",
+      "bytes": 2437,
+      "sha256": "80978f18edb4f23e1267887d870c6c6202f7a489eb4fc1735637315091ae8e62",
+      "raw_bytes": 2437,
+      "raw_sha256": "80978f18edb4f23e1267887d870c6c6202f7a489eb4fc1735637315091ae8e62",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-original/before-tcp-idle-10000-1-sidecar.json",
+      "bytes": 6866,
+      "sha256": "9f802f0271b14e0418c59e69a1f68dd0b393e21fc2d83b58f53e30d6b1d5c00f",
+      "raw_bytes": 6866,
+      "raw_sha256": "9f802f0271b14e0418c59e69a1f68dd0b393e21fc2d83b58f53e30d6b1d5c00f",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-original/before-tcp-idle-10000-1-stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "raw_bytes": 0,
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-original/before-tcp-idle-10000-1.json",
+      "bytes": 2432,
+      "sha256": "1d01e172944dbfbd764538141fde2f85ee51514632daafc0af9f28291b330b23",
+      "raw_bytes": 2432,
+      "raw_sha256": "1d01e172944dbfbd764538141fde2f85ee51514632daafc0af9f28291b330b23",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-original/campaign.json",
+      "bytes": 601,
+      "sha256": "66ba3f177bdf9f450e0086df4100ec5e0b951f6efbe7487dd3b80a664284bc7f",
+      "raw_bytes": 601,
+      "raw_sha256": "66ba3f177bdf9f450e0086df4100ec5e0b951f6efbe7487dd3b80a664284bc7f",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-original/outcomes.json",
+      "bytes": 6266,
+      "sha256": "bee2f1fb65b2b5e9dbaa6699f78d2793cce00a35dec4a8623f1c1caa91b77e8c",
+      "raw_bytes": 6266,
+      "raw_sha256": "bee2f1fb65b2b5e9dbaa6699f78d2793cce00a35dec4a8623f1c1caa91b77e8c",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "tcp-timewait-after-invalid.json",
+      "bytes": 450,
+      "sha256": "c3852f13c1f72d1bd99d631cb51f7d334389b702b524a44c98b9cb035e73eb3d",
+      "raw_bytes": 450,
+      "raw_sha256": "c3852f13c1f72d1bd99d631cb51f7d334389b702b524a44c98b9cb035e73eb3d",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "evidence-tools/tcp_timewait_snapshot.py",
+      "bytes": 1549,
+      "sha256": "794cf8d49a2bf2bf3a26573408d6a67fc9d185cfc55d9546fc8b5b89af982714",
+      "raw_bytes": 1549,
+      "raw_sha256": "794cf8d49a2bf2bf3a26573408d6a67fc9d185cfc55d9546fc8b5b89af982714",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "ci-recovery-original-failure.txt",
+      "bytes": 212403,
+      "sha256": "06cb15c9874944fe21268e793ee67c60ece051942bcb31a7088929cc1638f83f",
+      "raw_bytes": 213245,
+      "raw_sha256": "950b13bba598c905f9c4c6b4813833547d50b958e39cbce52d1d093da88f0928",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "quota-poison-before.txt",
+      "bytes": 5632,
+      "sha256": "fbf2fe99f6454007a6d7ae9d4662a680a53e434f3fb445b7e60acd993b1b1437",
+      "raw_bytes": 5717,
+      "raw_sha256": "200358b43af0a5d352b672b851220dcb25ff7477edb7f63b0a25048416a9c954",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "quota-poison-after.txt",
+      "bytes": 842,
+      "sha256": "68819e59aa1249298d8c8a1e7f8a8a9282e3de5fbb166dafb082fb5e5631160e",
+      "raw_bytes": 841,
+      "raw_sha256": "ad7c1f3f6971f6f0cf4049fe324a284fca2c85a173e84d85c9b231a77c452425",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "quota-poison-source-manifest.txt",
+      "bytes": 2698,
+      "sha256": "9142c0f15f4e35ed5d389d7b46f0574d9167eb435bbd2135df27761e6c2ee61f",
+      "raw_bytes": 2694,
+      "raw_sha256": "d0f946edeef0eea6b5fc2203545158ddca1934625467ecb93f591f41289d60a9",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "evidence-tools/tcp_density_campaign.py",
+      "bytes": 5355,
+      "sha256": "f1ba16399ec6ba52f3bdecad4f13e359168f84095e4b6c3865169f636c6b165a",
+      "raw_bytes": 5355,
+      "raw_sha256": "f1ba16399ec6ba52f3bdecad4f13e359168f84095e4b6c3865169f636c6b165a",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "candidate-linux-profile-inspection.json",
+      "bytes": 4211,
+      "sha256": "2a085528105d18f3b5564dd7d1ffec07d3ed0393eeef6cd0d4c9a48484bbf867",
+      "raw_bytes": 4211,
+      "raw_sha256": "2a085528105d18f3b5564dd7d1ffec07d3ed0393eeef6cd0d4c9a48484bbf867",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "toolchain-equivalence.json",
+      "bytes": 336,
+      "sha256": "b2c89ede05728a44c8f63141daad5be9e5feba52b398573a6db2fff6b26e2efb",
+      "raw_bytes": 336,
+      "raw_sha256": "b2c89ede05728a44c8f63141daad5be9e5feba52b398573a6db2fff6b26e2efb",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "recovery-fixture/after-forced-collision.patch",
+      "bytes": 533,
+      "sha256": "6a28057fa28ba7ffc64c2a9ba839f9917236bd53844b2001a18d1c2c6dd0d495",
+      "normalization": "fixture evidence normalized to placeholders; normalized hash independently verified",
+      "raw_bytes": 533,
+      "raw_sha256": "6a28057fa28ba7ffc64c2a9ba839f9917236bd53844b2001a18d1c2c6dd0d495",
+      "raw_kind": "already normalized metadata or exact test injection patch"
+    },
+    {
+      "file": "recovery-fixture/before-forced-collision.patch",
+      "bytes": 1146,
+      "sha256": "194b380fbd8c58266032e8c4844246d48a1899114ac952f4bd8dcb180219a7f9",
+      "normalization": "fixture evidence normalized to placeholders; normalized hash independently verified",
+      "raw_bytes": 1146,
+      "raw_sha256": "194b380fbd8c58266032e8c4844246d48a1899114ac952f4bd8dcb180219a7f9",
+      "raw_kind": "already normalized metadata or exact test injection patch"
+    },
+    {
+      "file": "recovery-fixture/ci-failure-excerpt.log",
+      "bytes": 2617,
+      "sha256": "5b7b5cb615ec785123507bb0e02fb7a242b5eea8beb975aebfc6676548086406",
+      "normalization": "fixture evidence normalized to placeholders; normalized hash independently verified",
+      "raw_bytes": 2617,
+      "raw_sha256": "5b7b5cb615ec785123507bb0e02fb7a242b5eea8beb975aebfc6676548086406",
+      "raw_hash_independently_verified": true
+    },
+    {
+      "file": "recovery-fixture/clippy-final.log",
+      "bytes": 138,
+      "sha256": "ca67f27278e3fe7db33fb41d05536f9041f7c0493289e9ac1b80e70d0a4ff885",
+      "normalization": "fixture evidence normalized to placeholders; normalized hash independently verified",
+      "raw_bytes": 167,
+      "raw_sha256": "92831bb8a8644f0a37fbd522741b5994c1f1a767d8678a2c3fdee3033cfaff85",
+      "raw_hash_independently_verified": true
+    },
+    {
+      "file": "recovery-fixture/collision-after.log",
+      "bytes": 507,
+      "sha256": "5e930cd9d36ee401b0370c8632eb3f5d49d8c39921585739f864d8f132c641d5",
+      "normalization": "fixture evidence normalized to placeholders; normalized hash independently verified",
+      "raw_bytes": 536,
+      "raw_sha256": "40406f0f54486971b6f19262a042e5a775e716b84e0e4c6431763fa781605162",
+      "raw_hash_independently_verified": true
+    },
+    {
+      "file": "recovery-fixture/collision-before.log",
+      "bytes": 1251,
+      "sha256": "c7c9ef2c91a4be03137d7e817e61d539c800f924445a0283851f6e79abea0db3",
+      "normalization": "fixture evidence normalized to placeholders; normalized hash independently verified",
+      "raw_bytes": 1280,
+      "raw_sha256": "05075fd43c10f541ebb432889850f285f83610e1a544288d170035c56fbfc605",
+      "raw_hash_independently_verified": true
+    },
+    {
+      "file": "recovery-fixture/collision-injected-after-server.rs",
+      "bytes": 109643,
+      "sha256": "3cabfc5b8bb6501ada168812aa59562cf9496991c119f60009f7dce53d0ba897",
+      "normalization": "fixture evidence normalized to placeholders; normalized hash independently verified",
+      "raw_bytes": 109643,
+      "raw_sha256": "3cabfc5b8bb6501ada168812aa59562cf9496991c119f60009f7dce53d0ba897",
+      "raw_hash_independently_verified": true
+    },
+    {
+      "file": "recovery-fixture/collision-injected-before-server.rs",
+      "bytes": 109108,
+      "sha256": "916d888de06e9df1b4ec55e9ec01cf4901a1da665ab69498074cdac16e2e7d38",
+      "normalization": "fixture evidence normalized to placeholders; normalized hash independently verified",
+      "raw_bytes": 109108,
+      "raw_sha256": "916d888de06e9df1b4ec55e9ec01cf4901a1da665ab69498074cdac16e2e7d38",
+      "raw_hash_independently_verified": true
+    },
+    {
+      "file": "recovery-fixture/final-common-mod.rs",
+      "bytes": 6278,
+      "sha256": "bab77cbc9c9a6b17fd80f0142bb6c4cf13018a9b77e6de741bc42d56e4367e48",
+      "normalization": "fixture evidence normalized to placeholders; normalized hash independently verified",
+      "raw_bytes": 6278,
+      "raw_sha256": "bab77cbc9c9a6b17fd80f0142bb6c4cf13018a9b77e6de741bc42d56e4367e48",
+      "raw_hash_independently_verified": true
+    },
+    {
+      "file": "recovery-fixture/final-server.rs",
+      "bytes": 109596,
+      "sha256": "116bf88b880b75e8465adcf6cdb552775d94283c4df884a6f3ab55391b0648c2",
+      "normalization": "fixture evidence normalized to placeholders; normalized hash independently verified",
+      "raw_bytes": 109596,
+      "raw_sha256": "116bf88b880b75e8465adcf6cdb552775d94283c4df884a6f3ab55391b0648c2",
+      "raw_hash_independently_verified": true
+    },
+    {
+      "file": "recovery-fixture/initial-probe-not-ci-reproduction.log",
+      "bytes": 1508,
+      "sha256": "1c1bdfa8f40efb6b155ddb0f25eee9356e05fb97de9a30208c090c147c7adb16",
+      "normalization": "fixture evidence normalized to placeholders; normalized hash independently verified",
+      "raw_bytes": 1653,
+      "raw_sha256": "d3ad617fe8c7832d5deaa2dcbf64ae45329b69a0fe8b1040b6338c1899190f2f",
+      "raw_hash_independently_verified": true
+    },
+    {
+      "file": "recovery-fixture/manifest.json",
+      "bytes": 7313,
+      "sha256": "3475e08f634f927ed85a6bfeef10590cfe540dc5437afdec34f54282138d38ee",
+      "normalization": "fixture evidence normalized to placeholders; normalized hash independently verified",
+      "raw_bytes": 7313,
+      "raw_sha256": "3475e08f634f927ed85a6bfeef10590cfe540dc5437afdec34f54282138d38ee",
+      "raw_kind": "already normalized metadata or exact test injection patch"
+    },
+    {
+      "file": "recovery-fixture/server-final.log",
+      "bytes": 3361,
+      "sha256": "16d6de423afe669b95232023ae062803636bf8d631cd4bc838be4db51d2796ff",
+      "normalization": "fixture evidence normalized to placeholders; normalized hash independently verified",
+      "raw_bytes": 3390,
+      "raw_sha256": "162a20c69f8b2a8ad2b547f28e52e45769b1fd001888e1f468a90e9cb8d3f721",
+      "raw_hash_independently_verified": true
+    },
+    {
+      "file": "fixture-final-fmt.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "raw_bytes": 0,
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "fixture-final-clippy.txt",
+      "bytes": 138,
+      "sha256": "718f13bf0568e43bb3445495e44650885318cd2f9fd42384b53294a1173aa345",
+      "raw_bytes": 167,
+      "raw_sha256": "bd2ddc3156ac879ccded57c4ceddad851796ccfc6535e04b2c621e87421d827a",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "fixture-final-workspace-tests.txt",
+      "bytes": 66451,
+      "sha256": "881bf5c159fecd632781407e0ef4fe9dc8f44fa6821f4d9928d5d7942951e90a",
+      "raw_bytes": 66509,
+      "raw_sha256": "15f841cf5e308777c04ee30d1e0b0875c61e9ad1b2e5817aec26839738917c9d",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "fixture-final-preflight.txt",
+      "bytes": 4268,
+      "sha256": "717a802b829e9b7e2b43b9dca2421d7ff4c4be67f3e684e2c4ae7e3901fa89f2",
+      "raw_bytes": 4326,
+      "raw_sha256": "e6f55ba0d28d52ed2376c02617fa991a94df8b1e148240c1cbc6dcc075922a5b",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "evidence-tools/summarize_density.py",
+      "bytes": 5647,
+      "sha256": "adca1c61bdc6a447a10509c4e800598e937b98ceba124e13c897dbddcbd49ddb",
+      "raw_bytes": 5647,
+      "raw_sha256": "adca1c61bdc6a447a10509c4e800598e937b98ceba124e13c897dbddcbd49ddb",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-summary.json",
+      "bytes": 42971,
+      "sha256": "51ca40fbd6799bb3bbf8de32d0fbc8487e3d14870726ae0d86b17b723f4f5673",
+      "raw_bytes": 42971,
+      "raw_sha256": "51ca40fbd6799bb3bbf8de32d0fbc8487e3d14870726ae0d86b17b723f4f5673",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-runs.csv",
+      "bytes": 7459,
+      "sha256": "f03a52654bfd344abb71c68b22f5eacab5eb0d58a630bffb83424a384e44772a",
+      "raw_bytes": 7459,
+      "raw_sha256": "f03a52654bfd344abb71c68b22f5eacab5eb0d58a630bffb83424a384e44772a",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-tcp-retry/after-tcp-idle-10000-1-sidecar.json",
+      "bytes": 6873,
+      "sha256": "38ed4a30f4c87abc5d63e3145c5ca9b1c5b4b7e3cdb03197cb90b74c082ea51c",
+      "raw_bytes": 6873,
+      "raw_sha256": "38ed4a30f4c87abc5d63e3145c5ca9b1c5b4b7e3cdb03197cb90b74c082ea51c",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-tcp-retry/after-tcp-idle-10000-1-stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "raw_bytes": 0,
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-tcp-retry/after-tcp-idle-10000-1-timewait-after.json",
+      "bytes": 481,
+      "sha256": "321af5401f22a842ad7ab91522b7ede5f4abe40874edc635f7c8368c4d3e2e57",
+      "raw_bytes": 481,
+      "raw_sha256": "321af5401f22a842ad7ab91522b7ede5f4abe40874edc635f7c8368c4d3e2e57",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-tcp-retry/after-tcp-idle-10000-1-timewait-before.json",
+      "bytes": 406,
+      "sha256": "2c2ff7d61588647bd96e4579e1bb2ffefce6e10c1b75d9ad8ab08bf00d2c0435",
+      "raw_bytes": 406,
+      "raw_sha256": "2c2ff7d61588647bd96e4579e1bb2ffefce6e10c1b75d9ad8ab08bf00d2c0435",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-tcp-retry/after-tcp-idle-10000-1.json",
+      "bytes": 2431,
+      "sha256": "9870cb6ef417933357255bcfaebd6de3112550da87646e62da977d0df2ae809f",
+      "raw_bytes": 2431,
+      "raw_sha256": "9870cb6ef417933357255bcfaebd6de3112550da87646e62da977d0df2ae809f",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-tcp-retry/after-tcp-idle-10000-2-sidecar.json",
+      "bytes": 6867,
+      "sha256": "c0aaa7ef091f6d802bf5b4441514dcfb59492ce095af94a002d1f38e2b7f9a49",
+      "raw_bytes": 6867,
+      "raw_sha256": "c0aaa7ef091f6d802bf5b4441514dcfb59492ce095af94a002d1f38e2b7f9a49",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-tcp-retry/after-tcp-idle-10000-2-stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "raw_bytes": 0,
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-tcp-retry/after-tcp-idle-10000-2-timewait-after.json",
+      "bytes": 480,
+      "sha256": "78fdc8511821a0452e5209ee4c95da70172df4a96a61f8837631e43843116c81",
+      "raw_bytes": 480,
+      "raw_sha256": "78fdc8511821a0452e5209ee4c95da70172df4a96a61f8837631e43843116c81",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-tcp-retry/after-tcp-idle-10000-2-timewait-before.json",
+      "bytes": 414,
+      "sha256": "971f9997bbfc14fb581bd84074e018fdda29d7dc16e212e60dd6aaeedc5f7cc2",
+      "raw_bytes": 414,
+      "raw_sha256": "971f9997bbfc14fb581bd84074e018fdda29d7dc16e212e60dd6aaeedc5f7cc2",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-tcp-retry/after-tcp-idle-10000-2.json",
+      "bytes": 2427,
+      "sha256": "7acfed7b5f8bac620c278839314f1837cdf55cd2ee3f70ec29d5ef1b125aabcd",
+      "raw_bytes": 2427,
+      "raw_sha256": "7acfed7b5f8bac620c278839314f1837cdf55cd2ee3f70ec29d5ef1b125aabcd",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-tcp-retry/before-tcp-idle-10000-1-sidecar.json",
+      "bytes": 6874,
+      "sha256": "7f4ef414d4c0d67119a0eba49f2975c63500944de1c45d9f26e00820b492753f",
+      "raw_bytes": 6874,
+      "raw_sha256": "7f4ef414d4c0d67119a0eba49f2975c63500944de1c45d9f26e00820b492753f",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-tcp-retry/before-tcp-idle-10000-1-stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "raw_bytes": 0,
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-tcp-retry/before-tcp-idle-10000-1-timewait-after.json",
+      "bytes": 481,
+      "sha256": "c8f8f3b95ead5d72b1106cead6df3cfdb62d42863de7c8f7f5a59f0904a77463",
+      "raw_bytes": 481,
+      "raw_sha256": "c8f8f3b95ead5d72b1106cead6df3cfdb62d42863de7c8f7f5a59f0904a77463",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-tcp-retry/before-tcp-idle-10000-1-timewait-before.json",
+      "bytes": 408,
+      "sha256": "7681d28b31edb9c49f5babb92a5c6688c5ddfd61b678d6ed01a2aacbceba29ed",
+      "raw_bytes": 408,
+      "raw_sha256": "7681d28b31edb9c49f5babb92a5c6688c5ddfd61b678d6ed01a2aacbceba29ed",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-tcp-retry/before-tcp-idle-10000-1.json",
+      "bytes": 2439,
+      "sha256": "d3d17a1531ed2fb1eb5a010e0d1af80bb72473f9e565c9336dcaafc4826c2991",
+      "raw_bytes": 2439,
+      "raw_sha256": "d3d17a1531ed2fb1eb5a010e0d1af80bb72473f9e565c9336dcaafc4826c2991",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-tcp-retry/before-tcp-idle-10000-2-sidecar.json",
+      "bytes": 6875,
+      "sha256": "d2dc165d67e92d31c01a3d8d979f905d78e649ce2a1337678576f152336c1f3b",
+      "raw_bytes": 6875,
+      "raw_sha256": "d2dc165d67e92d31c01a3d8d979f905d78e649ce2a1337678576f152336c1f3b",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-tcp-retry/before-tcp-idle-10000-2-stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "raw_bytes": 0,
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-tcp-retry/before-tcp-idle-10000-2-timewait-after.json",
+      "bytes": 479,
+      "sha256": "5d02ee25c616bd290bd1dca982b9857b6f81bb35d6d66eaf9b9931e19cff5128",
+      "raw_bytes": 479,
+      "raw_sha256": "5d02ee25c616bd290bd1dca982b9857b6f81bb35d6d66eaf9b9931e19cff5128",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-tcp-retry/before-tcp-idle-10000-2-timewait-before.json",
+      "bytes": 406,
+      "sha256": "701083183cf08f3c7f78f12864007428baa1d26b3e525ee85a588538c0508556",
+      "raw_bytes": 406,
+      "raw_sha256": "701083183cf08f3c7f78f12864007428baa1d26b3e525ee85a588538c0508556",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-tcp-retry/before-tcp-idle-10000-2.json",
+      "bytes": 2441,
+      "sha256": "af17412f11366a7211766c23198509c165cedbf8e0610f090c1f8d82e7d6d2cc",
+      "raw_bytes": 2441,
+      "raw_sha256": "af17412f11366a7211766c23198509c165cedbf8e0610f090c1f8d82e7d6d2cc",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-tcp-retry/campaign.json",
+      "bytes": 720,
+      "sha256": "4009f1803596a8dcb1685e080553c3ed559a901fc1c31a081033631fedb365d0",
+      "raw_bytes": 720,
+      "raw_sha256": "4009f1803596a8dcb1685e080553c3ed559a901fc1c31a081033631fedb365d0",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "density-tcp-retry/outcomes.json",
+      "bytes": 1589,
+      "sha256": "864e919ff8887672d2eb248a0d6011921b1589dbe1a245aa4abfe65e825be4ea",
+      "raw_bytes": 1589,
+      "raw_sha256": "864e919ff8887672d2eb248a0d6011921b1589dbe1a245aa4abfe65e825be4ea",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "ci-recovery-fixture-success.json",
+      "bytes": 3496,
+      "sha256": "e596e8a1ac1a2f57c63938f5aa8b9829af189187586e6738ef0510d61db974c9",
+      "raw_bytes": 3496,
+      "raw_sha256": "e596e8a1ac1a2f57c63938f5aa8b9829af189187586e6738ef0510d61db974c9",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "large-original/after-mqtt311-large-subscription-sidecar.json",
+      "bytes": 93688,
+      "sha256": "af589a600d07191554c17ae6c6473ccad1e0524d45eb666919dd340b59cc7b40",
+      "raw_bytes": 93688,
+      "raw_sha256": "af589a600d07191554c17ae6c6473ccad1e0524d45eb666919dd340b59cc7b40",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "large-original/after-mqtt311-large-subscription-stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "raw_bytes": 0,
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "large-original/after-mqtt311-large-subscription-timewait-after.json",
+      "bytes": 410,
+      "sha256": "d004b4255da177fcb677ebc4ea22587a135caab1659ee98189ddf7e46e7dbab0",
+      "raw_bytes": 410,
+      "raw_sha256": "d004b4255da177fcb677ebc4ea22587a135caab1659ee98189ddf7e46e7dbab0",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "large-original/after-mqtt311-large-subscription-timewait-before.json",
+      "bytes": 386,
+      "sha256": "44c23e0b75d8cf310feaf8919bfae86aa1dc67ea947a47cc813c59ed45b4a9d1",
+      "raw_bytes": 386,
+      "raw_sha256": "44c23e0b75d8cf310feaf8919bfae86aa1dc67ea947a47cc813c59ed45b4a9d1",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "large-original/after-mqtt311-large-subscription.json",
+      "bytes": 105027,
+      "sha256": "a35490dc16751171fc51d8d2b36701adeb687f38ba544da3ef8f9b8bc2e81605",
+      "raw_bytes": 105027,
+      "raw_sha256": "a35490dc16751171fc51d8d2b36701adeb687f38ba544da3ef8f9b8bc2e81605",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "large-original/before-mqtt311-large-subscription-sidecar.json",
+      "bytes": 92649,
+      "sha256": "5bfb1bf2764097c125df9cec1200fa683cc4c9a86b35299e4e1590803b3f500d",
+      "raw_bytes": 92649,
+      "raw_sha256": "5bfb1bf2764097c125df9cec1200fa683cc4c9a86b35299e4e1590803b3f500d",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "large-original/before-mqtt311-large-subscription-stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "raw_bytes": 0,
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "large-original/before-mqtt311-large-subscription-timewait-after.json",
+      "bytes": 410,
+      "sha256": "9ade99536fcfa8fc9985558991c1407cc8f1486ccc9fb4ed5fbf51600a00c0f7",
+      "raw_bytes": 410,
+      "raw_sha256": "9ade99536fcfa8fc9985558991c1407cc8f1486ccc9fb4ed5fbf51600a00c0f7",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "large-original/before-mqtt311-large-subscription-timewait-before.json",
+      "bytes": 406,
+      "sha256": "b43dc0a5fbe863b58b18554817cdafda79c17cda0fec5b8ca612a1093788c9dd",
+      "raw_bytes": 406,
+      "raw_sha256": "b43dc0a5fbe863b58b18554817cdafda79c17cda0fec5b8ca612a1093788c9dd",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "large-original/before-mqtt311-large-subscription.json",
+      "bytes": 104991,
+      "sha256": "489326da9be923ea3c65f54aba7d53f2d780eb338cab636a7d072879af60edb9",
+      "raw_bytes": 104991,
+      "raw_sha256": "489326da9be923ea3c65f54aba7d53f2d780eb338cab636a7d072879af60edb9",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "large-original/campaign.json",
+      "bytes": 721,
+      "sha256": "9405280284c16f2d8653b8612389eac3e76666871738f51755dff8efdc682487",
+      "raw_bytes": 721,
+      "raw_sha256": "9405280284c16f2d8653b8612389eac3e76666871738f51755dff8efdc682487",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "large-original/outcomes.json",
+      "bytes": 2289,
+      "sha256": "58fa786839b8e7ed7e46494b3a37c5e97bfcf76adc5ec3511ba9403ed6c73c2c",
+      "raw_bytes": 2289,
+      "raw_sha256": "58fa786839b8e7ed7e46494b3a37c5e97bfcf76adc5ec3511ba9403ed6c73c2c",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "evidence-tools/event_with_tcp_override-v1.py",
+      "bytes": 4255,
+      "sha256": "0b8b0359dd5842a16ba25aae0b264f110079b4b04f859a0c65dd05172095e519",
+      "raw_bytes": 4255,
+      "raw_sha256": "0b8b0359dd5842a16ba25aae0b264f110079b4b04f859a0c65dd05172095e519",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "evidence-tools/event_campaign-v1.py",
+      "bytes": 6954,
+      "sha256": "8845b3845ad6517ccb4a75427ad281984bbfe70ae5d410fb7cb84184a407f1e4",
+      "raw_bytes": 6954,
+      "raw_sha256": "8845b3845ad6517ccb4a75427ad281984bbfe70ae5d410fb7cb84184a407f1e4",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "full-ready-auth/before.log",
+      "bytes": 2374,
+      "sha256": "23343654118cd155d85010c23b4a07e0053071b4179a6c0135683a18aaa21e94",
+      "raw_bytes": 2431,
+      "raw_sha256": "1d5798ff61bcaf1422ce8575dd345054b7657fe614f3229270a2ad65b4c224fe",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "full-ready-auth/after.log",
+      "bytes": 1599,
+      "sha256": "e601972fbdcaef8d8e9b042229a3c1344846fd9764e865b66e64a302128689fd",
+      "raw_bytes": 1598,
+      "raw_sha256": "d3356e0e79d26cc138e75efe5c70704786b81704294590e2bad94bd7fe0b9741",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "full-ready-auth/shared-test.rs",
+      "bytes": 4900,
+      "sha256": "7b982d1b5aa27aee6d62ad6ea11a600fa912073e0624c3ba5b1651299b972b76",
+      "raw_bytes": 4900,
+      "raw_sha256": "7b982d1b5aa27aee6d62ad6ea11a600fa912073e0624c3ba5b1651299b972b76",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "full-ready-auth/baseline-auth-source.rs",
+      "bytes": 756,
+      "sha256": "2d011454a7d03a261ff15820390aca907b4333dbf87ebe3a37e6094c2c63154d",
+      "raw_bytes": 756,
+      "raw_sha256": "2d011454a7d03a261ff15820390aca907b4333dbf87ebe3a37e6094c2c63154d",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "full-ready-auth/candidate-auth-source.rs",
+      "bytes": 2041,
+      "sha256": "e31ab1db7e707cd8f44d1f14d02eb16260384c35903dd9d2fb3a938e9c805e7a",
+      "raw_bytes": 2041,
+      "raw_sha256": "e31ab1db7e707cd8f44d1f14d02eb16260384c35903dd9d2fb3a938e9c805e7a",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "full-ready-auth/shared-reader-source.rs",
+      "bytes": 8907,
+      "sha256": "59e1a6b601a1a73e820444ea20262872f610ba41e2bfd0c79edb6b59a90f09b2",
+      "raw_bytes": 8907,
+      "raw_sha256": "59e1a6b601a1a73e820444ea20262872f610ba41e2bfd0c79edb6b59a90f09b2",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "full-ready-auth/baseline-module.rs",
+      "bytes": 9914,
+      "sha256": "80b8ba76b221825ebf854d4e89c71daaeaa0d00316ab984ef58762103a20aa97",
+      "raw_bytes": 9914,
+      "raw_sha256": "80b8ba76b221825ebf854d4e89c71daaeaa0d00316ab984ef58762103a20aa97",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "full-ready-auth/candidate-module.rs",
+      "bytes": 11199,
+      "sha256": "66ce4e61f330f30a8d4dab54fa047597b5b11d05b6a285f9aa0404397058e139",
+      "raw_bytes": 11199,
+      "raw_sha256": "66ce4e61f330f30a8d4dab54fa047597b5b11d05b6a285f9aa0404397058e139",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "full-ready-auth/harness-Cargo.toml",
+      "bytes": 522,
+      "sha256": "2fde5a4c7be071216d19c953137d77ef7b31362978d5b17689f1018dfbdcef2f",
+      "raw_bytes": 638,
+      "raw_sha256": "a4d49f01bdef0f385bedeffcde1282f68a2d1fdf7013e5ac595a504c369c2333",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "full-ready-auth/manifest.json",
+      "bytes": 6997,
+      "sha256": "7d325fea76205b8ec5096beaf35c9a2086e0eda521e67cf340ce7f6496059774",
+      "raw_bytes": 6997,
+      "raw_sha256": "7d325fea76205b8ec5096beaf35c9a2086e0eda521e67cf340ce7f6496059774",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "http-task-diagnostic.json",
+      "bytes": 19540,
+      "sha256": "e268c645e93bd359aa2833064129a7ca9e167078ae3033ea263886b36b389860",
+      "raw_bytes": 19664,
+      "raw_sha256": "d0f4aae6339b9ef085ab03b5bd6802201e9d885ea8afee092b4d9ea78d8c4fb7",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "ci-rust-fixture-success.json",
+      "bytes": 14905,
+      "sha256": "c7d6d4f18c11d14a64f399bbbda80305eb0dafd6a1140c789fa1a2817fbba471",
+      "raw_bytes": 14905,
+      "raw_sha256": "c7d6d4f18c11d14a64f399bbbda80305eb0dafd6a1140c789fa1a2817fbba471",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "ci-dx-fixture-success.json",
+      "bytes": 4756,
+      "sha256": "b6e2eeee20f8e71e6482e88736682cecbe443ba642cea8f14f7b248dc9bdd64b",
+      "raw_bytes": 4756,
+      "raw_sha256": "b6e2eeee20f8e71e6482e88736682cecbe443ba642cea8f14f7b248dc9bdd64b",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "ci-fixture-runs.json",
+      "bytes": 675,
+      "sha256": "e38cc7525ff25fca949b5d1c21be7dee4d8aaa40da55b21aab897aea2431f661",
+      "raw_bytes": 675,
+      "raw_sha256": "e38cc7525ff25fca949b5d1c21be7dee4d8aaa40da55b21aab897aea2431f661",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "evidence-tools/event_load-measured-source.py",
+      "bytes": 18032,
+      "sha256": "0a478d331fda40edd0c12dad2fe66515bc5449f17869d71270fc35cdf7b9fefd",
+      "raw_bytes": 18032,
+      "raw_sha256": "0a478d331fda40edd0c12dad2fe66515bc5449f17869d71270fc35cdf7b9fefd",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "evidence-tools/summarize_event.py",
+      "bytes": 2533,
+      "sha256": "07ba6762344f5a93839f95041a0d36fe337554ddd48421f51b7c78370a15e390",
+      "raw_bytes": 2533,
+      "raw_sha256": "07ba6762344f5a93839f95041a0d36fe337554ddd48421f51b7c78370a15e390",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "candidate-vs-fixture-source-match.json",
+      "bytes": 1088,
+      "sha256": "07b3b5a8da0a726428c95b1cb343573d0188bc6a6dd467a8404e6b3e22dfe04e",
+      "raw_bytes": 1088,
+      "raw_sha256": "07b3b5a8da0a726428c95b1cb343573d0188bc6a6dd467a8404e6b3e22dfe04e",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "large-prewarmed/after-mqtt311-large-subscription-sidecar.json",
+      "bytes": 105942,
+      "sha256": "fc93138a5476a87b487fabbe4e202a6c2397a3277ae07bae5b7dffaf22f005e8",
+      "raw_bytes": 105942,
+      "raw_sha256": "fc93138a5476a87b487fabbe4e202a6c2397a3277ae07bae5b7dffaf22f005e8",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "large-prewarmed/after-mqtt311-large-subscription-stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "raw_bytes": 0,
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "large-prewarmed/after-mqtt311-large-subscription-timewait-after.json",
+      "bytes": 408,
+      "sha256": "de941a5fafaa2d8471a6d1b1e1543d982c0690fbe78650d80d52155ed4f658db",
+      "raw_bytes": 408,
+      "raw_sha256": "de941a5fafaa2d8471a6d1b1e1543d982c0690fbe78650d80d52155ed4f658db",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "large-prewarmed/after-mqtt311-large-subscription-timewait-before.json",
+      "bytes": 448,
+      "sha256": "74d5e9f3031a4104526d67a61a358775ada72ecc774c705e39ec99263df9d212",
+      "raw_bytes": 448,
+      "raw_sha256": "74d5e9f3031a4104526d67a61a358775ada72ecc774c705e39ec99263df9d212",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "large-prewarmed/after-mqtt311-large-subscription.json",
+      "bytes": 104969,
+      "sha256": "e0cb8ed8069de6e039f5b67a17c565aa8df849ec6382b38ea801a9ebd3427d18",
+      "raw_bytes": 104969,
+      "raw_sha256": "e0cb8ed8069de6e039f5b67a17c565aa8df849ec6382b38ea801a9ebd3427d18",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "large-prewarmed/after-mqtt5-large-subscription-sidecar.json",
+      "bytes": 166408,
+      "sha256": "8ad5a18b3a8691bd93abfecf851ca9c8fc59e50eb2aacf5c09fcb1d600996734",
+      "raw_bytes": 166408,
+      "raw_sha256": "8ad5a18b3a8691bd93abfecf851ca9c8fc59e50eb2aacf5c09fcb1d600996734",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "large-prewarmed/after-mqtt5-large-subscription-stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "raw_bytes": 0,
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "large-prewarmed/after-mqtt5-large-subscription-timewait-after.json",
+      "bytes": 452,
+      "sha256": "df2b7ee010ae08ff3b55d28b7b0eb5b8dac36ac2639d4838f85b79159eb319b7",
+      "raw_bytes": 452,
+      "raw_sha256": "df2b7ee010ae08ff3b55d28b7b0eb5b8dac36ac2639d4838f85b79159eb319b7",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "large-prewarmed/after-mqtt5-large-subscription-timewait-before.json",
+      "bytes": 408,
+      "sha256": "5d12e06a73a1564acec665503c27225e3bf4225000eb9fed5b9a3f55478464bb",
+      "raw_bytes": 408,
+      "raw_sha256": "5d12e06a73a1564acec665503c27225e3bf4225000eb9fed5b9a3f55478464bb",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "large-prewarmed/after-mqtt5-large-subscription.json",
+      "bytes": 105112,
+      "sha256": "76d2fa12f1bba90802ce85bdf7e0adf53f34edb37091eada88f7bca11e5949d7",
+      "raw_bytes": 105112,
+      "raw_sha256": "76d2fa12f1bba90802ce85bdf7e0adf53f34edb37091eada88f7bca11e5949d7",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "large-prewarmed/after-tcp-large-ingress-sidecar.json",
+      "bytes": 105324,
+      "sha256": "7710232bafa2e8e7ed4fc294e2154b25525a24cfa47b97bdacd6a858d14a6f7b",
+      "raw_bytes": 105324,
+      "raw_sha256": "7710232bafa2e8e7ed4fc294e2154b25525a24cfa47b97bdacd6a858d14a6f7b",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "large-prewarmed/after-tcp-large-ingress-stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "raw_bytes": 0,
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "large-prewarmed/after-tcp-large-ingress-timewait-after.json",
+      "bytes": 408,
+      "sha256": "d335b943aa52cb6c28c20f5ee8dec2b3c3ac2776d207171abcf5f820c979bcfb",
+      "raw_bytes": 408,
+      "raw_sha256": "d335b943aa52cb6c28c20f5ee8dec2b3c3ac2776d207171abcf5f820c979bcfb",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "large-prewarmed/after-tcp-large-ingress-timewait-before.json",
+      "bytes": 406,
+      "sha256": "9a8c1416bea55d922788d7ae80b906bea19d67c6b8991577e8a74433c1e293bd",
+      "raw_bytes": 406,
+      "raw_sha256": "9a8c1416bea55d922788d7ae80b906bea19d67c6b8991577e8a74433c1e293bd",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "large-prewarmed/after-tcp-large-ingress.json",
+      "bytes": 103951,
+      "sha256": "561b2e6995588548b012405145603f53f34f9994ea8741a829664b061b7e43f9",
+      "raw_bytes": 103951,
+      "raw_sha256": "561b2e6995588548b012405145603f53f34f9994ea8741a829664b061b7e43f9",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "large-prewarmed/after-tcp-partial-frame-disconnect-sidecar.json",
+      "bytes": 3654,
+      "sha256": "594ec1c09c51b82765817a95165ccc5e49cbba1a56912cae03a1c613bac13e3e",
+      "raw_bytes": 3654,
+      "raw_sha256": "594ec1c09c51b82765817a95165ccc5e49cbba1a56912cae03a1c613bac13e3e",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "large-prewarmed/after-tcp-partial-frame-disconnect-stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "raw_bytes": 0,
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "large-prewarmed/after-tcp-partial-frame-disconnect-timewait-after.json",
+      "bytes": 408,
+      "sha256": "e5434ec9bd2cf68690ef7568b814e854e8b72e3bedefb295d076598da1a49d05",
+      "raw_bytes": 408,
+      "raw_sha256": "e5434ec9bd2cf68690ef7568b814e854e8b72e3bedefb295d076598da1a49d05",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "large-prewarmed/after-tcp-partial-frame-disconnect-timewait-before.json",
+      "bytes": 406,
+      "sha256": "fbee477d7be5c983aa50f7915b7949ab87a939f0465ba42bb1ecfc0257d7b641",
+      "raw_bytes": 406,
+      "raw_sha256": "fbee477d7be5c983aa50f7915b7949ab87a939f0465ba42bb1ecfc0257d7b641",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "large-prewarmed/after-tcp-partial-frame-disconnect.json",
+      "bytes": 99110,
+      "sha256": "ff4a27cc574f04ced9be3588be3e3f14091a7078cd3e636ae21ed318d19831ad",
+      "raw_bytes": 99110,
+      "raw_sha256": "ff4a27cc574f04ced9be3588be3e3f14091a7078cd3e636ae21ed318d19831ad",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "large-prewarmed/before-mqtt311-large-subscription-sidecar.json",
+      "bytes": 105923,
+      "sha256": "635bec51b32a433b011a1b682c06b762dab3882f1d343f63bad8bb8050cb3ac8",
+      "raw_bytes": 105923,
+      "raw_sha256": "635bec51b32a433b011a1b682c06b762dab3882f1d343f63bad8bb8050cb3ac8",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "large-prewarmed/before-mqtt311-large-subscription-stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "raw_bytes": 0,
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "large-prewarmed/before-mqtt311-large-subscription-timewait-after.json",
+      "bytes": 408,
+      "sha256": "50f54dce2757b95f7f4edfeee627dced1451c2e4aaa76ccfc938079611a1aa98",
+      "raw_bytes": 408,
+      "raw_sha256": "50f54dce2757b95f7f4edfeee627dced1451c2e4aaa76ccfc938079611a1aa98",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "large-prewarmed/before-mqtt311-large-subscription-timewait-before.json",
+      "bytes": 408,
+      "sha256": "c1f18ff953c2bf8e8297677a5eb6748b70040d13d87d6f85cb4d15f55049760d",
+      "raw_bytes": 408,
+      "raw_sha256": "c1f18ff953c2bf8e8297677a5eb6748b70040d13d87d6f85cb4d15f55049760d",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "large-prewarmed/before-mqtt311-large-subscription.json",
+      "bytes": 104976,
+      "sha256": "ddefc8ebc270f5b56699a8be6664602b51d46024f5cff611126dba18539613bf",
+      "raw_bytes": 104976,
+      "raw_sha256": "ddefc8ebc270f5b56699a8be6664602b51d46024f5cff611126dba18539613bf",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "large-prewarmed/before-mqtt5-large-subscription-sidecar.json",
+      "bytes": 105995,
+      "sha256": "d839044b9230b7c835b0967fbf5e0ac615f98906bbe9c99967192c0c3b7564e8",
+      "raw_bytes": 105995,
+      "raw_sha256": "d839044b9230b7c835b0967fbf5e0ac615f98906bbe9c99967192c0c3b7564e8",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "large-prewarmed/before-mqtt5-large-subscription-stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "raw_bytes": 0,
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "large-prewarmed/before-mqtt5-large-subscription-timewait-after.json",
+      "bytes": 408,
+      "sha256": "86de43ae4dd8cd25a4bd79b0b6c935f5b6843ffb261f41015f4f2b0f212a5c5e",
+      "raw_bytes": 408,
+      "raw_sha256": "86de43ae4dd8cd25a4bd79b0b6c935f5b6843ffb261f41015f4f2b0f212a5c5e",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "large-prewarmed/before-mqtt5-large-subscription-timewait-before.json",
+      "bytes": 406,
+      "sha256": "fa81c8d1a147f76c1ff2f3eed872c81b620bee48ffd7f3b7c5c85281b93ec13d",
+      "raw_bytes": 406,
+      "raw_sha256": "fa81c8d1a147f76c1ff2f3eed872c81b620bee48ffd7f3b7c5c85281b93ec13d",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "large-prewarmed/before-mqtt5-large-subscription.json",
+      "bytes": 105065,
+      "sha256": "e286a09469b9f5ed89d394a40834207a9022422813c8a7a9f2f9a1c562c364e5",
+      "raw_bytes": 105065,
+      "raw_sha256": "e286a09469b9f5ed89d394a40834207a9022422813c8a7a9f2f9a1c562c364e5",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "large-prewarmed/before-tcp-large-ingress-sidecar.json",
+      "bytes": 105330,
+      "sha256": "95cb563f7858ac77d929c5f9f6571ea0f0e46091a1650ce82f54b4235688cea4",
+      "raw_bytes": 105330,
+      "raw_sha256": "95cb563f7858ac77d929c5f9f6571ea0f0e46091a1650ce82f54b4235688cea4",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "large-prewarmed/before-tcp-large-ingress-stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "raw_bytes": 0,
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "large-prewarmed/before-tcp-large-ingress-timewait-after.json",
+      "bytes": 408,
+      "sha256": "b006ba7fdabcb137bc0d5e6171d92be54d80cc19edfa1b777c6ed63f10abb18b",
+      "raw_bytes": 408,
+      "raw_sha256": "b006ba7fdabcb137bc0d5e6171d92be54d80cc19edfa1b777c6ed63f10abb18b",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "large-prewarmed/before-tcp-large-ingress-timewait-before.json",
+      "bytes": 448,
+      "sha256": "4d492eca205549343d1f777371edbf48e06d450d5f13da866a46dadd56bc4eba",
+      "raw_bytes": 448,
+      "raw_sha256": "4d492eca205549343d1f777371edbf48e06d450d5f13da866a46dadd56bc4eba",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "large-prewarmed/before-tcp-large-ingress.json",
+      "bytes": 103937,
+      "sha256": "8a2fcee4c6436aacbadb8a20daa22bf90d5f96b0575a55a31303d55afc0fd39b",
+      "raw_bytes": 103937,
+      "raw_sha256": "8a2fcee4c6436aacbadb8a20daa22bf90d5f96b0575a55a31303d55afc0fd39b",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "large-prewarmed/campaign.json",
+      "bytes": 898,
+      "sha256": "907e2102c6b9143c1ef9e9b7e52fea40c868308bdc22d9128849fc4636a8943c",
+      "raw_bytes": 898,
+      "raw_sha256": "907e2102c6b9143c1ef9e9b7e52fea40c868308bdc22d9128849fc4636a8943c",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "large-prewarmed/outcomes.json",
+      "bytes": 8206,
+      "sha256": "f2dce6989f53b6aae1fd33f080a9809f9e6de9749c3b31064ae016bd6a60579d",
+      "raw_bytes": 8206,
+      "raw_sha256": "f2dce6989f53b6aae1fd33f080a9809f9e6de9749c3b31064ae016bd6a60579d",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "large-wire-summary.json",
+      "bytes": 11917,
+      "sha256": "bf3951f68a7d84ebb7d8cb4d96f3a8cd90b039e9e7e31093e9944b851ec5ab29",
+      "raw_bytes": 11917,
+      "raw_sha256": "bf3951f68a7d84ebb7d8cb4d96f3a8cd90b039e9e7e31093e9944b851ec5ab29",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "sampling/heartbeat/profile-metadata.json",
+      "bytes": 13983,
+      "sha256": "63d8b81698981a705716bd33adad39cafc833175862f0feac078f61290ccd4f7",
+      "raw_bytes": 13990,
+      "raw_sha256": "4c126915911b7576e090d4c684c2f179ea2ed7f5ac236234be688f05ea9a8e0d",
+      "normalization": "scrub_text replaces machine-local paths only; test results, stack symbols and counters unchanged"
+    },
+    {
+      "file": "sampling/heartbeat/server-stacks.txt",
+      "bytes": 317830,
+      "sha256": "67331af04733e83b25c2443dd461bf5a1e4aff2a9001d2097748ac34d87cf152",
+      "raw_bytes": 317836,
+      "raw_sha256": "0ce63fa39a138cacd782e2b0067c476e4adeb4d8fd62ce8ffe803f7312bf6971",
+      "normalization": "scrub_text replaces machine-local paths only; test results, stack symbols and counters unchanged"
+    },
+    {
+      "file": "sampling/heartbeat/sample-command.log",
+      "bytes": 235,
+      "sha256": "3c581de91025e845ddb7a084a7112823188eeef54b0b4659f49d3907e561a00d",
+      "raw_bytes": 242,
+      "raw_sha256": "7707f230768ec98f3a7ce5cd6006f4291d944aed5e80103521d58691da203b72",
+      "normalization": "scrub_text replaces machine-local paths only; test results, stack symbols and counters unchanged"
+    },
+    {
+      "file": "sampling/heartbeat/result.json",
+      "bytes": 2626,
+      "sha256": "85c21cda6b8a22f933d2ed83bfc58d5dde196dca3d03ddb6f84a30fee9f202ed",
+      "raw_bytes": 2626,
+      "raw_sha256": "85c21cda6b8a22f933d2ed83bfc58d5dde196dca3d03ddb6f84a30fee9f202ed",
+      "normalization": "scrub_text replaces machine-local paths only; test results, stack symbols and counters unchanged"
+    },
+    {
+      "file": "sampling/heartbeat/stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "raw_bytes": 0,
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "normalization": "scrub_text replaces machine-local paths only; test results, stack symbols and counters unchanged"
+    },
+    {
+      "file": "sampling/disconnect/profile-metadata.json",
+      "bytes": 58894,
+      "sha256": "7c3d7ef12bfb3915c3d9858804837bc9dcc3c7f3bbb8da874d872f2423d3974e",
+      "raw_bytes": 58901,
+      "raw_sha256": "3fd10949b221ba0b3fc69b5a5ed60dff7fcfa67feba6c1afcc1db5750f3e8c57",
+      "normalization": "scrub_text replaces machine-local paths only; test results, stack symbols and counters unchanged"
+    },
+    {
+      "file": "sampling/disconnect/server-stacks.txt",
+      "bytes": 427094,
+      "sha256": "d0d59fda59dc2525cad70413c90611f4aef3c7484c97244ad11a5732dc8d6a9e",
+      "raw_bytes": 427100,
+      "raw_sha256": "0de30626170a7827b0a1a0aebe5780f1839c37d0bee8a0842d3dc6fda4ad8a73",
+      "normalization": "scrub_text replaces machine-local paths only; test results, stack symbols and counters unchanged"
+    },
+    {
+      "file": "sampling/disconnect/sample-command.log",
+      "bytes": 236,
+      "sha256": "e5cbab729a7b070ff95be4fe7e69aa96f46ba88fcad970c1b12d6e61f971c5d1",
+      "raw_bytes": 243,
+      "raw_sha256": "0aaffb436ee8014cbaaeedb34ae53133ad99fb7115952dc2c62f0660a8df8a3c",
+      "normalization": "scrub_text replaces machine-local paths only; test results, stack symbols and counters unchanged"
+    },
+    {
+      "file": "sampling/disconnect/result.json",
+      "bytes": 2477,
+      "sha256": "a5ef9eea4cef76e381c88a3fcf3b94e75681420da5930a1be06b9b1b046050f3",
+      "raw_bytes": 2477,
+      "raw_sha256": "a5ef9eea4cef76e381c88a3fcf3b94e75681420da5930a1be06b9b1b046050f3",
+      "normalization": "scrub_text replaces machine-local paths only; test results, stack symbols and counters unchanged"
+    },
+    {
+      "file": "sampling/disconnect/stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "raw_bytes": 0,
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "normalization": "scrub_text replaces machine-local paths only; test results, stack symbols and counters unchanged"
+    },
+    {
+      "file": "sampling/summary.json",
+      "bytes": 3087,
+      "sha256": "a7a563a97bbf85a1f4cebd33cbe4046ff2b3e65123088c786eef25f616390679",
+      "raw_bytes": 3087,
+      "raw_sha256": "a7a563a97bbf85a1f4cebd33cbe4046ff2b3e65123088c786eef25f616390679",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "evidence-tools/macos_sample_wrapper.py",
+      "bytes": 13045,
+      "sha256": "340969d09cc3e757a20cd075f1163920afb3d1ddf071b1bdfb177b55977eeb4a",
+      "raw_bytes": 13045,
+      "raw_sha256": "340969d09cc3e757a20cd075f1163920afb3d1ddf071b1bdfb177b55977eeb4a",
+      "normalization": "scrub_text replaces machine-local paths only; test results, stack symbols and counters unchanged"
+    },
+    {
+      "file": "large-prefix/initial-invalid-credential/result.json",
+      "bytes": 2226,
+      "sha256": "8432bbb1a763e92e4174c87c909c2d4832c06276a3b90d11fab04b97ba49c379",
+      "raw_bytes": 2226,
+      "raw_sha256": "8432bbb1a763e92e4174c87c909c2d4832c06276a3b90d11fab04b97ba49c379",
+      "normalization": "scrub_text replaces machine-local paths only; test results, stack symbols and counters unchanged"
+    },
+    {
+      "file": "large-prefix/initial-invalid-credential/server.log",
+      "bytes": 346,
+      "sha256": "82017e0e98280376771e8ee2bad3f133a00ab71b790433f3ba33f51e8b57d2bb",
+      "raw_bytes": 346,
+      "raw_sha256": "82017e0e98280376771e8ee2bad3f133a00ab71b790433f3ba33f51e8b57d2bb",
+      "normalization": "scrub_text replaces machine-local paths only; test results, stack symbols and counters unchanged"
+    },
+    {
+      "file": "large-prefix/initial-invalid-credential/stderr.txt",
+      "bytes": 325,
+      "sha256": "cf82dd1b4faff89b31f82e09c0fe80a63f0c1e32759b1ec1c19da0189627279b",
+      "raw_bytes": 323,
+      "raw_sha256": "a7046799c9be63f1fd9b8fef28f29ee7ccd8860a4eb6c7e35348778841122dd0",
+      "normalization": "scrub_text replaces machine-local paths only; test results, stack symbols and counters unchanged"
+    },
+    {
+      "file": "large-prefix/corrected/result.json",
+      "bytes": 6296,
+      "sha256": "141e71f7a15051c18fcf64c201a12bf306ad209b0c31ab10d2d5d6f346505b8a",
+      "raw_bytes": 6296,
+      "raw_sha256": "141e71f7a15051c18fcf64c201a12bf306ad209b0c31ab10d2d5d6f346505b8a",
+      "normalization": "scrub_text replaces machine-local paths only; test results, stack symbols and counters unchanged"
+    },
+    {
+      "file": "large-prefix/corrected/server.log",
+      "bytes": 1046,
+      "sha256": "fce0b912b6881ba8454953f4ace678040ea7c231ceeac1911c85ca942e9b4f24",
+      "raw_bytes": 1046,
+      "raw_sha256": "fce0b912b6881ba8454953f4ace678040ea7c231ceeac1911c85ca942e9b4f24",
+      "normalization": "scrub_text replaces machine-local paths only; test results, stack symbols and counters unchanged"
+    },
+    {
+      "file": "large-prefix/corrected/stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "raw_bytes": 0,
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "normalization": "scrub_text replaces machine-local paths only; test results, stack symbols and counters unchanged"
+    },
+    {
+      "file": "large-prefix/initial-invalid-credential/wrapper-source.py",
+      "bytes": 6980,
+      "sha256": "a19b29c37ac64334f1b7398804a9884fbb1052bb2043e961df1f6830c5ede298",
+      "raw_bytes": 6980,
+      "raw_sha256": "a19b29c37ac64334f1b7398804a9884fbb1052bb2043e961df1f6830c5ede298",
+      "normalization": "scrub_text replaces machine-local paths only; test results, stack symbols and counters unchanged"
+    },
+    {
+      "file": "evidence-tools/large_prefix_disconnect.py",
+      "bytes": 6956,
+      "sha256": "0e4bf414328cfe1a9e1a2d28e1b7ea1d0b205b4fbab8636e618a37805c12c2bd",
+      "raw_bytes": 6956,
+      "raw_sha256": "0e4bf414328cfe1a9e1a2d28e1b7ea1d0b205b4fbab8636e618a37805c12c2bd",
+      "normalization": "scrub_text replaces machine-local paths only; test results, stack symbols and counters unchanged"
+    },
+    {
+      "file": "event-cpu/source-manifest.json",
+      "bytes": 886,
+      "sha256": "f4b1c3f113525bcee06336836c87f90639ea473f96059487d82150e4edc341c2",
+      "raw_bytes": 886,
+      "raw_sha256": "f4b1c3f113525bcee06336836c87f90639ea473f96059487d82150e4edc341c2",
+      "normalization": "scrub_text replaces machine-local paths only; test results, stack symbols and counters unchanged"
+    },
+    {
+      "file": "event-cpu/before/event_load.py",
+      "bytes": 18032,
+      "sha256": "0a478d331fda40edd0c12dad2fe66515bc5449f17869d71270fc35cdf7b9fefd",
+      "raw_bytes": 18032,
+      "raw_sha256": "0a478d331fda40edd0c12dad2fe66515bc5449f17869d71270fc35cdf7b9fefd",
+      "normalization": "scrub_text replaces machine-local paths only; test results, stack symbols and counters unchanged"
+    },
+    {
+      "file": "event-cpu/before/test_event_load.py",
+      "bytes": 7080,
+      "sha256": "1855047a256f49b26f126125e86b900271b1929d328400b9f7d37c21b3b51a56",
+      "raw_bytes": 7080,
+      "raw_sha256": "1855047a256f49b26f126125e86b900271b1929d328400b9f7d37c21b3b51a56",
+      "normalization": "scrub_text replaces machine-local paths only; test results, stack symbols and counters unchanged"
+    },
+    {
+      "file": "event-cpu/before/connection_memory.py",
+      "bytes": 21812,
+      "sha256": "9f9d5aa5285235f8fd8c79faf73948e63ee98d40e9f103a2a21de556da42f241",
+      "raw_bytes": 21812,
+      "raw_sha256": "9f9d5aa5285235f8fd8c79faf73948e63ee98d40e9f103a2a21de556da42f241",
+      "normalization": "scrub_text replaces machine-local paths only; test results, stack symbols and counters unchanged"
+    },
+    {
+      "file": "event-cpu/before/linux_measurement.py",
+      "bytes": 5989,
+      "sha256": "5dd08acf6fe5f89c9eb5b4ac45d98efdc5720494e08bb035e92f77b34d3b6e72",
+      "raw_bytes": 5989,
+      "raw_sha256": "5dd08acf6fe5f89c9eb5b4ac45d98efdc5720494e08bb035e92f77b34d3b6e72",
+      "normalization": "scrub_text replaces machine-local paths only; test results, stack symbols and counters unchanged"
+    },
+    {
+      "file": "event-cpu/after/event_load.py",
+      "bytes": 19169,
+      "sha256": "acb8c66b0a9b03380b7c737b643e5a229c12a0339db362a30cd5f2e212051249",
+      "raw_bytes": 19169,
+      "raw_sha256": "acb8c66b0a9b03380b7c737b643e5a229c12a0339db362a30cd5f2e212051249",
+      "normalization": "scrub_text replaces machine-local paths only; test results, stack symbols and counters unchanged"
+    },
+    {
+      "file": "event-cpu/after/test_event_load.py",
+      "bytes": 7080,
+      "sha256": "1855047a256f49b26f126125e86b900271b1929d328400b9f7d37c21b3b51a56",
+      "raw_bytes": 7080,
+      "raw_sha256": "1855047a256f49b26f126125e86b900271b1929d328400b9f7d37c21b3b51a56",
+      "normalization": "scrub_text replaces machine-local paths only; test results, stack symbols and counters unchanged"
+    },
+    {
+      "file": "event-cpu/before.txt",
+      "bytes": 1642,
+      "sha256": "3acd695d63beb819ff4881195558d0ae3c4ec882b5d26a28c0c59c6dc85d34c5",
+      "raw_bytes": 1638,
+      "raw_sha256": "54ae7429c2dada8c38033248b59ed46ca19e4c4d66a7ab8e537474842d3a1806",
+      "normalization": "scrub_text replaces machine-local paths only; test results, stack symbols and counters unchanged"
+    },
+    {
+      "file": "event-cpu/after.txt",
+      "bytes": 310,
+      "sha256": "69429906069a5ff0687122907ffb98e88518ea12010d0f7342ba55d0c43a64c7",
+      "raw_bytes": 310,
+      "raw_sha256": "69429906069a5ff0687122907ffb98e88518ea12010d0f7342ba55d0c43a64c7",
+      "normalization": "scrub_text replaces machine-local paths only; test results, stack symbols and counters unchanged"
+    },
+    {
+      "file": "event-cpu/initial-harness-import-failure.txt",
+      "bytes": 1190,
+      "sha256": "1da0f4e622f977055bdd8d6c93301db96436aed7051044a559a68dd359b16034",
+      "raw_bytes": 1188,
+      "raw_sha256": "2364b78b2d77909ddd8cd1904398638930d76f90096bc8ea41574bedf42a47f8",
+      "normalization": "scrub_text replaces machine-local paths only; test results, stack symbols and counters unchanged"
+    },
+    {
+      "file": "completion-before-profiler-owner-fix/fmt.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "raw_bytes": 0,
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "completion-before-profiler-owner-fix/clippy.txt",
+      "bytes": 782,
+      "sha256": "1a4b2fa99bb8827c83e584fbf9995044422b2eeb0774da63ca576a80d63c39b6",
+      "raw_bytes": 985,
+      "raw_sha256": "58ee4c615eb1255961034ea42c1a00c913f07896e4bffc5baacece9788b08adb",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "completion-before-profiler-owner-fix/workspace-tests.txt",
+      "bytes": 66955,
+      "sha256": "d128d9b79e3caaf8088b5b3d1048730765b2937e5b5bd06231c198be66487242",
+      "raw_bytes": 67158,
+      "raw_sha256": "a32486882a59439a9c2cd8e5c24469aae874afd43beaa935d9c18ac8c6ba00d5",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "completion-before-profiler-owner-fix/python.txt",
+      "bytes": 2934,
+      "sha256": "e7bb6bd3ea05280f40d011a2e7c84ac264089f8295902b0370b2b9383a75974a",
+      "raw_bytes": 2934,
+      "raw_sha256": "e7bb6bd3ea05280f40d011a2e7c84ac264089f8295902b0370b2b9383a75974a",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "completion-before-profiler-owner-fix/preflight.txt",
+      "bytes": 4268,
+      "sha256": "678a9f13c79769e94a68e784944c7ca27ce67b1dc2baff9fd00cd03eb38239b1",
+      "raw_bytes": 4326,
+      "raw_sha256": "1b2902a6bc329085dc78a02f112da806a918dfc85cd594823c407ceb570be75e",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "completion-before-profiler-owner-fix/audit.txt",
+      "bytes": 504,
+      "sha256": "406328a94ed2eb1c8854631111666c8761862f96aed631f14388a1701e93e8b8",
+      "raw_bytes": 508,
+      "raw_sha256": "5ae5bd025c3713192ee30344b74925f4d8a4b3ddb80c28cf7c04c103bf368e1e",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "completion-before-profiler-owner-fix/xtask-audit.txt",
+      "bytes": 667,
+      "sha256": "76518a585ebfb3ce0f2885feaa0c45edebf975861bc2e52a037ebf11d1c60559",
+      "raw_bytes": 671,
+      "raw_sha256": "718b1595fb37c05cb42b022618b8b678e15830fcf4ec64f72c77e329190a45bf",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "event-profiler-owner/after.log",
+      "bytes": 469,
+      "sha256": "c19995b52da86d4bd420cf14ffa2f36022802482a909c780a271625f5cc7bdf7",
+      "raw_bytes": 469,
+      "raw_sha256": "c19995b52da86d4bd420cf14ffa2f36022802482a909c780a271625f5cc7bdf7",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "event-profiler-owner/all-perf-tests.log",
+      "bytes": 3093,
+      "sha256": "2cd23af89f57d477692e911e7c6b086a58b9cfa3b54c550505b813a5f3e67e54",
+      "raw_bytes": 3093,
+      "raw_sha256": "2cd23af89f57d477692e911e7c6b086a58b9cfa3b54c550505b813a5f3e67e54",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "event-profiler-owner/before.log",
+      "bytes": 1160,
+      "sha256": "c6a0255fe851464a79c0b35267990f845e4c75e091766242e49cca21660eabcd",
+      "raw_bytes": 1218,
+      "raw_sha256": "bef201d8b0a6038444c8b87b1116c6c076aa687129372028192020cd71149756",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "event-profiler-owner/event_load.final.py",
+      "bytes": 19162,
+      "sha256": "90fcc127d14277070b030e3156c1df80e5800746ad72b334f68659b9b6c0b05d",
+      "raw_bytes": 19162,
+      "raw_sha256": "90fcc127d14277070b030e3156c1df80e5800746ad72b334f68659b9b6c0b05d",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "event-profiler-owner/event_load.interim-before-owner.py",
+      "bytes": 19169,
+      "sha256": "acb8c66b0a9b03380b7c737b643e5a229c12a0339db362a30cd5f2e212051249",
+      "raw_bytes": 19169,
+      "raw_sha256": "acb8c66b0a9b03380b7c737b643e5a229c12a0339db362a30cd5f2e212051249",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "event-profiler-owner/manifest.json",
+      "bytes": 3356,
+      "sha256": "e6c1bb26139ca5bf585f1dc9ee3db5009d1bbabe9aff92a9aecc84c56ccb60d4",
+      "raw_bytes": 3356,
+      "raw_sha256": "e6c1bb26139ca5bf585f1dc9ee3db5009d1bbabe9aff92a9aecc84c56ccb60d4",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "event-profiler-owner/owner-only.patch",
+      "bytes": 969,
+      "sha256": "1cbac8fa2696dca6fb91c4f2c2f77b1b89158277b29553b2b3c4f6bab871a8ef",
+      "raw_bytes": 969,
+      "raw_sha256": "1cbac8fa2696dca6fb91c4f2c2f77b1b89158277b29553b2b3c4f6bab871a8ef",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "event-profiler-owner/test_event_load.final.py",
+      "bytes": 8900,
+      "sha256": "e8e9634b56a3fb0917d50f00d9db97398b4476560c929c6795e630e9bc31bcfa",
+      "raw_bytes": 8900,
+      "raw_sha256": "e8e9634b56a3fb0917d50f00d9db97398b4476560c929c6795e630e9bc31bcfa",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "event-profiler-owner/test_event_load.original-two-cases.py",
+      "bytes": 7080,
+      "sha256": "1855047a256f49b26f126125e86b900271b1929d328400b9f7d37c21b3b51a56",
+      "raw_bytes": 7080,
+      "raw_sha256": "1855047a256f49b26f126125e86b900271b1929d328400b9f7d37c21b3b51a56",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "event-profiler-owner/test_event_load.owner-regression.py",
+      "bytes": 8900,
+      "sha256": "e8e9634b56a3fb0917d50f00d9db97398b4476560c929c6795e630e9bc31bcfa",
+      "raw_bytes": 8900,
+      "raw_sha256": "e8e9634b56a3fb0917d50f00d9db97398b4476560c929c6795e630e9bc31bcfa",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "sampling/summary-before-node-scope-fix.json",
+      "bytes": 2687,
+      "sha256": "be589206aced234fdf89f1c00582ff6c35da409dc8bd93c38d2ad599163b1e2a",
+      "raw_bytes": 2687,
+      "raw_sha256": "be589206aced234fdf89f1c00582ff6c35da409dc8bd93c38d2ad599163b1e2a",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "evidence-tools/summarize_stack_nodes.py",
+      "bytes": 1479,
+      "sha256": "efbaa4dca6eec2bd88c9cad55720b9c2c8f1b19bdc28fc8478ca07b267e26dc3",
+      "raw_bytes": 1479,
+      "raw_sha256": "efbaa4dca6eec2bd88c9cad55720b9c2c8f1b19bdc28fc8478ca07b267e26dc3",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "event-cpu/live-smoke.json",
+      "bytes": 98757,
+      "sha256": "2fd10dc6f2e866b599e78db8ae5816970c1423b304c1bcd550d335dc7e8d63f0",
+      "raw_bytes": 98757,
+      "raw_sha256": "2fd10dc6f2e866b599e78db8ae5816970c1423b304c1bcd550d335dc7e8d63f0",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "event-cpu/live-smoke-stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "raw_bytes": 0,
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "evidence-tools/verify_strict_evidence.py",
+      "bytes": 3707,
+      "sha256": "78af8abe6c647faf342fb39ec0bae77d1947d3276d744bc9632e0db0c83980f8",
+      "raw_bytes": 3707,
+      "raw_sha256": "78af8abe6c647faf342fb39ec0bae77d1947d3276d744bc9632e0db0c83980f8",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "event-cleanup-timeout/manifest.json",
+      "bytes": 3849,
+      "sha256": "a47906a099a29fc5b6b3d949517c6e154cf2d55e1ffc7b0a64921c8b4b11503e",
+      "raw_bytes": 3849,
+      "raw_sha256": "a47906a099a29fc5b6b3d949517c6e154cf2d55e1ffc7b0a64921c8b4b11503e",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "event-cleanup-timeout/before.log",
+      "bytes": 1462,
+      "sha256": "1257c1b48402cc86b1140df7f7b7660bd956b0b3dc92b19c60e49de8bbd321fe",
+      "raw_bytes": 1520,
+      "raw_sha256": "d78cbad0ce4e82fa9f14a713d7820bfb28fec9c3ef89a4b8ab2c2d6e0ce5251b",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "event-cleanup-timeout/after.log",
+      "bytes": 734,
+      "sha256": "80af00b3d854f1c9ec648c7600fb0d43e18a8e5b582170f8724ae0b8b6252a87",
+      "raw_bytes": 734,
+      "raw_sha256": "80af00b3d854f1c9ec648c7600fb0d43e18a8e5b582170f8724ae0b8b6252a87",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "event-cleanup-timeout/all-perf-tests.log",
+      "bytes": 3358,
+      "sha256": "e3b75feb544673f11994bd57326ca99eb994a736907d6fe0a500a84883905dff",
+      "raw_bytes": 3358,
+      "raw_sha256": "e3b75feb544673f11994bd57326ca99eb994a736907d6fe0a500a84883905dff",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "event-cleanup-timeout/cleanup-only.patch",
+      "bytes": 949,
+      "sha256": "c5c0df722092613d0cece1c95367b082fabf1f2a8b2b7827c309e0b2a7be4b0b",
+      "raw_bytes": 949,
+      "raw_sha256": "c5c0df722092613d0cece1c95367b082fabf1f2a8b2b7827c309e0b2a7be4b0b",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "event-cleanup-timeout/event_load.bounded-interim-before.py",
+      "bytes": 19171,
+      "sha256": "1b3ec30dea6ff9b47a60769dc8d53f806e952a932e551e0cf6c35440cffdf612",
+      "raw_bytes": 19171,
+      "raw_sha256": "1b3ec30dea6ff9b47a60769dc8d53f806e952a932e551e0cf6c35440cffdf612",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "event-cleanup-timeout/event_load.robust-final.py",
+      "bytes": 19556,
+      "sha256": "a8070f53b1813b083172bc061c7b5360d2da6a0cd493910b4484290fb7e6361e",
+      "raw_bytes": 19556,
+      "raw_sha256": "a8070f53b1813b083172bc061c7b5360d2da6a0cd493910b4484290fb7e6361e",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "event-cleanup-timeout/test_event_load.same-four-cases.py",
+      "bytes": 10505,
+      "sha256": "0cef3eb5dab01adc5ecfdc5fa9d2727469b78c9a8699e6da124fadb7b92d43f0",
+      "raw_bytes": 10505,
+      "raw_sha256": "0cef3eb5dab01adc5ecfdc5fa9d2727469b78c9a8699e6da124fadb7b92d43f0",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "event-cleanup-timeout/test_event_load.final-four-cases.py",
+      "bytes": 10505,
+      "sha256": "0cef3eb5dab01adc5ecfdc5fa9d2727469b78c9a8699e6da124fadb7b92d43f0",
+      "raw_bytes": 10505,
+      "raw_sha256": "0cef3eb5dab01adc5ecfdc5fa9d2727469b78c9a8699e6da124fadb7b92d43f0",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "completion-final/python.txt",
+      "bytes": 3358,
+      "sha256": "19d5c9e3ebda82719aac3e1c4d439a8105ec2b01a8c9f52569230fd100dde21d",
+      "raw_bytes": 3358,
+      "raw_sha256": "19d5c9e3ebda82719aac3e1c4d439a8105ec2b01a8c9f52569230fd100dde21d",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "completion-final/preflight-offline-cache-failure.txt",
+      "bytes": 122,
+      "sha256": "0cea6488824f39fe7544cde0485a3302681f92e952e784c79c29107fe3bf73e7",
+      "raw_bytes": 122,
+      "raw_sha256": "0cea6488824f39fe7544cde0485a3302681f92e952e784c79c29107fe3bf73e7",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "completion-final/event_load.py",
+      "bytes": 19556,
+      "sha256": "a8070f53b1813b083172bc061c7b5360d2da6a0cd493910b4484290fb7e6361e",
+      "raw_bytes": 19556,
+      "raw_sha256": "a8070f53b1813b083172bc061c7b5360d2da6a0cd493910b4484290fb7e6361e",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "completion-final/test_event_load.py",
+      "bytes": 10505,
+      "sha256": "0cef3eb5dab01adc5ecfdc5fa9d2727469b78c9a8699e6da124fadb7b92d43f0",
+      "raw_bytes": 10505,
+      "raw_sha256": "0cef3eb5dab01adc5ecfdc5fa9d2727469b78c9a8699e6da124fadb7b92d43f0",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "completion-final/preflight.txt",
+      "bytes": 5233,
+      "sha256": "97de9dbaf6cb9801d7ff1497a0a94b4950b64484593477eab32d796c646ceba6",
+      "raw_bytes": 5320,
+      "raw_sha256": "76e607d6ba02e8fa930c41ce963b53df35bb264fbf8935b233f1ec8100fe153d",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "full-ready-auth/manifest-before-harness-normalization.json",
+      "bytes": 6379,
+      "sha256": "31996f16e3dc4ec25d83485dbab7d4e5bfe5c68b6c986a90f5258317e80bb6eb",
+      "raw_bytes": 6379,
+      "raw_sha256": "31996f16e3dc4ec25d83485dbab7d4e5bfe5c68b6c986a90f5258317e80bb6eb",
+      "normalization": "machine-local paths replaced with <repo>, <home>, or <tmp>; results unchanged"
+    },
+    {
+      "file": "final-evidence-integrity.json",
+      "bytes": 1131,
+      "sha256": "e54f2f19be94dad5c7dd6747f312070382bff8d5185daa8dbd0247098596ff17",
+      "raw_bytes": 1131,
+      "raw_sha256": "e54f2f19be94dad5c7dd6747f312070382bff8d5185daa8dbd0247098596ff17",
+      "normalization": "Generated integrity result; no machine-local paths. Staged archive check corrects earlier unstaged-check scope.",
+      "previous_integrity_record_bytes": 797,
+      "previous_integrity_record_sha256": "d7285ee423dfddc8ea71a54c839d9279ce118879842fc608765bf1e77702c47c"
+    }
+  ],
+  "measurements": [
+    {
+      "case": "mqtt311-idle",
+      "variant": "before",
+      "repeat": 1,
+      "json": "density-original/before-mqtt311-idle-10000-1.json",
+      "sidecar": "density-original/before-mqtt311-idle-10000-1-sidecar.json",
+      "online": 10000,
+      "connected": 10000,
+      "disconnected": 10000,
+      "client_errors": 0,
+      "rss_delta_bytes_per_connection": 11901.3,
+      "requested_heap_delta_bytes_per_connection": 10778.984,
+      "task_delta_per_connection": 1.0,
+      "process_cpu_percent_ramp": 4.862906929733636,
+      "process_cpu_percent_stable": 0.0,
+      "cpu_ramp_snapshot_seconds": 24.059683167,
+      "cpu_stable_snapshot_seconds": 3.183220125000002,
+      "connect_p99_ms": 4.24,
+      "heartbeat_p99_ms": null,
+      "pings_sent": 0,
+      "ping_responses": 0,
+      "swap_all_snapshots_used_zero": true,
+      "linux_cgroup_kernel_socket": null,
+      "global_connection_byte_budget_balance": null,
+      "recorded_at_utc": "2026-10-13T14:41:39.814247+00:00"
+    },
+    {
+      "case": "mqtt311-idle",
+      "variant": "after",
+      "repeat": 1,
+      "json": "density-original/after-mqtt311-idle-10000-1.json",
+      "sidecar": "density-original/after-mqtt311-idle-10000-1-sidecar.json",
+      "online": 10000,
+      "connected": 10000,
+      "disconnected": 10000,
+      "client_errors": 0,
+      "rss_delta_bytes_per_connection": 12114.3,
+      "requested_heap_delta_bytes_per_connection": 10787.2884,
+      "task_delta_per_connection": 1.0,
+      "process_cpu_percent_ramp": 4.778111223259964,
+      "process_cpu_percent_stable": 0.0,
+      "cpu_ramp_snapshot_seconds": 24.068087708,
+      "cpu_stable_snapshot_seconds": 3.184761667,
+      "connect_p99_ms": 4.22,
+      "heartbeat_p99_ms": null,
+      "pings_sent": 0,
+      "ping_responses": 0,
+      "swap_all_snapshots_used_zero": true,
+      "linux_cgroup_kernel_socket": null,
+      "global_connection_byte_budget_balance": null,
+      "recorded_at_utc": "2026-10-13T14:42:22.854115+00:00"
+    },
+    {
+      "case": "mqtt311-idle",
+      "variant": "after",
+      "repeat": 2,
+      "json": "density-original/after-mqtt311-idle-10000-2.json",
+      "sidecar": "density-original/after-mqtt311-idle-10000-2-sidecar.json",
+      "online": 10000,
+      "connected": 10000,
+      "disconnected": 10000,
+      "client_errors": 0,
+      "rss_delta_bytes_per_connection": 12168.4,
+      "requested_heap_delta_bytes_per_connection": 10787.4164,
+      "task_delta_per_connection": 1.0,
+      "process_cpu_percent_ramp": 4.777573984561752,
+      "process_cpu_percent_stable": 0.0,
+      "cpu_ramp_snapshot_seconds": 24.070794167000003,
+      "cpu_stable_snapshot_seconds": 3.186924915999999,
+      "connect_p99_ms": 4.38,
+      "heartbeat_p99_ms": null,
+      "pings_sent": 0,
+      "ping_responses": 0,
+      "swap_all_snapshots_used_zero": true,
+      "linux_cgroup_kernel_socket": null,
+      "global_connection_byte_budget_balance": null,
+      "recorded_at_utc": "2026-10-13T14:43:04.457482+00:00"
+    },
+    {
+      "case": "mqtt311-idle",
+      "variant": "before",
+      "repeat": 2,
+      "json": "density-original/before-mqtt311-idle-10000-2.json",
+      "sidecar": "density-original/before-mqtt311-idle-10000-2-sidecar.json",
+      "online": 10000,
+      "connected": 10000,
+      "disconnected": 10000,
+      "client_errors": 0,
+      "rss_delta_bytes_per_connection": 12022.6,
+      "requested_heap_delta_bytes_per_connection": 10779.0928,
+      "task_delta_per_connection": 1.0,
+      "process_cpu_percent_ramp": 4.736401142643115,
+      "process_cpu_percent_stable": 0.0,
+      "cpu_ramp_snapshot_seconds": 24.068907292,
+      "cpu_stable_snapshot_seconds": 3.180845250000001,
+      "connect_p99_ms": 4.33,
+      "heartbeat_p99_ms": null,
+      "pings_sent": 0,
+      "ping_responses": 0,
+      "swap_all_snapshots_used_zero": true,
+      "linux_cgroup_kernel_socket": null,
+      "global_connection_byte_budget_balance": null,
+      "recorded_at_utc": "2026-10-13T14:43:46.142304+00:00"
+    },
+    {
+      "case": "mqtt5-idle",
+      "variant": "before",
+      "repeat": 1,
+      "json": "density-original/before-mqtt5-idle-10000-1.json",
+      "sidecar": "density-original/before-mqtt5-idle-10000-1-sidecar.json",
+      "online": 10000,
+      "connected": 10000,
+      "disconnected": 10000,
+      "client_errors": 0,
+      "rss_delta_bytes_per_connection": 12120.9,
+      "requested_heap_delta_bytes_per_connection": 10803.1084,
+      "task_delta_per_connection": 1.0,
+      "process_cpu_percent_ramp": 5.194425205736379,
+      "process_cpu_percent_stable": 0.0,
+      "cpu_ramp_snapshot_seconds": 24.064260249999997,
+      "cpu_stable_snapshot_seconds": 3.1877720840000023,
+      "connect_p99_ms": 4.37,
+      "heartbeat_p99_ms": null,
+      "pings_sent": 0,
+      "ping_responses": 0,
+      "swap_all_snapshots_used_zero": true,
+      "linux_cgroup_kernel_socket": null,
+      "global_connection_byte_budget_balance": null,
+      "recorded_at_utc": "2026-10-13T14:44:27.750625+00:00"
+    },
+    {
+      "case": "mqtt5-idle",
+      "variant": "after",
+      "repeat": 1,
+      "json": "density-original/after-mqtt5-idle-10000-1.json",
+      "sidecar": "density-original/after-mqtt5-idle-10000-1-sidecar.json",
+      "online": 10000,
+      "connected": 10000,
+      "disconnected": 10000,
+      "client_errors": 0,
+      "rss_delta_bytes_per_connection": 12081.6,
+      "requested_heap_delta_bytes_per_connection": 10810.7724,
+      "task_delta_per_connection": 1.0,
+      "process_cpu_percent_ramp": 4.944248200262494,
+      "process_cpu_percent_stable": 0.0,
+      "cpu_ramp_snapshot_seconds": 24.068371,
+      "cpu_stable_snapshot_seconds": 3.1809954580000017,
+      "connect_p99_ms": 4.66,
+      "heartbeat_p99_ms": null,
+      "pings_sent": 0,
+      "ping_responses": 0,
+      "swap_all_snapshots_used_zero": true,
+      "linux_cgroup_kernel_socket": null,
+      "global_connection_byte_budget_balance": null,
+      "recorded_at_utc": "2026-10-13T14:45:09.370252+00:00"
+    },
+    {
+      "case": "mqtt5-idle",
+      "variant": "after",
+      "repeat": 2,
+      "json": "density-original/after-mqtt5-idle-10000-2.json",
+      "sidecar": "density-original/after-mqtt5-idle-10000-2-sidecar.json",
+      "online": 10000,
+      "connected": 10000,
+      "disconnected": 10000,
+      "client_errors": 0,
+      "rss_delta_bytes_per_connection": 11811.2,
+      "requested_heap_delta_bytes_per_connection": 10811.054,
+      "task_delta_per_connection": 1.0,
+      "process_cpu_percent_ramp": 5.152998088671932,
+      "process_cpu_percent_stable": 0.0,
+      "cpu_ramp_snapshot_seconds": 24.063661167,
+      "cpu_stable_snapshot_seconds": 3.1737364160000006,
+      "connect_p99_ms": 4.38,
+      "heartbeat_p99_ms": null,
+      "pings_sent": 0,
+      "ping_responses": 0,
+      "swap_all_snapshots_used_zero": true,
+      "linux_cgroup_kernel_socket": null,
+      "global_connection_byte_budget_balance": null,
+      "recorded_at_utc": "2026-10-13T14:45:50.967044+00:00"
+    },
+    {
+      "case": "mqtt5-idle",
+      "variant": "before",
+      "repeat": 2,
+      "json": "density-original/before-mqtt5-idle-10000-2.json",
+      "sidecar": "density-original/before-mqtt5-idle-10000-2-sidecar.json",
+      "online": 10000,
+      "connected": 10000,
+      "disconnected": 10000,
+      "client_errors": 0,
+      "rss_delta_bytes_per_connection": 11801.4,
+      "requested_heap_delta_bytes_per_connection": 10803.054,
+      "task_delta_per_connection": 1.0,
+      "process_cpu_percent_ramp": 5.111031931355323,
+      "process_cpu_percent_stable": 0.0,
+      "cpu_ramp_snapshot_seconds": 24.065590208,
+      "cpu_stable_snapshot_seconds": 3.301377207999998,
+      "connect_p99_ms": 4.19,
+      "heartbeat_p99_ms": null,
+      "pings_sent": 0,
+      "ping_responses": 0,
+      "swap_all_snapshots_used_zero": true,
+      "linux_cgroup_kernel_socket": null,
+      "global_connection_byte_budget_balance": null,
+      "recorded_at_utc": "2026-10-13T15:04:28.171720+00:00"
+    },
+    {
+      "case": "mqtt311-tls",
+      "variant": "before",
+      "repeat": 1,
+      "json": "density-original/before-mqtt311-tls-10000-1.json",
+      "sidecar": "density-original/before-mqtt311-tls-10000-1-sidecar.json",
+      "online": 10000,
+      "connected": 10000,
+      "disconnected": 10000,
+      "client_errors": 0,
+      "rss_delta_bytes_per_connection": 19660.8,
+      "requested_heap_delta_bytes_per_connection": 18243.4496,
+      "task_delta_per_connection": 1.0,
+      "process_cpu_percent_ramp": 34.913287537851105,
+      "process_cpu_percent_stable": 0.3132731360728036,
+      "cpu_ramp_snapshot_seconds": 24.088250042000002,
+      "cpu_stable_snapshot_seconds": 3.1921026250000004,
+      "connect_p99_ms": 6.3,
+      "heartbeat_p99_ms": null,
+      "pings_sent": 0,
+      "ping_responses": 0,
+      "swap_all_snapshots_used_zero": true,
+      "linux_cgroup_kernel_socket": null,
+      "global_connection_byte_budget_balance": null,
+      "recorded_at_utc": "2026-10-13T15:21:13.135391+00:00"
+    },
+    {
+      "case": "mqtt311-tls",
+      "variant": "after",
+      "repeat": 1,
+      "json": "density-original/after-mqtt311-tls-10000-1.json",
+      "sidecar": "density-original/after-mqtt311-tls-10000-1-sidecar.json",
+      "online": 10000,
+      "connected": 10000,
+      "disconnected": 10000,
+      "client_errors": 0,
+      "rss_delta_bytes_per_connection": 19739.4,
+      "requested_heap_delta_bytes_per_connection": 18251.2864,
+      "task_delta_per_connection": 1.0,
+      "process_cpu_percent_ramp": 34.36037452927586,
+      "process_cpu_percent_stable": 0.31221030298682323,
+      "cpu_ramp_snapshot_seconds": 24.097525459,
+      "cpu_stable_snapshot_seconds": 3.2029692500000024,
+      "connect_p99_ms": 6.68,
+      "heartbeat_p99_ms": null,
+      "pings_sent": 0,
+      "ping_responses": 0,
+      "swap_all_snapshots_used_zero": true,
+      "linux_cgroup_kernel_socket": null,
+      "global_connection_byte_budget_balance": null,
+      "recorded_at_utc": "2026-10-13T15:38:21.900646+00:00"
+    },
+    {
+      "case": "mqtt311-tls",
+      "variant": "after",
+      "repeat": 2,
+      "json": "density-original/after-mqtt311-tls-10000-2.json",
+      "sidecar": "density-original/after-mqtt311-tls-10000-2-sidecar.json",
+      "online": 10000,
+      "connected": 10000,
+      "disconnected": 10000,
+      "client_errors": 0,
+      "rss_delta_bytes_per_connection": 19610.0,
+      "requested_heap_delta_bytes_per_connection": 18251.6224,
+      "task_delta_per_connection": 1.0,
+      "process_cpu_percent_ramp": 35.60241771912419,
+      "process_cpu_percent_stable": 0.3136920789142546,
+      "cpu_ramp_snapshot_seconds": 24.099486916,
+      "cpu_stable_snapshot_seconds": 3.1878395000000026,
+      "connect_p99_ms": 5.01,
+      "heartbeat_p99_ms": null,
+      "pings_sent": 0,
+      "ping_responses": 0,
+      "swap_all_snapshots_used_zero": true,
+      "linux_cgroup_kernel_socket": null,
+      "global_connection_byte_budget_balance": null,
+      "recorded_at_utc": "2026-10-13T15:39:03.514158+00:00"
+    },
+    {
+      "case": "mqtt311-tls",
+      "variant": "before",
+      "repeat": 2,
+      "json": "density-original/before-mqtt311-tls-10000-2.json",
+      "sidecar": "density-original/before-mqtt311-tls-10000-2-sidecar.json",
+      "online": 10000,
+      "connected": 10000,
+      "disconnected": 10000,
+      "client_errors": 0,
+      "rss_delta_bytes_per_connection": 19659.2,
+      "requested_heap_delta_bytes_per_connection": 18243.3952,
+      "task_delta_per_connection": 1.0,
+      "process_cpu_percent_ramp": 35.6568301154729,
+      "process_cpu_percent_stable": 0.31218892890262984,
+      "cpu_ramp_snapshot_seconds": 24.090756167,
+      "cpu_stable_snapshot_seconds": 3.2031885419999995,
+      "connect_p99_ms": 5.16,
+      "heartbeat_p99_ms": null,
+      "pings_sent": 0,
+      "ping_responses": 0,
+      "swap_all_snapshots_used_zero": true,
+      "linux_cgroup_kernel_socket": null,
+      "global_connection_byte_budget_balance": null,
+      "recorded_at_utc": "2026-10-13T15:39:45.184268+00:00"
+    },
+    {
+      "case": "mqtt311-heartbeat",
+      "variant": "before",
+      "repeat": 1,
+      "json": "density-original/before-mqtt311-heartbeat-10000-1.json",
+      "sidecar": "density-original/before-mqtt311-heartbeat-10000-1-sidecar.json",
+      "online": 10000,
+      "connected": 10000,
+      "disconnected": 10000,
+      "client_errors": 0,
+      "rss_delta_bytes_per_connection": 12158.6,
+      "requested_heap_delta_bytes_per_connection": 10967.8144,
+      "task_delta_per_connection": 1.0,
+      "process_cpu_percent_ramp": 15.12482145900873,
+      "process_cpu_percent_stable": 16.103152160081617,
+      "cpu_ramp_snapshot_seconds": 24.066399791,
+      "cpu_stable_snapshot_seconds": 3.167081792000001,
+      "connect_p99_ms": 3.64,
+      "heartbeat_p99_ms": 2.3,
+      "pings_sent": 134883,
+      "ping_responses": 134883,
+      "swap_all_snapshots_used_zero": true,
+      "linux_cgroup_kernel_socket": null,
+      "global_connection_byte_budget_balance": null,
+      "recorded_at_utc": "2026-10-13T15:40:26.812476+00:00"
+    },
+    {
+      "case": "mqtt311-heartbeat",
+      "variant": "after",
+      "repeat": 1,
+      "json": "density-original/after-mqtt311-heartbeat-10000-1.json",
+      "sidecar": "density-original/after-mqtt311-heartbeat-10000-1-sidecar.json",
+      "online": 10000,
+      "connected": 10000,
+      "disconnected": 10000,
+      "client_errors": 0,
+      "rss_delta_bytes_per_connection": 12212.6,
+      "requested_heap_delta_bytes_per_connection": 10975.8908,
+      "task_delta_per_connection": 1.0,
+      "process_cpu_percent_ramp": 16.5760151987519,
+      "process_cpu_percent_stable": 16.312875301518613,
+      "cpu_ramp_snapshot_seconds": 24.070923875000002,
+      "cpu_stable_snapshot_seconds": 3.187666125,
+      "connect_p99_ms": 3.43,
+      "heartbeat_p99_ms": 1.92,
+      "pings_sent": 134907,
+      "ping_responses": 134907,
+      "swap_all_snapshots_used_zero": true,
+      "linux_cgroup_kernel_socket": null,
+      "global_connection_byte_budget_balance": null,
+      "recorded_at_utc": "2026-10-13T15:41:08.438452+00:00"
+    },
+    {
+      "case": "mqtt311-heartbeat",
+      "variant": "after",
+      "repeat": 2,
+      "json": "density-original/after-mqtt311-heartbeat-10000-2.json",
+      "sidecar": "density-original/after-mqtt311-heartbeat-10000-2-sidecar.json",
+      "online": 10000,
+      "connected": 10000,
+      "disconnected": 10000,
+      "client_errors": 0,
+      "rss_delta_bytes_per_connection": 12161.8,
+      "requested_heap_delta_bytes_per_connection": 10975.9004,
+      "task_delta_per_connection": 1.0,
+      "process_cpu_percent_ramp": 15.706711240346365,
+      "process_cpu_percent_stable": 17.25210238432683,
+      "cpu_ramp_snapshot_seconds": 24.066145625,
+      "cpu_stable_snapshot_seconds": 3.188017249999998,
+      "connect_p99_ms": 3.8,
+      "heartbeat_p99_ms": 3.29,
+      "pings_sent": 134887,
+      "ping_responses": 134887,
+      "swap_all_snapshots_used_zero": true,
+      "linux_cgroup_kernel_socket": null,
+      "global_connection_byte_budget_balance": null,
+      "recorded_at_utc": "2026-10-13T15:41:50.052136+00:00"
+    },
+    {
+      "case": "mqtt311-heartbeat",
+      "variant": "before",
+      "repeat": 2,
+      "json": "density-original/before-mqtt311-heartbeat-10000-2.json",
+      "sidecar": "density-original/before-mqtt311-heartbeat-10000-2-sidecar.json",
+      "online": 10000,
+      "connected": 10000,
+      "disconnected": 10000,
+      "client_errors": 0,
+      "rss_delta_bytes_per_connection": 11842.4,
+      "requested_heap_delta_bytes_per_connection": 10967.7276,
+      "task_delta_per_connection": 1.0,
+      "process_cpu_percent_ramp": 14.750850806802829,
+      "process_cpu_percent_stable": 16.681111607069596,
+      "cpu_ramp_snapshot_seconds": 24.066408416,
+      "cpu_stable_snapshot_seconds": 3.1772462919999995,
+      "connect_p99_ms": 3.97,
+      "heartbeat_p99_ms": 3.26,
+      "pings_sent": 134859,
+      "ping_responses": 134859,
+      "swap_all_snapshots_used_zero": true,
+      "linux_cgroup_kernel_socket": null,
+      "global_connection_byte_budget_balance": null,
+      "recorded_at_utc": "2026-10-13T15:42:31.726427+00:00"
+    },
+    {
+      "case": "mqtt5-persistent-subscribed",
+      "variant": "before",
+      "repeat": 1,
+      "json": "density-original/before-mqtt5-persistent-subscribed-10000-1.json",
+      "sidecar": "density-original/before-mqtt5-persistent-subscribed-10000-1-sidecar.json",
+      "online": 10000,
+      "connected": 10000,
+      "disconnected": 10000,
+      "client_errors": 0,
+      "rss_delta_bytes_per_connection": 13716.7,
+      "requested_heap_delta_bytes_per_connection": 12296.4636,
+      "task_delta_per_connection": 1.0,
+      "process_cpu_percent_ramp": 7.646011656547638,
+      "process_cpu_percent_stable": 0.0,
+      "cpu_ramp_snapshot_seconds": 24.064833833,
+      "cpu_stable_snapshot_seconds": 3.1865447499999995,
+      "connect_p99_ms": 4.14,
+      "heartbeat_p99_ms": null,
+      "pings_sent": 0,
+      "ping_responses": 0,
+      "swap_all_snapshots_used_zero": true,
+      "linux_cgroup_kernel_socket": null,
+      "global_connection_byte_budget_balance": null,
+      "recorded_at_utc": "2026-10-13T15:43:13.416253+00:00"
+    },
+    {
+      "case": "mqtt5-persistent-subscribed",
+      "variant": "after",
+      "repeat": 1,
+      "json": "density-original/after-mqtt5-persistent-subscribed-10000-1.json",
+      "sidecar": "density-original/after-mqtt5-persistent-subscribed-10000-1-sidecar.json",
+      "online": 10000,
+      "connected": 10000,
+      "disconnected": 10000,
+      "client_errors": 0,
+      "rss_delta_bytes_per_connection": 13641.3,
+      "requested_heap_delta_bytes_per_connection": 12304.5504,
+      "task_delta_per_connection": 1.0,
+      "process_cpu_percent_ramp": 7.731286086361291,
+      "process_cpu_percent_stable": 0.31502052936338965,
+      "cpu_ramp_snapshot_seconds": 24.058093042,
+      "cpu_stable_snapshot_seconds": 3.1743962910000008,
+      "connect_p99_ms": 4.76,
+      "heartbeat_p99_ms": null,
+      "pings_sent": 0,
+      "ping_responses": 0,
+      "swap_all_snapshots_used_zero": true,
+      "linux_cgroup_kernel_socket": null,
+      "global_connection_byte_budget_balance": null,
+      "recorded_at_utc": "2026-10-13T15:59:03.291557+00:00"
+    },
+    {
+      "case": "mqtt5-persistent-subscribed",
+      "variant": "after",
+      "repeat": 2,
+      "json": "density-original/after-mqtt5-persistent-subscribed-10000-2.json",
+      "sidecar": "density-original/after-mqtt5-persistent-subscribed-10000-2-sidecar.json",
+      "online": 10000,
+      "connected": 10000,
+      "disconnected": 10000,
+      "client_errors": 0,
+      "rss_delta_bytes_per_connection": 13672.4,
+      "requested_heap_delta_bytes_per_connection": 12304.3996,
+      "task_delta_per_connection": 1.0,
+      "process_cpu_percent_ramp": 7.560195159168616,
+      "process_cpu_percent_stable": 0.31325216818459306,
+      "cpu_ramp_snapshot_seconds": 24.073452624999998,
+      "cpu_stable_snapshot_seconds": 3.192316292000001,
+      "connect_p99_ms": 5.48,
+      "heartbeat_p99_ms": null,
+      "pings_sent": 0,
+      "ping_responses": 0,
+      "swap_all_snapshots_used_zero": true,
+      "linux_cgroup_kernel_socket": null,
+      "global_connection_byte_budget_balance": null,
+      "recorded_at_utc": "2026-10-13T16:31:33.426903+00:00"
+    },
+    {
+      "case": "mqtt5-persistent-subscribed",
+      "variant": "before",
+      "repeat": 2,
+      "json": "density-original/before-mqtt5-persistent-subscribed-10000-2.json",
+      "sidecar": "density-original/before-mqtt5-persistent-subscribed-10000-2-sidecar.json",
+      "online": 10000,
+      "connected": 10000,
+      "disconnected": 10000,
+      "client_errors": 0,
+      "rss_delta_bytes_per_connection": 13713.4,
+      "requested_heap_delta_bytes_per_connection": 12296.496,
+      "task_delta_per_connection": 1.0,
+      "process_cpu_percent_ramp": 7.437660253461301,
+      "process_cpu_percent_stable": 0.3133512177015865,
+      "cpu_ramp_snapshot_seconds": 24.066708333,
+      "cpu_stable_snapshot_seconds": 3.191307208999998,
+      "connect_p99_ms": 4.96,
+      "heartbeat_p99_ms": null,
+      "pings_sent": 0,
+      "ping_responses": 0,
+      "swap_all_snapshots_used_zero": true,
+      "linux_cgroup_kernel_socket": null,
+      "global_connection_byte_budget_balance": null,
+      "recorded_at_utc": "2026-10-13T16:58:02.402195+00:00"
+    },
+    {
+      "case": "tcp-idle",
+      "variant": "before",
+      "repeat": 1,
+      "json": "density-tcp-retry/before-tcp-idle-10000-1.json",
+      "sidecar": "density-tcp-retry/before-tcp-idle-10000-1-sidecar.json",
+      "online": 10000,
+      "connected": 10000,
+      "disconnected": 10000,
+      "client_errors": 0,
+      "rss_delta_bytes_per_connection": 9620.7,
+      "requested_heap_delta_bytes_per_connection": 8755.37,
+      "task_delta_per_connection": 1.0,
+      "process_cpu_percent_ramp": 4.155918465825243,
+      "process_cpu_percent_stable": 0.0,
+      "cpu_ramp_snapshot_seconds": 24.062069750000003,
+      "cpu_stable_snapshot_seconds": 3.175894207999999,
+      "connect_p99_ms": 3.69,
+      "heartbeat_p99_ms": null,
+      "pings_sent": 0,
+      "ping_responses": 0,
+      "swap_all_snapshots_used_zero": true,
+      "linux_cgroup_kernel_socket": null,
+      "global_connection_byte_budget_balance": null,
+      "recorded_at_utc": "2026-10-14T00:48:05.835135+00:00"
+    },
+    {
+      "case": "tcp-idle",
+      "variant": "after",
+      "repeat": 1,
+      "json": "density-tcp-retry/after-tcp-idle-10000-1.json",
+      "sidecar": "density-tcp-retry/after-tcp-idle-10000-1-sidecar.json",
+      "online": 10000,
+      "connected": 10000,
+      "disconnected": 10000,
+      "client_errors": 0,
+      "rss_delta_bytes_per_connection": 9650.2,
+      "requested_heap_delta_bytes_per_connection": 8763.5208,
+      "task_delta_per_connection": 1.0,
+      "process_cpu_percent_ramp": 4.073468079684254,
+      "process_cpu_percent_stable": 0.0,
+      "cpu_ramp_snapshot_seconds": 24.058123958,
+      "cpu_stable_snapshot_seconds": 3.1732485839999995,
+      "connect_p99_ms": 3.27,
+      "heartbeat_p99_ms": null,
+      "pings_sent": 0,
+      "ping_responses": 0,
+      "swap_all_snapshots_used_zero": true,
+      "linux_cgroup_kernel_socket": null,
+      "global_connection_byte_budget_balance": null,
+      "recorded_at_utc": "2026-10-14T00:49:22.525005+00:00"
+    },
+    {
+      "case": "tcp-idle",
+      "variant": "after",
+      "repeat": 2,
+      "json": "density-tcp-retry/after-tcp-idle-10000-2.json",
+      "sidecar": "density-tcp-retry/after-tcp-idle-10000-2-sidecar.json",
+      "online": 10000,
+      "connected": 10000,
+      "disconnected": 10000,
+      "client_errors": 0,
+      "rss_delta_bytes_per_connection": 9640.3,
+      "requested_heap_delta_bytes_per_connection": 8763.37,
+      "task_delta_per_connection": 1.0,
+      "process_cpu_percent_ramp": 4.447009094159573,
+      "process_cpu_percent_stable": 0.0,
+      "cpu_ramp_snapshot_seconds": 24.061115625,
+      "cpu_stable_snapshot_seconds": 3.174364166,
+      "connect_p99_ms": 3.2,
+      "heartbeat_p99_ms": null,
+      "pings_sent": 0,
+      "ping_responses": 0,
+      "swap_all_snapshots_used_zero": true,
+      "linux_cgroup_kernel_socket": null,
+      "global_connection_byte_budget_balance": null,
+      "recorded_at_utc": "2026-10-14T00:50:39.313457+00:00"
+    },
+    {
+      "case": "tcp-idle",
+      "variant": "before",
+      "repeat": 2,
+      "json": "density-tcp-retry/before-tcp-idle-10000-2.json",
+      "sidecar": "density-tcp-retry/before-tcp-idle-10000-2-sidecar.json",
+      "online": 10000,
+      "connected": 10000,
+      "disconnected": 10000,
+      "client_errors": 0,
+      "rss_delta_bytes_per_connection": 9704.2,
+      "requested_heap_delta_bytes_per_connection": 8755.4244,
+      "task_delta_per_connection": 1.0,
+      "process_cpu_percent_ramp": 4.196638641914643,
+      "process_cpu_percent_stable": 0.0,
+      "cpu_ramp_snapshot_seconds": 24.066880334,
+      "cpu_stable_snapshot_seconds": 3.1867172079999975,
+      "connect_p99_ms": 4.06,
+      "heartbeat_p99_ms": null,
+      "pings_sent": 0,
+      "ping_responses": 0,
+      "swap_all_snapshots_used_zero": true,
+      "linux_cgroup_kernel_socket": null,
+      "global_connection_byte_budget_balance": null,
+      "recorded_at_utc": "2026-10-14T00:51:56.038924+00:00"
+    }
+  ],
+  "unavailable": {
+    "linux_perf": "current host is Darwin; no trusted authorized Linux measurement target in repository instructions",
+    "linux_cgroup_and_kernel_socket_memory": "no Linux /proc or cgroup; not reported as zero",
+    "global_connection_byte_budget_balance": "not exported by current management API; checked in isolated quota regression tests",
+    "50000_and_100000_connections": "self-contained static-credential harness caps at 25000; unchanged single-loopback endpoint has 16384 ephemeral source ports; 100000 server+client pairs exceed total kernel FD limit 122880 and server alone exceeds process limit 61440; no authorized externally provisioned gateway",
+    "1000000_connections": "not tested; no capacity claim"
+  },
+  "historical_cpu_profiling": {
+    "source_sha": "fe4770b240e628418102b9c8964ac81d3273b730",
+    "run_id": 38405157151,
+    "x86_64_cpu_clock_samples": 374,
+    "aarch64_cpu_clock_samples": 328,
+    "arm64_heap_allocation_stack_attribution": "unavailable; 0x0 / ??",
+    "scope": "1000 MQTT5 TLS telemetry64, historical successful CI, not candidate or 10K acceptance"
+  },
+  "baseline_smoke": {
+    "connections_requested": 1000,
+    "actual_online": 1000,
+    "completed_disconnects": 1000,
+    "valid_population": true,
+    "excluded_from_matched_performance_comparison": true,
+    "reason": "harness validation while other review work may still be active"
+  },
+  "environment_failure": {
+    "test": "density_task_future_profile",
+    "cause": "workspace sandbox denied the owned loopback bind",
+    "original_failed_log": "before-task-futures-sandbox-denial.txt",
+    "unchanged_rerun_with_socket_permission": "before-task-futures.txt",
+    "rerun_passed": true
+  },
+  "candidate_builds": [
+    {
+      "metadata": "candidate-build-metadata-1.json",
+      "used_for_comparison": false,
+      "reason": "preliminary build predates the final deadline race fixes"
+    },
+    {
+      "metadata": "candidate-build-metadata-2.json",
+      "used_for_comparison": true,
+      "status": "used for all completed 24 matched 10K density measurements, seven large-wire cases and independent cleanup/profiling probes"
+    }
+  ],
+  "rustsec_advisory_count": 1310,
+  "initial_rustsec_snapshot": {
+    "commit": "64a0302dc836df15a10ac27ebdcdf8f9b4ce845a",
+    "advisories": 1309
+  },
+  "protocol_validation": {
+    "summary": "mqtt/evidence-summary.json",
+    "runtime_source_unchanged": true,
+    "mqtt311_gate_cases": 77,
+    "mqtt311_gate_normative_checks": "125/125",
+    "mqtt5_raw": "passed",
+    "mqtt5_mature_mosquitto": "passed",
+    "broker_unit_passed": 117,
+    "broker_manual_ignored": 28,
+    "external_protocol_regressions_passed": 7
+  },
+  "candidate_source_commit": "b4db4b7be6f3207aac34a9610eb0ce96d4f23e96",
+  "candidate_source_match": {
+    "commit": "b4db4b7be6f3207aac34a9610eb0ce96d4f23e96",
+    "freeze_metadata": "candidate-build-metadata-2.json",
+    "source_files_checked": 156,
+    "mismatches": [],
+    "server_sha256": "5ea5422446636273c65c2f3117b32fb0684c809bd1b045aeb90e65b630eb99d7",
+    "all_frozen_source_hashes_match": true
+  },
+  "density_original_campaign": {
+    "completed": 22,
+    "planned": 24,
+    "valid": 21,
+    "invalid": 1,
+    "stopped_on_invalid": true,
+    "invalid_result": "density-original/after-tcp-idle-10000-1.json",
+    "invalid_cause": "3668 load-generator EADDRNOTAVAIL errors, only 6332 actual TCP connections; not normalized as 10K",
+    "method_revision": "repeat full TCP two-round matched case with natural cooldown after read-only MSL check; preserve original successful baseline and invalid candidate as diagnostic evidence",
+    "mq_t_five_cases_completed": true
+  },
+  "candidate_linux_profiling": {
+    "source_sha": "b4db4b7be6f3207aac34a9610eb0ce96d4f23e96",
+    "run_id": 38415787048,
+    "evidence": "candidate-linux-profile-inspection.json",
+    "x86_64_cpu_clock_samples": 394,
+    "aarch64_cpu_clock_samples": 334,
+    "arm64_heap_allocation_stack_attribution": "unavailable; 0x0 / in ??",
+    "scope": "1000 actual MQTT5 TLS telemetry64 clients, 60-second CPU workload, 30-second heap workload, both native jobs complete, not 10K lock-contention proof"
+  },
+  "recovery_fixture": {
+    "source_commit": "a2025e6ca7742b458aec0a175a89799839e74fba",
+    "runtime_changed": false,
+    "evidence": "recovery-fixture/manifest.json",
+    "original_ci_failure_preserved": true,
+    "forced_collision_same_error_class_before_exit": 101,
+    "forced_candidate_collision_after_exit": 0,
+    "final_local_server_tests_passed": 34,
+    "original_ci_port_owner_not_observed": true
+  },
+  "matched_density": {
+    "summary": "density-summary.json",
+    "csv": "density-runs.csv",
+    "valid_matched_runs": 24,
+    "real_online_per_run": 10000,
+    "complete_disconnects_per_run": 10000,
+    "client_errors_total": 0,
+    "host_swap_used_zero_all_snapshots": true,
+    "source_runtime_commit": "b4db4b7be6f3207aac34a9610eb0ce96d4f23e96",
+    "tcp_natural_cooldown_seconds": 35
+  },
+  "large_wire_method_revisions": [
+    {
+      "revision": 1,
+      "archive": "large-original/outcomes.json",
+      "status": "Both MQTT 3.1.1 ACK/delivery workloads completed, but cleanup task gate invalid: cold startup 6 versus post-HTTP-request 8; retained, excluded from valid matched comparisons.",
+      "observed_owner_inference": "First HTTP1 pool connection driver and idle interval fit source and single max-active sink connection; no actual task stack attribution."
+    },
+    {
+      "revision": 2,
+      "archive": "large-prewarmed/outcomes.json",
+      "status": "complete; all seven valid; six normal cases with one excluded prewarm event each and one intentional partial-frame case without prewarm",
+      "prewarm": "Exactly one owned 256-byte event and its sink ACK occur before measured load; warmed baseline requires zero online/pending and three consecutive identical task counts; no hardcoded expected increment.",
+      "measured_count_excludes_prewarm": true,
+      "partial_frames_prewarmed": false
+    }
+  ],
+  "full_ready_auth_isolated_proof": {
+    "manifest": "full-ready-auth/manifest.json",
+    "before_exit": 101,
+    "before_error": "Invalid",
+    "before_provider_calls": 0,
+    "after_exit": 0,
+    "after_provider_calls": 1,
+    "scope": "Mixed complete auth functions under the identical candidate Reader/runtime, one full 8-byte prefill with no quota/grow/listener; not a complete baseline build."
+  },
+  "final_fixture_ci": {
+    "source_commit": "a2025e6ca7742b458aec0a175a89799839e74fba",
+    "rust_run": 38492097494,
+    "native_recovery_run": 38492097445,
+    "native_dx_run": 38492097476,
+    "all_completed_success": true,
+    "metadata": [
+      "ci-rust-fixture-success.json",
+      "ci-recovery-fixture-success.json",
+      "ci-dx-fixture-success.json",
+      "ci-fixture-runs.json"
+    ],
+    "runtime_profile_source_commit": "b4db4b7be6f3207aac34a9610eb0ce96d4f23e96",
+    "runtime_source_equivalent": true,
+    "final_documentation_commit_not_profiled": true,
+    "frozen_snapshot_files": 156,
+    "matching_frozen_files": 154,
+    "changed_frozen_files": [
+      "apps/netbaiot-server/tests/server.rs",
+      "apps/netbaiot-server/tests/common/mod.rs"
+    ],
+    "source_comparison": "candidate-vs-fixture-source-match.json"
+  },
+  "large_wire_measurements": [
+    {
+      "case": "before-mqtt311-large-subscription",
+      "exit_code": 0,
+      "elapsed_seconds": 29.407644417,
+      "json": "before-mqtt311-large-subscription.json",
+      "sidecar": "before-mqtt311-large-subscription-sidecar.json",
+      "stderr": "before-mqtt311-large-subscription-stderr.txt",
+      "timewait_before": "before-mqtt311-large-subscription-timewait-before.json",
+      "timewait_after": "before-mqtt311-large-subscription-timewait-after.json",
+      "intentional_partial_frame_close": false,
+      "valid": true,
+      "validation_errors": [],
+      "counters": {
+        "accepted": 2000,
+        "business_ack_timeouts": 0,
+        "connect_attempts": 32,
+        "connected": 32,
+        "disconnected": 32,
+        "event_accepted_receipts": 4000,
+        "payload_bytes": 130000000,
+        "pending_at_disconnect": 0,
+        "pubacks": 2000,
+        "published": 2000,
+        "subscriber_publishes": 2000,
+        "wire_bytes_sent": 130067212
+      },
+      "final_online": 0,
+      "final_pending_required": 0,
+      "final_runtime_tasks": 8,
+      "base_runtime_tasks": 8,
+      "sink_received_total": 2001,
+      "sink_acks_total": 2001,
+      "prewarm_published": 1,
+      "prewarm_sink_acks": 1,
+      "measured_sink_received": 2000,
+      "measured_sink_acks": 2000,
+      "application_ack_p99_ms": 1.43,
+      "puback_p99_ms": 1.14,
+      "connect_p99_ms": 0.85,
+      "server_cpu_exact_measured_window_percent": null,
+      "held_online_status": null,
+      "measured_client_count": 32,
+      "sink_rejected_including_prewarm": 0,
+      "lifecycle_samples": 24
+    },
+    {
+      "case": "after-mqtt311-large-subscription",
+      "exit_code": 0,
+      "elapsed_seconds": 29.394112334000013,
+      "json": "after-mqtt311-large-subscription.json",
+      "sidecar": "after-mqtt311-large-subscription-sidecar.json",
+      "stderr": "after-mqtt311-large-subscription-stderr.txt",
+      "timewait_before": "after-mqtt311-large-subscription-timewait-before.json",
+      "timewait_after": "after-mqtt311-large-subscription-timewait-after.json",
+      "intentional_partial_frame_close": false,
+      "valid": true,
+      "validation_errors": [],
+      "counters": {
+        "accepted": 2000,
+        "business_ack_timeouts": 0,
+        "connect_attempts": 32,
+        "connected": 32,
+        "disconnected": 32,
+        "event_accepted_receipts": 4000,
+        "payload_bytes": 130000000,
+        "pending_at_disconnect": 0,
+        "pubacks": 2000,
+        "published": 2000,
+        "subscriber_publishes": 2000,
+        "wire_bytes_sent": 130067212
+      },
+      "final_online": 0,
+      "final_pending_required": 0,
+      "final_runtime_tasks": 8,
+      "base_runtime_tasks": 8,
+      "sink_received_total": 2001,
+      "sink_acks_total": 2001,
+      "prewarm_published": 1,
+      "prewarm_sink_acks": 1,
+      "measured_sink_received": 2000,
+      "measured_sink_acks": 2000,
+      "application_ack_p99_ms": 1.43,
+      "puback_p99_ms": 1.12,
+      "connect_p99_ms": 0.85,
+      "server_cpu_exact_measured_window_percent": null,
+      "held_online_status": null,
+      "measured_client_count": 32,
+      "sink_rejected_including_prewarm": 0,
+      "lifecycle_samples": 24
+    },
+    {
+      "case": "before-mqtt5-large-subscription",
+      "exit_code": 0,
+      "elapsed_seconds": 29.47778037500001,
+      "json": "before-mqtt5-large-subscription.json",
+      "sidecar": "before-mqtt5-large-subscription-sidecar.json",
+      "stderr": "before-mqtt5-large-subscription-stderr.txt",
+      "timewait_before": "before-mqtt5-large-subscription-timewait-before.json",
+      "timewait_after": "before-mqtt5-large-subscription-timewait-after.json",
+      "intentional_partial_frame_close": false,
+      "valid": true,
+      "validation_errors": [],
+      "counters": {
+        "accepted": 2000,
+        "business_ack_timeouts": 0,
+        "connect_attempts": 32,
+        "connected": 32,
+        "disconnected": 32,
+        "event_accepted_receipts": 4000,
+        "payload_bytes": 130000000,
+        "pending_at_disconnect": 0,
+        "pubacks": 2000,
+        "published": 2000,
+        "subscriber_publishes": 2000,
+        "wire_bytes_sent": 130069372
+      },
+      "final_online": 0,
+      "final_pending_required": 0,
+      "final_runtime_tasks": 8,
+      "base_runtime_tasks": 8,
+      "sink_received_total": 2001,
+      "sink_acks_total": 2001,
+      "prewarm_published": 1,
+      "prewarm_sink_acks": 1,
+      "measured_sink_received": 2000,
+      "measured_sink_acks": 2000,
+      "application_ack_p99_ms": 1.44,
+      "puback_p99_ms": 1.16,
+      "connect_p99_ms": 0.81,
+      "server_cpu_exact_measured_window_percent": null,
+      "held_online_status": null,
+      "measured_client_count": 32,
+      "sink_rejected_including_prewarm": 0,
+      "lifecycle_samples": 24
+    },
+    {
+      "case": "after-mqtt5-large-subscription",
+      "exit_code": 0,
+      "elapsed_seconds": 32.485859542000014,
+      "json": "after-mqtt5-large-subscription.json",
+      "sidecar": "after-mqtt5-large-subscription-sidecar.json",
+      "stderr": "after-mqtt5-large-subscription-stderr.txt",
+      "timewait_before": "after-mqtt5-large-subscription-timewait-before.json",
+      "timewait_after": "after-mqtt5-large-subscription-timewait-after.json",
+      "intentional_partial_frame_close": false,
+      "valid": true,
+      "validation_errors": [],
+      "counters": {
+        "accepted": 2000,
+        "business_ack_timeouts": 0,
+        "connect_attempts": 32,
+        "connected": 32,
+        "disconnected": 32,
+        "event_accepted_receipts": 4000,
+        "payload_bytes": 130000000,
+        "pending_at_disconnect": 0,
+        "pubacks": 2000,
+        "published": 2000,
+        "subscriber_publishes": 2000,
+        "wire_bytes_sent": 130069372
+      },
+      "final_online": 0,
+      "final_pending_required": 0,
+      "final_runtime_tasks": 8,
+      "base_runtime_tasks": 8,
+      "sink_received_total": 2001,
+      "sink_acks_total": 2001,
+      "prewarm_published": 1,
+      "prewarm_sink_acks": 1,
+      "measured_sink_received": 2000,
+      "measured_sink_acks": 2000,
+      "application_ack_p99_ms": 1.51,
+      "puback_p99_ms": 1.19,
+      "connect_p99_ms": 0.83,
+      "server_cpu_exact_measured_window_percent": null,
+      "held_online_status": null,
+      "measured_client_count": 32,
+      "sink_rejected_including_prewarm": 1,
+      "lifecycle_samples": 24
+    },
+    {
+      "case": "before-tcp-large-ingress",
+      "exit_code": 0,
+      "elapsed_seconds": 29.38340741600001,
+      "json": "before-tcp-large-ingress.json",
+      "sidecar": "before-tcp-large-ingress-sidecar.json",
+      "stderr": "before-tcp-large-ingress-stderr.txt",
+      "timewait_before": "before-tcp-large-ingress-timewait-before.json",
+      "timewait_after": "before-tcp-large-ingress-timewait-after.json",
+      "intentional_partial_frame_close": false,
+      "valid": true,
+      "validation_errors": [],
+      "counters": {
+        "accepted": 2000,
+        "business_ack_timeouts": 0,
+        "connect_attempts": 32,
+        "connected": 32,
+        "disconnected": 32,
+        "event_accepted_receipts": 2000,
+        "payload_bytes": 130000000,
+        "pending_at_disconnect": 0,
+        "published": 2000,
+        "wire_bytes_sent": 130011286
+      },
+      "final_online": 0,
+      "final_pending_required": 0,
+      "final_runtime_tasks": 8,
+      "base_runtime_tasks": 8,
+      "sink_received_total": 2001,
+      "sink_acks_total": 2001,
+      "prewarm_published": 1,
+      "prewarm_sink_acks": 1,
+      "measured_sink_received": 2000,
+      "measured_sink_acks": 2000,
+      "application_ack_p99_ms": 1.1,
+      "puback_p99_ms": null,
+      "connect_p99_ms": 0.82,
+      "server_cpu_exact_measured_window_percent": null,
+      "held_online_status": null,
+      "measured_client_count": 32,
+      "sink_rejected_including_prewarm": 0,
+      "lifecycle_samples": 24
+    },
+    {
+      "case": "after-tcp-large-ingress",
+      "exit_code": 0,
+      "elapsed_seconds": 29.42427758299999,
+      "json": "after-tcp-large-ingress.json",
+      "sidecar": "after-tcp-large-ingress-sidecar.json",
+      "stderr": "after-tcp-large-ingress-stderr.txt",
+      "timewait_before": "after-tcp-large-ingress-timewait-before.json",
+      "timewait_after": "after-tcp-large-ingress-timewait-after.json",
+      "intentional_partial_frame_close": false,
+      "valid": true,
+      "validation_errors": [],
+      "counters": {
+        "accepted": 2000,
+        "business_ack_timeouts": 0,
+        "connect_attempts": 32,
+        "connected": 32,
+        "disconnected": 32,
+        "event_accepted_receipts": 2000,
+        "payload_bytes": 130000000,
+        "pending_at_disconnect": 0,
+        "published": 2000,
+        "wire_bytes_sent": 130011286
+      },
+      "final_online": 0,
+      "final_pending_required": 0,
+      "final_runtime_tasks": 8,
+      "base_runtime_tasks": 8,
+      "sink_received_total": 2001,
+      "sink_acks_total": 2001,
+      "prewarm_published": 1,
+      "prewarm_sink_acks": 1,
+      "measured_sink_received": 2000,
+      "measured_sink_acks": 2000,
+      "application_ack_p99_ms": 1.12,
+      "puback_p99_ms": null,
+      "connect_p99_ms": 0.73,
+      "server_cpu_exact_measured_window_percent": null,
+      "held_online_status": null,
+      "measured_client_count": 32,
+      "sink_rejected_including_prewarm": 0,
+      "lifecycle_samples": 24
+    },
+    {
+      "case": "after-tcp-partial-frame-disconnect",
+      "exit_code": 0,
+      "elapsed_seconds": 8.851284708000037,
+      "json": "after-tcp-partial-frame-disconnect.json",
+      "sidecar": "after-tcp-partial-frame-disconnect-sidecar.json",
+      "stderr": "after-tcp-partial-frame-disconnect-stderr.txt",
+      "timewait_before": "after-tcp-partial-frame-disconnect-timewait-before.json",
+      "timewait_after": "after-tcp-partial-frame-disconnect-timewait-after.json",
+      "intentional_partial_frame_close": true,
+      "valid": true,
+      "validation_errors": [],
+      "counters": {
+        "business_ack_timeouts": 0,
+        "connect_attempts": 16,
+        "connected": 16,
+        "disconnected": 16,
+        "wire_bytes_sent": 1718
+      },
+      "final_online": 0,
+      "final_pending_required": 0,
+      "final_runtime_tasks": 6,
+      "base_runtime_tasks": 6,
+      "sink_received_total": 0,
+      "sink_acks_total": 0,
+      "prewarm_published": 0,
+      "prewarm_sink_acks": 0,
+      "measured_sink_received": 0,
+      "measured_sink_acks": 0,
+      "application_ack_p99_ms": null,
+      "puback_p99_ms": null,
+      "connect_p99_ms": 0.82,
+      "server_cpu_exact_measured_window_percent": null,
+      "held_online_status": null,
+      "measured_client_count": 16,
+      "sink_rejected_including_prewarm": 0,
+      "lifecycle_samples": 8
+    }
+  ],
+  "large_wire_summary": "large-wire-summary.json",
+  "native_10k_sampling": {
+    "summary": "sampling/summary.json",
+    "scope": "Independent one-tenant wall-clock thread sampling, not matched CPU A/B; actual online population 10000 verified at each start.",
+    "heartbeat": {
+      "connected": 10000,
+      "disconnected": 10000,
+      "pings_and_responses": 134870,
+      "cleanup_tasks": 6
+    },
+    "disconnect": {
+      "connected": 10000,
+      "disconnected": 10000,
+      "pings_and_responses": 134918,
+      "cleanup_tasks": 6
+    },
+    "interpretation": "Observed quota and mutex-wait frames do not measure lock hold time or establish a CPU bottleneck; no lock rewrite is made.",
+    "exit_evidence": {
+      "loadgen": 0,
+      "sampler": 0,
+      "wrapper": 0,
+      "server": null,
+      "server_note": "Server waited and reaped; its exit code is not exported by the memory harness."
+    },
+    "latency_counter_scope": "Full approximately 40-second loadgen run, not the configured ten-second stack capture.",
+    "sampler_observation_scope": "Observed wait/finish timestamps may include delay after capture; configured duration and tool header are separate evidence, not observed sampling wall time.",
+    "symbol_counts_scope": "Only Call graph lines before Total number in stack, excluding duplicated aggregation tables; corrected without rerunning raw sampling.",
+    "prior_derived_summary": "sampling/summary-before-node-scope-fix.json",
+    "node_count_generator": "evidence-tools/summarize_stack_nodes.py",
+    "prior_derived_summary_classification": "Processing scope error in aggregation tables, not a load failure."
+  },
+  "large_prefix_disconnect": {
+    "result": "large-prefix/corrected/result.json",
+    "measurement_valid": true,
+    "actual_connections": 16,
+    "declared_payload_bytes": 65536,
+    "sent_partial_payload_bytes": 32768,
+    "accepted_events": 0,
+    "held_minus_authenticated_requested_bytes": 1049536,
+    "held_minus_post_disconnect_requested_bytes": 1172192,
+    "cleanup_online": 0,
+    "cleanup_tasks": 6,
+    "server_exit": 0,
+    "initial_attempt": "Invalid fixture credential representation caused auth EOF. It is retained separately and is not a product failure or a valid memory measurement.",
+    "limits": "Original server defaults; no runtime limits overridden. No server configuration, credentials or binary spool data are published.",
+    "interpretation": "Process-wide requested heap includes other ownership and retained auth cache. Private global/tenant balances remain unexported."
+  },
+  "perf_cpu_reporting_fix": {
+    "proof": "event-cpu/source-manifest.json",
+    "before": "2 real-main mock tests fail because load CPU delta is absent",
+    "after": "2 tests pass: CPU 100 -> 105 gives load delta 5, while legacy cumulative 108 is preserved",
+    "scope": "Loadgen lifecycle including ramp/warmup/cooldown; before optional profiler-tail waiting, metrics and shutdown; not the configured publication-only duration.",
+    "historical_measurements": "Previously measured large-wire JSON remains cumulative. New fields are not retroactively inserted.",
+    "initial_setup_failure": "Missing copied shared Python dependency; retained separately, corrected before defect reproduction.",
+    "final_owner_proof": "event-profiler-owner/manifest.json",
+    "final_source_sha256": {
+      "scripts/perf/event_load.py": "a8070f53b1813b083172bc061c7b5360d2da6a0cd493910b4484290fb7e6361e",
+      "scripts/perf/test_event_load.py": "0cef3eb5dab01adc5ecfdc5fa9d2727469b78c9a8699e6da124fadb7b92d43f0"
+    },
+    "profiler_exception_cleanup": {
+      "before": "Interim new-delta script: 2 existing CPU cases pass; profiler error cleanup case fails (profiler still running).",
+      "after": "Same three main tests pass; failed CPU read propagates and owned profiler is killed and reaped.",
+      "original_b4_reproduction": false,
+      "all_perf_tests_passed": 26
+    },
+    "live_functional_smoke": {
+      "evidence": "event-cpu/live-smoke.json",
+      "server_exit": 0,
+      "load_exit": 0,
+      "real_clients": 1,
+      "published_puback_and_business_ack": 1,
+      "load_cpu_seconds": 0.0,
+      "cpu_counters_seconds": [
+        0.01,
+        0.01
+      ],
+      "load_wall_seconds": 2.1011945410000004,
+      "interpretation": "CPU snapshot resolution yielded zero delta; this does not mean no CPU was used. Functional field test only, not matched A/B or capacity."
+    },
+    "final_perf_unit_tests_passed": 27,
+    "cleanup_timeout_proof": "event-cleanup-timeout/manifest.json",
+    "cleanup_timeout_behavior": "Each known child is attempted independently; first OSError/TimeoutExpired propagates after remaining owners are attempted. Timed-out profiler reaping stays unconfirmed, rather than claiming all children succeeded."
+  },
+  "previous_current_rustsec_snapshot": {
+    "commit": "29d1a60c3361576d366b1740bba2254dc6173434",
+    "advisories": 1310,
+    "current_audit": "cargo-audit-final.txt",
+    "xtask_audit": "xtask-audit-final.txt",
+    "baseline_original_audit": "cargo-audit-cae81a9-final.txt",
+    "same_database_comparison": true
+  },
+  "completion_checks_before_profiler_owner_fix": {
+    "all_seven_exit_zero": true,
+    "workspace_passed": 602,
+    "workspace_failed": 0,
+    "manual_ignored": 56,
+    "workspace_result_blocks": 42,
+    "python_passed": 25,
+    "release_script_tests_passed": 33,
+    "scope": "Python snapshot predates the final profiler-failure owner repair; Rust code is unchanged.",
+    "evidence_directory": "completion-before-profiler-owner-fix"
+  },
+  "final_completion_checks": {
+    "source_head_before_final_commit": "a2025e6ca7742b458aec0a175a89799839e74fba",
+    "uncommitted_validated_script_sha256": {
+      "scripts/perf/event_load.py": "a8070f53b1813b083172bc061c7b5360d2da6a0cd493910b4484290fb7e6361e",
+      "scripts/perf/test_event_load.py": "0cef3eb5dab01adc5ecfdc5fa9d2727469b78c9a8699e6da124fadb7b92d43f0"
+    },
+    "rust_runtime_unchanged_since_completed_workspace_checks": true,
+    "workspace_passed": 602,
+    "workspace_failed": 0,
+    "manual_ignored": 56,
+    "workspace_result_blocks": 42,
+    "python_passed": 27,
+    "python_exit": 0,
+    "python_evidence": "completion-final/python.txt",
+    "preflight_status": "passed",
+    "initial_preflight_exit": 101,
+    "initial_preflight_error": "Offline cache missing anstyle v1.0.14",
+    "initial_preflight_evidence": "completion-final/preflight-offline-cache-failure.txt",
+    "final_source_snapshots": [
+      "completion-final/event_load.py",
+      "completion-final/test_event_load.py"
+    ],
+    "linked_remote_ci_sources": [
+      "b4db4b7be6f3207aac34a9610eb0ce96d4f23e96",
+      "a2025e6ca7742b458aec0a175a89799839e74fba"
+    ],
+    "final_script_documentation_commit_not_yet_remote_ci_verified": true,
+    "preflight_exit": 0,
+    "release_script_tests_passed": 33,
+    "preflight_evidence": "completion-final/preflight.txt"
+  },
+  "original_parser_fuzz_raw_availability": {
+    "available_at_final_review": false,
+    "files": [
+      "fuzz-mqtt.txt",
+      "fuzz-mqtt5.txt",
+      "fuzz-tcp.txt"
+    ],
+    "previous_independent_hash_checks": "All three matched their historical manifest hashes in multiple earlier checks during this review.",
+    "current_raw_hash_reverification_possible": false,
+    "disappearance_cause": "Unknown; no attribution is made.",
+    "replacement_raw_generated": false,
+    "current_mqtt_state_recovery_fuzz_archive_affected": false
+  },
+  "final_evidence_integrity": {
+    "evidence": "final-evidence-integrity.json",
+    "published_records_verified_in_final_check": 326,
+    "canonical_nested_log_source_references_verified": 41,
+    "original_committed_records_verified": 24,
+    "all_local_report_links_verified": 37,
+    "path_scrubbing_clean": true,
+    "git_diff_check_clean": false,
+    "historical_parser_fuzz_raw_available_now": false,
+    "source_documentation_tools_diff_check_clean": true,
+    "archive_whitespace_preserved": true,
+    "git_diff_check_scope": "Staged source, both reports and evidence-tools pass; the full staged archive reports preserved log whitespace, patch context and CSV CRLF endings. The earlier clean unstaged check excluded untracked evidence."
+  }
+}

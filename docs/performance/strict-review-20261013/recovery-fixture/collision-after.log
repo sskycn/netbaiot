@@ -1,0 +1,10 @@
+   Compiling netbaiot-server v0.3.1 (<repo>/apps/netbaiot-server)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.11s
+     Running tests/server.rs (target/debug/deps/server-e8d63e1d3643bbba)
+
+running 1 test
+fixture TCP candidate 127.0.0.1:50294, attempt 1/32: kind=AddrInUse, raw_os_error=Some(48)
+test subprocess_spool_failure_stays_alive_until_repaired_then_replays_same_event_id ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 35 filtered out; finished in 4.11s
+

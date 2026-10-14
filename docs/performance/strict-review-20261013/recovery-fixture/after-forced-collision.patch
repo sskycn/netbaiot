@@ -1,0 +1,11 @@
+--- final/apps/netbaiot-server/tests/server.rs
++++ collision-injected/apps/netbaiot-server/tests/server.rs
+@@ -2224,7 +2224,7 @@
+     // its own distinct address; a :0 bind can otherwise claim a restart port.
+     let sink_listener = common::reserve_tcp_listener_excluding(
+         &[c.device_ingress, c.management_http],
+-        "127.0.0.1:0".parse().unwrap(),
++        c.management_http, // Deterministically force the same sink/restart collision.
+     )
+     .await;
+     let sink_address = sink_listener.local_addr().unwrap();

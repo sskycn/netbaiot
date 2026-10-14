@@ -1,0 +1,35 @@
+    Blocking waiting for file lock on build directory
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 5.32s
+     Running tests/end_to_end.rs (target/debug/deps/end_to_end-f92dfa545f62c127)
+
+running 27 tests
+test command_service_retries_conflicts_and_drain_share_one_dispatch ... ok
+test authenticated_candidates_cannot_register_after_quiesce ... ok
+test command_service_concurrent_same_id_reaches_device_once ... ok
+test continuously_ready_outbound_cannot_starve_ping_for_either_mqtt_version ... ok
+test disconnect_without_mqtt_disconnect_publishes_will_including_server_stop ... ok
+test fragmented_mqtt_qos1_puback_follows_event_acceptance ... ok
+test full_preauth_reader_observes_eof_overload_shutdown_and_packet_deadline ... ok
+test active_tcp_connection_reuses_bound_auth_context_for_frames ... ok
+test inbound_qos2_duplicate_sequence_emits_one_device_event ... ok
+test management_mutations_close_but_diagnostics_and_drain_remain_available ... ok
+test mqtt_command_requires_live_subscription_and_unsubscribe_preserves_inflight_ack ... ok
+test mqtt_connack_write_fail_cleanup ... ok
+test mqtt_publish_fast_paths_consume_protocol_budget ... ok
+test mqtt_v5_command_metrics_distinguish_ordinary_and_negative_puback ... ok
+test delayed_authentication_preserves_a_full_pipelined_maximum_tcp_frame ... ok
+test identical_cache_misses_are_single_flight ... ok
+test retained_delete_qos_matrix_skips_business_json_decode ... ok
+test unauthorized_publish_is_rejected_before_broker_side_effects ... ok
+test command_service_capacity_expiry_and_invalid_expiry_cleanup ... ok
+test delayed_authentication_preserves_maximum_mqtt_publish_for_both_versions ... ok
+test quiesce_waits_for_invalidation_before_committing_mqtt_recovery ... ok
+test command_dedup_tracks_sent_receipts_and_fences_evicted_dispatch_updates ... ok
+test auth_mqtt_attach_revoke_race_001 ... ok
+test accepted_receipt_survives_command_ttl_within_dedup_window ... ok
+test one_authentication_then_ten_thousand_messages_calls_provider_once ... ok
+test active_mqtt_authenticates_once_for_ten_thousand_real_publishes ... ok
+test command_dedup_expiry_is_ordered_and_lazily_reclaimed ... ok
+
+test result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.16s
+

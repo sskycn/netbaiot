@@ -1,0 +1,4 @@
+    Checking netbaiot-server v0.3.1 (<repo>/apps/netbaiot-server)
+    Checking netbaiot-cli v0.3.1 (<repo>/apps/netbaiot-cli)
+    Checking netbaiot-transports v0.3.1 (<repo>/crates/netbaiot-transports)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.18s

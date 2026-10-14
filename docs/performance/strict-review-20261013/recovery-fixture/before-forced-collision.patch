@@ -1,0 +1,22 @@
+--- before/apps/netbaiot-server/tests/server.rs
++++ collision-injected/apps/netbaiot-server/tests/server.rs
+@@ -2214,11 +2214,18 @@
+     assert_eq!(recovered.records.len(), 1);
+     assert_eq!(recovered.records[0].event.event_id, accepted);
+ 
+-    let sink_listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
++    // Deterministic injection: the new sink receives the released management port.
++    let collision = tokio::net::TcpSocket::new_v4().unwrap();
++    collision.set_reuseaddr(true).unwrap();
++    collision.bind(c.management_http).unwrap();
++    collision.set_reuseaddr(false).unwrap();
++    let sink_listener = collision.listen(128).unwrap();
+     let sink_address = sink_listener.local_addr().unwrap();
+     let delivered = Arc::new(Mutex::new(None));
+     let delivered_task = delivered.clone();
+     let sink = tokio::spawn(async move {
++        // Preserve the injected port owner through the child readiness judgment.
++        tokio::time::sleep(Duration::from_secs(6)).await;
+         let (mut socket, _) = sink_listener.accept().await.unwrap();
+         let mut bytes = Vec::new();
+         let mut chunk = [0u8; 4096];

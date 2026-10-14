@@ -1,0 +1,50 @@
+reqwest v0.12.28
+├── reqwest feature "__rustls"
+│   ├── reqwest feature "rustls-tls-native-roots-no-provider"
+│   │   └── reqwest feature "rustls-tls-native-roots"
+│   │       [dev-dependencies]
+│   │       └── netbaiot-server v0.3.1 (<repo>/apps/netbaiot-server)
+│   │           └── netbaiot-server feature "default" (command-line)
+│   │               └── netbaiot-cli v0.3.1 (<repo>/apps/netbaiot-cli)
+│   │                   └── netbaiot-cli feature "default" (command-line)
+│   └── reqwest feature "rustls-tls-webpki-roots-no-provider"
+│       └── reqwest feature "rustls-tls-webpki-roots"
+│           └── reqwest feature "rustls-tls"
+│               ├── netbaiot-cli v0.3.1 (<repo>/apps/netbaiot-cli) (*)
+│               ├── netbaiot-client v0.3.1 (<repo>/crates/netbaiot-client)
+│               │   └── netbaiot-client feature "default" (command-line)
+│               │       ├── netbaiot-cli v0.3.1 (<repo>/apps/netbaiot-cli) (*)
+│               │       └── netbaiot-loadgen v0.3.1 (<repo>/tools/netbaiot-loadgen)
+│               │           └── netbaiot-loadgen feature "default" (command-line)
+│               │       [dev-dependencies]
+│               │       └── netbaiot-server v0.3.1 (<repo>/apps/netbaiot-server) (*)
+│               ├── netbaiot-loadgen v0.3.1 (<repo>/tools/netbaiot-loadgen) (*)
+│               ├── netbaiot-runtime v0.3.1 (<repo>/crates/netbaiot-runtime)
+│               │   └── netbaiot-runtime feature "default" (command-line)
+│               │       ├── netbaiot-cli v0.3.1 (<repo>/apps/netbaiot-cli) (*)
+│               │       ├── netbaiot-loadgen v0.3.1 (<repo>/tools/netbaiot-loadgen) (*)
+│               │       ├── netbaiot-server v0.3.1 (<repo>/apps/netbaiot-server) (*)
+│               │       └── netbaiot-transports v0.3.1 (<repo>/crates/netbaiot-transports)
+│               │           └── netbaiot-transports feature "default" (command-line)
+│               │               └── netbaiot-server v0.3.1 (<repo>/apps/netbaiot-server) (*)
+│               └── netbaiot-server v0.3.1 (<repo>/apps/netbaiot-server) (*)
+│               [dev-dependencies]
+│               └── netbaiot-server v0.3.1 (<repo>/apps/netbaiot-server) (*)
+├── reqwest feature "__rustls-ring"
+│   ├── reqwest feature "rustls-tls-native-roots" (*)
+│   └── reqwest feature "rustls-tls-webpki-roots" (*)
+├── reqwest feature "__tls"
+│   └── reqwest feature "__rustls" (*)
+├── reqwest feature "json"
+│   ├── netbaiot-cli v0.3.1 (<repo>/apps/netbaiot-cli) (*)
+│   ├── netbaiot-client v0.3.1 (<repo>/crates/netbaiot-client) (*)
+│   ├── netbaiot-loadgen v0.3.1 (<repo>/tools/netbaiot-loadgen) (*)
+│   ├── netbaiot-runtime v0.3.1 (<repo>/crates/netbaiot-runtime) (*)
+│   └── netbaiot-server v0.3.1 (<repo>/apps/netbaiot-server) (*)
+│   [dev-dependencies]
+│   └── netbaiot-server v0.3.1 (<repo>/apps/netbaiot-server) (*)
+├── reqwest feature "rustls-tls" (*)
+├── reqwest feature "rustls-tls-native-roots" (*)
+├── reqwest feature "rustls-tls-native-roots-no-provider" (*)
+├── reqwest feature "rustls-tls-webpki-roots" (*)
+└── reqwest feature "rustls-tls-webpki-roots-no-provider" (*)

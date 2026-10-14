@@ -1,0 +1,26 @@
+{
+  "x86_64": {
+    "folded_total_weight": 3777777740,
+    "mutex_or_futex_inclusive_weight": 0,
+    "quota_named_inclusive_weight": 10101010,
+    "note": "Inferno folded values represent perf sample period weights (cpu-clock), not raw sample counts. Symbol-name matching is partial and does not isolate blocked wall time.",
+    "mutex_or_futex_inclusive_weight_fraction": 0.0,
+    "quota_named_inclusive_weight_fraction": 0.00267379679144385,
+    "folded_weight_by_thread_label": {
+      "tokio-rt-worker": 3777777740
+    },
+    "raw_cpu_clock_sample_count": 374
+  },
+  "aarch64": {
+    "folded_total_weight": 3313131280,
+    "mutex_or_futex_inclusive_weight": 50505050,
+    "quota_named_inclusive_weight": 101010100,
+    "note": "Inferno folded values represent perf sample period weights (cpu-clock), not raw sample counts. Symbol-name matching is partial and does not isolate blocked wall time.",
+    "mutex_or_futex_inclusive_weight_fraction": 0.01524390243902439,
+    "quota_named_inclusive_weight_fraction": 0.03048780487804878,
+    "folded_weight_by_thread_label": {
+      "tokio-rt-worker": 3313131280
+    },
+    "raw_cpu_clock_sample_count": 328
+  }
+}

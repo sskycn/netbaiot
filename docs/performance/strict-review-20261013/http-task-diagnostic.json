@@ -1,0 +1,217 @@
+{
+  "diagnostic": "readonly source/task ownership audit",
+  "captured_utc": "2026-10-14T01:05:03.186245+00:00",
+  "Cargo.lock_sha256": "640157fdb8da727f97237aae170c5dd8eb7a56e27fa64b6cf803ff9203f6f04d",
+  "dependency_versions": {
+    "reqwest": [
+      "0.12.28"
+    ],
+    "hyper-util": [
+      "0.1.20"
+    ],
+    "tokio": [
+      "1.53.1"
+    ]
+  },
+  "sources": [
+    {
+      "path": "<repo>/crates/netbaiot-transports/src/management_http.rs",
+      "sha256": "f3a0fbdbb5951e75cf71a8b1b7c12a83de9c9df9c76481f2e0a1c0ac0c305a5e",
+      "note": "runtime_tasks uses Tokio num_alive_tasks; entire-runtime gauge, includes management request task",
+      "excerpts": [
+        {
+          "start": 280,
+          "end": 280,
+          "text": "                    \"runtime_tasks\": tokio::runtime::Handle::current().metrics().num_alive_tasks(),"
+        }
+      ]
+    },
+    {
+      "path": "<repo>/apps/netbaiot-server/src/server.rs",
+      "sha256": "f550487a2008ed709e261e1b0b4761f48cb8ee9b3d9a3f43ad4c2e1f3dde2a6d",
+      "note": "sink workers started before RUNNING; root-owned transport/listener tasks",
+      "excerpts": [
+        {
+          "start": 397,
+          "end": 397,
+          "text": "    let event_workers = events.start_owned_workers()?;"
+        },
+        {
+          "start": 461,
+          "end": 485,
+          "text": "    work_tasks.spawn(serve_device_ingress(\n        device_ingress,\n        base_services.clone(),\n        tls.clone(),\n        work_listeners.child_token(),\n    ));\n    let mut management_task = OwnedTask(tokio::spawn(serve_management_http(\n        management_http,\n        base_services.clone(),\n        management_tls,\n        management_listener.child_token(),\n    )));\n    work_tasks.spawn(udp::serve(\n        udp,\n        base_services.clone(),\n        work_listeners.child_token(),\n    ));\n    let mut business_task = if config.business_rpc.is_some() {\n        business_future.map(|future| OwnedTask(tokio::spawn(future)))\n    } else {\n        if let Some(future) = business_future {\n            work_tasks.spawn(future);\n        }\n        None\n    };"
+        }
+      ]
+    },
+    {
+      "path": "<repo>/crates/netbaiot-runtime/src/event.rs",
+      "sha256": "d3f0bd16707ccf17acefb46c923826d9eef3b9d5406856940b642a767c963f38",
+      "note": "eager owned sink workers; bounded delivery JoinSet; stop and completion join",
+      "excerpts": [
+        {
+          "start": 429,
+          "end": 452,
+          "text": "    pub fn start_owned_workers(self: &Arc<Self>) -> Result<EventBusWorkers> {\n        self.start_workers()?;\n        Ok(EventBusWorkers { bus: self.clone() })\n    }\n\n    fn start_workers(self: &Arc<Self>) -> Result<()> {\n        let ids = self\n            .lock_state(EventBusProbe::Other)?\n            .sinks\n            .keys()\n            .cloned()\n            .collect::<Vec<_>>();\n        let mut workers = lock(&self.workers)?;\n        if self.stop.is_cancelled() {\n            return Err(Error::Draining);\n        }\n        if !workers.is_empty() {\n            return Err(Error::Conflict);\n        }\n        for id in ids {\n            let bus = self.clone();\n            workers.push(tokio::spawn(async move { bus.run_sink(id).await }));\n        }\n        Ok(())"
+        },
+        {
+          "start": 910,
+          "end": 947,
+          "text": "    pub async fn stop_workers(&self) -> Result<()> {\n        self.stop.cancel();\n        let handles = {\n            let mut workers = lock(&self.workers)?;\n            std::mem::take(&mut *workers)\n        };\n        for handle in handles {\n            let _ = handle.await;\n        }\n        Ok(())\n    }\n\n    async fn run_sink(self: Arc<Self>, id: SinkId) {\n        let (definition, notify) = match self.lock_state(EventBusProbe::Other) {\n            Ok(state) => match state.sinks.get(&id) {\n                Some(sink) => (sink.definition.clone(), sink.notify.clone()),\n                None => {\n                    tracing::error!(sink_id=%id, \"EventBus sink worker lost its definition\");\n                    return;\n                }\n            },\n            Err(error) => {\n                tracing::error!(%error, sink_id=%id, \"EventBus sink worker could not read state\");\n                return;\n            }\n        };\n        let mut inflight = JoinSet::new();\n        let mut woke = false;\n        loop {\n            if self.stop.is_cancelled() {\n                inflight.abort_all();\n                while inflight.join_next().await.is_some() {}\n                break;\n            }\n            let mut took_work = false;\n            while inflight.len() < definition.concurrency {\n                let next = self.take_ready(&id);\n                let record = match next {"
+        },
+        {
+          "start": 969,
+          "end": 1000,
+          "text": "                inflight.spawn(async move {\n                    let _timing = metrics.timer(Histogram::SinkLatency);\n                    let envelope = DeliveryEnvelope {\n                        event: record.event.clone(),\n                        sink_id,\n                        attempt: record.attempt.saturating_add(1),\n                        accepted_at: record.accepted_at,\n                    };\n                    let result = std::panic::AssertUnwindSafe(tokio::time::timeout(\n                        timeout,\n                        sink.deliver_detailed(envelope),\n                    ))\n                    .catch_unwind()\n                    .await;\n                    let result = match result {\n                        Ok(Ok(result)) => result,\n                        Ok(Err(_)) => Err(SinkFailure {\n                            error: SinkError::Retryable,\n                            reason: SinkFailureReason::Timeout,\n                            retry_after: None,\n                        }),\n                        Err(_) => Err(SinkFailure {\n                            error: SinkError::Retryable,\n                            reason: SinkFailureReason::Panic,\n                            retry_after: None,\n                        }),\n                    };\n                    (record, result)\n                });\n            }\n            if woke && !took_work {\n                self.metrics.event_bus_probe(EventBusProbe::EmptyWake);"
+        },
+        {
+          "start": 1049,
+          "end": 1068,
+          "text": "                        tracing::error!(%error, sink_id=%id, \"EventBus failed to schedule next delivery\");\n                        Duration::from_secs(3_600)\n                    }\n                };\n                tokio::select! {\n                    biased;\n                    _ = self.stop.cancelled() => continue,\n                    completed = inflight.join_next() => {\n                        self.metrics.event_bus_probe(EventBusProbe::WakeJoin);\n                        match completed {\n                            Some(Ok((record, result))) => {\n                                if let Err(error) = self.complete_detailed(&id, record, result, &definition) {\n                                    tracing::error!(%error, sink_id=%id, \"EventBus failed to complete delivery\");\n                                }\n                            }\n                            Some(Err(error)) => tracing::error!(%error, sink_id=%id, \"EventBus delivery task failed\"),\n                            None => {}\n                        }\n                    }\n                    _ = notify.notified() => { self.metrics.event_bus_probe(EventBusProbe::WakeNotify); },"
+        }
+      ]
+    },
+    {
+      "path": "<repo>/apps/netbaiot-server/src/delivery.rs",
+      "sha256": "e154a5adb2749d460df37b9959a2861c33bdbf8700a57fbe1c06fae0b964eaa2",
+      "note": "HttpSink owns persistent reqwest Client; idle pool bounded by sink_delivery_concurrency; no idle timeout override",
+      "excerpts": [
+        {
+          "start": 43,
+          "end": 70,
+          "text": "    client: reqwest::Client,\n    url: reqwest::Url,\n    token: Option<String>,\n    maximum_response_bytes: usize,\n    retry_after_limit: Duration,\n}\n\nimpl HttpSink {\n    pub(crate) fn new(url: &str, limits: &Limits) -> Result<Self> {\n        let url = reqwest::Url::parse(url).map_err(|_| Error::Configuration)?;\n        if !crate::diagnostics::safe_http_url(&url) {\n            return Err(Error::Configuration);\n        }\n        let client = reqwest::Client::builder()\n            .no_proxy()\n            .timeout(Duration::from_millis(limits.sink_timeout_ms))\n            .connect_timeout(Duration::from_millis(limits.sink_timeout_ms))\n            .redirect(reqwest::redirect::Policy::none())\n            .pool_max_idle_per_host(limits.sink_delivery_concurrency)\n            .build()\n            .map_err(|_| Error::Configuration)?;\n        Ok(Self {\n            client,\n            url,\n            token: std::env::var(\"NETBAIOT_DELIVERY_TOKEN\").ok(),\n            maximum_response_bytes: 4_096,\n            retry_after_limit: Duration::from_millis(limits.retry_max_ms),\n        })"
+        }
+      ]
+    },
+    {
+      "path": "<home>/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/reqwest-0.12.28/src/async_impl/client.rs",
+      "sha256": "8c30b009838be2126b90344ef97fb6141ac8bdf695f4e7bb00a3052a707d9b5c",
+      "note": "locked reqwest default pool idle timeout90seconds",
+      "excerpts": [
+        {
+          "start": 301,
+          "end": 302,
+          "text": "                pool_idle_timeout: Some(Duration::from_secs(90)),\n                pool_max_idle_per_host: usize::MAX,"
+        },
+        {
+          "start": 975,
+          "end": 976,
+          "text": "        builder.pool_idle_timeout(config.pool_idle_timeout);\n        builder.pool_max_idle_per_host(config.pool_max_idle_per_host);"
+        }
+      ]
+    },
+    {
+      "path": "<home>/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/hyper-util-0.1.20/src/client/legacy/client.rs",
+      "sha256": "cd5b32ba07ef6db7b51ffe36586ce355faec8f991ded275cb12dbc5aaaab808a",
+      "note": "HTTP1 connection handshake spawns background dispatcher",
+      "excerpts": [
+        {
+          "start": 568,
+          "end": 598,
+          "text": "                                    // and a connection task (conn) that manages the connection lifecycle.\n                                    let (mut tx, conn) =\n                                        h1_builder.handshake(io).await.map_err(crate::client::legacy::client::Error::tx)?;\n\n                                    // Log that the HTTP/1.1 handshake has completed successfully.\n                                    // This indicates the connection is established and ready for request processing.\n                                    trace!(\n                                        \"http1 handshake complete, spawning background dispatcher task\"\n                                    );\n                                    // Create a oneshot channel to communicate errors from the connection task.\n                                    // err_tx sends errors from the connection task, and err_rx receives them\n                                    // to correlate connection failures with request readiness errors.\n                                    let (err_tx, err_rx) = tokio::sync::oneshot::channel();\n                                    // Spawn the connection task in the background using the executor.\n                                    // The task manages the HTTP/1.1 connection, including upgrades (e.g., WebSocket).\n                                    // Errors are sent via err_tx to ensure they can be checked if the sender (tx) fails.\n                                    executor.execute(\n                                        conn.with_upgrades()\n                                            .map_err(|e| {\n                                                // Log the connection error at debug level for diagnostic purposes.\n                                                debug!(\"client connection error: {:?}\", e);\n                                                // Log that the error is being sent to the error channel.\n                                                trace!(\"sending connection error to error channel\");\n                                                // Send the error via the oneshot channel, ignoring send failures\n                                                // (e.g., if the receiver is dropped, which is handled later).\n                                                let _ =err_tx.send(e);\n                                            })\n                                            .map(|_| ()),\n                                    );\n                                    // Log that the client is waiting for the connection to be ready.\n                                    // Readiness indicates the sender (tx) can accept a request without blocking."
+        }
+      ]
+    },
+    {
+      "path": "<home>/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/hyper-util-0.1.20/src/client/legacy/pool.rs",
+      "sha256": "1c2a9fd1c4cd51353a5af9c9561265bf84c6fb9ce2d4a55ead7ff16ce271efe2",
+      "note": "first idle put starts pool interval; weak owner reference plus oneshot pool-drop notifier; exits when pool owner drops",
+      "excerpts": [
+        {
+          "start": 408,
+          "end": 410,
+          "text": "                self.spawn_idle_interval(__pool_ref);\n            }\n            None => trace!(\"put; found waiter for {:?}\", key),"
+        },
+        {
+          "start": 422,
+          "end": 462,
+          "text": "        self.waiters.remove(key);\n    }\n\n    fn spawn_idle_interval(&mut self, pool_ref: &Arc<Mutex<PoolInner<T, K>>>) {\n        if self.idle_interval_ref.is_some() {\n            return;\n        }\n        let dur = if let Some(dur) = self.timeout {\n            dur\n        } else {\n            return;\n        };\n        if dur == Duration::ZERO {\n            return;\n        }\n        let timer = if let Some(timer) = self.timer.clone() {\n            timer\n        } else {\n            return;\n        };\n\n        // While someone might want a shorter duration, and it will be respected\n        // at checkout time, there's no need to wake up and proactively evict\n        // faster than this.\n        const MIN_CHECK: Duration = Duration::from_millis(90);\n\n        let dur = dur.max(MIN_CHECK);\n\n        let (tx, rx) = oneshot::channel();\n        self.idle_interval_ref = Some(tx);\n\n        let interval = IdleTask {\n            timer: timer.clone(),\n            duration: dur,\n            pool: WeakOpt::downgrade(pool_ref),\n            pool_drop_notifier: rx,\n        };\n\n        self.exec.execute(interval.run());\n    }\n}"
+        },
+        {
+          "start": 781,
+          "end": 820,
+          "text": "struct IdleTask<T, K: Key> {\n    timer: Timer,\n    duration: Duration,\n    pool: WeakOpt<Mutex<PoolInner<T, K>>>,\n    // This allows the IdleTask to be notified as soon as the entire\n    // Pool is fully dropped, and shutdown. This channel is never sent on,\n    // but Err(Canceled) will be received when the Pool is dropped.\n    pool_drop_notifier: oneshot::Receiver<Infallible>,\n}\n\nimpl<T: Poolable + 'static, K: Key> IdleTask<T, K> {\n    async fn run(self) {\n        use futures_util::future;\n\n        let mut sleep = self.timer.sleep_until(self.timer.now() + self.duration);\n        let mut on_pool_drop = self.pool_drop_notifier;\n        loop {\n            match future::select(&mut on_pool_drop, &mut sleep).await {\n                future::Either::Left(_) => {\n                    // pool dropped, bah-bye\n                    break;\n                }\n                future::Either::Right(((), _)) => {\n                    if let Some(inner) = self.pool.upgrade() {\n                        if let Ok(mut inner) = inner.lock() {\n                            trace!(\"idle interval checking for expired\");\n                            inner.clear_expired();\n                        }\n                    }\n\n                    let deadline = self.timer.now() + self.duration;\n                    self.timer.reset(&mut sleep, deadline);\n                }\n            }\n        }\n\n        trace!(\"pool closed, canceling idle interval\");\n        return;\n    }\n}"
+        }
+      ]
+    }
+  ],
+  "observations": [
+    {
+      "variant": "before",
+      "raw_path": "<tmp>/netbaiot-review-validation/large-wire-ab/before-mqtt311-large-subscription.json",
+      "raw_sha256": "489326da9be923ea3c65f54aba7d53f2d780eb338cab636a7d072879af60edb9",
+      "sidecar_path": "<tmp>/netbaiot-review-validation/large-wire-ab/before-mqtt311-large-subscription-sidecar.json",
+      "sidecar_sha256": "5bfb1bf2764097c125df9cec1200fa683cc4c9a86b35299e4e1590803b3f500d",
+      "base_tasks": 6,
+      "cleanup_tasks_values": [
+        8
+      ],
+      "cleanup_online_values": [
+        0
+      ],
+      "cleanup_pending_values": [
+        0
+      ],
+      "cleanup_event_count_values": [
+        0
+      ],
+      "sink_final": {
+        "active": 0,
+        "epoch": 1791939228.872266,
+        "latency": {
+          "count": 2000,
+          "p50_ms": 1,
+          "p95_ms": 2,
+          "p99_ms": 2
+        },
+        "max_active": 1,
+        "received": 2000,
+        "rejected": 0
+      },
+      "campaign_result": "invalid due to cold startup task baseline mismatch; preserve raw evidence"
+    },
+    {
+      "variant": "after",
+      "raw_path": "<tmp>/netbaiot-review-validation/large-wire-ab/after-mqtt311-large-subscription.json",
+      "raw_sha256": "a35490dc16751171fc51d8d2b36701adeb687f38ba544da3ef8f9b8bc2e81605",
+      "sidecar_path": "<tmp>/netbaiot-review-validation/large-wire-ab/after-mqtt311-large-subscription-sidecar.json",
+      "sidecar_sha256": "af589a600d07191554c17ae6c6473ccad1e0524d45eb666919dd340b59cc7b40",
+      "base_tasks": 6,
+      "cleanup_tasks_values": [
+        8
+      ],
+      "cleanup_online_values": [
+        0
+      ],
+      "cleanup_pending_values": [
+        0
+      ],
+      "cleanup_event_count_values": [
+        0
+      ],
+      "sink_final": {
+        "active": 0,
+        "epoch": 1791939295.3007958,
+        "latency": {
+          "count": 2000,
+          "p50_ms": 1,
+          "p95_ms": 2,
+          "p99_ms": 2
+        },
+        "max_active": 1,
+        "received": 2000,
+        "rejected": 0
+      },
+      "campaign_result": "invalid due to cold startup task baseline mismatch; preserve raw evidence"
+    }
+  ],
+  "interpretation": {
+    "classification": "source/count inference, not sampled-task attribution",
+    "potential_two_additional_owners": [
+      "one HTTP1 connection dispatcher (sink max_active observed1)",
+      "one hyper-util pool idle interval spawned on first put"
+    ],
+    "not_supported": "two lazily started NetbaIoT sink/retry workers; EventBus sink workers are started before readiness",
+    "not_claimed": "No runtime leak has been independently disproved merely by both revisions agreeing; task identities have not been sampled.",
+    "recommended_control": "Preserve initial invalid pair; independent one-event gateway-to-business-ACK prewarm; measure pending0, online0 and stable actual warmed task baseline; after-load cleanup must equal that recorded value. Do not hardcode baseline+2 or mix warmup event with measured2000."
+  }
+}

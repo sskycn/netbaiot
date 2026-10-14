@@ -1,0 +1,494 @@
+{
+  "phase": "heartbeat",
+  "prepared_or_run_utc": "2026-10-14T01:29:41.362087+00:00",
+  "harness_source_sha256": "9f9d5aa5285235f8fd8c79faf73948e63ee98d40e9f103a2a21de556da42f241",
+  "wrapper_source_sha256": "340969d09cc3e757a20cd075f1163920afb3d1ddf071b1bdfb177b55977eeb4a",
+  "notes": [
+    "Independent profiling workload; do not combine with quiet A/B timing results.",
+    "macOS sample records wall-clock thread stacks. Blocked-stack sample share is not CPU utilization.",
+    "Configured credentials establish one synthetic tenant; active population is separately measured through management status.",
+    "No private quota balance, malloc usable size, per-task allocation, or kernel socket byte count is exported by this wrapper.",
+    "The repository memory harness and server/runtime configuration algorithms are unchanged."
+  ],
+  "status_snapshots": [
+    {
+      "monotonic_seconds": 0.2232785,
+      "utc": "2026-10-14T01:29:41.554747+00:00",
+      "active_connections": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 0,
+        "auth_cache_entries": 0,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 28847,
+        "runtime_tasks": 6,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "development-audit"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 25.486120541,
+      "utc": "2026-10-14T01:30:06.817756+00:00",
+      "active_connections": 10000,
+      "status": {
+        "active_connections": {
+          "mqtt": 10000,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 10000,
+        "auth_cache_bytes": 1457780,
+        "auth_cache_entries": 10000,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 28847,
+        "runtime_tasks": 10006,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "development-audit"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 25.495741875,
+      "utc": "2026-10-14T01:30:06.827382+00:00",
+      "active_connections": 10000,
+      "status": {
+        "active_connections": {
+          "mqtt": 10000,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 10000,
+        "auth_cache_bytes": 1457780,
+        "auth_cache_entries": 10000,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 28847,
+        "runtime_tasks": 10006,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "development-audit"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 26.599131708,
+      "utc": "2026-10-14T01:30:07.930778+00:00",
+      "active_connections": 10000,
+      "status": {
+        "active_connections": {
+          "mqtt": 10000,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 10000,
+        "auth_cache_bytes": 1457780,
+        "auth_cache_entries": 10000,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 28847,
+        "runtime_tasks": 10006,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "development-audit"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 27.609138541,
+      "utc": "2026-10-14T01:30:08.940793+00:00",
+      "active_connections": 10000,
+      "status": {
+        "active_connections": {
+          "mqtt": 10000,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 10000,
+        "auth_cache_bytes": 1457780,
+        "auth_cache_entries": 10000,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 28847,
+        "runtime_tasks": 10006,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "development-audit"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 28.619726666,
+      "utc": "2026-10-14T01:30:09.951384+00:00",
+      "active_connections": 10000,
+      "status": {
+        "active_connections": {
+          "mqtt": 10000,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 10000,
+        "auth_cache_bytes": 1457780,
+        "auth_cache_entries": 10000,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 28847,
+        "runtime_tasks": 10006,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "development-audit"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 41.585211208,
+      "utc": "2026-10-14T01:30:22.916953+00:00",
+      "active_connections": 3867,
+      "status": {
+        "active_connections": {
+          "mqtt": 3867,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 3867,
+        "auth_cache_bytes": 1457780,
+        "auth_cache_entries": 10000,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 28847,
+        "runtime_tasks": 3873,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "development-audit"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 41.691165666,
+      "utc": "2026-10-14T01:30:23.022900+00:00",
+      "active_connections": 3867,
+      "status": {
+        "active_connections": {
+          "mqtt": 3867,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 3867,
+        "auth_cache_bytes": 1457780,
+        "auth_cache_entries": 10000,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 28847,
+        "runtime_tasks": 3873,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "development-audit"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 41.792797125,
+      "utc": "2026-10-14T01:30:23.124532+00:00",
+      "active_connections": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 1457780,
+        "auth_cache_entries": 10000,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 28847,
+        "runtime_tasks": 6,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "development-audit"
+          }
+        ]
+      }
+    }
+  ],
+  "rss_snapshots": [
+    {
+      "pid": 28847,
+      "monotonic_seconds": 1.438705083,
+      "rss_kib": 22352,
+      "ordinal": 1
+    },
+    {
+      "pid": 28847,
+      "monotonic_seconds": 25.494900291,
+      "rss_kib": 141616,
+      "ordinal": 2
+    },
+    {
+      "pid": 28847,
+      "monotonic_seconds": 26.604193916,
+      "rss_kib": 141632,
+      "ordinal": 3
+    },
+    {
+      "pid": 28847,
+      "monotonic_seconds": 27.615421208,
+      "rss_kib": 141648,
+      "ordinal": 4
+    },
+    {
+      "pid": 28847,
+      "monotonic_seconds": 28.624669875,
+      "rss_kib": 141680,
+      "ordinal": 5
+    }
+  ],
+  "configured_identity_population": {
+    "credentials_count": 10000,
+    "tenant_ids": [
+      "t0"
+    ],
+    "classification": "generated input provenance; not a measured population or capacity"
+  },
+  "baseline_runtime_tasks": 6,
+  "load": {
+    "pid": 28852,
+    "started_monotonic_seconds": 1.479277125,
+    "started_utc": "2026-10-14T01:29:42.811018+00:00",
+    "configuration": {
+      "address": "127.0.0.1:53834",
+      "transport": "mqtt",
+      "connections": 10000,
+      "ramp_per_sec": 500,
+      "hold_secs": 20,
+      "mqtt_version": 4,
+      "persistent": false,
+      "subscribe": false,
+      "ping_secs": 2,
+      "tls_ca": null
+    }
+  },
+  "sample": {
+    "command": [
+      "/usr/bin/sample",
+      "28847",
+      "10",
+      "1",
+      "-mayDie",
+      "-file",
+      "<tmp>/netbaiot-strict-sampling-heartbeat/server-stacks.txt"
+    ],
+    "server_pid": 28847,
+    "started_monotonic_seconds": 25.496218166,
+    "started_utc": "2026-10-14T01:30:06.833340+00:00",
+    "measured_active_at_start": 10000,
+    "returncode": 0,
+    "finished_monotonic_seconds": 41.792845875,
+    "finished_utc": "2026-10-14T01:30:23.124578+00:00",
+    "output_exists": true,
+    "output_bytes": 317836,
+    "output_sha256": "0ce63fa39a138cacd782e2b0067c476e4adeb4d8fd62ce8ffe803f7312bf6971"
+  },
+  "load_final": {
+    "counters": {
+      "connect_attempts": 10000,
+      "connected": 10000,
+      "disconnected": 10000,
+      "ping_responses": 134870,
+      "pings_sent": 134870
+    },
+    "error_samples": [],
+    "inflight": 0,
+    "inflight_peak": 0,
+    "latencies": {
+      "connect": {
+        "count": 10000,
+        "max_ms": 16.509,
+        "mean_ms": 0.3714113,
+        "p50_ms": 0.31,
+        "p95_ms": 0.52,
+        "p999_ms": 5.67,
+        "p99_ms": 2.82
+      },
+      "ping": {
+        "count": 134870,
+        "max_ms": 16.26,
+        "mean_ms": 0.4456860903091866,
+        "p50_ms": 0.24,
+        "p95_ms": 1.66,
+        "p999_ms": 7.16,
+        "p99_ms": 2.97
+      }
+    }
+  },
+  "post_client_cleanup": {
+    "measurement_valid": true,
+    "monotonic_seconds": 41.792818166,
+    "active_connections": 0,
+    "runtime_tasks": 6,
+    "baseline_runtime_tasks": 6,
+    "note": "Public API observes connection/task cleanup; private byte quota is not exported."
+  },
+  "finished_utc": "2026-10-14T01:30:23.148021+00:00"
+}

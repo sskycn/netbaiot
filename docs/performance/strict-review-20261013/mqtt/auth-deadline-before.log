@@ -1,0 +1,24 @@
+   Compiling netbaiot-auth-deadline-audit v0.0.0 (<deadline-audit>)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.89s
+     Running tests/audit.rs (target/debug/deps/audit-71823bc14c09a190)
+
+running 2 tests
+
+thread 'audit_read_repoll_ready_bytes_after_deadline_must_timeout' (865969) panicked at tests/audit.rs:2128:5:
+reader accepted ready bytes after original 5ms packet deadline: Ok(())
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test audit_read_repoll_ready_bytes_after_deadline_must_timeout ... FAILED
+
+thread 'audit_full_auth_repoll_after_deadline_must_timeout' (865968) panicked at tests/audit.rs:2110:5:
+full reader accepted auth after original 5ms packet deadline: success=true
+test audit_full_auth_repoll_after_deadline_must_timeout ... FAILED
+
+failures:
+
+failures:
+    audit_full_auth_repoll_after_deadline_must_timeout
+    audit_read_repoll_ready_bytes_after_deadline_must_timeout
+
+test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 27 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `--test audit`

@@ -1,0 +1,2 @@
+    Checking netbaiot-server v0.3.1 (<repo>/apps/netbaiot-server)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.34s

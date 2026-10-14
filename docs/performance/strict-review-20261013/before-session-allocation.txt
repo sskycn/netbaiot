@@ -1,0 +1,24 @@
+   Compiling num-traits v0.2.19
+   Compiling hyper v1.11.0
+   Compiling num-integer v0.1.47
+   Compiling hyper-util v0.1.20
+   Compiling num-bigint v0.4.8
+   Compiling hyper-rustls v0.27.9
+   Compiling simple_asn1 v0.6.4
+   Compiling reqwest v0.12.28
+   Compiling jsonwebtoken v9.3.1
+   Compiling netbaiot-runtime v0.3.1 (<tmp>/netbaiot-strict-review-baseline-fe4770b/crates/netbaiot-runtime)
+    Finished `release` profile [optimized + debuginfo] target(s) in 26.55s
+     Running unittests src/lib.rs (target/release/deps/netbaiot_runtime-e2778cac43197068)
+
+running 1 test
+test sessions::tests::density_memory ... DENSITY_SIZE,SessionEndpoint,104
+DENSITY_SIZE,SessionLease,72
+DENSITY_SIZE,QueuedCommand,112
+DENSITY_ALLOC,command_channel,2,800,0
+DENSITY_SESSIONS,1000,7191,19,2236660,519144,1717.516
+DENSITY_SESSIONS,10000,71696,25,20320708,4175192,1614.552
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 166 filtered out; finished in 0.03s
+

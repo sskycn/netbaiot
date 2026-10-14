@@ -1,0 +1,12 @@
+test_main_cleans_remaining_children_when_profiler_wait_times_out (test_event_load.EventLoadCpuTests) ... ok
+test_main_excludes_profiler_tail_cpu_from_the_loadgen_delta (test_event_load.EventLoadCpuTests) ... ok
+test_main_keeps_cumulative_cpu_and_reports_the_full_loadgen_delta (test_event_load.EventLoadCpuTests) ... ok
+test_main_reaps_the_running_profiler_when_post_load_cpu_read_fails (test_event_load.EventLoadCpuTests) ... ok
+
+----------------------------------------------------------------------
+Ran 4 tests in 0.008s
+
+OK
+profiler_error_cleanup returncode=None killed=True
+profiler_wait_timeout_cleanup server_returncode=-9 server_killed=True sink_returncode=-9 sink_killed=True
+profiler_error_cleanup returncode=-9 killed=True

@@ -1,0 +1,12 @@
+{
+  "baseline_source_commit": "a2025e6ca7742b458aec0a175a89799839e74fba",
+  "before_source_sha256": "0a478d331fda40edd0c12dad2fe66515bc5449f17869d71270fc35cdf7b9fefd",
+  "after_source_sha256": "acb8c66b0a9b03380b7c737b643e5a229c12a0339db362a30cd5f2e212051249",
+  "shared_test_sha256": "1855047a256f49b26f126125e86b900271b1929d328400b9f7d37c21b3b51a56",
+  "scope": "real event_load.main with deterministic owned process, CPU, clock and management mocks; no child process or network is started",
+  "shared_dependency_sha256": {
+    "connection_memory.py": "9f9d5aa5285235f8fd8c79faf73948e63ee98d40e9f103a2a21de556da42f241",
+    "linux_measurement.py": "5dd08acf6fe5f89c9eb5b4ac45d98efdc5720494e08bb035e92f77b34d3b6e72"
+  },
+  "initial_harness_setup_failure": "missing copied shared connection_memory dependency; import failure retained separately and excluded from defect reproduction"
+}

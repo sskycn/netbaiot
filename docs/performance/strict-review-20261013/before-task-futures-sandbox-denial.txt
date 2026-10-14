@@ -1,0 +1,40 @@
+   Compiling serde_json v1.0.151
+   Compiling ref-cast v1.0.27
+   Compiling ref-cast-impl v1.0.27
+   Compiling serde_derive_internals v0.30.0
+   Compiling schemars_derive v1.2.2
+   Compiling dyn-clone v1.0.20
+   Compiling tracing-core v0.1.36
+   Compiling schemars v1.2.2
+   Compiling tracing v0.1.44
+   Compiling hyper-util v0.1.20
+   Compiling netbaiot-protocol v0.3.1 (<tmp>/netbaiot-strict-review-baseline-fe4770b/crates/netbaiot-protocol)
+   Compiling hyper-rustls v0.27.9
+   Compiling netbaiot-core v0.3.1 (<tmp>/netbaiot-strict-review-baseline-fe4770b/crates/netbaiot-core)
+   Compiling log v0.4.34
+   Compiling reqwest v0.12.28
+   Compiling jsonwebtoken v9.3.1
+   Compiling netbaiot-runtime v0.3.1 (<tmp>/netbaiot-strict-review-baseline-fe4770b/crates/netbaiot-runtime)
+   Compiling netbaiot-v3-mux v0.3.1 (<tmp>/netbaiot-strict-review-baseline-fe4770b/crates/netbaiot-v3-mux)
+   Compiling netbaiot-codecs v0.3.1 (<tmp>/netbaiot-strict-review-baseline-fe4770b/crates/netbaiot-codecs)
+   Compiling netbaiot-transports v0.3.1 (<tmp>/netbaiot-strict-review-baseline-fe4770b/crates/netbaiot-transports)
+    Finished `release` profile [optimized + debuginfo] target(s) in 58.15s
+     Running unittests src/lib.rs (target/release/deps/netbaiot_transports-bc7f7549ea596bf9)
+
+running 1 test
+test common::connection_density_profile::density_task_future_profile ... DENSITY_SIZE,connection_future_Mqtt,4992
+DENSITY_SIZE,connection_future_Tcp,1760
+
+thread 'common::connection_density_profile::density_task_future_profile' (804508) panicked at crates/netbaiot-transports/src/connection_density_profile.rs:105:59:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+
+failures:
+
+failures:
+    common::connection_density_profile::density_task_future_profile
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 217 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p netbaiot-transports --lib`

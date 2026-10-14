@@ -1,0 +1,28 @@
+   Compiling hyper-rustls v0.27.9
+   Compiling netbaiot-device-sdk v0.3.1 (<repo>/crates/netbaiot-device-sdk)
+   Compiling reqwest v0.12.28
+   Compiling netbaiot-runtime v0.3.1 (<repo>/crates/netbaiot-runtime)
+   Compiling netbaiot-client v0.3.1 (<repo>/crates/netbaiot-client)
+   Compiling netbaiot-transports v0.3.1 (<repo>/crates/netbaiot-transports)
+   Compiling netbaiot-server v0.3.1 (<repo>/apps/netbaiot-server)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 11.38s
+     Running tests/server.rs (target/debug/deps/server-e8d63e1d3643bbba)
+
+running 1 test
+
+thread 'subprocess_spool_failure_stays_alive_until_repaired_then_replays_same_event_id' (968505) panicked at apps/netbaiot-server/tests/server.rs:2241:18:
+called `Option::unwrap()` on a `None` value
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+thread 'subprocess_spool_failure_stays_alive_until_repaired_then_replays_same_event_id' (968505) panicked at apps/netbaiot-server/tests/server.rs:2270:10:
+called `Result::unwrap()` on an `Err` value: JoinError::Panic(Id(8), "called `Option::unwrap()` on a `None` value", ...)
+test subprocess_spool_failure_stays_alive_until_repaired_then_replays_same_event_id ... FAILED
+
+failures:
+
+failures:
+    subprocess_spool_failure_stays_alive_until_repaired_then_replays_same_event_id
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 34 filtered out; finished in 4.52s
+
+error: test failed, to rerun pass `-p netbaiot-server --test server`

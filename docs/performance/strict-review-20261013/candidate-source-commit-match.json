@@ -1,0 +1,8 @@
+{
+  "commit": "b4db4b7be6f3207aac34a9610eb0ce96d4f23e96",
+  "freeze_metadata": "candidate-build-metadata-2.json",
+  "source_files_checked": 156,
+  "mismatches": [],
+  "server_sha256": "5ea5422446636273c65c2f3117b32fb0684c809bd1b045aeb90e65b630eb99d7",
+  "all_frozen_source_hashes_match": true
+}

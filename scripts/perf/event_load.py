@@ -266,7 +266,7 @@ def main():
             stderr=subprocess.PIPE,
             text=True,
         )
-        server = load = None
+        server = load = profiler = None
         try:
             ready = sink.stdout.readline()
             if not ready:
@@ -290,6 +290,9 @@ def main():
                     if time.time() > deadline:
                         raise RuntimeError("server startup deadline elapsed while process remained alive")
                     time.sleep(.05)
+            # Bracket the whole loadgen lifecycle, including connection ramp,
+            # warmup and cooldown. This is not the configured measured duration.
+            server_cpu_load_started = time.monotonic()
             server_cpu_before = process_cpu_seconds(server.pid)
             load = subprocess.Popen(
                 [args.loadgen_bin, load_config],
@@ -302,7 +305,6 @@ def main():
             outage_end = outage_start + args.sink_outage_seconds
             outage_phases = []
             outage_state = None
-            profiler = None
             profile_at = time.time() + args.warmup + 1
             while load.poll() is None:
                 if args.sink_outage_seconds:
@@ -355,10 +357,14 @@ def main():
                 )
                 time.sleep(1)
             load_out, load_err = load.communicate(timeout=5)
+            # Capture before waiting for a profiler tail or collecting metrics;
+            # their post-load idle time must not enter the loadgen CPU delta.
+            server_cpu_after = process_cpu_seconds(server.pid)
+            server_cpu_load_finished = time.monotonic()
+            server_cpu_load_seconds = server_cpu_after - server_cpu_before
             profile_stderr = ""
             if profiler is not None:
                 _, profile_stderr = profiler.communicate(timeout=args.sample_seconds + 10)
-            server_cpu_seconds = process_cpu_seconds(server.pid) - server_cpu_before
             metrics = management_get(management, "/api/v1/metrics", args.tls)
             server_cpu_seconds = cpu_seconds(server.pid)
             server.send_signal(signal.SIGTERM)
@@ -392,7 +398,15 @@ def main():
                 "metrics": metrics,
                 "samples": samples,
                 "server_exit": server.returncode,
+                # Preserve the historical cumulative field for existing readers.
                 "server_cpu_seconds": server_cpu_seconds,
+                "server_cpu_load_seconds": server_cpu_load_seconds,
+                "server_cpu_load_before_seconds": server_cpu_before,
+                "server_cpu_load_after_seconds": server_cpu_after,
+                "server_cpu_load_started_monotonic_seconds": server_cpu_load_started,
+                "server_cpu_load_finished_monotonic_seconds": server_cpu_load_finished,
+                "server_cpu_load_wall_seconds": server_cpu_load_finished - server_cpu_load_started,
+                "server_cpu_load_scope": "loadgen_lifecycle_including_ramp_warmup_and_cooldown",
                 "load_stderr": load_err[-512:],
                 "sink_stderr": sink_err[-512:],
                 "profile_stderr": profile_stderr[-512:],
@@ -409,10 +423,18 @@ def main():
             ))
             raise
         finally:
-            for process in (load, server, sink):
-                if process is not None and process.poll() is None:
-                    process.kill()
-                    process.wait()
+            cleanup_error = None
+            for process in (profiler, load, server, sink):
+                try:
+                    if process is not None and process.poll() is None:
+                        process.kill()
+                        process.wait(timeout=5)
+                except (OSError, subprocess.TimeoutExpired) as error:
+                    # Attempt every owned child, preserving the first failure.
+                    if cleanup_error is None:
+                        cleanup_error = error
+            if cleanup_error is not None:
+                raise cleanup_error
 
 
 if __name__ == "__main__":

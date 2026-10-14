@@ -1,0 +1,35 @@
+test_already_failed_owner_cannot_claim_durable_shutdown (test_business_rpc_shutdown.ShutdownEvidenceTests) ... ok
+test_committed_opaque_files_are_preserved_with_hashes_and_permissions (test_business_rpc_shutdown.ShutdownEvidenceTests) ... ok
+test_expired_grace_is_recorded_as_forced_failure (test_business_rpc_shutdown.ShutdownEvidenceTests) ... ok
+test_failed_evidence_copy_preserves_source_and_cannot_claim_durability (test_business_rpc_shutdown.ShutdownEvidenceTests) ... ok
+test_gateway_grace_uses_configured_timeout_and_default (test_business_rpc_shutdown.ShutdownEvidenceTests) ... ok
+test_normal_exit_waits_for_gateway_grace_without_kill (test_business_rpc_shutdown.ShutdownEvidenceTests) ... ok
+test_path_scrubbing_preserves_ascii_recovery_bytes_and_manifest_hashes (test_business_rpc_shutdown.ShutdownEvidenceTests) ... ok
+test_proxy_default_grace_remains_three_seconds (test_business_rpc_shutdown.ShutdownEvidenceTests) ... ok
+test_successful_drained_exit_with_committed_mqtt_evidence_is_durable (test_business_rpc_shutdown.ShutdownEvidenceTests) ... ok
+test_successful_exit_without_committed_mqtt_evidence_is_not_durable (test_business_rpc_shutdown.ShutdownEvidenceTests) ... ok
+test_symlinked_committed_file_is_rejected_without_reading_it (test_business_rpc_shutdown.ShutdownEvidenceTests) ... ok
+test_network_data_without_timestamps_is_not_invented (test_capacity_summary.SummaryTests) ... ok
+test_active_population_uses_actual_connections_and_rejects_partial_success (test_connection_memory.PopulationTests) ... ok
+test_completed_workload_errors_and_retries_invalidate_the_sample (test_connection_memory.PopulationTests) ... ok
+test_disconnected_zero_active_uses_proven_unique_persistent_population (test_connection_memory.PopulationTests) ... ok
+test_final_record_is_required_and_samples_cannot_prove_completion (test_connection_memory.PopulationTests) ... ok
+test_status_counts_support_current_and_legacy_device_only_shapes (test_connection_memory.PopulationTests) ... ok
+test_main_cleans_remaining_children_when_profiler_wait_times_out (test_event_load.EventLoadCpuTests) ... ok
+test_main_excludes_profiler_tail_cpu_from_the_loadgen_delta (test_event_load.EventLoadCpuTests) ... ok
+test_main_keeps_cumulative_cpu_and_reports_the_full_loadgen_delta (test_event_load.EventLoadCpuTests) ... ok
+test_main_reaps_the_running_profiler_when_post_load_cpu_read_fails (test_event_load.EventLoadCpuTests) ... ok
+test_percentiles_use_window_delta_and_preserve_overflow (test_production_readiness.EvidenceTests) ... ok
+test_ramp_memory_is_not_a_leak_and_fixed_population_growth_is_a_suspect (test_production_readiness.EvidenceTests) ... ok
+test_helper_rejects_out_of_range_overrides (test_worker_environment.WorkerEnvironmentTests) ... ok
+test_omitted_flag_keeps_existing_environment (test_worker_environment.WorkerEnvironmentTests) ... ok
+test_override_does_not_change_parent_or_other_children (test_worker_environment.WorkerEnvironmentTests) ... ok
+test_parser_accepts_only_bounded_integers (test_worker_environment.WorkerEnvironmentTests) ... ok
+
+----------------------------------------------------------------------
+Ran 27 tests in 0.021s
+
+OK
+profiler_error_cleanup returncode=None killed=True
+profiler_wait_timeout_cleanup server_returncode=-9 server_killed=True sink_returncode=-9 sink_killed=True
+profiler_error_cleanup returncode=-9 killed=True

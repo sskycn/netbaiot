@@ -1,0 +1,3498 @@
+{
+  "measurement": "Unchanged event_load server/webhook lifecycle; owned transport selection and post-load diagnostic reads",
+  "transport": "mqtt",
+  "intentional_partial_frame_close": false,
+  "actual_loadgen_configuration": {
+    "transport": "mqtt",
+    "address": "127.0.0.1:52460",
+    "connections": 32,
+    "tenant_width": 33,
+    "ramp_per_sec": 32,
+    "warmup_secs": 2.0,
+    "duration_secs": 20.0,
+    "cooldown_secs": 2.0,
+    "publish_rate": 100.0,
+    "payload_bytes": 65000,
+    "qos": 1,
+    "subscribe": true,
+    "report_every_secs": 5,
+    "subscribe_uplink": true
+  },
+  "base_status": {
+    "active_connections": {
+      "mqtt": 0,
+      "tcp": 0,
+      "udp": 0
+    },
+    "active_sessions": 0,
+    "auth_cache_bytes": 0,
+    "auth_cache_entries": 0,
+    "business_auth_serving": false,
+    "business_rpc_pending": 0,
+    "event_bytes": 0,
+    "event_count": 0,
+    "lifecycle": "running",
+    "pending_required": 0,
+    "process_id": 25519,
+    "runtime_tasks": 6,
+    "sink_diagnostics": [
+      {
+        "consecutive_failures": 0,
+        "drop_total": 0,
+        "failure_total": 0,
+        "inflight": 0,
+        "last_failure": null,
+        "oldest_pending_age_ms": 0,
+        "pause_remaining_ms": 0,
+        "paused": false,
+        "queue_bytes": 0,
+        "queue_count": 0,
+        "retry_after_used_total": 0,
+        "retry_total": 0,
+        "sink_id": "webhook"
+      }
+    ]
+  },
+  "cleanup_samples": [
+    {
+      "monotonic_seconds": 26.183918833,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 26.243670708,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 26.304050041,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 26.362225291,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 26.423291208,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 26.478805333,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 26.5321585,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 26.585263041,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 26.645135,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 26.696537583,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 26.756668833,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 26.812764916,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 26.873720541,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 26.933768708,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 26.994815625,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 27.047113083,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 27.105458375,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 27.163387708,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 27.224423416,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 27.285488875,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 27.346579333,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 27.407580875,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 27.467414708,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 27.528249083,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 27.580673541,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 27.63697075,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 27.696689916,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 27.756457375,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 27.817475708,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 27.878489041,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 27.9395195,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 27.998781416,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 28.052108583,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 28.1075165,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 28.166541708,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 28.225152625,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 28.286187,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 28.347087958,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 28.405844333,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 28.465245166,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 28.523381375,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 28.584465666,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 28.643847833,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 28.704926291,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 28.763357708,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 28.822858666,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 28.878763,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 28.9396755,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 28.998384333,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 29.056751958,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 29.108764333,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 29.169752166,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 29.22547875,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 29.286498625,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 29.347502916,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 29.398738291,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 29.456644666,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 29.516663666,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 29.57707075,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 29.636686833,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 29.696689625,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 29.755066541,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 29.81102175,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 29.862305375,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 29.918206083,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 29.978687458,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 30.039481125,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 30.092110791,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 30.145487458,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 30.198604333,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 30.252175208,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 30.304820125,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 30.358668583,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 30.417945916,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 30.476712416,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 30.536719666,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 30.596720375,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 30.649610875,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 30.7055375,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 30.766465666,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 30.820833625,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 30.875589833,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 30.932081291,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 30.993103041,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 31.052182,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 31.11317225,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 31.173966041,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 31.232961708,
+      "online": 0,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 4524,
+        "auth_cache_entries": 32,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 25519,
+        "runtime_tasks": 8,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "webhook"
+          }
+        ]
+      }
+    }
+  ],
+  "harness_sha256": "0a478d331fda40edd0c12dad2fe66515bc5449f17869d71270fc35cdf7b9fefd",
+  "notes": [
+    "Only the owned temporary loadgen configuration selects TCP and intentional partial frames.",
+    "Server resource limits and webhook ACK policy are unchanged.",
+    "Post-load status polling is bounded to five seconds and occurs before shutdown, outside measured publish duration.",
+    "TCP accepted/application_ack counters are EventAccepted receipts, not business sink execution.",
+    "Intentional partial-frame disconnects are not successful publishes."
+  ]
+}

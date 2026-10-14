@@ -1,0 +1,28 @@
+--- interim/scripts/perf/event_load.py
++++ final/scripts/perf/event_load.py
+@@ -266,7 +266,7 @@
+             stderr=subprocess.PIPE,
+             text=True,
+         )
+-        server = load = None
++        server = load = profiler = None
+         try:
+             ready = sink.stdout.readline()
+             if not ready:
+@@ -305,7 +305,6 @@
+             outage_end = outage_start + args.sink_outage_seconds
+             outage_phases = []
+             outage_state = None
+-            profiler = None
+             profile_at = time.time() + args.warmup + 1
+             while load.poll() is None:
+                 if args.sink_outage_seconds:
+@@ -424,7 +423,7 @@
+             ))
+             raise
+         finally:
+-            for process in (load, server, sink):
++            for process in (profiler, load, server, sink):
+                 if process is not None and process.poll() is None:
+                     process.kill()
+                     process.wait()

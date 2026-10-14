@@ -1,0 +1,74 @@
+{
+  "server_sha256": "5ea5422446636273c65c2f3117b32fb0684c809bd1b045aeb90e65b630eb99d7",
+  "wrapper_sha256": "a19b29c37ac64334f1b7398804a9884fbb1052bb2043e961df1f6830c5ede298",
+  "connections": 16,
+  "declared_payload_bytes": 65536,
+  "sent_partial_payload_bytes": 32768,
+  "limits": {
+    "max_tcp_frame_size": 65536,
+    "max_read_buffer_per_connection": 65540,
+    "global_connection_logical_bytes": 134217728,
+    "max_connection_bytes_per_tenant": 67108864
+  },
+  "snapshots": {
+    "idle": {
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 0,
+        "auth_cache_entries": 0,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 29003,
+        "runtime_tasks": 6,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "development-audit"
+          }
+        ]
+      },
+      "allocator": {
+        "allocations": 2086,
+        "bytes_allocated": 384576,
+        "bytes_deallocated": 186006,
+        "deallocations": 1647,
+        "event": "allocation_profile",
+        "reallocations": 112,
+        "requested_live_bytes": 198570
+      },
+      "accepted_total": 0,
+      "monotonic_seconds": 1.366754208
+    }
+  },
+  "notes": [
+    "Allocator requests are process-wide, not RSS or private quota balances.",
+    "No limits are overridden. Partial payloads never become accepted events.",
+    "The configuration contains synthetic test credentials and is not published."
+  ],
+  "measurement_valid": false,
+  "error": {
+    "type": "RuntimeError",
+    "text": "unexpected authentication EOF"
+  },
+  "server_exit_code": 0
+}

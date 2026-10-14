@@ -1,0 +1,20 @@
+{
+  "source_commit": "b4db4b7be6f3207aac34a9610eb0ce96d4f23e96",
+  "connections": 32,
+  "payload_wire_bytes": 65000,
+  "rate_per_second": 100,
+  "measured_seconds": 20,
+  "warmup_seconds": 2,
+  "cooldown_seconds": 2,
+  "server_workers": 10,
+  "placement": "same-host loopback, serial",
+  "binary_sha256": {
+    "before": "aaa9a66cd352765fadb4022c270a7271c47721c0686a91aaeb21185d8b30a5fa",
+    "after": "5ea5422446636273c65c2f3117b32fb0684c809bd1b045aeb90e65b630eb99d7",
+    "frozen_loadgen": "4f3e50ce5a78796fb9afaf36603c46706d1bc84cca39a2bf633a2004f605a0ad"
+  },
+  "observer_sha256": "f080500df00555be80b570dc6151098ad29a51046642ba15c265597228560bb8",
+  "natural_cooldown_seconds": 35,
+  "tcp_msl_milliseconds": 15000,
+  "method_revision": "One separate 256-byte event initializes lazy webhook HTTP pool tasks before zero-online stable task baseline; no prewarm for intentional partial frames."
+}

@@ -1,0 +1,15 @@
+    Checking ring v0.17.14
+    Checking rustls-webpki v0.103.15
+    Checking jsonwebtoken v9.3.1
+    Checking rustls v0.23.45
+    Checking tokio-rustls v0.26.4
+    Checking hyper-rustls v0.27.9
+    Checking netbaiot-device-sdk v0.3.1 (<repo>/crates/netbaiot-device-sdk)
+    Checking reqwest v0.12.28
+    Checking netbaiot-runtime v0.3.1 (<repo>/crates/netbaiot-runtime)
+    Checking netbaiot-client v0.3.1 (<repo>/crates/netbaiot-client)
+    Checking netbaiot-transports v0.3.1 (<repo>/crates/netbaiot-transports)
+    Checking netbaiot-loadgen v0.3.1 (<repo>/tools/netbaiot-loadgen)
+    Checking netbaiot-server v0.3.1 (<repo>/apps/netbaiot-server)
+    Checking netbaiot-cli v0.3.1 (<repo>/apps/netbaiot-cli)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 13.03s

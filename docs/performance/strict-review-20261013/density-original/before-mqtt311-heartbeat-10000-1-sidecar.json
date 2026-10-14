@@ -1,0 +1,240 @@
+{
+  "measurement": "separate macOS ps cumulative user/system process CPU; host-wide swapusage",
+  "notes": [
+    "Original harness JSON and Linux-only fields remain unchanged.",
+    "Host swapusage includes other processes and is not process swap.",
+    "Each supplemental snapshot follows the unchanged harness RSS snapshot.",
+    "No task/Future/Channel allocation or connection byte-budget balance is exported by this wrapper."
+  ],
+  "samples": [
+    {
+      "pid": 20682,
+      "monotonic_seconds": 1.4139555,
+      "rss_kib": 22416,
+      "process_cpu_seconds": 0.03,
+      "host_swapusage": "total = 0.00M  used = 0.00M  free = 0.00M  (encrypted)"
+    },
+    {
+      "pid": 20682,
+      "monotonic_seconds": 25.480355291,
+      "rss_kib": 141152,
+      "process_cpu_seconds": 3.67,
+      "host_swapusage": "total = 0.00M  used = 0.00M  free = 0.00M  (encrypted)"
+    },
+    {
+      "pid": 20682,
+      "monotonic_seconds": 26.598958458,
+      "rss_kib": 141168,
+      "process_cpu_seconds": 3.83,
+      "host_swapusage": "total = 0.00M  used = 0.00M  free = 0.00M  (encrypted)"
+    },
+    {
+      "pid": 20682,
+      "monotonic_seconds": 27.630540166,
+      "rss_kib": 141184,
+      "process_cpu_seconds": 4.02,
+      "host_swapusage": "total = 0.00M  used = 0.00M  free = 0.00M  (encrypted)"
+    },
+    {
+      "pid": 20682,
+      "monotonic_seconds": 28.647437083,
+      "rss_kib": 141200,
+      "process_cpu_seconds": 4.18,
+      "host_swapusage": "total = 0.00M  used = 0.00M  free = 0.00M  (encrypted)"
+    }
+  ],
+  "status_snapshots": [
+    {
+      "monotonic_seconds": 0.195013291,
+      "status": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 0,
+        "auth_cache_entries": 0,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 20682,
+        "runtime_tasks": 6,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "development-audit"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 25.472868291,
+      "status": {
+        "active_connections": {
+          "mqtt": 10000,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 10000,
+        "auth_cache_bytes": 1457780,
+        "auth_cache_entries": 10000,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 20682,
+        "runtime_tasks": 10006,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "development-audit"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 26.59030675,
+      "status": {
+        "active_connections": {
+          "mqtt": 10000,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 10000,
+        "auth_cache_bytes": 1457780,
+        "auth_cache_entries": 10000,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 20682,
+        "runtime_tasks": 10006,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "development-audit"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 27.621996041,
+      "status": {
+        "active_connections": {
+          "mqtt": 10000,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 10000,
+        "auth_cache_bytes": 1457780,
+        "auth_cache_entries": 10000,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 20682,
+        "runtime_tasks": 10006,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "development-audit"
+          }
+        ]
+      }
+    },
+    {
+      "monotonic_seconds": 28.644959333,
+      "status": {
+        "active_connections": {
+          "mqtt": 10000,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 10000,
+        "auth_cache_bytes": 1457780,
+        "auth_cache_entries": 10000,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 20682,
+        "runtime_tasks": 10006,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "development-audit"
+          }
+        ]
+      }
+    }
+  ],
+  "process_cpu_percent_ramp": 15.12482145900873,
+  "process_cpu_percent_stable": 16.103152160081617
+}

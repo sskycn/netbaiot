@@ -1,0 +1,132 @@
+{
+  "schema_version": 1,
+  "scope": "Mixed-function harness, not a complete baseline workspace build: both cases use the identical complete b4 Reader and candidate runtime; only the complete authenticate_stream function differs. Prefill is one eight-byte read without grow, quota or network listeners.",
+  "commits": {
+    "baseline": "fe4770b240e628418102b9c8964ac81d3273b730",
+    "candidate": "b4db4b7be6f3207aac34a9610eb0ce96d4f23e96"
+  },
+  "reader_source_commit": "b4db4b7be6f3207aac34a9610eb0ce96d4f23e96",
+  "reader_sha256": "59e1a6b601a1a73e820444ea20262872f610ba41e2bfd0c79edb6b59a90f09b2",
+  "auth_functions": {
+    "baseline": {
+      "sha256": "2d011454a7d03a261ff15820390aca907b4333dbf87ebe3a37e6094c2c63154d",
+      "complete_module_sha256": "80b8ba76b221825ebf854d4e89c71daaeaa0d00316ab984ef58762103a20aa97",
+      "common_source_sha256": "5bc7ea2690a9108617d4ed9c619d315518c5236f2a4c6df5127d5c92321b9681"
+    },
+    "candidate": {
+      "sha256": "e31ab1db7e707cd8f44d1f14d02eb16260384c35903dd9d2fb3a938e9c805e7a",
+      "complete_module_sha256": "66ce4e61f330f30a8d4dab54fa047597b5b11d05b6a285f9aa0404397058e139",
+      "common_source_sha256": "013d7554f223c348a951451dca975dc03bf707baf880fc152a60538c286afcf8"
+    }
+  },
+  "shared_test_sha256": "7b982d1b5aa27aee6d62ad6ea11a600fa912073e0624c3ba5b1651299b972b76",
+  "shared_support_sha256": "38e70b0594b40bd05ddf6978da299a7e9c7a97dba3fc93a03775a2fce21530df",
+  "cargo_manifest_sha256": "a4d49f01bdef0f385bedeffcde1282f68a2d1fdf7013e5ac595a504c369c2333",
+  "source_extraction_rule": "Extract complete Reader struct/ReadFrame/impl definitions before write; extract the complete authenticate_stream function definition before serve_stream. Preserve every function-body byte and canonical trailing newline. Imports supply the unchanged public Services/BoxStream types.",
+  "commands": {
+    "before": "CARGO_NET_OFFLINE=true CARGO_TARGET_DIR=target cargo test --manifest-path <harness>/Cargo.toml --test full_ready_auth --features baseline full_prefilled_reader_ready_authentication -- --exact --nocapture",
+    "after": "CARGO_NET_OFFLINE=true CARGO_TARGET_DIR=target cargo test --manifest-path <harness>/Cargo.toml --test full_ready_auth full_prefilled_reader_ready_authentication -- --exact --nocapture"
+  },
+  "results": {
+    "before": {
+      "exit_code": 101,
+      "pass": 0,
+      "fail": 1,
+      "error": "Invalid",
+      "provider_calls": 0,
+      "buffer_len": 8,
+      "buffer_capacity": 8
+    },
+    "after": {
+      "exit_code": 0,
+      "pass": 1,
+      "fail": 0,
+      "success": true,
+      "provider_calls": 1,
+      "buffer_len": 8,
+      "buffer_capacity": 8
+    }
+  },
+  "interpretation": "The original complete authentication function rejects an already-full reader in its biased read branch before polling ready authentication. The new full-reader branch accepts it. This isolates zero-room behavior from the separately reproduced >8-byte replacement admission defect; socket UnexpectedEof alone cannot attribute the maximum-frame pipeline failure to either cause.",
+  "compiler_warnings": "The temporary harness reports two unused-source warnings because complete Reader definitions are retained; no warning/lint suppression was added. Repository fmt/Clippy results are separate.",
+  "dependency_lock_sha256": "2a3a3124591913bc9ce2f4cd890ff9c2cf456da411f4807f56b5f976790c9ff8",
+  "files": [
+    {
+      "file": "before.log",
+      "raw_source": "netbaiot-full-ready-auth-before.log",
+      "raw_sha256": "1d5798ff61bcaf1422ce8575dd345054b7657fe614f3229270a2ad65b4c224fe",
+      "raw_bytes": 2431,
+      "normalized_sha256": "23343654118cd155d85010c23b4a07e0053071b4179a6c0135683a18aaa21e94",
+      "normalized_bytes": 2374,
+      "prior_harness_normalization_sha256": "d31b35ca81bfa43a83bfc7607f03825c367b4e8e56a33384dff1a754c5964bd9",
+      "prior_harness_normalization_bytes": 2349
+    },
+    {
+      "file": "after.log",
+      "raw_source": "netbaiot-full-ready-auth-after.log",
+      "raw_sha256": "d3356e0e79d26cc138e75efe5c70704786b81704294590e2bad94bd7fe0b9741",
+      "raw_bytes": 1598,
+      "normalized_sha256": "e601972fbdcaef8d8e9b042229a3c1344846fd9764e865b66e64a302128689fd",
+      "normalized_bytes": 1599,
+      "prior_harness_normalization_sha256": "f5d12ea05dede96cbc9d19ab6dbadbd53c1f51e568e1c944c8bd0bdf954c6b9b",
+      "prior_harness_normalization_bytes": 1574
+    },
+    {
+      "file": "shared-test.rs",
+      "raw_source": "full_ready_auth.rs",
+      "raw_sha256": "7b982d1b5aa27aee6d62ad6ea11a600fa912073e0624c3ba5b1651299b972b76",
+      "raw_bytes": 4900,
+      "normalized_sha256": "7b982d1b5aa27aee6d62ad6ea11a600fa912073e0624c3ba5b1651299b972b76",
+      "normalized_bytes": 4900
+    },
+    {
+      "file": "baseline-auth-source.rs",
+      "raw_source": "baseline.auth-source.rs",
+      "raw_sha256": "2d011454a7d03a261ff15820390aca907b4333dbf87ebe3a37e6094c2c63154d",
+      "raw_bytes": 756,
+      "normalized_sha256": "2d011454a7d03a261ff15820390aca907b4333dbf87ebe3a37e6094c2c63154d",
+      "normalized_bytes": 756
+    },
+    {
+      "file": "candidate-auth-source.rs",
+      "raw_source": "candidate.auth-source.rs",
+      "raw_sha256": "e31ab1db7e707cd8f44d1f14d02eb16260384c35903dd9d2fb3a938e9c805e7a",
+      "raw_bytes": 2041,
+      "normalized_sha256": "e31ab1db7e707cd8f44d1f14d02eb16260384c35903dd9d2fb3a938e9c805e7a",
+      "normalized_bytes": 2041
+    },
+    {
+      "file": "shared-reader-source.rs",
+      "raw_source": "shared-reader-source.rs",
+      "raw_sha256": "59e1a6b601a1a73e820444ea20262872f610ba41e2bfd0c79edb6b59a90f09b2",
+      "raw_bytes": 8907,
+      "normalized_sha256": "59e1a6b601a1a73e820444ea20262872f610ba41e2bfd0c79edb6b59a90f09b2",
+      "normalized_bytes": 8907
+    },
+    {
+      "file": "baseline-module.rs",
+      "raw_source": "baseline.rs",
+      "raw_sha256": "80b8ba76b221825ebf854d4e89c71daaeaa0d00316ab984ef58762103a20aa97",
+      "raw_bytes": 9914,
+      "normalized_sha256": "80b8ba76b221825ebf854d4e89c71daaeaa0d00316ab984ef58762103a20aa97",
+      "normalized_bytes": 9914
+    },
+    {
+      "file": "candidate-module.rs",
+      "raw_source": "candidate.rs",
+      "raw_sha256": "66ce4e61f330f30a8d4dab54fa047597b5b11d05b6a285f9aa0404397058e139",
+      "raw_bytes": 11199,
+      "normalized_sha256": "66ce4e61f330f30a8d4dab54fa047597b5b11d05b6a285f9aa0404397058e139",
+      "normalized_bytes": 11199
+    },
+    {
+      "file": "harness-Cargo.toml",
+      "raw_source": "Cargo.toml",
+      "raw_sha256": "a4d49f01bdef0f385bedeffcde1282f68a2d1fdf7013e5ac595a504c369c2333",
+      "raw_bytes": 638,
+      "normalized_sha256": "2fde5a4c7be071216d19c953137d77ef7b31362978d5b17689f1018dfbdcef2f",
+      "normalized_bytes": 522
+    }
+  ],
+  "published_normalization_revision": "The bundle used <harness> while the common publisher uses <tmp>/netbaiot-auth-deadline-audit. Two log-reference hashes/bytes are updated to actual published files; their raw hashes and test results are unchanged. The original bundle manifest is retained."
+}

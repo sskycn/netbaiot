@@ -1,0 +1,70 @@
+{
+  "x86_64": {
+    "zip_bytes": 1731592,
+    "zip_sha256": "b1d956dfb7b5c49d60f5b000e5555bd2110b8746e406f80a5966b11467ef682b",
+    "profiles": [
+      {
+        "artifact_file": "performance/production-readiness/profile/cpu.folded",
+        "extracted_file": "x86_64-cpu.folded",
+        "bytes": 2360544,
+        "sha256": "fd94d93fc8b7661eb64884a9975004b66f3d06d8f1117d725180e2dd273e66e5",
+        "nonempty": true
+      },
+      {
+        "artifact_file": "performance/production-readiness/profile/cpu.svg",
+        "extracted_file": "x86_64-cpu.svg",
+        "bytes": 682456,
+        "sha256": "389750ed32484e216368d6cd56e5ca1468db7ff9435e4156a79263017861dfbf",
+        "nonempty": true
+      },
+      {
+        "artifact_file": "performance/production-readiness/profile/heap.txt",
+        "extracted_file": "x86_64-heap.txt",
+        "bytes": 2517565,
+        "sha256": "868440b215757456992691040bb90ee5feb042514e9cc11a1b98174c5005ba04",
+        "nonempty": true
+      },
+      {
+        "artifact_file": "performance/production-readiness/profile/perf.stacks",
+        "extracted_file": "x86_64-perf.stacks",
+        "bytes": 4062586,
+        "sha256": "95a4e15a8095d44f64f7019b7be8191a385bed9f0e4d4e860f1c0a6f613255af",
+        "nonempty": true
+      }
+    ]
+  },
+  "aarch64": {
+    "zip_bytes": 1354499,
+    "zip_sha256": "6def203ecc948b0ded1e235bc8783784a5bde3193d7cd7a0d6e06675f532458f",
+    "profiles": [
+      {
+        "artifact_file": "performance/production-readiness/profile/cpu.folded",
+        "extracted_file": "aarch64-cpu.folded",
+        "bytes": 1955632,
+        "sha256": "ea83a1b73c76f570e60710bafe50ffaec1ab494a34ee6b9bf041a95513f1f557",
+        "nonempty": true
+      },
+      {
+        "artifact_file": "performance/production-readiness/profile/cpu.svg",
+        "extracted_file": "aarch64-cpu.svg",
+        "bytes": 715059,
+        "sha256": "dfe74b162fb5159ebe22ab8655fa3b5e07773053a2c42fe629ff6cd9f9db91c3",
+        "nonempty": true
+      },
+      {
+        "artifact_file": "performance/production-readiness/profile/heap.txt",
+        "extracted_file": "aarch64-heap.txt",
+        "bytes": 981,
+        "sha256": "a372b2ae501401bc7db830e7b46dc733a6a1c58aca95bb076f833dae9058445d",
+        "nonempty": true
+      },
+      {
+        "artifact_file": "performance/production-readiness/profile/perf.stacks",
+        "extracted_file": "aarch64-perf.stacks",
+        "bytes": 3220031,
+        "sha256": "63f5b09c276c6f855f342a23c85e9ae216a6321ba765397107f47e6a4bcdcfcb",
+        "nonempty": true
+      }
+    ]
+  }
+}

@@ -1,0 +1,25 @@
+    Checking ring v0.17.14
+    Checking rustls-webpki v0.103.15
+    Checking jsonwebtoken v9.3.1
+    Checking rustls v0.23.45
+    Checking tokio-rustls v0.26.4
+    Checking hyper-rustls v0.27.9
+    Checking netbaiot-device-sdk v0.3.1 (<repo>/crates/netbaiot-device-sdk)
+    Checking reqwest v0.12.28
+    Checking netbaiot-runtime v0.3.1 (<repo>/crates/netbaiot-runtime)
+    Checking netbaiot-client v0.3.1 (<repo>/crates/netbaiot-client)
+    Checking netbaiot-transports v0.3.1 (<repo>/crates/netbaiot-transports)
+    Checking netbaiot-loadgen v0.3.1 (<repo>/tools/netbaiot-loadgen)
+    Checking netbaiot-server v0.3.1 (<repo>/apps/netbaiot-server)
+error: this OR pattern can be rewritten using a range
+    --> crates/netbaiot-transports/tests/end_to_end.rs:1815:45
+     |
+1815 |                     | (Err(Error::Timeout), 3 | 4 | 5)
+     |                                             ^^^^^^^^^ help: try: `3..=5`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#manual_range_patterns
+     = note: `-D clippy::manual-range-patterns` implied by `-D warnings`
+     = help: to override `-D warnings` add `#[allow(clippy::manual_range_patterns)]`
+
+error: could not compile `netbaiot-transports` (test "end_to_end") due to 1 previous error
+warning: build failed, waiting for other jobs to finish...

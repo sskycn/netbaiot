@@ -1,0 +1,14 @@
+{
+  "recorded_at_utc": "2026-10-13T22:48:57.484061+00:00",
+  "measurement": "read-only host loopback TCP state aggregate; no remote endpoints retained",
+  "tcp_msl_milliseconds": 15000,
+  "loopback_tcp_states": {
+    "ESTABLISHED": 42,
+    "CLOSE_WAIT": 2,
+    "FIN_WAIT_2": 2,
+    "TIME_WAIT": 10
+  },
+  "unique_ephemeral_ports_in_time_wait": 10,
+  "ephemeral_range_size": 16384,
+  "does_not_attribute_background_loopback_sockets_to_server": true
+}

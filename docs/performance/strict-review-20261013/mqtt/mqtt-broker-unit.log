@@ -1,0 +1,173 @@
+   Compiling reqwest v0.12.28
+   Compiling netbaiot-runtime v0.3.1 (<repo>/crates/netbaiot-runtime)
+   Compiling netbaiot-transports v0.3.1 (<repo>/crates/netbaiot-transports)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 8.77s
+     Running unittests src/lib.rs (target/debug/deps/netbaiot_transports-904fbe8f173d3f3b)
+
+running 145 tests
+test mqtt::broker::density_memory::density_memory ... ignored, isolated serial release allocation measurement
+test mqtt::broker::hotspot_bench::concurrent_route_ack_scaling ... ignored, manual release-mode broker benchmark
+test mqtt::broker::hotspot_bench::engineering_mqtt_session_matrix ... ignored, serial release MQTT session matrix and lock measurement
+test mqtt::broker::hotspot_bench::exact_subscribe_scaling ... ignored, manual release-mode broker benchmark
+test mqtt::broker::hotspot_bench::fanout_route_allocations ... ignored, serial release allocation benchmark
+test mqtt::broker::hotspot_bench::fanout_route_scaling ... ignored, manual release-mode broker benchmark
+test mqtt::broker::hotspot_bench::future_will_reconnect_scaling ... ignored, manual release-mode broker benchmark
+test mqtt::broker::hotspot_bench::no_subscriber_route_allocations ... ignored, serial release allocation benchmark
+test mqtt::broker::hotspot_bench::retained_lookup_scaling ... ignored, manual release-mode broker benchmark
+test mqtt::broker::hotspot_bench::session_recompute_scaling ... ignored, manual release-mode broker benchmark
+test mqtt::broker::hotspot_bench::single_session_route_ack_scaling ... ignored, manual release-mode broker benchmark
+test mqtt::broker::hotspot_bench::tenant_pending_wake_scaling ... ignored, manual release-mode broker benchmark
+test mqtt::broker::second_round_bench::legacy_cleanup_recovery_measurement ... ignored, serial cleanup recovery measurement
+test mqtt::broker::second_round_bench::second_round_expiry ... ignored, serial second-round release measurement
+test mqtt::broker::second_round_bench::second_round_metadata ... ignored, serial second-round release measurement
+test mqtt::broker::second_round_bench::second_round_order ... ignored, serial second-round release measurement
+test mqtt::broker::second_round_bench::second_round_ownership ... ignored, serial second-round release measurement
+test mqtt::broker::second_round_bench::second_round_preflight ... ignored, serial second-round release measurement
+test mqtt::broker::second_round_bench::second_round_publish_acl ... ignored, serial release canonical MQTT authorization allocation measurement
+test mqtt::broker::second_round_bench::second_round_retained ... ignored, serial second-round release measurement
+test mqtt::broker::second_round_bench::second_round_retained_subscribe ... ignored, serial second-round release measurement
+test mqtt::broker::second_round_bench::second_round_route_ack ... ignored, serial second-round release measurement
+test mqtt::broker::second_round_bench::second_round_session ... ignored, serial second-round release measurement
+test mqtt::broker::second_round_bench::second_round_topic ... ignored, serial second-round release measurement
+test mqtt::broker::lazy::tests::empty_extensions_read_and_reconnect_without_allocating ... ok
+test mqtt::broker::tests::accounting::v5_expired_session_releases_all_accounting_before_reconnect ... ok
+test mqtt::broker::tests::accounting::inbound_qos2_repeated_publish_does_not_change_accounting ... ok
+test mqtt::broker::tests::commands::command_is_rejected_when_send_quota_is_full ... ok
+test mqtt::broker::tests::commands::command_requires_subscription_and_current_generation ... ok
+test mqtt::broker::tests::commands::mqtt_frame_budget_failure_releases_every_partial_reservation ... ok
+test mqtt::broker::tests::commands::expired_command_at_broker_handoff_releases_all_responsibility ... ok
+test mqtt::broker::tests::commands::mqtt_frame_budget_survives_receiver_close_and_session_detach ... ok
+test mqtt::broker::tests::commands::command_progress_expiry_and_exact_ack_transitions_for_both_mqtt_versions ... ok
+test mqtt::broker::tests::accounting::derived_accounting_tracks_tenant_device_and_restore ... ok
+test mqtt::broker::tests::commands::released_global_outbound_bytes_wake_another_tenant ... ok
+test mqtt::broker::tests::commands::released_global_bytes_wake_deferred_reconnect_replay ... ok
+test mqtt::broker::tests::commands::mqtt_live_delivery_obeys_tenant_and_global_byte_budgets ... ok
+test mqtt::broker::tests::broker_operation_probes_are_optional_and_cover_early_returns ... ok
+test mqtt::broker::tests::commands::qos0_drop_and_closed_receiver_release_all_command_resources ... ok
+test mqtt::broker::tests::commands::stale_generation_cannot_send_command_to_replacement_connection ... ok
+test mqtt::broker::tests::expiry::qos0_drop_cleanup_and_expiry_count_one_terminal_failure ... ok
+test mqtt::broker::tests::expiry::oversized_qos1_delivery_is_settled_locally ... ok
+test mqtt::broker::tests::expiry::qos1_started_publish_survives_message_expiry_until_puback ... ok
+test mqtt::broker::tests::expiry::oversized_qos2_delivery_is_settled_locally ... ok
+test mqtt::broker::tests::expiry::qos2_started_publish_survives_message_expiry_until_pubcomp ... ok
+test mqtt::broker::tests::expiry::message_deadline_budget_cleans_only_due_sessions_and_reindexes ... ok
+test mqtt::broker::tests::commands::mqtt_qos0_live_delivery_obeys_byte_budget ... ok
+test mqtt::broker::tests::expiry::v5_qos2_retransmission_keeps_first_message_expiry_deadline ... ok
+test mqtt::broker::tests::expiry::unsent_expired_message_is_dropped ... ok
+test mqtt::broker::tests::inbound_qos2::inbound_qos2_classification_is_read_only_and_generation_fenced ... ok
+test mqtt::broker::tests::inbound_qos2::inbound_qos2_completion_wakes_waiting_outbound_qos2 ... ok
+test mqtt::broker::tests::expiry::v5_clean_start_expiry_and_cross_version_sessions ... ok
+test mqtt::broker::tests::inbound_qos2::inbound_qos2_dup_flag_does_not_create_second_transaction ... ok
+test mqtt::broker::tests::inbound_qos2::inbound_qos2_original_message_remains_authoritative_until_pubrel ... ok
+test mqtt::broker::tests::inbound_qos2::inbound_qos2_pubcomp_releases_identifier_for_new_message ... ok
+test mqtt::broker::tests::inbound_qos2::inbound_qos2_repeated_publish_before_pubrel_repeats_pubrec ... ok
+test mqtt::broker::tests::expiry::target_session_expiry_is_checked_after_bounded_global_maintenance ... ok
+test mqtt::broker::tests::inbound_qos2::inbound_qos2_repeated_publish_does_not_redeliver ... ok
+test mqtt::broker::tests::inbound_qos2::qos2_retransmission_charges_only_the_new_connection_window ... ok
+test mqtt::broker::tests::inbound_qos2::persistent_inbound_qos2_does_not_consume_new_connection_receive_window ... ok
+test mqtt::broker::tests::inbound_qos2::mqtt_inbound_qos2_takeover_can_finish_event_accepted_handoff ... ok
+test mqtt::broker::tests::outbound::mqtt_persistent_overload_qos1_001_is_atomic ... ok
+test mqtt::broker::tests::outbound::mqtt_persistent_overload_qos2_001_is_atomic ... ok
+test mqtt::broker::tests::outbound::mqtt_tenant_qos1_capacity_release_wakes_other_session ... ok
+test mqtt::broker::tests::outbound::qos2_negative_pubrec_releases_send_quota ... ok
+test mqtt::broker::tests::outbound::qos2_clean_session_incarnation_001 ... ok
+test mqtt::broker::tests::outbound::mqtt_tenant_qos2_capacity_release_wakes_other_session ... ok
+test mqtt::broker::tests::outbound::ownership_clean_session_qos2_and_snapshot ... ok
+test mqtt::broker::tests::outbound::receive_maximum_1_qos2_waits_for_pubcomp ... ok
+test mqtt::broker::tests::outbound::reconnect_await_pubcomp_does_not_consume_new_send_window ... ok
+test mqtt::broker::tests::outbound::v5_server_receive_maximum_counts_qos1_against_pending_qos2 ... ok
+test mqtt::broker::tests::outbound::v5_client_receive_maximum_defers_second_publish_until_ack ... ok
+test mqtt::broker::tests::outbound::tenant_session_bytes_and_qos2_inflight_are_hard_bounded ... ok
+test mqtt::broker::tests::commands::command_expiry_survives_snapshot_restore ... ok
+test mqtt::broker::tests::outbound::reconnect_replay_is_ordered_before_new_live_route ... ok
+test mqtt::broker::tests::outbound::v5_no_local_uses_client_id_and_retain_options_control_replay ... ok
+test mqtt::broker::tests::recovery_current::mqtt_recovery_acl_ownership_001 ... ok
+test mqtt::broker::tests::recovery_current::recovery_rejects_old_future_and_corrupt_versions_before_payload ... ok
+test mqtt::broker::tests::recovery_storage::mqtt_recovery_semantic_invalid_001 ... ok
+test mqtt::broker::tests::recovery_storage::mqtt_recovery_streaming_benchmark_manual ... ignored, manual 10/50/100 MiB recovery benchmark
+test mqtt::broker::tests::recovery_storage::command_progress_follows_started_qos_recovery_after_write_failure ... ok
+test mqtt::broker::tests::recovery_storage::mqtt_recovery_v6_near_default_capacity_manual ... ignored, manual near-capacity NBMQ v6 commit and recovery
+test mqtt::broker::tests::expiry::reconnect_preserves_started_qos_state_after_message_expiry ... ok
+test mqtt::broker::tests::recovery_current::current_recovery_preserves_mqtt5_persistent_session ... ok
+test mqtt::broker::tests::accounting::derived_accounting_survives_local_discard_expiry_and_limit_rejection ... ok
+test mqtt::broker::tests::recovery_storage::qos2_recovery_resumes_each_protocol_stage_without_reallocation ... ok
+test mqtt::broker::tests::accounting::derived_accounting_matches_authoritative_mutation_sequence ... ok
+test mqtt::broker::tests::recovery_storage::mqtt_recovery_v6_large_client_id_will_fits_admitted_bounds ... ok
+test mqtt::broker::tests::recovery_current::mqtt_recovery_raw_binary_round_trip_bound ... ok
+test mqtt::broker::tests::recovery_storage::mqtt_recovery_whole_image_integrity_001 ... ok
+test mqtt::broker::tests::recovery_storage::retained_qos2_reserved_state_round_trips_recovery ... ok
+test mqtt::broker::tests::recovery_storage::shared_payload_preserves_current_compact_recovery_bytes ... ok
+test mqtt::broker::tests::recovery_current::current_golden_bytes_round_trip_without_format_change ... ok
+test mqtt::broker::tests::routing::expired_retained_is_not_replayed_while_maintenance_is_budgeted ... ok
+test mqtt::broker::tests::routing::mqtt_empty_subscription_route_hint_is_restored_and_cleaned_001 ... ok
+test mqtt::broker::tests::routing::mqtt_retained_replay_obeys_byte_budget ... ok
+test mqtt::broker::tests::routing::mqtt_empty_subscription_route_hint_tracks_authoritative_state_001 ... ok
+test mqtt::broker::tests::routing::mqtt_route_preflight_benchmark_manual ... ignored, manual 100/1000/configured-max route preflight benchmark
+test mqtt::broker::tests::recovery_storage::recovery_file_round_trip_preserves_session_retained_and_inflight ... ok
+test mqtt::broker::tests::routing::persistent_unsubscribe_commits_session_trie_and_offline_removal ... ok
+test mqtt::broker::tests::recovery_storage::mqtt_recovery_storage_commit_replace_retry_and_io_errors ... ok
+test mqtt::broker::tests::routing::retained_offline_and_outbound_qos_lifecycle_are_bounded ... ok
+test mqtt::broker::tests::routing::retained_replacement_reservation_survives_old_value_deletion ... ok
+test mqtt::broker::tests::routing::retained_replay_capacity_failure_does_not_commit_subscription_or_trie ... ok
+test mqtt::broker::tests::routing::routing_uses_minimum_qos_and_retained_replace_delete_semantics ... ok
+test mqtt::broker::tests::routing::shared_payload_fanout_preserves_each_logical_responsibility ... ok
+test mqtt::broker::tests::routing::shared_payload_cannot_bypass_atomic_fanout_byte_limits ... ok
+test mqtt::broker::tests::recovery_storage::recovery_keeps_publish_properties_and_byte_accounting ... ok
+test mqtt::broker::tests::recovery_storage::recovery_file_rejects_corruption_and_unknown_version ... ok
+test mqtt::broker::tests::sessions::current_outbound_record_preserves_started_flag ... ok
+test mqtt::broker::tests::sessions::auth_invalidation_counting_001 ... ok
+test mqtt::broker::tests::recovery_storage::v5_message_expiry_cleans_offline_retained_and_recovery_state ... ok
+test mqtt::broker::tests::sessions::mqtt_attachment_guard_cleans_clean_and_preserves_persistent_session ... ok
+test mqtt::broker::tests::sessions::generated_client_id_never_replaces_explicit_or_recovered_session ... ok
+test mqtt::broker::tests::sessions::mqtt_authz_persistent_reset_001 ... ok
+test mqtt::broker::tests::sessions::mqtt_persistent_codec_provenance_001 ... ok
+test mqtt::broker::tests::sessions::mqtt_outbound_ack_state_matrix_preserves_transaction_on_wrong_ack ... ok
+test mqtt::broker::tests::sessions::packet_identifier_not_reused_before_qos_exchange_finishes ... ok
+test mqtt::broker::tests::sessions::concurrent_generated_client_ids_are_unique ... ok
+test mqtt::broker::tests::sessions::retain_replacement_reservation_001 ... ok
+test mqtt::broker::tests::sessions::persistent_reconnect_retransmits_outbound_in_original_order ... ok
+test mqtt::broker::tests::sessions::topic_matcher_agrees_with_subscription_trie_for_valid_filters ... ok
+test mqtt::broker::tests::recovery_current::unsupported_file_versions_preserve_existing_state_and_committed_bytes ... ok
+test mqtt::broker::tests::sessions::topic_matcher_preserves_empty_levels_and_terminal_wildcards ... ok
+test mqtt::broker::tests::sessions::wildcard_trie_and_dollar_rules ... ok
+test mqtt::broker::tests::will::benchmark_future_pending_will_retry ... ignored, manual baseline for future delayed-Will retry cost
+test mqtt::broker::tests::shared_metadata::metadata_sharing_preserves_logical_charge_and_copy_on_write_isolation ... ok
+test mqtt::broker::tests::will::current_pending_will_record_preserves_explicit_absent_origin ... ok
+test mqtt::broker::tests::will::delayed_will_deadlines_have_bounded_due_work ... ok
+test mqtt::broker::tests::shared_metadata::shared_metadata_preserves_snapshot_diagnostics_and_compact_message_bytes ... ok
+test mqtt::broker::tests::will::mqtt_accepted_will_reservation_survives_later_retained_pressure ... ok
+test mqtt::broker::tests::will::takeover_same_session_positive_delay_suppresses_will ... ok
+test mqtt::broker::tests::will::takeover_clean_start_zero_delay_publishes_old_will ... ok
+test mqtt::broker::tests::will::takeover_clean_start_publishes_old_will ... ok
+test mqtt::broker::tests::will::takeover_same_session_zero_delay_publishes_will ... ok
+test mqtt::broker::tests::will::will_origin_filters_no_local_after_takeover_without_suppressing_other_subscribers ... ok
+test mqtt::broker::tests::will::future_will_owner_index_handles_shared_deadline_and_due_promotion ... ok
+test mqtt::broker::tests::recovery_storage::mqtt_temporary_file_budget_blocks_commit_without_replacing_snapshot ... ok
+test mqtt::broker::tests::will::will_subscriber_pressure_001 ... ok
+test mqtt::broker::tests::routing::mqtt_route_preflight_bounded_memory_001 ... ok
+test mqtt::broker::tests::will::v5_delayed_will_is_bounded_cancelled_on_resume_and_recovers ... ok
+test mqtt::broker::tests::will::will_pending_restart_001 ... ok
+test mqtt::broker::tests::recovery_storage::recovery_file_supports_legal_state_larger_than_event_spool_record ... ok
+test mqtt::broker::tests::sessions::packet_identifier_exhaustion_preserves_offline_during_promotion ... ok
+test mqtt::broker::tests::sessions::packet_identifier_exhaustion_preserves_offline_during_reconnect ... ok
+
+test result: ok. 117 passed; 0 failed; 28 ignored; 0 measured; 84 filtered out; finished in 0.81s
+
+     Running tests/end_to_end.rs (target/debug/deps/end_to_end-88653d2adba64158)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 27 filtered out; finished in 0.00s
+
+     Running tests/multi_codec.rs (target/debug/deps/multi_codec-e4f698d632f5c3fa)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 12 filtered out; finished in 0.00s
+
+     Running tests/reader_memory.rs (target/debug/deps/reader_memory-49319df1f41a2448)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s
+

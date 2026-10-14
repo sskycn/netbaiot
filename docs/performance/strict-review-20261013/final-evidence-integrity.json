@@ -1,0 +1,22 @@
+{
+  "verified_at_utc": "2026-10-14T02:29:37.073398+00:00",
+  "strict_records_verified_before_adding_this_result": 325,
+  "original_records_verified": 24,
+  "original_raw_fuzz_verified_now": 0,
+  "original_raw_fuzz_unavailable_now": [
+    "fuzz-mqtt.txt",
+    "fuzz-mqtt5.txt",
+    "fuzz-tcp.txt"
+  ],
+  "b4_frozen_source_files_verified": 156,
+  "fixture_source_mismatch_files": [
+    "apps/netbaiot-server/tests/server.rs",
+    "apps/netbaiot-server/tests/common/mod.rs"
+  ],
+  "path_scrubbing_clean": true,
+  "git_diff_check_clean": false,
+  "scope": "Published evidence byte counts/SHA-256, available original raw fuzz references and exact committed source snapshot comparison; unavailable original raw files are explicitly listed. This does not reproduce missing raw data or rerun workloads.",
+  "source_documentation_tools_diff_check_clean": true,
+  "git_diff_check_scope": "Staged source, both reports and evidence-tools pass; the full staged archive reports preserved log whitespace, patch context and CSV CRLF endings. The earlier clean unstaged check excluded untracked evidence.",
+  "archive_whitespace_preserved": true
+}

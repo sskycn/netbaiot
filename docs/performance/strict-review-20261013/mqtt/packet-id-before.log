@@ -1,0 +1,28 @@
+   Compiling netbaiot-transports v0.3.1 (<repo>/crates/netbaiot-transports)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.38s
+     Running unittests src/lib.rs (target/debug/deps/netbaiot_transports-b99a3f51ecc7c897)
+
+running 2 tests
+
+thread 'mqtt::broker::tests::sessions::packet_identifier_exhaustion_preserves_offline_during_promotion' (784941) panicked at crates/netbaiot-transports/src/mqtt/broker/tests/sessions.rs:70:9:
+assertion `left == right` failed
+  left: None
+ right: Some(BrokerMessage { topic: "v1/t/t/p/p/d/packet-id-exhaustion/up", payload: b"pending", qos: 1, retain: false, properties: PublishProperties { payload_format: None, expires_at_ms: None, content_type: None, response_topic: None, correlation_data: None, user_properties: [] } })
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test mqtt::broker::tests::sessions::packet_identifier_exhaustion_preserves_offline_during_promotion ... FAILED
+
+thread 'mqtt::broker::tests::sessions::packet_identifier_exhaustion_preserves_offline_during_reconnect' (784942) panicked at crates/netbaiot-transports/src/mqtt/broker/tests/sessions.rs:95:9:
+assertion `left == right` failed
+  left: None
+ right: Some(BrokerMessage { topic: "v1/t/t/p/p/d/packet-id-exhaustion/up", payload: b"pending", qos: 1, retain: false, properties: PublishProperties { payload_format: None, expires_at_ms: None, content_type: None, response_topic: None, correlation_data: None, user_properties: [] } })
+test mqtt::broker::tests::sessions::packet_identifier_exhaustion_preserves_offline_during_reconnect ... FAILED
+
+failures:
+
+failures:
+    mqtt::broker::tests::sessions::packet_identifier_exhaustion_preserves_offline_during_promotion
+    mqtt::broker::tests::sessions::packet_identifier_exhaustion_preserves_offline_during_reconnect
+
+test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 219 filtered out; finished in 0.27s
+
+error: test failed, to rerun pass `-p netbaiot-transports --lib`

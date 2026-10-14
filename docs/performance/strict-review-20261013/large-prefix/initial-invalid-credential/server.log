@@ -1,0 +1,2 @@
+{"allocations":1760,"bytes_allocated":311271,"bytes_deallocated":124364,"deallocations":1404,"event":"allocation_profile","reallocations":101,"requested_live_bytes":186907}
+{"allocations":2086,"bytes_allocated":384576,"bytes_deallocated":186006,"deallocations":1647,"event":"allocation_profile","reallocations":112,"requested_live_bytes":198570}

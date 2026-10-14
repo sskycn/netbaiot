@@ -1,0 +1,146 @@
+{
+  "schema_version": 1,
+  "checkout_head": "b4db4b7be6f3207aac34a9610eb0ce96d4f23e96",
+  "ci": {
+    "run_id": 38415514180,
+    "source_commit": "b4db4b7be6f3207aac34a9610eb0ce96d4f23e96",
+    "job": "recovery (ubuntu-latest)",
+    "failed_test": "subprocess_spool_failure_stays_alive_until_repaired_then_replays_same_event_id",
+    "failure": "child exited before readiness; management_tcp AddrInUse",
+    "result": {
+      "pass": 32,
+      "fail": 1,
+      "ignored": 2
+    },
+    "previous_filtered_run_in_same_job": {
+      "pass": 5,
+      "fail": 0,
+      "ignored": 1
+    },
+    "full_raw_log_sha256": "950b13bba598c905f9c4c6b4813833547d50b958e39cbce52d1d093da88f0928",
+    "excerpt_source_lines": [
+      1554,
+      1574
+    ]
+  },
+  "diagnosis": "The observed failure is listener startup before readiness. The fixture releases restart reservations before binding a new sink, so that sink can claim a gateway restart address. The actual owner of the occupied CI port was not logged; controlled collision injection reproduces the identical error class. This does not establish a spool or Reader defect.",
+  "before_reproduction": {
+    "command": "cargo test --locked -p netbaiot-server --test server subprocess_spool_failure_stays_alive_until_repaired_then_replays_same_event_id -- --exact --nocapture",
+    "exit_code": 101,
+    "pass": 0,
+    "fail": 1,
+    "injection": "Use a non-reusable sink listener on the released management address; delay sink accept 6s to retain the port owner throughout child readiness. See before-forced-collision.patch."
+  },
+  "after_reproduction": {
+    "command": "cargo test --locked -p netbaiot-server --test server subprocess_spool_failure_stays_alive_until_repaired_then_replays_same_event_id -- --exact --nocapture",
+    "exit_code": 0,
+    "pass": 1,
+    "fail": 0,
+    "injection": "Force the fixture sink selector first candidate to the management restart address. The new selector excludes that address, logging AddrInUse and selecting a distinct sink. Full spool failure/replay assertions remain. See after-forced-collision.patch."
+  },
+  "initial_probe": "The first direct collision injection allowed the readiness GET to reach the test sink and trigger its Content-Length assertion. It is retained as an unsuccessful probe, not labeled as reproduction of the CI listener failure.",
+  "final": {
+    "forced_candidate_restored": "127.0.0.1:0",
+    "changed_files": [
+      "apps/netbaiot-server/tests/server.rs",
+      "apps/netbaiot-server/tests/common/mod.rs"
+    ],
+    "runtime_changed": false,
+    "server_command": "cargo test --locked -p netbaiot-server --test server -- --nocapture",
+    "server_exit_code": 0,
+    "server_tests": {
+      "pass": 34,
+      "fail": 0,
+      "ignored": 2
+    },
+    "clippy_command": "cargo clippy --locked -p netbaiot-server --tests --all-features -- -D warnings",
+    "clippy_exit_code": 0,
+    "source_sha256": {
+      "apps/netbaiot-server/tests/server.rs": "116bf88b880b75e8465adcf6cdb552775d94283c4df884a6f3ab55391b0648c2",
+      "apps/netbaiot-server/tests/common/mod.rs": "bab77cbc9c9a6b17fd80f0142bb6c4cf13018a9b77e6de741bc42d56e4367e48"
+    }
+  },
+  "review": "Resource auditor independently found no child/replay retry, accepted-work or spool mutation, or nested mutex deadlock. A Windows-aware bind-error assertion was incorporated before final tests. Release-to-child-bind still has a system-level handoff window; child errors remain fatal.",
+  "normalization": "Replace repository prefix with <repo>, local user home with <user-home>, and GitHub runner home with <ci-home>; other bytes are unchanged.",
+  "files": [
+    {
+      "file": "collision-before.log",
+      "raw_source": "netbaiot-recovery-fixture-collision-before.log",
+      "raw_bytes": 1280,
+      "raw_sha256": "05075fd43c10f541ebb432889850f285f83610e1a544288d170035c56fbfc605",
+      "normalized_bytes": 1251,
+      "normalized_sha256": "c7c9ef2c91a4be03137d7e817e61d539c800f924445a0283851f6e79abea0db3"
+    },
+    {
+      "file": "collision-after.log",
+      "raw_source": "netbaiot-recovery-fixture-collision-after.log",
+      "raw_bytes": 536,
+      "raw_sha256": "40406f0f54486971b6f19262a042e5a775e716b84e0e4c6431763fa781605162",
+      "normalized_bytes": 507,
+      "normalized_sha256": "5e930cd9d36ee401b0370c8632eb3f5d49d8c39921585739f864d8f132c641d5"
+    },
+    {
+      "file": "server-final.log",
+      "raw_source": "netbaiot-recovery-fixture-server-final-platform.log",
+      "raw_bytes": 3390,
+      "raw_sha256": "162a20c69f8b2a8ad2b547f28e52e45769b1fd001888e1f468a90e9cb8d3f721",
+      "normalized_bytes": 3361,
+      "normalized_sha256": "16d6de423afe669b95232023ae062803636bf8d631cd4bc838be4db51d2796ff"
+    },
+    {
+      "file": "clippy-final.log",
+      "raw_source": "netbaiot-recovery-fixture-clippy-final.log",
+      "raw_bytes": 167,
+      "raw_sha256": "92831bb8a8644f0a37fbd522741b5994c1f1a767d8678a2c3fdee3033cfaff85",
+      "normalized_bytes": 138,
+      "normalized_sha256": "ca67f27278e3fe7db33fb41d05536f9041f7c0493289e9ac1b80e70d0a4ff885"
+    },
+    {
+      "file": "initial-probe-not-ci-reproduction.log",
+      "raw_source": "netbaiot-recovery-fixture-before.log",
+      "raw_bytes": 1653,
+      "raw_sha256": "d3ad617fe8c7832d5deaa2dcbf64ae45329b69a0fe8b1040b6338c1899190f2f",
+      "normalized_bytes": 1508,
+      "normalized_sha256": "1c1bdfa8f40efb6b155ddb0f25eee9356e05fb97de9a30208c090c147c7adb16"
+    },
+    {
+      "file": "ci-failure-excerpt.log",
+      "raw_source": "ci-failure-excerpt.raw.log",
+      "raw_bytes": 2617,
+      "raw_sha256": "5b7b5cb615ec785123507bb0e02fb7a242b5eea8beb975aebfc6676548086406",
+      "normalized_bytes": 2617,
+      "normalized_sha256": "5b7b5cb615ec785123507bb0e02fb7a242b5eea8beb975aebfc6676548086406"
+    }
+  ],
+  "source_snapshots": [
+    {
+      "file": "collision-injected-before-server.rs",
+      "raw_source": "netbaiot-recovery-fixture-collision-injected-server.rs",
+      "raw_sha256": "916d888de06e9df1b4ec55e9ec01cf4901a1da665ab69498074cdac16e2e7d38",
+      "normalized_sha256": "916d888de06e9df1b4ec55e9ec01cf4901a1da665ab69498074cdac16e2e7d38"
+    },
+    {
+      "file": "collision-injected-after-server.rs",
+      "raw_source": "netbaiot-recovery-fixture-collision-injected-after-server.rs",
+      "raw_sha256": "3cabfc5b8bb6501ada168812aa59562cf9496991c119f60009f7dce53d0ba897",
+      "normalized_sha256": "3cabfc5b8bb6501ada168812aa59562cf9496991c119f60009f7dce53d0ba897"
+    },
+    {
+      "file": "final-server.rs",
+      "raw_source": "server.rs",
+      "raw_sha256": "116bf88b880b75e8465adcf6cdb552775d94283c4df884a6f3ab55391b0648c2",
+      "normalized_sha256": "116bf88b880b75e8465adcf6cdb552775d94283c4df884a6f3ab55391b0648c2"
+    },
+    {
+      "file": "final-common-mod.rs",
+      "raw_source": "mod.rs",
+      "raw_sha256": "bab77cbc9c9a6b17fd80f0142bb6c4cf13018a9b77e6de741bc42d56e4367e48",
+      "normalized_sha256": "bab77cbc9c9a6b17fd80f0142bb6c4cf13018a9b77e6de741bc42d56e4367e48"
+    }
+  ],
+  "original_fixture_source_sha256": "a8d5f200fe3f57cc11ab0710f53e2f8c80f7d959ce796d1e64b57ec93819ea49",
+  "patch_sha256": {
+    "before-forced-collision.patch": "194b380fbd8c58266032e8c4844246d48a1899114ac952f4bd8dcb180219a7f9",
+    "after-forced-collision.patch": "6a28057fa28ba7ffc64c2a9ba839f9917236bd53844b2001a18d1c2c6dd0d495"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "source_commit": "a2025e6ca7742b458aec0a175a89799839e74fba",
+  "frozen_candidate_runtime_commit": "b4db4b7be6f3207aac34a9610eb0ce96d4f23e96",
+  "frozen_snapshot_files": 156,
+  "matching_files": 154,
+  "mismatches": [
+    {
+      "file": "apps/netbaiot-server/tests/server.rs",
+      "frozen_b4_sha256": "a8d5f200fe3f57cc11ab0710f53e2f8c80f7d959ce796d1e64b57ec93819ea49",
+      "fixture_commit_sha256": "116bf88b880b75e8465adcf6cdb552775d94283c4df884a6f3ab55391b0648c2"
+    },
+    {
+      "file": "apps/netbaiot-server/tests/common/mod.rs",
+      "frozen_b4_sha256": "e0c94a4df136a1a8437dc712aa0466ef435df61c599930053a267929185cf69c",
+      "fixture_commit_sha256": "bab77cbc9c9a6b17fd80f0142bb6c4cf13018a9b77e6de741bc42d56e4367e48"
+    }
+  ],
+  "whole_commit_diff_files": [
+    "apps/netbaiot-server/tests/common/mod.rs",
+    "apps/netbaiot-server/tests/server.rs"
+  ],
+  "interpretation": "The 156-file frozen Rust/Cargo snapshot includes integration tests. All 156 match b4; a202 changes only two integration-test files, leaving the measured production runtime inputs unchanged."
+}

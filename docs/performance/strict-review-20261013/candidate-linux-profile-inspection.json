@@ -1,0 +1,126 @@
+{
+  "source_commit": "b4db4b7be6f3207aac34a9610eb0ce96d4f23e96",
+  "run_id": 38415787048,
+  "architectures": {
+    "x86": {
+      "archive_sha256": "bab66feec868645bdc3e50d1a1595cd3fec80b930dd6280245741d3402c1892d",
+      "archive_bytes": 3414933,
+      "profiles": {
+        "perf.stacks": {
+          "bytes": 5277704,
+          "sha256": "9f21740d592f2856d303ae081f86098bdd7fdf6148615631eca9d30f8ec9923c"
+        },
+        "cpu.folded": {
+          "bytes": 3158626,
+          "sha256": "8b74945b28147b99e1df16fcc2cba6ff877d8f5cd67007ddadf51eb5b9c6d3e4"
+        },
+        "cpu.svg": {
+          "bytes": 797162,
+          "sha256": "ba056256b8084f3f74c5bcf300952dd87ca8b2d30338471e1c75fb7026a786d3"
+        },
+        "heap.txt": {
+          "bytes": 2463479,
+          "sha256": "a6a10b2dd8eb1d476a948eb6376a1bcff729e399b36639bb1dcbaf0ec1f9a771"
+        }
+      },
+      "cpu_clock_samples": 394,
+      "folded_stack_count": 301,
+      "folded_multi_frame_count": 301,
+      "folded_period_weight": 3979797940,
+      "heap_named_netbaiot_occurrences": 13066,
+      "heap_unknown_symbol_occurrences": 0,
+      "workloads": {
+        "cpu-profile": {
+          "status": "pass",
+          "devices": 1000,
+          "connected": 1000,
+          "connection_attempts": 1000,
+          "submitted": 59999,
+          "event_accepted": 59999,
+          "sink_confirmed": 59999,
+          "measured_duration_s": 60.0,
+          "server_exit_code": 0,
+          "final_queues_empty": true,
+          "final_sessions": 0
+        },
+        "heap-profile": {
+          "status": "pass",
+          "devices": 1000,
+          "connected": 1000,
+          "connection_attempts": 1000,
+          "submitted": 29999,
+          "event_accepted": 29999,
+          "sink_confirmed": 29999,
+          "measured_duration_s": 30.0,
+          "server_exit_code": 0,
+          "final_queues_empty": true,
+          "final_sessions": 0
+        }
+      },
+      "heap_symbolization_usable": true,
+      "heap_symbolization_note": "resolved function attribution",
+      "heap_peak_consumption_text": "20.72M",
+      "heap_peak_rss_text": "38.61M"
+    },
+    "arm": {
+      "archive_sha256": "faae9449ab9499d16c1419cba5ea7bc922f99dc796e9b20f5bdb84c01863114b",
+      "archive_bytes": 2831491,
+      "profiles": {
+        "perf.stacks": {
+          "bytes": 2135493,
+          "sha256": "8efbe32c20b19e329b4485d448cd89ca02b96240f439717ea61678c8ccdf5f41"
+        },
+        "cpu.folded": {
+          "bytes": 1348024,
+          "sha256": "408c8c92c628516d8b78dfb0de91dfbf28b560de95b3a75b2c21b22207feb9c6"
+        },
+        "cpu.svg": {
+          "bytes": 704604,
+          "sha256": "8ba7c1f96d1ea200a3820fd8e30be44d00c497a9ee93cd5d236003188a514bc7"
+        },
+        "heap.txt": {
+          "bytes": 981,
+          "sha256": "5e7cbe1b23831a567a04f0663a2f8c1b05ba49326d729bf4480e7b3cf50aba47"
+        }
+      },
+      "cpu_clock_samples": 334,
+      "folded_stack_count": 247,
+      "folded_multi_frame_count": 247,
+      "folded_period_weight": 3373737340,
+      "heap_named_netbaiot_occurrences": 5,
+      "heap_unknown_symbol_occurrences": 3,
+      "workloads": {
+        "cpu-profile": {
+          "status": "pass",
+          "devices": 1000,
+          "connected": 1000,
+          "connection_attempts": 1000,
+          "submitted": 60000,
+          "event_accepted": 60000,
+          "sink_confirmed": 60000,
+          "measured_duration_s": 60.0,
+          "server_exit_code": 0,
+          "final_queues_empty": true,
+          "final_sessions": 0
+        },
+        "heap-profile": {
+          "status": "pass",
+          "devices": 1000,
+          "connected": 1000,
+          "connection_attempts": 1000,
+          "submitted": 29999,
+          "event_accepted": 29999,
+          "sink_confirmed": 29999,
+          "measured_duration_s": 30.0,
+          "server_exit_code": 0,
+          "final_queues_empty": true,
+          "final_sessions": 0
+        }
+      },
+      "heap_symbolization_usable": false,
+      "heap_symbolization_note": "ARM heaptrack aggregates have only 0x0 / in ?? frames; no usable function attribution",
+      "heap_peak_consumption_text": "20.58M",
+      "heap_peak_rss_text": "36.51M"
+    }
+  }
+}

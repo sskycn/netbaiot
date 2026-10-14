@@ -1,0 +1,6 @@
+{"allocations":1988,"bytes_allocated":335472,"bytes_deallocated":139677,"deallocations":1569,"event":"allocation_profile","reallocations":105,"requested_live_bytes":195795}
+{"allocations":2084,"bytes_allocated":383818,"bytes_deallocated":185090,"deallocations":1645,"event":"allocation_profile","reallocations":113,"requested_live_bytes":198728}
+{"allocations":3299,"bytes_allocated":766402,"bytes_deallocated":423502,"deallocations":2570,"event":"allocation_profile","reallocations":531,"requested_live_bytes":342900}
+{"allocations":4100,"bytes_allocated":2028390,"bytes_deallocated":635954,"deallocations":3339,"event":"allocation_profile","reallocations":949,"requested_live_bytes":1392436}
+{"allocations":4920,"bytes_allocated":2284828,"bytes_deallocated":2064584,"deallocations":4449,"event":"allocation_profile","reallocations":1372,"requested_live_bytes":220244}
+{"allocations":4932,"bytes_allocated":2286260,"bytes_deallocated":2066016,"deallocations":4461,"event":"allocation_profile","reallocations":1377,"requested_live_bytes":220244}

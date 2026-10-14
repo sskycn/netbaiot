@@ -1,0 +1,70 @@
+{
+  "scope": "Profiler owner cleanup regression against the interim measurement script, which already contains the new CPU delta fields. This is not an original b4 runtime defect reproduction. No real child processes or listeners are started.",
+  "checkout_head": "a2025e6ca7742b458aec0a175a89799839e74fba",
+  "interim_script_sha256": "acb8c66b0a9b03380b7c737b643e5a229c12a0339db362a30cd5f2e212051249",
+  "original_two_case_test_sha256": "1855047a256f49b26f126125e86b900271b1929d328400b9f7d37c21b3b51a56",
+  "owner_regression_test_sha256": "e8e9634b56a3fb0917d50f00d9db97398b4476560c929c6795e630e9bc31bcfa",
+  "commands": {
+    "focused": "python3 -m unittest discover -s scripts/perf -p test_event_load.py -v",
+    "all_perf": "python3 -m unittest discover -s scripts/perf -p 'test_*.py' -v",
+    "diff_check": "git diff --check -- scripts/perf/event_load.py scripts/perf/test_event_load.py"
+  },
+  "results": {
+    "before": {
+      "exit_code": 1,
+      "passed": 2,
+      "failed": 1,
+      "profiler_returncode": null,
+      "profiler_killed": false
+    },
+    "after": {
+      "exit_code": 0,
+      "passed": 3,
+      "failed": 0,
+      "profiler_returncode": -9,
+      "profiler_killed": true
+    },
+    "all_perf": {
+      "exit_code": 0,
+      "passed": 26,
+      "failed": 0
+    },
+    "diff_check": {
+      "exit_code": 0
+    }
+  },
+  "final_source_sha256": {
+    "scripts/perf/event_load.py": "90fcc127d14277070b030e3156c1df80e5800746ad72b334f68659b9b6c0b05d",
+    "scripts/perf/test_event_load.py": "e8e9634b56a3fb0917d50f00d9db97398b4476560c929c6795e630e9bc31bcfa"
+  },
+  "before_after_test_unchanged": true,
+  "owner_only_patch_sha256": "1cbac8fa2696dca6fb91c4f2c2f77b1b89158277b29553b2b3c4f6bab871a8ef",
+  "files": [
+    {
+      "file": "before.log",
+      "raw_source": "netbaiot-event-load-owner-before.log",
+      "raw_sha256": "bef201d8b0a6038444c8b87b1116c6c076aa687129372028192020cd71149756",
+      "raw_bytes": 1218,
+      "normalized_sha256": "c6a0255fe851464a79c0b35267990f845e4c75e091766242e49cca21660eabcd",
+      "normalized_bytes": 1160
+    },
+    {
+      "file": "after.log",
+      "raw_source": "netbaiot-event-load-owner-after.log",
+      "raw_sha256": "c19995b52da86d4bd420cf14ffa2f36022802482a909c780a271625f5cc7bdf7",
+      "raw_bytes": 469,
+      "normalized_sha256": "c19995b52da86d4bd420cf14ffa2f36022802482a909c780a271625f5cc7bdf7",
+      "normalized_bytes": 469
+    },
+    {
+      "file": "all-perf-tests.log",
+      "raw_source": "netbaiot-event-load-owner-all-perf.log",
+      "raw_sha256": "2cd23af89f57d477692e911e7c6b086a58b9cfa3b54c550505b813a5f3e67e54",
+      "raw_bytes": 3093,
+      "normalized_sha256": "2cd23af89f57d477692e911e7c6b086a58b9cfa3b54c550505b813a5f3e67e54",
+      "normalized_bytes": 3093
+    }
+  ],
+  "normalization": "Replace repository prefix with <repo> and local user home with <user-home>; all other log bytes unchanged.",
+  "failure_behavior": "The actual main is invoked with fake owned subprocesses and mocked network/status. Second process CPU read raises CalledProcessError while the fake profiler is still running. The error propagates; successful loadgen is not restarted, server/sink/profiler are terminated and reaped. The existing two successful-path CPU output checks retain legacy cumulative 108 and load delta 5 (snapshots 100/105), including profiler/no-profiler cases."
+}

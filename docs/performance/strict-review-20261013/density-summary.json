@@ -1,0 +1,1328 @@
+{
+  "baseline_source": "fe4770b240e628418102b9c8964ac81d3273b730",
+  "candidate_runtime_source": "b4db4b7be6f3207aac34a9610eb0ce96d4f23e96",
+  "connection_target": 10000,
+  "valid_matched_runs": 24,
+  "repeats_per_variant": 2,
+  "all_runs_actual_online_and_disconnects_10000": true,
+  "all_host_swap_snapshots_used_zero": true,
+  "cpu_ramp_snapshot_seconds_range": [
+    24.058093042,
+    24.099486916
+  ],
+  "cpu_stable_snapshot_seconds_range": [
+    3.167081792000001,
+    3.301377207999998
+  ],
+  "excluded_original_tcp_runs": [
+    "density-original/before-tcp-idle-10000-1.json",
+    "density-original/after-tcp-idle-10000-1.json"
+  ],
+  "notes": [
+    "Invalid original candidate established only 6332 and is never normalized as 10K.",
+    "TCP comparison is entirely the four runs using identical 35-second natural cooldown.",
+    "CPU percentages derive from ps cumulative process CPU across RSS snapshot intervals, not full 20-second hold.",
+    "Host-wide swap is not per-process swap; ps CPU has finite time resolution.",
+    "Linux cgroup/kernel socket memory and private quota balance remain null."
+  ],
+  "summaries": [
+    {
+      "case": "mqtt311-idle",
+      "variants": {
+        "before": {
+          "online_per_run": [
+            10000,
+            10000
+          ],
+          "completed_disconnects_per_run": [
+            10000,
+            10000
+          ],
+          "errors_per_run": [
+            0,
+            0
+          ],
+          "runs": [
+            "density-original/before-mqtt311-idle-10000-1.json",
+            "density-original/before-mqtt311-idle-10000-2.json"
+          ],
+          "rss_delta_bytes_per_connection_range": [
+            11901.3,
+            12022.6
+          ],
+          "requested_heap_delta_bytes_per_connection_range": [
+            10778.984,
+            10779.0928
+          ],
+          "task_delta_per_connection_range": [
+            1.0,
+            1.0
+          ],
+          "process_cpu_percent_ramp_range": [
+            4.736401142643115,
+            4.862906929733636
+          ],
+          "process_cpu_percent_stable_range": [
+            0.0,
+            0.0
+          ],
+          "cpu_ramp_snapshot_seconds_range": [
+            24.059683167,
+            24.068907292
+          ],
+          "cpu_stable_snapshot_seconds_range": [
+            3.180845250000001,
+            3.183220125000002
+          ],
+          "connect_p99_ms_range": [
+            4.24,
+            4.33
+          ],
+          "heartbeat_p99_ms_range": null
+        },
+        "after": {
+          "online_per_run": [
+            10000,
+            10000
+          ],
+          "completed_disconnects_per_run": [
+            10000,
+            10000
+          ],
+          "errors_per_run": [
+            0,
+            0
+          ],
+          "runs": [
+            "density-original/after-mqtt311-idle-10000-1.json",
+            "density-original/after-mqtt311-idle-10000-2.json"
+          ],
+          "rss_delta_bytes_per_connection_range": [
+            12114.3,
+            12168.4
+          ],
+          "requested_heap_delta_bytes_per_connection_range": [
+            10787.2884,
+            10787.4164
+          ],
+          "task_delta_per_connection_range": [
+            1.0,
+            1.0
+          ],
+          "process_cpu_percent_ramp_range": [
+            4.777573984561752,
+            4.778111223259964
+          ],
+          "process_cpu_percent_stable_range": [
+            0.0,
+            0.0
+          ],
+          "cpu_ramp_snapshot_seconds_range": [
+            24.068087708,
+            24.070794167000003
+          ],
+          "cpu_stable_snapshot_seconds_range": [
+            3.184761667,
+            3.186924915999999
+          ],
+          "connect_p99_ms_range": [
+            4.22,
+            4.38
+          ],
+          "heartbeat_p99_ms_range": null
+        }
+      },
+      "paired_requested_heap_delta_bytes_per_connection": [
+        8.304399999999077,
+        8.323599999999715
+      ]
+    },
+    {
+      "case": "mqtt5-idle",
+      "variants": {
+        "before": {
+          "online_per_run": [
+            10000,
+            10000
+          ],
+          "completed_disconnects_per_run": [
+            10000,
+            10000
+          ],
+          "errors_per_run": [
+            0,
+            0
+          ],
+          "runs": [
+            "density-original/before-mqtt5-idle-10000-1.json",
+            "density-original/before-mqtt5-idle-10000-2.json"
+          ],
+          "rss_delta_bytes_per_connection_range": [
+            11801.4,
+            12120.9
+          ],
+          "requested_heap_delta_bytes_per_connection_range": [
+            10803.054,
+            10803.1084
+          ],
+          "task_delta_per_connection_range": [
+            1.0,
+            1.0
+          ],
+          "process_cpu_percent_ramp_range": [
+            5.111031931355323,
+            5.194425205736379
+          ],
+          "process_cpu_percent_stable_range": [
+            0.0,
+            0.0
+          ],
+          "cpu_ramp_snapshot_seconds_range": [
+            24.064260249999997,
+            24.065590208
+          ],
+          "cpu_stable_snapshot_seconds_range": [
+            3.1877720840000023,
+            3.301377207999998
+          ],
+          "connect_p99_ms_range": [
+            4.19,
+            4.37
+          ],
+          "heartbeat_p99_ms_range": null
+        },
+        "after": {
+          "online_per_run": [
+            10000,
+            10000
+          ],
+          "completed_disconnects_per_run": [
+            10000,
+            10000
+          ],
+          "errors_per_run": [
+            0,
+            0
+          ],
+          "runs": [
+            "density-original/after-mqtt5-idle-10000-1.json",
+            "density-original/after-mqtt5-idle-10000-2.json"
+          ],
+          "rss_delta_bytes_per_connection_range": [
+            11811.2,
+            12081.6
+          ],
+          "requested_heap_delta_bytes_per_connection_range": [
+            10810.7724,
+            10811.054
+          ],
+          "task_delta_per_connection_range": [
+            1.0,
+            1.0
+          ],
+          "process_cpu_percent_ramp_range": [
+            4.944248200262494,
+            5.152998088671932
+          ],
+          "process_cpu_percent_stable_range": [
+            0.0,
+            0.0
+          ],
+          "cpu_ramp_snapshot_seconds_range": [
+            24.063661167,
+            24.068371
+          ],
+          "cpu_stable_snapshot_seconds_range": [
+            3.1737364160000006,
+            3.1809954580000017
+          ],
+          "connect_p99_ms_range": [
+            4.38,
+            4.66
+          ],
+          "heartbeat_p99_ms_range": null
+        }
+      },
+      "paired_requested_heap_delta_bytes_per_connection": [
+        7.664000000000669,
+        8.0
+      ]
+    },
+    {
+      "case": "mqtt311-tls",
+      "variants": {
+        "before": {
+          "online_per_run": [
+            10000,
+            10000
+          ],
+          "completed_disconnects_per_run": [
+            10000,
+            10000
+          ],
+          "errors_per_run": [
+            0,
+            0
+          ],
+          "runs": [
+            "density-original/before-mqtt311-tls-10000-1.json",
+            "density-original/before-mqtt311-tls-10000-2.json"
+          ],
+          "rss_delta_bytes_per_connection_range": [
+            19659.2,
+            19660.8
+          ],
+          "requested_heap_delta_bytes_per_connection_range": [
+            18243.3952,
+            18243.4496
+          ],
+          "task_delta_per_connection_range": [
+            1.0,
+            1.0
+          ],
+          "process_cpu_percent_ramp_range": [
+            34.913287537851105,
+            35.6568301154729
+          ],
+          "process_cpu_percent_stable_range": [
+            0.31218892890262984,
+            0.3132731360728036
+          ],
+          "cpu_ramp_snapshot_seconds_range": [
+            24.088250042000002,
+            24.090756167
+          ],
+          "cpu_stable_snapshot_seconds_range": [
+            3.1921026250000004,
+            3.2031885419999995
+          ],
+          "connect_p99_ms_range": [
+            5.16,
+            6.3
+          ],
+          "heartbeat_p99_ms_range": null
+        },
+        "after": {
+          "online_per_run": [
+            10000,
+            10000
+          ],
+          "completed_disconnects_per_run": [
+            10000,
+            10000
+          ],
+          "errors_per_run": [
+            0,
+            0
+          ],
+          "runs": [
+            "density-original/after-mqtt311-tls-10000-1.json",
+            "density-original/after-mqtt311-tls-10000-2.json"
+          ],
+          "rss_delta_bytes_per_connection_range": [
+            19610.0,
+            19739.4
+          ],
+          "requested_heap_delta_bytes_per_connection_range": [
+            18251.2864,
+            18251.6224
+          ],
+          "task_delta_per_connection_range": [
+            1.0,
+            1.0
+          ],
+          "process_cpu_percent_ramp_range": [
+            34.36037452927586,
+            35.60241771912419
+          ],
+          "process_cpu_percent_stable_range": [
+            0.31221030298682323,
+            0.3136920789142546
+          ],
+          "cpu_ramp_snapshot_seconds_range": [
+            24.097525459,
+            24.099486916
+          ],
+          "cpu_stable_snapshot_seconds_range": [
+            3.1878395000000026,
+            3.2029692500000024
+          ],
+          "connect_p99_ms_range": [
+            5.01,
+            6.68
+          ],
+          "heartbeat_p99_ms_range": null
+        }
+      },
+      "paired_requested_heap_delta_bytes_per_connection": [
+        7.836800000000949,
+        8.227200000001176
+      ]
+    },
+    {
+      "case": "mqtt311-heartbeat",
+      "variants": {
+        "before": {
+          "online_per_run": [
+            10000,
+            10000
+          ],
+          "completed_disconnects_per_run": [
+            10000,
+            10000
+          ],
+          "errors_per_run": [
+            0,
+            0
+          ],
+          "runs": [
+            "density-original/before-mqtt311-heartbeat-10000-1.json",
+            "density-original/before-mqtt311-heartbeat-10000-2.json"
+          ],
+          "rss_delta_bytes_per_connection_range": [
+            11842.4,
+            12158.6
+          ],
+          "requested_heap_delta_bytes_per_connection_range": [
+            10967.7276,
+            10967.8144
+          ],
+          "task_delta_per_connection_range": [
+            1.0,
+            1.0
+          ],
+          "process_cpu_percent_ramp_range": [
+            14.750850806802829,
+            15.12482145900873
+          ],
+          "process_cpu_percent_stable_range": [
+            16.103152160081617,
+            16.681111607069596
+          ],
+          "cpu_ramp_snapshot_seconds_range": [
+            24.066399791,
+            24.066408416
+          ],
+          "cpu_stable_snapshot_seconds_range": [
+            3.167081792000001,
+            3.1772462919999995
+          ],
+          "connect_p99_ms_range": [
+            3.64,
+            3.97
+          ],
+          "heartbeat_p99_ms_range": [
+            2.3,
+            3.26
+          ]
+        },
+        "after": {
+          "online_per_run": [
+            10000,
+            10000
+          ],
+          "completed_disconnects_per_run": [
+            10000,
+            10000
+          ],
+          "errors_per_run": [
+            0,
+            0
+          ],
+          "runs": [
+            "density-original/after-mqtt311-heartbeat-10000-1.json",
+            "density-original/after-mqtt311-heartbeat-10000-2.json"
+          ],
+          "rss_delta_bytes_per_connection_range": [
+            12161.8,
+            12212.6
+          ],
+          "requested_heap_delta_bytes_per_connection_range": [
+            10975.8908,
+            10975.9004
+          ],
+          "task_delta_per_connection_range": [
+            1.0,
+            1.0
+          ],
+          "process_cpu_percent_ramp_range": [
+            15.706711240346365,
+            16.5760151987519
+          ],
+          "process_cpu_percent_stable_range": [
+            16.312875301518613,
+            17.25210238432683
+          ],
+          "cpu_ramp_snapshot_seconds_range": [
+            24.066145625,
+            24.070923875000002
+          ],
+          "cpu_stable_snapshot_seconds_range": [
+            3.187666125,
+            3.188017249999998
+          ],
+          "connect_p99_ms_range": [
+            3.43,
+            3.8
+          ],
+          "heartbeat_p99_ms_range": [
+            1.92,
+            3.29
+          ]
+        }
+      },
+      "paired_requested_heap_delta_bytes_per_connection": [
+        8.076399999999921,
+        8.17280000000028
+      ]
+    },
+    {
+      "case": "mqtt5-persistent-subscribed",
+      "variants": {
+        "before": {
+          "online_per_run": [
+            10000,
+            10000
+          ],
+          "completed_disconnects_per_run": [
+            10000,
+            10000
+          ],
+          "errors_per_run": [
+            0,
+            0
+          ],
+          "runs": [
+            "density-original/before-mqtt5-persistent-subscribed-10000-1.json",
+            "density-original/before-mqtt5-persistent-subscribed-10000-2.json"
+          ],
+          "rss_delta_bytes_per_connection_range": [
+            13713.4,
+            13716.7
+          ],
+          "requested_heap_delta_bytes_per_connection_range": [
+            12296.4636,
+            12296.496
+          ],
+          "task_delta_per_connection_range": [
+            1.0,
+            1.0
+          ],
+          "process_cpu_percent_ramp_range": [
+            7.437660253461301,
+            7.646011656547638
+          ],
+          "process_cpu_percent_stable_range": [
+            0.0,
+            0.3133512177015865
+          ],
+          "cpu_ramp_snapshot_seconds_range": [
+            24.064833833,
+            24.066708333
+          ],
+          "cpu_stable_snapshot_seconds_range": [
+            3.1865447499999995,
+            3.191307208999998
+          ],
+          "connect_p99_ms_range": [
+            4.14,
+            4.96
+          ],
+          "heartbeat_p99_ms_range": null
+        },
+        "after": {
+          "online_per_run": [
+            10000,
+            10000
+          ],
+          "completed_disconnects_per_run": [
+            10000,
+            10000
+          ],
+          "errors_per_run": [
+            0,
+            0
+          ],
+          "runs": [
+            "density-original/after-mqtt5-persistent-subscribed-10000-1.json",
+            "density-original/after-mqtt5-persistent-subscribed-10000-2.json"
+          ],
+          "rss_delta_bytes_per_connection_range": [
+            13641.3,
+            13672.4
+          ],
+          "requested_heap_delta_bytes_per_connection_range": [
+            12304.3996,
+            12304.5504
+          ],
+          "task_delta_per_connection_range": [
+            1.0,
+            1.0
+          ],
+          "process_cpu_percent_ramp_range": [
+            7.560195159168616,
+            7.731286086361291
+          ],
+          "process_cpu_percent_stable_range": [
+            0.31325216818459306,
+            0.31502052936338965
+          ],
+          "cpu_ramp_snapshot_seconds_range": [
+            24.058093042,
+            24.073452624999998
+          ],
+          "cpu_stable_snapshot_seconds_range": [
+            3.1743962910000008,
+            3.192316292000001
+          ],
+          "connect_p99_ms_range": [
+            4.76,
+            5.48
+          ],
+          "heartbeat_p99_ms_range": null
+        }
+      },
+      "paired_requested_heap_delta_bytes_per_connection": [
+        8.086800000000949,
+        7.903600000001461
+      ]
+    },
+    {
+      "case": "tcp-idle",
+      "variants": {
+        "before": {
+          "online_per_run": [
+            10000,
+            10000
+          ],
+          "completed_disconnects_per_run": [
+            10000,
+            10000
+          ],
+          "errors_per_run": [
+            0,
+            0
+          ],
+          "runs": [
+            "density-tcp-retry/before-tcp-idle-10000-1.json",
+            "density-tcp-retry/before-tcp-idle-10000-2.json"
+          ],
+          "rss_delta_bytes_per_connection_range": [
+            9620.7,
+            9704.2
+          ],
+          "requested_heap_delta_bytes_per_connection_range": [
+            8755.37,
+            8755.4244
+          ],
+          "task_delta_per_connection_range": [
+            1.0,
+            1.0
+          ],
+          "process_cpu_percent_ramp_range": [
+            4.155918465825243,
+            4.196638641914643
+          ],
+          "process_cpu_percent_stable_range": [
+            0.0,
+            0.0
+          ],
+          "cpu_ramp_snapshot_seconds_range": [
+            24.062069750000003,
+            24.066880334
+          ],
+          "cpu_stable_snapshot_seconds_range": [
+            3.175894207999999,
+            3.1867172079999975
+          ],
+          "connect_p99_ms_range": [
+            3.69,
+            4.06
+          ],
+          "heartbeat_p99_ms_range": null
+        },
+        "after": {
+          "online_per_run": [
+            10000,
+            10000
+          ],
+          "completed_disconnects_per_run": [
+            10000,
+            10000
+          ],
+          "errors_per_run": [
+            0,
+            0
+          ],
+          "runs": [
+            "density-tcp-retry/after-tcp-idle-10000-1.json",
+            "density-tcp-retry/after-tcp-idle-10000-2.json"
+          ],
+          "rss_delta_bytes_per_connection_range": [
+            9640.3,
+            9650.2
+          ],
+          "requested_heap_delta_bytes_per_connection_range": [
+            8763.37,
+            8763.5208
+          ],
+          "task_delta_per_connection_range": [
+            1.0,
+            1.0
+          ],
+          "process_cpu_percent_ramp_range": [
+            4.073468079684254,
+            4.447009094159573
+          ],
+          "process_cpu_percent_stable_range": [
+            0.0,
+            0.0
+          ],
+          "cpu_ramp_snapshot_seconds_range": [
+            24.058123958,
+            24.061115625
+          ],
+          "cpu_stable_snapshot_seconds_range": [
+            3.1732485839999995,
+            3.174364166
+          ],
+          "connect_p99_ms_range": [
+            3.2,
+            3.27
+          ],
+          "heartbeat_p99_ms_range": null
+        }
+      },
+      "paired_requested_heap_delta_bytes_per_connection": [
+        8.150799999999435,
+        7.945600000000923
+      ]
+    }
+  ],
+  "runs": [
+    {
+      "case": "mqtt311-idle",
+      "variant": "before",
+      "repeat": 1,
+      "json": "density-original/before-mqtt311-idle-10000-1.json",
+      "sidecar": "density-original/before-mqtt311-idle-10000-1-sidecar.json",
+      "online": 10000,
+      "connected": 10000,
+      "disconnected": 10000,
+      "client_errors": 0,
+      "rss_delta_bytes_per_connection": 11901.3,
+      "requested_heap_delta_bytes_per_connection": 10778.984,
+      "task_delta_per_connection": 1.0,
+      "process_cpu_percent_ramp": 4.862906929733636,
+      "process_cpu_percent_stable": 0.0,
+      "cpu_ramp_snapshot_seconds": 24.059683167,
+      "cpu_stable_snapshot_seconds": 3.183220125000002,
+      "connect_p99_ms": 4.24,
+      "heartbeat_p99_ms": null,
+      "pings_sent": 0,
+      "ping_responses": 0,
+      "swap_all_snapshots_used_zero": true,
+      "linux_cgroup_kernel_socket": null,
+      "global_connection_byte_budget_balance": null,
+      "recorded_at_utc": "2026-10-13T14:41:39.814247+00:00"
+    },
+    {
+      "case": "mqtt311-idle",
+      "variant": "after",
+      "repeat": 1,
+      "json": "density-original/after-mqtt311-idle-10000-1.json",
+      "sidecar": "density-original/after-mqtt311-idle-10000-1-sidecar.json",
+      "online": 10000,
+      "connected": 10000,
+      "disconnected": 10000,
+      "client_errors": 0,
+      "rss_delta_bytes_per_connection": 12114.3,
+      "requested_heap_delta_bytes_per_connection": 10787.2884,
+      "task_delta_per_connection": 1.0,
+      "process_cpu_percent_ramp": 4.778111223259964,
+      "process_cpu_percent_stable": 0.0,
+      "cpu_ramp_snapshot_seconds": 24.068087708,
+      "cpu_stable_snapshot_seconds": 3.184761667,
+      "connect_p99_ms": 4.22,
+      "heartbeat_p99_ms": null,
+      "pings_sent": 0,
+      "ping_responses": 0,
+      "swap_all_snapshots_used_zero": true,
+      "linux_cgroup_kernel_socket": null,
+      "global_connection_byte_budget_balance": null,
+      "recorded_at_utc": "2026-10-13T14:42:22.854115+00:00"
+    },
+    {
+      "case": "mqtt311-idle",
+      "variant": "after",
+      "repeat": 2,
+      "json": "density-original/after-mqtt311-idle-10000-2.json",
+      "sidecar": "density-original/after-mqtt311-idle-10000-2-sidecar.json",
+      "online": 10000,
+      "connected": 10000,
+      "disconnected": 10000,
+      "client_errors": 0,
+      "rss_delta_bytes_per_connection": 12168.4,
+      "requested_heap_delta_bytes_per_connection": 10787.4164,
+      "task_delta_per_connection": 1.0,
+      "process_cpu_percent_ramp": 4.777573984561752,
+      "process_cpu_percent_stable": 0.0,
+      "cpu_ramp_snapshot_seconds": 24.070794167000003,
+      "cpu_stable_snapshot_seconds": 3.186924915999999,
+      "connect_p99_ms": 4.38,
+      "heartbeat_p99_ms": null,
+      "pings_sent": 0,
+      "ping_responses": 0,
+      "swap_all_snapshots_used_zero": true,
+      "linux_cgroup_kernel_socket": null,
+      "global_connection_byte_budget_balance": null,
+      "recorded_at_utc": "2026-10-13T14:43:04.457482+00:00"
+    },
+    {
+      "case": "mqtt311-idle",
+      "variant": "before",
+      "repeat": 2,
+      "json": "density-original/before-mqtt311-idle-10000-2.json",
+      "sidecar": "density-original/before-mqtt311-idle-10000-2-sidecar.json",
+      "online": 10000,
+      "connected": 10000,
+      "disconnected": 10000,
+      "client_errors": 0,
+      "rss_delta_bytes_per_connection": 12022.6,
+      "requested_heap_delta_bytes_per_connection": 10779.0928,
+      "task_delta_per_connection": 1.0,
+      "process_cpu_percent_ramp": 4.736401142643115,
+      "process_cpu_percent_stable": 0.0,
+      "cpu_ramp_snapshot_seconds": 24.068907292,
+      "cpu_stable_snapshot_seconds": 3.180845250000001,
+      "connect_p99_ms": 4.33,
+      "heartbeat_p99_ms": null,
+      "pings_sent": 0,
+      "ping_responses": 0,
+      "swap_all_snapshots_used_zero": true,
+      "linux_cgroup_kernel_socket": null,
+      "global_connection_byte_budget_balance": null,
+      "recorded_at_utc": "2026-10-13T14:43:46.142304+00:00"
+    },
+    {
+      "case": "mqtt5-idle",
+      "variant": "before",
+      "repeat": 1,
+      "json": "density-original/before-mqtt5-idle-10000-1.json",
+      "sidecar": "density-original/before-mqtt5-idle-10000-1-sidecar.json",
+      "online": 10000,
+      "connected": 10000,
+      "disconnected": 10000,
+      "client_errors": 0,
+      "rss_delta_bytes_per_connection": 12120.9,
+      "requested_heap_delta_bytes_per_connection": 10803.1084,
+      "task_delta_per_connection": 1.0,
+      "process_cpu_percent_ramp": 5.194425205736379,
+      "process_cpu_percent_stable": 0.0,
+      "cpu_ramp_snapshot_seconds": 24.064260249999997,
+      "cpu_stable_snapshot_seconds": 3.1877720840000023,
+      "connect_p99_ms": 4.37,
+      "heartbeat_p99_ms": null,
+      "pings_sent": 0,
+      "ping_responses": 0,
+      "swap_all_snapshots_used_zero": true,
+      "linux_cgroup_kernel_socket": null,
+      "global_connection_byte_budget_balance": null,
+      "recorded_at_utc": "2026-10-13T14:44:27.750625+00:00"
+    },
+    {
+      "case": "mqtt5-idle",
+      "variant": "after",
+      "repeat": 1,
+      "json": "density-original/after-mqtt5-idle-10000-1.json",
+      "sidecar": "density-original/after-mqtt5-idle-10000-1-sidecar.json",
+      "online": 10000,
+      "connected": 10000,
+      "disconnected": 10000,
+      "client_errors": 0,
+      "rss_delta_bytes_per_connection": 12081.6,
+      "requested_heap_delta_bytes_per_connection": 10810.7724,
+      "task_delta_per_connection": 1.0,
+      "process_cpu_percent_ramp": 4.944248200262494,
+      "process_cpu_percent_stable": 0.0,
+      "cpu_ramp_snapshot_seconds": 24.068371,
+      "cpu_stable_snapshot_seconds": 3.1809954580000017,
+      "connect_p99_ms": 4.66,
+      "heartbeat_p99_ms": null,
+      "pings_sent": 0,
+      "ping_responses": 0,
+      "swap_all_snapshots_used_zero": true,
+      "linux_cgroup_kernel_socket": null,
+      "global_connection_byte_budget_balance": null,
+      "recorded_at_utc": "2026-10-13T14:45:09.370252+00:00"
+    },
+    {
+      "case": "mqtt5-idle",
+      "variant": "after",
+      "repeat": 2,
+      "json": "density-original/after-mqtt5-idle-10000-2.json",
+      "sidecar": "density-original/after-mqtt5-idle-10000-2-sidecar.json",
+      "online": 10000,
+      "connected": 10000,
+      "disconnected": 10000,
+      "client_errors": 0,
+      "rss_delta_bytes_per_connection": 11811.2,
+      "requested_heap_delta_bytes_per_connection": 10811.054,
+      "task_delta_per_connection": 1.0,
+      "process_cpu_percent_ramp": 5.152998088671932,
+      "process_cpu_percent_stable": 0.0,
+      "cpu_ramp_snapshot_seconds": 24.063661167,
+      "cpu_stable_snapshot_seconds": 3.1737364160000006,
+      "connect_p99_ms": 4.38,
+      "heartbeat_p99_ms": null,
+      "pings_sent": 0,
+      "ping_responses": 0,
+      "swap_all_snapshots_used_zero": true,
+      "linux_cgroup_kernel_socket": null,
+      "global_connection_byte_budget_balance": null,
+      "recorded_at_utc": "2026-10-13T14:45:50.967044+00:00"
+    },
+    {
+      "case": "mqtt5-idle",
+      "variant": "before",
+      "repeat": 2,
+      "json": "density-original/before-mqtt5-idle-10000-2.json",
+      "sidecar": "density-original/before-mqtt5-idle-10000-2-sidecar.json",
+      "online": 10000,
+      "connected": 10000,
+      "disconnected": 10000,
+      "client_errors": 0,
+      "rss_delta_bytes_per_connection": 11801.4,
+      "requested_heap_delta_bytes_per_connection": 10803.054,
+      "task_delta_per_connection": 1.0,
+      "process_cpu_percent_ramp": 5.111031931355323,
+      "process_cpu_percent_stable": 0.0,
+      "cpu_ramp_snapshot_seconds": 24.065590208,
+      "cpu_stable_snapshot_seconds": 3.301377207999998,
+      "connect_p99_ms": 4.19,
+      "heartbeat_p99_ms": null,
+      "pings_sent": 0,
+      "ping_responses": 0,
+      "swap_all_snapshots_used_zero": true,
+      "linux_cgroup_kernel_socket": null,
+      "global_connection_byte_budget_balance": null,
+      "recorded_at_utc": "2026-10-13T15:04:28.171720+00:00"
+    },
+    {
+      "case": "mqtt311-tls",
+      "variant": "before",
+      "repeat": 1,
+      "json": "density-original/before-mqtt311-tls-10000-1.json",
+      "sidecar": "density-original/before-mqtt311-tls-10000-1-sidecar.json",
+      "online": 10000,
+      "connected": 10000,
+      "disconnected": 10000,
+      "client_errors": 0,
+      "rss_delta_bytes_per_connection": 19660.8,
+      "requested_heap_delta_bytes_per_connection": 18243.4496,
+      "task_delta_per_connection": 1.0,
+      "process_cpu_percent_ramp": 34.913287537851105,
+      "process_cpu_percent_stable": 0.3132731360728036,
+      "cpu_ramp_snapshot_seconds": 24.088250042000002,
+      "cpu_stable_snapshot_seconds": 3.1921026250000004,
+      "connect_p99_ms": 6.3,
+      "heartbeat_p99_ms": null,
+      "pings_sent": 0,
+      "ping_responses": 0,
+      "swap_all_snapshots_used_zero": true,
+      "linux_cgroup_kernel_socket": null,
+      "global_connection_byte_budget_balance": null,
+      "recorded_at_utc": "2026-10-13T15:21:13.135391+00:00"
+    },
+    {
+      "case": "mqtt311-tls",
+      "variant": "after",
+      "repeat": 1,
+      "json": "density-original/after-mqtt311-tls-10000-1.json",
+      "sidecar": "density-original/after-mqtt311-tls-10000-1-sidecar.json",
+      "online": 10000,
+      "connected": 10000,
+      "disconnected": 10000,
+      "client_errors": 0,
+      "rss_delta_bytes_per_connection": 19739.4,
+      "requested_heap_delta_bytes_per_connection": 18251.2864,
+      "task_delta_per_connection": 1.0,
+      "process_cpu_percent_ramp": 34.36037452927586,
+      "process_cpu_percent_stable": 0.31221030298682323,
+      "cpu_ramp_snapshot_seconds": 24.097525459,
+      "cpu_stable_snapshot_seconds": 3.2029692500000024,
+      "connect_p99_ms": 6.68,
+      "heartbeat_p99_ms": null,
+      "pings_sent": 0,
+      "ping_responses": 0,
+      "swap_all_snapshots_used_zero": true,
+      "linux_cgroup_kernel_socket": null,
+      "global_connection_byte_budget_balance": null,
+      "recorded_at_utc": "2026-10-13T15:38:21.900646+00:00"
+    },
+    {
+      "case": "mqtt311-tls",
+      "variant": "after",
+      "repeat": 2,
+      "json": "density-original/after-mqtt311-tls-10000-2.json",
+      "sidecar": "density-original/after-mqtt311-tls-10000-2-sidecar.json",
+      "online": 10000,
+      "connected": 10000,
+      "disconnected": 10000,
+      "client_errors": 0,
+      "rss_delta_bytes_per_connection": 19610.0,
+      "requested_heap_delta_bytes_per_connection": 18251.6224,
+      "task_delta_per_connection": 1.0,
+      "process_cpu_percent_ramp": 35.60241771912419,
+      "process_cpu_percent_stable": 0.3136920789142546,
+      "cpu_ramp_snapshot_seconds": 24.099486916,
+      "cpu_stable_snapshot_seconds": 3.1878395000000026,
+      "connect_p99_ms": 5.01,
+      "heartbeat_p99_ms": null,
+      "pings_sent": 0,
+      "ping_responses": 0,
+      "swap_all_snapshots_used_zero": true,
+      "linux_cgroup_kernel_socket": null,
+      "global_connection_byte_budget_balance": null,
+      "recorded_at_utc": "2026-10-13T15:39:03.514158+00:00"
+    },
+    {
+      "case": "mqtt311-tls",
+      "variant": "before",
+      "repeat": 2,
+      "json": "density-original/before-mqtt311-tls-10000-2.json",
+      "sidecar": "density-original/before-mqtt311-tls-10000-2-sidecar.json",
+      "online": 10000,
+      "connected": 10000,
+      "disconnected": 10000,
+      "client_errors": 0,
+      "rss_delta_bytes_per_connection": 19659.2,
+      "requested_heap_delta_bytes_per_connection": 18243.3952,
+      "task_delta_per_connection": 1.0,
+      "process_cpu_percent_ramp": 35.6568301154729,
+      "process_cpu_percent_stable": 0.31218892890262984,
+      "cpu_ramp_snapshot_seconds": 24.090756167,
+      "cpu_stable_snapshot_seconds": 3.2031885419999995,
+      "connect_p99_ms": 5.16,
+      "heartbeat_p99_ms": null,
+      "pings_sent": 0,
+      "ping_responses": 0,
+      "swap_all_snapshots_used_zero": true,
+      "linux_cgroup_kernel_socket": null,
+      "global_connection_byte_budget_balance": null,
+      "recorded_at_utc": "2026-10-13T15:39:45.184268+00:00"
+    },
+    {
+      "case": "mqtt311-heartbeat",
+      "variant": "before",
+      "repeat": 1,
+      "json": "density-original/before-mqtt311-heartbeat-10000-1.json",
+      "sidecar": "density-original/before-mqtt311-heartbeat-10000-1-sidecar.json",
+      "online": 10000,
+      "connected": 10000,
+      "disconnected": 10000,
+      "client_errors": 0,
+      "rss_delta_bytes_per_connection": 12158.6,
+      "requested_heap_delta_bytes_per_connection": 10967.8144,
+      "task_delta_per_connection": 1.0,
+      "process_cpu_percent_ramp": 15.12482145900873,
+      "process_cpu_percent_stable": 16.103152160081617,
+      "cpu_ramp_snapshot_seconds": 24.066399791,
+      "cpu_stable_snapshot_seconds": 3.167081792000001,
+      "connect_p99_ms": 3.64,
+      "heartbeat_p99_ms": 2.3,
+      "pings_sent": 134883,
+      "ping_responses": 134883,
+      "swap_all_snapshots_used_zero": true,
+      "linux_cgroup_kernel_socket": null,
+      "global_connection_byte_budget_balance": null,
+      "recorded_at_utc": "2026-10-13T15:40:26.812476+00:00"
+    },
+    {
+      "case": "mqtt311-heartbeat",
+      "variant": "after",
+      "repeat": 1,
+      "json": "density-original/after-mqtt311-heartbeat-10000-1.json",
+      "sidecar": "density-original/after-mqtt311-heartbeat-10000-1-sidecar.json",
+      "online": 10000,
+      "connected": 10000,
+      "disconnected": 10000,
+      "client_errors": 0,
+      "rss_delta_bytes_per_connection": 12212.6,
+      "requested_heap_delta_bytes_per_connection": 10975.8908,
+      "task_delta_per_connection": 1.0,
+      "process_cpu_percent_ramp": 16.5760151987519,
+      "process_cpu_percent_stable": 16.312875301518613,
+      "cpu_ramp_snapshot_seconds": 24.070923875000002,
+      "cpu_stable_snapshot_seconds": 3.187666125,
+      "connect_p99_ms": 3.43,
+      "heartbeat_p99_ms": 1.92,
+      "pings_sent": 134907,
+      "ping_responses": 134907,
+      "swap_all_snapshots_used_zero": true,
+      "linux_cgroup_kernel_socket": null,
+      "global_connection_byte_budget_balance": null,
+      "recorded_at_utc": "2026-10-13T15:41:08.438452+00:00"
+    },
+    {
+      "case": "mqtt311-heartbeat",
+      "variant": "after",
+      "repeat": 2,
+      "json": "density-original/after-mqtt311-heartbeat-10000-2.json",
+      "sidecar": "density-original/after-mqtt311-heartbeat-10000-2-sidecar.json",
+      "online": 10000,
+      "connected": 10000,
+      "disconnected": 10000,
+      "client_errors": 0,
+      "rss_delta_bytes_per_connection": 12161.8,
+      "requested_heap_delta_bytes_per_connection": 10975.9004,
+      "task_delta_per_connection": 1.0,
+      "process_cpu_percent_ramp": 15.706711240346365,
+      "process_cpu_percent_stable": 17.25210238432683,
+      "cpu_ramp_snapshot_seconds": 24.066145625,
+      "cpu_stable_snapshot_seconds": 3.188017249999998,
+      "connect_p99_ms": 3.8,
+      "heartbeat_p99_ms": 3.29,
+      "pings_sent": 134887,
+      "ping_responses": 134887,
+      "swap_all_snapshots_used_zero": true,
+      "linux_cgroup_kernel_socket": null,
+      "global_connection_byte_budget_balance": null,
+      "recorded_at_utc": "2026-10-13T15:41:50.052136+00:00"
+    },
+    {
+      "case": "mqtt311-heartbeat",
+      "variant": "before",
+      "repeat": 2,
+      "json": "density-original/before-mqtt311-heartbeat-10000-2.json",
+      "sidecar": "density-original/before-mqtt311-heartbeat-10000-2-sidecar.json",
+      "online": 10000,
+      "connected": 10000,
+      "disconnected": 10000,
+      "client_errors": 0,
+      "rss_delta_bytes_per_connection": 11842.4,
+      "requested_heap_delta_bytes_per_connection": 10967.7276,
+      "task_delta_per_connection": 1.0,
+      "process_cpu_percent_ramp": 14.750850806802829,
+      "process_cpu_percent_stable": 16.681111607069596,
+      "cpu_ramp_snapshot_seconds": 24.066408416,
+      "cpu_stable_snapshot_seconds": 3.1772462919999995,
+      "connect_p99_ms": 3.97,
+      "heartbeat_p99_ms": 3.26,
+      "pings_sent": 134859,
+      "ping_responses": 134859,
+      "swap_all_snapshots_used_zero": true,
+      "linux_cgroup_kernel_socket": null,
+      "global_connection_byte_budget_balance": null,
+      "recorded_at_utc": "2026-10-13T15:42:31.726427+00:00"
+    },
+    {
+      "case": "mqtt5-persistent-subscribed",
+      "variant": "before",
+      "repeat": 1,
+      "json": "density-original/before-mqtt5-persistent-subscribed-10000-1.json",
+      "sidecar": "density-original/before-mqtt5-persistent-subscribed-10000-1-sidecar.json",
+      "online": 10000,
+      "connected": 10000,
+      "disconnected": 10000,
+      "client_errors": 0,
+      "rss_delta_bytes_per_connection": 13716.7,
+      "requested_heap_delta_bytes_per_connection": 12296.4636,
+      "task_delta_per_connection": 1.0,
+      "process_cpu_percent_ramp": 7.646011656547638,
+      "process_cpu_percent_stable": 0.0,
+      "cpu_ramp_snapshot_seconds": 24.064833833,
+      "cpu_stable_snapshot_seconds": 3.1865447499999995,
+      "connect_p99_ms": 4.14,
+      "heartbeat_p99_ms": null,
+      "pings_sent": 0,
+      "ping_responses": 0,
+      "swap_all_snapshots_used_zero": true,
+      "linux_cgroup_kernel_socket": null,
+      "global_connection_byte_budget_balance": null,
+      "recorded_at_utc": "2026-10-13T15:43:13.416253+00:00"
+    },
+    {
+      "case": "mqtt5-persistent-subscribed",
+      "variant": "after",
+      "repeat": 1,
+      "json": "density-original/after-mqtt5-persistent-subscribed-10000-1.json",
+      "sidecar": "density-original/after-mqtt5-persistent-subscribed-10000-1-sidecar.json",
+      "online": 10000,
+      "connected": 10000,
+      "disconnected": 10000,
+      "client_errors": 0,
+      "rss_delta_bytes_per_connection": 13641.3,
+      "requested_heap_delta_bytes_per_connection": 12304.5504,
+      "task_delta_per_connection": 1.0,
+      "process_cpu_percent_ramp": 7.731286086361291,
+      "process_cpu_percent_stable": 0.31502052936338965,
+      "cpu_ramp_snapshot_seconds": 24.058093042,
+      "cpu_stable_snapshot_seconds": 3.1743962910000008,
+      "connect_p99_ms": 4.76,
+      "heartbeat_p99_ms": null,
+      "pings_sent": 0,
+      "ping_responses": 0,
+      "swap_all_snapshots_used_zero": true,
+      "linux_cgroup_kernel_socket": null,
+      "global_connection_byte_budget_balance": null,
+      "recorded_at_utc": "2026-10-13T15:59:03.291557+00:00"
+    },
+    {
+      "case": "mqtt5-persistent-subscribed",
+      "variant": "after",
+      "repeat": 2,
+      "json": "density-original/after-mqtt5-persistent-subscribed-10000-2.json",
+      "sidecar": "density-original/after-mqtt5-persistent-subscribed-10000-2-sidecar.json",
+      "online": 10000,
+      "connected": 10000,
+      "disconnected": 10000,
+      "client_errors": 0,
+      "rss_delta_bytes_per_connection": 13672.4,
+      "requested_heap_delta_bytes_per_connection": 12304.3996,
+      "task_delta_per_connection": 1.0,
+      "process_cpu_percent_ramp": 7.560195159168616,
+      "process_cpu_percent_stable": 0.31325216818459306,
+      "cpu_ramp_snapshot_seconds": 24.073452624999998,
+      "cpu_stable_snapshot_seconds": 3.192316292000001,
+      "connect_p99_ms": 5.48,
+      "heartbeat_p99_ms": null,
+      "pings_sent": 0,
+      "ping_responses": 0,
+      "swap_all_snapshots_used_zero": true,
+      "linux_cgroup_kernel_socket": null,
+      "global_connection_byte_budget_balance": null,
+      "recorded_at_utc": "2026-10-13T16:31:33.426903+00:00"
+    },
+    {
+      "case": "mqtt5-persistent-subscribed",
+      "variant": "before",
+      "repeat": 2,
+      "json": "density-original/before-mqtt5-persistent-subscribed-10000-2.json",
+      "sidecar": "density-original/before-mqtt5-persistent-subscribed-10000-2-sidecar.json",
+      "online": 10000,
+      "connected": 10000,
+      "disconnected": 10000,
+      "client_errors": 0,
+      "rss_delta_bytes_per_connection": 13713.4,
+      "requested_heap_delta_bytes_per_connection": 12296.496,
+      "task_delta_per_connection": 1.0,
+      "process_cpu_percent_ramp": 7.437660253461301,
+      "process_cpu_percent_stable": 0.3133512177015865,
+      "cpu_ramp_snapshot_seconds": 24.066708333,
+      "cpu_stable_snapshot_seconds": 3.191307208999998,
+      "connect_p99_ms": 4.96,
+      "heartbeat_p99_ms": null,
+      "pings_sent": 0,
+      "ping_responses": 0,
+      "swap_all_snapshots_used_zero": true,
+      "linux_cgroup_kernel_socket": null,
+      "global_connection_byte_budget_balance": null,
+      "recorded_at_utc": "2026-10-13T16:58:02.402195+00:00"
+    },
+    {
+      "case": "tcp-idle",
+      "variant": "before",
+      "repeat": 1,
+      "json": "density-tcp-retry/before-tcp-idle-10000-1.json",
+      "sidecar": "density-tcp-retry/before-tcp-idle-10000-1-sidecar.json",
+      "online": 10000,
+      "connected": 10000,
+      "disconnected": 10000,
+      "client_errors": 0,
+      "rss_delta_bytes_per_connection": 9620.7,
+      "requested_heap_delta_bytes_per_connection": 8755.37,
+      "task_delta_per_connection": 1.0,
+      "process_cpu_percent_ramp": 4.155918465825243,
+      "process_cpu_percent_stable": 0.0,
+      "cpu_ramp_snapshot_seconds": 24.062069750000003,
+      "cpu_stable_snapshot_seconds": 3.175894207999999,
+      "connect_p99_ms": 3.69,
+      "heartbeat_p99_ms": null,
+      "pings_sent": 0,
+      "ping_responses": 0,
+      "swap_all_snapshots_used_zero": true,
+      "linux_cgroup_kernel_socket": null,
+      "global_connection_byte_budget_balance": null,
+      "recorded_at_utc": "2026-10-14T00:48:05.835135+00:00"
+    },
+    {
+      "case": "tcp-idle",
+      "variant": "after",
+      "repeat": 1,
+      "json": "density-tcp-retry/after-tcp-idle-10000-1.json",
+      "sidecar": "density-tcp-retry/after-tcp-idle-10000-1-sidecar.json",
+      "online": 10000,
+      "connected": 10000,
+      "disconnected": 10000,
+      "client_errors": 0,
+      "rss_delta_bytes_per_connection": 9650.2,
+      "requested_heap_delta_bytes_per_connection": 8763.5208,
+      "task_delta_per_connection": 1.0,
+      "process_cpu_percent_ramp": 4.073468079684254,
+      "process_cpu_percent_stable": 0.0,
+      "cpu_ramp_snapshot_seconds": 24.058123958,
+      "cpu_stable_snapshot_seconds": 3.1732485839999995,
+      "connect_p99_ms": 3.27,
+      "heartbeat_p99_ms": null,
+      "pings_sent": 0,
+      "ping_responses": 0,
+      "swap_all_snapshots_used_zero": true,
+      "linux_cgroup_kernel_socket": null,
+      "global_connection_byte_budget_balance": null,
+      "recorded_at_utc": "2026-10-14T00:49:22.525005+00:00"
+    },
+    {
+      "case": "tcp-idle",
+      "variant": "after",
+      "repeat": 2,
+      "json": "density-tcp-retry/after-tcp-idle-10000-2.json",
+      "sidecar": "density-tcp-retry/after-tcp-idle-10000-2-sidecar.json",
+      "online": 10000,
+      "connected": 10000,
+      "disconnected": 10000,
+      "client_errors": 0,
+      "rss_delta_bytes_per_connection": 9640.3,
+      "requested_heap_delta_bytes_per_connection": 8763.37,
+      "task_delta_per_connection": 1.0,
+      "process_cpu_percent_ramp": 4.447009094159573,
+      "process_cpu_percent_stable": 0.0,
+      "cpu_ramp_snapshot_seconds": 24.061115625,
+      "cpu_stable_snapshot_seconds": 3.174364166,
+      "connect_p99_ms": 3.2,
+      "heartbeat_p99_ms": null,
+      "pings_sent": 0,
+      "ping_responses": 0,
+      "swap_all_snapshots_used_zero": true,
+      "linux_cgroup_kernel_socket": null,
+      "global_connection_byte_budget_balance": null,
+      "recorded_at_utc": "2026-10-14T00:50:39.313457+00:00"
+    },
+    {
+      "case": "tcp-idle",
+      "variant": "before",
+      "repeat": 2,
+      "json": "density-tcp-retry/before-tcp-idle-10000-2.json",
+      "sidecar": "density-tcp-retry/before-tcp-idle-10000-2-sidecar.json",
+      "online": 10000,
+      "connected": 10000,
+      "disconnected": 10000,
+      "client_errors": 0,
+      "rss_delta_bytes_per_connection": 9704.2,
+      "requested_heap_delta_bytes_per_connection": 8755.4244,
+      "task_delta_per_connection": 1.0,
+      "process_cpu_percent_ramp": 4.196638641914643,
+      "process_cpu_percent_stable": 0.0,
+      "cpu_ramp_snapshot_seconds": 24.066880334,
+      "cpu_stable_snapshot_seconds": 3.1867172079999975,
+      "connect_p99_ms": 4.06,
+      "heartbeat_p99_ms": null,
+      "pings_sent": 0,
+      "ping_responses": 0,
+      "swap_all_snapshots_used_zero": true,
+      "linux_cgroup_kernel_socket": null,
+      "global_connection_byte_budget_balance": null,
+      "recorded_at_utc": "2026-10-14T00:51:56.038924+00:00"
+    }
+  ]
+}

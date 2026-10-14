@@ -1,0 +1,25 @@
+reading file "target/performance/production-readiness/heap-profile/1000-json-mqtt5-telemetry64-none/heaptrack.zst" - please wait, this might take some time...
+Debuggee command was: <repo>/netbaiot/target/release/netbaiot-server <repo>/netbaiot/target/performance/production-readiness/heap-profile/1000-json-mqtt5-telemetry64-none/server.json
+finished reading file, now analyzing data:
+
+MOST CALLS TO ALLOCATION FUNCTIONS
+4772887 calls to allocation functions with 20.58M peak consumption from
+0x0
+  in ??
+
+PEAK MEMORY CONSUMERS
+20.58M peak memory consumed over 4772887 calls from
+0x0
+  in ??
+
+MOST TEMPORARY ALLOCATIONS
+500549 temporary allocations of 4772887 allocations in total (10.49%) from
+0x0
+  in ??
+
+total runtime: 36.38s.
+calls to allocation functions: 4772887 (131188/s)
+temporary memory allocations: 500549 (13758/s)
+peak heap memory consumption: 20.58M
+peak RSS (including heaptrack overhead): 37.27M
+total memory leaked: 66.59K

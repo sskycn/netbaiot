@@ -1,0 +1,59 @@
+   Compiling ring v0.17.14
+   Compiling rustls v0.23.45
+   Compiling rustls-webpki v0.103.15
+   Compiling jsonwebtoken v9.3.1
+   Compiling tokio-rustls v0.26.4
+   Compiling hyper-rustls v0.27.10
+   Compiling reqwest v0.12.28
+   Compiling netbaiot-runtime v0.3.1 (<repo>/crates/netbaiot-runtime)
+   Compiling netbaiot-transports v0.3.1 (<repo>/crates/netbaiot-transports)
+   Compiling netbaiot-auth-deadline-audit v0.0.0 (<tmp>/netbaiot-auth-deadline-audit)
+warning: struct `ReadFrame` is never constructed
+  --> tests/full_ready_auth_impl/baseline.rs:16:8
+   |
+16 | struct ReadFrame {
+   |        ^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: associated items `with_budget`, `authenticate`, `take_frame`, `own_frame`, and `consumed` are never used
+   --> tests/full_ready_auth_impl/baseline.rs:36:12
+    |
+ 25 | impl Reader {
+    | ----------- associated items in this implementation
+...
+ 36 |     pub fn with_budget(maximum: usize, timeout_ms: u64, budget: ConnectionReadBudget) -> Self {
+    |            ^^^^^^^^^^^
+...
+ 42 |     pub fn authenticate(&mut self, device: &netbaiot_core::DeviceKey) -> Result<()> {
+    |            ^^^^^^^^^^^^
+...
+ 50 |     pub fn take_frame(&mut self, length: usize) -> Result<Bytes> {
+    |            ^^^^^^^^^^
+...
+ 57 |     pub fn own_frame(&self, frame: Bytes) -> Bytes {
+    |            ^^^^^^^^^
+...
+151 |     pub fn consumed(&mut self) {
+    |            ^^^^^^^^
+
+warning: `netbaiot-auth-deadline-audit` (test "full_ready_auth") generated 2 warnings
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 7.88s
+     Running tests/full_ready_auth.rs (target/debug/deps/full_ready_auth-326c06775ce0a2e5)
+
+running 1 test
+full_ready_auth result_success=false error=Some(Invalid) provider_calls=0 buffer_len=8 capacity=8
+
+thread 'full_prefilled_reader_ready_authentication' (1005782) panicked at tests/full_ready_auth.rs:146:5:
+full reader rejected ready authentication: Some(Invalid); provider_calls=0
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test full_prefilled_reader_ready_authentication ... FAILED
+
+failures:
+
+failures:
+    full_prefilled_reader_ready_authentication
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `--test full_ready_auth`
