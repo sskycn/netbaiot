@@ -53,6 +53,7 @@ fn startup_failures_and_dropped_run_future_release_owned_tasks() {
         .build()
         .unwrap();
     runtime.block_on(async {
+        let _port_guard = EPHEMERAL_PORT_TEST_LOCK.lock().await;
         let root =
             std::env::temp_dir().join(format!("netbaiot-startup-owner-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&root).unwrap();
@@ -2151,9 +2152,14 @@ async fn subprocess_sigkill_exposes_the_documented_three_event_loss_window() {
 async fn subprocess_spool_failure_stays_alive_until_repaired_then_replays_same_event_id() {
     let _port_guard = EPHEMERAL_PORT_TEST_LOCK.lock().await;
     let mut c = config();
-    c.device_ingress = free_address().await;
-    c.management_http = free_address().await;
-    let unavailable_sink = free_address().await;
+    // Allocate all three addresses while their TCP/UDP reservations coexist;
+    // successive free_address calls can otherwise select the same released port.
+    let device_reservation = common::reserve_tcp_udp_pair().await;
+    let management_reservation = common::reserve_tcp_udp_pair().await;
+    let sink_reservation = common::reserve_tcp_udp_pair().await;
+    c.device_ingress = device_reservation.0.local_addr().unwrap();
+    c.management_http = management_reservation.0.local_addr().unwrap();
+    let unavailable_sink = sink_reservation.0.local_addr().unwrap();
     c.delivery_url = Some(format!("http://{unavailable_sink}/events"));
     c.limits.sink_max_attempts = 1;
     c.limits.shutdown_drain_timeout_ms = 25;
@@ -2165,6 +2171,8 @@ async fn subprocess_spool_failure_stays_alive_until_repaired_then_replays_same_e
     std::fs::write(&config_path, serde_json::to_vec_pretty(&c).unwrap()).unwrap();
     let admin = "c".repeat(64);
     let client = reqwest::Client::builder().no_proxy().build().unwrap();
+    // Release only at the subprocess handoff. Child startup errors stay fatal.
+    drop((device_reservation, management_reservation, sink_reservation));
     let mut child = start_child(&config_path, &admin).await;
     wait_child_ready(&client, c.management_http, &admin, &mut child, &config_path).await;
     let receipt = tcp_accept(c.device_ingress, r#"{"schema_version":1,"source_message_id":"spool-failure","kind":"heartbeat","data":{"sequence":1}}"#.as_bytes()).await;
@@ -2195,7 +2203,6 @@ async fn subprocess_spool_failure_stays_alive_until_repaired_then_replays_same_e
     // Device TCP and UDP close before durable recovery succeeds; management stays reachable.
     let stopped_tcp = TcpListener::bind(c.device_ingress).await.unwrap();
     let stopped_udp = tokio::net::UdpSocket::bind(c.device_ingress).await.unwrap();
-    drop((stopped_tcp, stopped_udp));
 
     std::fs::remove_dir(c.spool_directory.join("mqtt-runtime.state")).unwrap();
     std::fs::remove_dir(c.spool_directory.join("eventbus-recovery.spool")).unwrap();
@@ -2205,7 +2212,6 @@ async fn subprocess_spool_failure_stays_alive_until_repaired_then_replays_same_e
         .unwrap();
     assert!(status.success());
     let stopped_management = TcpListener::bind(c.management_http).await.unwrap();
-    drop(stopped_management);
 
     let recovered = RestartSpool::new(c.spool_directory.clone(), Arc::new(c.limits.clone()))
         .recover()
@@ -2214,7 +2220,13 @@ async fn subprocess_spool_failure_stays_alive_until_repaired_then_replays_same_e
     assert_eq!(recovered.records.len(), 1);
     assert_eq!(recovered.records[0].event.event_id, accepted);
 
-    let sink_listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    // Keep the stopped gateway ports reserved until the replacement sink has
+    // its own distinct address; a :0 bind can otherwise claim a restart port.
+    let sink_listener = common::reserve_tcp_listener_excluding(
+        &[c.device_ingress, c.management_http],
+        "127.0.0.1:0".parse().unwrap(),
+    )
+    .await;
     let sink_address = sink_listener.local_addr().unwrap();
     let delivered = Arc::new(Mutex::new(None));
     let delivered_task = delivered.clone();
@@ -2254,6 +2266,7 @@ async fn subprocess_spool_failure_stays_alive_until_repaired_then_replays_same_e
     });
     c.delivery_url = Some(format!("http://{sink_address}/events"));
     std::fs::write(&config_path, serde_json::to_vec_pretty(&c).unwrap()).unwrap();
+    drop((stopped_tcp, stopped_udp, stopped_management));
     let mut restarted = start_child(&config_path, &admin).await;
     wait_child_ready(
         &client,

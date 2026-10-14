@@ -138,7 +138,77 @@ impl Reader {
             .as_mut()
             .map(|budget| budget.reserve_allocation(capacity).map(Arc::new))
             .transpose()?;
-        Ok((BytesMut::with_capacity(capacity), allocation))
+        let buffer = Self::checked_buffer(capacity)?;
+        Ok((buffer, allocation))
+    }
+    fn checked_buffer(capacity: usize) -> Result<BytesMut> {
+        let buffer = BytesMut::with_capacity(capacity);
+        // Do not silently undercharge a dependency/allocator capacity change.
+        // The current BytesMut uses Vec::with_capacity with the exact request.
+        if buffer.capacity() != capacity {
+            return Err(Error::Internal);
+        }
+        Ok(buffer)
+    }
+    fn grow(&mut self, target: usize) -> Result<()> {
+        let room = target
+            .checked_sub(self.buffer.len())
+            .ok_or(Error::Invalid)?;
+        // A split buffer can have a large charged allocation behind a small
+        // visible tail. Reclaim its prefix without allocating, when unshared.
+        if self.buffer.try_reclaim(room) {
+            return Ok(());
+        }
+        if self.buffer.len() <= 8 {
+            let exclusive = self.allocation.as_mut().and_then(Arc::get_mut);
+            if let (Some(budget), Some(previous)) = (&mut self.budget, exclusive) {
+                // Reserve the larger allocation before touching the prefix.
+                // The eight-byte stack staging fits the fixed allowance and
+                // lets an aggregate budget fit exactly one maximum frame.
+                let capacity = target.max(previous.capacity());
+                budget.expand_allocation(previous, capacity)?;
+                let mut prefix = [0; 8];
+                let length = self.buffer.len();
+                prefix[..length].copy_from_slice(&self.buffer);
+                self.buffer = BytesMut::new();
+                let mut next = match Self::checked_buffer(capacity) {
+                    Ok(next) => next,
+                    Err(error) => {
+                        self.allocation = None;
+                        return Err(error);
+                    }
+                };
+                next.extend_from_slice(&prefix[..length]);
+                self.buffer = next;
+                return Ok(());
+            }
+        }
+        let (allocation, replacement) = if let Some(budget) = &mut self.budget {
+            if let Some(previous) = self.allocation.as_mut().and_then(Arc::get_mut) {
+                (None, Some(budget.reserve_replacement(target, previous)?))
+            } else {
+                (Some(Arc::new(budget.reserve_allocation(target)?)), None)
+            }
+        } else {
+            (None, None)
+        };
+        let mut next = Self::checked_buffer(target)?;
+        next.extend_from_slice(&self.buffer);
+        // No mutation before every resource check succeeds. Release the old
+        // physical allocation before its permit, then end the exclusive copy.
+        self.buffer = next;
+        self.allocation = allocation;
+        if let Some(replacement) = replacement {
+            match replacement.commit() {
+                Ok(allocation) => self.allocation = Some(Arc::new(allocation)),
+                Err((error, replacement)) => {
+                    self.buffer = BytesMut::new();
+                    drop(replacement);
+                    return Err(error);
+                }
+            }
+        }
+        Ok(())
     }
     pub fn consumed(&mut self) {
         // Buffered tail bytes have already arrived. Processing the preceding
@@ -167,11 +237,7 @@ impl Reader {
         idle_deadline: Instant,
         target: usize,
     ) -> Result<()> {
-        let deadline = self
-            .started
-            .map(|t| t + self.read_timeout)
-            .unwrap_or(idle_deadline)
-            .min(idle_deadline);
+        let deadline = self.deadline(idle_deadline);
         // Tokio timeout polls the I/O future first: ready bytes alone must not
         // let an already expired incomplete packet escape the whole deadline.
         if Instant::now() >= deadline {
@@ -204,25 +270,7 @@ impl Reader {
             read
         } else {
             if self.buffer.capacity() < target {
-                // BytesMut::reserve may double an old allocation. Use an exact
-                // checked capacity instead; there is no second read chunk copy.
-                let mut prefix = [0u8; 8];
-                let length = self.buffer.len();
-                if length <= prefix.len() {
-                    // A validated MQTT/TCP header fits inline. Release its old
-                    // allocation before admitting a maximum-size legal frame.
-                    prefix[..length].copy_from_slice(&self.buffer);
-                    self.buffer = BytesMut::new();
-                    self.allocation = None;
-                }
-                let (mut next, allocation) = self.allocate(target)?;
-                if length <= prefix.len() {
-                    next.extend_from_slice(&prefix[..length]);
-                } else {
-                    next.extend_from_slice(&self.buffer);
-                }
-                self.buffer = next;
-                self.allocation = allocation;
+                self.grow(target)?;
             }
             let mut destination = (&mut self.buffer).limit(room);
             tokio::time::timeout_at(deadline, stream.read_buf(&mut destination))
@@ -230,6 +278,11 @@ impl Reader {
                 .map_err(|_| Error::Timeout)?
                 .map_err(|_| Error::Unavailable)?
         };
+        // timeout_at polls ready I/O before its timer, including after a
+        // suspended read is rescheduled. Never accept bytes past this deadline.
+        if Instant::now() >= deadline {
+            return Err(Error::Timeout);
+        }
         if read == 0 {
             return Err(Error::Unavailable);
         }
@@ -237,6 +290,12 @@ impl Reader {
             self.started = Some(Instant::now());
         }
         Ok(())
+    }
+    fn deadline(&self, idle_deadline: Instant) -> Instant {
+        self.started
+            .map(|t| t + self.read_timeout)
+            .unwrap_or(idle_deadline)
+            .min(idle_deadline)
     }
 }
 pub async fn write(
@@ -262,11 +321,36 @@ pub async fn authenticate_stream(
     tokio::pin!(auth);
     let until = Instant::now() + Duration::from_millis(s.ingress.limits.authentication_timeout_ms);
     loop {
+        if reader.buffer.len() == reader.maximum {
+            // A legal pipelined frame may fill the pre-auth reader exactly.
+            // Do not ask read_more for zero room and reject ready auth. A
+            // bounded probe still observes EOF or additional overload bytes.
+            let mut probe = [0; 1];
+            let deadline = reader.deadline(until);
+            if Instant::now() >= deadline {
+                return Err(Error::Timeout);
+            }
+            tokio::select! {
+                biased;
+                _ = stop.cancelled() => return Err(Error::Draining),
+                result = &mut auth => {
+                    if Instant::now() >= deadline { return Err(Error::Timeout); }
+                    if s.ingress.is_draining() { return Err(Error::Draining); }
+                    return result;
+                }
+                _ = tokio::time::sleep_until(deadline) => return Err(Error::Timeout),
+                read = stream.read(&mut probe) => {
+                    let read = read.map_err(|_| Error::Unavailable)?;
+                    return Err(if read == 0 { Error::Unavailable } else { Error::Overloaded });
+                }
+            }
+        }
         tokio::select! {
             biased;
             _ = stop.cancelled() => return Err(Error::Draining),
             read = reader.read_more(stream, until) => read?,
             result = &mut auth => {
+                if Instant::now() >= reader.deadline(until) { return Err(Error::Timeout); }
                 if s.ingress.is_draining() { return Err(Error::Draining); }
                 return result;
             }
@@ -444,6 +528,10 @@ pub fn local_addr(listener: &TcpListener) -> Result<SocketAddr> {
 #[cfg(test)]
 #[path = "connection_density_profile.rs"]
 mod connection_density_profile;
+
+#[cfg(test)]
+#[path = "reader_regressions.rs"]
+mod reader_regressions;
 
 #[cfg(test)]
 mod audit_deadlines {

@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "review_date": "2026-10-13",
+  "archive_source_commit": "85e4a2b6a642b534bd79ea23382b0d01a1245c5f",
+  "runtime_source_commit": "b4db4b7be6f3207aac34a9610eb0ce96d4f23e96",
+  "fixture_source_commit": "a2025e6ca7742b458aec0a175a89799839e74fba",
+  "manifest_path_in_archive": "docs/performance/strict-review-20261013/manifest.json",
+  "manifest_bytes": 183014,
+  "manifest_sha256": "947bea4746453cf1a6302f7082706035cd374a18fca57f8d3b0480d776e08561",
+  "manifest_url": "https://github.com/sskycn/netbaiot/blob/85e4a2b6a642b534bd79ea23382b0d01a1245c5f/docs/performance/strict-review-20261013/manifest.json",
+  "evidence_records": 326,
+  "artifact_name": "strict-review-20261013-85e4a2b",
+  "configured_artifact_retention_days": 90,
+  "artifact_workflow": ".github/workflows/strict-review-evidence.yml",
+  "artifact_workflow_url": "https://github.com/sskycn/netbaiot/actions/workflows/strict-review-evidence.yml",
+  "artifact_scope": "Complete existing evidence and both report snapshots, extracted from an immutable Git commit. No workload is rerun and no missing historical raw output is reconstructed.",
+  "long_term_availability": "The complete normalized archive remains in Git history after the workflow artifact expires. Its manifest retains original raw hashes and explicitly records unavailable historical raw fuzz logs.",
+  "recovery_directory": "target/evidence/strict-review-20261013",
+  "recovery_command": "git archive 85e4a2b6a642b534bd79ea23382b0d01a1245c5f docs/performance/strict-review-20261013 docs/performance/strict-review-20261013.md docs/performance/strict-review-20261013-code.md | tar -x -C target/evidence/strict-review-20261013",
+  "download_command": "gh run download <archive-run-id> --repo sskycn/netbaiot --name strict-review-20261013-85e4a2b --dir target/evidence/strict-review-20261013",
+  "publication_failure": {
+    "source_commit": "85e4a2b6a642b534bd79ea23382b0d01a1245c5f",
+    "rust_checks_run": "https://github.com/sskycn/netbaiot/actions/runs/38501364142",
+    "native_dx_run": "https://github.com/sskycn/netbaiot/actions/runs/38501364192",
+    "observed_failure": "Existing evidence budget rejects raw CSV/log files in docs/performance; release preflight and dependency audit passed.",
+    "repair": "Retain reviewed reports and this compact archive reference in the active documentation tree. Publish the unchanged full archive under target/evidence as an Actions artifact and preserve it in Git history. Evidence policy and allowlist remain unchanged."
+  }
+}

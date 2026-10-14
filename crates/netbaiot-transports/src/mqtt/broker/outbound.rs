@@ -132,10 +132,16 @@ pub(super) fn promote_offline(
         if !session.has_outbound_capacity(message.qos, limits) || !session.has_send_quota() {
             return Ok(None);
         }
+        // QoS1/QoS2 have independent count ceilings but share Packet Identifiers.
+        // Keep accepted offline ownership intact until an identifier is available.
+        let id = match session.allocate_packet_id() {
+            Ok(id) => id,
+            Err(Error::Overloaded) => return Ok(None),
+            Err(error) => return Err(error),
+        };
         let message = session.offline.pop_front().ok_or(Error::Internal)?;
         let bytes = message.bytes();
         session.offline_bytes = session.offline_bytes.saturating_sub(bytes);
-        let id = session.allocate_packet_id()?;
         let outbound = if message.qos == 1 {
             OutboundState::AwaitPuback(message.clone())
         } else {
@@ -361,27 +367,29 @@ pub(super) fn resume_frames(
         let Some(message) = session.offline.front() else {
             break;
         };
-        let Ok(budget) = active.reserve_frame(message.bytes()) else {
-            break;
-        };
-        let message = session.offline.pop_front().ok_or(Error::Internal)?;
-        let bytes = message.bytes();
-        session.offline_bytes = session.offline_bytes.saturating_sub(bytes);
-        resumed_count += 1;
-        resumed_bytes += bytes;
         let tenant_capacity = if message.qos == 1 {
             promoted_qos1 < available_qos1
         } else {
             promoted_qos2 < available_qos2
         };
         if !session.has_outbound_capacity(message.qos, limits) || !tenant_capacity {
-            session.offline.push_front(message);
-            session.offline_bytes = session.offline_bytes.saturating_add(bytes);
-            resumed_count = resumed_count.saturating_sub(1);
-            resumed_bytes = resumed_bytes.saturating_sub(bytes);
             break;
         }
-        let id = session.allocate_packet_id()?;
+        let Ok(budget) = active.reserve_frame(message.bytes()) else {
+            break;
+        };
+        // Exhaustion is bounded backpressure. Reconnect must still restore the
+        // existing exchanges and retain this offline message for an ACK wakeup.
+        let id = match session.allocate_packet_id() {
+            Ok(id) => id,
+            Err(Error::Overloaded) => break,
+            Err(error) => return Err(error),
+        };
+        let message = session.offline.pop_front().ok_or(Error::Internal)?;
+        let bytes = message.bytes();
+        session.offline_bytes = session.offline_bytes.saturating_sub(bytes);
+        resumed_count += 1;
+        resumed_bytes += bytes;
         if message.qos == 1 {
             promoted_qos1 += 1;
         } else {

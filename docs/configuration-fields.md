@@ -215,7 +215,7 @@ Schema does not replace `netbaiot config check`; cross-field, TLS, secret-source
 | `max_pending_commands_per_tenant` | "integer" | `128` |  |
 | `max_persistent_sessions` | "integer" | `4096` |  |
 | `max_persistent_sessions_per_tenant` | "integer" | `512` |  |
-| `max_read_buffer_per_connection` | "integer" | `65540` | Actual capacity of all live reader allocations, including shared frames. Includes the four-byte TCP framing envelope. |
+| `max_read_buffer_per_connection` | "integer" | `65540` | Stable capacity of live reader allocations, including shared frames and the four-byte TCP envelope. Exclusive replacement may temporarily hold twice this capacity; both allocations still obey global/tenant budgets. |
 | `max_replay_entries` | "integer" | `1024` |  |
 | `max_replay_entries_per_device` | "integer" | `2` |  |
 | `max_replay_entries_per_tenant` | "integer" | `256` |  |

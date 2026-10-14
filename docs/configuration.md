@@ -94,7 +94,12 @@ Reader allocation capacity is charged on demand against
 `global_connection_logical_bytes`. The default reader ceiling is 65,540 bytes,
 including a maximum 65,536-byte TCP frame and its four-byte length envelope.
 Decoded frames that share an allocation keep its charge until their last alias
-is dropped. Replacement allocations must also reserve their temporary overlap.
+is dropped. The per-connection ceiling applies to all stable retained capacity.
+An exclusive synchronous replacement may temporarily hold up to twice that
+ceiling; both old and new allocations must fit the unchanged global and tenant
+budgets before either is changed. A shared old allocation receives no replacement
+exemption. Prefixes of at most eight bytes can use bounded stack staging after
+reserving the final capacity, avoiding two simultaneous heap buffers.
 Admission fails immediately when a count or byte ceiling is exhausted.
 
 The global connection account combines fixed allowances and live reader capacity;

@@ -177,15 +177,27 @@
     },
     {
       "file": "clippy-final.txt",
-      "bytes": 558,
-      "sha256": "acdbd81dab1a278c7b075da47d32e254f3fb155b60110dc5da7d47b179dea49c",
-      "raw_output_sha256": "acdbd81dab1a278c7b075da47d32e254f3fb155b60110dc5da7d47b179dea49c"
+      "bytes": 413,
+      "sha256": "619805e1e1af91f400f85931e694e5d36b2029d4b1668b72b71172211a5feed4",
+      "raw_output_sha256": "acdbd81dab1a278c7b075da47d32e254f3fb155b60110dc5da7d47b179dea49c",
+      "path_scrubbing": {
+        "revision": "0b88177bb6e0a786c5e5bc2901621382648bafa3",
+        "previous_bytes": 558,
+        "previous_sha256": "acdbd81dab1a278c7b075da47d32e254f3fb155b60110dc5da7d47b179dea49c",
+        "replacement": "repository absolute path replaced with <repo>; test results unchanged"
+      }
     },
     {
       "file": "workspace-tests-final.txt",
-      "bytes": 63977,
-      "sha256": "9493f728be542d9e2e61df4b2a078cce05829101984c43b9ee95972875443653",
-      "raw_output_sha256": "e5a018f86a516d19363e1a627a0762331eae6d2ff7f97dd417232b9b2d33ab38"
+      "bytes": 63832,
+      "sha256": "1d0a56e231ccc14764f4e24df01d3572fbbfe5e6a639672cc1bd23c1617b8df8",
+      "raw_output_sha256": "e5a018f86a516d19363e1a627a0762331eae6d2ff7f97dd417232b9b2d33ab38",
+      "path_scrubbing": {
+        "revision": "0b88177bb6e0a786c5e5bc2901621382648bafa3",
+        "previous_bytes": 63977,
+        "previous_sha256": "9493f728be542d9e2e61df4b2a078cce05829101984c43b9ee95972875443653",
+        "replacement": "repository absolute path replaced with <repo>; test results unchanged"
+      }
     },
     {
       "file": "mqtt-conformance.txt",
@@ -207,9 +219,15 @@
     },
     {
       "file": "tls-interop.txt",
-      "bytes": 549,
-      "sha256": "03f1790510772b4d569be4455179897f55fe3e62b97e1453f174ce5f3c4c3709",
-      "raw_output_sha256": "03f1790510772b4d569be4455179897f55fe3e62b97e1453f174ce5f3c4c3709"
+      "bytes": 462,
+      "sha256": "548fb3f23f87c510806200b421807b1b453ece634860096aa3b8712ec3df0b67",
+      "raw_output_sha256": "03f1790510772b4d569be4455179897f55fe3e62b97e1453f174ce5f3c4c3709",
+      "path_scrubbing": {
+        "revision": "0b88177bb6e0a786c5e5bc2901621382648bafa3",
+        "previous_bytes": 549,
+        "previous_sha256": "03f1790510772b4d569be4455179897f55fe3e62b97e1453f174ce5f3c4c3709",
+        "replacement": "repository absolute path replaced with <repo>; test results unchanged"
+      }
     }
   ],
   "fuzz": [
@@ -235,5 +253,5 @@
       "log_sha256": "a4915959e9215768b3e6a964cdc3686d4bb588c85eea1e72ec9907fbff05782c"
     }
   ],
-  "text_log_normalization": "Trailing whitespace/newlines trimmed for repository text; raw-output hashes retained."
+  "text_log_normalization": "Trailing whitespace/newlines trimmed for repository text; raw-output hashes retained. Logs scrubbed in 0b88177 also retain their pre-scrub repository byte counts and SHA-256 hashes."
 }
