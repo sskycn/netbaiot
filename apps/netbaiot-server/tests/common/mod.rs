@@ -89,3 +89,66 @@ fn fixture_bind_error_classification_is_platform_explicit() {
         }
     }
 }
+
+// This retries only fixture listener selection before a child starts. It never
+// retries a child, accepted work, or recovery replay. A forced first candidate
+// makes both reservation and release-to-bind collision paths deterministic.
+pub async fn reserve_tcp_listener_excluding(
+    excluded: &[std::net::SocketAddr],
+    mut candidate: std::net::SocketAddr,
+) -> TcpListener {
+    for attempt in 1..=32 {
+        match TcpListener::bind(candidate).await {
+            Ok(listener) => {
+                let address = listener.local_addr().unwrap();
+                if !excluded.contains(&address) {
+                    return listener;
+                }
+                eprintln!(
+                    "fixture TCP candidate {address}, attempt {attempt}/32: excluded restart address"
+                );
+                drop(listener);
+            }
+            Err(error) if retryable_fixture_bind_error(&error, cfg!(windows)) => {
+                eprintln!(
+                    "fixture TCP candidate {candidate}, attempt {attempt}/32: kind={:?}, raw_os_error={:?}",
+                    error.kind(),
+                    error.raw_os_error(),
+                );
+            }
+            Err(error) => {
+                panic!("fixture TCP candidate {candidate}, attempt {attempt}/32: {error}");
+            }
+        }
+        candidate.set_port(0);
+    }
+    panic!("no distinct TCP fixture listener after 32 candidates")
+}
+
+#[tokio::test]
+async fn sink_listener_excludes_both_reserved_and_released_restart_ports() {
+    for keep_reserved in [false, true] {
+        let (tcp, udp) = reserve_tcp_udp_pair().await;
+        let excluded = tcp.local_addr().unwrap();
+        let reservation = if keep_reserved {
+            Some((tcp, udp))
+        } else {
+            drop((tcp, udp));
+            None
+        };
+        // Force the first sink selection onto the gateway's restart port.
+        // An unreserved candidate binds successfully, but must be rejected;
+        // a still reserved candidate fails at bind and must stay reserved.
+        let sink = reserve_tcp_listener_excluding(&[excluded], excluded).await;
+        assert_ne!(sink.local_addr().unwrap(), excluded);
+        if let Some((tcp, udp)) = &reservation {
+            assert_eq!(tcp.local_addr().unwrap(), excluded);
+            assert_eq!(udp.local_addr().unwrap(), excluded);
+            let error = UdpSocket::bind(excluded).await.unwrap_err();
+            assert!(
+                retryable_fixture_bind_error(&error, cfg!(windows)),
+                "reserved restart UDP address unexpectedly returned {error}",
+            );
+        }
+    }
+}
