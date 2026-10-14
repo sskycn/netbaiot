@@ -1,7 +1,0 @@
-   Compiling hyper-rustls v0.27.9
-   Compiling jsonwebtoken v9.3.1
-   Compiling reqwest v0.12.28
-   Compiling netbaiot-runtime v0.3.1 (<repo>/crates/netbaiot-runtime)
-   Compiling netbaiot-transports v0.3.1 (<repo>/crates/netbaiot-transports)
-   Compiling netbaiot-server v0.3.1 (<repo>/apps/netbaiot-server)
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 5.94s

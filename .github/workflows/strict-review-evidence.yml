@@ -1,0 +1,59 @@
+name: Strict review evidence archive
+
+on:
+  push:
+    branches: ["codex/performance-correctness-review"]
+    paths:
+      - '.github/workflows/strict-review-evidence.yml'
+      - 'docs/performance/strict-review-20261013-archive.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  archive:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Recover immutable review evidence
+        run: |
+          set -euo pipefail
+          source=85e4a2b6a642b534bd79ea23382b0d01a1245c5f
+          git fetch --no-tags origin "$source"
+          mkdir -p target/evidence/strict-review-20261013
+          git archive "$source" docs/performance/strict-review-20261013 docs/performance/strict-review-20261013.md docs/performance/strict-review-20261013-code.md |
+            tar -x -C target/evidence/strict-review-20261013
+      - name: Verify every archived evidence record
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path, PurePosixPath
+
+          root = Path('target/evidence/strict-review-20261013/docs/performance/strict-review-20261013')
+          data = (root / 'manifest.json').read_bytes()
+          assert len(data) == 183014
+          assert hashlib.sha256(data).hexdigest() == '947bea4746453cf1a6302f7082706035cd374a18fca57f8d3b0480d776e08561'
+          records = json.loads(data)['records']
+          assert len(records) == 326
+          seen = set()
+          for record in records:
+              relative = PurePosixPath(record['file'])
+              assert not relative.is_absolute() and '..' not in relative.parts
+              assert record['file'] not in seen
+              seen.add(record['file'])
+              path = root / relative
+              assert path.is_file() and not path.is_symlink()
+              data = path.read_bytes()
+              assert len(data) == record['bytes'], record['file']
+              assert hashlib.sha256(data).hexdigest() == record['sha256'], record['file']
+          print(f'PASS: immutable manifest and all {len(seen)} evidence records')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: strict-review-20261013-85e4a2b
+          path: target/evidence/strict-review-20261013/
+          if-no-files-found: error
+          retention-days: 90

@@ -1,7 +1,0 @@
-test_main_excludes_profiler_tail_cpu_from_the_loadgen_delta (test_event_load.EventLoadCpuTests) ... ok
-test_main_keeps_cumulative_cpu_and_reports_the_full_loadgen_delta (test_event_load.EventLoadCpuTests) ... ok
-
-----------------------------------------------------------------------
-Ran 2 tests in 0.004s
-
-OK

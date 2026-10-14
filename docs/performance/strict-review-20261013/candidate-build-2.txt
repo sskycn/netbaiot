@@ -1,3 +1,0 @@
-   Compiling netbaiot-transports v0.3.1 (<repo>/crates/netbaiot-transports)
-   Compiling netbaiot-server v0.3.1 (<repo>/apps/netbaiot-server)
-    Finished `release` profile [optimized + debuginfo] target(s) in 38.04s
