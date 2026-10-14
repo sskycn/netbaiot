@@ -350,3 +350,10 @@ Unless the user explicitly requests otherwise, finish repository change tasks by
 merging the task branch into `main`, committing the result, and pushing `main` to
 `origin` after the required validation passes. Then remove the merged local task
 branch and its clean worktree. Preserve unrelated branches and user changes.
+
+## Local path references
+
+Do not write, commit, or show local absolute filesystem paths in repository
+content or user-facing responses. Refer to files with repository-relative paths.
+Tool calls may use an absolute path only when the tool requires it; do not copy
+that path into generated content or the response.
