@@ -1,15 +1,15 @@
 use super::*;
 use crate::config::read_bounded;
+use rustls_pki_types::{CertificateDer, PrivateKeyDer, pem::PemObject};
 
 pub async fn tls_acceptor(files: &TlsFiles) -> Result<TlsAcceptor> {
     let cert = read_bounded(&files.certificate, 1_048_576).await?;
     let key = read_bounded(&files.private_key, 65_536).await?;
-    let certificates = rustls_pemfile::certs(&mut cert.as_slice())
+    let certificates = CertificateDer::pem_slice_iter(cert.as_slice())
         .collect::<std::result::Result<Vec<_>, _>>()
         .map_err(|_| Error::Configuration)?;
-    let private = rustls_pemfile::private_key(&mut key.as_slice())
-        .map_err(|_| Error::Configuration)?
-        .ok_or(Error::Configuration)?;
+    let private =
+        PrivateKeyDer::from_pem_slice(key.as_slice()).map_err(|_| Error::Configuration)?;
     let config = rustls::ServerConfig::builder_with_provider(Arc::new(
         rustls::crypto::ring::default_provider(),
     ))
@@ -24,12 +24,11 @@ pub async fn tls_acceptor(files: &TlsFiles) -> Result<TlsAcceptor> {
 pub async fn management_tls_acceptor(files: &ManagementTlsFiles) -> Result<TlsAcceptor> {
     let cert = read_bounded(&files.certificate, 1_048_576).await?;
     let key = read_bounded(&files.private_key, 65_536).await?;
-    let certificates = rustls_pemfile::certs(&mut cert.as_slice())
+    let certificates = CertificateDer::pem_slice_iter(cert.as_slice())
         .collect::<std::result::Result<Vec<_>, _>>()
         .map_err(|_| Error::Configuration)?;
-    let private = rustls_pemfile::private_key(&mut key.as_slice())
-        .map_err(|_| Error::Configuration)?
-        .ok_or(Error::Configuration)?;
+    let private =
+        PrivateKeyDer::from_pem_slice(key.as_slice()).map_err(|_| Error::Configuration)?;
     let builder = rustls::ServerConfig::builder_with_provider(Arc::new(
         rustls::crypto::ring::default_provider(),
     ))
@@ -42,7 +41,7 @@ pub async fn management_tls_acceptor(files: &ManagementTlsFiles) -> Result<TlsAc
         )
         .await?;
         let mut roots = rustls::RootCertStore::empty();
-        for cert in rustls_pemfile::certs(&mut ca.as_slice()) {
+        for cert in CertificateDer::pem_slice_iter(ca.as_slice()) {
             roots
                 .add(cert.map_err(|_| Error::Configuration)?)
                 .map_err(|_| Error::Configuration)?;

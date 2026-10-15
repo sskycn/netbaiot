@@ -1,4 +1,5 @@
 use super::*;
+use rustls_pki_types::{CertificateDer, pem::PemObject};
 use std::time::{SystemTime, UNIX_EPOCH};
 pub(super) async fn inspect(config: &Config) -> Vec<Check> {
     let mut out = Vec::new();
@@ -50,7 +51,9 @@ pub(super) async fn inspect(config: &Config) -> Vec<Check> {
         };
         let data = crate::read_bounded(std::path::Path::new(path)).await;
         let result = data.ok().and_then(|bytes| {
-            let cert = rustls_pemfile::certs(&mut bytes.as_slice()).next()?.ok()?;
+            let cert = CertificateDer::pem_slice_iter(bytes.as_slice())
+                .next()?
+                .ok()?;
             let (_, certificate) = x509_parser::parse_x509_certificate(cert.as_ref()).ok()?;
             Some((
                 certificate.validity().not_before.timestamp(),

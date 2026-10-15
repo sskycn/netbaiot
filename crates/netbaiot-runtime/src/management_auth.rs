@@ -999,6 +999,7 @@ mod tests {
     use super::*;
     use jsonwebtoken::{EncodingKey, Header, encode};
     use netbaiot_core::DeviceId;
+    use rustls_pki_types::{CertificateDer, PrivateKeyDer, pem::PemObject};
     use std::sync::atomic::{AtomicUsize, Ordering};
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use tokio::net::TcpListener;
@@ -1308,12 +1309,10 @@ mod tests {
     ) {
         let cert = include_bytes!("../../../tests/fixtures/localhost-cert.pem");
         let key = include_bytes!("../../../tests/fixtures/localhost-key.pem");
-        let certificates = rustls_pemfile::certs(&mut cert.as_slice())
+        let certificates = CertificateDer::pem_slice_iter(cert.as_slice())
             .collect::<std::result::Result<Vec<_>, _>>()
             .unwrap();
-        let private = rustls_pemfile::private_key(&mut key.as_slice())
-            .unwrap()
-            .unwrap();
+        let private = PrivateKeyDer::from_pem_slice(key.as_slice()).unwrap();
         let server = rustls::ServerConfig::builder_with_provider(Arc::new(
             rustls::crypto::ring::default_provider(),
         ))

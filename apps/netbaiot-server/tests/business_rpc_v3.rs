@@ -18,6 +18,7 @@ use netbaiot_core::{
 };
 use netbaiot_device_sdk::{DeviceClient, DeviceCredentials, PublishQos};
 use netbaiot_server::{BusinessRpcConfig, Config, DeviceAuthSource, EventDeliverySource};
+use rustls_pki_types::{CertificateDer, pem::PemObject};
 use std::{
     process::Stdio,
     sync::{
@@ -479,7 +480,7 @@ async fn v3_command_real_tcp_tenant_scope_and_capacity() {
     config.spool_directory = root.join("spool");
     let fixtures = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures");
     let pem = std::fs::read(fixtures.join("management-client.pem")).unwrap();
-    let cert = rustls_pemfile::certs(&mut pem.as_slice())
+    let cert = CertificateDer::pem_slice_iter(pem.as_slice())
         .next()
         .unwrap()
         .unwrap();
@@ -1309,7 +1310,7 @@ async fn v3_mtls_authenticates_before_role_free_stream_authorization() {
     std::fs::create_dir_all(&root).unwrap();
     let fixtures = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures");
     let certificate = std::fs::read(fixtures.join("management-client.pem")).unwrap();
-    let certificate = rustls_pemfile::certs(&mut certificate.as_slice())
+    let certificate = CertificateDer::pem_slice_iter(certificate.as_slice())
         .next()
         .unwrap()
         .unwrap();

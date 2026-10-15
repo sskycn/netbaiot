@@ -1,3 +1,4 @@
+use rustls_pki_types::{CertificateDer, pem::PemObject};
 mod common;
 
 use async_trait::async_trait;
@@ -97,7 +98,7 @@ async fn command_pressure_preserves_auth_invalidation_and_event_ack() {
     let fixtures = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures");
     let fingerprint = |file: &str| {
         let pem = std::fs::read(fixtures.join(file)).unwrap();
-        let cert = rustls_pemfile::certs(&mut pem.as_slice())
+        let cert = CertificateDer::pem_slice_iter(pem.as_slice())
             .next()
             .unwrap()
             .unwrap();
@@ -295,7 +296,7 @@ async fn commands_role_dispatches_to_real_tcp_and_shares_http_dedup() {
     config.limits.command_dedup_max_entries = 1;
     let fixtures = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures");
     let cert_pem = std::fs::read(fixtures.join("management-client.pem")).unwrap();
-    let cert = rustls_pemfile::certs(&mut cert_pem.as_slice())
+    let cert = CertificateDer::pem_slice_iter(cert_pem.as_slice())
         .next()
         .unwrap()
         .unwrap();
@@ -1264,7 +1265,7 @@ async fn mtls_verifies_server_and_maps_exact_client_certificate() {
     config.spool_directory = root.join("spool");
     let fixtures = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures");
     let cert_pem = std::fs::read(fixtures.join("management-client.pem")).unwrap();
-    let cert = rustls_pemfile::certs(&mut cert_pem.as_slice())
+    let cert = CertificateDer::pem_slice_iter(cert_pem.as_slice())
         .next()
         .unwrap()
         .unwrap();
@@ -1439,7 +1440,7 @@ async fn mtls_verifies_server_and_maps_exact_client_certificate() {
     server.start_kill().unwrap();
     let _ = server.wait().await;
     let replacement_cert = std::fs::read(fixtures.join("management-unmapped.pem")).unwrap();
-    let replacement_der = rustls_pemfile::certs(&mut replacement_cert.as_slice())
+    let replacement_der = CertificateDer::pem_slice_iter(replacement_cert.as_slice())
         .next()
         .unwrap()
         .unwrap();

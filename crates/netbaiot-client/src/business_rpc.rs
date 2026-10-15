@@ -8,6 +8,7 @@ use netbaiot_protocol::{
         ResolveVerifierRequest, ResolveVerifierResponse, RpcError, RpcErrorCode,
     },
 };
+use rustls_pki_types::{CertificateDer, PrivateKeyDer, pem::PemObject};
 use serde::Serialize;
 use std::{
     io::{self, Write},
@@ -99,7 +100,7 @@ async fn connect_io(
             return Err(BusinessRpcClientError::InvalidConfig);
         }
         let mut roots = rustls::RootCertStore::empty();
-        for item in rustls_pemfile::certs(&mut ca.as_slice()) {
+        for item in CertificateDer::pem_slice_iter(ca.as_slice()) {
             roots
                 .add(item.map_err(|_| BusinessRpcClientError::InvalidConfig)?)
                 .map_err(|_| BusinessRpcClientError::InvalidConfig)?;
@@ -107,12 +108,11 @@ async fn connect_io(
         if roots.is_empty() {
             return Err(BusinessRpcClientError::InvalidConfig);
         }
-        let certs = rustls_pemfile::certs(&mut cert.as_slice())
+        let certs = CertificateDer::pem_slice_iter(cert.as_slice())
             .collect::<std::result::Result<Vec<_>, _>>()
             .map_err(|_| BusinessRpcClientError::InvalidConfig)?;
-        let key = rustls_pemfile::private_key(&mut key.as_slice())
-            .map_err(|_| BusinessRpcClientError::InvalidConfig)?
-            .ok_or(BusinessRpcClientError::InvalidConfig)?;
+        let key = PrivateKeyDer::from_pem_slice(key.as_slice())
+            .map_err(|_| BusinessRpcClientError::InvalidConfig)?;
         let rustls_config = rustls::ClientConfig::builder_with_provider(Arc::new(
             rustls::crypto::ring::default_provider(),
         ))

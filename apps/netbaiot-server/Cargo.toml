@@ -20,7 +20,7 @@ tokio-util.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
 tokio-rustls.workspace = true
-rustls-pemfile.workspace = true
+rustls-pki-types.workspace = true
 reqwest.workspace = true
 sha2.workspace = true
 stats_alloc = { version = "=0.1.10", optional = true }

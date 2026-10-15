@@ -1,4 +1,5 @@
 //! Separate, bounded real-network workload process. Test credentials only.
+use rustls_pki_types::{CertificateDer, pem::PemObject};
 mod density;
 mod mixed;
 mod production;
@@ -363,7 +364,7 @@ fn tls(c: &Config) -> Result<Option<TlsConnector>> {
     };
     let cert = read_bounded(path, 65536)?;
     let mut roots = rustls::RootCertStore::empty();
-    for der in rustls_pemfile::certs(&mut cert.as_slice()) {
+    for der in CertificateDer::pem_slice_iter(cert.as_slice()) {
         roots.add(der?)?;
     }
     let mut client = rustls::ClientConfig::builder_with_provider(Arc::new(

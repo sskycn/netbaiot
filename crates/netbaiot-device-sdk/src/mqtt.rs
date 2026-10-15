@@ -6,6 +6,7 @@ use crate::profile::{
 use bytes::BytesMut;
 use netbaiot_mqtt_wire::client::{self as wire, Limits, Packet, Properties, Version};
 use netbaiot_protocol::{DeviceCommand, DeviceKey, EventId};
+use rustls_pki_types::{CertificateDer, pem::PemObject};
 use std::{
     collections::BTreeMap,
     path::PathBuf,
@@ -159,7 +160,7 @@ async fn socket(config: &DriverConfig) -> Result<Socket, DeviceSdkError> {
             ));
         }
         let mut added = 0usize;
-        for cert in rustls_pemfile::certs(&mut pem.as_slice()) {
+        for cert in CertificateDer::pem_slice_iter(pem.as_slice()) {
             roots
                 .add(cert.map_err(|_| {
                     DeviceSdkError::InvalidConfiguration("invalid MQTT CA PEM".into())

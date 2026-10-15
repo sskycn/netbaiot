@@ -16,6 +16,7 @@ use netbaiot_server::{
 use netbaiot_transports::{
     BoxStream, Services, serve_device_ingress, serve_management_http, serve_stream,
 };
+use rustls_pki_types::{CertificateDer, PrivateKeyDer, pem::PemObject};
 use std::{
     collections::HashSet,
     process::Stdio,
@@ -497,9 +498,9 @@ async fn tls_composition_completes_verified_handshake() {
         stream.shutdown().await.unwrap();
     });
     let mut roots = rustls::RootCertStore::empty();
-    for cert in rustls_pemfile::certs(
-        &mut include_bytes!("../../../tests/fixtures/localhost-cert.pem").as_slice(),
-    ) {
+    for cert in
+        CertificateDer::pem_slice_iter(include_bytes!("../../../tests/fixtures/localhost-cert.pem"))
+    {
         roots.add(cert.unwrap()).unwrap();
     }
     let client = rustls::ClientConfig::builder_with_provider(Arc::new(
@@ -530,6 +531,77 @@ async fn config_input_is_bounded_and_malformed_config_fails() {
         read_config("/nonexistent/netbaiot.json").await,
         Err(Error::Configuration)
     ));
+}
+
+#[tokio::test]
+async fn tls_pem_bundles_and_invalid_inputs_preserve_configuration_errors() {
+    let root = std::env::temp_dir().join(format!("netbaiot-pem-{}", uuid::Uuid::new_v4()));
+    std::fs::create_dir_all(&root).unwrap();
+    let certificate = root.join("certificate.pem");
+    let private_key = root.join("private-key.pem");
+    let client_ca = root.join("ca.pem");
+    let cert = include_bytes!("../../../tests/fixtures/localhost-cert.pem");
+    let key = include_bytes!("../../../tests/fixtures/localhost-key.pem");
+    let ca = include_bytes!("../../../tests/fixtures/management-ca.pem");
+    let files = TlsFiles {
+        certificate: certificate.display().to_string(),
+        private_key: private_key.display().to_string(),
+    };
+    let management = ManagementTlsFiles {
+        certificate: files.certificate.clone(),
+        private_key: files.private_key.clone(),
+        client_ca: Some(client_ca.display().to_string()),
+        require_client_certificate: true,
+    };
+    let bundle = [b"certificate bundle\n".as_slice(), key, cert, cert].concat();
+    std::fs::write(&certificate, &bundle).unwrap();
+    std::fs::write(&private_key, [cert.as_slice(), key.as_slice()].concat()).unwrap();
+    std::fs::write(&client_ca, [ca.as_slice(), ca.as_slice()].concat()).unwrap();
+    assert!(tls_acceptor(&files).await.is_ok());
+    assert!(management_tls_acceptor(&management).await.is_ok());
+
+    for invalid in [
+        Vec::new(),
+        b"not a certificate".to_vec(),
+        b"-----BEGIN CERTIFICATE-----\n%%%\n-----END CERTIFICATE-----\n".to_vec(),
+        b"-----BEGIN CERTIFICATE-----\nYWJj\n".to_vec(),
+        vec![b' '; 1_048_577],
+    ] {
+        std::fs::write(&certificate, &invalid).unwrap();
+        assert!(matches!(
+            tls_acceptor(&files).await,
+            Err(Error::Configuration)
+        ));
+        assert!(matches!(
+            management_tls_acceptor(&management).await,
+            Err(Error::Configuration)
+        ));
+        std::fs::write(&certificate, &bundle).unwrap();
+        std::fs::write(&client_ca, &invalid).unwrap();
+        assert!(matches!(
+            management_tls_acceptor(&management).await,
+            Err(Error::Configuration)
+        ));
+    }
+    std::fs::write(&client_ca, ca).unwrap();
+    for invalid in [
+        Vec::new(),
+        cert.to_vec(),
+        b"-----BEGIN PRIVATE KEY-----\n%%%\n-----END PRIVATE KEY-----\n".to_vec(),
+        b"-----BEGIN PRIVATE KEY-----\nYWJj\n".to_vec(),
+        vec![b' '; 65_537],
+    ] {
+        std::fs::write(&private_key, invalid).unwrap();
+        assert!(matches!(
+            tls_acceptor(&files).await,
+            Err(Error::Configuration)
+        ));
+        assert!(matches!(
+            management_tls_acceptor(&management).await,
+            Err(Error::Configuration)
+        ));
+    }
+    std::fs::remove_dir_all(root).unwrap();
 }
 
 #[tokio::test]
@@ -922,12 +994,10 @@ async fn jwt_http_uses_https_jwks_and_reports_outage_as_503() {
     let _port_guard = EPHEMERAL_PORT_TEST_LOCK.lock().await;
     let cert = include_bytes!("../../../tests/fixtures/localhost-cert.pem");
     let key = include_bytes!("../../../tests/fixtures/localhost-key.pem");
-    let certificates = rustls_pemfile::certs(&mut cert.as_slice())
+    let certificates = CertificateDer::pem_slice_iter(cert.as_slice())
         .collect::<std::result::Result<Vec<_>, _>>()
         .unwrap();
-    let private_key = rustls_pemfile::private_key(&mut key.as_slice())
-        .unwrap()
-        .unwrap();
+    let private_key = PrivateKeyDer::from_pem_slice(key.as_slice()).unwrap();
     let tls = TlsAcceptor::from(Arc::new(
         rustls::ServerConfig::builder_with_provider(Arc::new(
             rustls::crypto::ring::default_provider(),
@@ -1131,7 +1201,7 @@ async fn management_mtls_trust_and_explicit_identity_mapping() {
     let files = test_tls_files();
     let client_cert = std::fs::read(fixtures.join("management-client.pem")).unwrap();
     let client_key = std::fs::read(fixtures.join("management-client-key.pem")).unwrap();
-    let leaf = rustls_pemfile::certs(&mut client_cert.as_slice())
+    let leaf = CertificateDer::pem_slice_iter(client_cert.as_slice())
         .next()
         .unwrap()
         .unwrap();
@@ -2296,7 +2366,7 @@ fn test_tls_files() -> TlsFiles {
 fn test_tls_connector() -> TlsConnector {
     let pem = std::fs::read(test_tls_files().certificate).unwrap();
     let mut roots = rustls::RootCertStore::empty();
-    for cert in rustls_pemfile::certs(&mut pem.as_slice()) {
+    for cert in CertificateDer::pem_slice_iter(pem.as_slice()) {
         roots.add(cert.unwrap()).unwrap();
     }
     let client = rustls::ClientConfig::builder_with_provider(Arc::new(

@@ -38,7 +38,7 @@ workspace = true
 [dev-dependencies]
 stats_alloc = "=0.1.10"
 tokio-rustls.workspace = true
-rustls-pemfile.workspace = true
+rustls-pki-types.workspace = true
 
 [features]
 schema = ["dep:schemars", "netbaiot-core/schema"]
