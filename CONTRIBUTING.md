@@ -1,5 +1,36 @@
 # Contributing to NetbaIoT
 
+## Contributor licensing
+
+The proposed Contributor License Agreement is available in
+[English](CLA.md) and [中文](CLA.zh-CN.md). Both versions are draft 1.0 and contain
+the same numbered terms. The draft lets contributors retain copyright while
+expressly granting the Maintainer independent commercial and proprietary
+sublicensing rights, alongside continued availability of an open source version
+under `AGPL-3.0-or-later`.
+
+The CLA is a draft awaiting finalization; a signing requirement and automated
+signing workflow are not yet active. Publishing the draft, submitting a pull
+request or adding a commit sign-off does not constitute signing this agreement.
+The project's current open source license remains [AGPL-3.0-or-later](LICENSE).
+Using the open source version alone does not require signing a CLA.
+
+Before adopting the agreement, the Maintainer must complete the legal identity
+behind `sskycn`, contact information, governing law, dispute resolution and
+controlling language, and arrange legal review. The signing process must obtain
+explicit acceptance of the finalized terms, including Sections 3 and 4, and
+retain a verifiable record linking the signer to the exact agreement version and
+date. Store completed forms, contact details and organization authorization
+records privately; do not commit them to the public repository.
+
+Where an employer or another organization owns relevant rights, obtain
+authorization covering the grants or a separate agreement from that rights
+holder. Earlier contributions require an expressly agreed attachment identifying
+the covered submissions. The draft does not automatically relicense earlier
+contributions or third-party material. Review the rights in existing code and
+dependencies before offering a commercial license; comply with, replace or
+exclude material for which the required rights are unavailable.
+
 ## Setup
 
 Use Rust 1.88 or newer, Cargo, and Python 3.9 or newer. The release checks run on

@@ -217,6 +217,10 @@ macOS/Windows 可选构建独立进行，失败不阻断 Linux 发布，见
 环境准备和验证要求见 [CONTRIBUTING.md](CONTRIBUTING.md)；架构和正确性约束见 [AGENTS.md](AGENTS.md)。欢迎提交问题和聚焦的 Pull Request。公开协议
 或 MQTT 行为改动需要兼容性证据和针对性测试。
 
+贡献者许可协议草案提供[中文版](CLA.zh-CN.md)和[英文版](CLA.md)，明确维护方在持续提供
+开源版本的同时进行独立商业授权的权限。草案尚待定稿，签署要求尚未启用，详见
+[CONTRIBUTING.md](CONTRIBUTING.md)。
+
 ## 许可证
 
 NetbaIoT 使用 [AGPL-3.0-or-later](LICENSE) 许可证。

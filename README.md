@@ -243,6 +243,11 @@ Read [AGENTS.md](AGENTS.md) for the architecture and correctness constraints.
 Bug reports and focused pull requests are welcome. Changes to public protocol or
 MQTT behavior should include compatibility evidence and focused tests.
 
+The proposed Contributor License Agreement is available in [English](CLA.md) and
+[中文](CLA.zh-CN.md). It covers independent commercial licensing alongside
+continued open source availability and remains a draft awaiting finalization;
+see [CONTRIBUTING.md](CONTRIBUTING.md) for its status and signing requirements.
+
 ## License
 
 NetbaIoT is licensed under [AGPL-3.0-or-later](LICENSE).
