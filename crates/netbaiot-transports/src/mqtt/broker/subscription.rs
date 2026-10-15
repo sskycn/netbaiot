@@ -49,11 +49,11 @@ impl SubscriptionTrie {
 
     pub(super) fn matching(&self, topic: &str) -> HashMap<SessionKey, Subscription> {
         let mut matches = HashMap::new();
-        // Clone only the borrowed cursor at a branch. In particular, unrelated
-        // downlink subscriptions must not allocate a topic-level Vec per uplink.
+        // Carry only the unconsumed borrowed topic at each branch. Unrelated
+        // downlink subscriptions need no temporary topic-level allocation.
         Self::match_at(
             &self.root,
-            topic.split('/'),
+            Some(topic),
             topic.starts_with('$'),
             &mut matches,
         );
@@ -62,22 +62,25 @@ impl SubscriptionTrie {
 
     pub(super) fn match_at(
         node: &TrieNode,
-        mut levels: std::str::Split<'_, char>,
+        remaining: Option<&str>,
         dollar_root: bool,
         output: &mut HashMap<SessionKey, Subscription>,
     ) {
         if !dollar_root && let Some(hash) = node.children.get("#") {
             merge_subscribers(output, &hash.subscribers);
         }
-        let Some(level) = levels.next() else {
+        let Some(remaining) = remaining else {
             merge_subscribers(output, &node.subscribers);
             return;
         };
+        let (level, rest) = remaining
+            .split_once('/')
+            .map_or((remaining, None), |(level, rest)| (level, Some(rest)));
         if let Some(exact) = node.children.get(level) {
-            Self::match_at(exact, levels.clone(), false, output);
+            Self::match_at(exact, rest, false, output);
         }
         if !dollar_root && let Some(plus) = node.children.get("+") {
-            Self::match_at(plus, levels, false, output);
+            Self::match_at(plus, rest, false, output);
         }
     }
 }

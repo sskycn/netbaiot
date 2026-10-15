@@ -54,6 +54,7 @@ struct Config {
     subscribe: bool,
     /// Measurement mode: subscribe to the same device's legal uplink topic.
     subscribe_uplink: bool,
+    /// Subscribe only to downlink; do not wait for an uplink application echo.
     subscribe_down_only: bool,
     mqtt_version: u8,
     mqtt_metadata: bool,
@@ -133,7 +134,7 @@ impl Config {
     // A down-only subscriber does not receive an application echo of its uplink.
     // QoS1/2 publish completion is tracked separately by the packet-id map.
     fn expects_application_receipt(&self) -> bool {
-        self.transport != "mqtt" || (self.subscribe && !self.subscribe_down_only)
+        self.subscribe && !self.subscribe_down_only
     }
 
     fn validate(&self) -> Result<()> {
@@ -1051,7 +1052,7 @@ async fn mqtt_or_tcp(
                     let source = format!("{unique}:{id}:{seq}");
                     let at = Instant::now();
                     production::sent(c, s, &source, at)?;
-                    if c.expects_application_receipt() {
+                    if c.expects_application_receipt() || !mqtt {
                         pending.insert(
                             source,
                             Pending {
