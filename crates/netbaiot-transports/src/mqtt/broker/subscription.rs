@@ -147,18 +147,17 @@ impl MqttBroker {
         let retained_allowed = |retained: &RetainedMessage| {
             !(retained.message.expired(now)
                 || (subscription.no_local && retained.origin.as_ref() == Some(key)))
-                && match subscription.retain_handling {
-                    0 => true,
-                    1 => !replacement,
-                    _ => false,
-                }
         };
         let replay_message = |retained: &RetainedMessage| BrokerMessage {
             qos: retained.message.qos.min(subscription.qos),
             retain: true,
             ..retained.message.clone()
         };
-        let retained = if filter.contains(['+', '#']) {
+        let retained = if subscription.retain_handling == 2
+            || (subscription.retain_handling == 1 && replacement)
+        {
+            Vec::new()
+        } else if filter.contains(['+', '#']) {
             state
                 .retained
                 .values()
