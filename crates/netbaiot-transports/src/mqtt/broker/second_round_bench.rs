@@ -863,3 +863,72 @@ async fn legacy_cleanup_recovery_measurement() {
         fs::remove_dir_all(directory).unwrap();
     }
 }
+
+// Covers matching independently of sockets, event decoding and sink scheduling.
+#[test]
+#[ignore = "serial release trie allocation and latency measurement"]
+fn second_round_trie_matching() {
+    if !enabled() {
+        return;
+    }
+    let topic = "v1/t/tenant-0/p/product/d/device-0/up";
+    for count in [1, 64, 1024] {
+        for pattern in [
+            "exact",
+            "plus",
+            "hash",
+            "overlap",
+            "fanout",
+            "down_only",
+            "early_miss",
+        ] {
+            let mut trie = SubscriptionTrie::default();
+            for index in 0..count {
+                let key = SessionKey {
+                    device: auth(index, 1).device_key,
+                    client_id: format!("trie-{index}").into(),
+                };
+                let filter = match pattern {
+                    "plus" => format!("v1/t/+/p/product/d/device-{index}/up"),
+                    "hash" => format!("v1/t/tenant-0/p/product/d/device-{index}/#"),
+                    "fanout" => topic.to_owned(),
+                    "down_only" => format!("v1/t/tenant-0/p/product/d/device-{index}/down"),
+                    "early_miss" => format!("other/t/tenant-0/p/product/d/device-{index}/up"),
+                    _ => format!("v1/t/tenant-0/p/product/d/device-{index}/up"),
+                };
+                trie.insert(&filter, key.clone(), Subscription::v311(1));
+                if pattern == "overlap" {
+                    trie.insert(
+                        &format!("v1/t/+/p/product/d/device-{index}/#"),
+                        key,
+                        Subscription {
+                            qos: 2,
+                            no_local: true,
+                            retain_as_published: true,
+                            retain_handling: 0,
+                        },
+                    );
+                }
+            }
+            let expected = match pattern {
+                "down_only" | "early_miss" => 0,
+                "fanout" => count,
+                _ => 1,
+            };
+            assert_eq!(trie.matching(topic).len(), expected);
+            probe(
+                &format!("trie_{pattern}"),
+                count,
+                256,
+                32,
+                || (),
+                |_| {
+                    for _ in 0..32 {
+                        black_box(trie.matching(black_box(topic)));
+                    }
+                },
+                |_| {},
+            );
+        }
+    }
+}
