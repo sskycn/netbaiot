@@ -236,6 +236,14 @@ pub(super) fn check_retained_update(
     Ok(())
 }
 
+// Avoid allocating an owned index key when the deadline is already current,
+// including the usual case where neither the old nor new value expires.
+fn update_retained_expiry(state: &mut BrokerState, topic: &str, deadline: Option<i64>) {
+    if state.retained_expiry.by_key.get(topic).copied() != deadline {
+        state.retained_expiry.update(topic.to_owned(), deadline);
+    }
+}
+
 pub(super) fn update_retained(
     state: &mut BrokerState,
     owner: &DeviceKey,
@@ -248,13 +256,15 @@ pub(super) fn update_retained(
             state.retained_bytes = state.retained_bytes.saturating_sub(old.bytes());
             retained_usage_remove(state, &old)?;
         }
-        state
-            .retained_expiry
-            .update(message.topic.to_string(), None);
+        update_retained_expiry(state, &message.topic, None);
         return Ok(());
     }
     check_retained_update(state, owner, origin, message, limits)?;
-    let old = state.retained.remove(message.topic.as_ref());
+    // Reuse the authoritative key on replacement instead of allocating it again.
+    let (topic, old) = match state.retained.remove_entry(message.topic.as_ref()) {
+        Some((topic, retained)) => (topic, Some(retained)),
+        None => (message.topic.to_string(), None),
+    };
     let old_bytes = old.as_ref().map_or(0, RetainedMessage::bytes);
     if let Some(old) = &old {
         retained_usage_remove(state, old)?;
@@ -270,10 +280,8 @@ pub(super) fn update_retained(
         origin: origin.cloned(),
     };
     retained_usage_add(state, &retained)?;
-    state.retained.insert(message.topic.to_string(), retained);
-    state
-        .retained_expiry
-        .update(message.topic.to_string(), message.properties.expires_at_ms);
+    state.retained.insert(topic, retained);
+    update_retained_expiry(state, &message.topic, message.properties.expires_at_ms);
     Ok(())
 }
 

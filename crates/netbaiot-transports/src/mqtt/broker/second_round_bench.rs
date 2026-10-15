@@ -1000,13 +1000,67 @@ fn retained_store_update_measurement() {
         message.retain = true;
         drop(state);
         probe(
-            "retained_replace",
+            "retained_replace_batched",
             count,
-            512,
-            1,
+            1024,
+            256,
             || (),
-            |_| broker.route(&owner.device_key, message.clone()).unwrap(),
+            |_| {
+                for _ in 0..256 {
+                    black_box(broker.route(&owner.device_key, message.clone()).unwrap());
+                }
+            },
             |_| {},
         );
+    }
+}
+
+#[test]
+#[ignore = "serial release /up no-match route measurement"]
+fn uplink_no_match_route_measurement() {
+    if !enabled() {
+        return;
+    }
+    for count in [0, 64, 1024] {
+        for wildcard in [false, true] {
+            let broker = MqttBroker::new(limits(count));
+            let owner = auth(0, 1);
+            let mut attachments = Vec::new();
+            for index in 0..count {
+                let identity = auth(index, 1);
+                let attachment = broker
+                    .attach(&identity, format!("hint-{index}"), false)
+                    .unwrap();
+                let filter = if wildcard {
+                    format!("v1/t/tenant-0/p/other/d/device-{index}/#")
+                } else {
+                    format!("v1/t/tenant-0/p/product/d/device-{index}/down")
+                };
+                broker
+                    .subscribe(&attachment.key, attachment.generation, &filter, 1)
+                    .unwrap();
+                attachments.push(attachment);
+            }
+            let message = publish("v1/t/tenant-0/p/product/d/device-0/up", 1, None);
+            assert_eq!(broker.route(&owner.device_key, message.clone()).unwrap(), 0);
+            probe(
+                if wildcard {
+                    "uplink_no_match_wildcard"
+                } else {
+                    "uplink_no_match_exact_down"
+                },
+                count,
+                2048,
+                256,
+                || (),
+                |_| {
+                    for _ in 0..256 {
+                        black_box(broker.route(&owner.device_key, message.clone()).unwrap());
+                    }
+                },
+                |_| {},
+            );
+            drop(attachments);
+        }
     }
 }
