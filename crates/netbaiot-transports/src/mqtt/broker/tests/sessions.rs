@@ -781,3 +781,87 @@ async fn persistent_reconnect_retransmits_outbound_in_original_order() {
         assert!(delivery.dup);
     }
 }
+
+#[test]
+fn trie_branches_merge_options_and_track_replacement_removal() {
+    let keys = ["first", "second", "third"].map(|id| SessionKey {
+        device: auth(id).device_key,
+        client_id: id.into(),
+    });
+    let mut topics = Vec::new();
+    for first in ["", "a", "b", "$SYS", "温度"] {
+        topics.push(first.to_owned());
+        for second in ["", "a", "b", "$SYS", "温度"] {
+            topics.push(format!("{first}/{second}"));
+            for third in ["", "a", "b", "$SYS", "温度"] {
+                topics.push(format!("{first}/{second}/{third}"));
+            }
+        }
+    }
+    let mut filters = topics.clone();
+    filters.extend(
+        [
+            "#", "+", "+/#", "+/+", "+/+/+", "a/#", "a/+", "a/+/b", "a/+/#", "$SYS/#", "$SYS/+",
+            "/#", "/+", "温度/#",
+        ]
+        .map(str::to_owned),
+    );
+    let mut trie = SubscriptionTrie::default();
+    let mut subscriptions = HashMap::new();
+    for (index, filter) in filters.iter().enumerate() {
+        let key = keys[index % keys.len()].clone();
+        let options = Subscription {
+            qos: (index % 3) as u8,
+            no_local: index % 2 == 0,
+            retain_as_published: index % 5 == 0,
+            retain_handling: (index % 3) as u8,
+        };
+        trie.insert(filter, key.clone(), options);
+        subscriptions.insert((filter.clone(), key), options);
+    }
+    // Check the combined result against independent linear filter matching.
+    // Retain Handling applies at SUBSCRIBE, not during publication merging.
+    let check = |trie: &SubscriptionTrie,
+                 subscriptions: &HashMap<(String, SessionKey), Subscription>| {
+        for topic in &topics {
+            let mut expected = HashMap::<SessionKey, (u8, bool, bool)>::new();
+            for ((filter, key), options) in subscriptions {
+                if topic_matches(filter, topic) {
+                    let merged = expected.entry(key.clone()).or_insert((0, true, false));
+                    merged.0 = merged.0.max(options.qos);
+                    merged.1 &= options.no_local;
+                    merged.2 |= options.retain_as_published;
+                }
+            }
+            let actual = trie
+                .matching(topic)
+                .into_iter()
+                .map(|(key, options)| {
+                    (
+                        key,
+                        (options.qos, options.no_local, options.retain_as_published),
+                    )
+                })
+                .collect::<HashMap<_, _>>();
+            assert_eq!(actual, expected, "topic {topic:?}");
+        }
+    };
+    check(&trie, &subscriptions);
+    for (index, filter) in filters.iter().enumerate().step_by(2) {
+        let key = keys[index % keys.len()].clone();
+        let options = Subscription::v311(2);
+        trie.insert(filter, key.clone(), options);
+        subscriptions.insert((filter.clone(), key), options);
+    }
+    check(&trie, &subscriptions);
+    for (index, filter) in filters.iter().enumerate() {
+        let key = &keys[index % keys.len()];
+        trie.remove(filter, key);
+        subscriptions.remove(&(filter.clone(), key.clone()));
+        if index % 16 == 0 {
+            check(&trie, &subscriptions);
+        }
+    }
+    check(&trie, &subscriptions);
+    assert!(trie.root.children.is_empty());
+}
