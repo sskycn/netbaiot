@@ -248,6 +248,8 @@ def main():
             }
             if args.subscribe_uplink:
                 workload["subscribe_uplink"] = True
+            if args.subscribe_down:
+                workload["subscribe_down_only"] = True
             if args.mqtt_v5:
                 workload["mqtt_version"] = 5
             if args.mqtt_metadata:

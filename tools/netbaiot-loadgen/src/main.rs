@@ -54,6 +54,7 @@ struct Config {
     subscribe: bool,
     /// Measurement mode: subscribe to the same device's legal uplink topic.
     subscribe_uplink: bool,
+    subscribe_down_only: bool,
     mqtt_version: u8,
     mqtt_metadata: bool,
     mqtt_clean_session: bool,
@@ -105,6 +106,7 @@ impl Default for Config {
             qos: 1,
             subscribe: true,
             subscribe_uplink: false,
+            subscribe_down_only: false,
             mqtt_version: 4,
             mqtt_metadata: false,
             mqtt_clean_session: true,
@@ -128,6 +130,12 @@ impl Default for Config {
     }
 }
 impl Config {
+    // A down-only subscriber does not receive an application echo of its uplink.
+    // QoS1/2 publish completion is tracked separately by the packet-id map.
+    fn expects_application_receipt(&self) -> bool {
+        self.transport != "mqtt" || (self.subscribe && !self.subscribe_down_only)
+    }
+
     fn validate(&self) -> Result<()> {
         production::validate(self)?;
         if self.connections == 0
@@ -139,6 +147,8 @@ impl Config {
             || ![4, 5].contains(&self.mqtt_version)
             || (self.mqtt_metadata && self.mqtt_version != 5)
             || (self.subscribe_uplink && (!self.subscribe || self.transport != "mqtt"))
+            || (self.subscribe_down_only
+                && (!self.subscribe || self.subscribe_uplink || self.transport != "mqtt"))
             || self.window == 0
             || self.window > 32
             || self.command_padding > 256
@@ -683,8 +693,10 @@ async fn mqtt_or_tcp(
         } else {
             text(&mut b, &(topics.clone() + "down"));
             b.push(1);
-            text(&mut b, &(topics.clone() + "up_ack"));
-            b.push(0);
+            if !c.subscribe_down_only {
+                text(&mut b, &(topics.clone() + "up_ack"));
+                b.push(0);
+            }
         }
         write(&mut stream, &packet(0x82, &b), s).await?;
         let sub = timeout(
@@ -699,7 +711,10 @@ async fn mqtt_or_tcp(
         if c.subscribe_uplink {
             expected.push(c.qos);
         } else {
-            expected.extend_from_slice(&[1, 0]);
+            expected.push(1);
+            if !c.subscribe_down_only {
+                expected.push(0);
+            }
         }
         if sub != (0x90, expected) {
             return Err("SUBACK rejected".into());
@@ -943,7 +958,7 @@ async fn mqtt_or_tcp(
                     let source = format!("ack:{command_id}");
                     let a=json!({"schema_version":1,"source_message_id":source,"kind":"command_ack","data":{"command_id":command_id,"execution":"succeeded"}}).to_string();
                     let at = Instant::now();
-                    if c.subscribe {
+                    if c.expects_application_receipt() {
                         pending.insert(
                             source,
                             Pending {
@@ -1036,7 +1051,7 @@ async fn mqtt_or_tcp(
                     let source = format!("{unique}:{id}:{seq}");
                     let at = Instant::now();
                     production::sent(c, s, &source, at)?;
-                    if c.subscribe || !mqtt {
+                    if c.expects_application_receipt() {
                         pending.insert(
                             source,
                             Pending {
@@ -1588,6 +1603,30 @@ mod tests {
         assert_eq!(h.count, 101);
         assert!(h.percentile(99) >= 0.13);
     }
+    #[test]
+    fn down_only_subscription_uses_protocol_ack_without_an_application_echo() {
+        let mut config = Config {
+            subscribe_down_only: true,
+            ..Config::default()
+        };
+        assert!(config.validate().is_ok());
+        assert!(!config.expects_application_receipt());
+        config.subscribe_uplink = true;
+        assert!(config.validate().is_err());
+        config.subscribe_uplink = false;
+        config.subscribe = false;
+        assert!(config.validate().is_err());
+        config.subscribe = true;
+        config.transport = "tcp".into();
+        assert!(config.validate().is_err());
+        config.subscribe_down_only = false;
+        assert!(config.expects_application_receipt());
+        config.transport = "mqtt".into();
+        assert!(config.expects_application_receipt());
+        config.subscribe_uplink = true;
+        assert!(config.expects_application_receipt());
+    }
+
     #[test]
     fn bad_config_and_oversize_response() {
         assert!(
