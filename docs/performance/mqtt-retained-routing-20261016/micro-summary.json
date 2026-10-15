@@ -1,0 +1,2189 @@
+{
+  "method": "median of three inner repeats within each process, then median across alternating independent processes; raw rows retained in local archive",
+  "groups": {
+    "route_a": {
+      "uplink_no_match_exact_down:0": {
+        "process_medians_ns": {
+          "route-1-a.log": 76.308,
+          "route-2-a.log": 77.115,
+          "route-3-a.log": 77.203,
+          "route-4-a.log": 77.752,
+          "route-5-a.log": 75.911
+        },
+        "median_ns": 77.115,
+        "range_ns": [
+          75.911,
+          77.752
+        ],
+        "allocations": [
+          0.0
+        ],
+        "requested_bytes": [
+          0.0
+        ]
+      },
+      "uplink_no_match_exact_down:64": {
+        "process_medians_ns": {
+          "route-1-a.log": 346.449,
+          "route-2-a.log": 346.283,
+          "route-3-a.log": 351.026,
+          "route-4-a.log": 344.53,
+          "route-5-a.log": 342.998
+        },
+        "median_ns": 346.283,
+        "range_ns": [
+          342.998,
+          351.026
+        ],
+        "allocations": [
+          0.0
+        ],
+        "requested_bytes": [
+          0.0
+        ]
+      },
+      "uplink_no_match_exact_down:1024": {
+        "process_medians_ns": {
+          "route-1-a.log": 348.285,
+          "route-2-a.log": 343.107,
+          "route-3-a.log": 346.357,
+          "route-4-a.log": 344.354,
+          "route-5-a.log": 346.619
+        },
+        "median_ns": 346.357,
+        "range_ns": [
+          343.107,
+          348.285
+        ],
+        "allocations": [
+          0.0
+        ],
+        "requested_bytes": [
+          0.0
+        ]
+      },
+      "uplink_no_match_wildcard:0": {
+        "process_medians_ns": {
+          "route-1-a.log": 76.981,
+          "route-2-a.log": 77.562,
+          "route-3-a.log": 78.63,
+          "route-4-a.log": 77.744,
+          "route-5-a.log": 76.212
+        },
+        "median_ns": 77.562,
+        "range_ns": [
+          76.212,
+          78.63
+        ],
+        "allocations": [
+          0.0
+        ],
+        "requested_bytes": [
+          0.0
+        ]
+      },
+      "uplink_no_match_wildcard:64": {
+        "process_medians_ns": {
+          "route-1-a.log": 273.269,
+          "route-2-a.log": 267.375,
+          "route-3-a.log": 267.835,
+          "route-4-a.log": 270.042,
+          "route-5-a.log": 266.134
+        },
+        "median_ns": 267.835,
+        "range_ns": [
+          266.134,
+          273.269
+        ],
+        "allocations": [
+          0.0
+        ],
+        "requested_bytes": [
+          0.0
+        ]
+      },
+      "uplink_no_match_wildcard:1024": {
+        "process_medians_ns": {
+          "route-1-a.log": 271.269,
+          "route-2-a.log": 269.286,
+          "route-3-a.log": 269.737,
+          "route-4-a.log": 269.394,
+          "route-5-a.log": 267.648
+        },
+        "median_ns": 269.394,
+        "range_ns": [
+          267.648,
+          271.269
+        ],
+        "allocations": [
+          0.0
+        ],
+        "requested_bytes": [
+          0.0
+        ]
+      }
+    },
+    "route_b": {
+      "uplink_no_match_exact_down:0": {
+        "process_medians_ns": {
+          "route-1-b.log": 80.811,
+          "route-2-b.log": 78.451,
+          "route-3-b.log": 77.622,
+          "route-4-b.log": 76.119,
+          "route-5-b.log": 77.294
+        },
+        "median_ns": 77.622,
+        "range_ns": [
+          76.119,
+          80.811
+        ],
+        "allocations": [
+          0.0
+        ],
+        "requested_bytes": [
+          0.0
+        ]
+      },
+      "uplink_no_match_exact_down:64": {
+        "process_medians_ns": {
+          "route-1-b.log": 78.029,
+          "route-2-b.log": 78.806,
+          "route-3-b.log": 79.709,
+          "route-4-b.log": 76.696,
+          "route-5-b.log": 77.571
+        },
+        "median_ns": 78.029,
+        "range_ns": [
+          76.696,
+          79.709
+        ],
+        "allocations": [
+          0.0
+        ],
+        "requested_bytes": [
+          0.0
+        ]
+      },
+      "uplink_no_match_exact_down:1024": {
+        "process_medians_ns": {
+          "route-1-b.log": 79.469,
+          "route-2-b.log": 79.337,
+          "route-3-b.log": 78.177,
+          "route-4-b.log": 77.841,
+          "route-5-b.log": 78.097
+        },
+        "median_ns": 78.177,
+        "range_ns": [
+          77.841,
+          79.469
+        ],
+        "allocations": [
+          0.0
+        ],
+        "requested_bytes": [
+          0.0
+        ]
+      },
+      "uplink_no_match_wildcard:0": {
+        "process_medians_ns": {
+          "route-1-b.log": 76.965,
+          "route-2-b.log": 78.632,
+          "route-3-b.log": 78.047,
+          "route-4-b.log": 76.415,
+          "route-5-b.log": 78.04
+        },
+        "median_ns": 78.04,
+        "range_ns": [
+          76.415,
+          78.632
+        ],
+        "allocations": [
+          0.0
+        ],
+        "requested_bytes": [
+          0.0
+        ]
+      },
+      "uplink_no_match_wildcard:64": {
+        "process_medians_ns": {
+          "route-1-b.log": 270.278,
+          "route-2-b.log": 270.989,
+          "route-3-b.log": 268.505,
+          "route-4-b.log": 266.579,
+          "route-5-b.log": 270.678
+        },
+        "median_ns": 270.278,
+        "range_ns": [
+          266.579,
+          270.989
+        ],
+        "allocations": [
+          0.0
+        ],
+        "requested_bytes": [
+          0.0
+        ]
+      },
+      "uplink_no_match_wildcard:1024": {
+        "process_medians_ns": {
+          "route-1-b.log": 271.821,
+          "route-2-b.log": 271.097,
+          "route-3-b.log": 270.895,
+          "route-4-b.log": 269.237,
+          "route-5-b.log": 272.298
+        },
+        "median_ns": 271.097,
+        "range_ns": [
+          269.237,
+          272.298
+        ],
+        "allocations": [
+          0.0
+        ],
+        "requested_bytes": [
+          0.0
+        ]
+      }
+    },
+    "update_a": {
+      "retained_replace_batched:100": {
+        "process_medians_ns": {
+          "update-batched-1-update-a2.log": 376.522,
+          "update-batched-2-update-a2.log": 380.54,
+          "update-batched-3-update-a2.log": 379.793,
+          "update-batched-4-update-a2.log": 380.801,
+          "update-batched-5-update-a2.log": 378.749
+        },
+        "median_ns": 379.793,
+        "range_ns": [
+          376.522,
+          380.801
+        ],
+        "allocations": [
+          2.0
+        ],
+        "requested_bytes": [
+          78.0
+        ]
+      },
+      "retained_replace_batched:1000": {
+        "process_medians_ns": {
+          "update-batched-1-update-a2.log": 375.065,
+          "update-batched-2-update-a2.log": 379.785,
+          "update-batched-3-update-a2.log": 391.111,
+          "update-batched-4-update-a2.log": 380.976,
+          "update-batched-5-update-a2.log": 379.473
+        },
+        "median_ns": 379.785,
+        "range_ns": [
+          375.065,
+          391.111
+        ],
+        "allocations": [
+          2.0
+        ],
+        "requested_bytes": [
+          78.0
+        ]
+      },
+      "retained_replace_batched:10000": {
+        "process_medians_ns": {
+          "update-batched-1-update-a2.log": 381.271,
+          "update-batched-2-update-a2.log": 383.761,
+          "update-batched-3-update-a2.log": 383.325,
+          "update-batched-4-update-a2.log": 393.134,
+          "update-batched-5-update-a2.log": 375.867
+        },
+        "median_ns": 383.325,
+        "range_ns": [
+          375.867,
+          393.134
+        ],
+        "allocations": [
+          2.0
+        ],
+        "requested_bytes": [
+          78.0
+        ]
+      }
+    },
+    "update_b": {
+      "retained_replace_batched:100": {
+        "process_medians_ns": {
+          "update-batched-1-candidate.log": 343.843,
+          "update-batched-2-candidate.log": 351.32,
+          "update-batched-3-candidate.log": 342.34,
+          "update-batched-4-candidate.log": 348.78,
+          "update-batched-5-candidate.log": 337.196
+        },
+        "median_ns": 343.843,
+        "range_ns": [
+          337.196,
+          351.32
+        ],
+        "allocations": [
+          0.0
+        ],
+        "requested_bytes": [
+          0.0
+        ]
+      },
+      "retained_replace_batched:1000": {
+        "process_medians_ns": {
+          "update-batched-1-candidate.log": 334.414,
+          "update-batched-2-candidate.log": 339.877,
+          "update-batched-3-candidate.log": 336.24,
+          "update-batched-4-candidate.log": 333.743,
+          "update-batched-5-candidate.log": 333.98
+        },
+        "median_ns": 334.414,
+        "range_ns": [
+          333.743,
+          339.877
+        ],
+        "allocations": [
+          0.0
+        ],
+        "requested_bytes": [
+          0.0
+        ]
+      },
+      "retained_replace_batched:10000": {
+        "process_medians_ns": {
+          "update-batched-1-candidate.log": 333.444,
+          "update-batched-2-candidate.log": 346.276,
+          "update-batched-3-candidate.log": 338.957,
+          "update-batched-4-candidate.log": 334.604,
+          "update-batched-5-candidate.log": 339.285
+        },
+        "median_ns": 338.957,
+        "range_ns": [
+          333.444,
+          346.276
+        ],
+        "allocations": [
+          0.0
+        ],
+        "requested_bytes": [
+          0.0
+        ]
+      }
+    },
+    "policy_a": {
+      "subscribe_retained_broad:10": {
+        "process_medians_ns": {
+          "policy-final-1-a.log": 2535.805,
+          "policy-final-2-a.log": 2424.109,
+          "policy-final-3-a.log": 2453.375
+        },
+        "median_ns": 2453.375,
+        "range_ns": [
+          2424.109,
+          2535.805
+        ],
+        "allocations": [
+          39.0
+        ],
+        "requested_bytes": [
+          3514.0
+        ]
+      },
+      "subscribe_retained_broad:100": {
+        "process_medians_ns": {
+          "policy-final-1-a.log": 15629.883,
+          "policy-final-2-a.log": 15339.188,
+          "policy-final-3-a.log": 15608.102
+        },
+        "median_ns": 15608.102,
+        "range_ns": [
+          15339.188,
+          15629.883
+        ],
+        "allocations": [
+          312.125
+        ],
+        "requested_bytes": [
+          28718.0
+        ]
+      },
+      "subscribe_retained_broad:1000": {
+        "process_medians_ns": {
+          "policy-final-1-a.log": 144739.219,
+          "policy-final-2-a.log": 144167.352,
+          "policy-final-3-a.log": 144194.672
+        },
+        "median_ns": 144194.672,
+        "range_ns": [
+          144167.352,
+          144739.219
+        ],
+        "allocations": [
+          3043.25
+        ],
+        "requested_bytes": [
+          274162.0
+        ]
+      },
+      "subscribe_retained_broad:4000": {
+        "process_medians_ns": {
+          "policy-final-1-a.log": 576234.688,
+          "policy-final-2-a.log": 565152.984,
+          "policy-final-3-a.log": 575521.469
+        },
+        "median_ns": 575521.469,
+        "range_ns": [
+          565152.984,
+          576234.688
+        ],
+        "allocations": [
+          12139.0
+        ],
+        "requested_bytes": [
+          1097770.0
+        ]
+      },
+      "subscribe_retained_broad:10000": {
+        "process_medians_ns": {
+          "policy-final-1-a.log": 1490333.625,
+          "policy-final-2-a.log": 1410972.305,
+          "policy-final-3-a.log": 1410523.125
+        },
+        "median_ns": 1410972.305,
+        "range_ns": [
+          1410523.125,
+          1490333.625
+        ],
+        "allocations": [
+          30328.5
+        ],
+        "requested_bytes": [
+          3138202.0
+        ]
+      },
+      "subscribe_retained_device_hash:10": {
+        "process_medians_ns": {
+          "policy-final-1-a.log": 1896.812,
+          "policy-final-2-a.log": 1889.695,
+          "policy-final-3-a.log": 1956.672
+        },
+        "median_ns": 1896.812,
+        "range_ns": [
+          1889.695,
+          1956.672
+        ],
+        "allocations": [
+          24.0,
+          24.008
+        ],
+        "requested_bytes": [
+          4457.0,
+          4459.25
+        ]
+      },
+      "subscribe_retained_device_hash:100": {
+        "process_medians_ns": {
+          "policy-final-1-a.log": 6608.109,
+          "policy-final-2-a.log": 6223.336,
+          "policy-final-3-a.log": 6217.75
+        },
+        "median_ns": 6223.336,
+        "range_ns": [
+          6217.75,
+          6608.109
+        ],
+        "allocations": [
+          24.0,
+          24.008
+        ],
+        "requested_bytes": [
+          4457.0,
+          4459.25
+        ]
+      },
+      "subscribe_retained_device_hash:1000": {
+        "process_medians_ns": {
+          "policy-final-1-a.log": 49737.625,
+          "policy-final-2-a.log": 48124.359,
+          "policy-final-3-a.log": 47176.102
+        },
+        "median_ns": 48124.359,
+        "range_ns": [
+          47176.102,
+          49737.625
+        ],
+        "allocations": [
+          24.0,
+          24.008
+        ],
+        "requested_bytes": [
+          4457.0,
+          4459.25
+        ]
+      },
+      "subscribe_retained_device_hash:4000": {
+        "process_medians_ns": {
+          "policy-final-1-a.log": 204107.789,
+          "policy-final-2-a.log": 187250.688,
+          "policy-final-3-a.log": 188149.109
+        },
+        "median_ns": 188149.109,
+        "range_ns": [
+          187250.688,
+          204107.789
+        ],
+        "allocations": [
+          24.0,
+          24.008
+        ],
+        "requested_bytes": [
+          4457.0,
+          4459.25
+        ]
+      },
+      "subscribe_retained_device_hash:10000": {
+        "process_medians_ns": {
+          "policy-final-1-a.log": 487510.406,
+          "policy-final-2-a.log": 456118.148,
+          "policy-final-3-a.log": 473688.188
+        },
+        "median_ns": 473688.188,
+        "range_ns": [
+          456118.148,
+          487510.406
+        ],
+        "allocations": [
+          24.0,
+          24.008
+        ],
+        "requested_bytes": [
+          4457.0,
+          4459.25
+        ]
+      },
+      "subscribe_retained_exact:10": {
+        "process_medians_ns": {
+          "policy-final-1-a.log": 1266.602,
+          "policy-final-2-a.log": 1284.859,
+          "policy-final-3-a.log": 1264.023
+        },
+        "median_ns": 1266.602,
+        "range_ns": [
+          1264.023,
+          1284.859
+        ],
+        "allocations": [
+          24.0,
+          24.008
+        ],
+        "requested_bytes": [
+          4267.0,
+          4269.25
+        ]
+      },
+      "subscribe_retained_exact:100": {
+        "process_medians_ns": {
+          "policy-final-1-a.log": 1405.289,
+          "policy-final-2-a.log": 1433.227,
+          "policy-final-3-a.log": 1415.289
+        },
+        "median_ns": 1415.289,
+        "range_ns": [
+          1405.289,
+          1433.227
+        ],
+        "allocations": [
+          24.0,
+          24.008
+        ],
+        "requested_bytes": [
+          4267.0,
+          4269.25
+        ]
+      },
+      "subscribe_retained_exact:1000": {
+        "process_medians_ns": {
+          "policy-final-1-a.log": 1417.656,
+          "policy-final-2-a.log": 1425.773,
+          "policy-final-3-a.log": 1410.164
+        },
+        "median_ns": 1417.656,
+        "range_ns": [
+          1410.164,
+          1425.773
+        ],
+        "allocations": [
+          24.0,
+          24.008
+        ],
+        "requested_bytes": [
+          4267.0,
+          4269.25
+        ]
+      },
+      "subscribe_retained_exact:4000": {
+        "process_medians_ns": {
+          "policy-final-1-a.log": 1375.938,
+          "policy-final-2-a.log": 1388.719,
+          "policy-final-3-a.log": 1424.156
+        },
+        "median_ns": 1388.719,
+        "range_ns": [
+          1375.938,
+          1424.156
+        ],
+        "allocations": [
+          24.0,
+          24.008
+        ],
+        "requested_bytes": [
+          4267.0,
+          4269.25
+        ]
+      },
+      "subscribe_retained_exact:10000": {
+        "process_medians_ns": {
+          "policy-final-1-a.log": 1505.836,
+          "policy-final-2-a.log": 1467.086,
+          "policy-final-3-a.log": 1299.508
+        },
+        "median_ns": 1467.086,
+        "range_ns": [
+          1299.508,
+          1505.836
+        ],
+        "allocations": [
+          24.0,
+          24.008
+        ],
+        "requested_bytes": [
+          4267.0,
+          4269.25
+        ]
+      },
+      "subscribe_retained_none:10": {
+        "process_medians_ns": {
+          "policy-final-1-a.log": 1033.852,
+          "policy-final-2-a.log": 990.867,
+          "policy-final-3-a.log": 1066.367
+        },
+        "median_ns": 1033.852,
+        "range_ns": [
+          990.867,
+          1066.367
+        ],
+        "allocations": [
+          11.0
+        ],
+        "requested_bytes": [
+          1989.0
+        ]
+      },
+      "subscribe_retained_none:100": {
+        "process_medians_ns": {
+          "policy-final-1-a.log": 3249.414,
+          "policy-final-2-a.log": 3416.023,
+          "policy-final-3-a.log": 3240.93
+        },
+        "median_ns": 3249.414,
+        "range_ns": [
+          3240.93,
+          3416.023
+        ],
+        "allocations": [
+          11.0
+        ],
+        "requested_bytes": [
+          1989.0
+        ]
+      },
+      "subscribe_retained_none:1000": {
+        "process_medians_ns": {
+          "policy-final-1-a.log": 23841.484,
+          "policy-final-2-a.log": 25630.234,
+          "policy-final-3-a.log": 23161.117
+        },
+        "median_ns": 23841.484,
+        "range_ns": [
+          23161.117,
+          25630.234
+        ],
+        "allocations": [
+          11.0
+        ],
+        "requested_bytes": [
+          1989.0
+        ]
+      },
+      "subscribe_retained_none:4000": {
+        "process_medians_ns": {
+          "policy-final-1-a.log": 91730.141,
+          "policy-final-2-a.log": 93949.18,
+          "policy-final-3-a.log": 93655.336
+        },
+        "median_ns": 93655.336,
+        "range_ns": [
+          91730.141,
+          93949.18
+        ],
+        "allocations": [
+          11.0
+        ],
+        "requested_bytes": [
+          1989.0
+        ]
+      },
+      "subscribe_retained_none:10000": {
+        "process_medians_ns": {
+          "policy-final-1-a.log": 237333.32,
+          "policy-final-2-a.log": 222097.711,
+          "policy-final-3-a.log": 229627.578
+        },
+        "median_ns": 229627.578,
+        "range_ns": [
+          222097.711,
+          237333.32
+        ],
+        "allocations": [
+          11.0
+        ],
+        "requested_bytes": [
+          1989.0
+        ]
+      },
+      "subscribe_retained_plus:10": {
+        "process_medians_ns": {
+          "policy-final-1-a.log": 1822.234,
+          "policy-final-2-a.log": 1834.305,
+          "policy-final-3-a.log": 1805.312
+        },
+        "median_ns": 1822.234,
+        "range_ns": [
+          1805.312,
+          1834.305
+        ],
+        "allocations": [
+          24.0,
+          24.008
+        ],
+        "requested_bytes": [
+          4443.0,
+          4445.25
+        ]
+      },
+      "subscribe_retained_plus:100": {
+        "process_medians_ns": {
+          "policy-final-1-a.log": 6707.633,
+          "policy-final-2-a.log": 7432.297,
+          "policy-final-3-a.log": 7138.07
+        },
+        "median_ns": 7138.07,
+        "range_ns": [
+          6707.633,
+          7432.297
+        ],
+        "allocations": [
+          24.0,
+          24.008
+        ],
+        "requested_bytes": [
+          4443.0,
+          4445.25
+        ]
+      },
+      "subscribe_retained_plus:1000": {
+        "process_medians_ns": {
+          "policy-final-1-a.log": 57469.398,
+          "policy-final-2-a.log": 56377.953,
+          "policy-final-3-a.log": 56301.164
+        },
+        "median_ns": 56377.953,
+        "range_ns": [
+          56301.164,
+          57469.398
+        ],
+        "allocations": [
+          24.0,
+          24.008
+        ],
+        "requested_bytes": [
+          4443.0,
+          4445.25
+        ]
+      },
+      "subscribe_retained_plus:4000": {
+        "process_medians_ns": {
+          "policy-final-1-a.log": 229582.984,
+          "policy-final-2-a.log": 221567.336,
+          "policy-final-3-a.log": 223165.023
+        },
+        "median_ns": 223165.023,
+        "range_ns": [
+          221567.336,
+          229582.984
+        ],
+        "allocations": [
+          24.0,
+          24.008
+        ],
+        "requested_bytes": [
+          4443.0,
+          4445.25
+        ]
+      },
+      "subscribe_retained_plus:10000": {
+        "process_medians_ns": {
+          "policy-final-1-a.log": 578094.719,
+          "policy-final-2-a.log": 557307.32,
+          "policy-final-3-a.log": 554454.359
+        },
+        "median_ns": 557307.32,
+        "range_ns": [
+          554454.359,
+          578094.719
+        ],
+        "allocations": [
+          24.0,
+          24.008
+        ],
+        "requested_bytes": [
+          4443.0,
+          4445.25
+        ]
+      },
+      "subscribe_retained_selective:10": {
+        "process_medians_ns": {
+          "policy-final-1-a.log": 1715.148,
+          "policy-final-2-a.log": 1676.773,
+          "policy-final-3-a.log": 1718.055
+        },
+        "median_ns": 1715.148,
+        "range_ns": [
+          1676.773,
+          1718.055
+        ],
+        "allocations": [
+          20.0,
+          20.008
+        ],
+        "requested_bytes": [
+          3453.0,
+          3455.25
+        ]
+      },
+      "subscribe_retained_selective:100": {
+        "process_medians_ns": {
+          "policy-final-1-a.log": 6060.859,
+          "policy-final-2-a.log": 5623.344,
+          "policy-final-3-a.log": 5570.938
+        },
+        "median_ns": 5623.344,
+        "range_ns": [
+          5570.938,
+          6060.859
+        ],
+        "allocations": [
+          20.0,
+          20.008
+        ],
+        "requested_bytes": [
+          3453.0,
+          3455.25
+        ]
+      },
+      "subscribe_retained_selective:1000": {
+        "process_medians_ns": {
+          "policy-final-1-a.log": 49321.312,
+          "policy-final-2-a.log": 47247.711,
+          "policy-final-3-a.log": 48540.68
+        },
+        "median_ns": 48540.68,
+        "range_ns": [
+          47247.711,
+          49321.312
+        ],
+        "allocations": [
+          49.0
+        ],
+        "requested_bytes": [
+          6021.0
+        ]
+      },
+      "subscribe_retained_selective:4000": {
+        "process_medians_ns": {
+          "policy-final-1-a.log": 188988.664,
+          "policy-final-2-a.log": 179671.883,
+          "policy-final-3-a.log": 178178.984
+        },
+        "median_ns": 179671.883,
+        "range_ns": [
+          178178.984,
+          188988.664
+        ],
+        "allocations": [
+          141.0
+        ],
+        "requested_bytes": [
+          15093.0
+        ]
+      },
+      "subscribe_retained_selective:10000": {
+        "process_medians_ns": {
+          "policy-final-1-a.log": 476775.703,
+          "policy-final-2-a.log": 430537.766,
+          "policy-final-3-a.log": 452789.703
+        },
+        "median_ns": 452789.703,
+        "range_ns": [
+          430537.766,
+          476775.703
+        ],
+        "allocations": [
+          322.125
+        ],
+        "requested_bytes": [
+          31225.0
+        ]
+      },
+      "subscribe_retained_skip_all:10": {
+        "process_medians_ns": {
+          "policy-final-1-a.log": 683.891,
+          "policy-final-2-a.log": 710.523,
+          "policy-final-3-a.log": 693.688
+        },
+        "median_ns": 693.688,
+        "range_ns": [
+          683.891,
+          710.523
+        ],
+        "allocations": [
+          5.0
+        ],
+        "requested_bytes": [
+          490.0
+        ]
+      },
+      "subscribe_retained_skip_all:100": {
+        "process_medians_ns": {
+          "policy-final-1-a.log": 998.023,
+          "policy-final-2-a.log": 1008.781,
+          "policy-final-3-a.log": 997.391
+        },
+        "median_ns": 998.023,
+        "range_ns": [
+          997.391,
+          1008.781
+        ],
+        "allocations": [
+          5.0
+        ],
+        "requested_bytes": [
+          490.0
+        ]
+      },
+      "subscribe_retained_skip_all:1000": {
+        "process_medians_ns": {
+          "policy-final-1-a.log": 4206.711,
+          "policy-final-2-a.log": 4771.492,
+          "policy-final-3-a.log": 4722.047
+        },
+        "median_ns": 4722.047,
+        "range_ns": [
+          4206.711,
+          4771.492
+        ],
+        "allocations": [
+          5.0
+        ],
+        "requested_bytes": [
+          490.0
+        ]
+      },
+      "subscribe_retained_skip_all:4000": {
+        "process_medians_ns": {
+          "policy-final-1-a.log": 17213.922,
+          "policy-final-2-a.log": 17491.562,
+          "policy-final-3-a.log": 17735.367
+        },
+        "median_ns": 17491.562,
+        "range_ns": [
+          17213.922,
+          17735.367
+        ],
+        "allocations": [
+          5.0
+        ],
+        "requested_bytes": [
+          490.0
+        ]
+      },
+      "subscribe_retained_skip_all:10000": {
+        "process_medians_ns": {
+          "policy-final-1-a.log": 38937.82,
+          "policy-final-2-a.log": 41362.898,
+          "policy-final-3-a.log": 40751.586
+        },
+        "median_ns": 40751.586,
+        "range_ns": [
+          38937.82,
+          41362.898
+        ],
+        "allocations": [
+          5.0
+        ],
+        "requested_bytes": [
+          490.0
+        ]
+      },
+      "subscribe_retained_skip_existing:10": {
+        "process_medians_ns": {
+          "policy-final-1-a.log": 545.234,
+          "policy-final-2-a.log": 530.945,
+          "policy-final-3-a.log": 536.086
+        },
+        "median_ns": 536.086,
+        "range_ns": [
+          530.945,
+          545.234
+        ],
+        "allocations": [
+          2.0
+        ],
+        "requested_bytes": [
+          2.0
+        ]
+      },
+      "subscribe_retained_skip_existing:100": {
+        "process_medians_ns": {
+          "policy-final-1-a.log": 832.008,
+          "policy-final-2-a.log": 839.539,
+          "policy-final-3-a.log": 854.195
+        },
+        "median_ns": 839.539,
+        "range_ns": [
+          832.008,
+          854.195
+        ],
+        "allocations": [
+          2.0
+        ],
+        "requested_bytes": [
+          2.0
+        ]
+      },
+      "subscribe_retained_skip_existing:1000": {
+        "process_medians_ns": {
+          "policy-final-1-a.log": 4126.953,
+          "policy-final-2-a.log": 4468.086,
+          "policy-final-3-a.log": 4686.891
+        },
+        "median_ns": 4468.086,
+        "range_ns": [
+          4126.953,
+          4686.891
+        ],
+        "allocations": [
+          2.0
+        ],
+        "requested_bytes": [
+          2.0
+        ]
+      },
+      "subscribe_retained_skip_existing:4000": {
+        "process_medians_ns": {
+          "policy-final-1-a.log": 16606.43,
+          "policy-final-2-a.log": 17448.18,
+          "policy-final-3-a.log": 17673.508
+        },
+        "median_ns": 17448.18,
+        "range_ns": [
+          16606.43,
+          17673.508
+        ],
+        "allocations": [
+          2.0
+        ],
+        "requested_bytes": [
+          2.0
+        ]
+      },
+      "subscribe_retained_skip_existing:10000": {
+        "process_medians_ns": {
+          "policy-final-1-a.log": 41231.422,
+          "policy-final-2-a.log": 41214.172,
+          "policy-final-3-a.log": 39063.156
+        },
+        "median_ns": 41214.172,
+        "range_ns": [
+          39063.156,
+          41231.422
+        ],
+        "allocations": [
+          2.0
+        ],
+        "requested_bytes": [
+          2.0
+        ]
+      },
+      "subscribe_retained_v1:10": {
+        "process_medians_ns": {
+          "policy-final-1-a.log": 2577.805,
+          "policy-final-2-a.log": 2527.711,
+          "policy-final-3-a.log": 2575.531
+        },
+        "median_ns": 2575.531,
+        "range_ns": [
+          2527.711,
+          2577.805
+        ],
+        "allocations": [
+          41.0
+        ],
+        "requested_bytes": [
+          4011.0
+        ]
+      },
+      "subscribe_retained_v1:100": {
+        "process_medians_ns": {
+          "policy-final-1-a.log": 15832.695,
+          "policy-final-2-a.log": 16189.109,
+          "policy-final-3-a.log": 16028.305
+        },
+        "median_ns": 16028.305,
+        "range_ns": [
+          15832.695,
+          16189.109
+        ],
+        "allocations": [
+          314.125
+        ],
+        "requested_bytes": [
+          29215.0
+        ]
+      },
+      "subscribe_retained_v1:1000": {
+        "process_medians_ns": {
+          "policy-final-1-a.log": 153616.859,
+          "policy-final-2-a.log": 148385.445,
+          "policy-final-3-a.log": 148779.312
+        },
+        "median_ns": 148779.312,
+        "range_ns": [
+          148385.445,
+          153616.859
+        ],
+        "allocations": [
+          3045.25
+        ],
+        "requested_bytes": [
+          274659.0
+        ]
+      },
+      "subscribe_retained_v1:4000": {
+        "process_medians_ns": {
+          "policy-final-1-a.log": 587264.648,
+          "policy-final-2-a.log": 582030.25,
+          "policy-final-3-a.log": 589301.75
+        },
+        "median_ns": 587264.648,
+        "range_ns": [
+          582030.25,
+          589301.75
+        ],
+        "allocations": [
+          12141.0
+        ],
+        "requested_bytes": [
+          1098267.0
+        ]
+      },
+      "subscribe_retained_v1:10000": {
+        "process_medians_ns": {
+          "policy-final-1-a.log": 1461122.359,
+          "policy-final-2-a.log": 1455633.43,
+          "policy-final-3-a.log": 1452953.078
+        },
+        "median_ns": 1455633.43,
+        "range_ns": [
+          1452953.078,
+          1461122.359
+        ],
+        "allocations": [
+          30330.5
+        ],
+        "requested_bytes": [
+          3138699.0
+        ]
+      }
+    },
+    "policy_b": {
+      "subscribe_retained_broad:10": {
+        "process_medians_ns": {
+          "policy-final-1-b.log": 2420.258,
+          "policy-final-2-b.log": 2703.062,
+          "policy-final-3-b.log": 2508.164
+        },
+        "median_ns": 2508.164,
+        "range_ns": [
+          2420.258,
+          2703.062
+        ],
+        "allocations": [
+          39.0
+        ],
+        "requested_bytes": [
+          3514.0
+        ]
+      },
+      "subscribe_retained_broad:100": {
+        "process_medians_ns": {
+          "policy-final-1-b.log": 15764.875,
+          "policy-final-2-b.log": 17100.875,
+          "policy-final-3-b.log": 15411.797
+        },
+        "median_ns": 15764.875,
+        "range_ns": [
+          15411.797,
+          17100.875
+        ],
+        "allocations": [
+          312.125
+        ],
+        "requested_bytes": [
+          28718.0
+        ]
+      },
+      "subscribe_retained_broad:1000": {
+        "process_medians_ns": {
+          "policy-final-1-b.log": 142596.641,
+          "policy-final-2-b.log": 158735.062,
+          "policy-final-3-b.log": 144064.117
+        },
+        "median_ns": 144064.117,
+        "range_ns": [
+          142596.641,
+          158735.062
+        ],
+        "allocations": [
+          3043.25
+        ],
+        "requested_bytes": [
+          274162.0
+        ]
+      },
+      "subscribe_retained_broad:4000": {
+        "process_medians_ns": {
+          "policy-final-1-b.log": 567790.688,
+          "policy-final-2-b.log": 624294.617,
+          "policy-final-3-b.log": 563321.992
+        },
+        "median_ns": 567790.688,
+        "range_ns": [
+          563321.992,
+          624294.617
+        ],
+        "allocations": [
+          12139.0
+        ],
+        "requested_bytes": [
+          1097770.0
+        ]
+      },
+      "subscribe_retained_broad:10000": {
+        "process_medians_ns": {
+          "policy-final-1-b.log": 1424618.5,
+          "policy-final-2-b.log": 1560975.578,
+          "policy-final-3-b.log": 1420048.836
+        },
+        "median_ns": 1424618.5,
+        "range_ns": [
+          1420048.836,
+          1560975.578
+        ],
+        "allocations": [
+          30328.5
+        ],
+        "requested_bytes": [
+          3138202.0
+        ]
+      },
+      "subscribe_retained_device_hash:10": {
+        "process_medians_ns": {
+          "policy-final-1-b.log": 1964.93,
+          "policy-final-2-b.log": 1970.445,
+          "policy-final-3-b.log": 1893.25
+        },
+        "median_ns": 1964.93,
+        "range_ns": [
+          1893.25,
+          1970.445
+        ],
+        "allocations": [
+          24.0,
+          24.008
+        ],
+        "requested_bytes": [
+          4457.0,
+          4459.25
+        ]
+      },
+      "subscribe_retained_device_hash:100": {
+        "process_medians_ns": {
+          "policy-final-1-b.log": 6477.203,
+          "policy-final-2-b.log": 6220.039,
+          "policy-final-3-b.log": 6479.828
+        },
+        "median_ns": 6477.203,
+        "range_ns": [
+          6220.039,
+          6479.828
+        ],
+        "allocations": [
+          24.0,
+          24.008
+        ],
+        "requested_bytes": [
+          4457.0,
+          4459.25
+        ]
+      },
+      "subscribe_retained_device_hash:1000": {
+        "process_medians_ns": {
+          "policy-final-1-b.log": 48681.688,
+          "policy-final-2-b.log": 52281.852,
+          "policy-final-3-b.log": 49611.352
+        },
+        "median_ns": 49611.352,
+        "range_ns": [
+          48681.688,
+          52281.852
+        ],
+        "allocations": [
+          24.0,
+          24.008
+        ],
+        "requested_bytes": [
+          4457.0,
+          4459.25
+        ]
+      },
+      "subscribe_retained_device_hash:4000": {
+        "process_medians_ns": {
+          "policy-final-1-b.log": 212188.797,
+          "policy-final-2-b.log": 203460.648,
+          "policy-final-3-b.log": 196878.578
+        },
+        "median_ns": 203460.648,
+        "range_ns": [
+          196878.578,
+          212188.797
+        ],
+        "allocations": [
+          24.0,
+          24.008
+        ],
+        "requested_bytes": [
+          4457.0,
+          4459.25
+        ]
+      },
+      "subscribe_retained_device_hash:10000": {
+        "process_medians_ns": {
+          "policy-final-1-b.log": 488643.859,
+          "policy-final-2-b.log": 476893.242,
+          "policy-final-3-b.log": 463754.469
+        },
+        "median_ns": 476893.242,
+        "range_ns": [
+          463754.469,
+          488643.859
+        ],
+        "allocations": [
+          24.0,
+          24.008
+        ],
+        "requested_bytes": [
+          4457.0,
+          4459.25
+        ]
+      },
+      "subscribe_retained_exact:10": {
+        "process_medians_ns": {
+          "policy-final-1-b.log": 1267.602,
+          "policy-final-2-b.log": 1347.586,
+          "policy-final-3-b.log": 1300.102
+        },
+        "median_ns": 1300.102,
+        "range_ns": [
+          1267.602,
+          1347.586
+        ],
+        "allocations": [
+          24.0,
+          24.008
+        ],
+        "requested_bytes": [
+          4267.0,
+          4269.25
+        ]
+      },
+      "subscribe_retained_exact:100": {
+        "process_medians_ns": {
+          "policy-final-1-b.log": 1388.992,
+          "policy-final-2-b.log": 1361.305,
+          "policy-final-3-b.log": 1398.875
+        },
+        "median_ns": 1388.992,
+        "range_ns": [
+          1361.305,
+          1398.875
+        ],
+        "allocations": [
+          24.0,
+          24.008
+        ],
+        "requested_bytes": [
+          4267.0,
+          4269.25
+        ]
+      },
+      "subscribe_retained_exact:1000": {
+        "process_medians_ns": {
+          "policy-final-1-b.log": 1497.703,
+          "policy-final-2-b.log": 1427.047,
+          "policy-final-3-b.log": 1415.047
+        },
+        "median_ns": 1427.047,
+        "range_ns": [
+          1415.047,
+          1497.703
+        ],
+        "allocations": [
+          24.0,
+          24.008
+        ],
+        "requested_bytes": [
+          4267.0,
+          4269.25
+        ]
+      },
+      "subscribe_retained_exact:4000": {
+        "process_medians_ns": {
+          "policy-final-1-b.log": 1438.18,
+          "policy-final-2-b.log": 1470.336,
+          "policy-final-3-b.log": 1391.977
+        },
+        "median_ns": 1438.18,
+        "range_ns": [
+          1391.977,
+          1470.336
+        ],
+        "allocations": [
+          24.0,
+          24.008
+        ],
+        "requested_bytes": [
+          4267.0,
+          4269.25
+        ]
+      },
+      "subscribe_retained_exact:10000": {
+        "process_medians_ns": {
+          "policy-final-1-b.log": 1456.414,
+          "policy-final-2-b.log": 1406.938,
+          "policy-final-3-b.log": 1442.375
+        },
+        "median_ns": 1442.375,
+        "range_ns": [
+          1406.938,
+          1456.414
+        ],
+        "allocations": [
+          24.0,
+          24.008
+        ],
+        "requested_bytes": [
+          4267.0,
+          4269.25
+        ]
+      },
+      "subscribe_retained_none:10": {
+        "process_medians_ns": {
+          "policy-final-1-b.log": 1080.727,
+          "policy-final-2-b.log": 1083.961,
+          "policy-final-3-b.log": 1006.836
+        },
+        "median_ns": 1080.727,
+        "range_ns": [
+          1006.836,
+          1083.961
+        ],
+        "allocations": [
+          11.0
+        ],
+        "requested_bytes": [
+          1989.0
+        ]
+      },
+      "subscribe_retained_none:100": {
+        "process_medians_ns": {
+          "policy-final-1-b.log": 3231.125,
+          "policy-final-2-b.log": 3211.242,
+          "policy-final-3-b.log": 3380.219
+        },
+        "median_ns": 3231.125,
+        "range_ns": [
+          3211.242,
+          3380.219
+        ],
+        "allocations": [
+          11.0
+        ],
+        "requested_bytes": [
+          1989.0
+        ]
+      },
+      "subscribe_retained_none:1000": {
+        "process_medians_ns": {
+          "policy-final-1-b.log": 24320.219,
+          "policy-final-2-b.log": 23862.336,
+          "policy-final-3-b.log": 25283.555
+        },
+        "median_ns": 24320.219,
+        "range_ns": [
+          23862.336,
+          25283.555
+        ],
+        "allocations": [
+          11.0
+        ],
+        "requested_bytes": [
+          1989.0
+        ]
+      },
+      "subscribe_retained_none:4000": {
+        "process_medians_ns": {
+          "policy-final-1-b.log": 96783.164,
+          "policy-final-2-b.log": 95566.055,
+          "policy-final-3-b.log": 95572.914
+        },
+        "median_ns": 95572.914,
+        "range_ns": [
+          95566.055,
+          96783.164
+        ],
+        "allocations": [
+          11.0
+        ],
+        "requested_bytes": [
+          1989.0
+        ]
+      },
+      "subscribe_retained_none:10000": {
+        "process_medians_ns": {
+          "policy-final-1-b.log": 233968.133,
+          "policy-final-2-b.log": 233938.156,
+          "policy-final-3-b.log": 227813.164
+        },
+        "median_ns": 233938.156,
+        "range_ns": [
+          227813.164,
+          233968.133
+        ],
+        "allocations": [
+          11.0
+        ],
+        "requested_bytes": [
+          1989.0
+        ]
+      },
+      "subscribe_retained_plus:10": {
+        "process_medians_ns": {
+          "policy-final-1-b.log": 1996.062,
+          "policy-final-2-b.log": 1968.102,
+          "policy-final-3-b.log": 1878.234
+        },
+        "median_ns": 1968.102,
+        "range_ns": [
+          1878.234,
+          1996.062
+        ],
+        "allocations": [
+          24.0,
+          24.008
+        ],
+        "requested_bytes": [
+          4443.0,
+          4445.25
+        ]
+      },
+      "subscribe_retained_plus:100": {
+        "process_medians_ns": {
+          "policy-final-1-b.log": 6965.836,
+          "policy-final-2-b.log": 7316.109,
+          "policy-final-3-b.log": 7059.93
+        },
+        "median_ns": 7059.93,
+        "range_ns": [
+          6965.836,
+          7316.109
+        ],
+        "allocations": [
+          24.0,
+          24.008
+        ],
+        "requested_bytes": [
+          4443.0,
+          4445.25
+        ]
+      },
+      "subscribe_retained_plus:1000": {
+        "process_medians_ns": {
+          "policy-final-1-b.log": 59779.961,
+          "policy-final-2-b.log": 61086.219,
+          "policy-final-3-b.log": 60445.312
+        },
+        "median_ns": 60445.312,
+        "range_ns": [
+          59779.961,
+          61086.219
+        ],
+        "allocations": [
+          24.0,
+          24.008
+        ],
+        "requested_bytes": [
+          4443.0,
+          4445.25
+        ]
+      },
+      "subscribe_retained_plus:4000": {
+        "process_medians_ns": {
+          "policy-final-1-b.log": 234333.977,
+          "policy-final-2-b.log": 243271.469,
+          "policy-final-3-b.log": 238848.914
+        },
+        "median_ns": 238848.914,
+        "range_ns": [
+          234333.977,
+          243271.469
+        ],
+        "allocations": [
+          24.0,
+          24.008
+        ],
+        "requested_bytes": [
+          4443.0,
+          4445.25
+        ]
+      },
+      "subscribe_retained_plus:10000": {
+        "process_medians_ns": {
+          "policy-final-1-b.log": 610235.328,
+          "policy-final-2-b.log": 584561.539,
+          "policy-final-3-b.log": 609485.383
+        },
+        "median_ns": 609485.383,
+        "range_ns": [
+          584561.539,
+          610235.328
+        ],
+        "allocations": [
+          24.0,
+          24.008
+        ],
+        "requested_bytes": [
+          4443.0,
+          4445.25
+        ]
+      },
+      "subscribe_retained_selective:10": {
+        "process_medians_ns": {
+          "policy-final-1-b.log": 1651.672,
+          "policy-final-2-b.log": 1789.102,
+          "policy-final-3-b.log": 1693.992
+        },
+        "median_ns": 1693.992,
+        "range_ns": [
+          1651.672,
+          1789.102
+        ],
+        "allocations": [
+          20.0,
+          20.008
+        ],
+        "requested_bytes": [
+          3453.0,
+          3455.25
+        ]
+      },
+      "subscribe_retained_selective:100": {
+        "process_medians_ns": {
+          "policy-final-1-b.log": 6348.609,
+          "policy-final-2-b.log": 6267.266,
+          "policy-final-3-b.log": 6094.688
+        },
+        "median_ns": 6267.266,
+        "range_ns": [
+          6094.688,
+          6348.609
+        ],
+        "allocations": [
+          20.0,
+          20.008
+        ],
+        "requested_bytes": [
+          3453.0,
+          3455.25
+        ]
+      },
+      "subscribe_retained_selective:1000": {
+        "process_medians_ns": {
+          "policy-final-1-b.log": 50099.266,
+          "policy-final-2-b.log": 51051.086,
+          "policy-final-3-b.log": 50682.281
+        },
+        "median_ns": 50682.281,
+        "range_ns": [
+          50099.266,
+          51051.086
+        ],
+        "allocations": [
+          49.0
+        ],
+        "requested_bytes": [
+          6021.0
+        ]
+      },
+      "subscribe_retained_selective:4000": {
+        "process_medians_ns": {
+          "policy-final-1-b.log": 192935.172,
+          "policy-final-2-b.log": 201692.391,
+          "policy-final-3-b.log": 190921.492
+        },
+        "median_ns": 192935.172,
+        "range_ns": [
+          190921.492,
+          201692.391
+        ],
+        "allocations": [
+          141.0
+        ],
+        "requested_bytes": [
+          15093.0
+        ]
+      },
+      "subscribe_retained_selective:10000": {
+        "process_medians_ns": {
+          "policy-final-1-b.log": 483738.961,
+          "policy-final-2-b.log": 479551.055,
+          "policy-final-3-b.log": 488362.0
+        },
+        "median_ns": 483738.961,
+        "range_ns": [
+          479551.055,
+          488362.0
+        ],
+        "allocations": [
+          322.125
+        ],
+        "requested_bytes": [
+          31225.0
+        ]
+      },
+      "subscribe_retained_skip_all:10": {
+        "process_medians_ns": {
+          "policy-final-1-b.log": 658.18,
+          "policy-final-2-b.log": 686.234,
+          "policy-final-3-b.log": 680.023
+        },
+        "median_ns": 680.023,
+        "range_ns": [
+          658.18,
+          686.234
+        ],
+        "allocations": [
+          5.0
+        ],
+        "requested_bytes": [
+          490.0
+        ]
+      },
+      "subscribe_retained_skip_all:100": {
+        "process_medians_ns": {
+          "policy-final-1-b.log": 672.508,
+          "policy-final-2-b.log": 693.031,
+          "policy-final-3-b.log": 641.961
+        },
+        "median_ns": 672.508,
+        "range_ns": [
+          641.961,
+          693.031
+        ],
+        "allocations": [
+          5.0
+        ],
+        "requested_bytes": [
+          490.0
+        ]
+      },
+      "subscribe_retained_skip_all:1000": {
+        "process_medians_ns": {
+          "policy-final-1-b.log": 651.328,
+          "policy-final-2-b.log": 688.523,
+          "policy-final-3-b.log": 613.555
+        },
+        "median_ns": 651.328,
+        "range_ns": [
+          613.555,
+          688.523
+        ],
+        "allocations": [
+          5.0
+        ],
+        "requested_bytes": [
+          490.0
+        ]
+      },
+      "subscribe_retained_skip_all:4000": {
+        "process_medians_ns": {
+          "policy-final-1-b.log": 690.445,
+          "policy-final-2-b.log": 670.891,
+          "policy-final-3-b.log": 668.289
+        },
+        "median_ns": 670.891,
+        "range_ns": [
+          668.289,
+          690.445
+        ],
+        "allocations": [
+          5.0
+        ],
+        "requested_bytes": [
+          490.0
+        ]
+      },
+      "subscribe_retained_skip_all:10000": {
+        "process_medians_ns": {
+          "policy-final-1-b.log": 643.188,
+          "policy-final-2-b.log": 666.297,
+          "policy-final-3-b.log": 691.062
+        },
+        "median_ns": 666.297,
+        "range_ns": [
+          643.188,
+          691.062
+        ],
+        "allocations": [
+          5.0
+        ],
+        "requested_bytes": [
+          490.0
+        ]
+      },
+      "subscribe_retained_skip_existing:10": {
+        "process_medians_ns": {
+          "policy-final-1-b.log": 487.992,
+          "policy-final-2-b.log": 459.617,
+          "policy-final-3-b.log": 497.07
+        },
+        "median_ns": 487.992,
+        "range_ns": [
+          459.617,
+          497.07
+        ],
+        "allocations": [
+          2.0
+        ],
+        "requested_bytes": [
+          2.0
+        ]
+      },
+      "subscribe_retained_skip_existing:100": {
+        "process_medians_ns": {
+          "policy-final-1-b.log": 478.211,
+          "policy-final-2-b.log": 458.023,
+          "policy-final-3-b.log": 491.93
+        },
+        "median_ns": 478.211,
+        "range_ns": [
+          458.023,
+          491.93
+        ],
+        "allocations": [
+          2.0
+        ],
+        "requested_bytes": [
+          2.0
+        ]
+      },
+      "subscribe_retained_skip_existing:1000": {
+        "process_medians_ns": {
+          "policy-final-1-b.log": 487.961,
+          "policy-final-2-b.log": 461.93,
+          "policy-final-3-b.log": 499.023
+        },
+        "median_ns": 487.961,
+        "range_ns": [
+          461.93,
+          499.023
+        ],
+        "allocations": [
+          2.0
+        ],
+        "requested_bytes": [
+          2.0
+        ]
+      },
+      "subscribe_retained_skip_existing:4000": {
+        "process_medians_ns": {
+          "policy-final-1-b.log": 469.352,
+          "policy-final-2-b.log": 483.406,
+          "policy-final-3-b.log": 495.773
+        },
+        "median_ns": 483.406,
+        "range_ns": [
+          469.352,
+          495.773
+        ],
+        "allocations": [
+          2.0
+        ],
+        "requested_bytes": [
+          2.0
+        ]
+      },
+      "subscribe_retained_skip_existing:10000": {
+        "process_medians_ns": {
+          "policy-final-1-b.log": 483.711,
+          "policy-final-2-b.log": 505.844,
+          "policy-final-3-b.log": 531.227
+        },
+        "median_ns": 505.844,
+        "range_ns": [
+          483.711,
+          531.227
+        ],
+        "allocations": [
+          2.0
+        ],
+        "requested_bytes": [
+          2.0
+        ]
+      },
+      "subscribe_retained_v1:10": {
+        "process_medians_ns": {
+          "policy-final-1-b.log": 2549.492,
+          "policy-final-2-b.log": 2777.055,
+          "policy-final-3-b.log": 2536.852
+        },
+        "median_ns": 2549.492,
+        "range_ns": [
+          2536.852,
+          2777.055
+        ],
+        "allocations": [
+          41.0
+        ],
+        "requested_bytes": [
+          4011.0
+        ]
+      },
+      "subscribe_retained_v1:100": {
+        "process_medians_ns": {
+          "policy-final-1-b.log": 16069.602,
+          "policy-final-2-b.log": 17174.797,
+          "policy-final-3-b.log": 16226.266
+        },
+        "median_ns": 16226.266,
+        "range_ns": [
+          16069.602,
+          17174.797
+        ],
+        "allocations": [
+          314.125
+        ],
+        "requested_bytes": [
+          29215.0
+        ]
+      },
+      "subscribe_retained_v1:1000": {
+        "process_medians_ns": {
+          "policy-final-1-b.log": 147646.117,
+          "policy-final-2-b.log": 162341.164,
+          "policy-final-3-b.log": 149023.742
+        },
+        "median_ns": 149023.742,
+        "range_ns": [
+          147646.117,
+          162341.164
+        ],
+        "allocations": [
+          3045.25
+        ],
+        "requested_bytes": [
+          274659.0
+        ]
+      },
+      "subscribe_retained_v1:4000": {
+        "process_medians_ns": {
+          "policy-final-1-b.log": 583542.641,
+          "policy-final-2-b.log": 645272.148,
+          "policy-final-3-b.log": 584348.289
+        },
+        "median_ns": 584348.289,
+        "range_ns": [
+          583542.641,
+          645272.148
+        ],
+        "allocations": [
+          12141.0
+        ],
+        "requested_bytes": [
+          1098267.0
+        ]
+      },
+      "subscribe_retained_v1:10000": {
+        "process_medians_ns": {
+          "policy-final-1-b.log": 1472689.406,
+          "policy-final-2-b.log": 1602574.18,
+          "policy-final-3-b.log": 1467335.953
+        },
+        "median_ns": 1472689.406,
+        "range_ns": [
+          1467335.953,
+          1602574.18
+        ],
+        "allocations": [
+          30330.5
+        ],
+        "requested_bytes": [
+          3138699.0
+        ]
+      }
+    },
+    "rejected_ordered_a": {
+      "retained_replace:100": {
+        "process_medians_ns": {
+          "update-1-a.log": 407.881,
+          "update-2-a.log": 439.861,
+          "update-3-a.log": 421.135,
+          "update-4-a.log": 355.701,
+          "update-5-a.log": 375.736
+        },
+        "median_ns": 407.881,
+        "range_ns": [
+          355.701,
+          439.861
+        ],
+        "allocations": [
+          2.0
+        ],
+        "requested_bytes": [
+          78.0
+        ]
+      },
+      "retained_replace:1000": {
+        "process_medians_ns": {
+          "update-1-a.log": 369.049,
+          "update-2-a.log": 450.684,
+          "update-3-a.log": 423.914,
+          "update-4-a.log": 364.475,
+          "update-5-a.log": 370.117
+        },
+        "median_ns": 370.117,
+        "range_ns": [
+          364.475,
+          450.684
+        ],
+        "allocations": [
+          2.0
+        ],
+        "requested_bytes": [
+          78.0
+        ]
+      },
+      "retained_replace:10000": {
+        "process_medians_ns": {
+          "update-1-a.log": 373.621,
+          "update-2-a.log": 437.082,
+          "update-3-a.log": 413.549,
+          "update-4-a.log": 366.607,
+          "update-5-a.log": 372.793
+        },
+        "median_ns": 373.621,
+        "range_ns": [
+          366.607,
+          437.082
+        ],
+        "allocations": [
+          2.0
+        ],
+        "requested_bytes": [
+          78.0
+        ]
+      }
+    },
+    "rejected_ordered_b": {
+      "retained_replace:100": {
+        "process_medians_ns": {
+          "update-1-b.log": 341.887,
+          "update-2-b.log": 457.102,
+          "update-3-b.log": 350.637,
+          "update-4-b.log": 317.617,
+          "update-5-b.log": 316.088
+        },
+        "median_ns": 341.887,
+        "range_ns": [
+          316.088,
+          457.102
+        ],
+        "allocations": [
+          0.0
+        ],
+        "requested_bytes": [
+          0.0
+        ]
+      },
+      "retained_replace:1000": {
+        "process_medians_ns": {
+          "update-1-b.log": 691.16,
+          "update-2-b.log": 641.295,
+          "update-3-b.log": 482.43,
+          "update-4-b.log": 452.072,
+          "update-5-b.log": 440.189
+        },
+        "median_ns": 482.43,
+        "range_ns": [
+          440.189,
+          691.16
+        ],
+        "allocations": [
+          1.0
+        ],
+        "requested_bytes": [
+          1864.0
+        ]
+      },
+      "retained_replace:10000": {
+        "process_medians_ns": {
+          "update-1-b.log": 604.092,
+          "update-2-b.log": 496.414,
+          "update-3-b.log": 422.354,
+          "update-4-b.log": 393.648,
+          "update-5-b.log": 385.256
+        },
+        "median_ns": 422.354,
+        "range_ns": [
+          385.256,
+          604.092
+        ],
+        "allocations": [
+          0.0
+        ],
+        "requested_bytes": [
+          0.0
+        ]
+      }
+    }
+  }
+}

@@ -211,3 +211,5 @@ python3 scripts/perf/event_load.py --server-bin target/performance/mqtt-publish-
 ## 后续研究
 
 保留现有单 BrokerState、EventBus、Tokio 和受限 JoinSet。下一阶段应在独立 Linux 服务端与外部负载机上做 CPU flamegraph、锁 wait/hold 和更长窗口的容量搜索，分清锁竞争、任务唤醒、系统调用及负载端调度成本。再以测量决定是否优化小 fanout 临时 HashMap、单 required Sink 状态或固定小 ACK 编码。没有证据支持直接引入 Broker/EventBus 分片、Mio/DPDK、批量业务协议或放宽资源限制。
+
+提交的 `summary.json` 在后续证据预算检查中压缩了重复延迟字段和 Trie 内部重复行；逐轮计数、CPU、回执百分位和 Trie 汇总保留。原始完整重复数据仍在本目录原有 `raw-evidence.tar.gz` 中，其归档和哈希未改变。
