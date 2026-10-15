@@ -3,7 +3,7 @@
 ## Contributor licensing
 
 The proposed Contributor License Agreement is available in
-[English](CLA.md) and [中文](CLA.zh-CN.md). Both versions are draft 1.0 and contain
+[English](CLA.md) and [中文](CLA.zh-CN.md). Both versions are draft 1.1 and contain
 the same numbered terms. The draft lets contributors retain copyright while
 expressly granting the Maintainer independent commercial and proprietary
 sublicensing rights, alongside continued availability of an open source version
@@ -13,23 +13,110 @@ The CLA is a draft awaiting finalization; a signing requirement and automated
 signing workflow are not yet active. Publishing the draft, submitting a pull
 request or adding a commit sign-off does not constitute signing this agreement.
 The project's current open source license remains [AGPL-3.0-or-later](LICENSE).
-Using the open source version alone does not require signing a CLA.
+Individuals and organizations may use, modify, deploy and redistribute the open
+source version, including for commercial purposes, under the AGPL without signing
+a CLA or purchasing a commercial license. All existing Rust crates retain their
+AGPL license declarations; the CLA does not split or replace those licenses.
+
+### Contributions and pull request process
+
+Once a finalized CLA is formally adopted, the signing requirement is intended to
+cover external source code, patches, tests, documentation and other original
+material intentionally submitted for inclusion in NetbaIoT under Section 2.
+Ordinary issue reports, discussions and use of the software alone are outside
+that requirement. An existing signature may cover later submissions within its
+recorded scope and signing capacity; a new signature is not required for every
+pull request. A different rights holder or changed signing capacity requires a
+new or supplemental authorization record.
+
+Until formal adoption, contributors may use the existing pull request process;
+the draft does not impose a new signature or merge gate. For a contribution:
+
+1. Identify the problem, scope of the change and whether you submit personally or
+   for an organization. Keep the submission traceable to its authors and rights
+   holders through pull request and commit references.
+2. Identify third-party material, its source, version, affected files, license,
+   required notices and known restrictions. Distinguish your original additions
+   from underlying work or code written by other contributors. Follow
+   [SECURITY.md](SECURITY.md) for undisclosed vulnerabilities and do not publish
+   confidential material or private authorization documents in an issue or PR.
+3. Run the checks applicable to the change and state their results in the PR.
+4. After formal adoption, use the published signing channel if a valid record
+   covering your contribution is missing. The Maintainer must verify the signing
+   record, rights scope and any organization authority before accepting material
+   as covered by the CLA. A PR or `Signed-off-by` line alone is not that record.
+
+An individual signs for rights they own or are authorized to grant. A company or
+other organization signs through a representative who can bind it, with the
+authorized submitters and contribution scope recorded. Where an employer or
+client owns relevant rights, an employee's personal signature does not replace
+the required organization authorization or agreement. Do not infer authorization
+from a company email address or GitHub organization membership alone.
+
+Historical contributions require a supplemental document expressly agreed by both
+parties that identifies the covered submissions. Keep their records linked to
+the signer and rights holder. Neither adopting a CLA nor updating its version
+automatically covers earlier contributions.
+
+Third-party code requires a separate rights review. AGPL compatibility does not
+by itself permit closed source commercial relicensing. Review the actual license
+or separately obtained permission before including the material in a commercial
+license; preserve applicable obligations, replace it or exclude it where the
+required rights are unavailable. The CLA cannot grant rights the signer lacks.
+
+### Decisions and legal review before adoption
 
 Before adopting the agreement, the Maintainer must complete the legal identity
 behind `sskycn`, contact information, governing law, dispute resolution and
-controlling language, and arrange legal review. The signing process must obtain
-explicit acceptance of the finalized terms, including Sections 3 and 4, and
-retain a verifiable record linking the signer to the exact agreement version and
-date. Store completed forms, contact details and organization authorization
-records privately; do not commit them to the public repository.
+controlling language. No jurisdiction or language is selected by default.
 
-Where an employer or another organization owns relevant rights, obtain
-authorization covering the grants or a separate agreement from that rights
-holder. Earlier contributions require an expressly agreed attachment identifying
-the covered submissions. The draft does not automatically relicense earlier
-contributions or third-party material. Review the rights in existing code and
-dependencies before offering a commercial license; comply with, replace or
-exclude material for which the required rights are unavailable.
+The Maintainer must also decide the adoption date, contribution scope, published
+signing channel, identity and organization authority verification process, record
+custodian, privacy notice, access controls and lawful retention policy. Confirm
+how historical contributions and any version transition will be handled before
+announcing a signing requirement.
+
+Qualified counsel for the chosen jurisdictions must review the final text,
+including the irrevocable grants and commercial sublicensing chain, removal
+exceptions and continuing AGPL obligations, direct downstream patent grants,
+patent litigation termination and the treatment of defensive counterclaims,
+project succession and any required consent or formalities, electronic signature
+evidence, moral rights, privacy, governing law and dispute resolution. The draft
+does not constitute a finding that these arrangements are legally enforceable.
+It is not ready for formal signing until those decisions and reviews are complete.
+
+### Signing records and future automation
+
+The signing process must obtain explicit acceptance of the finalized terms,
+including Sections 3 and 4. Follow Section 10 for the required record: legal
+identity and linked GitHub account, signing capacity and authority, exact version
+and immutable copies of both texts, signed-text revision or digest, timestamp with
+time zone, consent evidence, contribution scope, agreed controlling language,
+historical attachments where needed and acknowledgment of receipt.
+
+Store completed forms, contact details, signatures and organization authority
+documents privately with restricted access. Do not commit them to this public
+repository or expose them in PR comments, Actions logs or artifacts. Collect only
+necessary information; government identification numbers or identity document
+copies are not routine requirements. Explain data purposes, access and retention
+before collection and keep a copy of the applicable privacy notice with the record.
+
+After adoption, a GitHub App or GitHub Actions check could compare PR contributors
+and rights holders against a private signing register for the relevant agreement
+version and scope, reporting only the necessary status. Start with a non-blocking
+trial and manual review of organizational contributions, historical attachments
+and ambiguous authorship before making any check required. Review permissions,
+data handling, private storage and record export before selecting a service.
+[CLA assistant](https://github.com/cla-assistant/cla-assistant) is an example of a
+tool that supports PR signing and version-specific signing status; account-based
+confirmation alone does not replace the legal identity, authority and consent
+records required here. No such automation or required CLA check is enabled by
+this change.
+
+A DCO or Git `Signed-off-by` may serve a different provenance process, but does
+not automatically grant the independent commercial sublicensing rights in this
+CLA. An automated check must verify express acceptance of the actual finalized
+CLA rather than treating a commit sign-off as a substitute.
 
 ## Setup
 
