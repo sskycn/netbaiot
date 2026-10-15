@@ -115,6 +115,8 @@ impl MqttBroker {
     pub(super) fn publish_subscription_count(&self, state: &BrokerState) {
         self.subscription_count
             .store(state.subscription_count, Ordering::Release);
+        self.uplink_subscription_count
+            .store(state.trie.uplink_subscriptions, Ordering::Release);
     }
 
     pub(super) fn prune_expired(&self, state: &mut BrokerState, budget: usize) -> Result<()> {

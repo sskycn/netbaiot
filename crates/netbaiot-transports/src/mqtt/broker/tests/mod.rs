@@ -24,6 +24,7 @@ fn assert_accounting_consistent(state: &BrokerState) {
     let mut device_subscriptions = HashMap::<DeviceKey, usize>::new();
     let mut global_bytes = 0;
     let mut global_subscriptions = 0;
+    let mut uplink_subscriptions = 0;
     let mut global_offline_count = 0;
     let mut global_offline_bytes = 0;
     let mut reserved_count = 0;
@@ -47,6 +48,11 @@ fn assert_accounting_consistent(state: &BrokerState) {
         *device_subscriptions.entry(key.device.clone()).or_default() += usage.subscriptions;
         global_bytes += usage.state_bytes;
         global_subscriptions += usage.subscriptions;
+        uplink_subscriptions += session
+            .subscriptions
+            .keys()
+            .filter(|filter| matches!(filter.split('/').next_back(), Some("up" | "+" | "#")))
+            .count();
         global_offline_count += usage.offline_count;
         global_offline_bytes += usage.offline_bytes;
         if let Some(deadline) = next_message_expiry(session) {
@@ -101,6 +107,7 @@ fn assert_accounting_consistent(state: &BrokerState) {
     assert_eq!(state.device_subscription_count, device_subscriptions);
     assert_eq!(state.session_bytes, global_bytes);
     assert_eq!(state.subscription_count, global_subscriptions);
+    assert_eq!(state.trie.uplink_subscriptions, uplink_subscriptions);
     assert_eq!(state.offline_count, global_offline_count);
     assert_eq!(state.offline_bytes, global_offline_bytes);
     assert_eq!(
@@ -185,6 +192,10 @@ fn assert_accounting_consistent(state: &BrokerState) {
 fn assert_broker_accounting(broker: &MqttBroker) {
     let state = lock(&broker.state).unwrap();
     assert_accounting_consistent(&state);
+    assert_eq!(
+        broker.uplink_subscription_count.load(Ordering::Acquire),
+        state.trie.uplink_subscriptions
+    );
 }
 
 fn auth(device: &str) -> AuthenticatedDevice {

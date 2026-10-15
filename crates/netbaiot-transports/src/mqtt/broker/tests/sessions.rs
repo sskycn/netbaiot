@@ -789,11 +789,11 @@ fn trie_branches_merge_options_and_track_replacement_removal() {
         client_id: id.into(),
     });
     let mut topics = Vec::new();
-    for first in ["", "a", "b", "$SYS", "温度"] {
+    for first in ["", "a", "b", "$SYS", "温度", "up"] {
         topics.push(first.to_owned());
-        for second in ["", "a", "b", "$SYS", "温度"] {
+        for second in ["", "a", "b", "$SYS", "温度", "up"] {
             topics.push(format!("{first}/{second}"));
-            for third in ["", "a", "b", "$SYS", "温度"] {
+            for third in ["", "a", "b", "$SYS", "温度", "up"] {
                 topics.push(format!("{first}/{second}/{third}"));
             }
         }
@@ -823,6 +823,11 @@ fn trie_branches_merge_options_and_track_replacement_removal() {
     // Retain Handling applies at SUBSCRIBE, not during publication merging.
     let check = |trie: &SubscriptionTrie,
                  subscriptions: &HashMap<(String, SessionKey), Subscription>| {
+        let expected_uplinks = subscriptions
+            .keys()
+            .filter(|(filter, _)| matches!(filter.split('/').next_back(), Some("up" | "+" | "#")))
+            .count();
+        assert_eq!(trie.uplink_subscriptions, expected_uplinks);
         for topic in &topics {
             let mut expected = HashMap::<SessionKey, (u8, bool, bool)>::new();
             for ((filter, key), options) in subscriptions {
@@ -843,6 +848,9 @@ fn trie_branches_merge_options_and_track_replacement_removal() {
                     )
                 })
                 .collect::<HashMap<_, _>>();
+            if topic.ends_with("/up") && trie.uplink_subscriptions == 0 {
+                assert!(expected.is_empty(), "false negative for {topic:?}");
+            }
             assert_eq!(actual, expected, "topic {topic:?}");
         }
     };
@@ -857,6 +865,7 @@ fn trie_branches_merge_options_and_track_replacement_removal() {
     for (index, filter) in filters.iter().enumerate() {
         let key = &keys[index % keys.len()];
         trie.remove(filter, key);
+        trie.remove(filter, key); // Repeated removal must not decrement the hint.
         subscriptions.remove(&(filter.clone(), key.clone()));
         if index % 16 == 0 {
             check(&trie, &subscriptions);

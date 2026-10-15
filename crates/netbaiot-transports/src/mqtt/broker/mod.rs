@@ -472,6 +472,8 @@ struct TrieNode {
 #[derive(Default)]
 struct SubscriptionTrie {
     root: TrieNode,
+    /// Filters that may match a topic ending in /up; maintained with trie mutations.
+    uplink_subscriptions: usize,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -612,6 +614,8 @@ pub struct MqttBroker {
     /// Derived from `BrokerState::subscription_count`. Broker state remains authoritative; this
     /// hint only lets a non-retained route with no possible target linearize without the mutex.
     subscription_count: AtomicUsize,
+    /// Conservative suffix hint; a nonzero count still uses the authoritative trie.
+    uplink_subscription_count: AtomicUsize,
     state: Mutex<BrokerState>,
     recovery_owner: Mutex<Option<Arc<recovery_io::RecoveryDirectory>>>,
     #[cfg(test)]
@@ -635,6 +639,7 @@ impl MqttBroker {
             limits,
             metrics,
             subscription_count: AtomicUsize::new(0),
+            uplink_subscription_count: AtomicUsize::new(0),
             recovery_owner: Mutex::new(None),
             #[cfg(test)]
             replay_hook: Mutex::new(None),

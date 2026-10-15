@@ -677,3 +677,122 @@ async fn routing_uses_minimum_qos_and_retained_replace_delete_semantics() {
         "zero payload deletes retained"
     );
 }
+
+#[test]
+fn uplink_without_possible_subscriber_does_not_wait_for_broker_mutex() {
+    let broker = MqttBroker::new(Arc::new(Limits::default()));
+    let device = auth("uplink-hint");
+    let attachment = broker.attach(&device, "client".into(), false).unwrap();
+    broker
+        .subscribe(
+            &attachment.key,
+            attachment.generation,
+            "v1/t/t/p/p/d/uplink-hint/down",
+            1,
+        )
+        .unwrap();
+    assert_eq!(broker.subscription_count.load(Ordering::Acquire), 1);
+    let message = BrokerMessage {
+        topic: "v1/t/t/p/p/d/uplink-hint/up".into(),
+        payload: b"payload".to_vec().into(),
+        qos: 1,
+        retain: false,
+        properties: Default::default(),
+    };
+    let held = broker.state.lock().unwrap();
+    let (sender, receiver) = std::sync::mpsc::sync_channel(1);
+    let worker_broker = broker.clone();
+    let owner = device.device_key.clone();
+    let work = message.clone();
+    let worker = std::thread::spawn(move || {
+        sender.send(worker_broker.route(&owner, work)).unwrap();
+    });
+    let completed = receiver.recv_timeout(Duration::from_secs(2));
+    drop(held);
+    worker.join().unwrap();
+    assert_eq!(completed.unwrap().unwrap(), 0);
+    // Retain must still own storage even when the same suffix has no subscriber.
+    let retained = BrokerMessage {
+        retain: true,
+        ..message
+    };
+    broker.route(&device.device_key, retained.clone()).unwrap();
+    assert!(broker.has_retained_topic(&retained.topic).unwrap());
+    assert_broker_accounting(&broker);
+}
+
+#[test]
+fn uplink_hint_preserves_exact_wildcard_takeover_recovery_and_invalidation() {
+    let broker = MqttBroker::new(Arc::new(Limits::default()));
+    let device = auth("uplink-lifecycle");
+    let mut attachment = broker.attach(&device, "client".into(), false).unwrap();
+    let topic = "v1/t/t/p/p/d/uplink-lifecycle/up";
+    let message = BrokerMessage {
+        topic: topic.into(),
+        payload: b"data".to_vec().into(),
+        qos: 0,
+        retain: false,
+        properties: Default::default(),
+    };
+    for filter in [
+        topic,
+        "v1/t/t/p/p/d/uplink-lifecycle/+",
+        "v1/t/t/p/p/d/uplink-lifecycle/#",
+        "#",
+    ] {
+        broker
+            .subscribe(&attachment.key, attachment.generation, filter, 0)
+            .unwrap();
+        broker
+            .subscribe(&attachment.key, attachment.generation, filter, 0)
+            .unwrap();
+        assert_eq!(broker.uplink_subscription_count.load(Ordering::Acquire), 1);
+        assert_eq!(
+            broker.route(&device.device_key, message.clone()).unwrap(),
+            1
+        );
+        assert!(attachment.receiver.try_recv().is_ok());
+        assert_broker_accounting(&broker);
+        broker
+            .unsubscribe(&attachment.key, attachment.generation, filter)
+            .unwrap();
+        assert_eq!(broker.uplink_subscription_count.load(Ordering::Acquire), 0);
+    }
+    broker
+        .subscribe(&attachment.key, attachment.generation, topic, 1)
+        .unwrap();
+    let mut takeover = broker.attach(&device, "client".into(), false).unwrap();
+    attachment.detach().unwrap();
+    assert_eq!(broker.uplink_subscription_count.load(Ordering::Acquire), 1);
+    assert_eq!(
+        broker.route(&device.device_key, message.clone()).unwrap(),
+        1
+    );
+    assert!(takeover.receiver.try_recv().is_ok());
+    takeover.detach().unwrap();
+    let recovered = MqttBroker::new(Arc::new(Limits::default()));
+    recovered.restore(broker.snapshot().unwrap()).unwrap();
+    assert_eq!(
+        recovered.uplink_subscription_count.load(Ordering::Acquire),
+        1
+    );
+    assert_broker_accounting(&recovered);
+    let clean = recovered.attach(&device, "client".into(), true).unwrap();
+    assert_eq!(
+        recovered.uplink_subscription_count.load(Ordering::Acquire),
+        0
+    );
+    recovered
+        .subscribe(&clean.key, clean.generation, topic, 1)
+        .unwrap();
+    recovered
+        .invalidate_sessions(&AuthInvalidation::Device {
+            device: device.device_key.clone(),
+        })
+        .unwrap();
+    assert_eq!(
+        recovered.uplink_subscription_count.load(Ordering::Acquire),
+        0
+    );
+    assert_broker_accounting(&recovered);
+}

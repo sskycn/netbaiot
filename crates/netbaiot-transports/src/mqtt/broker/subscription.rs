@@ -17,18 +17,31 @@ pub(super) fn merge_subscribers(
     }
 }
 
+// A valid MQTT filter ending in another literal cannot match a topic ending in /up.
+// Wildcard endings deliberately count even when their prefix cannot match: false positives
+// take the normal route, while a zero must never hide a delivery responsibility.
+fn filter_may_match_uplink(filter: &str) -> bool {
+    matches!(filter.rsplit('/').next(), Some("up" | "+" | "#"))
+}
+
 impl SubscriptionTrie {
     pub(super) fn insert(&mut self, filter: &str, key: SessionKey, subscription: Subscription) {
         let mut node = &mut self.root;
         for level in filter.split('/') {
             node = node.children.entry(level.to_owned()).or_default();
         }
-        node.subscribers.insert(key, subscription);
+        if node.subscribers.insert(key, subscription).is_none() && filter_may_match_uplink(filter) {
+            self.uplink_subscriptions += 1;
+        }
     }
 
     pub(super) fn remove(&mut self, filter: &str, key: &SessionKey) {
         let levels = filter.split('/').collect::<Vec<_>>();
-        Self::remove_at(&mut self.root, &levels, 0, key);
+        let mut removed = false;
+        Self::remove_at(&mut self.root, &levels, 0, key, &mut removed);
+        if removed && filter_may_match_uplink(filter) {
+            self.uplink_subscriptions -= 1;
+        }
     }
 
     pub(super) fn remove_at(
@@ -36,11 +49,12 @@ impl SubscriptionTrie {
         levels: &[&str],
         at: usize,
         key: &SessionKey,
+        removed: &mut bool,
     ) -> bool {
         if at == levels.len() {
-            node.subscribers.remove(key);
+            *removed = node.subscribers.remove(key).is_some();
         } else if let Some(child) = node.children.get_mut(levels[at])
-            && Self::remove_at(child, levels, at + 1, key)
+            && Self::remove_at(child, levels, at + 1, key, removed)
         {
             node.children.remove(levels[at]);
         }
