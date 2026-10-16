@@ -84,6 +84,15 @@ The `route-fairness` scenario instead runs one saturated QoS1 publisher beside
 drivers accept `--server-bin` and `--loadgen-bin`, which permits an exact-SHA
 comparison binary from an isolated worktree without moving the current checkout.
 
+`event_load.py --subscribe-down` makes every MQTT publisher subscribe only to
+its own `/down` topic. It exercises the broker's no-matching-uplink route while
+QoS1/2 completion is counted by PUBACK/PUBCOMP. It is mutually exclusive with
+`--subscribe-uplink`, which additionally receives the published message. The new
+loadgen `subscribe_down_only` option defaults to false; unlike the legacy
+`subscribe` mode, it does not wait for an `up_ack` application echo. For QoS0,
+use gateway metrics to establish EventAccepted; a successful client write alone
+is not acceptance. Preserve all full-lifecycle and measurement-window counts.
+
 Both drivers accept `--server-workers N` (1..64). It sets
 `TOKIO_WORKER_THREADS` only for the server; sink and load-generator runtimes are
 unchanged. Results record the requested count and the environment passed to the

@@ -375,8 +375,13 @@ impl MqttBroker {
         }
         // Stores happen while holding the broker mutex after the matching trie mutation. A zero
         // observed here therefore linearizes this route before a concurrent subscribe or after a
-        // concurrent final unsubscribe. Retained messages still need the mutex for their update.
-        if !message.retain && self.subscription_count.load(Ordering::Acquire) == 0 {
+        // concurrent final unsubscribe. The suffix hint also excludes downlink-only subscriptions;
+        // any possibly matching wildcard keeps the normal path. Retained updates always lock.
+        if !message.retain
+            && (self.subscription_count.load(Ordering::Acquire) == 0
+                || (message.topic.ends_with("/up")
+                    && self.uplink_subscription_count.load(Ordering::Acquire) == 0))
+        {
             return Ok(0);
         }
         let mut state = self.lock_state(BrokerProbe::Route)?;

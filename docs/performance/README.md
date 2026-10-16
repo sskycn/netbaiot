@@ -10,6 +10,9 @@ This directory retains compact [codec comparisons](codec-audit/README.md) and
 process logs and task reports are available in Git history rather than the active
 documentation tree.
 
+Current MQTT measurements: [publish and Trie](mqtt-publish-20261015/README.md),
+[uplink routing and Retained](mqtt-retained-routing-20261016/README.md).
+
 Write raw logs, per-request samples, traces and heap/perf captures under ignored
 `target/performance/` or `target/evidence/`. CI artifacts have limited retention;
 use reviewed release assets when permanent external evidence is required.

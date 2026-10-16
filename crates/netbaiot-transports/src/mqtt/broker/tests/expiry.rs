@@ -498,3 +498,71 @@ fn qos0_drop_cleanup_and_expiry_count_one_terminal_failure() {
     assert_eq!(metrics.get(Metric::CommandFailed), 1);
     assert_eq!(Arc::strong_count(&progress), 1);
 }
+
+#[test]
+fn retained_replacement_keeps_deadline_index_and_accounting_consistent() {
+    let broker = MqttBroker::new(Arc::new(Limits::default()));
+    let owner = auth("retained-deadline");
+    let topic = "v1/t/t/p/p/d/retained-deadline/up";
+    let first = now_ms() + 60_000;
+    for deadline in [
+        None,
+        None,
+        Some(first),
+        Some(first),
+        Some(first + 1000),
+        None,
+        Some(first),
+    ] {
+        let message = BrokerMessage {
+            topic: topic.into(),
+            payload: vec![1; 128].into(),
+            qos: 1,
+            retain: true,
+            properties: (PublishProperties {
+                expires_at_ms: deadline,
+                ..Default::default()
+            })
+            .into(),
+        };
+        broker.route(&owner.device_key, message).unwrap();
+        assert_broker_accounting(&broker);
+        let state = broker.state.lock().unwrap();
+        assert_eq!(state.retained.len(), 1);
+        assert_eq!(state.retained_expiry.by_key.get(topic).copied(), deadline);
+    }
+    broker
+        .route(
+            &owner.device_key,
+            BrokerMessage {
+                topic: topic.into(),
+                payload: Vec::new().into(),
+                qos: 1,
+                retain: true,
+                properties: Default::default(),
+            },
+        )
+        .unwrap();
+    assert!(!broker.has_retained_topic(topic).unwrap());
+    assert_broker_accounting(&broker);
+    broker
+        .route(
+            &owner.device_key,
+            BrokerMessage {
+                topic: topic.into(),
+                payload: vec![1].into(),
+                qos: 1,
+                retain: true,
+                properties: (PublishProperties {
+                    expires_at_ms: Some(first),
+                    ..Default::default()
+                })
+                .into(),
+            },
+        )
+        .unwrap();
+    let mut state = broker.state.lock().unwrap();
+    prune_expired_messages(&mut state, first + 1, 1).unwrap();
+    assert!(state.retained.is_empty());
+    assert_accounting_consistent(&state);
+}

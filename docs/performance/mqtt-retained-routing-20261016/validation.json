@@ -1,0 +1,269 @@
+{
+  "source_revision": "5bd93b442a063b1ef76c8161c4aca92ea2260e04",
+  "checks": [
+    {
+      "name": "fmt",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.5003305410000001
+    },
+    {
+      "name": "clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "--workspace",
+        "--all-targets",
+        "--all-features",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 3.6478280419999995
+    },
+    {
+      "name": "workspace",
+      "command": [
+        "cargo",
+        "test",
+        "--workspace",
+        "--all-features"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 74.17368387500001
+    },
+    {
+      "name": "perf-tools",
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "scripts/perf",
+        "-p",
+        "test_*.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.13287866699999995
+    },
+    {
+      "name": "raw-regressions",
+      "command": [
+        "python3",
+        "tests/mqtt_protocol_regressions.py",
+        "--repo",
+        ".",
+        "--output",
+        "<repo>/target/performance/retained-index-20261015/validation/raw-regressions.json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 5.373112583999998
+    },
+    {
+      "name": "conformance-tools",
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests/mqtt_conformance",
+        "-p",
+        "test_*.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.14576162499999157
+    },
+    {
+      "name": "conformance-release-gate",
+      "command": [
+        "python3",
+        "tests/mqtt_conformance/run.py",
+        "--release-gate",
+        "--no-build"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 50.133453625
+    },
+    {
+      "name": "mqtt5-smoke",
+      "command": [
+        "python3",
+        "tests/mqtt_conformance/v5_smoke.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 7.398135875000008
+    },
+    {
+      "name": "mqtt5-mosquitto",
+      "command": [
+        "python3",
+        "tests/mqtt_conformance/v5_mosquitto.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 6.971563333999995
+    },
+    {
+      "name": "sdk-build",
+      "command": [
+        "cargo",
+        "build",
+        "--locked",
+        "-p",
+        "netbaiot-device-sdk",
+        "--example",
+        "device_mqtt"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.14820095900000751
+    },
+    {
+      "name": "sdk-mosquitto",
+      "command": [
+        "python3",
+        "tests/run_device_profile_mosquitto.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 1.8796516249999797
+    },
+    {
+      "name": "device-profile",
+      "command": [
+        "python3",
+        "tests/measure_device_profile.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 6.526491415999999
+    },
+    {
+      "name": "restart-soak",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "netbaiot-server",
+        "--test",
+        "server",
+        "subprocess_graceful_restart_sixty_second_soak",
+        "--",
+        "--ignored",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 69.79302099999998
+    },
+    {
+      "name": "tls-outage-soak",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "netbaiot-server",
+        "--test",
+        "server",
+        "engineering_tls_qos1_http_sixty_second_soak",
+        "--",
+        "--ignored",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 60.370698167
+    },
+    {
+      "name": "mixed-reconnect-soak",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "netbaiot-transports",
+        "--test",
+        "multi_codec",
+        "mixed_codec_reconnect_and_control_soak",
+        "--",
+        "--ignored",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 64.60575841600001
+    },
+    {
+      "name": "fuzz-seeds",
+      "command": [
+        "python3",
+        "fuzz/seed_corpus.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.08745058300000608
+    },
+    {
+      "name": "fuzz-mqtt-state",
+      "command": [
+        "cargo",
+        "+nightly",
+        "fuzz",
+        "run",
+        "mqtt_state",
+        "--",
+        "-max_total_time=30",
+        "-max_len=1024",
+        "-rss_limit_mb=2048",
+        "-timeout=5"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 47.14491383299999
+    },
+    {
+      "name": "fuzz-mqtt-recovery",
+      "command": [
+        "cargo",
+        "+nightly",
+        "fuzz",
+        "run",
+        "mqtt_recovery",
+        "--",
+        "-max_total_time=30",
+        "-max_len=1048576",
+        "-rss_limit_mb=2048",
+        "-timeout=5"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 32.373162166000014
+    }
+  ],
+  "workspace": {
+    "passed": 608,
+    "failed": 0,
+    "ignored": 59
+  },
+  "protocol_release_gate": {
+    "total": 77,
+    "pass": 77,
+    "reference_observations": 0,
+    "fail": 0
+  },
+  "healthy_network_runs_verified": 55,
+  "memory_runs": 4,
+  "micro_route_pairs": 5,
+  "micro_retained_update_pairs": 5,
+  "micro_retained_policy_pairs": 3,
+  "not_run": [
+    "dedicated Linux server/external load generator",
+    "saturation capacity search",
+    "multi-hour soak",
+    "full-gateway per-event allocation attribution",
+    "new production-scale SIGKILL loss curve",
+    "all other ignored manual benchmarks"
+  ]
+}

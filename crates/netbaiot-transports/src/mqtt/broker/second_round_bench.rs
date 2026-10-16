@@ -747,13 +747,16 @@ fn second_round_retained_subscribe() {
         return;
     }
     for count in [10, 100, 1000, 4000, 10000] {
-        for (name, filter) in [
-            ("exact", "v1/t/tenant-0/p/product-1/d/device-1/up"),
-            ("plus", "v1/t/tenant-0/p/+/d/device-1/up"),
-            ("selective", "v1/t/tenant-0/p/product-1/#"),
-            ("v1", "v1/#"),
-            ("broad", "#"),
-            ("none", "v1/t/missing/#"),
+        for (name, filter, handling) in [
+            ("exact", "v1/t/tenant-0/p/product-1/d/device-1/up", 0),
+            ("plus", "v1/t/tenant-0/p/+/d/device-1/up", 0),
+            ("selective", "v1/t/tenant-0/p/product-1/#", 0),
+            ("v1", "v1/#", 0),
+            ("broad", "#", 0),
+            ("none", "v1/t/missing/#", 0),
+            ("device_hash", "v1/t/tenant-0/p/product-1/d/device-1/#", 0),
+            ("skip_all", "#", 2),
+            ("skip_existing", "#", 1),
         ] {
             let metrics = Arc::new(Metrics::with_lock_timing());
             let broker = MqttBroker::new_with_metrics(limits(count), metrics.clone());
@@ -778,6 +781,21 @@ fn second_round_retained_subscribe() {
                     state.retained.insert(topic, retained);
                 }
             }
+            if handling == 1 {
+                broker
+                    .subscribe_options(
+                        &attachment.key,
+                        attachment.generation,
+                        filter,
+                        Subscription {
+                            qos: 0,
+                            no_local: false,
+                            retain_as_published: false,
+                            retain_handling: 2,
+                        },
+                    )
+                    .unwrap();
+            }
             // QoS0 replay isolates retained lookup/preflight/enqueue from artificially
             // raising persistent inflight above normal transport admission limits.
             probe(
@@ -788,14 +806,26 @@ fn second_round_retained_subscribe() {
                 || (),
                 |_| {
                     broker
-                        .subscribe(&attachment.key, attachment.generation, filter, 0)
+                        .subscribe_options(
+                            &attachment.key,
+                            attachment.generation,
+                            filter,
+                            Subscription {
+                                qos: 0,
+                                no_local: false,
+                                retain_as_published: false,
+                                retain_handling: handling,
+                            },
+                        )
                         .unwrap()
                 },
                 |_| {
                     while attachment.receiver.try_recv().is_ok() {}
-                    broker
-                        .unsubscribe(&attachment.key, attachment.generation, filter)
-                        .unwrap();
+                    if handling != 1 {
+                        broker
+                            .unsubscribe(&attachment.key, attachment.generation, filter)
+                            .unwrap();
+                    }
                 },
             );
             println!("RETAINED_METRICS_BEGIN,{name},{count}");
@@ -861,5 +891,176 @@ async fn legacy_cleanup_recovery_measurement() {
             );
         }
         fs::remove_dir_all(directory).unwrap();
+    }
+}
+
+// Covers matching independently of sockets, event decoding and sink scheduling.
+#[test]
+#[ignore = "serial release trie allocation and latency measurement"]
+fn second_round_trie_matching() {
+    if !enabled() {
+        return;
+    }
+    let topic = "v1/t/tenant-0/p/product/d/device-0/up";
+    for count in [1, 64, 1024] {
+        for pattern in [
+            "exact",
+            "plus",
+            "hash",
+            "overlap",
+            "fanout",
+            "down_only",
+            "early_miss",
+        ] {
+            let mut trie = SubscriptionTrie::default();
+            for index in 0..count {
+                let key = SessionKey {
+                    device: auth(index, 1).device_key,
+                    client_id: format!("trie-{index}").into(),
+                };
+                let filter = match pattern {
+                    "plus" => format!("v1/t/+/p/product/d/device-{index}/up"),
+                    "hash" => format!("v1/t/tenant-0/p/product/d/device-{index}/#"),
+                    "fanout" => topic.to_owned(),
+                    "down_only" => format!("v1/t/tenant-0/p/product/d/device-{index}/down"),
+                    "early_miss" => format!("other/t/tenant-0/p/product/d/device-{index}/up"),
+                    _ => format!("v1/t/tenant-0/p/product/d/device-{index}/up"),
+                };
+                trie.insert(&filter, key.clone(), Subscription::v311(1));
+                if pattern == "overlap" {
+                    trie.insert(
+                        &format!("v1/t/+/p/product/d/device-{index}/#"),
+                        key,
+                        Subscription {
+                            qos: 2,
+                            no_local: true,
+                            retain_as_published: true,
+                            retain_handling: 0,
+                        },
+                    );
+                }
+            }
+            let expected = match pattern {
+                "down_only" | "early_miss" => 0,
+                "fanout" => count,
+                _ => 1,
+            };
+            assert_eq!(trie.matching(topic).len(), expected);
+            probe(
+                &format!("trie_{pattern}"),
+                count,
+                256,
+                32,
+                || (),
+                |_| {
+                    for _ in 0..32 {
+                        black_box(trie.matching(black_box(topic)));
+                    }
+                },
+                |_| {},
+            );
+        }
+    }
+}
+
+#[test]
+#[ignore = "serial release retained store update and allocation measurement"]
+fn retained_store_update_measurement() {
+    if !enabled() {
+        return;
+    }
+    for count in [100, 1000, 10000] {
+        let broker = MqttBroker::new(limits(count));
+        let owner = auth(0, 1);
+        let mut state = lock(&broker.state).unwrap();
+        let region = stats_alloc::Region::new(&stats_alloc::INSTRUMENTED_SYSTEM);
+        for index in 0..count {
+            let topic = format!(
+                "v1/t/tenant-0/p/product-{}/d/device-{index}/up",
+                index % 100
+            );
+            let mut message = publish(&topic, 1, None);
+            message.retain = true;
+            update_retained(
+                &mut state,
+                &owner.device_key,
+                None,
+                &message,
+                &broker.limits,
+            )
+            .unwrap();
+        }
+        let memory = region.change();
+        println!(
+            "RETAINED_STORE_HEAP,{count},{},{}",
+            memory.allocations,
+            memory.bytes_allocated - memory.bytes_deallocated
+        );
+        let mut message = publish("v1/t/tenant-0/p/product-1/d/device-1/up", 1, None);
+        message.retain = true;
+        drop(state);
+        probe(
+            "retained_replace_batched",
+            count,
+            1024,
+            256,
+            || (),
+            |_| {
+                for _ in 0..256 {
+                    black_box(broker.route(&owner.device_key, message.clone()).unwrap());
+                }
+            },
+            |_| {},
+        );
+    }
+}
+
+#[test]
+#[ignore = "serial release /up no-match route measurement"]
+fn uplink_no_match_route_measurement() {
+    if !enabled() {
+        return;
+    }
+    for count in [0, 64, 1024] {
+        for wildcard in [false, true] {
+            let broker = MqttBroker::new(limits(count));
+            let owner = auth(0, 1);
+            let mut attachments = Vec::new();
+            for index in 0..count {
+                let identity = auth(index, 1);
+                let attachment = broker
+                    .attach(&identity, format!("hint-{index}"), false)
+                    .unwrap();
+                let filter = if wildcard {
+                    format!("v1/t/tenant-0/p/other/d/device-{index}/#")
+                } else {
+                    format!("v1/t/tenant-0/p/product/d/device-{index}/down")
+                };
+                broker
+                    .subscribe(&attachment.key, attachment.generation, &filter, 1)
+                    .unwrap();
+                attachments.push(attachment);
+            }
+            let message = publish("v1/t/tenant-0/p/product/d/device-0/up", 1, None);
+            assert_eq!(broker.route(&owner.device_key, message.clone()).unwrap(), 0);
+            probe(
+                if wildcard {
+                    "uplink_no_match_wildcard"
+                } else {
+                    "uplink_no_match_exact_down"
+                },
+                count,
+                2048,
+                256,
+                || (),
+                |_| {
+                    for _ in 0..256 {
+                        black_box(broker.route(&owner.device_key, message.clone()).unwrap());
+                    }
+                },
+                |_| {},
+            );
+            drop(attachments);
+        }
     }
 }

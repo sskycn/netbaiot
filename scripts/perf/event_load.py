@@ -138,7 +138,9 @@ def main():
     parser.add_argument("--sample-output")
     parser.add_argument("--sample-seconds", type=int, default=10)
     parser.add_argument("--tls", action="store_true")
-    parser.add_argument("--subscribe-uplink", action="store_true")
+    subscriptions = parser.add_mutually_exclusive_group()
+    subscriptions.add_argument("--subscribe-uplink", action="store_true")
+    subscriptions.add_argument("--subscribe-down", action="store_true")
     parser.add_argument("--mqtt-v5", action="store_true")
     parser.add_argument("--mqtt-metadata", action="store_true")
     parser.add_argument("--audit-open-loop", action="store_true")
@@ -241,11 +243,13 @@ def main():
                 "publish_rate": args.rate,
                 "payload_bytes": args.payload_bytes,
                 "qos": args.qos,
-                "subscribe": args.subscribe_uplink,
+                "subscribe": args.subscribe_uplink or args.subscribe_down,
                 "report_every_secs": 5,
             }
             if args.subscribe_uplink:
                 workload["subscribe_uplink"] = True
+            if args.subscribe_down:
+                workload["subscribe_down_only"] = True
             if args.mqtt_v5:
                 workload["mqtt_version"] = 5
             if args.mqtt_metadata:
@@ -382,6 +386,7 @@ def main():
                 "sink_mode": args.sink_mode,
                 "tls": args.tls,
                 "subscribe_uplink": args.subscribe_uplink,
+                "subscribe_down": args.subscribe_down,
                 "mqtt_v5": args.mqtt_v5,
                 "mqtt_metadata": args.mqtt_metadata,
                 "audit_open_loop": args.audit_open_loop,

@@ -17,18 +17,31 @@ pub(super) fn merge_subscribers(
     }
 }
 
+// A valid MQTT filter ending in another literal cannot match a topic ending in /up.
+// Wildcard endings deliberately count even when their prefix cannot match: false positives
+// take the normal route, while a zero must never hide a delivery responsibility.
+fn filter_may_match_uplink(filter: &str) -> bool {
+    matches!(filter.rsplit('/').next(), Some("up" | "+" | "#"))
+}
+
 impl SubscriptionTrie {
     pub(super) fn insert(&mut self, filter: &str, key: SessionKey, subscription: Subscription) {
         let mut node = &mut self.root;
         for level in filter.split('/') {
             node = node.children.entry(level.to_owned()).or_default();
         }
-        node.subscribers.insert(key, subscription);
+        if node.subscribers.insert(key, subscription).is_none() && filter_may_match_uplink(filter) {
+            self.uplink_subscriptions += 1;
+        }
     }
 
     pub(super) fn remove(&mut self, filter: &str, key: &SessionKey) {
         let levels = filter.split('/').collect::<Vec<_>>();
-        Self::remove_at(&mut self.root, &levels, 0, key);
+        let mut removed = false;
+        Self::remove_at(&mut self.root, &levels, 0, key, &mut removed);
+        if removed && filter_may_match_uplink(filter) {
+            self.uplink_subscriptions -= 1;
+        }
     }
 
     pub(super) fn remove_at(
@@ -36,11 +49,12 @@ impl SubscriptionTrie {
         levels: &[&str],
         at: usize,
         key: &SessionKey,
+        removed: &mut bool,
     ) -> bool {
         if at == levels.len() {
-            node.subscribers.remove(key);
+            *removed = node.subscribers.remove(key).is_some();
         } else if let Some(child) = node.children.get_mut(levels[at])
-            && Self::remove_at(child, levels, at + 1, key)
+            && Self::remove_at(child, levels, at + 1, key, removed)
         {
             node.children.remove(levels[at]);
         }
@@ -48,13 +62,13 @@ impl SubscriptionTrie {
     }
 
     pub(super) fn matching(&self, topic: &str) -> HashMap<SessionKey, Subscription> {
-        let levels = topic.split('/').collect::<Vec<_>>();
         let mut matches = HashMap::new();
+        // Carry only the unconsumed borrowed topic at each branch. Unrelated
+        // downlink subscriptions need no temporary topic-level allocation.
         Self::match_at(
             &self.root,
-            &levels,
-            0,
-            levels.first().is_some_and(|level| level.starts_with('$')),
+            Some(topic),
+            topic.starts_with('$'),
             &mut matches,
         );
         matches
@@ -62,27 +76,25 @@ impl SubscriptionTrie {
 
     pub(super) fn match_at(
         node: &TrieNode,
-        levels: &[&str],
-        at: usize,
+        remaining: Option<&str>,
         dollar_root: bool,
         output: &mut HashMap<SessionKey, Subscription>,
     ) {
-        if !(at == 0 && dollar_root)
-            && let Some(hash) = node.children.get("#")
-        {
+        if !dollar_root && let Some(hash) = node.children.get("#") {
             merge_subscribers(output, &hash.subscribers);
         }
-        if at == levels.len() {
+        let Some(remaining) = remaining else {
             merge_subscribers(output, &node.subscribers);
             return;
+        };
+        let (level, rest) = remaining
+            .split_once('/')
+            .map_or((remaining, None), |(level, rest)| (level, Some(rest)));
+        if let Some(exact) = node.children.get(level) {
+            Self::match_at(exact, rest, false, output);
         }
-        if let Some(exact) = node.children.get(levels[at]) {
-            Self::match_at(exact, levels, at + 1, dollar_root, output);
-        }
-        if !(at == 0 && dollar_root)
-            && let Some(plus) = node.children.get("+")
-        {
-            Self::match_at(plus, levels, at + 1, dollar_root, output);
+        if !dollar_root && let Some(plus) = node.children.get("+") {
+            Self::match_at(plus, rest, false, output);
         }
     }
 }
@@ -149,18 +161,17 @@ impl MqttBroker {
         let retained_allowed = |retained: &RetainedMessage| {
             !(retained.message.expired(now)
                 || (subscription.no_local && retained.origin.as_ref() == Some(key)))
-                && match subscription.retain_handling {
-                    0 => true,
-                    1 => !replacement,
-                    _ => false,
-                }
         };
         let replay_message = |retained: &RetainedMessage| BrokerMessage {
             qos: retained.message.qos.min(subscription.qos),
             retain: true,
             ..retained.message.clone()
         };
-        let retained = if filter.contains(['+', '#']) {
+        let retained = if subscription.retain_handling == 2
+            || (subscription.retain_handling == 1 && replacement)
+        {
+            Vec::new()
+        } else if filter.contains(['+', '#']) {
             state
                 .retained
                 .values()
