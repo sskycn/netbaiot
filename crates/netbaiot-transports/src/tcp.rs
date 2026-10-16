@@ -92,6 +92,10 @@ pub async fn connection(
     stop: CancellationToken,
 ) -> Result<()> {
     let l = &s.ingress.limits;
+    // Embedded hosts can construct Services without validating Limits first.
+    if l.max_tcp_frame_size < tcp_ack::BODY_LEN {
+        return Err(Error::Configuration);
+    }
     let framer = LengthPrefixFramer {
         maximum: l.max_tcp_frame_size,
     };
@@ -166,7 +170,6 @@ pub async fn connection(
                     transport: Transport::Tcp, payload: &frame, require_command_ack: false,
                     validated_at: std::time::Instant::now(), validation_us: 0,
                 }).await?;
-                if tcp_ack::BODY_LEN > framer.maximum { return Err(Error::Invalid); }
                 let ack = tcp_ack::encode(&acceptance.receipt).map_err(|_| Error::Internal)?;
                 write(&mut stream, &ack, l.write_timeout_ms).await?;
             }
@@ -193,6 +196,11 @@ mod tests {
         assert_eq!(&command[4..], &ack[4..]);
         assert!(tcp_ack::decode(&command[4..]).is_ok());
         assert_ne!(&command[..4], &ack[..4]);
+        assert!(tcp_ack::decode_frame(&command).is_err());
+        assert_eq!(
+            tcp_ack::decode_frame(&ack).unwrap().event_id,
+            receipt.event_id
+        );
     }
     #[test]
     fn split_multiple_and_invalid() {

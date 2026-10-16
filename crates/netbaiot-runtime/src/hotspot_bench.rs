@@ -137,3 +137,32 @@ fn tcp_ack_encoding() {
         |_| {},
     );
 }
+
+#[test]
+#[ignore = "isolated serial release TCP ACK decoding/allocation comparison"]
+fn tcp_ack_decoding() {
+    use netbaiot_core::{EventAccepted, EventId, tcp_ack};
+    let frame = tcp_ack::encode(&EventAccepted {
+        event_id: EventId::generate(),
+        accepted_at: 1_792_108_800_000,
+        required_deliveries: 1,
+        best_effort_deliveries: 0,
+    })
+    .unwrap();
+    measure(
+        "tcp_ack_decode_body",
+        1,
+        100_000,
+        || (),
+        |_| tcp_ack::decode(std::hint::black_box(&frame[4..])).unwrap(),
+        |_| {},
+    );
+    measure(
+        "tcp_ack_decode_frame",
+        1,
+        100_000,
+        || (),
+        |_| tcp_ack::decode_frame(std::hint::black_box(&frame)).unwrap(),
+        |_| {},
+    );
+}

@@ -100,8 +100,10 @@ This control ACK is independent of `DeviceCodec`. Clients must validate the head
 then the ACK body version and type, buffer split reads and handle coalesced frames
 and interleaved commands/ACKs. Commands retain their bound codec. Rust clients must
 first use `netbaiot_protocol::tcp_frame::decode_header`, dispatch on `FrameKind`,
-and call `tcp_ack::decode` only for EventAccepted. `tcp_ack::encode` produces the
-complete stack-allocated frame. Counts that
+and call `tcp_ack::decode` only for EventAccepted. For a complete frame, prefer
+`tcp_ack::decode_frame`, which validates both header and body without allocation.
+`tcp_ack::encode` produces the complete stack-allocated frame. `max_tcp_frame_size`
+must be at least 42 (the body length, excluding the header). Counts that
 cannot fit the Rust client's `usize` are rejected, never truncated.
 
 ACKs correspond to successful uplinks in connection order and contain the exact

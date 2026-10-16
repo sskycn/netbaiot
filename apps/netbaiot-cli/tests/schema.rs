@@ -36,6 +36,12 @@ fn generated_schema_matches_examples_and_rejects_unknown_types_and_invalid_limit
     config["limits"]["max_connections"] = 0.into();
     assert!(!validator.is_valid(&config));
     config["limits"]["max_connections"] = 256.into();
+    for (maximum, valid) in [(41, false), (42, true), (65_536, true)] {
+        config["limits"]["max_tcp_frame_size"] = maximum.into();
+        assert_eq!(validator.is_valid(&config), valid);
+        let parsed: netbaiot_server::Config = serde_json::from_value(config.clone()).unwrap();
+        assert_eq!(parsed.validate().is_ok(), valid);
+    }
     config.as_object_mut().unwrap().remove("device_ingress");
     assert!(!validator.is_valid(&config));
     assert_eq!(

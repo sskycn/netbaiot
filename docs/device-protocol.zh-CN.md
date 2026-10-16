@@ -76,7 +76,9 @@ ACK 解码猜测报文类型。ACK 正文版本仍为 1，命令字节保持原�
 该控制 ACK 独立于 DeviceCodec。客户端先校验帧头，再校验 ACK 正文版本和类型，并正确处理
 分片、粘包及命令与 ACK 交错。命令继续使用绑定的 Codec。Rust 客户端须先调用
 `netbaiot_protocol::tcp_frame::decode_header`，按 `FrameKind` 分流，仅对 EventAccepted
-调用 `tcp_ack::decode`。`tcp_ack::encode` 返回完整的栈上帧。
+调用 `tcp_ack::decode`。已持有完整帧时，优先使用 `tcp_ack::decode_frame`，它零分配地
+同时校验帧头和正文。`tcp_ack::encode` 返回完整的栈上帧。
+`max_tcp_frame_size` 不得小于 42（正文长度，不含帧头）。
 计数超出当前 Rust 平台 `usize` 范围时拒绝而不截断。
 
 ACK 与连接上成功接纳的上行顺序一致，字段来自原始 EventBus receipt。只有完成认证、授权、

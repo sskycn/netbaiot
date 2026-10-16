@@ -2,6 +2,12 @@
 use libfuzzer_sys::fuzz_target;
 fuzz_target!(|data: &[u8]| {
     use netbaiot_core::{tcp_ack, tcp_frame};
+    if let Ok(receipt) = tcp_ack::decode_frame(data) {
+        let mut frame = tcp_ack::encode(&receipt).unwrap();
+        assert_eq!(frame, data);
+        frame[..4].copy_from_slice(&tcp_frame::payload_header(tcp_ack::BODY_LEN).unwrap());
+        assert!(tcp_ack::decode_frame(&frame).is_err());
+    }
     if data.len() >= 4 {
         if let Ok((kind, length)) = tcp_frame::decode_header(data[..4].try_into().unwrap(), 65536) {
             assert!((1..=65536).contains(&length));

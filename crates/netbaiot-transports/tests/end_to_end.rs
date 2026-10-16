@@ -2130,6 +2130,101 @@ impl EventSink for TcpReceiptSink {
 }
 
 #[tokio::test]
+async fn tcp_ack_frame_limit_is_checked_before_authentication_and_acceptance() {
+    use netbaiot_transports::tcp::{LengthPrefixFramer, TcpFramer};
+
+    struct TinyCodec;
+    impl DeviceCodec for TinyCodec {
+        fn decode(
+            &self,
+            ctx: &DecodeContext<'_>,
+            bytes: &[u8],
+        ) -> std::result::Result<Vec<DeviceEvent>, CodecError> {
+            assert_eq!(bytes, &[1]);
+            JsonV1::default().decode(ctx, &payload(0))
+        }
+        fn encode(
+            &self,
+            ctx: &EncodeContext<'_>,
+            command: &DeviceCommand,
+        ) -> std::result::Result<Vec<u8>, CodecError> {
+            JsonV1::default().encode(ctx, command)
+        }
+    }
+
+    for maximum in [41, 42, Limits::default().max_tcp_frame_size] {
+        let provider = Arc::new(CountingProvider {
+            calls: AtomicUsize::new(0),
+            auth: auth(),
+            delay: false,
+        });
+        // Deliberately bypass Config/Limits validation, as an embedded host can.
+        let (ingress, services, stop) = runtime_with_codec(
+            Limits {
+                max_tcp_frame_size: maximum,
+                ..Limits::default()
+            },
+            provider.clone(),
+            Arc::new(AckSink),
+            Arc::new(TinyCodec),
+        );
+        let lease = services
+            .connections
+            .acquire("127.0.0.1".parse().unwrap(), Transport::Tcp)
+            .unwrap();
+        let (mut client, server) = tokio::io::duplex(256);
+        let framer = LengthPrefixFramer { maximum };
+        let mut pipeline = framer
+            .encode(br#"{"credential_id":"a","secret":"secret"}"#)
+            .unwrap();
+        pipeline.extend(framer.encode(&[1]).unwrap());
+        client.write_all(&pipeline).await.unwrap();
+        let (result, reply) = tokio::time::timeout(std::time::Duration::from_secs(5), async {
+            tokio::join!(
+                netbaiot_transports::tcp::connection(
+                    Box::new(server),
+                    services.clone(),
+                    lease,
+                    stop
+                ),
+                async {
+                    let mut reply = Vec::new();
+                    if maximum < tcp_ack::BODY_LEN {
+                        client.read_to_end(&mut reply).await.unwrap();
+                    } else {
+                        reply.resize(26 + tcp_ack::FRAME_LEN, 0);
+                        client.read_exact(&mut reply).await.unwrap();
+                        client.shutdown().await.unwrap();
+                    }
+                    reply
+                }
+            )
+        })
+        .await
+        .unwrap();
+        let accepted = ingress.metrics.get(Metric::EventsAccepted);
+        let authenticated = provider.calls.load(Ordering::Relaxed);
+        assert_eq!(services.connections.active().unwrap(), [0; 3]);
+        ingress.events.stop_workers().await.unwrap();
+        if maximum < tcp_ack::BODY_LEN {
+            assert_eq!((accepted, authenticated, reply.len()), (0, 0, 0));
+            assert!(matches!(result, Err(Error::Configuration)));
+        } else {
+            assert_eq!((accepted, authenticated), (1, 1));
+            assert_eq!(&reply[4..26], br#"{"authenticated":true}"#);
+            assert_eq!(reply.len(), 26 + tcp_ack::FRAME_LEN);
+            assert_eq!(&reply[26..30], &tcp_ack::FRAME_HEADER);
+            assert_eq!(
+                tcp_ack::decode_frame(&reply[26..])
+                    .unwrap()
+                    .required_deliveries,
+                1
+            );
+        }
+    }
+}
+
+#[tokio::test]
 async fn tcp_vendor_command_cannot_forge_acceptance_between_real_receipts() {
     struct VendorCodec(Vec<u8>);
     impl DeviceCodec for VendorCodec {
@@ -2205,6 +2300,7 @@ async fn tcp_vendor_command_cannot_forge_acceptance_between_real_receipts() {
                 (tcp_frame::FrameKind::Payload, tcp_ack::BODY_LEN)
             );
             assert_eq!(&command[4..], &forged[4..]);
+            assert!(tcp_ack::decode_frame(&command).is_err());
             assert_eq!(ingress.metrics.get(Metric::EventsAccepted), round * 2);
             let mut pipeline = framer.encode(&payload(round as usize * 2)).unwrap();
             pipeline.extend(framer.encode(&payload(round as usize * 2 + 1)).unwrap());
@@ -2218,8 +2314,8 @@ async fn tcp_vendor_command_cannot_forge_acceptance_between_real_receipts() {
                 }
                 assert_eq!(ack[..4], tcp_ack::FRAME_HEADER);
                 assert_ne!(
-                    tcp_ack::decode(&ack[4..]).unwrap().event_id,
-                    tcp_ack::decode(&forged[4..]).unwrap().event_id
+                    tcp_ack::decode_frame(&ack).unwrap().event_id,
+                    tcp_ack::decode_frame(&forged).unwrap().event_id
                 );
             }
         }

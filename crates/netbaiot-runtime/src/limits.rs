@@ -10,6 +10,8 @@ pub const MIN_CONNECTION_MEMORY_RESERVATION: u64 = 16_384;
 pub fn limit_scalar_minimum(name: &str) -> u64 {
     if name == "connection_memory_reservation" {
         MIN_CONNECTION_MEMORY_RESERVATION
+    } else if name == "max_tcp_frame_size" {
+        netbaiot_core::tcp_ack::BODY_LEN as u64
     } else {
         LIMIT_SCALAR_MIN
     }
@@ -504,6 +506,25 @@ impl Limits {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn tcp_ack_body_must_fit_frame_limit() {
+        let limits = Limits {
+            max_tcp_frame_size: 41,
+            ..Limits::default()
+        };
+        assert!(matches!(limits.validate(), Err(Error::Configuration)));
+    }
+
+    #[test]
+    fn tcp_ack_body_fits_minimum_and_default_frame_limits() {
+        let limits = Limits {
+            max_tcp_frame_size: 42,
+            ..Limits::default()
+        };
+        limits.validate().unwrap();
+        Limits::default().validate().unwrap();
+    }
 
     #[test]
     fn tenant_backlog_limits_keep_old_configs_and_validate_new_scalars() {

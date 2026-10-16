@@ -26,7 +26,19 @@ pub fn encode(receipt: &EventAccepted) -> Result<[u8; FRAME_LEN], ProtocolError>
     Ok(frame)
 }
 
+/// Decode exactly one complete 46-byte EventAccepted frame without allocation.
+/// Validates the type/length header and body; rejects Payload frames, truncated
+/// frames and trailing bytes. Buffer split reads and isolate one frame first.
+pub fn decode_frame(frame: &[u8]) -> Result<EventAccepted, ProtocolError> {
+    let frame: &[u8; FRAME_LEN] = frame.try_into().map_err(|_| ProtocolError)?;
+    if frame[..4] != FRAME_HEADER {
+        return Err(ProtocolError);
+    }
+    decode(&frame[4..])
+}
+
 /// Decode exactly one 42-byte body after TCP framing, with no allocation.
+/// Prefer [`decode_frame`] when the complete frame is available.
 /// The caller MUST first validate an EventAccepted header with `tcp_frame::decode_header`.
 /// Body bytes alone cannot distinguish a receipt from an opaque command payload.
 /// Unknown versions/types, trailing bytes and counts exceeding `usize` are errors.
@@ -77,14 +89,15 @@ mod tests {
                 255, 255, 255, 255, 255, 255, 254, 0, 0, 0, 0, 1, 2, 3, 4, 0, 0, 0, 0, 5, 6, 7, 8,
             ]
         );
-        let decoded = decode(&frame[4..]).unwrap();
-        assert_eq!(decoded.event_id, receipt.event_id);
-        assert_eq!(decoded.accepted_at, -2);
-        assert_eq!(decoded.required_deliveries, receipt.required_deliveries);
-        assert_eq!(
-            decoded.best_effort_deliveries,
-            receipt.best_effort_deliveries
-        );
+        for decoded in [decode(&frame[4..]).unwrap(), decode_frame(&frame).unwrap()] {
+            assert_eq!(decoded.event_id, receipt.event_id);
+            assert_eq!(decoded.accepted_at, -2);
+            assert_eq!(decoded.required_deliveries, receipt.required_deliveries);
+            assert_eq!(
+                decoded.best_effort_deliveries,
+                receipt.best_effort_deliveries
+            );
+        }
     }
 
     #[test]
@@ -95,7 +108,7 @@ mod tests {
                 receipt.accepted_at = timestamp;
                 receipt.required_deliveries = count;
                 receipt.best_effort_deliveries = count;
-                let decoded = decode(&encode(&receipt).unwrap()[4..]).unwrap();
+                let decoded = decode_frame(&encode(&receipt).unwrap()).unwrap();
                 assert_eq!(decoded.accepted_at, timestamp);
                 assert_eq!(decoded.required_deliveries, count);
                 assert_eq!(decoded.best_effort_deliveries, count);
@@ -104,6 +117,33 @@ mod tests {
         let mut body = [255; BODY_LEN];
         body[..2].copy_from_slice(&[VERSION, EVENT_ACCEPTED]);
         assert_eq!(decode(&body).is_ok(), usize::BITS == 64);
+    }
+
+    #[test]
+    fn complete_frame_requires_exact_header_length_and_body() {
+        let frame = encode(&receipt()).unwrap();
+        for length in 0..FRAME_LEN {
+            assert!(decode_frame(&frame[..length]).is_err());
+        }
+        let mut extra = [0; FRAME_LEN + 1];
+        extra[..FRAME_LEN].copy_from_slice(&frame);
+        assert!(decode_frame(&extra).is_err());
+        assert!(decode_frame(&[frame, frame].concat()).is_err());
+        assert!(decode_frame(&frame[4..]).is_err());
+        // Every bit of the fixed type/length header is significant, including
+        // the type bit separating a byte-identical vendor Payload from an ACK.
+        for bit in 0..32 {
+            let mut bad = frame;
+            bad[bit / 8] ^= 1 << (bit % 8);
+            assert!(decode_frame(&bad).is_err());
+        }
+        for offset in [4, 5] {
+            for value in [0, 2, 255] {
+                let mut bad = frame;
+                bad[offset] = value;
+                assert!(decode_frame(&bad).is_err());
+            }
+        }
     }
 
     #[test]
