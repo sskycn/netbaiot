@@ -175,9 +175,18 @@ async fn read_v3_frame(socket: &mut TcpStream) -> (V3FrameHeader, Vec<u8>) {
 }
 
 async fn read_tcp_device(socket: &mut TcpStream) -> Vec<u8> {
+    read_typed_tcp_device(socket, netbaiot_core::tcp_frame::FrameKind::Payload).await
+}
+
+async fn read_typed_tcp_device(
+    socket: &mut TcpStream,
+    expected: netbaiot_core::tcp_frame::FrameKind,
+) -> Vec<u8> {
     let mut header = [0u8; 4];
     socket.read_exact(&mut header).await.unwrap();
-    let mut body = vec![0u8; u32::from_be_bytes(header) as usize];
+    let (kind, length) = netbaiot_core::tcp_frame::decode_header(header, 65536).unwrap();
+    assert_eq!(kind, expected);
+    let mut body = vec![0u8; length];
     socket.read_exact(&mut body).await.unwrap();
     body
 }
@@ -385,7 +394,12 @@ async fn v3_planned_restart_replays_event_but_resets_command_dedup() {
         .await
         .unwrap();
     device.write_all(&body).await.unwrap();
-    let _accepted = read_tcp_device(&mut device).await;
+    let accepted = read_typed_tcp_device(
+        &mut device,
+        netbaiot_core::tcp_frame::FrameKind::EventAccepted,
+    )
+    .await;
+    netbaiot_core::tcp_ack::decode(&accepted).unwrap();
     let first_delivery = tokio::time::timeout(Duration::from_secs(5), events.recv())
         .await
         .unwrap()

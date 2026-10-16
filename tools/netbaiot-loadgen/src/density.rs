@@ -103,7 +103,9 @@ async fn read_packet(
             (header[0], length)
         } else {
             stream.read_exact(&mut header[1..4]).await?;
-            (0, u32::from_be_bytes(header[..4].try_into()?) as usize)
+            let (kind, length) =
+                netbaiot_core::tcp_frame::decode_header(header[..4].try_into()?, maximum)?;
+            (kind as u8, length)
         };
         if length > maximum {
             return Err("density peer packet exceeds bound".into());

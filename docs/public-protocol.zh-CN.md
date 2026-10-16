@@ -14,12 +14,13 @@
 
 控制平面快照和变更共用一把串行化锁。因此每次被接受的变更都会观察最新的已提交状态，并确定性地推进 revision 语义，不会与缓存失效或快照替换操作发生竞态。
 
-设备 JSON v1 对应 `DeviceUplink`。稳定字段包括 `schema_version`、`source_message_id`、可选的 `occurred_at`、`kind` 和 `data`。原生 TCP 使用[二进制 EventAccepted ACK v1](device-protocol.zh-CN.md)，正文 42 字节、完整帧 46 字节；已移除 JSON 接纳回执兼容，客户端需同步升级。MQTT QoS1 PUBACK、TCP acceptance 和签名 UDP NBA1都只代表达到 `EventAccepted`。
+设备 JSON v1 对应 `DeviceUplink`。稳定字段包括 `schema_version`、`source_message_id`、可选的 `occurred_at`、`kind` 和 `data`。原生 TCP 使用[二进制 EventAccepted ACK v1](device-protocol.zh-CN.md)，正文 42 字节、完整帧 46 字节，显式 ACK 帧头为 `80 00 00 2a`；已移除 JSON 接纳回执兼容，客户端需同步升级。MQTT QoS1 PUBACK、TCP acceptance 和签名 UDP NBA1都只代表达到 `EventAccepted`。
 
 本次 0.x 清理是有意的 source/control API 破坏性变更：删除 `TransportKind::Http` 和
 `ConnectionCounts.http`，传输字符串只剩 `mqtt`、`tcp`、`udp`；status 只输出这三项，
-不包含管理连接。UDP 无会话，活动连接数为零。设备 JSON v1、MQTT 3.1.1、TCP 分帧、
-NBI1/NBA1 以及当前 Business RPC V3 的 wire bytes 均不变。公共客户端应与服务器一起重新构建。
+不包含管理连接。UDP 无会话，活动连接数为零。该 HTTP 清理本身没有改变设备 JSON v1、
+MQTT 3.1.1、TCP 分帧、NBI1/NBA1 及当前 Business RPC V3 的 wire bytes；上述独立的
+TCP ACK 变更则需要更新分帧读取逻辑。公共客户端应与服务器一起重新构建。
 详见[协议支持](protocol-support.zh-CN.md)。
 
 连接 presence 属于 Sessions 和管理连接查询，不是业务事件。此次 0.x 清理从公共

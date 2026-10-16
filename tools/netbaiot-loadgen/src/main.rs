@@ -495,7 +495,9 @@ fn parse(buffer: &mut BytesMut, mqtt: bool) -> Result<Option<(u8, Vec<u8>)>> {
         if buffer.len() < 4 {
             return Ok(None);
         }
-        (0, u32::from_be_bytes(buffer[..4].try_into()?) as usize, 4)
+        let (kind, length) =
+            netbaiot_core::tcp_frame::decode_header(buffer[..4].try_into()?, MAX_PACKET)?;
+        (kind as u8, length, 4)
     };
     if len > MAX_PACKET {
         return Err("response too large".into());
@@ -878,7 +880,7 @@ async fn mqtt_or_tcp(
                 } else {
                     &b
                 };
-                if !mqtt && payload.first() == Some(&netbaiot_core::tcp_ack::VERSION) {
+                if !mqtt && first == netbaiot_core::tcp_frame::FrameKind::EventAccepted as u8 {
                     // The fixed TCP EventAccepted receipt has no source_message_id.
                     // Frames and their receipts are ordered on this connection.
                     netbaiot_core::tcp_ack::decode(payload)?;
@@ -1594,6 +1596,51 @@ mod tests {
                 assert_eq!(parse(&mut b, mqtt).unwrap().unwrap().1.len(), 256);
                 assert!(b.is_empty());
             }
+        }
+    }
+    #[test]
+    fn tcp_conflicting_payloads_and_interleaved_acks_use_header_type() {
+        use netbaiot_core::{EventAccepted, EventId, tcp_ack, tcp_frame::FrameKind};
+        let receipt = EventAccepted {
+            event_id: EventId::generate(),
+            accepted_at: -2,
+            required_deliveries: 1,
+            best_effort_deliveries: 0,
+        };
+        let ack = tcp_ack::encode(&receipt).unwrap();
+        let mut wire = Vec::new();
+        let mut expected = Vec::new();
+        for payload in [&ack[4..], &[1][..], &[1; 43][..], &[255; 256][..]] {
+            wire.extend(frame(payload));
+            expected.push((FrameKind::Payload as u8, payload.to_vec()));
+            for _ in 0..2 {
+                wire.extend(ack);
+                expected.push((FrameKind::EventAccepted as u8, ack[4..].to_vec()));
+            }
+        }
+        for split in 0..=wire.len() {
+            let mut buffer = BytesMut::new();
+            let mut actual = Vec::new();
+            for part in [&wire[..split], &wire[split..]] {
+                buffer.extend_from_slice(part);
+                while let Some(frame) = parse(&mut buffer, false).unwrap() {
+                    actual.push(frame);
+                }
+            }
+            assert!(buffer.is_empty());
+            assert_eq!(actual, expected);
+        }
+        for raw in [
+            0,
+            0x80000000,
+            0x80000029,
+            0x8000002b,
+            0xffffffff,
+            MAX_PACKET as u32 + 1,
+        ] {
+            let mut buffer = BytesMut::from(raw.to_be_bytes().as_slice());
+            assert!(parse(&mut buffer, false).is_err());
+            assert_eq!(buffer.len(), 4);
         }
     }
     #[test]

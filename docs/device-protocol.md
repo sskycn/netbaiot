@@ -51,8 +51,9 @@ codec needs a matching atomic batch receipt design; ingress currently requires o
 
 ## Generic TCP
 
-Every frame is `u32` big-endian payload length followed by payload. Length must be
-1..max_tcp_frame_size. The first frame is an authentication handshake:
+Every frame is a four-byte big-endian type/length header followed by its body.
+The high bit selects Payload (0) or EventAccepted ACK (1); the low 31 bits give the
+body length in 1..max_tcp_frame_size. The first Payload frame is an authentication handshake:
 
 ```json
 {"credential_id":"demo-device","secret":"<64-hex-character-key>"}
@@ -72,8 +73,19 @@ The JSON authentication request/result, uplink codecs, command codecs, MQTT and 
 are unchanged. ACK version `1` is independent of crate SemVer, device codec version
 and the Business RPC wire version.
 
+The four-byte big-endian frame header uses bit 31 as an explicit type: **0 = Payload,
+1 = EventAccepted ACK**. Bits 0..30 are the body length, excluding the header.
+Payload lengths must be nonzero, at most `0x7fffffff` and within the configured limit.
+Authentication requests/results, uplinks and downlink commands use Payload; only the
+server may send EventAccepted. Reject a tagged uplink. Check type/length before
+allocating or reading the body; tagged lengths other than 42 are invalid.
+
 The ACK body is exactly **42 bytes**; the complete frame is **46 bytes**, including
-the prefix `00 00 00 2a`. All integers are big-endian. Offsets below exclude the prefix.
+the header **`80 00 00 2a`**. All integers are big-endian. Offsets below exclude the header.
+This replaces the ambiguous `00 00 00 2a` ACK header; clients must upgrade together
+with the server. Untagged data is always Payload, even if it is byte-for-byte equal
+to an ACK body. Never infer a frame type from the payload's first byte or attempt
+ACK decoding to classify it. ACK body version 1 and all command bytes are unchanged.
 
 | Body offset | Field | Bytes | Encoding |
 |---:|---|---:|---|
@@ -84,10 +96,12 @@ the prefix `00 00 00 2a`. All integers are big-endian. Offsets below exclude the
 | 26 | Required Deliveries | 8 | Unsigned u64 |
 | 34 | Best Effort Deliveries | 8 | Unsigned u64 |
 
-This control ACK is independent of `DeviceCodec`. Clients must validate the length,
-version and type, buffer split reads and handle coalesced frames; command frames
-retain their bound codec. Rust clients can use `netbaiot_protocol::tcp_ack::decode`
-on the body; `encode` produces the complete stack-allocated frame. Counts that
+This control ACK is independent of `DeviceCodec`. Clients must validate the header,
+then the ACK body version and type, buffer split reads and handle coalesced frames
+and interleaved commands/ACKs. Commands retain their bound codec. Rust clients must
+first use `netbaiot_protocol::tcp_frame::decode_header`, dispatch on `FrameKind`,
+and call `tcp_ack::decode` only for EventAccepted. `tcp_ack::encode` produces the
+complete stack-allocated frame. Counts that
 cannot fit the Rust client's `usize` are rejected, never truncated.
 
 ACKs correspond to successful uplinks in connection order and contain the exact

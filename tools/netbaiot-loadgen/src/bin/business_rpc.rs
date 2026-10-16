@@ -557,9 +557,9 @@ async fn tcp_command_device(config: &Config) -> Result<TcpStream> {
     socket.write_all(&hello).await?;
     let mut header = [0u8; 4];
     socket.read_exact(&mut header).await?;
-    let length = u32::from_be_bytes(header) as usize;
-    if length > 1024 {
-        return Err("oversized TCP authentication response".into());
+    let (kind, length) = netbaiot_core::tcp_frame::decode_header(header, 1024)?;
+    if kind != netbaiot_core::tcp_frame::FrameKind::Payload {
+        return Err("unexpected TCP authentication frame type".into());
     }
     let mut body = vec![0; length];
     socket.read_exact(&mut body).await?;
@@ -735,10 +735,7 @@ async fn event_load(
                     socket = reconnected;
                     continue;
                 }
-                let length = u32::from_be_bytes(header) as usize;
-                if length > 65_536 {
-                    return Err("oversized TCP command frame".into());
-                }
+                let (kind, length) = netbaiot_core::tcp_frame::decode_header(header, 65_536)?;
                 let mut body = vec![0; length];
                 if socket.read_exact(&mut body).await.is_err() {
                     let Some(reconnected) =
@@ -750,7 +747,7 @@ async fn event_load(
                     socket = reconnected;
                     continue;
                 }
-                if body.first() == Some(&netbaiot_core::tcp_ack::VERSION) {
+                if kind == netbaiot_core::tcp_frame::FrameKind::EventAccepted {
                     netbaiot_core::tcp_ack::decode(&body)?;
                     continue;
                 }

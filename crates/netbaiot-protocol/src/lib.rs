@@ -12,6 +12,7 @@ use uuid::Uuid;
 pub mod business_rpc;
 pub mod business_rpc_v3;
 pub mod tcp_ack;
+pub mod tcp_frame;
 pub use business_rpc::*;
 
 pub const PROTOCOL_VERSION: u16 = 1;

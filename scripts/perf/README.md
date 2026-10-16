@@ -255,8 +255,11 @@ results. Existing test fixtures are for loopback testing only.
 ## Native TCP binary ACK comparison
 
 The native TCP listener now sends only the fixed binary EventAccepted ACK v1
-(42-byte body, 46-byte complete frame); authentication JSON and command codecs
-are unchanged. Use the current loadgen and `examples/device_tcp.py` with the new
+with header `80 00 00 2a` (type bit 1, length 42; 46-byte complete frame).
+Authentication JSON and command codecs are unchanged. Readers must dispatch on the
+header type, never on codec payload bytes; commands have type bit 0. Use matching
+server/loadgen binaries when comparing against earlier untagged binary ACKs.
+Use the current loadgen and `examples/device_tcp.py` with the new
 server. `device_protocol_benchmark.py --candidate-loadgen PATH` selects a matching
 binary client only for candidate plans, so a frozen JSON baseline can still be
 measured with its frozen client. This is benchmark orchestration, not runtime

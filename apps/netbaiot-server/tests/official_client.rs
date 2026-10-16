@@ -378,7 +378,7 @@ async fn official_clients_cover_mqtt_tcp_command_ack_status_and_offline_contract
             .await
             .unwrap();
         assert_eq!(
-            tcp_device_frame(&mut socket).await,
+            tcp_device_frame(&mut socket, netbaiot_core::tcp_frame::FrameKind::Payload).await,
             br#"{"authenticated":true}"#
         );
         let connection = business.devices().connection(&device_key()).await.unwrap();
@@ -398,8 +398,10 @@ async fn official_clients_cover_mqtt_tcp_command_ack_status_and_offline_contract
         let dispatch = business.commands().send(&command).await.unwrap();
         assert_eq!(dispatch.command_id, command.command_id);
         assert_eq!(dispatch.state, DeliveryState::Queued);
-        let received: DeviceCommand =
-            serde_json::from_slice(&tcp_device_frame(&mut socket).await).unwrap();
+        let received: DeviceCommand = serde_json::from_slice(
+            &tcp_device_frame(&mut socket, netbaiot_core::tcp_frame::FrameKind::Payload).await,
+        )
+        .unwrap();
         assert_eq!(received.command_id, command.command_id);
         assert_eq!(received.device, command.device);
         assert_eq!(received.payload, command.payload);
@@ -415,8 +417,14 @@ async fn official_clients_cover_mqtt_tcp_command_ack_status_and_offline_contract
             .write_all(&framer.encode(&serde_json::to_vec(&ack).unwrap()).unwrap())
             .await
             .unwrap();
-        let accepted: EventAccepted =
-            tcp_ack::decode(&tcp_device_frame(&mut socket).await).unwrap();
+        let accepted: EventAccepted = tcp_ack::decode(
+            &tcp_device_frame(
+                &mut socket,
+                netbaiot_core::tcp_frame::FrameKind::EventAccepted,
+            )
+            .await,
+        )
+        .unwrap();
         let delivery = next_event(&mut events).await;
         assert_eq!(delivery.event().event_id, accepted.event_id);
         assert!(
@@ -647,9 +655,14 @@ async fn official_client_throughput_latency_and_idle_memory_measurement() {
     let _ = std::fs::remove_dir_all(root);
 }
 
-async fn tcp_device_frame(socket: &mut TcpStream) -> Vec<u8> {
+async fn tcp_device_frame(
+    socket: &mut TcpStream,
+    expected: netbaiot_core::tcp_frame::FrameKind,
+) -> Vec<u8> {
     tokio::time::timeout(Duration::from_secs(5), async {
-        let length = socket.read_u32().await.unwrap() as usize;
+        let header = socket.read_u32().await.unwrap().to_be_bytes();
+        let (kind, length) = netbaiot_core::tcp_frame::decode_header(header, 65536).unwrap();
+        assert_eq!(kind, expected);
         assert!((1..=65_536).contains(&length));
         let mut payload = vec![0; length];
         socket.read_exact(&mut payload).await.unwrap();

@@ -1,0 +1,321 @@
+{
+  "baseline_revision": "40ce7c7942cbd6ed8c65c91959041a4616bd6296",
+  "candidate": "working-tree; production unchanged after Release build except a documentation comment",
+  "build": "cargo build --release -p netbaiot-server -p netbaiot-loadgen",
+  "environment": {
+    "platform": "macOS-27.0.1-arm64-arm-64bit",
+    "machine": "arm64",
+    "cpu_count": 10,
+    "rust": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1",
+    "cargo": "cargo 1.99.0 (5f94df478 2026-08-27)",
+    "sysctl": "hw.model: Mac16,10\nhw.memsize: 17179869184\nhw.ncpu: 10\nmachdep.cpu.brand_string: Apple M4\nkern.ipc.somaxconn: 128\nnet.inet.tcp.msl: 15000\nnet.inet.udp.recvspace: 786896\nnet.inet.udp.maxdgram: 9216"
+  },
+  "plan": [
+    {
+      "name": "tcp-frame-types-110k-0",
+      "variant": "before",
+      "seconds": 20,
+      "warmup": 3,
+      "ramp": 1,
+      "tls": false,
+      "host_cpu_sample": false,
+      "lock_metrics": false,
+      "production_revision": "40ce7c7942cbd6ed8c65c91959041a4616bd6296",
+      "groups": [
+        {
+          "label": "tcp",
+          "protocol": "tcp",
+          "rate": 110000,
+          "workers": 8,
+          "offset": 256,
+          "window": 128
+        }
+      ]
+    },
+    {
+      "name": "tcp-frame-types-110k-0",
+      "variant": "candidate",
+      "seconds": 20,
+      "warmup": 3,
+      "ramp": 1,
+      "tls": false,
+      "host_cpu_sample": false,
+      "lock_metrics": false,
+      "production_revision": "working-tree",
+      "groups": [
+        {
+          "label": "tcp",
+          "protocol": "tcp",
+          "rate": 110000,
+          "workers": 8,
+          "offset": 256,
+          "window": 128
+        }
+      ]
+    },
+    {
+      "name": "tcp-frame-types-110k-1",
+      "variant": "candidate",
+      "seconds": 20,
+      "warmup": 3,
+      "ramp": 1,
+      "tls": false,
+      "host_cpu_sample": false,
+      "lock_metrics": false,
+      "production_revision": "working-tree",
+      "groups": [
+        {
+          "label": "tcp",
+          "protocol": "tcp",
+          "rate": 110000,
+          "workers": 8,
+          "offset": 256,
+          "window": 128
+        }
+      ]
+    },
+    {
+      "name": "tcp-frame-types-110k-1",
+      "variant": "before",
+      "seconds": 20,
+      "warmup": 3,
+      "ramp": 1,
+      "tls": false,
+      "host_cpu_sample": false,
+      "lock_metrics": false,
+      "production_revision": "40ce7c7942cbd6ed8c65c91959041a4616bd6296",
+      "groups": [
+        {
+          "label": "tcp",
+          "protocol": "tcp",
+          "rate": 110000,
+          "workers": 8,
+          "offset": 256,
+          "window": 128
+        }
+      ]
+    },
+    {
+      "name": "tcp-frame-types-110k-2",
+      "variant": "before",
+      "seconds": 20,
+      "warmup": 3,
+      "ramp": 1,
+      "tls": false,
+      "host_cpu_sample": false,
+      "lock_metrics": false,
+      "production_revision": "40ce7c7942cbd6ed8c65c91959041a4616bd6296",
+      "groups": [
+        {
+          "label": "tcp",
+          "protocol": "tcp",
+          "rate": 110000,
+          "workers": 8,
+          "offset": 256,
+          "window": 128
+        }
+      ]
+    },
+    {
+      "name": "tcp-frame-types-110k-2",
+      "variant": "candidate",
+      "seconds": 20,
+      "warmup": 3,
+      "ramp": 1,
+      "tls": false,
+      "host_cpu_sample": false,
+      "lock_metrics": false,
+      "production_revision": "working-tree",
+      "groups": [
+        {
+          "label": "tcp",
+          "protocol": "tcp",
+          "rate": 110000,
+          "workers": 8,
+          "offset": 256,
+          "window": 128
+        }
+      ]
+    }
+  ],
+  "binaries": {
+    "server-before": "2a08aa7bc9d64e4637b7a66a092cdc33f4ce0341015ddb42c4e4dd997ae89c76",
+    "loadgen-before": "61c72ae2ae2f24e1200803ef0dd66807c68cd8d5a8b3789f1bb1d033cbbd74e3",
+    "server-after": "7a35c7b2e0ecb2abd0ce857f41be2855d02de8ce48c1d0772bc5fa5c43a81aef",
+    "loadgen-after": "53bd347da58cd9a64f8e4ea65c61c7058077a04c0a1c48ecbce59494053083f7"
+  },
+  "source_files": {
+    "apps/netbaiot-server/tests/business_rpc_current.rs": "71f92295f132bef8e3f9595faee168e4984448d05f918024b1e1ad1b974c7d3b",
+    "apps/netbaiot-server/tests/business_rpc_v3.rs": "ea468b008456d9e0030d5b4684c47a36bb0b31605f5ee959f1c36a3541262ad0",
+    "apps/netbaiot-server/tests/official_client.rs": "682c147024edfcacd314f77b5cea56e1aa7b0121a463c8963c29dd36133fd555",
+    "apps/netbaiot-server/tests/server.rs": "182dbfa5748d10c0cb7d5eae384b24fdbce85700505655e10dfe7c5601ac3c3d",
+    "crates/netbaiot-codecs/tests/codecs.rs": "88310090525ee406737e4eaaa8581fd1733a69ea1bb37bc5e6243eef3104f9e9",
+    "crates/netbaiot-protocol/src/lib.rs": "8b282a1fb8337c2af2c55badbc0927f30ba14a86d42b381814c76f3bce7b2084",
+    "crates/netbaiot-protocol/src/tcp_ack.rs": "b0e4233c9e53928c6e176d923257f569f6f0d19119d27ce843ce5e69990c870c",
+    "crates/netbaiot-transports/src/tcp.rs": "a81ea30970fb86174963ee84b663abacbbb52cecc31108ef01a0b1381d860343",
+    "crates/netbaiot-transports/tests/end_to_end.rs": "ca9e004fe1b3eb1c3d3583ab69f6c873fbeffefb8d2dbd4fe319cea19eab6d3f",
+    "crates/netbaiot-transports/tests/multi_codec.rs": "c393349d33be88595c4b0d31e659e56840d00ca399be78b023e5c3eac970058b",
+    "examples/device_tcp.py": "44fd054eebfb0f9bbfc45bf59520d3dc6bad0cac4d93f7be3927244abdaec478",
+    "fuzz/fuzz_targets/tcp_frame.rs": "f4a4a79018588bbdab44c603ed0c865a058e1b0e0898238f51034ef5c8cbe63e",
+    "fuzz/seed_corpus.py": "3c3b0e5af347cef7ebbbf05b6e2d5ac82d58a7bde36e6346320e427888f30fda",
+    "scripts/perf/codec_campaign.py": "47596ee106c30c32f6a0d8cc253abdd281243d4d6a3c93949b747a808422789f",
+    "scripts/perf/test_tcp_ack.py": "70c71276cac5603a58cf3bef751f0295c0bad42a4530f5dd4e8046c7c66d0c09",
+    "tools/netbaiot-loadgen/src/bin/business_rpc.rs": "74f20cac503222397ee789b0383b4e158a64882744301d657ae330849172d04d",
+    "tools/netbaiot-loadgen/src/density.rs": "f2a57af5e19c29ccb27152a5dd306451974e4fb319cf88be0b08ad3416e1ccf4",
+    "tools/netbaiot-loadgen/src/main.rs": "d9373f4f41a32e753e283415b34542c267a9f870f9a8ce80e8d72684c3e3b1b8",
+    "tools/netbaiot-loadgen/src/mixed.rs": "43e0fff5d0932140dd38d433bb8e999736840c54e017609ee3d3a74e7ad8d945",
+    "crates/netbaiot-protocol/src/tcp_frame.rs": "4bca12ee9ab2cf627ab6a7e53b0fc6d87d313a84a278c8fad43f987d2bf6d710"
+  },
+  "evidence_files": {
+    "paired.log": "331b48b1b91ff0647ace673142952d4bade498207fcc835e6adff36ace4c80e3",
+    "collision-before.log": "832a9c6f7c88c19ac55570ef9e1b84ced78f7ce27ed85ff87564fe96e33d2662",
+    "candidate-build.log": "5e41eb878bf0dc038696e1280b9002bd6f62825d8fbf31ea41a042ff711c986c",
+    "clippy.log": "f9e0aecb0e5e781a32966b8cb91a15138dcdb12fd49a8e364ab00a5e93568248",
+    "python-interop.log": "ddcf529ac2f89fd924a8de9fe6c2c4657a1bd21e014c7c1539be572a8040cabb",
+    "targeted.log": "0966f9e59c896fea6099cce626003803e45b3e894ad79ae5adc5419f7f4d4cf5",
+    "paired-low.log": "2a4312a39a642aaa39274fd592a3fd6880c66a6edb56da7e96f10385126907be",
+    "ack-allocations.log": "d5cfffea3f6c36893fe77c771a145c0c0a99329b29342c34e599b05eda7d35a3",
+    "baseline-build.log": "f428ab88767d02520455b5b5cb1d86525a434d6efaf2dbd6ee3da134d99da351",
+    "python-tests.log": "d3722fdbec7cf63e1734f0beb19f74f7ee3f159909cf6f90035eb2dd51f7cebe",
+    "fuzz-seeded.log": "a29a09e74284a94281b76ea2d40e72e4798200d1a27218f2f9dfa8c7744fa5e5",
+    "fuzz.log": "869f6eace353a6209fe9741c2e11acc5048f4c041ffea6616efc455733dddcac",
+    "workspace-tests.log": "b78c733f7f2b3c7c7cdfebc7c4b0aee5a081184fd4bfaa8ba1cf4a5ff14b9d3d",
+    "soak.log": "746f3f138a6aab98fb8e17ce224074241005dfd5d83683d51e648a1e4c4eacfc"
+  },
+  "limitations": [
+    "Shared macOS ARM64 loopback host, short samples, successful-ACK latency only.",
+    "No Linux, remote-host network, TLS performance or long-duration soak measurement."
+  ],
+  "low_pressure_plan": [
+    {
+      "name": "tcp-frame-types-60k-0",
+      "variant": "before",
+      "seconds": 20,
+      "warmup": 3,
+      "ramp": 1,
+      "tls": false,
+      "host_cpu_sample": false,
+      "lock_metrics": false,
+      "production_revision": "40ce7c7942cbd6ed8c65c91959041a4616bd6296",
+      "groups": [
+        {
+          "label": "tcp",
+          "protocol": "tcp",
+          "rate": 60000,
+          "workers": 8,
+          "offset": 256,
+          "window": 128
+        }
+      ]
+    },
+    {
+      "name": "tcp-frame-types-60k-0",
+      "variant": "candidate",
+      "seconds": 20,
+      "warmup": 3,
+      "ramp": 1,
+      "tls": false,
+      "host_cpu_sample": false,
+      "lock_metrics": false,
+      "production_revision": "working-tree",
+      "groups": [
+        {
+          "label": "tcp",
+          "protocol": "tcp",
+          "rate": 60000,
+          "workers": 8,
+          "offset": 256,
+          "window": 128
+        }
+      ]
+    },
+    {
+      "name": "tcp-frame-types-60k-1",
+      "variant": "candidate",
+      "seconds": 20,
+      "warmup": 3,
+      "ramp": 1,
+      "tls": false,
+      "host_cpu_sample": false,
+      "lock_metrics": false,
+      "production_revision": "working-tree",
+      "groups": [
+        {
+          "label": "tcp",
+          "protocol": "tcp",
+          "rate": 60000,
+          "workers": 8,
+          "offset": 256,
+          "window": 128
+        }
+      ]
+    },
+    {
+      "name": "tcp-frame-types-60k-1",
+      "variant": "before",
+      "seconds": 20,
+      "warmup": 3,
+      "ramp": 1,
+      "tls": false,
+      "host_cpu_sample": false,
+      "lock_metrics": false,
+      "production_revision": "40ce7c7942cbd6ed8c65c91959041a4616bd6296",
+      "groups": [
+        {
+          "label": "tcp",
+          "protocol": "tcp",
+          "rate": 60000,
+          "workers": 8,
+          "offset": 256,
+          "window": 128
+        }
+      ]
+    },
+    {
+      "name": "tcp-frame-types-60k-2",
+      "variant": "before",
+      "seconds": 20,
+      "warmup": 3,
+      "ramp": 1,
+      "tls": false,
+      "host_cpu_sample": false,
+      "lock_metrics": false,
+      "production_revision": "40ce7c7942cbd6ed8c65c91959041a4616bd6296",
+      "groups": [
+        {
+          "label": "tcp",
+          "protocol": "tcp",
+          "rate": 60000,
+          "workers": 8,
+          "offset": 256,
+          "window": 128
+        }
+      ]
+    },
+    {
+      "name": "tcp-frame-types-60k-2",
+      "variant": "candidate",
+      "seconds": 20,
+      "warmup": 3,
+      "ramp": 1,
+      "tls": false,
+      "host_cpu_sample": false,
+      "lock_metrics": false,
+      "production_revision": "working-tree",
+      "groups": [
+        {
+          "label": "tcp",
+          "protocol": "tcp",
+          "rate": 60000,
+          "workers": 8,
+          "offset": 256,
+          "window": 128
+        }
+      ]
+    }
+  ],
+  "measurements": {
+    "measurements-low.json": "1b46cd21dd520af7f235b4cdf3496085dc29e6b626ed3f0bff5a8d0ae5b02ce2",
+    "measurements.json": "806b1f1cebe952079086d4adcffb07bc65711ef56973269d50e6e3969ff2371a"
+  }
+}

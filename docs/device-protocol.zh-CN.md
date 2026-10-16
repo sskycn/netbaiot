@@ -39,7 +39,7 @@ Codec 默认限制：输入/编码后字节数 64 KiB、每次输出一条消息
 
 ## 通用 TCP
 
-每个帧由 `u32` 大端序载荷长度和后续载荷组成。长度必须在 1..max_tcp_frame_size 范围内。首帧是认证握手：
+每个帧由 4 字节大端类型/长度帧头和正文组成。最高位区分 Payload（0）与 EventAccepted ACK（1），低 31 位是正文长度，必须在 1..max_tcp_frame_size 范围内。首个 Payload 帧是认证握手：
 
 ```json
 {"credential_id":"demo-device","secret":"<64-hex-character-key>"}
@@ -53,8 +53,16 @@ Codec 默认限制：输入/编码后字节数 64 KiB、每次输出一条消息
 JSON 回退或双格式模式。** JSON 认证请求及认证结果、上行与命令 Codec、MQTT、UDP
 保持原状。ACK 版本独立于 crate SemVer、业务 Codec 及 Business RPC 版本。
 
-ACK 正文固定 **42 字节**，加上 `00 00 00 2a` 长度前缀，完整帧固定 **46 字节**。
-多字节整数均采用大端；下表偏移不包含长度前缀。
+4 字节大端帧头的最高位（bit 31）是显式类型：**0 = Payload，1 = EventAccepted ACK**；
+低 31 位表示正文长度，不包含帧头。Payload 长度必须非零、不超过 `0x7fffffff` 和配置上限。
+认证请求/结果、上行及下行命令均为 Payload；只有服务端可发送 EventAccepted，带 ACK 类型的
+上行必须拒绝。接收端在读取正文或分配内存前校验帧头，ACK 类型的长度必须恰好为 42。
+
+ACK 正文固定 **42 字节**，加上 **`80 00 00 2a`** 帧头，完整帧固定 **46 字节**。
+这是对原先有歧义的 `00 00 00 2a` ACK 帧头的不兼容修复，客户端须与服务端同步升级。
+未标记的数据始终是 Payload，即使其正文与合法 ACK 完全相同。禁止通过正文首字节或尝试
+ACK 解码猜测报文类型。ACK 正文版本仍为 1，命令字节保持原样。
+多字节整数均采用大端；下表偏移不包含帧头。
 
 | 正文偏移 | 字段 | 字节 | 编码 |
 |---:|---|---:|---|
@@ -65,9 +73,11 @@ ACK 正文固定 **42 字节**，加上 `00 00 00 2a` 长度前缀，完整帧�
 | 26 | Required Deliveries | 8 | 无符号 u64 |
 | 34 | Best Effort Deliveries | 8 | 无符号 u64 |
 
-该控制 ACK 独立于 DeviceCodec。客户端必须校验长度、版本和类型，正确处理分片与粘包；
-命令帧继续使用绑定的 Codec。Rust 客户端可通过 `netbaiot_protocol::tcp_ack::decode`
-解析正文；`encode` 返回完整的栈上帧。计数超出当前 Rust 平台 `usize` 范围时拒绝而不截断。
+该控制 ACK 独立于 DeviceCodec。客户端先校验帧头，再校验 ACK 正文版本和类型，并正确处理
+分片、粘包及命令与 ACK 交错。命令继续使用绑定的 Codec。Rust 客户端须先调用
+`netbaiot_protocol::tcp_frame::decode_header`，按 `FrameKind` 分流，仅对 EventAccepted
+调用 `tcp_ack::decode`。`tcp_ack::encode` 返回完整的栈上帧。
+计数超出当前 Rust 平台 `usize` 范围时拒绝而不截断。
 
 ACK 与连接上成功接纳的上行顺序一致，字段来自原始 EventBus receipt。只有完成认证、授权、
 Codec 验证、路由选择、数量/字节配额接纳，以及全部 required sink 原子预留与入队后才发送。

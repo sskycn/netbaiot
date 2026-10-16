@@ -301,6 +301,15 @@ fn all_command_encoders_preserve_identity_expiry_and_typed_arguments() {
     };
     for (i, (codec, _)) in fixtures("telemetry").iter().enumerate() {
         let bytes = codec.encode(&EncodeContext { device: &k }, &c).unwrap();
+        // Current builtins have fixed outer envelopes. Arbitrary vendor codecs
+        // do not share this property and must be classified by TCP frame type.
+        assert_eq!(bytes[0], [b'{', 0xa5, 0x85, 0x08][i]);
+        assert!(tcp_ack::decode(&bytes).is_err());
+        assert_eq!(
+            tcp_frame::decode_header(tcp_frame::payload_header(bytes.len()).unwrap(), bytes.len())
+                .unwrap(),
+            (tcp_frame::FrameKind::Payload, bytes.len())
+        );
         if i == 3 {
             let w = wire::DeviceCommand::decode(bytes.as_slice()).unwrap();
             assert_eq!(w.schema_version, 1);

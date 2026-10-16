@@ -418,12 +418,22 @@ async fn tcp_accept(address: std::net::SocketAddr, payload: &[u8]) -> EventAccep
     let mut socket: BoxStream = Box::new(TcpStream::connect(address).await.unwrap());
     let framer = LengthPrefixFramer { maximum: 65_536 };
     socket.write_all(&framer.encode(br#"{"credential_id":"demo-device","secret":"000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"}"#).unwrap()).await.unwrap();
-    assert_eq!(read_frame(&mut socket).await, br#"{"authenticated":true}"#);
+    assert_eq!(
+        read_frame(&mut socket, netbaiot_core::tcp_frame::FrameKind::Payload).await,
+        br#"{"authenticated":true}"#
+    );
     socket
         .write_all(&framer.encode(payload).unwrap())
         .await
         .unwrap();
-    let receipt = netbaiot_core::tcp_ack::decode(&read_frame(&mut socket).await).unwrap();
+    let receipt = netbaiot_core::tcp_ack::decode(
+        &read_frame(
+            &mut socket,
+            netbaiot_core::tcp_frame::FrameKind::EventAccepted,
+        )
+        .await,
+    )
+    .unwrap();
     socket.shutdown().await.unwrap();
     receipt
 }
@@ -2393,8 +2403,13 @@ async fn device_socket(address: std::net::SocketAddr, tls: bool) -> BoxStream {
         Box::new(socket)
     }
 }
-async fn read_frame(socket: &mut BoxStream) -> Vec<u8> {
-    let length = socket.read_u32().await.unwrap() as usize;
+async fn read_frame(
+    socket: &mut BoxStream,
+    expected: netbaiot_core::tcp_frame::FrameKind,
+) -> Vec<u8> {
+    let header = socket.read_u32().await.unwrap().to_be_bytes();
+    let (kind, length) = netbaiot_core::tcp_frame::decode_header(header, 65536).unwrap();
+    assert_eq!(kind, expected);
     assert!(length <= 65_536);
     let mut bytes = vec![0; length];
     socket.read_exact(&mut bytes).await.unwrap();
@@ -2593,9 +2608,14 @@ async fn exercise_shared_listener(tls: bool) {
         .unwrap();
     wire.extend(framer.encode(payload).unwrap());
     tcp.write_all(&wire).await.unwrap();
-    assert_eq!(read_frame(&mut tcp).await, br#"{"authenticated":true}"#);
-    let receipt: EventAcceptance =
-        netbaiot_core::tcp_ack::decode(&read_frame(&mut tcp).await).unwrap();
+    assert_eq!(
+        read_frame(&mut tcp, netbaiot_core::tcp_frame::FrameKind::Payload).await,
+        br#"{"authenticated":true}"#
+    );
+    let receipt: EventAcceptance = netbaiot_core::tcp_ack::decode(
+        &read_frame(&mut tcp, netbaiot_core::tcp_frame::FrameKind::EventAccepted).await,
+    )
+    .unwrap();
     assert!(!receipt.event_id.0.is_nil());
     assert_eq!(
         services.connections.active().unwrap()[Transport::Tcp as usize],

@@ -14,7 +14,7 @@
 | --- | --- | --- |
 | MQTT 3.1.1 | QoS 0/1/2、CleanSession 0/1、持久会话、保留消息、Will、精确/`+`/`#` 订阅、计划重启恢复 | 内嵌 broker；不支持 WebSocket、共享订阅、MQTT-SN、bridge、`$SYS` 或集群 |
 | MQTT 5.0 | QoS 0/1/2、Clean Start、会话/消息过期、Will Delay、Receive Maximum、Maximum Packet Size、No Local、Retain As Published、Retain Handling，以及受限元数据 | 不支持 Topic Alias、Subscription Identifier、共享订阅、Enhanced Authentication 和 WebSocket |
-| 分帧 TCP | 4 字节大端长度 + 一条有界的认证 Codec 载荷；首个 JSON 帧认证连接；固定二进制 ACK v1（42 字节正文、46 字节完整帧，无 JSON 回退）；支持上行与在线命令 | TCP 是字节流；非 loopback 必须使用 TLS；没有 HTTP 设备入口 |
+| 分帧 TCP | 4 字节大端类型/长度（最高位 Payload=0、ACK=1）+ 有界正文；首个 JSON 帧认证连接；固定二进制 ACK v1（42 字节正文、46 字节完整帧，无 JSON 回退）；支持上行与在线命令 | TCP 是字节流；非 loopback 必须使用 TLS；没有 HTTP 设备入口 |
 | 认证 UDP | NBI1 HMAC-SHA256 上行；检查 credential version、时间戳和重放；越过 `EventAccepted` 后返回 64 字节签名 NBA1 | 已认证但未加密；没有长期会话、命令下行或分片 |
 
 MQTT 3.1.1 与 MQTT 5.0 使用同一个设备 TCP listener。跨协议 level 切换不会恢复

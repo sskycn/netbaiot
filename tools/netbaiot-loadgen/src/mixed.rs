@@ -317,8 +317,9 @@ async fn stream_session(
                 let valid = if mqtt {
                     first == 0x40 && b == expected.to_be_bytes()
                 } else {
-                    netbaiot_core::tcp_ack::decode(&b)
-                        .is_ok_and(|receipt| receipt.required_deliveries > 0)
+                    first == netbaiot_core::tcp_frame::FrameKind::EventAccepted as u8
+                        && netbaiot_core::tcp_ack::decode(&b)
+                            .is_ok_and(|receipt| receipt.required_deliveries > 0)
                 };
                 if !valid {
                     w.failure("protocol_error");

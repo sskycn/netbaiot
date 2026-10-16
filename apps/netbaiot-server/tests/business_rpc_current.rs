@@ -45,7 +45,9 @@ async fn reserve_business_ports() -> (Vec<TcpListener>, UdpSocket) {
 async fn read_tcp_device(socket: &mut TcpStream) -> Vec<u8> {
     let mut header = [0u8; 4];
     socket.read_exact(&mut header).await.unwrap();
-    let mut body = vec![0; u32::from_be_bytes(header) as usize];
+    let (kind, length) = netbaiot_core::tcp_frame::decode_header(header, 65536).unwrap();
+    assert_eq!(kind, netbaiot_core::tcp_frame::FrameKind::Payload);
+    let mut body = vec![0; length];
     socket.read_exact(&mut body).await.unwrap();
     body
 }

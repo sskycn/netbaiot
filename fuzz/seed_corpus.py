@@ -75,6 +75,13 @@ for i, topic in enumerate([b'v1/t/t/p/p/d/a/down', b'#', b'a/+', b'a/#/b', b'a+'
 for size in [1, 128, 16384, 65500]:
     seed('mqtt_packet', f'publish-{size}', packet(0x32, text(b'v1/t/t/p/p/d/a/up') + b'\x00\x01' + b'x'*size))
     seed('tcp_frame', f'frame-{size}', struct.pack('!I',size)+b'x'*size)
+# Identical bodies with disjoint transport types; also exercise ACK body validation.
+ack_body = struct.pack('!BB16sqQQ', 1, 1, bytes(range(16)), -2, 1, 0)
+seed('tcp_frame', 'ack-body', ack_body)
+seed('tcp_frame', 'typed-ack', struct.pack('!I', 0x8000002a) + ack_body)
+seed('tcp_frame', 'ack-shaped-payload', struct.pack('!I', 42) + ack_body)
+for length in [0, 41, 43, 0x7fffffff]:
+    seed('tcp_frame', f'invalid-ack-length-{length}', struct.pack('!I', 0x80000000 | length))
 for i, body in enumerate([b'{"schema_version":1,"source_message_id":"1","kind":"heartbeat","data":{"sequence":1}}', b'{"schema_version":1,"source_message_id":"1","kind":"telemetry","data":{"temperature":25.3}}']):
     seed('json_codec', f'valid-{i}', body)
     udp = b'NBI1\x01a' + struct.pack('!I',1) + b'\x01'*16 + struct.pack('!QqH',1,1000,len(body)) + body + b'\x00'*32

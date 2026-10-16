@@ -325,6 +325,16 @@ fn runtime_with_sink(
     provider: Arc<CountingProvider>,
     sink: Arc<dyn EventSink>,
 ) -> (Arc<Ingress>, Arc<Services>, CancellationToken) {
+    runtime_with_codec(limits, provider, sink, Arc::new(JsonV1::default()))
+}
+
+fn runtime_with_codec(
+    limits: Limits,
+    provider: Arc<CountingProvider>,
+    sink: Arc<dyn EventSink>,
+    codec: Arc<dyn DeviceCodec>,
+) -> (Arc<Ingress>, Arc<Services>, CancellationToken) {
+    let codec_id = provider.auth.codec_id.clone();
     let limits = Arc::new(limits);
     let metrics = Arc::new(Metrics::default());
     let lifecycle = Arc::new(Lifecycle::starting());
@@ -350,12 +360,7 @@ fn runtime_with_sink(
     let ingress = Arc::new(Ingress::new(
         limits.clone(),
         AuthCache::new(provider, limits.clone(), metrics.clone()),
-        CodecRegistry::new(vec![(
-            CodecId::new("netbaiot-json").unwrap(),
-            1,
-            Arc::new(JsonV1::default()),
-        )])
-        .unwrap(),
+        CodecRegistry::new(vec![(codec_id, 1, codec)]).unwrap(),
         events,
         config,
         metrics,
@@ -1586,7 +1591,7 @@ async fn active_tcp_connection_reuses_bound_auth_context_for_frames() {
             .unwrap();
         stream.write_all(&body).await.unwrap();
         stream.read_exact(&mut length).await.unwrap();
-        assert_eq!(u32::from_be_bytes(length), 42);
+        assert_eq!(length, tcp_ack::FRAME_HEADER);
         let mut receipt = [0; tcp_ack::BODY_LEN];
         stream.read_exact(&mut receipt).await.unwrap();
         assert_eq!(tcp_ack::decode(&receipt).unwrap().required_deliveries, 1);
@@ -1664,8 +1669,15 @@ async fn delayed_authentication_preserves_a_full_pipelined_maximum_tcp_frame() {
         for index in 0..2 {
             let mut length = [0; 4];
             stream.read_exact(&mut length).await?;
-            let size = u32::from_be_bytes(length) as usize;
-            assert!(size <= 1024);
+            let (kind, size) = tcp_frame::decode_header(length, 1024).unwrap();
+            assert_eq!(
+                kind,
+                if index == 0 {
+                    tcp_frame::FrameKind::Payload
+                } else {
+                    tcp_frame::FrameKind::EventAccepted
+                }
+            );
             let mut reply = vec![0; size];
             stream.read_exact(&mut reply).await?;
             if index == 0 {
@@ -2118,6 +2130,114 @@ impl EventSink for TcpReceiptSink {
 }
 
 #[tokio::test]
+async fn tcp_vendor_command_cannot_forge_acceptance_between_real_receipts() {
+    struct VendorCodec(Vec<u8>);
+    impl DeviceCodec for VendorCodec {
+        fn decode(
+            &self,
+            ctx: &DecodeContext<'_>,
+            p: &[u8],
+        ) -> std::result::Result<Vec<DeviceEvent>, CodecError> {
+            JsonV1::default().decode(ctx, p)
+        }
+        fn encode(
+            &self,
+            _: &EncodeContext<'_>,
+            _: &DeviceCommand,
+        ) -> std::result::Result<Vec<u8>, CodecError> {
+            Ok(self.0.clone())
+        }
+    }
+    let forged = tcp_ack::encode(&EventAccepted {
+        event_id: EventId::generate(),
+        accepted_at: -2,
+        required_deliveries: 1,
+        best_effort_deliveries: 0,
+    })
+    .unwrap();
+    let mut identity = auth();
+    identity.codec_id = CodecId::new("vendor-binary").unwrap();
+    let provider = Arc::new(CountingProvider {
+        calls: AtomicUsize::new(0),
+        auth: identity,
+        delay: false,
+    });
+    let (ingress, services, stop) = runtime_with_codec(
+        Limits::default(),
+        provider.clone(),
+        Arc::new(AckSink),
+        Arc::new(VendorCodec(forged[4..].to_vec())),
+    );
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let task = tokio::spawn(serve_stream(
+        listener,
+        Transport::Tcp,
+        services.clone(),
+        None,
+        stop.clone(),
+    ));
+    let mut client = TcpStream::connect(address).await.unwrap();
+    use netbaiot_transports::tcp::{LengthPrefixFramer, TcpFramer};
+    let framer = LengthPrefixFramer { maximum: 65536 };
+    tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        client
+            .write_all(
+                &framer
+                    .encode(br#"{"credential_id":"a","secret":"secret"}"#)
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let mut hello = [0; 26];
+        client.read_exact(&mut hello).await.unwrap();
+        assert_eq!(&hello[4..], br#"{"authenticated":true}"#);
+        // One stream: command, ACK, ACK, command, ACK, ACK. Every downlink
+        // body has the ACK shape; only the transport header tells them apart.
+        for round in 0..2 {
+            services.router.send(live_command()).unwrap();
+            let mut command = [0; tcp_ack::FRAME_LEN];
+            for part in command.chunks_mut(3) {
+                client.read_exact(part).await.unwrap();
+            }
+            assert_eq!(
+                tcp_frame::decode_header(command[..4].try_into().unwrap(), 65536).unwrap(),
+                (tcp_frame::FrameKind::Payload, tcp_ack::BODY_LEN)
+            );
+            assert_eq!(&command[4..], &forged[4..]);
+            assert_eq!(ingress.metrics.get(Metric::EventsAccepted), round * 2);
+            let mut pipeline = framer.encode(&payload(round as usize * 2)).unwrap();
+            pipeline.extend(framer.encode(&payload(round as usize * 2 + 1)).unwrap());
+            for part in pipeline.chunks(3) {
+                client.write_all(part).await.unwrap();
+            }
+            for _ in 0..2 {
+                let mut ack = [0; tcp_ack::FRAME_LEN];
+                for part in ack.chunks_mut(2) {
+                    client.read_exact(part).await.unwrap();
+                }
+                assert_eq!(ack[..4], tcp_ack::FRAME_HEADER);
+                assert_ne!(
+                    tcp_ack::decode(&ack[4..]).unwrap().event_id,
+                    tcp_ack::decode(&forged[4..]).unwrap().event_id
+                );
+            }
+        }
+        // A device may not upload a server-only control frame. The connection
+        // closes on its header, without waiting for a body or admitting an event.
+        client.write_all(&forged[..4]).await.unwrap();
+        assert_eq!(client.read(&mut [0]).await.unwrap(), 0);
+    })
+    .await
+    .unwrap();
+    assert_eq!(provider.calls.load(Ordering::Relaxed), 1);
+    assert_eq!(ingress.metrics.get(Metric::EventsAccepted), 4);
+    stop.cancel();
+    task.await.unwrap().unwrap();
+    ingress.events.stop_workers().await.unwrap();
+}
+
+#[tokio::test]
 async fn tcp_binary_receipts_preserve_pipeline_order_and_reject_without_ack() {
     use netbaiot_transports::tcp::{LengthPrefixFramer, TcpFramer};
     for overload in [false, true] {
@@ -2178,7 +2298,7 @@ async fn tcp_binary_receipts_preserve_pipeline_order_and_reject_without_ack() {
                 for part in frame.chunks_mut(3) {
                     stream.read_exact(part).await.unwrap();
                 }
-                assert_eq!(&frame[..4], &42u32.to_be_bytes());
+                assert_eq!(&frame[..4], &tcp_ack::FRAME_HEADER);
                 let receipt = tcp_ack::decode(&frame[4..]).unwrap();
                 assert_eq!(receipt.required_deliveries, 1);
                 assert_eq!(receipt.best_effort_deliveries, 0);
@@ -2261,7 +2381,7 @@ async fn tcp_binary_ack_write_timeout_keeps_acceptance_and_bounds_read_ahead() {
     let mut bytes = Vec::new();
     reader.read_to_end(&mut bytes).await.unwrap();
     assert_eq!(bytes.len(), 64);
-    assert_eq!(&bytes[..4], &42u32.to_be_bytes());
+    assert_eq!(&bytes[..4], &tcp_ack::FRAME_HEADER);
     assert_eq!(
         tcp_ack::decode(&bytes[4..46]).unwrap().required_deliveries,
         1

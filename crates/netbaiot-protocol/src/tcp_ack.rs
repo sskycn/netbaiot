@@ -7,6 +7,7 @@ pub const VERSION: u8 = 1;
 pub const EVENT_ACCEPTED: u8 = 1;
 pub const BODY_LEN: usize = 42;
 pub const FRAME_LEN: usize = 46;
+pub const FRAME_HEADER: [u8; 4] = (crate::tcp_frame::ACK_FLAG | BODY_LEN as u32).to_be_bytes();
 
 /// Encode the complete length-prefixed frame without heap allocation.
 /// `accepted_at` is signed Unix time in milliseconds; integer fields are big-endian.
@@ -15,7 +16,7 @@ pub fn encode(receipt: &EventAccepted) -> Result<[u8; FRAME_LEN], ProtocolError>
     let required = u64::try_from(receipt.required_deliveries).map_err(|_| ProtocolError)?;
     let best_effort = u64::try_from(receipt.best_effort_deliveries).map_err(|_| ProtocolError)?;
     let mut frame = [0; FRAME_LEN];
-    frame[..4].copy_from_slice(&42u32.to_be_bytes());
+    frame[..4].copy_from_slice(&FRAME_HEADER);
     frame[4] = VERSION;
     frame[5] = EVENT_ACCEPTED;
     frame[6..22].copy_from_slice(receipt.event_id.0.as_bytes());
@@ -26,6 +27,8 @@ pub fn encode(receipt: &EventAccepted) -> Result<[u8; FRAME_LEN], ProtocolError>
 }
 
 /// Decode exactly one 42-byte body after TCP framing, with no allocation.
+/// The caller MUST first validate an EventAccepted header with `tcp_frame::decode_header`.
+/// Body bytes alone cannot distinguish a receipt from an opaque command payload.
 /// Unknown versions/types, trailing bytes and counts exceeding `usize` are errors.
 pub fn decode(body: &[u8]) -> Result<EventAccepted, ProtocolError> {
     let body: &[u8; BODY_LEN] = body.try_into().map_err(|_| ProtocolError)?;
@@ -70,8 +73,8 @@ mod tests {
         assert_eq!(
             frame,
             [
-                0, 0, 0, 42, 1, 1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 255, 255,
-                255, 255, 255, 255, 255, 254, 0, 0, 0, 0, 1, 2, 3, 4, 0, 0, 0, 0, 5, 6, 7, 8,
+                128, 0, 0, 42, 1, 1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 255,
+                255, 255, 255, 255, 255, 255, 254, 0, 0, 0, 0, 1, 2, 3, 4, 0, 0, 0, 0, 5, 6, 7, 8,
             ]
         );
         let decoded = decode(&frame[4..]).unwrap();

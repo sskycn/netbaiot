@@ -550,10 +550,11 @@ fn publish(a: &AuthenticatedDevice, p: &[u8], qos: u8, v5: bool) -> Vec<u8> {
     body.extend_from_slice(p);
     packet(0x30 | (qos << 1), &body)
 }
-async fn read_tcp(s: &mut TcpStream) -> Vec<u8> {
+async fn read_tcp(s: &mut TcpStream, expected: tcp_frame::FrameKind) -> Vec<u8> {
     tokio::time::timeout(Duration::from_secs(3), async {
-        let n = s.read_u32().await.unwrap() as usize;
-        assert!(n <= 65536);
+        let header = s.read_u32().await.unwrap().to_be_bytes();
+        let (kind, n) = tcp_frame::decode_header(header, 65536).unwrap();
+        assert_eq!(kind, expected);
         let mut v = vec![0; n];
         s.read_exact(&mut v).await.unwrap();
         v
@@ -660,11 +661,16 @@ async fn mixed_codec_reconnect_and_control_soak() {
             for part in frame(&hello).chunks(3) {
                 tcp.write_all(part).await.unwrap();
             }
-            assert_eq!(read_tcp(&mut tcp).await, br#"{"authenticated":true}"#);
+            assert_eq!(
+                read_tcp(&mut tcp, tcp_frame::FrameKind::Payload).await,
+                br#"{"authenticated":true}"#
+            );
             for part in frame(&payload).chunks(3) {
                 tcp.write_all(part).await.unwrap();
             }
-            let _: EventAcceptance = tcp_ack::decode(&read_tcp(&mut tcp).await).unwrap();
+            let _: EventAcceptance =
+                tcp_ack::decode(&read_tcp(&mut tcp, tcp_frame::FrameKind::EventAccepted).await)
+                    .unwrap();
             let udp = UdpSocket::bind("127.0.0.1:0").await.unwrap();
             let data = datagram_sequence(f, &payload, cycle);
             udp.send_to(&data, address).await.unwrap();
@@ -774,17 +780,24 @@ async fn four_codecs_coexist_on_real_mqtt_tcp_udp_with_binary_commands() {
         for bytes in frame(&hello).chunks(2) {
             client.write_all(bytes).await.unwrap();
         }
-        assert_eq!(read_tcp(&mut client).await, br#"{"authenticated":true}"#);
+        assert_eq!(
+            read_tcp(&mut client, tcp_frame::FrameKind::Payload).await,
+            br#"{"authenticated":true}"#
+        );
         // Split binary payload, then two coalesced frames.
         for bytes in frame(&p).chunks(3) {
             client.write_all(bytes).await.unwrap();
         }
-        let _: EventAcceptance = tcp_ack::decode(&read_tcp(&mut client).await).unwrap();
+        let _: EventAcceptance =
+            tcp_ack::decode(&read_tcp(&mut client, tcp_frame::FrameKind::EventAccepted).await)
+                .unwrap();
         let mut frames = frame(&p);
         frames.extend_from_slice(&frame(&p));
         client.write_all(&frames).await.unwrap();
         for _ in 0..2 {
-            let _: EventAcceptance = tcp_ack::decode(&read_tcp(&mut client).await).unwrap();
+            let _: EventAcceptance =
+                tcp_ack::decode(&read_tcp(&mut client, tcp_frame::FrameKind::EventAccepted).await)
+                    .unwrap();
         }
         let c = command(&a);
         let expected = ingress
@@ -799,7 +812,16 @@ async fn four_codecs_coexist_on_real_mqtt_tcp_udp_with_binary_commands() {
             )
             .unwrap();
         services.router.send(c).unwrap();
-        assert_eq!(read_tcp(&mut client).await, expected);
+        assert_eq!(
+            read_tcp(&mut client, tcp_frame::FrameKind::Payload).await,
+            expected
+        );
+        // Resume receipts after the command on the same connection for each codec.
+        client.write_all(&frame(&p)).await.unwrap();
+        let receipt =
+            tcp_ack::decode(&read_tcp(&mut client, tcp_frame::FrameKind::EventAccepted).await)
+                .unwrap();
+        assert_eq!(receipt.required_deliveries, 1);
         clients.push(client);
         let udp_client = UdpSocket::bind("127.0.0.1:0").await.unwrap();
         let request = datagram(f, &p);
@@ -831,7 +853,7 @@ async fn four_codecs_coexist_on_real_mqtt_tcp_udp_with_binary_commands() {
     }
     assert_eq!(ingress.sessions.list(0, 32).unwrap().len(), 8);
     tokio::time::timeout(Duration::from_secs(3), async {
-        while sink.0.lock().unwrap().len() != 28 {
+        while sink.0.lock().unwrap().len() != 32 {
             tokio::task::yield_now().await;
         }
     })

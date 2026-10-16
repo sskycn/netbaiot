@@ -28,7 +28,7 @@ import uuid
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "examples"))
-from device_tcp import decode_ack
+from device_tcp import EVENT_ACCEPTED, PAYLOAD, recv_downlink
 spec = importlib.util.spec_from_file_location('vectors', ROOT / 'crates/netbaiot-codecs/tests/fixtures/generate.py')
 vectors = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(vectors)
@@ -80,8 +80,11 @@ def frame(body):
     return struct.pack('!I', len(body)) + body
 
 
-def tcp_read(sock):
-    return exact(sock, struct.unpack('!I', exact(sock, 4))[0])
+def tcp_read(sock, expected_kind=PAYLOAD):
+    kind, value = recv_downlink(sock)
+    if kind != expected_kind:
+        raise ValueError('unexpected TCP frame type')
+    return value
 
 
 def management(address, path, value=None):
@@ -287,7 +290,7 @@ def client(device, management_address, receiver, fmt, protocol, qos, version, wo
                     # Exercise split headers and payloads on every TCP frame.
                     data = frame(payload)
                     sock.sendall(data[:3]); sock.sendall(data[3:])
-                    decode_ack(tcp_read(sock))
+                    tcp_read(sock, EVENT_ACCEPTED)
                     transport.append(time.perf_counter()-at)
                 with receiver.condition:
                     if not receiver.condition.wait_for(lambda: receiver.pending[source][1] is not None, timeout=3):

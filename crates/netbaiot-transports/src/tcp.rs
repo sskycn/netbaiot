@@ -15,6 +15,8 @@ pub trait TcpFramer: Send + Sync {
         Ok(None)
     }
 }
+/// Payload frames only. Server control receipts use `tcp_ack`; downstream readers
+/// must dispatch with `tcp_frame::decode_header` before decoding either body.
 pub struct LengthPrefixFramer {
     pub maximum: usize,
 }
@@ -25,7 +27,7 @@ impl TcpFramer for LengthPrefixFramer {
         }
         let raw = u32::from_be_bytes(input[..4].try_into().map_err(|_| Error::Invalid)?);
         let length = usize::try_from(raw).map_err(|_| Error::Invalid)?;
-        if length == 0 || length > self.maximum {
+        if raw & tcp_frame::ACK_FLAG != 0 || length == 0 || length > self.maximum {
             return Err(Error::Invalid);
         }
         Ok(Some(length.checked_add(4).ok_or(Error::Invalid)?))
@@ -36,7 +38,7 @@ impl TcpFramer for LengthPrefixFramer {
         }
         let raw = u32::from_be_bytes(input[..4].try_into().map_err(|_| Error::Invalid)?);
         let len = usize::try_from(raw).map_err(|_| Error::Invalid)?;
-        if len == 0 || len > self.maximum {
+        if raw & tcp_frame::ACK_FLAG != 0 || len == 0 || len > self.maximum {
             return Err(Error::Invalid);
         }
         let total = len.checked_add(4).ok_or(Error::Invalid)?;
@@ -51,9 +53,9 @@ impl TcpFramer for LengthPrefixFramer {
         if payload.is_empty() || payload.len() > self.maximum {
             return Err(Error::Invalid);
         }
-        let len = u32::try_from(payload.len()).map_err(|_| Error::Invalid)?;
+        let header = tcp_frame::payload_header(payload.len()).map_err(|_| Error::Invalid)?;
         let mut out = Vec::with_capacity(payload.len() + 4);
-        out.extend_from_slice(&len.to_be_bytes());
+        out.extend_from_slice(&header);
         out.extend_from_slice(payload);
         Ok(out)
     }
@@ -176,6 +178,23 @@ pub async fn connection(
 mod tests {
     use super::*;
     #[test]
+    fn vendor_command_identical_to_ack_body_has_distinct_frame_type() {
+        let receipt = EventAccepted {
+            event_id: EventId(uuid::Uuid::from_u128(1)),
+            accepted_at: 123,
+            required_deliveries: 1,
+            best_effort_deliveries: 0,
+        };
+        let ack = tcp_ack::encode(&receipt).unwrap();
+        // DeviceCodec::encode may legally return these exact vendor bytes.
+        let command = LengthPrefixFramer { maximum: 65536 }
+            .encode(&ack[4..])
+            .unwrap();
+        assert_eq!(&command[4..], &ack[4..]);
+        assert!(tcp_ack::decode(&command[4..]).is_ok());
+        assert_ne!(&command[..4], &ack[..4]);
+    }
+    #[test]
     fn split_multiple_and_invalid() {
         let f = LengthPrefixFramer { maximum: 16 };
         let wire = f.encode(b"test").unwrap();
@@ -202,5 +221,19 @@ mod tests {
                 .len(),
             16
         );
+    }
+
+    #[test]
+    fn control_headers_are_invalid_uplinks_even_with_a_large_limit() {
+        let framer = LengthPrefixFramer {
+            maximum: usize::MAX,
+        };
+        for raw in [0x8000002au32, 0x80000000, 0xffffffff] {
+            let header = raw.to_be_bytes();
+            assert!(framer.read_target(&header).is_err());
+            let mut input = BytesMut::from(header.as_slice());
+            assert!(framer.decode(&mut input).is_err());
+            assert_eq!(&input[..], &header);
+        }
     }
 }
