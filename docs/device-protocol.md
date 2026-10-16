@@ -59,10 +59,44 @@ Every frame is `u32` big-endian payload length followed by payload. Length must 
 ```
 
 The server returns a framed `{"authenticated":true}`. Subsequent frames carry uplinks in the authenticated codec. Server frames contain
-JSON acceptance receipts or `DeviceCommand` encoded in that same codec. A command
+binary EventAccepted ACK v1 or `DeviceCommand` encoded in that same codec. A command
 has command_id, device, expires_at, and payload `{name,arguments}`. Execution ACKs
 use the shared codec. Partial frames survive fragmented reads; EOF closes and drops
 connection-owned resources. Vendor framing can implement `TcpFramer` separately.
+
+### Binary EventAccepted ACK v1 (breaking change)
+
+**TCP JSON acceptance receipts have been removed. Upgrade TCP device clients together
+with the gateway. There is no negotiation, JSON fallback or dual-format mode.**
+The JSON authentication request/result, uplink codecs, command codecs, MQTT and UDP
+are unchanged. ACK version `1` is independent of crate SemVer, device codec version
+and the Business RPC wire version.
+
+The ACK body is exactly **42 bytes**; the complete frame is **46 bytes**, including
+the prefix `00 00 00 2a`. All integers are big-endian. Offsets below exclude the prefix.
+
+| Body offset | Field | Bytes | Encoding |
+|---:|---|---:|---|
+| 0 | Version | 1 | `0x01` |
+| 1 | Type | 1 | `0x01` = EventAccepted |
+| 2 | Event ID | 16 | Raw UUID bytes in canonical UUID byte order (no text) |
+| 18 | Accepted At | 8 | Signed i64, Unix milliseconds, two's complement |
+| 26 | Required Deliveries | 8 | Unsigned u64 |
+| 34 | Best Effort Deliveries | 8 | Unsigned u64 |
+
+This control ACK is independent of `DeviceCodec`. Clients must validate the length,
+version and type, buffer split reads and handle coalesced frames; command frames
+retain their bound codec. Rust clients can use `netbaiot_protocol::tcp_ack::decode`
+on the body; `encode` produces the complete stack-allocated frame. Counts that
+cannot fit the Rust client's `usize` are rejected, never truncated.
+
+ACKs correspond to successful uplinks in connection order and contain the exact
+EventBus receipt values. An ACK is written only after authentication/authorization,
+codec validation, route selection, count/byte admission, atomic required-sink capacity
+reservation and enqueue. It does not imply sink ACK, business persistence, processing
+or device execution. Failed ingress retains the existing connection-error behavior
+and sends no success ACK. The existing sequential write, timeout, resource limits
+and lifecycle apply; a failed socket write does not undo an already accepted event.
 
 ## UDP v1.1 signed reliable uplink
 

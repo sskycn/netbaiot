@@ -20,12 +20,15 @@ import socket
 import statistics
 import struct
 import subprocess
+import sys
 import threading
 import time
 import urllib.request
 import uuid
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "examples"))
+from device_tcp import decode_ack
 spec = importlib.util.spec_from_file_location('vectors', ROOT / 'crates/netbaiot-codecs/tests/fixtures/generate.py')
 vectors = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(vectors)
@@ -284,8 +287,7 @@ def client(device, management_address, receiver, fmt, protocol, qos, version, wo
                     # Exercise split headers and payloads on every TCP frame.
                     data = frame(payload)
                     sock.sendall(data[:3]); sock.sendall(data[3:])
-                    reply = json.loads(tcp_read(sock))
-                    assert 'event_id' in reply and 'accepted_at' in reply, reply
+                    decode_ack(tcp_read(sock))
                     transport.append(time.perf_counter()-at)
                 with receiver.condition:
                     if not receiver.condition.wait_for(lambda: receiver.pending[source][1] is not None, timeout=3):

@@ -750,10 +750,11 @@ async fn event_load(
                     socket = reconnected;
                     continue;
                 }
-                let Ok(command) = serde_json::from_slice::<DeviceCommand>(&body) else {
-                    // A TCP EventAccepted receipt may follow an application ACK.
+                if body.first() == Some(&netbaiot_core::tcp_ack::VERSION) {
+                    netbaiot_core::tcp_ack::decode(&body)?;
                     continue;
-                };
+                }
+                let command: DeviceCommand = serde_json::from_slice(&body)?;
                 {
                     let mut state = worker_stats.lock().unwrap();
                     state.counts.command_device_deliveries += 1;

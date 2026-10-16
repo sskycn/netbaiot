@@ -14,7 +14,7 @@
 
 控制平面快照和变更共用一把串行化锁。因此每次被接受的变更都会观察最新的已提交状态，并确定性地推进 revision 语义，不会与缓存失效或快照替换操作发生竞态。
 
-设备 JSON v1 对应 `DeviceUplink`。稳定字段包括 `schema_version`、`source_message_id`、可选的 `occurred_at`、`kind` 和 `data`。MQTT QoS1 PUBACK、TCP acceptance 和签名 UDP NBA1都只代表达到 `EventAccepted`。
+设备 JSON v1 对应 `DeviceUplink`。稳定字段包括 `schema_version`、`source_message_id`、可选的 `occurred_at`、`kind` 和 `data`。原生 TCP 使用[二进制 EventAccepted ACK v1](device-protocol.zh-CN.md)，正文 42 字节、完整帧 46 字节；已移除 JSON 接纳回执兼容，客户端需同步升级。MQTT QoS1 PUBACK、TCP acceptance 和签名 UDP NBA1都只代表达到 `EventAccepted`。
 
 本次 0.x 清理是有意的 source/control API 破坏性变更：删除 `TransportKind::Http` 和
 `ConnectionCounts.http`，传输字符串只剩 `mqtt`、`tcp`、`udp`；status 只输出这三项，

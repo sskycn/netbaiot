@@ -251,3 +251,26 @@ See [capacity and stability testing](../../docs/production-readiness.zh-CN.md) f
 100/1000/5000/10000-device matrices, owned 6/24-hour runs, report definitions and
 unverified production coverage. Use a fresh output directory and preserve failed
 results. Existing test fixtures are for loopback testing only.
+
+## Native TCP binary ACK comparison
+
+The native TCP listener now sends only the fixed binary EventAccepted ACK v1
+(42-byte body, 46-byte complete frame); authentication JSON and command codecs
+are unchanged. Use the current loadgen and `examples/device_tcp.py` with the new
+server. `device_protocol_benchmark.py --candidate-loadgen PATH` selects a matching
+binary client only for candidate plans, so a frozen JSON baseline can still be
+measured with its frozen client. This is benchmark orchestration, not runtime
+protocol negotiation or JSON compatibility.
+
+`tcp_ack_summary.py INPUT OUTPUT` reports receipt throughput/P99, process CPU per
+EventAccepted using matched sampling endpoints, peak RSS, offered/attempted ACK
+rates, unconfirmed work and cleanup. All-zero macOS TCP kernel counters are marked
+unusable; they do not establish zero packet loss. The encoding allocation comparison
+uses the existing test allocator and runs separately:
+
+```bash
+cargo test --release -p netbaiot-runtime tcp_ack_encoding -- --ignored --nocapture --test-threads=1
+```
+
+See [the measured comparison](../../docs/performance/tcp-ack-20261016/README.md)
+for executable hashes, plans, limitations and the breaking wire migration.

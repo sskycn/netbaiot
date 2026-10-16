@@ -164,8 +164,9 @@ pub async fn connection(
                     transport: Transport::Tcp, payload: &frame, require_command_ack: false,
                     validated_at: std::time::Instant::now(), validation_us: 0,
                 }).await?;
-                let bytes = serde_json::to_vec(&acceptance.receipt).map_err(|_| Error::Internal)?;
-                write(&mut stream, &framer.encode(&bytes)?, l.write_timeout_ms).await?;
+                if tcp_ack::BODY_LEN > framer.maximum { return Err(Error::Invalid); }
+                let ack = tcp_ack::encode(&acceptance.receipt).map_err(|_| Error::Internal)?;
+                write(&mut stream, &ack, l.write_timeout_ms).await?;
             }
         }
     }

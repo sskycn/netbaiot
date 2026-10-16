@@ -5,6 +5,7 @@ import argparse
 import json
 import socket
 import struct
+import uuid
 
 
 def send_frame(sock, value):
@@ -28,6 +29,23 @@ def recv_frame(sock):
     if length == 0 or length > 65_536:
         raise ValueError(f"invalid frame length {length}")
     return json.loads(recv_exact(sock, length))
+
+
+def decode_ack(body):
+    """Decode the independent 42-byte binary EventAccepted ACK v1 body."""
+    if len(body) != 42:
+        raise ValueError("EventAccepted ACK body must be exactly 42 bytes")
+    version, kind, event, accepted_at, required, best_effort = struct.unpack("!BB16sqQQ", body)
+    if (version, kind) != (1, 1):
+        raise ValueError("unsupported EventAccepted ACK version/type")
+    return dict(event_id=str(uuid.UUID(bytes=event)), accepted_at=accepted_at,
+                required_deliveries=required, best_effort_deliveries=best_effort)
+
+
+def recv_ack(sock):
+    if struct.unpack("!I", recv_exact(sock, 4))[0] != 42:
+        raise ValueError("EventAccepted ACK body must be exactly 42 bytes")
+    return decode_ack(recv_exact(sock, 42))
 
 
 def main():
@@ -54,7 +72,7 @@ def main():
                 "data": {"sequence": 1},
             },
         )
-        print("acceptance:", recv_frame(sock))
+        print("acceptance:", recv_ack(sock))
         if args.wait_command:
             sock.settimeout(60)
             print("command:", recv_frame(sock))

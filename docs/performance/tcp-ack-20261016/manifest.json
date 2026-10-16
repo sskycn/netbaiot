@@ -1,0 +1,717 @@
+{
+  "baseline_revision": "0454c76613851a5f1ac4f3e4ffaba30d4e6787ee",
+  "production_baseline": "a2b46a2ad49a43ee538a6de74afddac350763c23",
+  "compiler": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+  "build": "cargo build --release --locked -p netbaiot-server -p netbaiot-loadgen",
+  "binaries": {
+    "server-before": "05a65985e699444393ad4759d0ddd0b6eae3da4c9b10f5877b897bf25bce4f76",
+    "loadgen-before": "77b8c675a46adcbab7327d0a83b6a79937cbe0e9e222faa2fe92033d50545001",
+    "server-after": "2a08aa7bc9d64e4637b7a66a092cdc33f4ce0341015ddb42c4e4dd997ae89c76",
+    "loadgen-after": "61c72ae2ae2f24e1200803ef0dd66807c68cd8d5a8b3789f1bb1d033cbbd74e3"
+  },
+  "protocol": {
+    "version": 1,
+    "type": 1,
+    "body_bytes": 42,
+    "frame_bytes": 46
+  },
+  "methodology": {
+    "path": "same-host macOS ARM64 loopback",
+    "server_workers": 10,
+    "loadgen_workers": 4,
+    "payload_bytes": 256,
+    "required_sink": "Immediate AuditSink",
+    "cpu_event": "Process CPU delta / server EventAccepted delta using the same two sampling endpoints",
+    "clients": "Frozen JSON client for baseline, strict binary client for candidate",
+    "stability": "ACK/attempted >= 99.9%, ACK/offered >= 99.5%, no receipt timeout/protocol error, P99 <= 20ms, graceful shutdown and empty event/delivery queues after cooldown"
+  },
+  "source_files": {
+    "crates/netbaiot-protocol/src/lib.rs": "b7aae942823791de4ed34cc9bf1b0b22478055dc1738711ff4d7e227ec242d93",
+    "crates/netbaiot-protocol/src/tcp_ack.rs": "c4a7e4f8078a004444ce5b334e57c70b63ae3f3841a0626bab3af27b9365d666",
+    "crates/netbaiot-transports/src/tcp.rs": "70ba959de2e0eb25abb7ca4b6f25d273758f257b58d8909ba1c46724bd733099",
+    "tools/netbaiot-loadgen/src/mixed.rs": "3416207634f3779e350837f60e4b9042e00c3b684757272785040ce293051b01",
+    "tools/netbaiot-loadgen/src/main.rs": "e2ef700c9cfe41c10b8d57fdce262f56fe1544a35359f71732b536c10a22b0d7",
+    "tools/netbaiot-loadgen/src/bin/business_rpc.rs": "6f8f40bbc7550612f934a7b81d568aa4f8ea0fc0673e43005cee6f1fdd055be9",
+    "scripts/perf/device_protocol_benchmark.py": "46565d05097dd10748e3f99b2e8bdc3567d91a98bb877f07d8fafbe6dd12f2bc",
+    "scripts/perf/tcp_ack_summary.py": "a7792f9721146b2b33bf19669e47c472e4c9620d2728b88a64661cb7d91c3e9a"
+  },
+  "plans": {
+    "steps-plan.json": [
+      {
+        "name": "tcp-ack-step-10000",
+        "variant": "before",
+        "seconds": 20,
+        "warmup": 3,
+        "ramp": 1,
+        "tls": false,
+        "host_cpu_sample": false,
+        "lock_metrics": false,
+        "groups": [
+          {
+            "label": "tcp",
+            "protocol": "tcp",
+            "rate": 10000,
+            "workers": 32,
+            "offset": 256,
+            "window": 128
+          }
+        ]
+      },
+      {
+        "name": "tcp-ack-step-10000",
+        "variant": "candidate",
+        "seconds": 20,
+        "warmup": 3,
+        "ramp": 1,
+        "tls": false,
+        "host_cpu_sample": false,
+        "lock_metrics": false,
+        "groups": [
+          {
+            "label": "tcp",
+            "protocol": "tcp",
+            "rate": 10000,
+            "workers": 32,
+            "offset": 256,
+            "window": 128
+          }
+        ]
+      },
+      {
+        "name": "tcp-ack-step-30000",
+        "variant": "before",
+        "seconds": 20,
+        "warmup": 3,
+        "ramp": 1,
+        "tls": false,
+        "host_cpu_sample": false,
+        "lock_metrics": false,
+        "groups": [
+          {
+            "label": "tcp",
+            "protocol": "tcp",
+            "rate": 30000,
+            "workers": 32,
+            "offset": 256,
+            "window": 128
+          }
+        ]
+      },
+      {
+        "name": "tcp-ack-step-30000",
+        "variant": "candidate",
+        "seconds": 20,
+        "warmup": 3,
+        "ramp": 1,
+        "tls": false,
+        "host_cpu_sample": false,
+        "lock_metrics": false,
+        "groups": [
+          {
+            "label": "tcp",
+            "protocol": "tcp",
+            "rate": 30000,
+            "workers": 32,
+            "offset": 256,
+            "window": 128
+          }
+        ]
+      },
+      {
+        "name": "tcp-ack-step-60000",
+        "variant": "before",
+        "seconds": 20,
+        "warmup": 3,
+        "ramp": 1,
+        "tls": false,
+        "host_cpu_sample": false,
+        "lock_metrics": false,
+        "groups": [
+          {
+            "label": "tcp",
+            "protocol": "tcp",
+            "rate": 60000,
+            "workers": 32,
+            "offset": 256,
+            "window": 128
+          }
+        ]
+      },
+      {
+        "name": "tcp-ack-step-60000",
+        "variant": "candidate",
+        "seconds": 20,
+        "warmup": 3,
+        "ramp": 1,
+        "tls": false,
+        "host_cpu_sample": false,
+        "lock_metrics": false,
+        "groups": [
+          {
+            "label": "tcp",
+            "protocol": "tcp",
+            "rate": 60000,
+            "workers": 32,
+            "offset": 256,
+            "window": 128
+          }
+        ]
+      },
+      {
+        "name": "tcp-ack-step-90000",
+        "variant": "before",
+        "seconds": 20,
+        "warmup": 3,
+        "ramp": 1,
+        "tls": false,
+        "host_cpu_sample": false,
+        "lock_metrics": false,
+        "groups": [
+          {
+            "label": "tcp",
+            "protocol": "tcp",
+            "rate": 90000,
+            "workers": 32,
+            "offset": 256,
+            "window": 128
+          }
+        ]
+      },
+      {
+        "name": "tcp-ack-step-90000",
+        "variant": "candidate",
+        "seconds": 20,
+        "warmup": 3,
+        "ramp": 1,
+        "tls": false,
+        "host_cpu_sample": false,
+        "lock_metrics": false,
+        "groups": [
+          {
+            "label": "tcp",
+            "protocol": "tcp",
+            "rate": 90000,
+            "workers": 32,
+            "offset": 256,
+            "window": 128
+          }
+        ]
+      }
+    ],
+    "repeated-plan.json": [
+      {
+        "name": "tcp-ack-repeat-0",
+        "variant": "before",
+        "seconds": 60,
+        "warmup": 5,
+        "ramp": 1,
+        "tls": false,
+        "host_cpu_sample": false,
+        "lock_metrics": false,
+        "groups": [
+          {
+            "label": "tcp",
+            "protocol": "tcp",
+            "rate": 140000,
+            "workers": 8,
+            "offset": 256,
+            "window": 128
+          }
+        ]
+      },
+      {
+        "name": "tcp-ack-repeat-0",
+        "variant": "candidate",
+        "seconds": 60,
+        "warmup": 5,
+        "ramp": 1,
+        "tls": false,
+        "host_cpu_sample": false,
+        "lock_metrics": false,
+        "groups": [
+          {
+            "label": "tcp",
+            "protocol": "tcp",
+            "rate": 140000,
+            "workers": 8,
+            "offset": 256,
+            "window": 128
+          }
+        ]
+      },
+      {
+        "name": "tcp-ack-repeat-1",
+        "variant": "candidate",
+        "seconds": 60,
+        "warmup": 5,
+        "ramp": 1,
+        "tls": false,
+        "host_cpu_sample": false,
+        "lock_metrics": false,
+        "groups": [
+          {
+            "label": "tcp",
+            "protocol": "tcp",
+            "rate": 140000,
+            "workers": 8,
+            "offset": 256,
+            "window": 128
+          }
+        ]
+      },
+      {
+        "name": "tcp-ack-repeat-1",
+        "variant": "before",
+        "seconds": 60,
+        "warmup": 5,
+        "ramp": 1,
+        "tls": false,
+        "host_cpu_sample": false,
+        "lock_metrics": false,
+        "groups": [
+          {
+            "label": "tcp",
+            "protocol": "tcp",
+            "rate": 140000,
+            "workers": 8,
+            "offset": 256,
+            "window": 128
+          }
+        ]
+      },
+      {
+        "name": "tcp-ack-repeat-2",
+        "variant": "before",
+        "seconds": 60,
+        "warmup": 5,
+        "ramp": 1,
+        "tls": false,
+        "host_cpu_sample": false,
+        "lock_metrics": false,
+        "groups": [
+          {
+            "label": "tcp",
+            "protocol": "tcp",
+            "rate": 140000,
+            "workers": 8,
+            "offset": 256,
+            "window": 128
+          }
+        ]
+      },
+      {
+        "name": "tcp-ack-repeat-2",
+        "variant": "candidate",
+        "seconds": 60,
+        "warmup": 5,
+        "ramp": 1,
+        "tls": false,
+        "host_cpu_sample": false,
+        "lock_metrics": false,
+        "groups": [
+          {
+            "label": "tcp",
+            "protocol": "tcp",
+            "rate": 140000,
+            "workers": 8,
+            "offset": 256,
+            "window": 128
+          }
+        ]
+      }
+    ],
+    "upper-plan.json": [
+      {
+        "name": "tcp-ack-upper-140000",
+        "variant": "before",
+        "seconds": 20,
+        "warmup": 3,
+        "ramp": 1,
+        "tls": false,
+        "host_cpu_sample": false,
+        "lock_metrics": false,
+        "groups": [
+          {
+            "label": "tcp",
+            "protocol": "tcp",
+            "rate": 140000,
+            "workers": 8,
+            "offset": 256,
+            "window": 128
+          }
+        ]
+      },
+      {
+        "name": "tcp-ack-upper-140000",
+        "variant": "candidate",
+        "seconds": 20,
+        "warmup": 3,
+        "ramp": 1,
+        "tls": false,
+        "host_cpu_sample": false,
+        "lock_metrics": false,
+        "groups": [
+          {
+            "label": "tcp",
+            "protocol": "tcp",
+            "rate": 140000,
+            "workers": 8,
+            "offset": 256,
+            "window": 128
+          }
+        ]
+      },
+      {
+        "name": "tcp-ack-upper-180000",
+        "variant": "before",
+        "seconds": 20,
+        "warmup": 3,
+        "ramp": 1,
+        "tls": false,
+        "host_cpu_sample": false,
+        "lock_metrics": false,
+        "groups": [
+          {
+            "label": "tcp",
+            "protocol": "tcp",
+            "rate": 180000,
+            "workers": 8,
+            "offset": 256,
+            "window": 128
+          }
+        ]
+      },
+      {
+        "name": "tcp-ack-upper-180000",
+        "variant": "candidate",
+        "seconds": 20,
+        "warmup": 3,
+        "ramp": 1,
+        "tls": false,
+        "host_cpu_sample": false,
+        "lock_metrics": false,
+        "groups": [
+          {
+            "label": "tcp",
+            "protocol": "tcp",
+            "rate": 180000,
+            "workers": 8,
+            "offset": 256,
+            "window": 128
+          }
+        ]
+      }
+    ],
+    "eight-plan.json": [
+      {
+        "name": "tcp-ack-eight-20000",
+        "variant": "candidate",
+        "seconds": 20,
+        "warmup": 3,
+        "ramp": 1,
+        "tls": false,
+        "host_cpu_sample": false,
+        "lock_metrics": false,
+        "groups": [
+          {
+            "label": "tcp",
+            "protocol": "tcp",
+            "rate": 20000,
+            "workers": 8,
+            "offset": 256,
+            "window": 128
+          }
+        ]
+      },
+      {
+        "name": "tcp-ack-eight-20000",
+        "variant": "before",
+        "seconds": 20,
+        "warmup": 3,
+        "ramp": 1,
+        "tls": false,
+        "host_cpu_sample": false,
+        "lock_metrics": false,
+        "groups": [
+          {
+            "label": "tcp",
+            "protocol": "tcp",
+            "rate": 20000,
+            "workers": 8,
+            "offset": 256,
+            "window": 128
+          }
+        ]
+      },
+      {
+        "name": "tcp-ack-eight-50000",
+        "variant": "candidate",
+        "seconds": 20,
+        "warmup": 3,
+        "ramp": 1,
+        "tls": false,
+        "host_cpu_sample": false,
+        "lock_metrics": false,
+        "groups": [
+          {
+            "label": "tcp",
+            "protocol": "tcp",
+            "rate": 50000,
+            "workers": 8,
+            "offset": 256,
+            "window": 128
+          }
+        ]
+      },
+      {
+        "name": "tcp-ack-eight-50000",
+        "variant": "before",
+        "seconds": 20,
+        "warmup": 3,
+        "ramp": 1,
+        "tls": false,
+        "host_cpu_sample": false,
+        "lock_metrics": false,
+        "groups": [
+          {
+            "label": "tcp",
+            "protocol": "tcp",
+            "rate": 50000,
+            "workers": 8,
+            "offset": 256,
+            "window": 128
+          }
+        ]
+      },
+      {
+        "name": "tcp-ack-eight-80000",
+        "variant": "candidate",
+        "seconds": 20,
+        "warmup": 3,
+        "ramp": 1,
+        "tls": false,
+        "host_cpu_sample": false,
+        "lock_metrics": false,
+        "groups": [
+          {
+            "label": "tcp",
+            "protocol": "tcp",
+            "rate": 80000,
+            "workers": 8,
+            "offset": 256,
+            "window": 128
+          }
+        ]
+      },
+      {
+        "name": "tcp-ack-eight-80000",
+        "variant": "before",
+        "seconds": 20,
+        "warmup": 3,
+        "ramp": 1,
+        "tls": false,
+        "host_cpu_sample": false,
+        "lock_metrics": false,
+        "groups": [
+          {
+            "label": "tcp",
+            "protocol": "tcp",
+            "rate": 80000,
+            "workers": 8,
+            "offset": 256,
+            "window": 128
+          }
+        ]
+      },
+      {
+        "name": "tcp-ack-eight-110000",
+        "variant": "candidate",
+        "seconds": 20,
+        "warmup": 3,
+        "ramp": 1,
+        "tls": false,
+        "host_cpu_sample": false,
+        "lock_metrics": false,
+        "groups": [
+          {
+            "label": "tcp",
+            "protocol": "tcp",
+            "rate": 110000,
+            "workers": 8,
+            "offset": 256,
+            "window": 128
+          }
+        ]
+      },
+      {
+        "name": "tcp-ack-eight-110000",
+        "variant": "before",
+        "seconds": 20,
+        "warmup": 3,
+        "ramp": 1,
+        "tls": false,
+        "host_cpu_sample": false,
+        "lock_metrics": false,
+        "groups": [
+          {
+            "label": "tcp",
+            "protocol": "tcp",
+            "rate": 110000,
+            "workers": 8,
+            "offset": 256,
+            "window": 128
+          }
+        ]
+      }
+    ],
+    "steady-plan.json": [
+      {
+        "name": "tcp-ack-steady-0",
+        "variant": "candidate",
+        "seconds": 30,
+        "warmup": 3,
+        "ramp": 1,
+        "tls": false,
+        "host_cpu_sample": false,
+        "lock_metrics": false,
+        "production_revision": "0454c76+tcp-binary-ack-working-tree",
+        "groups": [
+          {
+            "label": "tcp",
+            "protocol": "tcp",
+            "rate": 110000,
+            "workers": 8,
+            "offset": 256,
+            "window": 128
+          }
+        ]
+      },
+      {
+        "name": "tcp-ack-steady-0",
+        "variant": "before",
+        "seconds": 30,
+        "warmup": 3,
+        "ramp": 1,
+        "tls": false,
+        "host_cpu_sample": false,
+        "lock_metrics": false,
+        "production_revision": "0454c76",
+        "groups": [
+          {
+            "label": "tcp",
+            "protocol": "tcp",
+            "rate": 110000,
+            "workers": 8,
+            "offset": 256,
+            "window": 128
+          }
+        ]
+      },
+      {
+        "name": "tcp-ack-steady-1",
+        "variant": "before",
+        "seconds": 30,
+        "warmup": 3,
+        "ramp": 1,
+        "tls": false,
+        "host_cpu_sample": false,
+        "lock_metrics": false,
+        "production_revision": "0454c76",
+        "groups": [
+          {
+            "label": "tcp",
+            "protocol": "tcp",
+            "rate": 110000,
+            "workers": 8,
+            "offset": 256,
+            "window": 128
+          }
+        ]
+      },
+      {
+        "name": "tcp-ack-steady-1",
+        "variant": "candidate",
+        "seconds": 30,
+        "warmup": 3,
+        "ramp": 1,
+        "tls": false,
+        "host_cpu_sample": false,
+        "lock_metrics": false,
+        "production_revision": "0454c76+tcp-binary-ack-working-tree",
+        "groups": [
+          {
+            "label": "tcp",
+            "protocol": "tcp",
+            "rate": 110000,
+            "workers": 8,
+            "offset": 256,
+            "window": 128
+          }
+        ]
+      },
+      {
+        "name": "tcp-ack-steady-2",
+        "variant": "candidate",
+        "seconds": 30,
+        "warmup": 3,
+        "ramp": 1,
+        "tls": false,
+        "host_cpu_sample": false,
+        "lock_metrics": false,
+        "production_revision": "0454c76+tcp-binary-ack-working-tree",
+        "groups": [
+          {
+            "label": "tcp",
+            "protocol": "tcp",
+            "rate": 110000,
+            "workers": 8,
+            "offset": 256,
+            "window": 128
+          }
+        ]
+      },
+      {
+        "name": "tcp-ack-steady-2",
+        "variant": "before",
+        "seconds": 30,
+        "warmup": 3,
+        "ramp": 1,
+        "tls": false,
+        "host_cpu_sample": false,
+        "lock_metrics": false,
+        "production_revision": "0454c76",
+        "groups": [
+          {
+            "label": "tcp",
+            "protocol": "tcp",
+            "rate": 110000,
+            "workers": 8,
+            "offset": 256,
+            "window": 128
+          }
+        ]
+      }
+    ]
+  },
+  "candidate_source": "Uncommitted TCP binary ACK changes on 0454c76; see source_files hashes, not a clean baseline checkout.",
+  "raw_metadata_correction": "Earlier raw harness production_revision defaults to --baseline for both variants: candidate records still say 0454c76. Actual code is identified by executable SHA256 and source_files here; raw records are preserved. The final 110k plan explicitly labels candidate as the working tree.",
+  "benchmark_limit_overrides": {
+    "max_connections_per_ip": 256,
+    "max_connections_per_tenant": 256,
+    "max_devices": 4096,
+    "max_devices_per_tenant": 4096,
+    "auth_cache_max_entries": 4096,
+    "auth_cache_max_bytes": 8388608,
+    "requests_per_second": 2000000,
+    "requests_per_ip_second": 2000000,
+    "messages_per_device_second": 2000000,
+    "messages_per_tenant_second": 2000000
+  },
+  "unchanged_admission_limits": {
+    "max_ingress": 16,
+    "max_ingress_per_tenant": 4,
+    "max_ingress_per_device": 1,
+    "max_ingress_waiters": 16,
+    "ingress_wait_timeout_ms": 25
+  }
+}

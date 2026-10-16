@@ -1,6 +1,10 @@
 #![no_main]
 use libfuzzer_sys::fuzz_target;
 fuzz_target!(|data: &[u8]| {
+    if let Ok(receipt) = netbaiot_core::tcp_ack::decode(data) {
+        let encoded = netbaiot_core::tcp_ack::encode(&receipt).unwrap();
+        assert_eq!(&encoded[4..], data);
+    }
     if data.len()>65540 { return; }
     use netbaiot_transports::tcp::TcpFramer;
     let framer=netbaiot_transports::tcp::LengthPrefixFramer{maximum:65536};

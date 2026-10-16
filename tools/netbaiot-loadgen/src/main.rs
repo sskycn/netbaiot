@@ -878,11 +878,10 @@ async fn mqtt_or_tcp(
                 } else {
                     &b
                 };
-                let v: Value = serde_json::from_slice(payload)?;
-                if !mqtt && v.get("event_id").is_some() {
+                if !mqtt && payload.first() == Some(&netbaiot_core::tcp_ack::VERSION) {
                     // The fixed TCP EventAccepted receipt has no source_message_id.
                     // Frames and their receipts are ordered on this connection.
-                    let _: netbaiot_core::EventAccepted = serde_json::from_slice(payload)?;
+                    netbaiot_core::tcp_ack::decode(payload)?;
                     let source = pending
                         .iter()
                         .min_by_key(|(_, p)| p.at)
@@ -907,6 +906,10 @@ async fn mqtt_or_tcp(
                         return Err("unexpected TCP acceptance receipt".into());
                     }
                     continue;
+                }
+                let v: Value = serde_json::from_slice(payload)?;
+                if !mqtt && v.get("command_id").is_none() {
+                    return Err("expected TCP command or binary acceptance ACK".into());
                 }
                 if let Some(source) = v["source_message_id"].as_str() {
                     if let Some(p) = pending.remove(source) {

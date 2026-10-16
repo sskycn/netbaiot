@@ -1586,8 +1586,10 @@ async fn active_tcp_connection_reuses_bound_auth_context_for_frames() {
             .unwrap();
         stream.write_all(&body).await.unwrap();
         stream.read_exact(&mut length).await.unwrap();
-        let mut receipt = vec![0; u32::from_be_bytes(length) as usize];
+        assert_eq!(u32::from_be_bytes(length), 42);
+        let mut receipt = [0; tcp_ack::BODY_LEN];
         stream.read_exact(&mut receipt).await.unwrap();
+        assert_eq!(tcp_ack::decode(&receipt).unwrap().required_deliveries, 1);
     }
     assert_eq!(provider.calls.load(Ordering::Relaxed), 1);
     stop.cancel();
@@ -1659,13 +1661,18 @@ async fn delayed_authentication_preserves_a_full_pipelined_maximum_tcp_frame() {
     pipeline.extend_from_slice(&body);
     stream.write_all(&pipeline).await.unwrap();
     let result = tokio::time::timeout(std::time::Duration::from_secs(2), async {
-        for _ in 0..2 {
+        for index in 0..2 {
             let mut length = [0; 4];
             stream.read_exact(&mut length).await?;
             let size = u32::from_be_bytes(length) as usize;
             assert!(size <= 1024);
             let mut reply = vec![0; size];
             stream.read_exact(&mut reply).await?;
+            if index == 0 {
+                assert_eq!(reply, br#"{"authenticated":true}"#);
+            } else {
+                assert_eq!(tcp_ack::decode(&reply).unwrap().required_deliveries, 1);
+            }
         }
         std::io::Result::Ok(())
     })
@@ -2093,4 +2100,176 @@ async fn command_dedup_tracks_sent_receipts_and_fences_evicted_dispatch_updates(
     );
     assert!(receiver.try_recv().is_err());
     ingress.events.stop_workers().await.unwrap();
+}
+
+struct TcpReceiptSink {
+    events: std::sync::Mutex<Vec<Arc<DeviceEvent>>>,
+    hold: bool,
+}
+#[async_trait]
+impl EventSink for TcpReceiptSink {
+    async fn deliver(&self, delivery: DeliveryEnvelope) -> std::result::Result<SinkAck, SinkError> {
+        self.events.lock().unwrap().push(delivery.event.clone());
+        if self.hold {
+            std::future::pending::<()>().await;
+        }
+        Ok(SinkAck)
+    }
+}
+
+#[tokio::test]
+async fn tcp_binary_receipts_preserve_pipeline_order_and_reject_without_ack() {
+    use netbaiot_transports::tcp::{LengthPrefixFramer, TcpFramer};
+    for overload in [false, true] {
+        let provider = Arc::new(CountingProvider {
+            calls: AtomicUsize::new(0),
+            auth: auth(),
+            delay: false,
+        });
+        let sink = Arc::new(TcpReceiptSink {
+            events: Default::default(),
+            hold: overload,
+        });
+        let limits = Limits {
+            global_event_max_count: if overload { 1 } else { 64 },
+            ..Limits::default()
+        };
+        let (ingress, services, stop) = runtime_with_sink(limits, provider.clone(), sink.clone());
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let task = tokio::spawn(serve_stream(
+            listener,
+            Transport::Tcp,
+            services,
+            None,
+            stop.clone(),
+        ));
+        let mut stream = TcpStream::connect(address).await.unwrap();
+        let framer = LengthPrefixFramer { maximum: 65536 };
+        let mut pipeline = framer
+            .encode(br#"{"credential_id":"a","secret":"secret"}"#)
+            .unwrap();
+        let count = if overload { 1 } else { 8 };
+        for sequence in 0..count {
+            pipeline.extend(framer.encode(&payload(sequence)).unwrap());
+        }
+        // The next frame fails either resource admission or codec validation.
+        pipeline.extend(
+            framer
+                .encode(&if overload {
+                    payload(count)
+                } else {
+                    b"invalid".to_vec()
+                })
+                .unwrap(),
+        );
+        for chunk in pipeline.chunks(7) {
+            stream.write_all(chunk).await.unwrap();
+        }
+        tokio::time::timeout(std::time::Duration::from_secs(5), async {
+            let mut hello = [0; 26];
+            stream.read_exact(&mut hello).await.unwrap();
+            assert_eq!(&hello[..4], &22u32.to_be_bytes());
+            assert_eq!(&hello[4..], br#"{"authenticated":true}"#);
+            let mut ids = Vec::new();
+            for _ in 0..count {
+                // A client must tolerate split ACK reads independently of server writes.
+                let mut frame = [0; tcp_ack::FRAME_LEN];
+                for part in frame.chunks_mut(3) {
+                    stream.read_exact(part).await.unwrap();
+                }
+                assert_eq!(&frame[..4], &42u32.to_be_bytes());
+                let receipt = tcp_ack::decode(&frame[4..]).unwrap();
+                assert_eq!(receipt.required_deliveries, 1);
+                assert_eq!(receipt.best_effort_deliveries, 0);
+                ids.push(receipt.event_id);
+            }
+            assert_eq!(stream.read(&mut [0; 1]).await.unwrap(), 0);
+            loop {
+                if sink.events.lock().unwrap().len() == count {
+                    break;
+                }
+                tokio::task::yield_now().await;
+            }
+            let events = sink.events.lock().unwrap();
+            for (sequence, id) in ids.into_iter().enumerate() {
+                let event = events.iter().find(|event| event.event_id == id).unwrap();
+                assert_eq!(event.source_message_id.as_str(), format!("s:{sequence}"));
+            }
+        })
+        .await
+        .unwrap();
+        assert_eq!(ingress.metrics.get(Metric::EventsAccepted), count as u64);
+        assert_eq!(provider.calls.load(Ordering::Relaxed), 1);
+        stop.cancel();
+        task.await.unwrap().unwrap();
+    }
+}
+
+#[tokio::test]
+async fn tcp_binary_ack_write_timeout_keeps_acceptance_and_bounds_read_ahead() {
+    use netbaiot_transports::tcp::{LengthPrefixFramer, TcpFramer};
+    let provider = Arc::new(CountingProvider {
+        calls: AtomicUsize::new(0),
+        auth: auth(),
+        delay: false,
+    });
+    let limits = Limits {
+        write_timeout_ms: 100,
+        ..Limits::default()
+    };
+    let (ingress, services, stop) = runtime(limits, provider);
+    let mut lease = services
+        .connections
+        .acquire("127.0.0.1".parse().unwrap(), Transport::Tcp)
+        .unwrap();
+    let tracking = lease.read_budget();
+    // Exactly one complete ACK plus a partial second ACK fits, after reading auth.
+    let (mut client, server) = tokio::io::duplex(64);
+    let task = tokio::spawn(netbaiot_transports::tcp::connection(
+        Box::new(server),
+        services.clone(),
+        lease,
+        stop.clone(),
+    ));
+    let framer = LengthPrefixFramer { maximum: 65536 };
+    client
+        .write_all(
+            &framer
+                .encode(br#"{"credential_id":"a","secret":"secret"}"#)
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let mut hello = [0; 26];
+    client.read_exact(&mut hello).await.unwrap();
+    assert_eq!(&hello[4..], br#"{"authenticated":true}"#);
+    let (mut reader, mut writer) = tokio::io::split(client);
+    let sending = tokio::spawn(async move {
+        for sequence in 0..3 {
+            writer
+                .write_all(&framer.encode(&payload(sequence)).unwrap())
+                .await?;
+        }
+        std::io::Result::Ok(())
+    });
+    let result = tokio::time::timeout(std::time::Duration::from_secs(5), task)
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(matches!(result, Err(Error::Timeout)));
+    let mut bytes = Vec::new();
+    reader.read_to_end(&mut bytes).await.unwrap();
+    assert_eq!(bytes.len(), 64);
+    assert_eq!(&bytes[..4], &42u32.to_be_bytes());
+    assert_eq!(
+        tcp_ack::decode(&bytes[4..46]).unwrap().required_deliveries,
+        1
+    );
+    assert_eq!(ingress.metrics.get(Metric::EventsAccepted), 2);
+    assert_eq!(services.connections.active().unwrap(), [0; 3]);
+    assert_eq!(tracking.capacity().unwrap(), 0);
+    // The blocked third uplink cannot be admitted after ACK writing times out.
+    let _ = sending.await.unwrap();
+    stop.cancel();
 }

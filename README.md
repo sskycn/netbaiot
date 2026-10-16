@@ -154,7 +154,7 @@ message storage. Those are not provided by this gateway.
 | Ingress | Current profile |
 | --- | --- |
 | MQTT | Embedded MQTT 3.1.1 and MQTT 5.0 broker; QoS 0/1/2, retained messages, Will, bounded persistent sessions, and exact/`+`/`#` subscriptions |
-| TCP | Length-prefixed generic frames and MQTT share the device TCP listener; non-loopback TCP requires TLS |
+| TCP | Length-prefixed generic frames with [binary EventAccepted ACK v1](docs/device-protocol.md#binary-eventaccepted-ack-v1-breaking-change) (46 bytes, replaces JSON receipts); TCP and MQTT share the device TCP listener; non-loopback TCP requires TLS |
 | UDP | NBI1 uplink with HMAC authentication, timestamp checks, replay protection, and signed NBA1 acceptance receipt; no encryption or downlink |
 | Business egress | Confirmed HTTP webhook or framed TCP/RPC consumer; independent bounded queues and ACK rules |
 

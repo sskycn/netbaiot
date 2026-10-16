@@ -1,6 +1,6 @@
 # 设备协议：netbaiot-json-v1
 
-本文保留 JSON V1 与 TCP/UDP 信封定义；认证也可选择 [CBOR、MessagePack、Protobuf V1](codecs.zh-CN.md)。TCP 首帧仍为 JSON 认证，后续上行与命令按绑定 Codec 编码，接纳回执保持 JSON。UDP 只改变 NBI1 内部 payload 的编码，签名范围与 NBA1 不变。
+本文保留 JSON V1 与 TCP/UDP 信封定义；认证也可选择 [CBOR、MessagePack、Protobuf V1](codecs.zh-CN.md)。TCP 首帧仍为 JSON 认证，后续上行与命令按绑定 Codec 编码，接纳回执使用独立的二进制 ACK v1。UDP 只改变 NBI1 内部 payload 的编码，签名范围与 NBA1 不变。
 
 ## Single Device Ingress（单设备入口）
 
@@ -45,7 +45,35 @@ Codec 默认限制：输入/编码后字节数 64 KiB、每次输出一条消息
 {"credential_id":"demo-device","secret":"<64-hex-character-key>"}
 ```
 
-服务端返回分帧的 `{"authenticated":true}`。后续帧是绑定 Codec 编码的上行消息。服务端帧包含 JSON 接纳回执或同一 Codec 编码的 `DeviceCommand`。命令包含 command_id、device、expires_at 和 `{name,arguments}` 载荷。执行 ACK 使用共享 codec。读取分片时会保留未收全的帧；EOF 会关闭连接并释放连接所属资源。厂商自有分帧格式可单独实现 `TcpFramer`。
+服务端返回分帧的 `{"authenticated":true}`。后续帧是绑定 Codec 编码的上行消息。服务端帧包含 二进制 EventAccepted ACK v1 或同一 Codec 编码的 `DeviceCommand`。命令包含 command_id、device、expires_at 和 `{name,arguments}` 载荷。执行 ACK 使用共享 codec。读取分片时会保留未收全的帧；EOF 会关闭连接并释放连接所属资源。厂商自有分帧格式可单独实现 `TcpFramer`。
+
+### 二进制 EventAccepted ACK v1（不向后兼容）
+
+**已移除 TCP JSON 接纳回执。设备客户端必须与网关同步升级，不提供格式协商、
+JSON 回退或双格式模式。** JSON 认证请求及认证结果、上行与命令 Codec、MQTT、UDP
+保持原状。ACK 版本独立于 crate SemVer、业务 Codec 及 Business RPC 版本。
+
+ACK 正文固定 **42 字节**，加上 `00 00 00 2a` 长度前缀，完整帧固定 **46 字节**。
+多字节整数均采用大端；下表偏移不包含长度前缀。
+
+| 正文偏移 | 字段 | 字节 | 编码 |
+|---:|---|---:|---|
+| 0 | Version | 1 | `0x01` |
+| 1 | Type | 1 | `0x01`，表示 EventAccepted |
+| 2 | Event ID | 16 | UUID 原始字节，采用 UUID 标准字节顺序，不编码为文本 |
+| 18 | Accepted At | 8 | 有符号 i64，Unix 毫秒，二进制补码 |
+| 26 | Required Deliveries | 8 | 无符号 u64 |
+| 34 | Best Effort Deliveries | 8 | 无符号 u64 |
+
+该控制 ACK 独立于 DeviceCodec。客户端必须校验长度、版本和类型，正确处理分片与粘包；
+命令帧继续使用绑定的 Codec。Rust 客户端可通过 `netbaiot_protocol::tcp_ack::decode`
+解析正文；`encode` 返回完整的栈上帧。计数超出当前 Rust 平台 `usize` 范围时拒绝而不截断。
+
+ACK 与连接上成功接纳的上行顺序一致，字段来自原始 EventBus receipt。只有完成认证、授权、
+Codec 验证、路由选择、数量/字节配额接纳，以及全部 required sink 原子预留与入队后才发送。
+ACK 不表示 sink ACK、业务落库/处理完成或设备执行。摄取失败保持原有连接错误处理，
+不发送成功 ACK；原有串行写入、超时、资源限制和连接生命周期保持不变。
+写 ACK 失败不会撤销已经接纳的事件。
 
 ## UDP v1.1 签名可靠上行
 

@@ -14,7 +14,7 @@ are in [device protocol](device-protocol.md).
 | --- | --- | --- |
 | MQTT 3.1.1 | QoS 0/1/2, CleanSession 0/1, persistent sessions, retained messages, Will, exact/`+`/`#` subscriptions, planned-restart recovery | Embedded broker; no WebSocket, shared subscriptions, MQTT-SN, bridge, `$SYS`, or clustering |
 | MQTT 5.0 | QoS 0/1/2, Clean Start, session/message expiry, Will Delay, Receive Maximum, Maximum Packet Size, No Local, Retain As Published, Retain Handling, bounded supported metadata | Topic Alias, Subscription Identifier, shared subscriptions, Enhanced Authentication, and WebSocket are not supported |
-| Framed TCP | Four-byte big-endian length followed by one bounded payload in the authenticated codec; first JSON frame authenticates the connection; uplinks and online command path | TCP is a byte stream and must be TLS protected off loopback; no HTTP device ingress |
+| Framed TCP | Four-byte big-endian length followed by one bounded payload in the authenticated codec; first JSON frame authenticates the connection; fixed binary EventAccepted ACK v1 (42-byte body, 46-byte frame; no JSON fallback); uplinks and online command path | TCP is a byte stream and must be TLS protected off loopback; no HTTP device ingress |
 | Authenticated UDP | NBI1 HMAC-SHA256 uplink; credential version, timestamp and replay checks; signed 64-byte NBA1 receipt after `EventAccepted` | Authenticated but not encrypted; no long-lived session, command downlink, or fragmentation |
 
 MQTT 3.1.1 and MQTT 5.0 run on the same device TCP listener. A version change

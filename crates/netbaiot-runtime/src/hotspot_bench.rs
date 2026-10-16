@@ -101,3 +101,39 @@ pub(crate) fn enable_clock(enabled: bool) {
 pub(crate) fn last_lock() -> (u128, u128) {
     LAST_LOCK_NS.get()
 }
+
+#[test]
+#[ignore = "isolated serial release TCP ACK encoding/allocation comparison"]
+fn tcp_ack_encoding() {
+    use netbaiot_core::{EventAccepted, EventId, tcp_ack};
+    let receipt = EventAccepted {
+        event_id: EventId::generate(),
+        accepted_at: 1_792_108_800_000,
+        required_deliveries: 1,
+        best_effort_deliveries: 0,
+    };
+    // Exact previous TCP hot path: serde JSON followed by LengthPrefixFramer::encode.
+    // This test-only reference is not a supported wire codec or production fallback.
+    measure(
+        "tcp_ack_json_before",
+        1,
+        100_000,
+        || (),
+        |_| {
+            let bytes = serde_json::to_vec(std::hint::black_box(&receipt)).unwrap();
+            let mut frame = Vec::with_capacity(bytes.len() + 4);
+            frame.extend_from_slice(&u32::try_from(bytes.len()).unwrap().to_be_bytes());
+            frame.extend_from_slice(&bytes);
+            frame
+        },
+        drop,
+    );
+    measure(
+        "tcp_ack_binary_after",
+        1,
+        100_000,
+        || (),
+        |_| tcp_ack::encode(std::hint::black_box(&receipt)).unwrap(),
+        |_| {},
+    );
+}

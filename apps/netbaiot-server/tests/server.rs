@@ -423,7 +423,7 @@ async fn tcp_accept(address: std::net::SocketAddr, payload: &[u8]) -> EventAccep
         .write_all(&framer.encode(payload).unwrap())
         .await
         .unwrap();
-    let receipt = serde_json::from_slice(&read_frame(&mut socket).await).unwrap();
+    let receipt = netbaiot_core::tcp_ack::decode(&read_frame(&mut socket).await).unwrap();
     socket.shutdown().await.unwrap();
     receipt
 }
@@ -2594,7 +2594,8 @@ async fn exercise_shared_listener(tls: bool) {
     wire.extend(framer.encode(payload).unwrap());
     tcp.write_all(&wire).await.unwrap();
     assert_eq!(read_frame(&mut tcp).await, br#"{"authenticated":true}"#);
-    let receipt: EventAcceptance = serde_json::from_slice(&read_frame(&mut tcp).await).unwrap();
+    let receipt: EventAcceptance =
+        netbaiot_core::tcp_ack::decode(&read_frame(&mut tcp).await).unwrap();
     assert!(!receipt.event_id.0.is_nil());
     assert_eq!(
         services.connections.active().unwrap()[Transport::Tcp as usize],

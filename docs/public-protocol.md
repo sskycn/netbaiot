@@ -36,6 +36,8 @@ semantics deterministically instead of racing an invalidate or replacement.
 
 Device JSON v1 is represented by `DeviceUplink`. Its stable fields are
 `schema_version`, `source_message_id`, optional `occurred_at`, `kind`, and `data`.
+Native TCP now uses [binary EventAccepted ACK v1](device-protocol.md#binary-eventaccepted-ack-v1-breaking-change), replacing JSON receipts without negotiation; upgrade clients with the gateway.
+
 MQTT QoS1 PUBACK, TCP acceptance and signed UDP NBA1 mean only `EventAccepted`.
 
 The 0.x device-HTTP removal is an intentional source/control-API breaking change:

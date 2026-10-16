@@ -1,0 +1,75 @@
+{
+  "raw_log_sha256": "e6c0b2033dad595b27024826883ccd2aaed5774bbc8bec5c3c2a2b0565f31a2b",
+  "rows": [
+    {
+      "case": "tcp_ack_json_before",
+      "iterations": 100000,
+      "repeat": 1,
+      "operations_per_second": 7909258.0,
+      "p50_ns": 125,
+      "p95_ns": 167,
+      "p99_ns": 167,
+      "allocations_per_ack": 2.0,
+      "bytes_allocated_per_ack": 390.0
+    },
+    {
+      "case": "tcp_ack_json_before",
+      "iterations": 100000,
+      "repeat": 2,
+      "operations_per_second": 7852134.0,
+      "p50_ns": 125,
+      "p95_ns": 167,
+      "p99_ns": 167,
+      "allocations_per_ack": 2.0,
+      "bytes_allocated_per_ack": 390.0
+    },
+    {
+      "case": "tcp_ack_json_before",
+      "iterations": 100000,
+      "repeat": 3,
+      "operations_per_second": 7758345.0,
+      "p50_ns": 125,
+      "p95_ns": 167,
+      "p99_ns": 167,
+      "allocations_per_ack": 2.0,
+      "bytes_allocated_per_ack": 390.0
+    },
+    {
+      "case": "tcp_ack_binary_after",
+      "iterations": 100000,
+      "repeat": 1,
+      "operations_per_second": 75713008.0,
+      "p50_ns": 0,
+      "p95_ns": 42,
+      "p99_ns": 42,
+      "allocations_per_ack": 0.0,
+      "bytes_allocated_per_ack": 0.0
+    },
+    {
+      "case": "tcp_ack_binary_after",
+      "iterations": 100000,
+      "repeat": 2,
+      "operations_per_second": 73042551.0,
+      "p50_ns": 0,
+      "p95_ns": 42,
+      "p99_ns": 42,
+      "allocations_per_ack": 0.0,
+      "bytes_allocated_per_ack": 0.0
+    },
+    {
+      "case": "tcp_ack_binary_after",
+      "iterations": 100000,
+      "repeat": 3,
+      "operations_per_second": 75056536.0,
+      "p50_ns": 0,
+      "p95_ns": 42,
+      "p99_ns": 42,
+      "allocations_per_ack": 0.0,
+      "bytes_allocated_per_ack": 0.0
+    }
+  ],
+  "limitations": [
+    "Test allocator only; this does not measure full-ingress allocation.",
+    "Clock resolution ~42ns; binary P50 falls into the zero bucket."
+  ]
+}

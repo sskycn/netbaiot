@@ -1,0 +1,616 @@
+{
+  "schema_version": 1,
+  "rows": [
+    {
+      "name": "before-tcp-ack-repeat-0-0",
+      "input_sha256": "72654c450796f89591401b84677436d6b91313a3fc51fe5dacab3e46db282858",
+      "server_sha256": "05a65985e699444393ad4759d0ddd0b6eae3da4c9b10f5877b897bf25bce4f76",
+      "loadgen_sha256": "77b8c675a46adcbab7327d0a83b6a79937cbe0e9e222faa2fe92033d50545001",
+      "plan": {
+        "name": "tcp-ack-repeat-0",
+        "variant": "before",
+        "seconds": 60,
+        "warmup": 5,
+        "ramp": 1,
+        "tls": false,
+        "host_cpu_sample": false,
+        "lock_metrics": false,
+        "groups": [
+          {
+            "label": "tcp",
+            "protocol": "tcp",
+            "rate": 140000,
+            "workers": 8,
+            "offset": 256,
+            "window": 128
+          }
+        ]
+      },
+      "receipt_per_second": 139947.61666666667,
+      "receipt_percent": 100.0,
+      "offered_percent": 99.96258333333333,
+      "cpu_us_per_event": 35.55690885866889,
+      "cpu_percent": 497.60530943092044,
+      "cpu_sample_events": 8256342,
+      "cpu_sample_seconds": 58.996556997299194,
+      "rss_peak_kib": 9920,
+      "latency": {
+        "count": 8396857,
+        "max_ms": 3.434,
+        "mean_ms": 0.8120921168480063,
+        "p50_ms": 0.75,
+        "p95_ms": 1.82,
+        "p999_ms": 2.66,
+        "p99_ms": 2.17
+      },
+      "client": {
+        "accepted": 8396857,
+        "attempted": 8396857,
+        "authenticated_total": 8,
+        "connect_attempts_total": 8,
+        "connected_total": 8,
+        "schedule_missed": 3121,
+        "scheduled": 8399976
+      },
+      "host_tcp_retransmits": null,
+      "tcp_kernel_counters_usable": false,
+      "pending_peak": 236,
+      "rss_first_kib": 9712,
+      "rss_last_kib": 9920,
+      "cooldown": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 1152,
+        "auth_cache_entries": 8,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 89032,
+        "runtime_tasks": 6,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "development-audit"
+          }
+        ]
+      },
+      "counters": {
+        "ingress_admission_rejects": 0,
+        "events_accepted": 9094774,
+        "events_rejected": 0,
+        "sink_acks": 9094774,
+        "sink_failures": 0,
+        "sink_drops": 0
+      }
+    },
+    {
+      "name": "before-tcp-ack-repeat-1-0",
+      "input_sha256": "c5949ae0172ea0d85711bc0b8fdadafb717f685842444246ea936c78fcc072fc",
+      "server_sha256": "05a65985e699444393ad4759d0ddd0b6eae3da4c9b10f5877b897bf25bce4f76",
+      "loadgen_sha256": "77b8c675a46adcbab7327d0a83b6a79937cbe0e9e222faa2fe92033d50545001",
+      "plan": {
+        "name": "tcp-ack-repeat-1",
+        "variant": "before",
+        "seconds": 60,
+        "warmup": 5,
+        "ramp": 1,
+        "tls": false,
+        "host_cpu_sample": false,
+        "lock_metrics": false,
+        "groups": [
+          {
+            "label": "tcp",
+            "protocol": "tcp",
+            "rate": 140000,
+            "workers": 8,
+            "offset": 256,
+            "window": 128
+          }
+        ]
+      },
+      "receipt_per_second": 139880.51666666666,
+      "receipt_percent": 100.0,
+      "offered_percent": 99.91465476190476,
+      "cpu_us_per_event": 35.13585074625057,
+      "cpu_percent": 491.4759303665323,
+      "cpu_sample_events": 8252255,
+      "cpu_sample_seconds": 58.99576807022095,
+      "rss_peak_kib": 9472,
+      "latency": {
+        "count": 8392831,
+        "max_ms": 7.619,
+        "mean_ms": 0.8181087700919988,
+        "p50_ms": 0.77,
+        "p95_ms": 1.8,
+        "p999_ms": 2.64,
+        "p99_ms": 2.11
+      },
+      "client": {
+        "accepted": 8392831,
+        "attempted": 8392831,
+        "authenticated_total": 8,
+        "client_window_full": 8,
+        "connect_attempts_total": 8,
+        "connected_total": 8,
+        "schedule_missed": 7138,
+        "scheduled": 8399978
+      },
+      "host_tcp_retransmits": null,
+      "tcp_kernel_counters_usable": false,
+      "pending_peak": 137,
+      "rss_first_kib": 9264,
+      "rss_last_kib": 9472,
+      "cooldown": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 1152,
+        "auth_cache_entries": 8,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 89540,
+        "runtime_tasks": 6,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "development-audit"
+          }
+        ]
+      },
+      "counters": {
+        "ingress_admission_rejects": 0,
+        "events_accepted": 9090746,
+        "events_rejected": 0,
+        "sink_acks": 9090746,
+        "sink_failures": 0,
+        "sink_drops": 0
+      }
+    },
+    {
+      "name": "before-tcp-ack-repeat-2-0",
+      "input_sha256": "18f160343bb6da08369336597c37e26c8bdc55a1e7922cf753ec7d6e45c411b7",
+      "server_sha256": "05a65985e699444393ad4759d0ddd0b6eae3da4c9b10f5877b897bf25bce4f76",
+      "loadgen_sha256": "77b8c675a46adcbab7327d0a83b6a79937cbe0e9e222faa2fe92033d50545001",
+      "plan": {
+        "name": "tcp-ack-repeat-2",
+        "variant": "before",
+        "seconds": 60,
+        "warmup": 5,
+        "ramp": 1,
+        "tls": false,
+        "host_cpu_sample": false,
+        "lock_metrics": false,
+        "groups": [
+          {
+            "label": "tcp",
+            "protocol": "tcp",
+            "rate": 140000,
+            "workers": 8,
+            "offset": 256,
+            "window": 128
+          }
+        ]
+      },
+      "receipt_per_second": 139683.85,
+      "receipt_percent": 99.99100430278276,
+      "offered_percent": 99.77417857142858,
+      "cpu_us_per_event": 34.91793962682051,
+      "cpu_percent": 487.7368699994666,
+      "cpu_sample_events": 8242468,
+      "cpu_sample_seconds": 59.00927686691284,
+      "rss_peak_kib": 15968,
+      "latency": {
+        "count": 8381031,
+        "max_ms": 37.511,
+        "mean_ms": 0.7976121061955265,
+        "p50_ms": 0.74,
+        "p95_ms": 1.75,
+        "p999_ms": 3.23,
+        "p99_ms": 2.05
+      },
+      "client": {
+        "accepted": 8381031,
+        "attempted": 8381785,
+        "authenticated": 6,
+        "authenticated_total": 14,
+        "client_window_full": 5511,
+        "connect_attempts": 6,
+        "connect_attempts_total": 14,
+        "connected": 6,
+        "connected_total": 14,
+        "disconnects": 6,
+        "remote_close": 6,
+        "schedule_missed": 12676,
+        "scheduled": 8399979,
+        "unconfirmed": 381
+      },
+      "host_tcp_retransmits": null,
+      "tcp_kernel_counters_usable": false,
+      "pending_peak": 136,
+      "rss_first_kib": 8976,
+      "rss_last_kib": 15968,
+      "cooldown": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 1152,
+        "auth_cache_entries": 8,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 89706,
+        "runtime_tasks": 6,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "development-audit"
+          }
+        ]
+      },
+      "counters": {
+        "ingress_admission_rejects": 0,
+        "events_accepted": 9078890,
+        "events_rejected": 6,
+        "sink_acks": 9078890,
+        "sink_failures": 0,
+        "sink_drops": 0
+      }
+    },
+    {
+      "name": "candidate-tcp-ack-repeat-0-0",
+      "input_sha256": "566604042c01988c1818d524b6ca3b6cb6afb0b46fe7c575e02eb6ddead8723a",
+      "server_sha256": "2a08aa7bc9d64e4637b7a66a092cdc33f4ce0341015ddb42c4e4dd997ae89c76",
+      "loadgen_sha256": "61c72ae2ae2f24e1200803ef0dd66807c68cd8d5a8b3789f1bb1d033cbbd74e3",
+      "plan": {
+        "name": "tcp-ack-repeat-0",
+        "variant": "candidate",
+        "seconds": 60,
+        "warmup": 5,
+        "ramp": 1,
+        "tls": false,
+        "host_cpu_sample": false,
+        "lock_metrics": false,
+        "groups": [
+          {
+            "label": "tcp",
+            "protocol": "tcp",
+            "rate": 140000,
+            "workers": 8,
+            "offset": 256,
+            "window": 128
+          }
+        ]
+      },
+      "receipt_per_second": 139860.28333333333,
+      "receipt_percent": 100.0,
+      "offered_percent": 99.90020238095238,
+      "cpu_us_per_event": 34.240088304597535,
+      "cpu_percent": 478.86076303733887,
+      "cpu_sample_events": 8251439,
+      "cpu_sample_seconds": 59.00044894218445,
+      "rss_peak_kib": 8816,
+      "latency": {
+        "count": 8391617,
+        "max_ms": 10.208,
+        "mean_ms": 0.7803293129321799,
+        "p50_ms": 0.74,
+        "p95_ms": 1.7,
+        "p999_ms": 2.31,
+        "p99_ms": 1.97
+      },
+      "client": {
+        "accepted": 8391617,
+        "attempted": 8391617,
+        "authenticated_total": 8,
+        "client_window_full": 125,
+        "connect_attempts_total": 8,
+        "connected_total": 8,
+        "schedule_missed": 8237,
+        "scheduled": 8399979
+      },
+      "host_tcp_retransmits": null,
+      "tcp_kernel_counters_usable": false,
+      "pending_peak": 517,
+      "rss_first_kib": 8288,
+      "rss_last_kib": 8816,
+      "cooldown": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 1152,
+        "auth_cache_entries": 8,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 89191,
+        "runtime_tasks": 6,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "development-audit"
+          }
+        ]
+      },
+      "counters": {
+        "ingress_admission_rejects": 0,
+        "events_accepted": 9089741,
+        "events_rejected": 0,
+        "sink_acks": 9089741,
+        "sink_failures": 0,
+        "sink_drops": 0
+      }
+    },
+    {
+      "name": "candidate-tcp-ack-repeat-1-0",
+      "input_sha256": "e7646a96433c4bdf535d59cd92d43275eb1a1d70cfa719e8416f9e7497383587",
+      "server_sha256": "2a08aa7bc9d64e4637b7a66a092cdc33f4ce0341015ddb42c4e4dd997ae89c76",
+      "loadgen_sha256": "61c72ae2ae2f24e1200803ef0dd66807c68cd8d5a8b3789f1bb1d033cbbd74e3",
+      "plan": {
+        "name": "tcp-ack-repeat-1",
+        "variant": "candidate",
+        "seconds": 60,
+        "warmup": 5,
+        "ramp": 1,
+        "tls": false,
+        "host_cpu_sample": false,
+        "lock_metrics": false,
+        "groups": [
+          {
+            "label": "tcp",
+            "protocol": "tcp",
+            "rate": 140000,
+            "workers": 8,
+            "offset": 256,
+            "window": 128
+          }
+        ]
+      },
+      "receipt_per_second": 139759.26666666666,
+      "receipt_percent": 100.0,
+      "offered_percent": 99.82804761904762,
+      "cpu_us_per_event": 34.48495847929981,
+      "cpu_percent": 481.9598639321868,
+      "cpu_sample_events": 8245044,
+      "cpu_sample_seconds": 58.99453902244568,
+      "rss_peak_kib": 15280,
+      "latency": {
+        "count": 8385556,
+        "max_ms": 28.842,
+        "mean_ms": 0.8227618860335558,
+        "p50_ms": 0.76,
+        "p95_ms": 1.76,
+        "p999_ms": 8.1,
+        "p99_ms": 2.12
+      },
+      "client": {
+        "accepted": 8385556,
+        "attempted": 8385556,
+        "authenticated_total": 8,
+        "client_window_full": 5985,
+        "connect_attempts_total": 8,
+        "connected_total": 8,
+        "schedule_missed": 8438,
+        "scheduled": 8399977
+      },
+      "host_tcp_retransmits": null,
+      "tcp_kernel_counters_usable": false,
+      "pending_peak": 129,
+      "rss_first_kib": 8512,
+      "rss_last_kib": 15280,
+      "cooldown": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 1152,
+        "auth_cache_entries": 8,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 89352,
+        "runtime_tasks": 6,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "development-audit"
+          }
+        ]
+      },
+      "counters": {
+        "ingress_admission_rejects": 0,
+        "events_accepted": 9084706,
+        "events_rejected": 0,
+        "sink_acks": 9084706,
+        "sink_failures": 0,
+        "sink_drops": 0
+      }
+    },
+    {
+      "name": "candidate-tcp-ack-repeat-2-0",
+      "input_sha256": "683f36fde8274ffde054cb005314564b29c331323b1ddef6d2dc1cfeac939a8d",
+      "server_sha256": "2a08aa7bc9d64e4637b7a66a092cdc33f4ce0341015ddb42c4e4dd997ae89c76",
+      "loadgen_sha256": "61c72ae2ae2f24e1200803ef0dd66807c68cd8d5a8b3789f1bb1d033cbbd74e3",
+      "plan": {
+        "name": "tcp-ack-repeat-2",
+        "variant": "candidate",
+        "seconds": 60,
+        "warmup": 5,
+        "ramp": 1,
+        "tls": false,
+        "host_cpu_sample": false,
+        "lock_metrics": false,
+        "groups": [
+          {
+            "label": "tcp",
+            "protocol": "tcp",
+            "rate": 140000,
+            "workers": 8,
+            "offset": 256,
+            "window": 128
+          }
+        ]
+      },
+      "receipt_per_second": 139825.61666666667,
+      "receipt_percent": 100.0,
+      "offered_percent": 99.87544047619048,
+      "cpu_us_per_event": 34.30463113732617,
+      "cpu_percent": 479.63795519605526,
+      "cpu_sample_events": 8249032,
+      "cpu_sample_seconds": 58.99866700172424,
+      "rss_peak_kib": 9824,
+      "latency": {
+        "count": 8389537,
+        "max_ms": 16.864,
+        "mean_ms": 0.790767171537595,
+        "p50_ms": 0.74,
+        "p95_ms": 1.71,
+        "p999_ms": 6.33,
+        "p99_ms": 2.01
+      },
+      "client": {
+        "accepted": 8389537,
+        "attempted": 8389537,
+        "authenticated_total": 8,
+        "client_window_full": 767,
+        "connect_attempts_total": 8,
+        "connected_total": 8,
+        "schedule_missed": 9678,
+        "scheduled": 8399983
+      },
+      "host_tcp_retransmits": null,
+      "tcp_kernel_counters_usable": false,
+      "pending_peak": 86,
+      "rss_first_kib": 9664,
+      "rss_last_kib": 9824,
+      "cooldown": {
+        "active_connections": {
+          "mqtt": 0,
+          "tcp": 0,
+          "udp": 0
+        },
+        "active_sessions": 0,
+        "auth_cache_bytes": 1152,
+        "auth_cache_entries": 8,
+        "business_auth_serving": false,
+        "business_rpc_pending": 0,
+        "event_bytes": 0,
+        "event_count": 0,
+        "lifecycle": "running",
+        "pending_required": 0,
+        "process_id": 89891,
+        "runtime_tasks": 6,
+        "sink_diagnostics": [
+          {
+            "consecutive_failures": 0,
+            "drop_total": 0,
+            "failure_total": 0,
+            "inflight": 0,
+            "last_failure": null,
+            "oldest_pending_age_ms": 0,
+            "pause_remaining_ms": 0,
+            "paused": false,
+            "queue_bytes": 0,
+            "queue_count": 0,
+            "retry_after_used_total": 0,
+            "retry_total": 0,
+            "sink_id": "development-audit"
+          }
+        ]
+      },
+      "counters": {
+        "ingress_admission_rejects": 0,
+        "events_accepted": 9087799,
+        "events_rejected": 0,
+        "sink_acks": 9087799,
+        "sink_failures": 0,
+        "sink_drops": 0
+      }
+    }
+  ]
+}

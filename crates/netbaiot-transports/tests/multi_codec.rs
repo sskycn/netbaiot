@@ -664,7 +664,7 @@ async fn mixed_codec_reconnect_and_control_soak() {
             for part in frame(&payload).chunks(3) {
                 tcp.write_all(part).await.unwrap();
             }
-            let _: EventAcceptance = serde_json::from_slice(&read_tcp(&mut tcp).await).unwrap();
+            let _: EventAcceptance = tcp_ack::decode(&read_tcp(&mut tcp).await).unwrap();
             let udp = UdpSocket::bind("127.0.0.1:0").await.unwrap();
             let data = datagram_sequence(f, &payload, cycle);
             udp.send_to(&data, address).await.unwrap();
@@ -779,12 +779,12 @@ async fn four_codecs_coexist_on_real_mqtt_tcp_udp_with_binary_commands() {
         for bytes in frame(&p).chunks(3) {
             client.write_all(bytes).await.unwrap();
         }
-        let _: EventAcceptance = serde_json::from_slice(&read_tcp(&mut client).await).unwrap();
+        let _: EventAcceptance = tcp_ack::decode(&read_tcp(&mut client).await).unwrap();
         let mut frames = frame(&p);
         frames.extend_from_slice(&frame(&p));
         client.write_all(&frames).await.unwrap();
         for _ in 0..2 {
-            let _: EventAcceptance = serde_json::from_slice(&read_tcp(&mut client).await).unwrap();
+            let _: EventAcceptance = tcp_ack::decode(&read_tcp(&mut client).await).unwrap();
         }
         let c = command(&a);
         let expected = ingress

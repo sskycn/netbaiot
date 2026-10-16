@@ -317,11 +317,8 @@ async fn stream_session(
                 let valid = if mqtt {
                     first == 0x40 && b == expected.to_be_bytes()
                 } else {
-                    serde_json::from_slice::<Value>(&b).is_ok_and(|v| {
-                        v["event_id"].is_string()
-                            && v["accepted_at"].is_number()
-                            && v["required_deliveries"].as_u64().is_some_and(|n| n > 0)
-                    })
+                    netbaiot_core::tcp_ack::decode(&b)
+                        .is_ok_and(|receipt| receipt.required_deliveries > 0)
                 };
                 if !valid {
                     w.failure("protocol_error");

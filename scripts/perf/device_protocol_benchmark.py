@@ -324,6 +324,7 @@ def main():
     parser.add_argument('--server', type=Path, default=ROOT / 'target/remove-device-http/before-server')
     parser.add_argument('--candidate', type=Path, help='Optional candidate server for interleaved paired plans')
     parser.add_argument('--loadgen', type=Path, default=ROOT / 'target/release/netbaiot-loadgen')
+    parser.add_argument('--candidate-loadgen', type=Path, help='Matching client for a breaking candidate wire protocol')
     parser.add_argument('--label', default='baseline')
     parser.add_argument('--baseline', default=BASELINE, help='Source revision of the frozen baseline server')
     parser.add_argument('--resume', action='store_true', help='Skip only matching, completed successful raw records')
@@ -346,6 +347,9 @@ def main():
                     raise ValueError('candidate plan requires --candidate')
                 selected.server = args.candidate.resolve()
                 selected.server_hash = digest(selected.server)
+                if args.candidate_loadgen is not None:
+                    selected.loadgen = args.candidate_loadgen.resolve()
+                    selected.loadgen_hash = digest(selected.loadgen)
             selected.label = plan.get('variant', args.label)
             for repeat in range(plan.get('repeats', 1)):
                 if (ROOT / 'target/mixed-audit/stop-after-run').exists():

@@ -416,7 +416,7 @@ async fn official_clients_cover_mqtt_tcp_command_ack_status_and_offline_contract
             .await
             .unwrap();
         let accepted: EventAccepted =
-            serde_json::from_slice(&tcp_device_frame(&mut socket).await).unwrap();
+            tcp_ack::decode(&tcp_device_frame(&mut socket).await).unwrap();
         let delivery = next_event(&mut events).await;
         assert_eq!(delivery.event().event_id, accepted.event_id);
         assert!(
