@@ -1,0 +1,458 @@
+{
+  "schema_version": 1,
+  "baseline": "a2b46a2ad49a43ee538a6de74afddac350763c23",
+  "final_variant": "a (all runtime changes restored)",
+  "git_actions": "local branch only; no commit, merge or push",
+  "environment": {
+    "cpu": "Apple M4",
+    "model": "Mac16,10",
+    "logical_cpus": 10,
+    "ram_gib": 16,
+    "os": "macOS 27.0.1",
+    "architecture": "aarch64",
+    "rust": "1.99.0",
+    "rustc_commit": "b940084d7eb6a299eb4bfeb8e34901bc051e7ac4",
+    "server_workers": 10,
+    "loadgen_workers": 4,
+    "path": "shared desktop loopback",
+    "power_assertion": "caffeinate -i during late runs; no persistent power setting changes",
+    "udp_recvspace_bytes": 786896,
+    "udp_maxdgram_bytes": 9216
+  },
+  "compiler_metadata_correction": "Early harness collected rustc +1.88.0 irrespective of build toolchain. All frozen binary stdlib fingerprints match Rust 1.99.0. Raw records unchanged.",
+  "final_rebuild": {
+    "server-a": {
+      "rebuilt_sha256": "05a65985e699444393ad4759d0ddd0b6eae3da4c9b10f5877b897bf25bce4f76",
+      "frozen_sha256": "05a65985e699444393ad4759d0ddd0b6eae3da4c9b10f5877b897bf25bce4f76",
+      "identical": true
+    },
+    "loadgen": {
+      "rebuilt_sha256": "77b8c675a46adcbab7327d0a83b6a79937cbe0e9e222faa2fe92033d50545001",
+      "frozen_sha256": "77b8c675a46adcbab7327d0a83b6a79937cbe0e9e222faa2fe92033d50545001",
+      "identical": true
+    }
+  },
+  "binary_provenance": {
+    "loadgen": {
+      "sha256": "77b8c675a46adcbab7327d0a83b6a79937cbe0e9e222faa2fe92033d50545001",
+      "rustc_commit_ids": [
+        "b940084d7eb6a299eb4bfeb8e34901bc051e7ac4"
+      ]
+    },
+    "server-a": {
+      "sha256": "05a65985e699444393ad4759d0ddd0b6eae3da4c9b10f5877b897bf25bce4f76",
+      "rustc_commit_ids": [
+        "b940084d7eb6a299eb4bfeb8e34901bc051e7ac4"
+      ]
+    },
+    "server-b": {
+      "sha256": "7f2143ceccce513cfc07355d2aac58bb9bacf22d3414e66dfc311c583fc22786",
+      "rustc_commit_ids": [
+        "b940084d7eb6a299eb4bfeb8e34901bc051e7ac4"
+      ]
+    },
+    "server-c": {
+      "sha256": "f1da15928bb35285add9efb1b0266d84f74e54fdeb94e0fce8d0d8f130c721ca",
+      "rustc_commit_ids": [
+        "b940084d7eb6a299eb4bfeb8e34901bc051e7ac4"
+      ]
+    },
+    "server-d": {
+      "sha256": "30504d2bd201c12d4709c621f1c79fdf50cd4483e9796e9c4fa63a550c3372f0",
+      "rustc_commit_ids": [
+        "b940084d7eb6a299eb4bfeb8e34901bc051e7ac4"
+      ]
+    },
+    "server-e": {
+      "sha256": "c9012569228c714e306f7d08b33574129dae5c5ce0e160f46f774891cd38f3ea",
+      "rustc_commit_ids": [
+        "b940084d7eb6a299eb4bfeb8e34901bc051e7ac4"
+      ]
+    },
+    "server-f": {
+      "sha256": "d8e179783adfe4d3acdaa99a1b2413ad5b66484383f69a2e07075fb7f479dc04",
+      "rustc_commit_ids": [
+        "b940084d7eb6a299eb4bfeb8e34901bc051e7ac4"
+      ]
+    },
+    "server-g": {
+      "sha256": "b1c3d1edcb10665c3a6de1e87c0d2960c297e3e6088b92fc39512ce90edd0ee7",
+      "rustc_commit_ids": [
+        "b940084d7eb6a299eb4bfeb8e34901bc051e7ac4"
+      ]
+    },
+    "server-h": {
+      "sha256": "80d1f44586eed26e783a2886d6d5a0293dab2bbabc6a8324300ea1cdf4b9436b",
+      "rustc_commit_ids": [
+        "b940084d7eb6a299eb4bfeb8e34901bc051e7ac4"
+      ]
+    },
+    "server-i": {
+      "sha256": "b0d9704ecc38caecdc54044d3bcc697030f2a73c34bd9034570749a549503749",
+      "rustc_commit_ids": [
+        "b940084d7eb6a299eb4bfeb8e34901bc051e7ac4"
+      ]
+    },
+    "server-j": {
+      "sha256": "17133cb8e13d3707d61730cb15f71fed20b7f8f1f63009de4c8b06aee7b63782",
+      "rustc_commit_ids": [
+        "b940084d7eb6a299eb4bfeb8e34901bc051e7ac4"
+      ]
+    },
+    "server-k": {
+      "sha256": "ac59b681ebcfe49614fed1b9be89e7cde1bee1f32e49d42c4f64a0fbba7d8741",
+      "rustc_commit_ids": [
+        "b940084d7eb6a299eb4bfeb8e34901bc051e7ac4"
+      ]
+    },
+    "server-l": {
+      "sha256": "fb1117a7f33d718f08c57cd5302a6f4af5cfae8d74e2ba7bf56744a6846bea55",
+      "rustc_commit_ids": [
+        "b940084d7eb6a299eb4bfeb8e34901bc051e7ac4"
+      ]
+    },
+    "server-m": {
+      "sha256": "764fca259610bb51f2fc45e44eef0eca2f1717c96701838f87e821d02de7d8f6",
+      "rustc_commit_ids": [
+        "b940084d7eb6a299eb4bfeb8e34901bc051e7ac4"
+      ]
+    },
+    "server-n": {
+      "sha256": "a1c76d5dd6ca4d7da29263b13181899a188bc819c428b68fe60e0a252f1c35b2",
+      "rustc_commit_ids": [
+        "b940084d7eb6a299eb4bfeb8e34901bc051e7ac4"
+      ]
+    },
+    "server-o": {
+      "sha256": "b921a44392d001399de3623efea803f2aa75d24cfe61274efaaf6a46189d557a",
+      "rustc_commit_ids": [
+        "b940084d7eb6a299eb4bfeb8e34901bc051e7ac4"
+      ]
+    },
+    "server-p": {
+      "sha256": "92db32356d22a58ef688cc26d0117cfcae296d89822a4755876442863fe74bef",
+      "rustc_commit_ids": [
+        "b940084d7eb6a299eb4bfeb8e34901bc051e7ac4"
+      ]
+    }
+  },
+  "variants": {
+    "a": "original a2b46a2",
+    "b": "A + replay reservations / short sync lock",
+    "c": "B + buffer and boxed future reuse (rejected)",
+    "d": "B + cached HMAC",
+    "e": "D + empty-to-ready notifications",
+    "f": "E + spawn each datagram (rejected)",
+    "g": "E + bounded batch join (rejected)",
+    "h": "E + periodic spawn (rejected)",
+    "i": "E + async fairness gate",
+    "j": "E + cooperative budget (rejected)",
+    "k": "A + cached HMAC + empty-to-ready notifications (rejected)",
+    "l": "I + post-gate profile validation (rejected)",
+    "m": "L + reap completed JoinSet entry at full capacity (rejected)",
+    "n": "K + reap completed JoinSet entry at full capacity (rejected)",
+    "o": "A + cached HMAC only (rejected)",
+    "p": "A + empty-to-ready notifications only (rejected after end-to-end validation)"
+  },
+  "source_sha256": {
+    "Cargo.toml": "62bf06572e6dd553d6bb80b82750fe60acfa0ec26db589912eaefd898cf22da2",
+    "Cargo.lock": "a9e9f7143f8a6df3a10a10626493a3f24fa2d3f7b52faa8380820133d9032605",
+    "crates/netbaiot-runtime/src/auth.rs": "34445d3dfb8a1f5458424891d03cad94e58d1cf4053132340edbac7aa4dbeb4d",
+    "crates/netbaiot-runtime/src/event.rs": "d3f0bd16707ccf17acefb46c923826d9eef3b9d5406856940b642a767c963f38",
+    "crates/netbaiot-runtime/src/event_accounting_bench.rs": "53d50db20c1c49846fb5b6dfae2c61592f8d2d1153c16d1add65f2a119a1991b",
+    "crates/netbaiot-transports/src/udp.rs": "9679335a7cf483e0633cbf28684804e6c79958afe47b49da9eded7e0a531ed9e",
+    "crates/netbaiot-transports/src/udp_tests.rs": "07390c323a9e3c2632dd0ccafca96170bbdb7d8ec6c844bdeb5c3a3b227fe0c9",
+    "scripts/perf/device_protocol_benchmark.py": "1866c34b8971d48a4defcffcd2cbbc31c40b8dc79e3b582fa35c95cf2748257e",
+    "scripts/perf/udp_capacity_summary.py": "e2e768b3ee67199ad5f82e8100e82c7f17f4cfa688354c4066cdf3e8c25753b8",
+    "scripts/perf/macos_cpu_summary.py": "aa545b40f2efdb25143683e580c5be4adcfa742764d985e01d6364f3fcf0eae1",
+    "scripts/perf/test_udp_capacity_summary.py": "f8c845151857f0fbcd22b9a1ea9d59086deb700db24a46d7de2fe9fa4f6670b1",
+    "scripts/perf/test_macos_cpu_summary.py": "5562c7898ca472108af751398e4878a71d772dfa294641726d356e6fbec9ad41"
+  },
+  "validation": [
+    {
+      "name": "fmt",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "exit_code": 0,
+      "seconds": 0.463,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "log_path": "target/performance/udp-20261016/validation/fmt.log"
+    },
+    {
+      "name": "clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "--workspace",
+        "--all-targets",
+        "--all-features",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "seconds": 4.329,
+      "log_sha256": "2d3f2f6dd91c5d54f0f9aa0388490b71640010d02e1214228d1121591de25acd",
+      "log_path": "target/performance/udp-20261016/validation/clippy.log"
+    },
+    {
+      "name": "workspace-tests",
+      "command": [
+        "cargo",
+        "test",
+        "--workspace",
+        "--all-features"
+      ],
+      "exit_code": 0,
+      "seconds": 78.628,
+      "log_sha256": "d32268452e08341028888e0d08f610ba5c461f144adcea1dd00415ab628297a3",
+      "log_path": "target/performance/udp-20261016/validation/workspace-tests.log"
+    },
+    {
+      "name": "perf-python-tests",
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "scripts/perf",
+        "-p",
+        "test_*.py"
+      ],
+      "exit_code": 0,
+      "seconds": 0.122,
+      "log_sha256": "f440659afeedd5a17d3d938001263fb2fec440f9d6c0a838bcfdabd59e375238",
+      "log_path": "target/performance/udp-20261016/validation/perf-python-tests.log"
+    },
+    {
+      "name": "udp-release-tests",
+      "command": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "-p",
+        "netbaiot-transports",
+        "udp::"
+      ],
+      "exit_code": 0,
+      "seconds": 20.754,
+      "log_sha256": "53a7bf26151c7b4de8fc218f62ef1a97c7c15085acb059975073a893e855d22f",
+      "log_path": "target/performance/udp-20261016/validation/udp-release-tests.log"
+    },
+    {
+      "name": "restart-soak",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "netbaiot-server",
+        "--test",
+        "server",
+        "subprocess_graceful_restart_sixty_second_soak",
+        "--",
+        "--ignored",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "seconds": 70.403,
+      "log_sha256": "e87355b4f2c605f013a73c2808de5ab7cd7430b0f421ef85d923e9b9cf3a37be",
+      "log_path": "target/performance/udp-20261016/validation/restart-soak.log"
+    },
+    {
+      "name": "codec-control-soak",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "netbaiot-transports",
+        "--test",
+        "multi_codec",
+        "mixed_codec_reconnect_and_control_soak",
+        "--",
+        "--ignored",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "seconds": 62.757,
+      "log_sha256": "e8dc2ec363cd61652f1496ab6ac71453a22545d87555d0bda99990789659f3ab",
+      "log_path": "target/performance/udp-20261016/validation/codec-control-soak.log"
+    },
+    {
+      "name": "tls-http-soak",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "netbaiot-server",
+        "--test",
+        "server",
+        "engineering_tls_qos1_http_sixty_second_soak",
+        "--",
+        "--ignored",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "seconds": 60.406,
+      "log_sha256": "df5876b14012b5acc1967a7719b931f9f0031bbe994a321d9cf81a310d33f3da",
+      "log_path": "target/performance/udp-20261016/validation/tls-http-soak.log"
+    },
+    {
+      "name": "fuzz-seeds",
+      "command": [
+        "python3",
+        "fuzz/seed_corpus.py"
+      ],
+      "exit_code": 0,
+      "seconds": 0.07,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "log_path": "target/performance/udp-20261016/validation/fuzz-seeds.log"
+    },
+    {
+      "name": "udp-fuzz",
+      "command": [
+        "cargo",
+        "+nightly",
+        "fuzz",
+        "run",
+        "udp_envelope",
+        "--",
+        "-max_total_time=30",
+        "-max_len=1201",
+        "-rss_limit_mb=2048",
+        "-timeout=5"
+      ],
+      "exit_code": 0,
+      "seconds": 48.556,
+      "log_sha256": "59ad460a641c004eaa54f9453feab8b432a26057cf942adcd144f454b26d8f80",
+      "log_path": "target/performance/udp-20261016/validation/udp-fuzz.log"
+    }
+  ],
+  "validation_counts": {
+    "workspace_passed": 608,
+    "workspace_failed": 0,
+    "workspace_ignored": 60,
+    "python_passed": 32,
+    "udp_release_passed": 22,
+    "udp_release_ignored": 1,
+    "udp_fuzz_runs": 247541,
+    "udp_fuzz_actual_seconds": 31
+  },
+  "measurement": {
+    "cpu": "matching process CPU and gateway EventAccepted sample deltas",
+    "latency": "client successful verified ACKs only",
+    "rss": "1Hz sampled measurement-window peak",
+    "kernel_drops": "host-wide full-socket counter delta including warmup/cooldown",
+    "retained_incomplete_runs": 2,
+    "full_udp_allocations": "not measured",
+    "eventbus_allocations": "StatsAlloc queued publish only; frozen executables, ABBA BAAB, 100000 iterations, 12 observations per side/depth"
+  },
+  "completed_udp_runs": 281,
+  "unverified": [
+    "Linux recvmmsg/sendmmsg",
+    "separate host or physical network",
+    "production capacity",
+    "full UDP allocation count",
+    "unbounded-duration soak"
+  ],
+  "evidence": {
+    "README.md": {
+      "sha256": "9db1b16751236423e1e94f50efa0c7371bcc0804a1a30802e3ecca06a7df38e6",
+      "bytes": 21066
+    },
+    "candidate-i-capacity.json": {
+      "sha256": "4f423643a3e2563f184d390070feca8fb5027209d505cc1ad17e5e96276f024a",
+      "bytes": 30450
+    },
+    "candidate-k-capacity.json": {
+      "sha256": "f4d31ebdb7ba77266b545d45ba2a15b0f31ede92744800ca0989a643458854cc",
+      "bytes": 68789
+    },
+    "candidate-k-soak.json": {
+      "sha256": "f337e46052483eaf973fb103b87035dff3c90db1ebe02b9dd212c97526a70886",
+      "bytes": 4958
+    },
+    "candidate-l-capacity.json": {
+      "sha256": "43ce4390efe823a90b8f12cef1d004a30aecf2055b40423daa67c369d1d698de",
+      "bytes": 57214
+    },
+    "candidate-p-capacity.json": {
+      "sha256": "1146068e0d13b704abde38c1bce8f06454af73582cf4bb92950f7c2f0902574b",
+      "bytes": 68709
+    },
+    "candidate-p-diagnostics.json": {
+      "sha256": "433e45254216766fb8b70931eda89f11562071795ae26c9a9e6a183065a6984a",
+      "bytes": 12504
+    },
+    "candidate-p-plan.json": {
+      "sha256": "bc39641c5f7bd92e3d5ddb49a4ba98a5524f8ab5e79c3c04c9174dea3173b720",
+      "bytes": 16442
+    },
+    "candidate-p-soak.json": {
+      "sha256": "a61747aee9a5f548ef26077b20de9cdf14d18bd5a056bbef9a8bacd6f9f38518",
+      "bytes": 4957
+    },
+    "cpu-profile-baseline.json": {
+      "sha256": "af0cb8f7d4320a9442e662eaadcb34348b8145edef5bdea122400687d366ed80",
+      "bytes": 13992
+    },
+    "cpu-profile-candidate-p.json": {
+      "sha256": "1e9d5e77da1b0026059b1afc36996ec99a553034d3d980b9f7dd1a165b2885b7",
+      "bytes": 14157
+    },
+    "eventbus-allocation-pilot.json": {
+      "sha256": "9a5f7b33f38ed5771b48cdd50683f3bb27840140b93c004da82b5062971fc3d6",
+      "bytes": 3247
+    },
+    "eventbus-allocations.json": {
+      "sha256": "4c682c707737bc3c7f4f2df8eb60e394726043fdd6771829aae398f3c7502490",
+      "bytes": 14904
+    },
+    "experiments-hmac-eventbus.json": {
+      "sha256": "b9d81f9366e223e03537202a9ab92654d5cf3873dc4f8c93828ca6fdd420094a",
+      "bytes": 69704
+    },
+    "experiments-rejected-io.json": {
+      "sha256": "fe4073feb72ab6aa3d58700c1d9eb26f036adde015e4aab2da44822f320a5598",
+      "bytes": 105182
+    },
+    "experiments-replay.json": {
+      "sha256": "71ed93d0e5d67428014de4d18806164c5eea57db25ef7d1425b4a69bbf7c0fbc",
+      "bytes": 139247
+    },
+    "hmac-experiment.patch": {
+      "sha256": "3966f739f5d89c73c58d8891d87568442cd4a6b79738b6f53725851987c7fe4a",
+      "bytes": 4382
+    },
+    "isolated-final-options.json": {
+      "sha256": "e713aee28c6667f946cb895e9b102cfac9b2ce7ad8784fa69e20389f4156bfac",
+      "bytes": 29041
+    },
+    "notify-experiment.patch": {
+      "sha256": "3941140f2580797d10f433d4115db20475d2aecd791e7eccea7c61110dcbad25",
+      "bytes": 3078
+    },
+    "reap-experiments.json": {
+      "sha256": "d038d11909f9255b6fd3fa1ec5fd2c9edd49ae9fc83fc973e0e7447063a19475",
+      "bytes": 42777
+    },
+    "rejected-join-reap.patch": {
+      "sha256": "8e5d8a41274882031a52bd5da483320691f576eae4df582ea32211b79b9b49b4",
+      "bytes": 2427
+    },
+    "rejected-replay.patch": {
+      "sha256": "33da9399aae04ebfe9fb734ca89d13427327f3032b94d1fa00f2092a295aaecf",
+      "bytes": 23885
+    },
+    "replay-isolated.json": {
+      "sha256": "22a7aab2ed687ac8395bc789f5e0f2f959d38fae5fd9a0b42f684ed3543994ef",
+      "bytes": 29881
+    }
+  }
+}

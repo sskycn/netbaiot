@@ -1,0 +1,67 @@
+--- a/crates/netbaiot-runtime/src/event.rs
++++ b/crates/netbaiot-runtime/src/event.rs
+@@ -641,6 +641,7 @@
+             sink.used_count += 1;
+             sink.used_bytes += bytes;
+             *sink.pending_ages.entry(now).or_default() += 1;
++            let wake = sink.ready.is_empty();
+             sink.ready.push_back(DeliveryRecord {
+                 event: event.clone(),
+                 bytes,
+@@ -653,7 +654,12 @@
+             if sink.definition.mode == SinkDeliveryMode::ConfirmedRequired {
+                 required.insert(id.clone());
+             }
+-            accepted_notifies.push(sink.notify.clone());
++            // Existing ready work already owns a wakeup. A busy worker resumes
++            // on completion; an idle worker retains Notify's permit. Only the
++            // empty-to-ready transition needs another wakeup, under this lock.
++            if wake {
++                accepted_notifies.push(sink.notify.clone());
++            }
+         }
+         let required_deliveries = required.len();
+         let best_effort_deliveries = remaining.len().saturating_sub(required_deliveries);
+@@ -2230,6 +2236,42 @@
+             })
+             .into();
+         EventBus::new_paused(limits, Arc::new(Metrics::default()), definitions, routes, 7)
++    }
++
++    #[tokio::test]
++    async fn publish_wakes_each_sink_on_empty_to_ready_transition() {
++        let bus = route_bus(Limits::default(), vec![route(None, &["a", "b"])]).unwrap();
++        let a = SinkId::new("a").unwrap();
++        let b = SinkId::new("b").unwrap();
++        let (wake_a, wake_b) = {
++            let state = bus.state.lock().unwrap();
++            (
++                state.sinks[&a].notify.clone(),
++                state.sinks[&b].notify.clone(),
++            )
++        };
++        bus.publish(event(8)).unwrap();
++        assert!(wake_a.notified().now_or_never().is_some());
++        assert!(wake_b.notified().now_or_never().is_some());
++        let definition = bus.state.lock().unwrap().sinks[&a].definition.clone();
++        let record = bus.take_ready(&a).unwrap().unwrap();
++        bus.complete(&a, record, Ok(SinkAck), &definition).unwrap();
++        // a became empty; b still owns its first delivery. Fanout must wake a
++        // without producing a redundant permit for b or losing either record.
++        bus.publish(event(8)).unwrap();
++        assert!(wake_a.notified().now_or_never().is_some());
++        assert!(wake_b.notified().now_or_never().is_none());
++        for (id, count) in [(a, 1), (b, 2)] {
++            let definition = bus.state.lock().unwrap().sinks[&id].definition.clone();
++            for _ in 0..count {
++                let record = bus.take_ready(&id).unwrap().unwrap();
++                bus.complete(&id, record, Ok(SinkAck), &definition).unwrap();
++            }
++        }
++        assert_eq!(checked_usage(&bus), EventBusUsage::default());
++        bus.publish(event(8)).unwrap();
++        assert!(wake_a.notified().now_or_never().is_some());
++        assert!(wake_b.notified().now_or_never().is_some());
+     }
+ 
+     #[tokio::test]

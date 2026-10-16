@@ -47,11 +47,12 @@ def environment():
     return dict(checkout_revision=command(['git','rev-parse','HEAD']), platform=platform.platform(), machine=platform.machine(), cpu_count=os.cpu_count(),
                 sysctl=command(['sysctl', 'hw.model', 'hw.memsize', 'hw.ncpu', 'machdep.cpu.brand_string',
                                 'kern.ipc.somaxconn', 'net.inet.tcp.msl', 'net.inet.udp.recvspace', 'net.inet.udp.maxdgram']),
-                limits=command(['sh', '-c', 'ulimit -a']), rust=command(['rustc', '+1.88.0', '-Vv']),
+                limits=command(['sh', '-c', 'ulimit -a']), rust=command(['rustc', '-Vv']),
+                cargo=command(['cargo', '-V']),
                 server_tokio_workers=10, loadgen_tokio_workers=4, path='loopback',
                 limitations=['Shared server/loadgen host; no separate-host capacity claim.',
-                             'Process CPU time; no per-thread scheduler or syscall profiling.',
-                             'No per-sink gauge; one required sink, pending_required is its depth.',
+                             'Capacity uses process CPU time; keep separate profiler runs out of capacity statistics.',
+                             'Per-run configuration identifies required sinks; their ACK is distinct from EventAccepted.',
                              'TCP/MQTT remote close does not identify the cause on wire; use server counters.'])
 
 
@@ -180,13 +181,14 @@ def run(plan, repeat, args):
     config = server_config(folder, plan, device, management, sinkport)
     (folder / 'server.json').write_text(json.dumps(config))
     (folder / 'sink-control.json').write_text(json.dumps(dict(delay=plan.get('sink_delay', 2), status=204)))
-    env = {**os.environ, 'NETBAIOT_ADMIN_SECRET': 'ab' * 32, 'RUST_LOG': 'error', 'TOKIO_WORKER_THREADS': '10'}
-    server = load = sink = control = None
+    env = {**os.environ, 'NETBAIOT_ADMIN_SECRET': 'ab' * 32, 'RUST_LOG': 'error', 'TOKIO_WORKER_THREADS': '10',
+           'NETBAIOT_PERF_LOCK_METRICS': '1' if plan.get('lock_metrics') else '0'}
+    server = load = sink = control = profiler = None
     files = []
     samples = []
     row = dict(name=name, plan=plan, repeat=repeat, label=args.label, timestamp=time.time(),
                baseline=args.baseline, production_revision=plan.get('production_revision', args.baseline), server_sha256=args.server_hash, loadgen_sha256=args.loadgen_hash,
-               harness_version=3, loadgen_tokio_workers=workers, loadgen_worker_source='main tokio macro (environment ignored)', server_tokio_workers=10, harness_sha256=digest(Path(__file__)), server_config=config, network_before=command(['netstat', '-s', '-p', 'udp']),
+               harness_version=4, loadgen_tokio_workers=workers, loadgen_worker_source='main tokio macro (environment ignored)', server_tokio_workers=10, harness_sha256=digest(Path(__file__)), server_config=config, network_before=command(['netstat', '-s', '-p', 'udp']),
                tcp_before=command(['netstat', '-s', '-p', 'tcp']))
     try:
         for s in reservations:
@@ -227,9 +229,19 @@ def run(plan, repeat, args):
         shutdown = False
         while load.poll() is None:
             now = time.time()
+            if plan.get('cpu_profile') and profiler is None and now >= start:
+                # Diagnostic run only: never mix sampling overhead into paired capacity runs.
+                log = open(folder / 'profile.log', 'w'); files.append(log)
+                duration = min(10, plan['seconds'])
+                profile_command = (
+                    ['xctrace', 'record', '--template', 'Time Profiler', '--attach', str(server.pid),
+                     '--time-limit', f'{duration}s', '--output', str(folder / 'cpu.trace')]
+                    if plan['cpu_profile'] == 'time' else
+                    ['sample', str(server.pid), str(duration), '1', '-file', str(folder / 'cpu.sample.txt')])
+                profiler = subprocess.Popen(profile_command, stdout=log, stderr=log)
             if now > start + plan['seconds'] + 15:
                 raise RuntimeError('load generator exceeded bounded deadline')
-            if 'host_cpu_sample' not in row and now >= start + plan['seconds'] * .5:
+            if plan.get('host_cpu_sample', True) and 'host_cpu_sample' not in row and now >= start + plan['seconds'] * .5:
                 row['host_cpu_sample'] = command(['top', '-l', '2', '-s', '1', '-n', '0'])
                 now = time.time()
             if plan.get('sink') and not restored and now >= start + plan.get('sink_restore_at', plan['seconds'] * .5):
@@ -272,6 +284,12 @@ def run(plan, repeat, args):
         row['network_after'] = command(['netstat', '-s', '-p', 'udp'])
         row['tcp_after'] = command(['netstat', '-s', '-p', 'tcp'])
     finally:
+        if profiler is not None:
+            try:
+                row['profiler_exit'] = profiler.wait(timeout=15)
+            except subprocess.TimeoutExpired:
+                # A diagnostic failure must not skip cleanup of the workload.
+                row['profiler_stop'] = stop(profiler, 5)
         row['load_stop'] = stop(load, 5)
         row['server_stop'] = stop(server, 40)
         row['sink_stop'] = stop(sink, 5)

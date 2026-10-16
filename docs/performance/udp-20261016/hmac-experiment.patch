@@ -1,0 +1,100 @@
+--- a/crates/netbaiot-runtime/src/auth.rs
++++ b/crates/netbaiot-runtime/src/auth.rs
+@@ -59,15 +59,27 @@
+ #[derive(Clone)]
+ pub struct DeviceVerifier {
+     identity: AuthenticatedDevice,
+-    key: [u8; 32],
++    // Cache the keyed inner/outer SHA-256 states, never a message-specific state.
++    // Each operation clones this template and still verifies the complete tag.
++    mac: Arc<Hmac<Sha256>>,
+     replay_policy: netbaiot_core::business_rpc::UdpReplayPolicy,
+ }
++
++// Replaces the old inline 32-byte key with an Arc handle, its two counters,
++// and the keyed template. Charge the additional logical memory to cache bytes.
++const VERIFIER_MAC_EXTRA_BYTES: usize = std::mem::size_of::<Hmac<Sha256>>()
++    + 3 * std::mem::size_of::<usize>()
++    - std::mem::size_of::<[u8; 32]>();
+ 
+ impl DeviceVerifier {
+     pub fn new(identity: AuthenticatedDevice, key: [u8; 32]) -> Self {
++        // HMAC pads this fixed 32-byte key to SHA-256's 64-byte block. KeyInit's
++        // fixed-size constructor is infallible and computes the pads once.
++        let mut padded = hmac::digest::Key::<Hmac<Sha256>>::default();
++        padded[..key.len()].copy_from_slice(&key);
+         Self {
+             identity,
+-            key,
++            mac: Arc::new(<Hmac<Sha256> as hmac::digest::KeyInit>::new(&padded)),
+             replay_policy: Default::default(),
+         }
+     }
+@@ -85,15 +97,13 @@
+     }
+ 
+     pub fn sign(&self, message: &[u8]) -> Result<[u8; 32]> {
+-        let mut mac =
+-            Hmac::<Sha256>::new_from_slice(&self.key).map_err(|_| Error::Authentication)?;
++        let mut mac = (*self.mac).clone();
+         mac.update(message);
+         Ok(mac.finalize().into_bytes().into())
+     }
+ 
+     pub fn verify(&self, message: &[u8], tag: &[u8]) -> Result<()> {
+-        let mut mac =
+-            Hmac::<Sha256>::new_from_slice(&self.key).map_err(|_| Error::Authentication)?;
++        let mut mac = (*self.mac).clone();
+         mac.update(message);
+         mac.verify_slice(tag).map_err(|_| Error::Authentication)
+     }
+@@ -339,6 +349,7 @@
+                             + verifier.identity.device_key.device_id.as_str().len()
+                             + verifier.identity.codec_id.as_str().len()
+                             + 96
++                            + VERIFIER_MAC_EXTRA_BYTES
+                     }
+                     CachedAuth::Negative => 1,
+                 };
+@@ -510,6 +521,7 @@
+                             + verifier.identity.device_key.device_id.as_str().len()
+                             + verifier.identity.codec_id.as_str().len()
+                             + 96
++                            + VERIFIER_MAC_EXTRA_BYTES
+                     }
+                     CachedAuth::Negative => 1,
+                     CachedAuth::Positive(_) => return Err(Error::Internal),
+@@ -863,6 +875,33 @@
+ #[cfg(test)]
+ mod cache_tests {
+     use super::*;
++
++    #[test]
++    fn cached_hmac_template_matches_fresh_mac_and_rejects_corruption() {
++        for seed in [0, 7, 255] {
++            let key = [seed; 32];
++            let verifier = DeviceVerifier::new(identity(), key);
++            for length in [0, 1, 31, 32, 55, 56, 63, 64, 65, 256, 1200, 65535] {
++                let message = vec![seed.wrapping_add(1); length];
++                let mut fresh = Hmac::<Sha256>::new_from_slice(&key).unwrap();
++                fresh.update(&message);
++                let expected = fresh.finalize().into_bytes();
++                let tag = verifier.sign(&message).unwrap();
++                assert_eq!(tag[..], expected[..]);
++                verifier.verify(&message, &tag).unwrap();
++                verifier.clone().verify(&message, &tag).unwrap();
++                for byte in 0..tag.len() {
++                    let mut invalid = tag;
++                    invalid[byte] ^= 1;
++                    assert!(verifier.verify(&message, &invalid).is_err());
++                }
++                assert!(verifier.verify(&message, &tag[..31]).is_err());
++                assert!(verifier.verify(&message, &[0; 33]).is_err());
++                // Neither signing nor verification can mutate the cached pads.
++                assert_eq!(verifier.sign(&message).unwrap(), tag);
++            }
++        }
++    }
+     use std::sync::atomic::{AtomicU8, AtomicUsize, Ordering};
+ 
+     // Unit-test binary only. No production allocator or hot-path changes.

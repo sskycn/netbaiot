@@ -1,0 +1,658 @@
+--- a/crates/netbaiot-transports/src/udp.rs
++++ b/crates/netbaiot-transports/src/udp.rs
+@@ -5,11 +5,11 @@
+ use std::{
+     collections::{BTreeSet, HashMap},
+     future::Future,
+-    sync::Arc,
++    sync::{Arc, Mutex},
+     task::Poll,
+ };
+ use tokio::net::UdpSocket;
+-use tokio::{sync::Mutex, task::JoinSet};
++use tokio::{sync::Notify, task::JoinSet};
+ use tokio_util::sync::CancellationToken;
+ pub const ACK_SIZE: usize = 64;
+ pub const MIN_ENVELOPE_SIZE: usize = 76;
+@@ -130,6 +130,9 @@
+     expirations: BTreeSet<ReplayExpiry>,
+     devices: HashMap<DeviceKey, usize>,
+     tenants: HashMap<TenantId, usize>,
++    // Only admissions that actually yield need a reservation/wakeup allocation.
++    // Reserved keys count against the same replay quotas and cannot expire.
++    pending: HashMap<ReplayKey, Arc<Notify>>,
+     limits: Arc<Limits>,
+ }
+ impl ReplayWindow {
+@@ -139,6 +142,7 @@
+             expirations: BTreeSet::new(),
+             devices: HashMap::new(),
+             tenants: HashMap::new(),
++            pending: HashMap::new(),
+             limits,
+         }
+     }
+@@ -200,7 +204,7 @@
+         Ok(ReplayDecision::New)
+     }
+     /// Called only after a successful New check and EventAccepted, with no intervening
+-    /// replay mutation. The UDP replay mutex owns this ordering across the await.
++    /// mutation for this key. Concurrent admissions pin their key while waiting.
+     pub fn commit(
+         &mut self,
+         device: DeviceKey,
+@@ -271,6 +275,68 @@
+         }
+     }
+ }
++
++// Async entry preserves bounded, cooperative FIFO contention. The state lock
++// only protects synchronous check/poll/commit and permits cancellation cleanup;
++// neither guard is retained while an admission or a same-key owner is pending.
++struct ReplayCoordinator {
++    state: Mutex<ReplayWindow>,
++    enter: tokio::sync::Mutex<()>,
++}
++impl ReplayCoordinator {
++    fn new(window: ReplayWindow) -> Self {
++        Self {
++            state: Mutex::new(window),
++            enter: tokio::sync::Mutex::new(()),
++        }
++    }
++    fn lock(&self) -> std::sync::LockResult<std::sync::MutexGuard<'_, ReplayWindow>> {
++        self.state.lock()
++    }
++}
++
++/// Owns one suspended admission, including its replay capacity. No lock is held
++/// while awaiting ingress; cancellation restores the exact previously committed
++/// window (or removes a new, uncommitted key) and wakes same-key contenders.
++struct ReplayReservation<'a> {
++    owner: &'a Mutex<ReplayWindow>,
++    key: ReplayKey,
++    previous_expiry: Option<i64>,
++    active: bool,
++}
++impl ReplayReservation<'_> {
++    fn release(&self, window: &mut ReplayWindow) {
++        if let Some(expires) = self.previous_expiry {
++            window.expirations.insert(expiry_key(expires, &self.key));
++        } else {
++            window.entries.remove(&self.key);
++            if let Some(count) = window.devices.get_mut(&self.key.0) {
++                *count -= 1;
++                if *count == 0 {
++                    window.devices.remove(&self.key.0);
++                }
++            }
++            if let Some(count) = window.tenants.get_mut(&self.key.0.tenant_id) {
++                *count -= 1;
++                if *count == 0 {
++                    window.tenants.remove(&self.key.0.tenant_id);
++                }
++            }
++        }
++        if let Some(wake) = window.pending.remove(&self.key) {
++            wake.notify_waiters();
++        }
++    }
++}
++impl Drop for ReplayReservation<'_> {
++    fn drop(&mut self) {
++        if self.active
++            && let Ok(mut window) = self.owner.lock()
++        {
++            self.release(&mut window);
++        }
++    }
++}
+ #[cfg(test)]
+ #[path = "udp_replay_tests.rs"]
+ mod replay_tests;
+@@ -279,7 +345,7 @@
+     let l = &s.ingress.limits;
+     let mut input = vec![0; l.max_udp_datagram_size + 1];
+     let socket = Arc::new(socket);
+-    let replay = Arc::new(Mutex::new(ReplayWindow::new(l.clone())));
++    let replay = Arc::new(ReplayCoordinator::new(ReplayWindow::new(l.clone())));
+     // There is no waiting datagram queue. Both task count and retained datagram
+     // bytes are bounded by this ceiling times max_udp_datagram_size.
+     let mut tasks = JoinSet::new();
+@@ -355,26 +421,19 @@
+     replay: &mut ReplayWindow,
+     send: impl FnOnce(&[u8]) -> std::io::Result<usize>,
+ ) -> Result<()> {
+-    // Also gates duplicates: quiescing does not start new receipt work.
+-    let _admission = ingress.lifecycle.begin_admission()?;
+-    let envelope = decode(input, ingress.limits.max_udp_datagram_size)?;
+-    let auth_timing = ingress
+-        .metrics
+-        .timer(netbaiot_runtime::Histogram::Authentication);
+-    let verified = ingress
+-        .auth_cache
+-        .verify_signed_with_verifier(envelope.credential_id, envelope.signed, envelope.tag)
+-        .await?;
+-    drop(auth_timing);
+-    accept_verified(&envelope, &verified, ingress, replay).await?;
+-    send_ack(&envelope, &verified, ingress, send);
+-    Ok(())
++    let owner = ReplayCoordinator::new(std::mem::replace(
++        replay,
++        ReplayWindow::new(ingress.limits.clone()),
++    ));
++    let result = accept_and_ack_concurrent(input, ingress, &owner, send).await;
++    *replay = owner.state.into_inner().map_err(|_| Error::Unavailable)?;
++    result
+ }
+ 
+ async fn accept_and_ack_concurrent(
+     input: &[u8],
+     ingress: &Ingress,
+-    replay: &Mutex<ReplayWindow>,
++    replay: &ReplayCoordinator,
+     send: impl FnOnce(&[u8]) -> std::io::Result<usize>,
+ ) -> Result<()> {
+     let _admission = ingress.lifecycle.begin_admission()?;
+@@ -387,19 +446,15 @@
+         .verify_signed_with_verifier(envelope.credential_id, envelope.signed, envelope.tag)
+         .await?;
+     drop(auth_timing);
+-    {
+-        let mut replay = replay.lock().await;
+-        accept_verified(&envelope, &verified, ingress, &mut replay).await?;
+-    }
++    accept_verified_concurrent(&envelope, &verified, ingress, replay).await?;
+     send_ack(&envelope, &verified, ingress, send);
+     Ok(())
+ }
+ 
+-async fn accept_verified(
++fn validate_verified(
+     envelope: &Envelope<'_>,
+     verified: &VerifiedDatagram,
+     ingress: &Ingress,
+-    replay: &mut ReplayWindow,
+ ) -> Result<()> {
+     let auth = verified.identity();
+     ingress.validate_auth_profile(auth)?;
+@@ -409,51 +464,161 @@
+     if !auth.permissions.publish {
+         return Err(Error::Forbidden);
+     }
+-    match replay.check_with_policy(
+-        &auth.device_key,
++    Ok(())
++}
++
++fn check_verified(
++    window: &mut ReplayWindow,
++    envelope: &Envelope<'_>,
++    verified: &VerifiedDatagram,
++) -> Result<ReplayDecision> {
++    window.check_with_policy(
++        &verified.identity().device_key,
+         envelope.credential_version,
+         envelope.boot_id,
+         envelope.sequence,
+         (envelope.timestamp, now_ms()),
+         verified.replay_policy(),
+-    )? {
+-        ReplayDecision::New => {
+-            let input = IngressEnvelope {
+-                transport: Transport::Udp,
+-                payload: envelope.payload,
+-                require_command_ack: false,
+-                validated_at: std::time::Instant::now(),
+-                validation_us: 0,
++    )
++}
++
++fn commit_verified(
++    window: &mut ReplayWindow,
++    envelope: &Envelope<'_>,
++    verified: &VerifiedDatagram,
++    ingress: &Ingress,
++) {
++    window.commit(
++        verified.identity().device_key.clone(),
++        envelope.credential_version,
++        envelope.boot_id,
++        envelope.sequence,
++        now_ms(),
++    );
++    ingress.metrics.inc(Metric::UdpAccepted);
++}
++
++async fn ingest_verified(
++    envelope: &Envelope<'_>,
++    verified: &VerifiedDatagram,
++    ingress: &Ingress,
++) -> Result<()> {
++    let input = IngressEnvelope {
++        transport: Transport::Udp,
++        payload: envelope.payload,
++        require_command_ack: false,
++        validated_at: std::time::Instant::now(),
++        validation_us: 0,
++    };
++    if verified.replay_policy() == UdpReplayPolicy::Monotonic {
++        ingress
++            .ingest_monotonic_udp(
++                verified.identity(),
++                input,
++                netbaiot_core::security::replay::UdpMessageIdentity {
++                    credential_version: envelope.credential_version,
++                    boot_id: envelope.boot_id,
++                    sequence: envelope.sequence,
++                },
++            )
++            .await?;
++    } else {
++        ingress.ingest(verified.identity(), input).await?;
++    }
++    Ok(())
++}
++
++enum ReplayAttempt<'a> {
++    Complete,
++    Wait(tokio::sync::futures::OwnedNotified),
++    Reserved(ReplayReservation<'a>),
++}
++
++async fn accept_verified_concurrent(
++    envelope: &Envelope<'_>,
++    verified: &VerifiedDatagram,
++    ingress: &Ingress,
++    owner: &ReplayCoordinator,
++) -> Result<()> {
++    let key = (
++        verified.identity().device_key.clone(),
++        envelope.boot_id,
++        envelope.credential_version,
++    );
++    let mut ingest = std::pin::pin!(ingest_verified(envelope, verified, ingress));
++    loop {
++        let mut enter = std::pin::pin!(owner.enter.lock());
++        // Poll once inside a *synchronous* critical section. Ready admissions
++        // need neither reservation allocation nor a second lock. A Pending poll
++        // is necessarily before EventAccepted; all subsequent awaits are outside
++        // the lock and exclusively own this key until commit or RAII rollback.
++        let attempt = std::future::poll_fn(|cx| {
++            let Poll::Ready(_entered) = enter.as_mut().poll(cx) else {
++                return Poll::Pending;
+             };
+-            if verified.replay_policy() == UdpReplayPolicy::Monotonic {
+-                ingress
+-                    .ingest_monotonic_udp(
+-                        auth,
+-                        input,
+-                        netbaiot_core::security::replay::UdpMessageIdentity {
+-                            credential_version: envelope.credential_version,
+-                            boot_id: envelope.boot_id,
+-                            sequence: envelope.sequence,
++            let result = (|| {
++                let mut window = owner.lock().map_err(|_| Error::Unavailable)?;
++                if let Some(wake) = window.pending.get(&key) {
++                    // notified_owned captures notify_waiters' generation here,
++                    // before releasing the lock, so completion cannot be lost.
++                    return Ok(ReplayAttempt::Wait(wake.clone().notified_owned()));
++                }
++                // Match the old replay-owner boundary: a queued packet must
++                // observe a product profile installed while it was waiting.
++                validate_verified(envelope, verified, ingress)?;
++                if check_verified(&mut window, envelope, verified)?
++                    == ReplayDecision::AcceptedDuplicate
++                {
++                    ingress.metrics.inc(Metric::UdpAcceptedDuplicates);
++                    return Ok(ReplayAttempt::Complete);
++                }
++                if let Poll::Ready(result) = ingest.as_mut().poll(cx) {
++                    result?;
++                    commit_verified(&mut window, envelope, verified, ingress);
++                    return Ok(ReplayAttempt::Complete);
++                }
++                let previous_expiry = window.entries.get(&key).map(|entry| entry.expires);
++                if let Some(expires) = previous_expiry {
++                    window.expirations.remove(&expiry_key(expires, &key));
++                } else {
++                    // A placeholder owns quota but no accepted sequence. Every
++                    // contender checks pending before inspecting this entry.
++                    window.entries.insert(
++                        key.clone(),
++                        Replay {
++                            max: 0,
++                            bits: 0,
++                            expires: 0,
+                         },
+-                    )
+-                    .await?;
+-            } else {
+-                ingress.ingest(auth, input).await?;
+-            }
+-            replay.commit(
+-                auth.device_key.clone(),
+-                envelope.credential_version,
+-                envelope.boot_id,
+-                envelope.sequence,
+-                now_ms(),
+-            );
+-            ingress.metrics.inc(Metric::UdpAccepted);
+-        }
+-        ReplayDecision::AcceptedDuplicate => {
+-            ingress.metrics.inc(Metric::UdpAcceptedDuplicates);
+-        }
+-    }
+-    Ok(())
++                    );
++                    *window.devices.entry(key.0.clone()).or_default() += 1;
++                    *window.tenants.entry(key.0.tenant_id.clone()).or_default() += 1;
++                }
++                window.pending.insert(key.clone(), Arc::new(Notify::new()));
++                Ok(ReplayAttempt::Reserved(ReplayReservation {
++                    owner: &owner.state,
++                    key: key.clone(),
++                    previous_expiry,
++                    active: true,
++                }))
++            })();
++            Poll::Ready(result)
++        })
++        .await?;
++        match attempt {
++            ReplayAttempt::Complete => return Ok(()),
++            ReplayAttempt::Wait(wake) => wake.await,
++            ReplayAttempt::Reserved(mut reservation) => {
++                ingest.await?;
++                // No cancellation point between EventAccepted and replay commit.
++                let mut window = owner.lock().map_err(|_| Error::Unavailable)?;
++                reservation.release(&mut window);
++                reservation.active = false;
++                commit_verified(&mut window, envelope, verified, ingress);
++                return Ok(());
++            }
++        }
++    }
+ }
+ 
+ fn send_ack(
+--- a/crates/netbaiot-transports/src/udp_tests.rs
++++ b/crates/netbaiot-transports/src/udp_tests.rs
+@@ -274,10 +274,10 @@
+     ingress.events.stop_workers().await.unwrap();
+ }
+ 
+-#[tokio::test]
++#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+ async fn concurrent_duplicate_packets_have_one_event_accepted_owner() {
+     let (ingress, provider) = fixture(Limits::default());
+-    let replay = Arc::new(tokio::sync::Mutex::new(ReplayWindow::new(
++    let replay = Arc::new(ReplayCoordinator::new(ReplayWindow::new(
+         ingress.limits.clone(),
+     )));
+     let bytes = packet("a", 1, 42, now_ms(), PAYLOAD);
+@@ -300,10 +300,263 @@
+ }
+ 
+ #[tokio::test]
++async fn queued_replay_entry_validates_the_current_product_profile() {
++    let (mut ingress, _) = fixture(Limits::default());
++    Arc::get_mut(&mut ingress).unwrap().codecs = CodecRegistry::new(vec![
++        (
++            CodecId::new("netbaiot-json").unwrap(),
++            1,
++            Arc::new(JsonV1::default()),
++        ),
++        (
++            CodecId::new("alternate-json").unwrap(),
++            1,
++            Arc::new(JsonV1::default()),
++        ),
++    ])
++    .unwrap();
++    let replay = ReplayCoordinator::new(ReplayWindow::new(ingress.limits.clone()));
++    let packet = packet("a", 1, 42, now_ms(), PAYLOAD);
++    let envelope = decode(&packet, ingress.limits.max_udp_datagram_size).unwrap();
++    ingress
++        .auth_cache
++        .verify_signed_with_verifier(envelope.credential_id, envelope.signed, envelope.tag)
++        .await
++        .unwrap();
++    let entry = replay.enter.lock().await;
++    let mut waiting = std::pin::pin!(accept_and_ack_concurrent(
++        &packet,
++        &ingress,
++        &replay,
++        |_| panic!("stale profile ACK"),
++    ));
++    assert!(
++        std::future::poll_fn(|cx| Poll::Ready(waiting.as_mut().poll(cx)))
++            .await
++            .is_pending()
++    );
++    ingress
++        .apply_control_snapshot(ControlSnapshot {
++            revision: 2,
++            products: vec![ProductRuntimeConfig {
++                tenant_id: TenantId::new("t").unwrap(),
++                product_id: ProductId::new("p").unwrap(),
++                codec_id: CodecId::new("alternate-json").unwrap(),
++                codec_version: 1,
++                revision: 2,
++            }],
++            routes: vec![RouteDefinition {
++                tenant: None,
++                sinks: vec![SinkId::new("pending").unwrap()],
++            }],
++        })
++        .unwrap();
++    drop(entry);
++    assert!(matches!(waiting.await, Err(Error::Forbidden)));
++    assert_eq!(ingress.metrics.get(Metric::EventsAccepted), 0);
++    assert_eq!(ingress.metrics.get(Metric::UdpAcksSent), 0);
++    ingress.events.stop_workers().await.unwrap();
++}
++
++async fn wait_for_reservation(replay: &ReplayCoordinator) {
++    tokio::time::timeout(Duration::from_secs(1), async {
++        while replay.lock().unwrap().pending.is_empty() {
++            tokio::task::yield_now().await;
++        }
++    })
++    .await
++    .unwrap();
++}
++
++#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
++async fn suspended_admission_does_not_block_other_devices_or_ack_duplicates_early() {
++    let (ingress, _) = fixture(Limits {
++        ingress_wait_timeout_ms: 2_000,
++        ..Limits::default()
++    });
++    let replay = Arc::new(ReplayCoordinator::new(ReplayWindow::new(
++        ingress.limits.clone(),
++    )));
++    let held = ingress.admission.acquire(&auth().device_key, 100).unwrap();
++    let mut tasks = JoinSet::new();
++    for _ in 0..32 {
++        let ingress = ingress.clone();
++        let replay = replay.clone();
++        tasks.spawn(async move {
++            accept_and_ack_concurrent(
++                &packet("a", 1, 42, now_ms(), PAYLOAD),
++                &ingress,
++                &replay,
++                |ack| Ok(ack.len()),
++            )
++            .await
++        });
++    }
++    wait_for_reservation(&replay).await;
++    assert_eq!(ingress.metrics.get(Metric::UdpAcksSent), 0);
++    tokio::time::timeout(
++        Duration::from_millis(500),
++        accept_and_ack_concurrent(
++            &packet("slow", 1, 1, now_ms(), PAYLOAD),
++            &ingress,
++            &replay,
++            |ack| Ok(ack.len()),
++        ),
++    )
++    .await
++    .unwrap()
++    .unwrap();
++    assert_eq!(ingress.metrics.get(Metric::EventsAccepted), 1);
++    assert_eq!(ingress.metrics.get(Metric::UdpAcksSent), 1);
++    drop(held);
++    while let Some(result) = tasks.join_next().await {
++        result.unwrap().unwrap();
++    }
++    assert_eq!(ingress.metrics.get(Metric::EventsAccepted), 2);
++    assert_eq!(ingress.metrics.get(Metric::UdpAcceptedDuplicates), 31);
++    assert_eq!(ingress.metrics.get(Metric::UdpAcksSent), 33);
++    assert!(replay.lock().unwrap().pending.is_empty());
++    ingress.events.stop_workers().await.unwrap();
++}
++
++#[tokio::test]
++async fn cancelled_reservation_restores_capacity_and_committed_expiry() {
++    for existing in [false, true] {
++        let (ingress, _) = fixture(Limits {
++            max_replay_entries: 1,
++            ingress_wait_timeout_ms: 2_000,
++            ..Limits::default()
++        });
++        let replay = Arc::new(ReplayCoordinator::new(ReplayWindow::new(
++            ingress.limits.clone(),
++        )));
++        if existing {
++            accept_and_ack_concurrent(
++                &packet("a", 1, 41, now_ms(), PAYLOAD),
++                &ingress,
++                &replay,
++                |ack| Ok(ack.len()),
++            )
++            .await
++            .unwrap();
++        }
++        let expiry = replay
++            .lock()
++            .unwrap()
++            .entries
++            .values()
++            .next()
++            .map(|entry| entry.expires);
++        let held = ingress.admission.acquire(&auth().device_key, 100).unwrap();
++        let task_ingress = ingress.clone();
++        let task_replay = replay.clone();
++        let pending = tokio::spawn(async move {
++            accept_and_ack_concurrent(
++                &packet("a", 1, 42, now_ms(), PAYLOAD),
++                &task_ingress,
++                &task_replay,
++                |_| panic!("premature ACK"),
++            )
++            .await
++        });
++        wait_for_reservation(&replay).await;
++        {
++            let mut state = replay.lock().unwrap();
++            // Even an expired wall clock must not evict a pending key.
++            state.prune(i64::MAX);
++            assert_eq!(state.entries.len(), 1);
++            assert_eq!(state.devices.values().sum::<usize>(), 1);
++            assert!(state.expirations.is_empty());
++        }
++        assert!(matches!(
++            accept_and_ack_concurrent(
++                &packet("slow", 1, 1, now_ms(), PAYLOAD),
++                &ingress,
++                &replay,
++                |_| panic!("quota ACK")
++            )
++            .await,
++            Err(Error::Overloaded)
++        ));
++        pending.abort();
++        assert!(pending.await.unwrap_err().is_cancelled());
++        {
++            let state = replay.lock().unwrap();
++            assert!(state.pending.is_empty());
++            assert_eq!(state.entries.len(), usize::from(existing));
++            assert_eq!(state.expirations.len(), state.entries.len());
++            assert_eq!(state.devices.values().sum::<usize>(), state.entries.len());
++            assert_eq!(state.tenants.values().sum::<usize>(), state.entries.len());
++            assert_eq!(
++                state.entries.values().next().map(|entry| entry.expires),
++                expiry
++            );
++        }
++        assert_eq!(ingress.admission.waiting(), (0, 0));
++        drop(held);
++        accept_and_ack_concurrent(
++            &packet("a", 1, 42, now_ms(), PAYLOAD),
++            &ingress,
++            &replay,
++            |ack| Ok(ack.len()),
++        )
++        .await
++        .unwrap();
++        assert_eq!(
++            ingress.metrics.get(Metric::EventsAccepted),
++            1 + u64::from(existing)
++        );
++        ingress.events.stop_workers().await.unwrap();
++    }
++}
++
++#[tokio::test]
++async fn failed_reserved_codec_wakes_retry_without_committing_sequence() {
++    let (ingress, _) = fixture(Limits {
++        ingress_wait_timeout_ms: 2_000,
++        ..Limits::default()
++    });
++    let replay = Arc::new(ReplayCoordinator::new(ReplayWindow::new(
++        ingress.limits.clone(),
++    )));
++    let held = ingress.admission.acquire(&auth().device_key, 100).unwrap();
++    let task_ingress = ingress.clone();
++    let task_replay = replay.clone();
++    let bad = tokio::spawn(async move {
++        accept_and_ack_concurrent(
++            &packet("a", 1, 42, now_ms(), b"invalid"),
++            &task_ingress,
++            &task_replay,
++            |_| panic!("invalid ACK"),
++        )
++        .await
++    });
++    wait_for_reservation(&replay).await;
++    let good = packet("a", 1, 42, now_ms(), PAYLOAD);
++    let retry = accept_and_ack_concurrent(&good, &ingress, &replay, |ack| Ok(ack.len()));
++    tokio::pin!(retry);
++    assert!(
++        std::future::poll_fn(|cx| Poll::Ready(retry.as_mut().poll(cx)))
++            .await
++            .is_pending()
++    );
++    drop(held);
++    assert!(matches!(bad.await.unwrap(), Err(Error::Codec)));
++    tokio::time::timeout(Duration::from_secs(1), retry)
++        .await
++        .unwrap()
++        .unwrap();
++    assert_eq!(ingress.metrics.get(Metric::EventsAccepted), 1);
++    assert_eq!(ingress.metrics.get(Metric::UdpAcceptedDuplicates), 0);
++    assert!(replay.lock().unwrap().pending.is_empty());
++    ingress.events.stop_workers().await.unwrap();
++}
++
++#[tokio::test]
+ async fn slow_authentication_does_not_hold_replay_owner_for_other_devices() {
+     let (ingress, provider) = fixture(Limits::default());
+     provider.delay_slow.store(true, Ordering::Release);
+-    let replay = Arc::new(tokio::sync::Mutex::new(ReplayWindow::new(
++    let replay = Arc::new(ReplayCoordinator::new(ReplayWindow::new(
+         ingress.limits.clone(),
+     )));
+     let entered = provider.slow_entered.notified();

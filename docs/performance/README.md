@@ -13,6 +13,8 @@ documentation tree.
 Current MQTT measurements: [publish and Trie](mqtt-publish-20261015/README.md),
 [uplink routing and Retained](mqtt-retained-routing-20261016/README.md).
 
+Current UDP measurements: [profiling, capacity and optimization rollbacks](udp-20261016/README.md).
+
 Write raw logs, per-request samples, traces and heap/perf captures under ignored
 `target/performance/` or `target/evidence/`. CI artifacts have limited retention;
 use reviewed release assets when permanent external evidence is required.

@@ -1,0 +1,746 @@
+[
+  {
+    "name": "capacity-p-40000-r0",
+    "variant": "baseline",
+    "seconds": 15,
+    "warmup": 3,
+    "ramp": 1,
+    "tls": false,
+    "host_cpu_sample": false,
+    "groups": [
+      {
+        "label": "udp",
+        "protocol": "udp",
+        "rate": 40000,
+        "workers": 64,
+        "offset": 0,
+        "window": 128
+      }
+    ],
+    "power_assertion": "caffeinate -i",
+    "production_revision": "a2b46a2ad49a43ee538a6de74afddac350763c23"
+  },
+  {
+    "name": "capacity-p-40000-r0",
+    "variant": "candidate",
+    "seconds": 15,
+    "warmup": 3,
+    "ramp": 1,
+    "tls": false,
+    "host_cpu_sample": false,
+    "groups": [
+      {
+        "label": "udp",
+        "protocol": "udp",
+        "rate": 40000,
+        "workers": 64,
+        "offset": 0,
+        "window": 128
+      }
+    ],
+    "power_assertion": "caffeinate -i",
+    "production_revision": "a2b46a2 + EventBus empty-to-ready notification only"
+  },
+  {
+    "name": "capacity-p-40000-r1",
+    "variant": "candidate",
+    "seconds": 15,
+    "warmup": 3,
+    "ramp": 1,
+    "tls": false,
+    "host_cpu_sample": false,
+    "groups": [
+      {
+        "label": "udp",
+        "protocol": "udp",
+        "rate": 40000,
+        "workers": 64,
+        "offset": 0,
+        "window": 128
+      }
+    ],
+    "power_assertion": "caffeinate -i",
+    "production_revision": "a2b46a2 + EventBus empty-to-ready notification only"
+  },
+  {
+    "name": "capacity-p-40000-r1",
+    "variant": "baseline",
+    "seconds": 15,
+    "warmup": 3,
+    "ramp": 1,
+    "tls": false,
+    "host_cpu_sample": false,
+    "groups": [
+      {
+        "label": "udp",
+        "protocol": "udp",
+        "rate": 40000,
+        "workers": 64,
+        "offset": 0,
+        "window": 128
+      }
+    ],
+    "power_assertion": "caffeinate -i",
+    "production_revision": "a2b46a2ad49a43ee538a6de74afddac350763c23"
+  },
+  {
+    "name": "capacity-p-50000-r0",
+    "variant": "baseline",
+    "seconds": 15,
+    "warmup": 3,
+    "ramp": 1,
+    "tls": false,
+    "host_cpu_sample": false,
+    "groups": [
+      {
+        "label": "udp",
+        "protocol": "udp",
+        "rate": 50000,
+        "workers": 64,
+        "offset": 0,
+        "window": 128
+      }
+    ],
+    "power_assertion": "caffeinate -i",
+    "production_revision": "a2b46a2ad49a43ee538a6de74afddac350763c23"
+  },
+  {
+    "name": "capacity-p-50000-r0",
+    "variant": "candidate",
+    "seconds": 15,
+    "warmup": 3,
+    "ramp": 1,
+    "tls": false,
+    "host_cpu_sample": false,
+    "groups": [
+      {
+        "label": "udp",
+        "protocol": "udp",
+        "rate": 50000,
+        "workers": 64,
+        "offset": 0,
+        "window": 128
+      }
+    ],
+    "power_assertion": "caffeinate -i",
+    "production_revision": "a2b46a2 + EventBus empty-to-ready notification only"
+  },
+  {
+    "name": "capacity-p-50000-r1",
+    "variant": "candidate",
+    "seconds": 15,
+    "warmup": 3,
+    "ramp": 1,
+    "tls": false,
+    "host_cpu_sample": false,
+    "groups": [
+      {
+        "label": "udp",
+        "protocol": "udp",
+        "rate": 50000,
+        "workers": 64,
+        "offset": 0,
+        "window": 128
+      }
+    ],
+    "power_assertion": "caffeinate -i",
+    "production_revision": "a2b46a2 + EventBus empty-to-ready notification only"
+  },
+  {
+    "name": "capacity-p-50000-r1",
+    "variant": "baseline",
+    "seconds": 15,
+    "warmup": 3,
+    "ramp": 1,
+    "tls": false,
+    "host_cpu_sample": false,
+    "groups": [
+      {
+        "label": "udp",
+        "protocol": "udp",
+        "rate": 50000,
+        "workers": 64,
+        "offset": 0,
+        "window": 128
+      }
+    ],
+    "power_assertion": "caffeinate -i",
+    "production_revision": "a2b46a2ad49a43ee538a6de74afddac350763c23"
+  },
+  {
+    "name": "capacity-p-60000-r0",
+    "variant": "baseline",
+    "seconds": 15,
+    "warmup": 3,
+    "ramp": 1,
+    "tls": false,
+    "host_cpu_sample": false,
+    "groups": [
+      {
+        "label": "udp",
+        "protocol": "udp",
+        "rate": 60000,
+        "workers": 64,
+        "offset": 0,
+        "window": 128
+      }
+    ],
+    "power_assertion": "caffeinate -i",
+    "production_revision": "a2b46a2ad49a43ee538a6de74afddac350763c23"
+  },
+  {
+    "name": "capacity-p-60000-r0",
+    "variant": "candidate",
+    "seconds": 15,
+    "warmup": 3,
+    "ramp": 1,
+    "tls": false,
+    "host_cpu_sample": false,
+    "groups": [
+      {
+        "label": "udp",
+        "protocol": "udp",
+        "rate": 60000,
+        "workers": 64,
+        "offset": 0,
+        "window": 128
+      }
+    ],
+    "power_assertion": "caffeinate -i",
+    "production_revision": "a2b46a2 + EventBus empty-to-ready notification only"
+  },
+  {
+    "name": "capacity-p-60000-r1",
+    "variant": "candidate",
+    "seconds": 15,
+    "warmup": 3,
+    "ramp": 1,
+    "tls": false,
+    "host_cpu_sample": false,
+    "groups": [
+      {
+        "label": "udp",
+        "protocol": "udp",
+        "rate": 60000,
+        "workers": 64,
+        "offset": 0,
+        "window": 128
+      }
+    ],
+    "power_assertion": "caffeinate -i",
+    "production_revision": "a2b46a2 + EventBus empty-to-ready notification only"
+  },
+  {
+    "name": "capacity-p-60000-r1",
+    "variant": "baseline",
+    "seconds": 15,
+    "warmup": 3,
+    "ramp": 1,
+    "tls": false,
+    "host_cpu_sample": false,
+    "groups": [
+      {
+        "label": "udp",
+        "protocol": "udp",
+        "rate": 60000,
+        "workers": 64,
+        "offset": 0,
+        "window": 128
+      }
+    ],
+    "power_assertion": "caffeinate -i",
+    "production_revision": "a2b46a2ad49a43ee538a6de74afddac350763c23"
+  },
+  {
+    "name": "capacity-p-65000-r0",
+    "variant": "baseline",
+    "seconds": 15,
+    "warmup": 3,
+    "ramp": 1,
+    "tls": false,
+    "host_cpu_sample": false,
+    "groups": [
+      {
+        "label": "udp",
+        "protocol": "udp",
+        "rate": 65000,
+        "workers": 64,
+        "offset": 0,
+        "window": 128
+      }
+    ],
+    "power_assertion": "caffeinate -i",
+    "production_revision": "a2b46a2ad49a43ee538a6de74afddac350763c23"
+  },
+  {
+    "name": "capacity-p-65000-r0",
+    "variant": "candidate",
+    "seconds": 15,
+    "warmup": 3,
+    "ramp": 1,
+    "tls": false,
+    "host_cpu_sample": false,
+    "groups": [
+      {
+        "label": "udp",
+        "protocol": "udp",
+        "rate": 65000,
+        "workers": 64,
+        "offset": 0,
+        "window": 128
+      }
+    ],
+    "power_assertion": "caffeinate -i",
+    "production_revision": "a2b46a2 + EventBus empty-to-ready notification only"
+  },
+  {
+    "name": "capacity-p-65000-r1",
+    "variant": "candidate",
+    "seconds": 15,
+    "warmup": 3,
+    "ramp": 1,
+    "tls": false,
+    "host_cpu_sample": false,
+    "groups": [
+      {
+        "label": "udp",
+        "protocol": "udp",
+        "rate": 65000,
+        "workers": 64,
+        "offset": 0,
+        "window": 128
+      }
+    ],
+    "power_assertion": "caffeinate -i",
+    "production_revision": "a2b46a2 + EventBus empty-to-ready notification only"
+  },
+  {
+    "name": "capacity-p-65000-r1",
+    "variant": "baseline",
+    "seconds": 15,
+    "warmup": 3,
+    "ramp": 1,
+    "tls": false,
+    "host_cpu_sample": false,
+    "groups": [
+      {
+        "label": "udp",
+        "protocol": "udp",
+        "rate": 65000,
+        "workers": 64,
+        "offset": 0,
+        "window": 128
+      }
+    ],
+    "power_assertion": "caffeinate -i",
+    "production_revision": "a2b46a2ad49a43ee538a6de74afddac350763c23"
+  },
+  {
+    "name": "capacity-p-70000-r0",
+    "variant": "baseline",
+    "seconds": 15,
+    "warmup": 3,
+    "ramp": 1,
+    "tls": false,
+    "host_cpu_sample": false,
+    "groups": [
+      {
+        "label": "udp",
+        "protocol": "udp",
+        "rate": 70000,
+        "workers": 64,
+        "offset": 0,
+        "window": 128
+      }
+    ],
+    "power_assertion": "caffeinate -i",
+    "production_revision": "a2b46a2ad49a43ee538a6de74afddac350763c23"
+  },
+  {
+    "name": "capacity-p-70000-r0",
+    "variant": "candidate",
+    "seconds": 15,
+    "warmup": 3,
+    "ramp": 1,
+    "tls": false,
+    "host_cpu_sample": false,
+    "groups": [
+      {
+        "label": "udp",
+        "protocol": "udp",
+        "rate": 70000,
+        "workers": 64,
+        "offset": 0,
+        "window": 128
+      }
+    ],
+    "power_assertion": "caffeinate -i",
+    "production_revision": "a2b46a2 + EventBus empty-to-ready notification only"
+  },
+  {
+    "name": "capacity-p-70000-r1",
+    "variant": "candidate",
+    "seconds": 15,
+    "warmup": 3,
+    "ramp": 1,
+    "tls": false,
+    "host_cpu_sample": false,
+    "groups": [
+      {
+        "label": "udp",
+        "protocol": "udp",
+        "rate": 70000,
+        "workers": 64,
+        "offset": 0,
+        "window": 128
+      }
+    ],
+    "power_assertion": "caffeinate -i",
+    "production_revision": "a2b46a2 + EventBus empty-to-ready notification only"
+  },
+  {
+    "name": "capacity-p-70000-r1",
+    "variant": "baseline",
+    "seconds": 15,
+    "warmup": 3,
+    "ramp": 1,
+    "tls": false,
+    "host_cpu_sample": false,
+    "groups": [
+      {
+        "label": "udp",
+        "protocol": "udp",
+        "rate": 70000,
+        "workers": 64,
+        "offset": 0,
+        "window": 128
+      }
+    ],
+    "power_assertion": "caffeinate -i",
+    "production_revision": "a2b46a2ad49a43ee538a6de74afddac350763c23"
+  },
+  {
+    "name": "capacity-p-80000-r0",
+    "variant": "baseline",
+    "seconds": 15,
+    "warmup": 3,
+    "ramp": 1,
+    "tls": false,
+    "host_cpu_sample": false,
+    "groups": [
+      {
+        "label": "udp",
+        "protocol": "udp",
+        "rate": 80000,
+        "workers": 64,
+        "offset": 0,
+        "window": 128
+      }
+    ],
+    "power_assertion": "caffeinate -i",
+    "production_revision": "a2b46a2ad49a43ee538a6de74afddac350763c23"
+  },
+  {
+    "name": "capacity-p-80000-r0",
+    "variant": "candidate",
+    "seconds": 15,
+    "warmup": 3,
+    "ramp": 1,
+    "tls": false,
+    "host_cpu_sample": false,
+    "groups": [
+      {
+        "label": "udp",
+        "protocol": "udp",
+        "rate": 80000,
+        "workers": 64,
+        "offset": 0,
+        "window": 128
+      }
+    ],
+    "power_assertion": "caffeinate -i",
+    "production_revision": "a2b46a2 + EventBus empty-to-ready notification only"
+  },
+  {
+    "name": "capacity-p-80000-r1",
+    "variant": "candidate",
+    "seconds": 15,
+    "warmup": 3,
+    "ramp": 1,
+    "tls": false,
+    "host_cpu_sample": false,
+    "groups": [
+      {
+        "label": "udp",
+        "protocol": "udp",
+        "rate": 80000,
+        "workers": 64,
+        "offset": 0,
+        "window": 128
+      }
+    ],
+    "power_assertion": "caffeinate -i",
+    "production_revision": "a2b46a2 + EventBus empty-to-ready notification only"
+  },
+  {
+    "name": "capacity-p-80000-r1",
+    "variant": "baseline",
+    "seconds": 15,
+    "warmup": 3,
+    "ramp": 1,
+    "tls": false,
+    "host_cpu_sample": false,
+    "groups": [
+      {
+        "label": "udp",
+        "protocol": "udp",
+        "rate": 80000,
+        "workers": 64,
+        "offset": 0,
+        "window": 128
+      }
+    ],
+    "power_assertion": "caffeinate -i",
+    "production_revision": "a2b46a2ad49a43ee538a6de74afddac350763c23"
+  },
+  {
+    "name": "capacity-p-100000-r0",
+    "variant": "baseline",
+    "seconds": 15,
+    "warmup": 3,
+    "ramp": 1,
+    "tls": false,
+    "host_cpu_sample": false,
+    "groups": [
+      {
+        "label": "udp",
+        "protocol": "udp",
+        "rate": 100000,
+        "workers": 64,
+        "offset": 0,
+        "window": 128
+      }
+    ],
+    "power_assertion": "caffeinate -i",
+    "production_revision": "a2b46a2ad49a43ee538a6de74afddac350763c23"
+  },
+  {
+    "name": "capacity-p-100000-r0",
+    "variant": "candidate",
+    "seconds": 15,
+    "warmup": 3,
+    "ramp": 1,
+    "tls": false,
+    "host_cpu_sample": false,
+    "groups": [
+      {
+        "label": "udp",
+        "protocol": "udp",
+        "rate": 100000,
+        "workers": 64,
+        "offset": 0,
+        "window": 128
+      }
+    ],
+    "power_assertion": "caffeinate -i",
+    "production_revision": "a2b46a2 + EventBus empty-to-ready notification only"
+  },
+  {
+    "name": "capacity-p-100000-r1",
+    "variant": "candidate",
+    "seconds": 15,
+    "warmup": 3,
+    "ramp": 1,
+    "tls": false,
+    "host_cpu_sample": false,
+    "groups": [
+      {
+        "label": "udp",
+        "protocol": "udp",
+        "rate": 100000,
+        "workers": 64,
+        "offset": 0,
+        "window": 128
+      }
+    ],
+    "power_assertion": "caffeinate -i",
+    "production_revision": "a2b46a2 + EventBus empty-to-ready notification only"
+  },
+  {
+    "name": "capacity-p-100000-r1",
+    "variant": "baseline",
+    "seconds": 15,
+    "warmup": 3,
+    "ramp": 1,
+    "tls": false,
+    "host_cpu_sample": false,
+    "groups": [
+      {
+        "label": "udp",
+        "protocol": "udp",
+        "rate": 100000,
+        "workers": 64,
+        "offset": 0,
+        "window": 128
+      }
+    ],
+    "power_assertion": "caffeinate -i",
+    "production_revision": "a2b46a2ad49a43ee538a6de74afddac350763c23"
+  },
+  {
+    "name": "soak-p-60000-300s",
+    "variant": "baseline",
+    "seconds": 300,
+    "warmup": 10,
+    "ramp": 2,
+    "tls": false,
+    "host_cpu_sample": false,
+    "power_assertion": "caffeinate -i",
+    "production_revision": "a2b46a2",
+    "groups": [
+      {
+        "label": "udp",
+        "protocol": "udp",
+        "rate": 60000,
+        "workers": 64,
+        "offset": 0,
+        "window": 128
+      }
+    ]
+  },
+  {
+    "name": "soak-p-60000-300s",
+    "variant": "candidate",
+    "seconds": 300,
+    "warmup": 10,
+    "ramp": 2,
+    "tls": false,
+    "host_cpu_sample": false,
+    "power_assertion": "caffeinate -i",
+    "production_revision": "a2b46a2 + EventBus empty-to-ready notification only",
+    "groups": [
+      {
+        "label": "udp",
+        "protocol": "udp",
+        "rate": 60000,
+        "workers": 64,
+        "offset": 0,
+        "window": 128
+      }
+    ]
+  },
+  {
+    "name": "fault-p-slow-sink",
+    "variant": "baseline",
+    "seconds": 15,
+    "warmup": 2,
+    "ramp": 1,
+    "tls": false,
+    "host_cpu_sample": false,
+    "sink": true,
+    "sink_delay": 0.2,
+    "sink_restore_at": 5,
+    "groups": [
+      {
+        "label": "udp",
+        "protocol": "udp",
+        "rate": 200,
+        "workers": 8,
+        "offset": 0,
+        "window": 16
+      }
+    ],
+    "power_assertion": "caffeinate -i",
+    "production_revision": "a2b46a2ad49a43ee538a6de74afddac350763c23"
+  },
+  {
+    "name": "fault-p-slow-sink",
+    "variant": "candidate",
+    "seconds": 15,
+    "warmup": 2,
+    "ramp": 1,
+    "tls": false,
+    "host_cpu_sample": false,
+    "sink": true,
+    "sink_delay": 0.2,
+    "sink_restore_at": 5,
+    "groups": [
+      {
+        "label": "udp",
+        "protocol": "udp",
+        "rate": 200,
+        "workers": 8,
+        "offset": 0,
+        "window": 16
+      }
+    ],
+    "power_assertion": "caffeinate -i",
+    "production_revision": "a2b46a2 + EventBus empty-to-ready notification only"
+  },
+  {
+    "name": "lock-p-60000",
+    "variant": "baseline",
+    "seconds": 12,
+    "warmup": 3,
+    "ramp": 1,
+    "tls": false,
+    "host_cpu_sample": false,
+    "lock_metrics": true,
+    "groups": [
+      {
+        "label": "udp",
+        "protocol": "udp",
+        "rate": 60000,
+        "workers": 64,
+        "offset": 0,
+        "window": 128
+      }
+    ],
+    "power_assertion": "caffeinate -i",
+    "production_revision": "a2b46a2ad49a43ee538a6de74afddac350763c23"
+  },
+  {
+    "name": "lock-p-60000",
+    "variant": "candidate",
+    "seconds": 12,
+    "warmup": 3,
+    "ramp": 1,
+    "tls": false,
+    "host_cpu_sample": false,
+    "lock_metrics": true,
+    "groups": [
+      {
+        "label": "udp",
+        "protocol": "udp",
+        "rate": 60000,
+        "workers": 64,
+        "offset": 0,
+        "window": 128
+      }
+    ],
+    "power_assertion": "caffeinate -i",
+    "production_revision": "a2b46a2 + EventBus empty-to-ready notification only"
+  },
+  {
+    "name": "profile-p-60000",
+    "variant": "candidate",
+    "seconds": 12,
+    "warmup": 3,
+    "ramp": 1,
+    "tls": false,
+    "host_cpu_sample": false,
+    "cpu_profile": "time",
+    "groups": [
+      {
+        "label": "udp",
+        "protocol": "udp",
+        "rate": 60000,
+        "workers": 64,
+        "offset": 0,
+        "window": 128
+      }
+    ],
+    "power_assertion": "caffeinate -i",
+    "production_revision": "a2b46a2 + EventBus empty-to-ready notification only"
+  }
+]

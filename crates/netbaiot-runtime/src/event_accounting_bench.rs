@@ -1,5 +1,26 @@
 // Isolated subsystem evidence; setup and cleanup are outside the measured region.
 #[test]
+#[ignore = "serial release UDP EventBus queued-publish allocation measurement"]
+fn udp_queued_publish_allocations() {
+    use crate::hotspot_bench::measure;
+    for depth in [1, 16, 64] {
+        let bus = route_bus(Limits::default(), vec![route(None, &["a"])]).unwrap();
+        let id = SinkId::new("a").unwrap();
+        let definition = bus.state.lock().unwrap().sinks[&id].definition.clone();
+        for _ in 0..depth {
+            bus.publish(event(256)).unwrap();
+        }
+        measure("udp_queued_publish", depth, 100_000, || event(256),
+            |event| bus.publish(event).unwrap(),
+            |_| {
+                let record = bus.take_ready(&id).unwrap().unwrap();
+                bus.complete(&id, record, Ok(SinkAck), &definition).unwrap();
+            });
+        assert_eq!(checked_usage(&bus).pending_required, depth);
+    }
+}
+
+#[test]
 #[ignore = "serial release EventBus accounting measurement"]
 fn engineering_eventbus_accounting_benchmark() {
     use crate::hotspot_bench::measure;

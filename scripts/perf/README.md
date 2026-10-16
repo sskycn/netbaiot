@@ -103,6 +103,41 @@ separately and include CPU, tail latency and fairness.
 The event and mixed drivers set `NETBAIOT_PERF_LOCK_METRICS=1` for the child
 server. Broker/EventBus lock timing is disabled by default outside these drivers.
 
+For UDP A/B capacity runs, `device_protocol_benchmark.py` accepts interleaved plan
+entries with `variant: "baseline"` or `"candidate"` and a `--candidate` executable.
+Freeze both Release executables and the load generator first. Increase `groups`
+UDP `rate` progressively, then repeat the rates around the loss/latency boundary
+and run a longer soak; keep worker counts, payloads, limits and client windows
+identical. This driver leaves lock timing disabled unless `lock_metrics: true` is
+set in the plan. Set `host_cpu_sample: false` to omit the intrusive midpoint `top`
+sample; process CPU and RSS samples remain enabled. Record these choices.
+On a macOS desktop, wrap the driver in `caffeinate -i` to prevent idle sleep for
+that command's lifetime. Keep incomplete runs; do not count a sleep-interrupted
+warmup as a capacity measurement.
+
+On macOS, a separate diagnostic plan with `cpu_profile: "time"` records up to ten
+seconds using Instruments Time Profiler; `cpu_profile: true` uses `sample`.
+Do not mix profiled results into capacity statistics. `sample` includes parked
+threads and is not a CPU percentage profile. Raw traces stay under ignored
+`target/mixed-audit`; inspect exported metadata before publishing anything.
+After exporting only the `time-profile` table with `xctrace export`, summarize it
+with `python3 scripts/perf/macos_cpu_summary.py input.xml output.json`. The output
+contains sampled running-stack weights and symbol names, not the trace's process
+environment or local binary paths.
+
+Summarize matching UDP records without mixing counter windows:
+
+```bash
+python3 scripts/perf/udp_capacity_summary.py target/performance/udp/raw target/performance/udp/summary.json --match '*capacity*.json'
+```
+
+CPU/event divides process CPU by gateway EventAccepted deltas from the same
+sample interval. Receipt rate/P99 and acceptance percentage use the load generator
+window. Preserve `udp_no_ack`, client window exhaustion, gateway rejects and ACK
+send failures separately: their accounting intervals differ. Kernel socket drops
+are host-wide deltas over warmup, measurement and cooldown, not per-process loss.
+Summaries retain hashes, per-run plans, queue/RSS peaks and graceful-stop results.
+
 The V3 HOL and command-readiness harnesses wait for the configured gateway
 shutdown deadline plus five seconds. They retain the authoritative recovery
 directory and copy committed files with permissions, byte counts and SHA256

@@ -1,0 +1,62 @@
+--- a/crates/netbaiot-transports/src/udp.rs
++++ b/crates/netbaiot-transports/src/udp.rs
+@@ -275,6 +275,18 @@
+ #[path = "udp_replay_tests.rs"]
+ mod replay_tests;
+ 
++fn datagram_capacity(tasks: &mut JoinSet<()>, limit: usize) -> bool {
++    // A worker can finish after select! polls join_next but before recv_from
++    // returns. Reclaim that completed owner before declaring overload. Live
++    // work still owns its slot; this never waits or raises the concurrency cap.
++    if tasks.len() >= limit
++        && let Some(Err(_)) = tasks.try_join_next()
++    {
++        tracing::error!("UDP datagram worker failed");
++    }
++    tasks.len() < limit
++}
++
+ pub async fn serve(socket: UdpSocket, s: Arc<Services>, stop: CancellationToken) -> Result<()> {
+     let l = &s.ingress.limits;
+     let mut input = vec![0; l.max_udp_datagram_size + 1];
+@@ -306,7 +318,9 @@
+         if s.rates.take(peer.ip()).is_err() {
+             continue;
+         }
+-        if len > l.max_udp_datagram_size || tasks.len() >= l.max_udp_inflight_datagrams {
++        if len > l.max_udp_datagram_size
++            || !datagram_capacity(&mut tasks, l.max_udp_inflight_datagrams)
++        {
+             s.ingress.metrics.inc(Metric::UdpOverloadDrops);
+             continue;
+         }
+--- a/crates/netbaiot-transports/src/udp_tests.rs
++++ b/crates/netbaiot-transports/src/udp_tests.rs
+@@ -122,6 +122,27 @@
+ }
+ const PAYLOAD: &[u8] =
+     br#"{"schema_version":1,"source_message_id":"udp:42","kind":"heartbeat","data":{"sequence":42}}"#;
++#[tokio::test]
++async fn capacity_reclaims_completed_work_but_never_a_live_owner() {
++    let mut tasks = JoinSet::new();
++    tasks.spawn(std::future::pending());
++    let completed = Arc::new(tokio::sync::Notify::new());
++    let worker_completed = completed.clone();
++    tasks.spawn(async move {
++        worker_completed.notify_one();
++    });
++    completed.notified().await;
++    assert_eq!(tasks.len(), 2);
++    assert!(datagram_capacity(&mut tasks, 2));
++    assert_eq!(tasks.len(), 1);
++    tasks.spawn(std::future::pending());
++    assert!(!datagram_capacity(&mut tasks, 2));
++    assert_eq!(tasks.len(), 2);
++    tasks.abort_all();
++    while tasks.join_next().await.is_some() {}
++    assert!(datagram_capacity(&mut tasks, 2));
++}
++
+ fn packet(id: &str, version: u32, sequence: u64, timestamp: i64, payload: &[u8]) -> Vec<u8> {
+     let mut bytes = b"NBI1".to_vec();
+     bytes.push(id.len() as u8);

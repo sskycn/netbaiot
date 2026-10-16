@@ -274,7 +274,7 @@ async fn send_failure_commits_and_ten_thousand_duplicates_do_not_ingest() {
     ingress.events.stop_workers().await.unwrap();
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn concurrent_duplicate_packets_have_one_event_accepted_owner() {
     let (ingress, provider) = fixture(Limits::default());
     let replay = Arc::new(tokio::sync::Mutex::new(ReplayWindow::new(
