@@ -49,6 +49,80 @@ fn lifecycle_log_tail(path: &std::path::Path) -> String {
     read().unwrap_or_else(|error| format!("cannot read lifecycle log: {error}"))
 }
 
+async fn wait_for_business_ready(
+    business: &BusinessRpcV3Client,
+    config: &BusinessRpcV3ClientConfig,
+    server: &mut tokio::process::Child,
+    log: &std::path::Path,
+) -> Result<(), String> {
+    let started = tokio::time::Instant::now();
+    let pid = server.id();
+    let failure = tokio::select! {
+        biased;
+        status = server.wait() => format!("server exited before Business RPC readiness: {status:?}"),
+        result = tokio::time::timeout(Duration::from_secs(10), business.wait_ready()) => {
+            match result {
+                Ok(Ok(())) => return Ok(()),
+                Ok(Err(error)) => format!("Business RPC readiness failed: {error}"),
+                Err(error) => format!("Business RPC readiness timed out: {error}"),
+            }
+        }
+    };
+    Err(format!(
+        "{failure}; elapsed={:?}; server_pid={:?}; server_status={:?}; address={}; tls={}; provider={}; events={}; ready={}\nserver log (last 64 KiB):\n{}",
+        started.elapsed(),
+        pid,
+        server.try_wait(),
+        config.address,
+        config.tls.is_some(),
+        config.provider,
+        config.events,
+        business.ready(),
+        lifecycle_log_tail(log),
+    ))
+}
+
+#[tokio::test]
+async fn business_ready_diagnostic_reports_early_server_exit() {
+    let root = std::env::temp_dir().join(format!("netbaiot-v3-ready-{}", uuid::Uuid::new_v4()));
+    std::fs::create_dir_all(&root).unwrap();
+    let log = root.join("server.log");
+    let output = std::fs::File::create(&log).unwrap();
+    let mut server = Command::new(env!("CARGO_BIN_EXE_netbaiot-server"))
+        .arg(root.join("missing-config.json"))
+        .stdout(Stdio::from(output.try_clone().unwrap()))
+        .stderr(Stdio::from(output))
+        .kill_on_drop(true)
+        .spawn()
+        .unwrap();
+    let pid = server.id().unwrap();
+    // Keep the address reserved: this client cannot become Ready or contact an unrelated server.
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let mut config = BusinessRpcV3ClientConfig::development(
+        listener.local_addr().unwrap(),
+        "diagnostic-test-token".into(),
+    );
+    config.provider = false;
+    config.events = false;
+    let (business, _) = BusinessRpcV3Client::connect(config.clone(), None).unwrap();
+    let failure = wait_for_business_ready(&business, &config, &mut server, &log)
+        .await
+        .unwrap_err();
+    assert!(
+        failure.contains("server exited before Business RPC readiness"),
+        "{failure}"
+    );
+    assert!(
+        failure.contains(&format!("server_pid=Some({pid})")),
+        "{failure}"
+    );
+    assert!(failure.contains("ready=false"), "{failure}");
+    assert!(failure.contains("NBI-CFG-"), "{failure}");
+    assert!(!failure.contains("diagnostic-test-token"), "{failure}");
+    drop(business);
+    std::fs::remove_dir_all(root).unwrap();
+}
+
 const SECRET: &str = "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f";
 struct Handler {
     calls: AtomicUsize,
@@ -540,7 +614,8 @@ async fn v3_command_real_tcp_tenant_scope_and_capacity() {
     let mut server = Command::new(env!("CARGO_BIN_EXE_netbaiot-server"))
         .arg(&path)
         .env("NETBAIOT_ADMIN_SECRET", "a".repeat(64))
-        .stdout(Stdio::null())
+        .env("RUST_LOG", "info,netbaiot_transports::business_rpc=debug")
+        .stdout(Stdio::from(stderr.try_clone().unwrap()))
         .stderr(Stdio::from(stderr))
         .kill_on_drop(true)
         .spawn()
@@ -555,11 +630,15 @@ async fn v3_command_real_tcp_tenant_scope_and_capacity() {
     });
     client_config.provider = false;
     client_config.events = false;
-    let (business, _) = BusinessRpcV3Client::connect(client_config, None).unwrap();
-    tokio::time::timeout(Duration::from_secs(10), business.wait_ready())
-        .await
-        .unwrap()
-        .unwrap();
+    let (business, _) = BusinessRpcV3Client::connect(client_config.clone(), None).unwrap();
+    wait_for_business_ready(
+        &business,
+        &client_config,
+        &mut server,
+        &root.join("server.log"),
+    )
+    .await
+    .unwrap_or_else(|diagnostic| panic!("{diagnostic}"));
     let mut other_config = current_config(addresses[2], "unused".into(), BusinessRole::Commands);
     other_config.token = None;
     other_config.tls = Some(BusinessRpcTls {
@@ -568,11 +647,10 @@ async fn v3_command_real_tcp_tenant_scope_and_capacity() {
         certificate_pem: fixtures.join("management-client.pem"),
         private_key_pem: fixtures.join("management-client-key.pem"),
     });
-    let (other, _) = BusinessRpcV3Client::connect(other_config, None).unwrap();
-    tokio::time::timeout(Duration::from_secs(10), other.wait_ready())
+    let (other, _) = BusinessRpcV3Client::connect(other_config.clone(), None).unwrap();
+    wait_for_business_ready(&other, &other_config, &mut server, &root.join("server.log"))
         .await
-        .unwrap()
-        .unwrap();
+        .unwrap_or_else(|diagnostic| panic!("{diagnostic}"));
 
     let mut socket = TcpStream::connect(addresses[0]).await.unwrap();
     let handshake =

@@ -50,7 +50,7 @@ pub async fn run_with_credentials(
 /// Like run_with_credentials, with one bounded startup notification for embedded hosts.
 /// No notification is sent until preparation and worker ownership are complete.
 pub async fn run_with_credentials_ready(
-    config: Config,
+    mut config: Config,
     stop: CancellationToken,
     admin_secret: Option<String>,
     business_rpc_token: Option<String>,
@@ -120,7 +120,14 @@ pub async fn run_with_credentials_ready(
         }
     };
     let auth_cache = AuthCache::new(provider, limits.clone(), metrics.clone());
-    let registry = crate::bootstrap::codec_registry(&limits)?;
+    let registry = crate::bootstrap::configured_codec_registry(
+        &limits,
+        &config.payload_codecs,
+        &config.native_codecs,
+    )?;
+    // Retain only compiled plans and registry-owned native codecs during service.
+    config.payload_codecs.clear();
+    config.native_codecs.clear();
     for auth in identities.values() {
         registry.get(auth)?;
     }

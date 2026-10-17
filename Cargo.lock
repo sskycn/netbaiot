@@ -1285,6 +1285,7 @@ dependencies = [
  "prost-build",
  "protoc-bin-vendored",
  "rmp-serde",
+ "schemars",
  "serde",
  "serde_json",
  "stats_alloc",

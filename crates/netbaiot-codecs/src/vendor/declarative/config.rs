@@ -1,0 +1,197 @@
+//! Versioned, bounded binary payload descriptions. Offsets are payload-relative.
+use serde::{Deserialize, Serialize};
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct DeclarativeConfig {
+    /// Explicit authentication-bound codec ID, e.g. vendor-acme. Never inferred from bytes.
+    pub id: String,
+    #[cfg_attr(feature = "schema", schemars(range(min = 1)))]
+    pub version: u16,
+    #[cfg_attr(feature = "schema", schemars(length(min = 1, max = 64)))]
+    pub header: Vec<u8>,
+    pub message_type: IntegerField,
+    pub length: Option<LengthField>,
+    #[cfg_attr(feature = "schema", schemars(length(min = 1, max = 64)))]
+    pub messages: Vec<Message>,
+    #[serde(default)]
+    #[cfg_attr(feature = "schema", schemars(length(max = 64)))]
+    pub commands: Vec<Command>,
+}
+
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub enum Endian {
+    #[default]
+    Big,
+    Little,
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub enum IntegerType {
+    U8,
+    U16,
+    U32,
+    U64,
+}
+impl IntegerType {
+    pub(super) fn width(self) -> usize {
+        match self {
+            Self::U8 => 1,
+            Self::U16 => 2,
+            Self::U32 => 4,
+            Self::U64 => 8,
+        }
+    }
+    pub(super) fn fits(self, n: u64) -> bool {
+        self.width() == 8 || n < (1u64 << (self.width() * 8))
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct IntegerField {
+    #[cfg_attr(feature = "schema", schemars(range(max = 65535)))]
+    pub offset: usize,
+    #[serde(rename = "type")]
+    pub data_type: IntegerType,
+    #[serde(default)]
+    pub endian: Endian,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct LengthField {
+    pub field: IntegerField,
+    /// Wire value + adjustment must equal the complete payload length.
+    #[serde(default)]
+    pub adjustment: i32,
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub enum DataType {
+    U8,
+    U16,
+    U32,
+    U64,
+    I8,
+    I16,
+    I32,
+    I64,
+    F32,
+    F64,
+    Bool,
+    Utf8,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct Field {
+    #[cfg_attr(feature = "schema", schemars(range(max = 65535)))]
+    pub offset: usize,
+    #[serde(rename = "type")]
+    pub data_type: DataType,
+    #[serde(default)]
+    pub endian: Endian,
+    /// Required only for UTF-8: exact byte length, without padding or terminator.
+    pub length: Option<usize>,
+    #[serde(default = "one")]
+    pub scale: f64,
+    #[serde(default)]
+    pub bias: f64,
+}
+fn one() -> f64 {
+    1.0
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct NamedField {
+    pub name: String,
+    pub field: Field,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub enum MessagePayload {
+    Telemetry {
+        fields: Vec<NamedField>,
+    },
+    Heartbeat {
+        sequence: IntegerField,
+    },
+    Event {
+        name: String,
+        value: Option<Field>,
+    },
+    CommandAck {
+        /// Offset of the complete 16-byte UUID in RFC 4122 byte order.
+        command_id_offset: usize,
+        execution: IntegerField,
+        running: u64,
+        succeeded: u64,
+        failed: u64,
+    },
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct Message {
+    pub tag: u64,
+    #[cfg_attr(feature = "schema", schemars(range(min = 1, max = 65536)))]
+    pub size: usize,
+    /// Unscaled unsigned integer (decimal ID) or exact UTF-8 identifier, at most 64 bytes.
+    pub source_message_id: Field,
+    pub occurred_at: Option<IntegerField>,
+    pub payload: MessagePayload,
+    pub checksum: Option<Checksum>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct Command {
+    pub name: String,
+    pub tag: u64,
+    #[cfg_attr(feature = "schema", schemars(range(min = 1, max = 65536)))]
+    pub size: usize,
+    pub command_id_offset: usize,
+    pub expires_at: Option<IntegerField>,
+    pub fields: Vec<NamedField>,
+    pub checksum: Option<Checksum>,
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub enum ChecksumAlgorithm {
+    Sum8,
+    Xor8,
+    Crc16Modbus,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct Checksum {
+    pub algorithm: ChecksumAlgorithm,
+    #[cfg_attr(feature = "schema", schemars(range(max = 65535)))]
+    pub offset: usize,
+    /// Inclusive start and exclusive end; the checksum bytes must be outside this range.
+    pub start: usize,
+    pub end: usize,
+    #[serde(default)]
+    pub endian: Endian,
+}

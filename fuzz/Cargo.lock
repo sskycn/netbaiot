@@ -773,7 +773,7 @@ checksum = "1d87ecb2933e8aeadb3e3a02b828fed80a7528047e68b4f424523a0981a3a084"
 
 [[package]]
 name = "netbaiot-codecs"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "ciborium",
  "netbaiot-core",
@@ -788,7 +788,7 @@ dependencies = [
 
 [[package]]
 name = "netbaiot-core"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "hkdf",
  "netbaiot-protocol",
@@ -816,14 +816,14 @@ dependencies = [
 
 [[package]]
 name = "netbaiot-mqtt-wire"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "bytes",
 ]
 
 [[package]]
 name = "netbaiot-protocol"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "serde",
  "thiserror",
@@ -832,7 +832,7 @@ dependencies = [
 
 [[package]]
 name = "netbaiot-runtime"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "async-trait",
  "atomicwrites",
@@ -858,7 +858,7 @@ dependencies = [
 
 [[package]]
 name = "netbaiot-transports"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "async-trait",
  "bytes",
@@ -884,7 +884,7 @@ dependencies = [
 
 [[package]]
 name = "netbaiot-v3-mux"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "bytes",
  "netbaiot-protocol",

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Four native payload codecs through real Mosquitto clients and a confirmed webhook.
+"""Built-in and vendor payload codecs through real Mosquitto clients and a confirmed webhook.
 Run: cargo build -p netbaiot-server; python3 tests/multi_codec_interop.py
 Uses public development fixtures only. No external runtime broker is started.
 """
@@ -34,6 +34,15 @@ def main():
     opener=urllib.request.build_opener(urllib.request.ProxyHandler({}))
     with tempfile.TemporaryDirectory(prefix='netbaiot-multi-codec-') as tmp:
         config=json.loads((ROOT/'configs/multi-codec.json').read_text())
+        config['payload_codecs']=[json.loads((ROOT/'configs/codecs/acme-v1.json').read_text())]
+        vendor_credential=json.loads(json.dumps(config['credentials'][0]))
+        vendor_credential['credential_id']='acme-sensor'
+        vendor_credential['identity']['codec_id']='vendor-acme'
+        vendor_credential['identity']['device_key']['product_id']='acme'
+        config['credentials'].append(vendor_credential)
+        vendor_payload=bytearray([165,90,0,19,1,42,0,0,0,0x85,0xff,0x02,0x8e,1,65,49,48,48])
+        vendor_payload.append(sum(vendor_payload)%256)
+        vendor_wire=Path(tmp)/'vendor.bin';vendor_wire.write_bytes(vendor_payload)
         reservations=[socket.socket() for _ in range(2)]
         for s in reservations:s.bind(('127.0.0.1',0))
         udp=socket.socket(type=socket.SOCK_DGRAM);udp.bind(reservations[0].getsockname())
@@ -64,16 +73,30 @@ def main():
                         for qos in [0,1,2]:
                             result=subprocess.run([*base,'-q',str(qos),'-f',str(ROOT/f'crates/netbaiot-codecs/tests/fixtures/telemetry.{f}')],capture_output=True,timeout=5)
                             assert result.returncode==0, 'Mosquitto publish failed'
+                for version in ['mqttv311','mqttv5']:
+                    for qos in [0,1,2]:
+                        result=subprocess.run([pub,'-h','127.0.0.1','-p',str(port),'-V',version,
+                            '-u',vendor_credential['credential_id'],'-P',vendor_credential['secret_hex'],
+                            '-t','v1/t/demo/p/acme/d/device-1/up','-q',str(qos),'-f',str(vendor_wire)],
+                            capture_output=True,timeout=5)
+                        assert result.returncode==0, 'Mosquitto vendor publish failed'
                 for f in FORMATS:
                     credential=next(c for c in config['credentials'] if c['identity']['codec_id']==f'netbaiot-{f}')
                     for kind in ['types','event','heartbeat','command_ack']:
                         result=subprocess.run([pub,'-h','127.0.0.1','-p',str(port),'-V','mqttv311','-u',credential['credential_id'],'-P',credential['secret_hex'],'-t',f'v1/t/demo/p/{f}/d/device-1/up','-q','1','-f',str(ROOT/f'crates/netbaiot-codecs/tests/fixtures/{kind}.{f}')],capture_output=True,timeout=5)
                         assert result.returncode==0, f'Mosquitto typed publish failed: {f}/{kind}: {result.stderr.decode(errors="replace")}'
                 deadline=time.monotonic()+5
-                while len(received)<40 and time.monotonic()<deadline:time.sleep(.01)
-                assert len(received)==40,len(received)
+                while len(received)<46 and time.monotonic()<deadline:time.sleep(.01)
+                assert len(received)==46,len(received)
+                vendor_events=[e for e in received if e['product_id']=='acme']
+                assert len(vendor_events)==6
+                for event in vendor_events:
+                    assert event['source_message_id']=='42'
+                    assert event['tenant_id']=='demo' and event['device_id']=='device-1'
+                    assert event['payload']['kind']=='telemetry'
+                    assert event['payload']['data']=={'temperature':-123*0.1,'humidity':654*0.1,'alarm':True,'model':'A100'}
                 expected={}
-                for event in received:
+                for event in (e for e in received if e['product_id']!='acme'):
                     assert event['source_message_id']=='sample:1'
                     assert event['tenant_id']=='demo' and event['device_id']=='device-1'
                     assert event['product_id'] in FORMATS
@@ -83,7 +106,7 @@ def main():
                 assert expected[('telemetry','normal')]['data']=={'temperature':25.3,'humidity':61.2}
                 assert len(expected)==5
                 server.terminate();assert server.wait(timeout=8)==0
-                print(json.dumps({'accepted_webhooks':40,'codecs':list(FORMATS),'mqtt_versions':['3.1.1','5.0'],'qos':[0,1,2],'result':'PASS'}))
+                print(json.dumps({'accepted_webhooks':46,'codecs':[*FORMATS,'vendor-acme'],'mqtt_versions':['3.1.1','5.0'],'qos':[0,1,2],'result':'PASS'}))
             except Exception:
                 log.flush()
                 print((Path(tmp)/'server.log').read_text()[-4096:])

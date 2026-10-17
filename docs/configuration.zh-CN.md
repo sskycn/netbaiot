@@ -2,6 +2,9 @@
 
 设备载荷支持 JSON V1、CBOR V1、MessagePack V1、Protobuf V1，详见[wire 格式、认证选择与扩展](codecs.zh-CN.md)。
 
+可选 `payload_codecs` 数组在启动时编译厂商二进制协议。详见
+[厂商协议配置与原生注册](vendor-codecs.zh-CN.md)和[完整开发示例](../configs/vendor-codec.json)。
+
 [English](configuration.md)
 
 ```bash

@@ -195,10 +195,15 @@ implementations can use `src/vendor`). Reuse common validators and add a bounded
 preflight before calling a generic binary decoder. Override validate_payload with
 the same parser as decode, so prevalidation creates no event_id. Emit exactly one
 event with identity from DecodeContext, preserve source_message_id, and implement
-encode for that profile. Add one explicit ID/version entry in builtins; the
+encode for that profile. Register an explicit ID/version through `vendor::registration`
+and the server's `Config.native_codecs` composition hook; the
 registry allows up to 64 unique positive-version pairs, including several versions
 of one ID. Add independent wire vectors, malformed/limit tests, fuzz and integration
 coverage. Transport adapters own new industrial framing (e.g. Modbus), not codecs.
+
+For JSON binary layouts, native Rust examples, checksums and field bounds, see
+[Vendor payload codecs](vendor-codecs.md). Declarations live in the optional
+server `payload_codecs` array and use the same authentication-bound registry.
 
 ## Runnable examples and validation
 

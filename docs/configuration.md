@@ -2,6 +2,10 @@
 
 Device payloads support JSON V1, CBOR V1, MessagePack V1 and Protobuf V1. See [codec wire formats, selection and extension](codecs.md).
 
+The optional `payload_codecs` array compiles vendor binary protocols at startup.
+See [vendor codec configuration and native registration](vendor-codecs.md) and
+[the complete development example](../configs/vendor-codec.json).
+
 [中文](configuration.zh-CN.md)
 
 ```bash

@@ -12,6 +12,10 @@
 | netbaiot-msgpack | 1 | 同上 | 原生 MessagePack Map |
 | netbaiot-protobuf | 1 | 同上 | 原生 Protobuf DeviceCommand |
 
+厂商二进制 JSON 声明、原生 Rust 示例、校验和与资源边界见
+[厂商自定义 Payload Codec](vendor-codecs.zh-CN.md)。声明位于 `payload_codecs`，
+共用现有认证绑定的注册表。
+
 ## 认证与产品配置
 
 静态凭据、HTTP 认证及 Business RPC V3 均通过可信 `AuthenticatedDevice` 中的
@@ -141,7 +145,8 @@ NBMQ v6 均不变；非计划故障仍可能丢失有界的未 spool 内存流�
 
 新厂商协议可放在 `src/vendor`，独立实现同步 `DeviceCodec`，共用验证，库解码前
 完成有界预检，validate_payload 和 decode 使用同一 parser，身份来自 DecodeContext，
-只输出一个事件，并实现 encode。在 builtins 中注册唯一 ID/版本，添加独立 wire
+只输出一个事件，并实现 encode。通过 `vendor::registration` 和服务器
+`Config.native_codecs` 注册唯一 ID/版本，添加独立 wire
 向量、边界测试、fuzz 和真实传输测试。工业协议 framing（例如 Modbus）属于独立
 适配器，不注册为通用序列化 Codec。
 

@@ -51,3 +51,23 @@ fn generated_schema_matches_examples_and_rejects_unknown_types_and_invalid_limit
         ))
     );
 }
+
+#[test]
+fn vendor_schema_exposes_json_plans_but_not_native_code_loading() {
+    let schema: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../docs/schema/netbaiot-config.schema.json"
+    ))
+    .unwrap();
+    let validator = jsonschema::validator_for(&schema).unwrap();
+    let mut config: serde_json::Value =
+        serde_json::from_str(include_str!("../../../configs/vendor-codec.json")).unwrap();
+    assert!(validator.is_valid(&config));
+    config["payload_codecs"][0]["version"] = 0.into();
+    assert!(!validator.is_valid(&config));
+    config["payload_codecs"][0]["version"] = 1.into();
+    config["payload_codecs"][0]["messages"][0]["size"] = 65537.into();
+    assert!(!validator.is_valid(&config));
+    config["payload_codecs"][0]["messages"][0]["size"] = 19.into();
+    config["native_codecs"] = serde_json::json!([]);
+    assert!(!validator.is_valid(&config));
+}

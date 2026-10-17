@@ -79,7 +79,12 @@ fn identity(format: &str, device: &str) -> AuthenticatedDevice {
         },
         credential_version: 1,
         auth_generation: 1,
-        codec_id: CodecId::new(format!("netbaiot-{format}")).unwrap(),
+        codec_id: CodecId::new(if format == "acme" {
+            "vendor-acme".into()
+        } else {
+            format!("netbaiot-{format}")
+        })
+        .unwrap(),
         codec_version: 1,
         permissions: Permissions {
             publish: true,
@@ -181,6 +186,13 @@ async fn unconfigured_dynamic_product_allows_distinct_bound_profiles_until_provi
     ingress.events.stop_workers().await.unwrap();
 }
 fn payload(format: &str) -> Vec<u8> {
+    if format == "acme" {
+        let mut bytes = vec![
+            165, 90, 0, 19, 1, 42, 0, 0, 0, 0x85, 0xff, 0x02, 0x8e, 1, b'A', b'1', b'0', b'0',
+        ];
+        bytes.push(bytes.iter().fold(0u8, |sum, b| sum.wrapping_add(*b)));
+        return bytes;
+    }
     std::fs::read(
         std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(format!(
             "../netbaiot-codecs/tests/fixtures/telemetry.{format}"
@@ -233,8 +245,15 @@ fn fixture_with_sink(
         1,
     )
     .unwrap();
-    let codecs =
-        CodecRegistry::new(netbaiot_codecs::builtins(CodecLimits::default()).unwrap()).unwrap();
+    let mut entries = netbaiot_codecs::builtins(CodecLimits::default()).unwrap();
+    let vendor = netbaiot_codecs::vendor::declarative::DeclarativeCodec::from_json(
+        include_bytes!("../../../configs/codecs/acme-v1.json"),
+        CodecLimits::default(),
+    )
+    .unwrap();
+    entries
+        .push(netbaiot_codecs::vendor::registration("vendor-acme", 1, Arc::new(vendor)).unwrap());
+    let codecs = CodecRegistry::new(entries).unwrap();
     let control = GatewayControl::empty(l.clone());
     control
         .apply(
@@ -261,6 +280,7 @@ fn fixture_with_sink(
     let static_provider = StaticAuthenticator::new(
         FORMATS
             .iter()
+            .chain([&"acme"])
             .flat_map(|f| {
                 ["mqtt", "tcp", "udp"].map(|d| Credential {
                     credential_id: format!("{f}-{d}"),
@@ -634,7 +654,7 @@ async fn mixed_codec_reconnect_and_control_soak() {
     while started.elapsed() < Duration::from_secs(60) {
         pace.tick().await;
         cycle += 1;
-        for f in FORMATS {
+        for f in FORMATS.into_iter().chain(["acme"]) {
             let auth = identity(f, "mqtt");
             let v5 = cycle.is_multiple_of(2);
             let payload = payload(f);
@@ -691,13 +711,13 @@ async fn mixed_codec_reconnect_and_control_soak() {
         .unwrap();
         assert_eq!(ingress.events.usage().unwrap(), EventBusUsage::default());
         let mut captured = sink.0.lock().unwrap();
-        assert_eq!(captured.len(), 16);
+        assert_eq!(captured.len(), 20);
         captured.clear(); // Test evidence itself never grows with soak duration.
         drop(captured);
         ingress
             .apply_control_snapshot(control_snapshot(&ingress, cycle + 1))
             .unwrap();
-        assert!(ingress.sessions.list(0, 32).unwrap().len() <= 8);
+        assert!(ingress.sessions.list(0, 32).unwrap().len() <= 10);
     }
     stop.cancel();
     tcp_owner.await.unwrap().unwrap();
@@ -706,7 +726,7 @@ async fn mixed_codec_reconnect_and_control_soak() {
     ingress.events.stop_workers().await.unwrap();
     println!(
         "cycles={cycle}, accepted_events={}, duration_seconds={:.2}",
-        cycle * 16,
+        cycle * 20,
         started.elapsed().as_secs_f64()
     );
 }
@@ -1202,5 +1222,143 @@ async fn new_product_profiles_cannot_switch_live_or_pending_authentication() {
         ingress.register_session(pending, Transport::Tcp),
         Err(Error::Forbidden)
     ));
+    ingress.events.stop_workers().await.unwrap();
+}
+
+#[tokio::test]
+async fn vendor_payloads_use_authenticated_codec_on_real_mqtt_tcp_udp_and_commands() {
+    let (ingress, services, sink, stop) = fixture(None);
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let udp_socket = UdpSocket::bind(address).await.unwrap();
+    let tcp_owner = tokio::spawn(serve_device_ingress(
+        listener,
+        services.clone(),
+        None,
+        stop.clone(),
+    ));
+    let udp_owner = tokio::spawn(udp::serve(udp_socket, services.clone(), stop.clone()));
+    let json_payload = payload("json");
+    let payload = payload("acme");
+    let mut clients = Vec::new();
+    for v5 in [false, true] {
+        tokio::time::timeout(Duration::from_secs(3), async {
+            while sink.0.lock().unwrap().len() != usize::from(v5) {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        let auth = identity("acme", "mqtt");
+        let mut client = mqtt_connect(address, &auth, v5).await;
+        client
+            .write_all(&publish(&auth, &payload, 2, v5))
+            .await
+            .unwrap();
+        assert_eq!(read_mqtt(&mut client).await.0, 0x50);
+        // Prevalidation owns no business event. Only PUBREL crosses EventAccepted.
+        assert_eq!(sink.0.lock().unwrap().len(), usize::from(v5));
+        client.write_all(&[0x62, 2, 0, 2]).await.unwrap();
+        assert_eq!(read_mqtt(&mut client).await.0, 0x70);
+        let mut cmd = command(&auth);
+        cmd.payload.name = "set_temperature".into();
+        let expected = ingress
+            .codecs
+            .get(&auth)
+            .unwrap()
+            .encode(
+                &EncodeContext {
+                    device: &auth.device_key,
+                },
+                &cmd,
+            )
+            .unwrap();
+        services.router.send(cmd).unwrap();
+        let (_, body) = read_mqtt(&mut client).await;
+        let topic_len = usize::from(u16::from_be_bytes([body[0], body[1]]));
+        let offset = 2 + topic_len;
+        let pid = &body[offset..offset + 2];
+        let payload_offset = if v5 {
+            // The command TTL is carried by MQTT 5 Message Expiry Interval.
+            let properties = usize::from(body[offset + 2]);
+            assert!(properties < 128);
+            offset + 3 + properties
+        } else {
+            offset + 2
+        };
+        assert_eq!(&body[payload_offset..], &expected);
+        client.write_all(&[0x40, 2, pid[0], pid[1]]).await.unwrap();
+        client.write_all(&[0xe0, 0]).await.unwrap();
+        clients.push(client);
+    }
+    let auth = identity("acme", "tcp");
+    let mut tcp = TcpStream::connect(address).await.unwrap();
+    let hello = serde_json::to_vec(
+        &serde_json::json!({"credential_id":"acme-tcp","secret":"07".repeat(32)}),
+    )
+    .unwrap();
+    tcp.write_all(&frame(&hello)).await.unwrap();
+    assert_eq!(
+        read_tcp(&mut tcp, tcp_frame::FrameKind::Payload).await,
+        br#"{"authenticated":true}"#
+    );
+    for part in frame(&payload).chunks(2) {
+        tcp.write_all(part).await.unwrap();
+    }
+    let receipt =
+        tcp_ack::decode(&read_tcp(&mut tcp, tcp_frame::FrameKind::EventAccepted).await).unwrap();
+    assert_eq!(receipt.required_deliveries, 1);
+    let mut cmd = command(&auth);
+    cmd.payload.name = "set_temperature".into();
+    let id = cmd.command_id;
+    services.router.send(cmd).unwrap();
+    let wire = read_tcp(&mut tcp, tcp_frame::FrameKind::Payload).await;
+    assert_eq!(&wire[5..21], id.0.as_bytes());
+    let udp = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+    let request = datagram("acme", &payload);
+    let mut ack = [0; 128];
+    for _ in 0..2 {
+        udp.send_to(&request, address).await.unwrap();
+        let (n, _) = tokio::time::timeout(Duration::from_secs(3), udp.recv_from(&mut ack))
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(n, 64);
+        assert_eq!(&ack[..4], b"NBA1");
+        let mut mac = Hmac::<Sha256>::new_from_slice(&[7; 32]).unwrap();
+        mac.update(&ack[..32]);
+        mac.verify_slice(&ack[32..64]).unwrap();
+    }
+    tokio::time::timeout(Duration::from_secs(3), async {
+        while sink.0.lock().unwrap().len() != 4 {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .unwrap();
+    assert_eq!(ingress.metrics.get(Metric::UdpAccepted), 1);
+    assert_eq!(ingress.metrics.get(Metric::UdpAcceptedDuplicates), 1);
+    for e in sink.0.lock().unwrap().iter() {
+        assert_eq!(e.source_message_id.as_str(), "42");
+        assert_eq!(e.device.product_id.as_str(), "acme");
+    }
+    // No payload-selected fallback to JSON, including before QoS2 PUBREC.
+    let auth = identity("acme", "mqtt");
+    let mut mqtt = mqtt_connect(address, &auth, false).await;
+    mqtt.write_all(&publish(&auth, &json_payload, 2, false))
+        .await
+        .unwrap();
+    let mut byte = [0];
+    assert_eq!(
+        tokio::time::timeout(Duration::from_secs(3), mqtt.read(&mut byte))
+            .await
+            .unwrap()
+            .unwrap(),
+        0
+    );
+    assert_eq!(sink.0.lock().unwrap().len(), 4);
+    stop.cancel();
+    tcp_owner.await.unwrap().unwrap();
+    udp_owner.await.unwrap().unwrap();
     ingress.events.stop_workers().await.unwrap();
 }

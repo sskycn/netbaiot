@@ -23,6 +23,7 @@ Schema does not replace `netbaiot config check`; cross-field, TLS, secret-source
 | `management_auth` | "#/$defs/ManagementAuthConfig" | `{"api_keys":[],"jwt":null,"legacy_static_token_enabled":null,"mtls_identities":[]}` | Management providers, scoped identities and protected secret-source names. |
 | `management_http` | "string" | `required/no default` | Independent authenticated management listener. Public management requires TLS. |
 | `management_tls` | union/object | `null` | Independent management TLS and optional mapped client certificate authentication. |
+| `payload_codecs` | "array" | `[]` | Explicit vendor binary payload plans, validated and compiled before serving connections. |
 | `spool_directory` | "string" | `required/no default` | Dedicated local planned-restart recovery directory; one gateway owner only. |
 | `tls` | union/object | `required/no default` | Device server PEM certificate and matching private-key paths. |
 
@@ -96,6 +97,28 @@ Schema does not replace `netbaiot config check`; cross-field, TLS, secret-source
 | `sink_id` | ["string","null"] | `required/no default` |  |
 | `tenants` | "array" | `[]` |  |
 
+## Checksum
+
+| Field | Schema type | Default | Description |
+| --- | --- | --- | --- |
+| `algorithm` | "#/$defs/ChecksumAlgorithm" | `required/no default` |  |
+| `end` | "integer" | `required/no default` |  |
+| `endian` | "#/$defs/Endian" | `"big"` |  |
+| `offset` | "integer" | `required/no default` |  |
+| `start` | "integer" | `required/no default` | Inclusive start and exclusive end; the checksum bytes must be outside this range. |
+
+## Command
+
+| Field | Schema type | Default | Description |
+| --- | --- | --- | --- |
+| `checksum` | union/object | `required/no default` |  |
+| `command_id_offset` | "integer" | `required/no default` |  |
+| `expires_at` | union/object | `required/no default` |  |
+| `fields` | "array" | `required/no default` |  |
+| `name` | "string" | `required/no default` |  |
+| `size` | "integer" | `required/no default` |  |
+| `tag` | "integer" | `required/no default` |  |
+
 ## Credential
 
 | Field | Schema type | Default | Description |
@@ -104,6 +127,18 @@ Schema does not replace `netbaiot config check`; cross-field, TLS, secret-source
 | `identity` | "#/$defs/AuthenticatedDevice" | `required/no default` |  |
 | `secret_hex` | "string" | `required/no default` |  |
 
+## DeclarativeConfig
+
+| Field | Schema type | Default | Description |
+| --- | --- | --- | --- |
+| `commands` | "array" | `[]` |  |
+| `header` | "array" | `required/no default` |  |
+| `id` | "string" | `required/no default` | Explicit authentication-bound codec ID, e.g. vendor-acme. Never inferred from bytes. |
+| `length` | union/object | `required/no default` |  |
+| `message_type` | "#/$defs/IntegerField" | `required/no default` |  |
+| `messages` | "array" | `required/no default` |  |
+| `version` | "integer" | `required/no default` |  |
+
 ## DeviceKey
 
 | Field | Schema type | Default | Description |
@@ -111,6 +146,25 @@ Schema does not replace `netbaiot config check`; cross-field, TLS, secret-source
 | `device_id` | "string" | `required/no default` |  |
 | `product_id` | "string" | `required/no default` |  |
 | `tenant_id` | "string" | `required/no default` |  |
+
+## Field
+
+| Field | Schema type | Default | Description |
+| --- | --- | --- | --- |
+| `bias` | "number" | `0.0` |  |
+| `endian` | "#/$defs/Endian" | `"big"` |  |
+| `length` | ["integer","null"] | `required/no default` | Required only for UTF-8: exact byte length, without padding or terminator. |
+| `offset` | "integer" | `required/no default` |  |
+| `scale` | "number" | `1.0` |  |
+| `type` | "#/$defs/DataType" | `required/no default` |  |
+
+## IntegerField
+
+| Field | Schema type | Default | Description |
+| --- | --- | --- | --- |
+| `endian` | "#/$defs/Endian" | `"big"` |  |
+| `offset` | "integer" | `required/no default` |  |
+| `type` | "#/$defs/IntegerType" | `required/no default` |  |
 
 ## JwtConfig
 
@@ -125,6 +179,13 @@ Schema does not replace `netbaiot config check`; cross-field, TLS, secret-source
 | `scope_claim` | "string" | `"scope"` |  |
 | `subject_claim` | "string" | `"sub"` |  |
 | `tenant_claim` | "string" | `"tenants"` |  |
+
+## LengthField
+
+| Field | Schema type | Default | Description |
+| --- | --- | --- | --- |
+| `adjustment` | "integer" | `0` | Wire value + adjustment must equal the complete payload length. |
+| `field` | "#/$defs/IntegerField" | `required/no default` |  |
 
 ## Limits
 
@@ -288,6 +349,17 @@ Schema does not replace `netbaiot config check`; cross-field, TLS, secret-source
 | `private_key` | "string" | `required/no default` |  |
 | `require_client_certificate` | "boolean" | `false` |  |
 
+## Message
+
+| Field | Schema type | Default | Description |
+| --- | --- | --- | --- |
+| `checksum` | union/object | `required/no default` |  |
+| `occurred_at` | union/object | `required/no default` |  |
+| `payload` | "#/$defs/MessagePayload" | `required/no default` |  |
+| `size` | "integer" | `required/no default` |  |
+| `source_message_id` | "#/$defs/Field" | `required/no default` | Unscaled unsigned integer (decimal ID) or exact UTF-8 identifier, at most 64 bytes. |
+| `tag` | "integer" | `required/no default` |  |
+
 ## MtlsIdentityConfig
 
 | Field | Schema type | Default | Description |
@@ -297,6 +369,13 @@ Schema does not replace `netbaiot config check`; cross-field, TLS, secret-source
 | `resources` | "#/$defs/AdminResourceConfig" | `{"devices":[],"products":[],"tenants":[]}` |  |
 | `scopes` | "array" | `required/no default` |  |
 | `subject` | "string" | `required/no default` |  |
+
+## NamedField
+
+| Field | Schema type | Default | Description |
+| --- | --- | --- | --- |
+| `field` | "#/$defs/Field" | `required/no default` |  |
+| `name` | "string" | `required/no default` |  |
 
 ## Permissions
 

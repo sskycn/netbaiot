@@ -40,7 +40,7 @@ jsonwebtoken = "9.3.1"
 reqwest = { workspace = true, features = ["rustls-tls-native-roots"] }
 
 [features]
-schema = ["dep:schemars", "netbaiot-runtime/schema", "netbaiot-transports/schema"]
+schema = ["dep:schemars", "netbaiot-runtime/schema", "netbaiot-transports/schema", "netbaiot-codecs/schema"]
 allocation-profile = ["dep:stats_alloc"]
 
 [[bin]]

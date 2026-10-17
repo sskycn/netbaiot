@@ -25,6 +25,14 @@ pub struct Config {
     #[serde(default)]
     /// Static device credentials; secrets must not be logged or reused from development.
     pub credentials: Vec<Credential>,
+    /// Explicit vendor binary payload plans, validated and compiled before serving connections.
+    #[serde(default)]
+    #[cfg_attr(feature = "schema", schemars(length(max = 60)))]
+    pub payload_codecs: Vec<netbaiot_codecs::vendor::declarative::DeclarativeConfig>,
+    /// Native Rust composition hook. Not accepted from JSON; never loads executable code.
+    #[serde(skip)]
+    #[cfg_attr(feature = "schema", schemars(skip))]
+    pub native_codecs: Vec<netbaiot_codecs::CodecRegistration>,
     /// Device server PEM certificate and matching private-key paths.
     pub tls: Option<TlsFiles>,
     #[serde(default)]

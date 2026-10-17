@@ -301,6 +301,108 @@
       ],
       "type": "object"
     },
+    "Checksum": {
+      "additionalProperties": false,
+      "properties": {
+        "algorithm": {
+          "$ref": "#/$defs/ChecksumAlgorithm"
+        },
+        "end": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "endian": {
+          "$ref": "#/$defs/Endian",
+          "default": "big"
+        },
+        "offset": {
+          "format": "uint",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "start": {
+          "description": "Inclusive start and exclusive end; the checksum bytes must be outside this range.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "algorithm",
+        "offset",
+        "start",
+        "end"
+      ],
+      "type": "object"
+    },
+    "ChecksumAlgorithm": {
+      "enum": [
+        "sum8",
+        "xor8",
+        "crc16_modbus"
+      ],
+      "type": "string"
+    },
+    "Command": {
+      "additionalProperties": false,
+      "properties": {
+        "checksum": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Checksum"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "command_id_offset": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "expires_at": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/IntegerField"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "fields": {
+          "items": {
+            "$ref": "#/$defs/NamedField"
+          },
+          "type": "array"
+        },
+        "name": {
+          "type": "string"
+        },
+        "size": {
+          "format": "uint",
+          "maximum": 65536,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "tag": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "name",
+        "tag",
+        "size",
+        "command_id_offset",
+        "fields"
+      ],
+      "type": "object"
+    },
     "Credential": {
       "additionalProperties": false,
       "description": "Provisioned high-entropy 256-bit key. Deliberately no Debug implementation.",
@@ -323,6 +425,86 @@
         "credential_id",
         "secret_hex",
         "identity"
+      ],
+      "type": "object"
+    },
+    "DataType": {
+      "enum": [
+        "u8",
+        "u16",
+        "u32",
+        "u64",
+        "i8",
+        "i16",
+        "i32",
+        "i64",
+        "f32",
+        "f64",
+        "bool",
+        "utf8"
+      ],
+      "type": "string"
+    },
+    "DeclarativeConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "commands": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/Command"
+          },
+          "maxItems": 64,
+          "type": "array"
+        },
+        "header": {
+          "items": {
+            "format": "uint8",
+            "maximum": 255,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "type": "array"
+        },
+        "id": {
+          "description": "Explicit authentication-bound codec ID, e.g. vendor-acme. Never inferred from bytes.",
+          "type": "string"
+        },
+        "length": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LengthField"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "message_type": {
+          "$ref": "#/$defs/IntegerField"
+        },
+        "messages": {
+          "items": {
+            "$ref": "#/$defs/Message"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "type": "array"
+        },
+        "version": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "version",
+        "header",
+        "message_type",
+        "messages"
       ],
       "type": "object"
     },
@@ -354,11 +536,92 @@
       ],
       "type": "object"
     },
+    "Endian": {
+      "enum": [
+        "big",
+        "little"
+      ],
+      "type": "string"
+    },
     "EventDeliverySource": {
       "enum": [
         "http",
         "business_rpc",
         "development_audit"
+      ],
+      "type": "string"
+    },
+    "Field": {
+      "additionalProperties": false,
+      "properties": {
+        "bias": {
+          "default": 0.0,
+          "format": "double",
+          "type": "number"
+        },
+        "endian": {
+          "$ref": "#/$defs/Endian",
+          "default": "big"
+        },
+        "length": {
+          "description": "Required only for UTF-8: exact byte length, without padding or terminator.",
+          "format": "uint",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "offset": {
+          "format": "uint",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "scale": {
+          "default": 1.0,
+          "format": "double",
+          "type": "number"
+        },
+        "type": {
+          "$ref": "#/$defs/DataType"
+        }
+      },
+      "required": [
+        "offset",
+        "type"
+      ],
+      "type": "object"
+    },
+    "IntegerField": {
+      "additionalProperties": false,
+      "properties": {
+        "endian": {
+          "$ref": "#/$defs/Endian",
+          "default": "big"
+        },
+        "offset": {
+          "format": "uint",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "type": {
+          "$ref": "#/$defs/IntegerType"
+        }
+      },
+      "required": [
+        "offset",
+        "type"
+      ],
+      "type": "object"
+    },
+    "IntegerType": {
+      "enum": [
+        "u8",
+        "u16",
+        "u32",
+        "u64"
       ],
       "type": "string"
     },
@@ -412,6 +675,24 @@
         "issuer",
         "audience",
         "jwks_url"
+      ],
+      "type": "object"
+    },
+    "LengthField": {
+      "additionalProperties": false,
+      "properties": {
+        "adjustment": {
+          "default": 0,
+          "description": "Wire value + adjustment must equal the complete payload length.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "field": {
+          "$ref": "#/$defs/IntegerField"
+        }
+      },
+      "required": [
+        "field"
       ],
       "type": "object"
     },
@@ -1473,6 +1754,166 @@
       ],
       "type": "object"
     },
+    "Message": {
+      "additionalProperties": false,
+      "properties": {
+        "checksum": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Checksum"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "occurred_at": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/IntegerField"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "payload": {
+          "$ref": "#/$defs/MessagePayload"
+        },
+        "size": {
+          "format": "uint",
+          "maximum": 65536,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "source_message_id": {
+          "$ref": "#/$defs/Field",
+          "description": "Unscaled unsigned integer (decimal ID) or exact UTF-8 identifier, at most 64 bytes."
+        },
+        "tag": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "tag",
+        "size",
+        "source_message_id",
+        "payload"
+      ],
+      "type": "object"
+    },
+    "MessagePayload": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "fields": {
+              "items": {
+                "$ref": "#/$defs/NamedField"
+              },
+              "type": "array"
+            },
+            "kind": {
+              "const": "telemetry",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "fields"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "heartbeat",
+              "type": "string"
+            },
+            "sequence": {
+              "$ref": "#/$defs/IntegerField"
+            }
+          },
+          "required": [
+            "kind",
+            "sequence"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "event",
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "value": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Field"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "kind",
+            "name"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "command_id_offset": {
+              "description": "Offset of the complete 16-byte UUID in RFC 4122 byte order.",
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "execution": {
+              "$ref": "#/$defs/IntegerField"
+            },
+            "failed": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "kind": {
+              "const": "command_ack",
+              "type": "string"
+            },
+            "running": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "succeeded": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "kind",
+            "command_id_offset",
+            "execution",
+            "running",
+            "succeeded",
+            "failed"
+          ],
+          "type": "object"
+        }
+      ]
+    },
     "MtlsIdentityConfig": {
       "additionalProperties": false,
       "properties": {
@@ -1505,6 +1946,22 @@
         "certificate_sha256",
         "subject",
         "scopes"
+      ],
+      "type": "object"
+    },
+    "NamedField": {
+      "additionalProperties": false,
+      "properties": {
+        "field": {
+          "$ref": "#/$defs/Field"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "field"
       ],
       "type": "object"
     },
@@ -1843,6 +2300,15 @@
       ],
       "default": null,
       "description": "Independent management TLS and optional mapped client certificate authentication."
+    },
+    "payload_codecs": {
+      "default": [],
+      "description": "Explicit vendor binary payload plans, validated and compiled before serving connections.",
+      "items": {
+        "$ref": "#/$defs/DeclarativeConfig"
+      },
+      "maxItems": 60,
+      "type": "array"
     },
     "spool_directory": {
       "description": "Dedicated local planned-restart recovery directory; one gateway owner only.",

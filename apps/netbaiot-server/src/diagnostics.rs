@@ -137,7 +137,18 @@ impl Config {
             } else {
                 DeviceAuthSource::Static
             });
-        let registry = crate::bootstrap::codec_registry(&self.limits);
+        let registry = crate::bootstrap::configured_codec_registry(
+            &self.limits,
+            &self.payload_codecs,
+            &self.native_codecs,
+        );
+        issue(
+            registry.is_err(),
+            "NBI-CFG-015",
+            "payload_codecs",
+            "Codec registration or binary payload layout is invalid.",
+            "Use unique vendor ID/version pairs, bounded non-overlapping fields and valid checksum/length ranges; see docs/codecs.md.",
+        );
         issue(
             self.credentials.iter().any(|c| {
                 registry

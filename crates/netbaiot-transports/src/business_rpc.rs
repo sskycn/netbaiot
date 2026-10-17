@@ -234,12 +234,14 @@ pub async fn serve(
             drop(accepted.0);
             continue;
         }
-        let (stream, _) = accepted;
+        let (stream, peer) = accepted;
         let config = config.clone();
         let services = services.clone();
         let stop = stop_connections.child_token();
         tasks.spawn(async move {
-            let _ = connection(stream, config, services, stop).await;
+            if let Err(error) = connection(stream, config, services, stop).await {
+                tracing::debug!(%peer, ?error, "business RPC connection failed");
+            }
         });
     }
     while tasks.join_next().await.is_some() {}
@@ -390,10 +392,12 @@ async fn connection_inner(
     };
     let (mut io, certificate): (Box<dyn Io>, Option<Vec<u8>>) = if let Some(acceptor) = &config.tls
     {
+        tracing::debug!("business RPC TLS handshake started");
         let tls = tokio::time::timeout(config.handshake_timeout, acceptor.accept(stream))
             .await
             .map_err(|_| Error::Timeout)?
             .map_err(|_| Error::Authentication)?;
+        tracing::debug!("business RPC TLS handshake completed");
         let cert = tls
             .get_ref()
             .1

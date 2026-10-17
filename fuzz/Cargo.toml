@@ -168,3 +168,17 @@ path = "fuzz_targets/protobuf_codec.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "vendor_codec"
+path = "fuzz_targets/vendor_codec.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "vendor_config"
+path = "fuzz_targets/vendor_config.rs"
+test = false
+doc = false
+bench = false

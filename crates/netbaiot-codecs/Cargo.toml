@@ -6,6 +6,7 @@ license.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+schemars = { workspace = true, optional = true }
 netbaiot-core.workspace = true
 serde.workspace = true
 serde_json.workspace = true
@@ -26,4 +27,11 @@ stats_alloc = "=0.1.10"
 
 [[bench]]
 name = "codecs"
+harness = false
+
+[features]
+schema = ["dep:schemars"]
+
+[[bench]]
+name = "vendor"
 harness = false

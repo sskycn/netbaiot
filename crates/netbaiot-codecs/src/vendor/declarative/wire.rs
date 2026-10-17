@@ -1,0 +1,217 @@
+use super::*;
+use crate::common::valid_text;
+use std::ops::Range;
+
+pub(super) struct Integer {
+    pub range: Range<usize>,
+    pub endian: Endian,
+}
+fn unsigned(bytes: &[u8], endian: Endian) -> u64 {
+    match endian {
+        Endian::Big => bytes.iter().fold(0, |n, b| (n << 8) | u64::from(*b)),
+        Endian::Little => bytes.iter().rev().fold(0, |n, b| (n << 8) | u64::from(*b)),
+    }
+}
+fn put(bytes: &mut [u8], n: u64, endian: Endian) {
+    let width = bytes.len();
+    match endian {
+        Endian::Big => bytes.copy_from_slice(&n.to_be_bytes()[8 - width..]),
+        Endian::Little => bytes.copy_from_slice(&n.to_le_bytes()[..width]),
+    }
+}
+impl Integer {
+    pub fn read(&self, data: &[u8]) -> Result<u64, CodecError> {
+        Ok(unsigned(
+            data.get(self.range.clone()).ok_or(CodecError)?,
+            self.endian,
+        ))
+    }
+    pub fn write(&self, data: &mut [u8], n: u64) -> Result<(), CodecError> {
+        let width = self.range.len();
+        if width < 8 && n >= (1u64 << (width * 8)) {
+            return Err(CodecError);
+        }
+        put(
+            data.get_mut(self.range.clone()).ok_or(CodecError)?,
+            n,
+            self.endian,
+        );
+        Ok(())
+    }
+}
+
+pub(super) struct Value {
+    pub range: Range<usize>,
+    pub data_type: DataType,
+    pub endian: Endian,
+    pub scale: f64,
+    pub bias: f64,
+}
+impl Value {
+    fn bytes<'a>(&self, data: &'a [u8]) -> Result<&'a [u8], CodecError> {
+        data.get(self.range.clone()).ok_or(CodecError)
+    }
+    pub fn source(&self, data: &[u8]) -> Result<SourceMessageId, CodecError> {
+        let bytes = self.bytes(data)?;
+        match self.data_type {
+            DataType::Utf8 => {
+                SourceMessageId::new(std::str::from_utf8(bytes).map_err(|_| CodecError)?)
+                    .map_err(|_| CodecError)
+            }
+            _ => crate::vendor::sequence_id(unsigned(bytes, self.endian)),
+        }
+    }
+    pub fn read(&self, data: &[u8]) -> Result<Scalar, CodecError> {
+        let bytes = self.bytes(data)?;
+        if matches!(self.data_type, DataType::Utf8) {
+            let text = std::str::from_utf8(bytes).map_err(|_| CodecError)?;
+            if !valid_text(text, self.range.len()) {
+                return Err(CodecError);
+            }
+            return Ok(Scalar::Text(text.to_owned()));
+        }
+        let bits = unsigned(bytes, self.endian);
+        let raw = match self.data_type {
+            DataType::Bool => {
+                return match bits {
+                    0 => Ok(Scalar::Boolean(false)),
+                    1 => Ok(Scalar::Boolean(true)),
+                    _ => Err(CodecError),
+                };
+            }
+            DataType::F32 => f64::from(f32::from_bits(bits as u32)),
+            DataType::F64 => f64::from_bits(bits),
+            DataType::I8 | DataType::I16 | DataType::I32 | DataType::I64 => {
+                let shift = (8 - bytes.len()) * 8;
+                let signed = ((bits << shift) as i64) >> shift;
+                if signed.unsigned_abs() > (1 << 53) {
+                    return Err(CodecError);
+                }
+                signed as f64
+            }
+            _ => {
+                if bits > (1 << 53) {
+                    return Err(CodecError);
+                }
+                bits as f64
+            }
+        };
+        let number = raw * self.scale + self.bias;
+        if !raw.is_finite() || !number.is_finite() {
+            return Err(CodecError);
+        }
+        Ok(Scalar::Number(number))
+    }
+    pub fn write(&self, data: &mut [u8], scalar: &Scalar) -> Result<(), CodecError> {
+        let bytes = data.get_mut(self.range.clone()).ok_or(CodecError)?;
+        let bits = match (self.data_type, scalar) {
+            (DataType::Utf8, Scalar::Text(text))
+                if text.len() == bytes.len() && valid_text(text, bytes.len()) =>
+            {
+                bytes.copy_from_slice(text.as_bytes());
+                return Ok(());
+            }
+            (DataType::Bool, Scalar::Boolean(b)) => u64::from(*b),
+            (DataType::Utf8 | DataType::Bool, _) => return Err(CodecError),
+            (kind, Scalar::Number(number)) if number.is_finite() => {
+                let raw = (number - self.bias) / self.scale;
+                if !raw.is_finite() {
+                    return Err(CodecError);
+                }
+                match kind {
+                    DataType::F64 => raw.to_bits(),
+                    DataType::F32 => {
+                        let value = raw as f32;
+                        if !value.is_finite() {
+                            return Err(CodecError);
+                        }
+                        u64::from(value.to_bits())
+                    }
+                    _ => {
+                        // Allow only floating-point roundoff, never truncate fractional commands.
+                        let integer = raw.round();
+                        if (raw - integer).abs()
+                            > (4.0 * f64::EPSILON * raw.abs().max(1.0)).min(1e-7)
+                            || integer.abs() > (1u64 << 53) as f64
+                        {
+                            return Err(CodecError);
+                        }
+                        let signed = matches!(
+                            kind,
+                            DataType::I8 | DataType::I16 | DataType::I32 | DataType::I64
+                        );
+                        let width = bytes.len() * 8;
+                        let (min, max_exclusive) = if signed {
+                            let magnitude = 2f64.powi((width - 1) as i32);
+                            (-magnitude, magnitude)
+                        } else {
+                            (0.0, 2f64.powi(width as i32))
+                        };
+                        if integer < min || integer >= max_exclusive {
+                            return Err(CodecError);
+                        }
+                        if signed {
+                            integer as i64 as u64
+                        } else {
+                            integer as u64
+                        }
+                    }
+                }
+            }
+            _ => return Err(CodecError),
+        };
+        put(bytes, bits, self.endian);
+        // Reject inverse scaling that would produce nonfinite normalized values.
+        self.read(data)?;
+        Ok(())
+    }
+}
+
+pub(super) struct Check {
+    pub value: Integer,
+    pub covered: Range<usize>,
+    pub algorithm: ChecksumAlgorithm,
+}
+impl Check {
+    pub fn calculate(&self, data: &[u8]) -> Result<u64, CodecError> {
+        let bytes = data.get(self.covered.clone()).ok_or(CodecError)?;
+        Ok(match self.algorithm {
+            ChecksumAlgorithm::Sum8 => {
+                u64::from(bytes.iter().fold(0u8, |sum, b| sum.wrapping_add(*b)))
+            }
+            ChecksumAlgorithm::Xor8 => u64::from(bytes.iter().fold(0u8, |sum, b| sum ^ b)),
+            // CRC-16/MODBUS: init FFFF, reflected polynomial A001, xorout 0000.
+            ChecksumAlgorithm::Crc16Modbus => {
+                let mut crc = 0xffffu16;
+                for byte in bytes {
+                    crc ^= u16::from(*byte);
+                    for _ in 0..8 {
+                        crc = if crc & 1 == 1 {
+                            (crc >> 1) ^ 0xa001
+                        } else {
+                            crc >> 1
+                        };
+                    }
+                }
+                u64::from(crc)
+            }
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn crc16_modbus_standard_check_vector() {
+        let check = Check {
+            value: Integer {
+                range: 9..11,
+                endian: Endian::Little,
+            },
+            covered: 0..9,
+            algorithm: ChecksumAlgorithm::Crc16Modbus,
+        };
+        assert_eq!(check.calculate(b"123456789").unwrap(), 0x4b37);
+    }
+}
