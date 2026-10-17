@@ -261,6 +261,78 @@ fn command_identity_types_quantization_limits_and_arguments_are_strict() {
         assert!(codec.encode(&ctx, &c).is_err());
     }
 }
+
+#[test]
+fn ordinary_decimal_commands_encode_consistently() {
+    let declarative = codec();
+    let native = AcmeV1::new(CodecLimits::default()).unwrap();
+    let device = key();
+    let context = EncodeContext { device: &device };
+    for (value, raw) in [
+        (0.1, 1i16),
+        (0.2, 2),
+        (5.1, 51i16),
+        (0.3, 3),
+        (0.7, 7),
+        (1.1, 11),
+        (1.7, 17),
+        (2.3, 23),
+        (3.3, 33),
+        (12.3, 123),
+        (25.3, 253),
+        (-0.1, -1),
+        (-0.2, -2),
+        (-5.1, -51),
+        (-0.3, -3),
+        (-0.7, -7),
+        (-1.1, -11),
+        (-1.7, -17),
+        (-2.3, -23),
+        (-3.3, -33),
+        (-12.3, -123),
+        (-25.3, -253),
+    ] {
+        let mut command = command();
+        command
+            .payload
+            .arguments
+            .insert("temperature".into(), Scalar::Number(value));
+        let declared = declarative.encode(&context, &command).unwrap();
+        let native = native.encode(&context, &command).unwrap();
+        assert_eq!(declared, native, "{value}");
+        assert_eq!(&declared[21..23], &raw.to_le_bytes(), "{value}");
+    }
+}
+
+#[test]
+fn native_and_declarative_reject_material_command_quantization() {
+    let declarative = codec();
+    let native = AcmeV1::new(CodecLimits::default()).unwrap();
+    let device = key();
+    let context = EncodeContext { device: &device };
+    for value in [
+        5.15,
+        -5.15,
+        12.30000000001,
+        -12.30000000001,
+        3276.8,
+        -3276.9,
+        1e-300,
+        -1e-300,
+        f64::NAN,
+        f64::INFINITY,
+        f64::NEG_INFINITY,
+    ] {
+        let mut command = command();
+        command
+            .payload
+            .arguments
+            .insert("temperature".into(), Scalar::Number(value));
+        for codec in [&declarative as &dyn DeviceCodec, &native] {
+            assert!(codec.encode(&context, &command).is_err(), "{value}");
+        }
+    }
+}
 #[test]
 fn resource_limits_are_checked_before_runtime_allocations() {
     for limits in [

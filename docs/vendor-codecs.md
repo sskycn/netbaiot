@@ -102,10 +102,11 @@ values outside ±2^53 are rejected before conversion. Full u64 remains available
 for source IDs, heartbeat sequences and integer metadata. Downlink reverses this
 formula and rejects integer overflow or fractional raw values, allowing only a
 small floating-point roundoff tolerance (at most 1e-7 raw units) when selecting an
-integer candidate. Every numeric output is then read back with the same normalization
-and must equal the original f64 value exactly. Narrowing to f32, inverse scaling,
-underflow or cancellation that changes the value is rejected. Some decimal literals
-are therefore rejected even if they appear close to a representable wire value. Arguments must match the configured names,
+integer candidate. Every numeric output is then read back with the same normalization.
+Unscaled values must match exactly; scaled values may differ by at most one adjacent
+f64 value and four f64 machine epsilons relative to their magnitude. This admits
+ordinary decimal scaling roundoff while rejecting larger quantization, overflow,
+underflow, and precision loss. Arguments must match the configured names,
 count and types exactly; there are no silent defaults or extra ignored arguments.
 
 The source ID is an unscaled unsigned integer rendered as decimal, or an exact

@@ -161,9 +161,20 @@ impl Value {
             _ => return Err(CodecError),
         };
         put(bytes, bits, self.endian);
-        // Compare the actual wire value after normalization, including f32 narrowing,
-        // integer quantization and cancellation/underflow in the inverse transform.
-        if self.read(data)? != *scalar {
+        // Check the actual normalized wire value. One f64 ULP admits arithmetic
+        // roundoff from decimal scales while rejecting larger quantization steps.
+        let actual = self.read(data)?;
+        let preserves_value = match (&actual, scalar) {
+            (Scalar::Number(actual), Scalar::Number(expected)) => {
+                if self.scale == 1.0 && self.bias == 0.0 {
+                    actual == expected
+                } else {
+                    crate::vendor::normalized_number_matches(*expected, *actual)
+                }
+            }
+            _ => actual == *scalar,
+        };
+        if !preserves_value {
             return Err(CodecError);
         }
         Ok(())
@@ -206,14 +217,16 @@ impl Check {
 mod tests {
     use super::*;
     #[test]
-    fn numeric_commands_must_round_trip_exactly() {
+    fn numeric_commands_reject_material_round_trip_loss() {
         for endian in [Endian::Big, Endian::Little] {
             for (kind, width, scale, bias, number) in [
                 (DataType::F32, 4, 1.0, 0.0, 16_777_217.0),
                 (DataType::F32, 4, 1.0, 0.0, 1e-50),
+                (DataType::F32, 4, 1.0, 0.0, 1.0f64.next_up()),
+                (DataType::I16, 2, 1.0, 0.0, 5.0f64.next_up()),
                 (DataType::F64, 8, 1.0, 1e20, 1.0),
                 (DataType::F64, 8, 1e300, 0.0, 1e-300),
-                (DataType::I16, 2, 0.1, 0.0, 12.300000000000002),
+                (DataType::I16, 2, 0.1, 0.0, 12.30000000001),
                 (DataType::U64, 8, 1.0, 1e20, 1.0),
             ] {
                 let field = Value {
@@ -229,6 +242,53 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn decimal_scales_and_extremes_only_admit_bounded_roundoff() {
+        for endian in [Endian::Big, Endian::Little] {
+            for (kind, width, scale, bias, number) in [
+                (DataType::I16, 2, 0.1, 0.0, 5.1),
+                (DataType::I16, 2, -0.1, 0.0, -5.1),
+                (DataType::U16, 2, 0.1, 0.0, 0.3),
+                (DataType::F32, 4, 0.1, 0.0, 1.7),
+                (DataType::F64, 8, 0.1, 2.0, 5.1),
+                (DataType::F64, 8, 1e-300, 0.0, 1e-300),
+                (DataType::F64, 8, 1e300, 0.0, 1e300),
+            ] {
+                let field = Value {
+                    range: 0..width,
+                    data_type: kind,
+                    endian,
+                    scale,
+                    bias,
+                };
+                let mut bytes = [0; 8];
+                field.write(&mut bytes, &Scalar::Number(number)).unwrap();
+                let Scalar::Number(actual) = field.read(&bytes).unwrap() else {
+                    panic!()
+                };
+                assert!(crate::vendor::normalized_number_matches(number, actual));
+            }
+            for (scale, number) in [(1e-300, 1e300), (1e300, 1e-300)] {
+                let field = Value {
+                    range: 0..8,
+                    data_type: DataType::F64,
+                    endian,
+                    scale,
+                    bias: 0.0,
+                };
+                assert!(field.write(&mut [0; 8], &Scalar::Number(number)).is_err());
+            }
+        }
+        assert!(!crate::vendor::normalized_number_matches(
+            0.0,
+            f64::from_bits(1)
+        ));
+        assert!(!crate::vendor::normalized_number_matches(
+            f64::from_bits(1),
+            f64::from_bits(2)
+        ));
     }
 
     #[test]

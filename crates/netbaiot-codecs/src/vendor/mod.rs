@@ -7,6 +7,20 @@ use crate::CodecRegistration;
 use netbaiot_core::{CodecError, CodecId, DeviceCodec};
 use std::sync::Arc;
 
+/// The wire transform uses f64 arithmetic. Admit at most one adjacent f64 value
+/// of roundoff, and never let an absolute ULP near zero hide relative loss.
+pub(crate) fn normalized_number_matches(expected: f64, actual: f64) -> bool {
+    if !expected.is_finite() || !actual.is_finite() {
+        return false;
+    }
+    if expected == actual {
+        return true;
+    }
+    let difference = (expected - actual).abs();
+    (actual == expected.next_up() || actual == expected.next_down())
+        && difference <= 4.0 * f64::EPSILON * expected.abs().max(actual.abs())
+}
+
 /// A vendor ID occupies the existing codec namespace. Reserved built-ins cannot be replaced.
 pub fn vendor_id(id: &str, version: u16) -> Result<CodecId, CodecError> {
     if version == 0 || !id.starts_with("vendor-") || id.len() <= "vendor-".len() {

@@ -95,9 +95,17 @@ pub fn commands(config: &DeclarativeConfig, codec: &dyn DeviceCodec, data: &[u8]
                     }
                     _ => bits as f64,
                 };
-                assert_eq!(
-                    Scalar::Number(raw * field.scale + field.bias),
-                    command.payload.arguments[&named.name]
+                let actual = raw * field.scale + field.bias;
+                let Scalar::Number(expected) = &command.payload.arguments[&named.name] else {
+                    panic!("encoded numeric field has a nonnumeric argument");
+                };
+                let adjacent = actual == expected.next_up() || actual == expected.next_down();
+                assert!(
+                    actual == *expected
+                        || ((field.scale != 1.0 || field.bias != 0.0)
+                            && adjacent
+                            && (actual - *expected).abs()
+                                <= 4.0 * f64::EPSILON * actual.abs().max(expected.abs()))
                 );
             }
         }

@@ -147,7 +147,7 @@ for tag, body in [(1, struct.pack('<Ih', 42, -123) + struct.pack('!H', 654) + b'
         mutated = bytearray(wire)
         mutated[n] ^= 255
         seed('vendor_codec', f'malformed-{tag}-{n}', mutated)
-for value in [0., 1.25, 16777217., 1e-300, float('inf'), float('nan')]:
+for value in [0., 0.3, 1.7, 5.1, -0.3, -1.7, -5.1, 5.15, 1.25, 16777217., 1e-300, float('inf'), float('nan')]:
     for scale, bias in [(1., 0.), (0.1, 0.), (1., 1e20), (1e300, 0.)]:
         seed('vendor_codec', f'numeric-{value}-{scale}-{bias}', struct.pack('<ddd', value, scale, bias))
 for kind in ['u8', 'u16', 'u32', 'u64']:

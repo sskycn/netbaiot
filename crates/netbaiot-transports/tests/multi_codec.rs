@@ -1392,9 +1392,9 @@ async fn vendor_command_transport_limits_reject_before_queue_and_keep_connection
     use netbaiot_codecs::vendor::declarative::DeclarativeConfig;
     // Include the MQTT Remaining Length expansion and MQTT 5 expiry property.
     for (transport, maximum) in [
+        ("mqtt", 8192),
         ("tcp", 256),
-        ("mqtt", 256),
-        ("mqtt5", 256),
+        ("mqtt5", 8192),
         ("mqtt5-client", 128),
         ("write", 256),
         ("global", 256),
@@ -1430,14 +1430,25 @@ async fn vendor_command_transport_limits_reject_before_queue_and_keep_connection
             } else {
                 65536
             },
+            max_retained_message_bytes: if mqtt && transport != "mqtt5-client" {
+                maximum
+            } else {
+                65536
+            },
+            max_will_payload_bytes: if mqtt && transport != "mqtt5-client" {
+                maximum
+            } else {
+                65536
+            },
             max_write_buffer_per_connection: if transport == "write" { maximum } else { 65536 },
-            max_command_bytes: if transport == "global" {
+            max_command_bytes: if transport == "global" || transport == "write" {
                 maximum
             } else {
                 16384
             },
             ..Default::default()
         };
+        limits.validate().unwrap();
         let (ingress, services, _, stop) =
             fixture_with_vendor(None, None, Some(limits), Some(config));
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
