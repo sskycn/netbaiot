@@ -40,7 +40,7 @@ def analyze(directory, mode):
             if match:
                 socket_bytes += int(match.group(1))
                 socket_writes += 1
-        if not any(marker in line for marker in ("business RPC V3", "business RPC V4")):
+        if "business RPC V4" not in line:
             continue
         stream = ID.search(line)
         if stream is None:
@@ -107,7 +107,7 @@ def analyze(directory, mode):
     metrics = {}
     if metrics_path.exists():
         for line in metrics_path.read_text().splitlines():
-            if line.startswith("netbaiot_business_rpc_v3_") and "{" not in line:
+            if line.startswith("netbaiot_business_rpc_mux_") and "{" not in line:
                 name, value = line.split(" ", 1)
                 try:
                     metrics[name[len("netbaiot_"):]] = float(value)
@@ -137,7 +137,7 @@ def analyze(directory, mode):
         "socket_send_buffer_bytes": send_buffer_bytes,
         "socket_accepted_bytes": socket_bytes,
         "socket_write_calls": socket_writes,
-        "v3_metrics": metrics,
+        "rpc_metrics": metrics,
     }
 
 

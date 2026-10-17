@@ -388,7 +388,7 @@ async fn connection_inner(
     }
     let stream = ObservedSocket {
         inner: stream,
-        trace: std::env::var_os("NETBAIOT_V3_SOCKET_TRACE").is_some(),
+        trace: std::env::var_os("NETBAIOT_BUSINESS_RPC_SOCKET_TRACE").is_some(),
     };
     let (mut io, certificate): (Box<dyn Io>, Option<Vec<u8>>) = if let Some(acceptor) = &config.tls
     {

@@ -181,23 +181,23 @@ const NAMES: [&str; 90] = [
     "business_rpc_reconnects",
     "business_rpc_revision_gaps",
     "business_rpc_offline_grace_expirations",
-    "business_rpc_v3_connections",
-    "business_rpc_v3_abnormal_closures",
-    "business_rpc_v3_streams_opened",
-    "business_rpc_v3_streams_reset",
-    "business_rpc_v3_frames_sent",
-    "business_rpc_v3_frames_received",
-    "business_rpc_v3_data_bytes_sent",
-    "business_rpc_v3_data_bytes_selected",
-    "business_rpc_v3_data_bytes_received",
-    "business_rpc_v3_connection_window_stalls",
-    "business_rpc_v3_stream_window_stalls",
-    "business_rpc_v3_send_ahead_stalls",
-    "business_rpc_v3_overloads",
-    "business_rpc_v3_protocol_errors",
-    "business_rpc_v3_command_requests",
-    "business_rpc_v3_command_accepted",
-    "business_rpc_v3_command_errors",
+    "business_rpc_mux_connections",
+    "business_rpc_mux_abnormal_closures",
+    "business_rpc_mux_streams_opened",
+    "business_rpc_mux_streams_reset",
+    "business_rpc_mux_frames_sent",
+    "business_rpc_mux_frames_received",
+    "business_rpc_mux_data_bytes_sent",
+    "business_rpc_mux_data_bytes_selected",
+    "business_rpc_mux_data_bytes_received",
+    "business_rpc_mux_connection_window_stalls",
+    "business_rpc_mux_stream_window_stalls",
+    "business_rpc_mux_send_ahead_stalls",
+    "business_rpc_mux_overloads",
+    "business_rpc_mux_protocol_errors",
+    "business_rpc_mux_command_requests",
+    "business_rpc_mux_command_accepted",
+    "business_rpc_mux_command_errors",
 ];
 
 /// Opt-in experiment counters, inactive unless lock timing is enabled.
@@ -286,8 +286,8 @@ const HISTOGRAM_NAMES: [&str; 28] = [
     "business_rpc_admission_us",
     "business_rpc_remote_wait_us",
     "business_rpc_queue_wait_us",
-    "business_rpc_v3_scheduler_wait_us",
-    "business_rpc_v3_writer_wait_us",
+    "business_rpc_mux_scheduler_wait_us",
+    "business_rpc_mux_writer_wait_us",
     "authentication_us",
     "codec_latency_us",
     "ingress_latency_us",
@@ -753,17 +753,17 @@ impl Metrics {
             self.business_rpc_active.load(Ordering::Relaxed)
         ));
         output.push_str(&format!(
-            "netbaiot_business_rpc_v3_active_connections {}\n",
+            "netbaiot_business_rpc_mux_active_connections {}\n",
             self.business_rpc_mux_active.load(Ordering::Relaxed)
         ));
         output.push_str(&format!(
-            "netbaiot_business_rpc_v3_active_streams {}\nnetbaiot_business_rpc_v3_queued_bytes {}\nnetbaiot_business_rpc_v3_reassembly_reserved_bytes {}\n",
+            "netbaiot_business_rpc_mux_active_streams {}\nnetbaiot_business_rpc_mux_queued_bytes {}\nnetbaiot_business_rpc_mux_reassembly_reserved_bytes {}\n",
             self.business_rpc_mux_streams.load(Ordering::Relaxed),
             self.business_rpc_mux_queued_bytes.load(Ordering::Relaxed),
             self.business_rpc_mux_reassembly_bytes.load(Ordering::Relaxed),
         ));
         output.push_str(&format!(
-            "netbaiot_business_rpc_v3_peak_active_streams {}\nnetbaiot_business_rpc_v3_peak_queued_bytes {}\nnetbaiot_business_rpc_v3_peak_reassembly_reserved_bytes {}\n",
+            "netbaiot_business_rpc_mux_peak_active_streams {}\nnetbaiot_business_rpc_mux_peak_queued_bytes {}\nnetbaiot_business_rpc_mux_peak_reassembly_reserved_bytes {}\n",
             self.business_rpc_mux_streams_peak.load(Ordering::Relaxed),
             self.business_rpc_mux_queued_bytes_peak.load(Ordering::Relaxed),
             self.business_rpc_mux_reassembly_bytes_peak.load(Ordering::Relaxed),
@@ -920,7 +920,7 @@ impl Metrics {
 mod tests {
     use super::*;
     #[test]
-    fn rpc_mux_names_preserve_prometheus_contract_and_gauge_cleanup() {
+    fn rpc_mux_metrics_have_version_independent_names_and_gauge_cleanup() {
         let metrics = Metrics::default();
         let counters = [
             (Metric::BusinessRpcMuxConnections, "connections"),
@@ -962,8 +962,13 @@ mod tests {
         metrics.observe(Histogram::BusinessRpcMuxSchedulerWait, 25);
         metrics.observe(Histogram::BusinessRpcMuxWriterWait, 50);
         let rendered = metrics.render();
+        let mut series = std::collections::BTreeSet::new();
+        for line in rendered.lines().filter(|line| !line.starts_with('#')) {
+            let (name, _) = line.split_once(' ').unwrap();
+            assert!(series.insert(name), "duplicate Prometheus series: {name}");
+        }
         for (_, suffix) in counters {
-            assert!(rendered.contains(&format!("netbaiot_business_rpc_v3_{suffix}_total 1\n")));
+            assert!(rendered.contains(&format!("netbaiot_business_rpc_mux_{suffix}_total 1\n")));
         }
         for (suffix, value) in [
             ("active_connections", 1),
@@ -978,7 +983,7 @@ mod tests {
             ("writer_wait_us_count", 1),
             ("writer_wait_us_sum", 50),
         ] {
-            assert!(rendered.contains(&format!("netbaiot_business_rpc_v3_{suffix} {value}\n")));
+            assert!(rendered.contains(&format!("netbaiot_business_rpc_mux_{suffix} {value}\n")));
         }
         metrics.business_rpc_mux_connection_gauges((2, 4096), (0, 0));
         metrics.business_rpc_mux_writer_bytes(1024, 0);
@@ -990,9 +995,9 @@ mod tests {
             "queued_bytes",
             "reassembly_reserved_bytes",
         ] {
-            assert!(rendered.contains(&format!("netbaiot_business_rpc_v3_{suffix} 0\n")));
+            assert!(rendered.contains(&format!("netbaiot_business_rpc_mux_{suffix} 0\n")));
         }
-        assert!(!rendered.contains("netbaiot_business_rpc_mux_"));
+        assert!(!rendered.contains("business_rpc_v3_"));
     }
 
     #[test]

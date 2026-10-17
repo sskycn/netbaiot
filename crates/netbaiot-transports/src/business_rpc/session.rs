@@ -1507,7 +1507,7 @@ mod send_ahead_tests {
         assert!(
             metrics
                 .render()
-                .contains("netbaiot_business_rpc_v3_queued_bytes 0\n")
+                .contains("netbaiot_business_rpc_mux_queued_bytes 0\n")
         );
     }
 
@@ -1556,7 +1556,7 @@ mod send_ahead_tests {
         assert!(
             metrics
                 .render()
-                .contains("netbaiot_business_rpc_v3_send_ahead_stalls_total 1\n")
+                .contains("netbaiot_business_rpc_mux_send_ahead_stalls_total 1\n")
         );
         stop.cancel();
         assert!(task.await.unwrap().is_ok());

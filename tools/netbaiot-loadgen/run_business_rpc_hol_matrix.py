@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run reproducible local V3 send-ahead discovery cases with fresh gateways."""
+"""Run reproducible local Business RPC send-ahead discovery cases with fresh gateways."""
 import argparse
 import os
 from pathlib import Path
@@ -43,7 +43,7 @@ def main():
     for frame, stream in selected:
         for run in range(1, args.repeat + 1):
             target = args.output / f"frame-{frame}-ahead-{stream}-run-{run}"
-            mode = f"v3-{frame}"
+            mode = f"rpc-{frame}"
             command = [sys.executable, str(HARNESS), "--duration-secs", str(args.duration_secs),
                        "--modes", mode, "--send-ahead-stream-bytes", str(stream),
                        "--send-ahead-connection-bytes", str(max(131072, stream)), "--bytes-per-second",

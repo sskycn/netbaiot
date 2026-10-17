@@ -20,7 +20,7 @@ async def main():
     parser.add_argument("--reset-after-secs", type=float)
     parser.add_argument("--half-open-after-secs", type=float)
     parser.add_argument("--max-connections", type=int, default=8)
-    parser.add_argument("--capture-prefix", help="test-only prefix for bounded V3 frame-header traces")
+    parser.add_argument("--capture-prefix", help="test-only prefix for bounded Business RPC frame-header traces")
     args = parser.parse_args()
     if (args.delay_ms < 0 or args.jitter_ms < 0 or args.bytes_per_second < 0
             or args.max_connections < 1 or args.max_connections > 64
@@ -54,7 +54,7 @@ async def main():
                 asyncio.open_connection(target_host, target_port), timeout=5)
 
             async def pump(source, sink, upstream):
-                # A V3 trace stores only frame headers, never Hello tokens or Event bodies.
+                # A Business RPC trace stores only frame headers, never Hello tokens or Event bodies.
                 capture = args.capture_prefix is not None and not upstream
                 capture_buffer = bytearray()
                 capture_seen = 0

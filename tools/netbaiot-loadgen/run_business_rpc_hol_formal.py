@@ -12,7 +12,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[2]
 HARNESS = ROOT / "tools/netbaiot-loadgen/run_business_rpc_hol.py"
 ANALYZER = ROOT / "tools/netbaiot-loadgen/analyze_business_rpc_hol.py"
-VARIANTS = ("v3-dual", "v3-baseline", "v3-ahead-8192", "v3-ahead-16384")
+VARIANTS = ("rpc-dual", "rpc-baseline", "rpc-ahead-8192", "rpc-ahead-16384")
 
 
 def stats(values):
@@ -31,7 +31,7 @@ def main():
     parser.add_argument("--event-rate", type=int, default=1)
     parser.add_argument("--auth-concurrency", type=int, default=4)
     parser.add_argument("--no-proxy", action="store_true")
-    parser.add_argument("--no-trace-v3", action="store_true")
+    parser.add_argument("--no-trace-rpc", action="store_true")
     parser.add_argument("--variants", nargs="+", choices=VARIANTS, default=VARIANTS)
     args = parser.parse_args()
     if not 1 <= args.repeat <= 5 or not 10 <= args.duration_secs <= 120:
@@ -42,20 +42,20 @@ def main():
     for run in range(1, args.repeat + 1):
         for variant in args.variants:
             target = args.output / f"run-{run}-{variant}"
-            mode = "v3-dual" if variant == "v3-dual" else "v3-8192"
+            mode = "rpc-dual" if variant == "rpc-dual" else "rpc-8192"
             command = [sys.executable, str(HARNESS), "--duration-secs", str(args.duration_secs),
                        "--auth-unique-devices", "--auth-concurrency", str(args.auth_concurrency),
                        "--event-rate", str(args.event_rate), "--bytes-per-second",
                        str(args.bytes_per_second), "--delay-ms", str(args.delay_ms),
                        "--modes", mode, "--output", str(target)]
             environment = os.environ.copy()
-            if variant != "v3-dual":
-                if not args.no_trace_v3:
+            if variant != "rpc-dual":
+                if not args.no_trace_rpc:
                     command.append("--trace-gateway")
                     environment["NETBAIOT_HOL_CAPTURE"] = "1"
             if args.no_proxy:
                 command.append("--no-proxy")
-            if variant.startswith("v3-ahead-"):
+            if variant.startswith("rpc-ahead-"):
                 stream = int(variant.rsplit("-", 1)[1])
                 command.extend(["--send-ahead-stream-bytes", str(stream),
                                 "--send-ahead-connection-bytes", "131072"])
@@ -65,7 +65,7 @@ def main():
                 failures.append(str(target))
                 continue
             raw = json.loads((target / f"{mode}.json").read_text())
-            if variant != "v3-dual":
+            if variant != "rpc-dual":
                 summary = target / "summary.json"
                 subprocess.run([sys.executable, str(ANALYZER), str(target), mode,
                                 "--output", str(summary)], cwd=ROOT, check=True)
@@ -91,7 +91,7 @@ def main():
                "delay_ms_per_read_per_direction": args.delay_ms,
                "event_rate": args.event_rate, "auth_concurrency": args.auth_concurrency,
                "fresh_identities": True, "no_proxy": args.no_proxy,
-               "trace_v3": not args.no_trace_v3,
+               "trace_rpc": not args.no_trace_rpc,
                "failures": failures, "variants": {}}
     for variant, runs in results.items():
         summary["variants"][variant] = {
@@ -109,7 +109,7 @@ def main():
             "cpu_percent": stats([run["cpu_percent"] for run in runs]),
             "rss_peak_kb": stats([run["rss_peak_kb"] for run in runs]),
         }
-        if variant != "v3-dual":
+        if variant != "rpc-dual":
             summary["variants"][variant].update({
                 "event_completion_p50_ms": stats([run["event_completion_ms"]["p50"] for run in runs]),
                 "event_completion_p95_ms": stats([run["event_completion_ms"]["p95"] for run in runs]),

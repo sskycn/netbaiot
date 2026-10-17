@@ -16,8 +16,10 @@ clients, and unknown versions, are rejected during bootstrap without a successfu
 Ready or entry into normal stream handling. There is no downgrade, V3 converter
 or compatibility layer; old business clients must upgrade before connecting.
 Software SemVer is independent of this wire version.
-Existing Prometheus names, `NETBAIOT_V3_SOCKET_TRACE`, loadgen topology values
-(`v3`/`v3_dual`) and serialized `v3_*` measurement fields remain unchanged.
+Business RPC mux metrics use `netbaiot_business_rpc_mux_*`; socket tracing uses
+`NETBAIOT_BUSINESS_RPC_SOCKET_TRACE`. Loadgen topology values are `rpc`/`rpc_dual`
+and measurement fields use `rpc_*`. Update dashboards, alerts, environment settings
+and loadgen inputs together; old version-specific identifiers have no aliases.
 
 The bootstrap Hello and Ready are bounded length-prefixed JSON. Ready returns a fresh `connection_epoch` and negotiated limits. Subsequent frames use a 12-byte header: `payload_length: u32 BE`, `stream_id: u32 BE` (high bit clear), `frame_type: u8`, `flags: u8`, `reserved: u16 BE` (zero), followed by payload. The stable type numbers are OPEN 1, ACCEPT 2, RESPONSE 3, DATA 4, WINDOW_UPDATE 5, RESET_STREAM 6, CLOSE_STREAM 7, PING 8, PONG 9, GOAWAY 10. `END_STREAM = 1` is valid only on DATA and RESPONSE; all other flag bits are invalid. Header type, flags, ID and negotiated payload limit are checked before payload allocation. Metadata remains bounded JSON (4 KiB); DATA contains raw application body bytes (currently JSON DTOs). A declared `content_length` is checked against the exact reassembled byte count.
 
@@ -37,7 +39,7 @@ Each RPC or delivery body is sliced lazily into DATA frames of at most the negot
 
 ## Bounds and operation
 
-Defaults: 8 KiB DATA payload, 256 concurrent streams, 256 KiB stream window, 4 MiB connection window and 5 s heartbeat setting. The hard frame payload ceiling is 16 KiB, metadata 4 KiB, message 8 MiB, server and SDK outbound body budgets 16 MiB per connection, server inbound reassembly 16 MiB per connection and 128 MiB across Business RPC connections. Control queues are limited to 64 frames and 256 KiB; per-connection writer and credit channels hold 256 items. These are configured limits, not measured capacity or optimal performance claims. Monitor the fixed-name `business_rpc_v3_*` metrics alongside existing auth and event metrics. Identifiers, tokens and certificate material must never become metric labels.
+Defaults: 8 KiB DATA payload, 256 concurrent streams, 256 KiB stream window, 4 MiB connection window and 5 s heartbeat setting. The hard frame payload ceiling is 16 KiB, metadata 4 KiB, message 8 MiB, server and SDK outbound body budgets 16 MiB per connection, server inbound reassembly 16 MiB per connection and 128 MiB across Business RPC connections. Control queues are limited to 64 frames and 256 KiB; per-connection writer and credit channels hold 256 items. These are configured limits, not measured capacity or optimal performance claims. Monitor the fixed-name `business_rpc_mux_*` metrics alongside existing auth and event metrics. Identifiers, tokens and certificate material must never become metric labels.
 
 The gateway can optionally bound sender-local DATA submitted before peer progress without reducing the negotiated receive windows. Set `business_rpc.send_ahead` to `{"stream_bytes": 16384, "connection_bytes": 131072}` for an experiment. Both values must be at least the configured frame payload, the connection value must be at least the stream value, and the connection value may not exceed 16 MiB. Invalid configurations fail startup. The default is `null`, which preserves the original window-only scheduling behavior. Stream `WINDOW_UPDATE` releases the corresponding stream counter; connection `WINDOW_UPDATE` releases the connection counter. Local `AsyncWrite` completion does not release either counter. The current receiver sends an update after every non-final DATA frame, so an 8 KiB sender limit with an 8 KiB frame does not wait for a larger batching threshold. On RESET, queued body bytes and the stream counter are removed; submitted connection bytes remain charged until peer connection credit arrives or the connection closes. This is a local policy and adds no Hello setting or wire field. A sender can only reorder frames that it has not yet submitted to the ordered TLS/TCP stream.
 

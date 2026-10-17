@@ -14,7 +14,7 @@ All device credentials in these fixtures are public development values.
 | [codecs/acme-v1.json](codecs/acme-v1.json) | `DeclarativeCodec::from_json` | Standalone fictional wire layout, not a server Config；不交给 config check |
 | [resource-limits.json](resource-limits.json) | `Limits` / `netbaiot config limits` | Complete current defaults, not measured capacity；不可单独启动服务 |
 | [business-rpc-load.example.json](business-rpc-load.example.json) | `business_rpc` loadgen Config | Requires a prepared gateway；不是 server Config |
-| [smoke-30m](business-rpc-production-readiness/smoke-30m.json), [readiness-1h](business-rpc-production-readiness/readiness-1h.json), [optional-6h](business-rpc-production-readiness/optional-6h.json) | `business_rpc` loadgen Config, `topology: v3_dual` | TLS paths are placeholders; supply real files and gateway first；配置时长不表示已经完成测试 |
+| [smoke-30m](business-rpc-production-readiness/smoke-30m.json), [readiness-1h](business-rpc-production-readiness/readiness-1h.json), [optional-6h](business-rpc-production-readiness/optional-6h.json) | `business_rpc` loadgen Config, `topology: rpc_dual` | TLS paths are placeholders; supply real files and gateway first；配置时长不表示已经完成测试 |
 | [smoke-60s](business-rpc-command-readiness/smoke-60s.json), [fault-storm-20s](business-rpc-command-readiness/fault-storm-20s.json), [readiness-30m](business-rpc-command-readiness/readiness-30m.json), [optional-1h](business-rpc-command-readiness/optional-1h.json) | Profile input to [command readiness harness](../tools/netbaiot-loadgen/run_business_rpc_command_readiness.py) | Harness generates gateway/loadgen configs; these are not standalone configs；require_* 是测试断言，不是服务端字段 |
 
 CLI Schema tests parse and validate all four server examples, compare the limits

@@ -22,7 +22,7 @@
     "certificate_pem": "/path/to/client.pem",
     "private_key_pem": "/path/to/client-key.pem"
   },
-  "topology": "v3_dual",
+  "topology": "rpc_dual",
   "network_profile": "local",
   "event_payload_bytes": 1024,
   "auth_reconnect_every_secs": 60,

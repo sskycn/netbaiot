@@ -1187,14 +1187,14 @@ async fn rpc_command_real_mqtt_dedup_http_ack_and_lost_response() {
             };
             observed = body
                 .lines()
-                .filter(|line| line.starts_with("netbaiot_business_rpc_v3_"))
+                .filter(|line| line.starts_with("netbaiot_business_rpc_mux_"))
                 .collect::<Vec<_>>()
                 .join("; ");
             if [
-                "netbaiot_business_rpc_v3_active_connections 0\n",
-                "netbaiot_business_rpc_v3_active_streams 0\n",
-                "netbaiot_business_rpc_v3_queued_bytes 0\n",
-                "netbaiot_business_rpc_v3_reassembly_reserved_bytes 0\n",
+                "netbaiot_business_rpc_mux_active_connections 0\n",
+                "netbaiot_business_rpc_mux_active_streams 0\n",
+                "netbaiot_business_rpc_mux_queued_bytes 0\n",
+                "netbaiot_business_rpc_mux_reassembly_reserved_bytes 0\n",
             ]
             .iter()
             .all(|line| body.contains(line))

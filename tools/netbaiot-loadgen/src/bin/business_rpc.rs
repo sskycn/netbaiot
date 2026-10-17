@@ -134,9 +134,7 @@ impl BusinessTransport {
 #[serde(rename_all = "snake_case")]
 enum Topology {
     #[default]
-    #[serde(rename = "v3")]
     Rpc,
-    #[serde(rename = "v3_dual")]
     RpcDual,
 }
 impl Topology {
@@ -1393,17 +1391,11 @@ struct Peaks {
     pending_bytes_last: u64,
     active_business_connections_peak: u64,
     active_business_connections_last: u64,
-    #[serde(rename = "v3_active_streams_peak")]
     rpc_active_streams_peak: u64,
-    #[serde(rename = "v3_active_streams_last")]
     rpc_active_streams_last: u64,
-    #[serde(rename = "v3_queued_bytes_peak")]
     rpc_queued_bytes_peak: u64,
-    #[serde(rename = "v3_queued_bytes_last")]
     rpc_queued_bytes_last: u64,
-    #[serde(rename = "v3_reassembly_bytes_peak")]
     rpc_reassembly_bytes_peak: u64,
-    #[serde(rename = "v3_reassembly_bytes_last")]
     rpc_reassembly_bytes_last: u64,
     command_dedup_entries_peak: u64,
     command_dedup_entries_last: u64,
@@ -1436,11 +1428,8 @@ struct Milestone {
     pending_items: Option<u64>,
     pending_bytes: Option<u64>,
     connections: Option<u64>,
-    #[serde(rename = "v3_active_streams")]
     rpc_active_streams: Option<u64>,
-    #[serde(rename = "v3_queued_bytes")]
     rpc_queued_bytes: Option<u64>,
-    #[serde(rename = "v3_reassembly_bytes")]
     rpc_reassembly_bytes: Option<u64>,
     command_dedup_entries: Option<u64>,
     command_dedup_inflight: Option<u64>,
@@ -1594,15 +1583,17 @@ async fn sample_gateway(
                 .active_business_connections_peak
                 .max(guard.active_business_connections_last);
             guard.rpc_active_streams_last =
-                metric(&body, "netbaiot_business_rpc_v3_active_streams ");
+                metric(&body, "netbaiot_business_rpc_mux_active_streams ");
             guard.rpc_active_streams_peak = guard
                 .rpc_active_streams_peak
                 .max(guard.rpc_active_streams_last);
-            guard.rpc_queued_bytes_last = metric(&body, "netbaiot_business_rpc_v3_queued_bytes ");
+            guard.rpc_queued_bytes_last = metric(&body, "netbaiot_business_rpc_mux_queued_bytes ");
             guard.rpc_queued_bytes_peak =
                 guard.rpc_queued_bytes_peak.max(guard.rpc_queued_bytes_last);
-            guard.rpc_reassembly_bytes_last =
-                metric(&body, "netbaiot_business_rpc_v3_reassembly_reserved_bytes ");
+            guard.rpc_reassembly_bytes_last = metric(
+                &body,
+                "netbaiot_business_rpc_mux_reassembly_reserved_bytes ",
+            );
             guard.rpc_reassembly_bytes_peak = guard
                 .rpc_reassembly_bytes_peak
                 .max(guard.rpc_reassembly_bytes_last);
@@ -1965,22 +1956,25 @@ mod configuration_examples {
     use super::*;
 
     #[test]
-    fn rpc_rust_names_preserve_loadgen_json_names() {
+    fn rpc_loadgen_json_names_are_version_independent() {
         for (topology, json) in [
-            (Topology::Rpc, "\"v3\""),
-            (Topology::RpcDual, "\"v3_dual\""),
+            (Topology::Rpc, "\"rpc\""),
+            (Topology::RpcDual, "\"rpc_dual\""),
         ] {
             assert_eq!(serde_json::to_string(&topology).unwrap(), json);
             assert!(serde_json::from_str::<Topology>(json).unwrap() == topology);
         }
+        for old in ["\"v3\"", "\"v3_dual\""] {
+            assert!(serde_json::from_str::<Topology>(old).is_err());
+        }
         let peaks = serde_json::to_value(Peaks::default()).unwrap();
         for field in [
-            "v3_active_streams_peak",
-            "v3_active_streams_last",
-            "v3_queued_bytes_peak",
-            "v3_queued_bytes_last",
-            "v3_reassembly_bytes_peak",
-            "v3_reassembly_bytes_last",
+            "rpc_active_streams_peak",
+            "rpc_active_streams_last",
+            "rpc_queued_bytes_peak",
+            "rpc_queued_bytes_last",
+            "rpc_reassembly_bytes_peak",
+            "rpc_reassembly_bytes_last",
         ] {
             assert_eq!(peaks[field], 0);
         }
@@ -1989,7 +1983,7 @@ mod configuration_examples {
                 .as_object()
                 .unwrap()
                 .keys()
-                .all(|key| !key.starts_with("rpc_"))
+                .all(|key| !key.starts_with("v3_"))
         );
     }
 

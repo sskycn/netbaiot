@@ -3,7 +3,7 @@
 
 This user-space proxy limits a byte stream; it does not emulate TCP packet loss.
 The script writes loadgen JSON, metrics, and logs so each result is reviewable.
-Optional capture stores V3 frame headers only, without tokens or Event bodies.
+Optional capture stores Business RPC frame headers only, without tokens or Event bodies.
 """
 import argparse
 import atexit
@@ -26,7 +26,7 @@ from business_rpc_harness_support import scrub_evidence, shutdown_gateway, stop,
 GATEWAY = ROOT / "target/release/netbaiot-server"
 LOADGEN = ROOT / "target/release/business_rpc"
 PROXY = ROOT / "tools/netbaiot-loadgen/business_stream_proxy.py"
-MODES = ("v3-dual", "v3-4096", "v3-8192", "v3-16384")
+MODES = ("rpc-dual", "rpc-4096", "rpc-8192", "rpc-16384")
 
 
 def free_ports(count):
@@ -49,7 +49,7 @@ def run_mode(mode, args):
     stream_window_bytes = args.stream_window_bytes
     disconnect_after_secs = args.disconnect_after_secs
     device, management, business, proxy_port = free_ports(4)
-    frame_size = int(mode.split("-")[1]) if mode != "v3-dual" else 8192
+    frame_size = int(mode.split("-")[1]) if mode != "rpc-dual" else 8192
     with tempfile.TemporaryDirectory(prefix=f"netbaiot-hol-{mode}-") as temporary:
         temporary = Path(temporary)
         gateway_config = json.loads((ROOT / "configs/development.json").read_text())
@@ -105,7 +105,7 @@ def run_mode(mode, args):
         load_config = {
             "scenario": "multiplexed",
             "business_address": f"127.0.0.1:{business if args.no_proxy else proxy_port}",
-            "topology": "v3_dual" if mode == "v3-dual" else "v3",
+            "topology": "rpc_dual" if mode == "rpc-dual" else "rpc",
             "frame_payload_bytes": frame_size,
             "stream_window_bytes": stream_window_bytes,
             "network_profile": ("loopback" if args.no_proxy else "user_proxy"),
@@ -132,13 +132,13 @@ def run_mode(mode, args):
         load_path = temporary / "load.json"
         environment = os.environ.copy()
         environment["NETBAIOT_ADMIN_SECRET"] = "a" * 64
-        environment["NETBAIOT_BUSINESS_RPC_TOKEN"] = "v3-hol-local-test-token"
+        environment["NETBAIOT_BUSINESS_RPC_TOKEN"] = "rpc-hol-local-test-token"
         if args.trace_gateway or args.trace_socket:
             environment["RUST_LOG"] = ("info,netbaiot_transports::business_rpc=debug"
                                        if args.trace_socket else
-                                       "info,netbaiot_transports::business_rpc::v3=debug")
+                                       "info,netbaiot_transports::business_rpc::session=debug")
         if args.trace_socket:
-            environment["NETBAIOT_V3_SOCKET_TRACE"] = "1"
+            environment["NETBAIOT_BUSINESS_RPC_SOCKET_TRACE"] = "1"
         (output / f"{mode}-experiment.json").write_text(json.dumps({
             "git_sha": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
             "binaries": {
@@ -281,10 +281,10 @@ def main():
     args.output.mkdir(parents=True, exist_ok=True)
     atexit.register(scrub_evidence, args.output, repo_root=ROOT, write=True)
     for mode in args.modes:
-        if mode.startswith("v3-") and args.stream_window_bytes is not None:
+        if mode.startswith("rpc-") and args.stream_window_bytes is not None:
             if args.stream_window_bytes < int(mode.split("-")[1]):
                 parser.error("stream window must be at least max frame payload")
-        if mode.startswith("v3-") and args.send_ahead_stream_bytes is not None:
+        if mode.startswith("rpc-") and args.send_ahead_stream_bytes is not None:
             if args.send_ahead_stream_bytes < int(mode.split("-")[1]):
                 parser.error("send-ahead stream limit must be at least frame payload")
         run_mode(mode, args)

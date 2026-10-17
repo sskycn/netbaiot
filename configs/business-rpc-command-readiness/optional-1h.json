@@ -1,6 +1,6 @@
 {
   "duration_secs": 3600,
-  "topology": "v3_dual",
+  "topology": "rpc_dual",
   "auth_concurrency": 4,
   "auth_rate": 2,
   "require_zero_ingress_rejections": true,

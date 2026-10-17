@@ -14,8 +14,10 @@ V4 正式采用已实现的 `Scalar::Decimal` 数据契约，例如
 V3 及更早客户端、未知版本均在握手阶段被拒绝，不返回成功 Ready，也不进入正常业务流。
 不存在降级、V3 转换器或兼容层，旧业务客户端必须升级后才能连接。
 软件 SemVer 与此 wire 版本相互独立。
-对外 Prometheus 名称、`NETBAIOT_V3_SOCKET_TRACE`、loadgen topology 值
-（`v3`/`v3_dual`）与序列化 `v3_*` 测量字段保持不变。
+Business RPC 多路复用指标使用 `netbaiot_business_rpc_mux_*`，socket trace 使用
+`NETBAIOT_BUSINESS_RPC_SOCKET_TRACE`；loadgen topology 为 `rpc`/`rpc_dual`，
+测量字段使用 `rpc_*`。部署时需同步更新 dashboard、告警、环境变量与 loadgen 配置；
+不保留旧版命名别名。
 
 Hello/Ready 是有长度上限的 JSON 握手；Ready 返回新的 `connection_epoch` 和协商限额。后续固定帧头为 12 字节：`payload_length: u32 BE`、`stream_id: u32 BE`（高位为零）、`frame_type: u8`、`flags: u8`、`reserved: u16 BE`（必须为零），随后是 payload。稳定编号：OPEN 1、ACCEPT 2、RESPONSE 3、DATA 4、WINDOW_UPDATE 5、RESET_STREAM 6、CLOSE_STREAM 7、PING 8、PONG 9、GOAWAY 10。`END_STREAM = 1` 仅用于 DATA/RESPONSE；其他 flag 位均非法。读取 payload 前先验证帧类型、标志、ID 和长度。metadata 仍是最多 4 KiB 的 JSON，DATA 是原始业务 body 字节（当前业务 DTO 仍为 JSON）；收齐后严格核对声明的 `content_length`。
 
@@ -35,7 +37,7 @@ HTTP `/api/v1/devices/commands` 和当前 Business RPC 共用一个 `CommandServ
 
 ## 限额和迁移
 
-默认 DATA payload 8 KiB、并发流 256、流窗口 256 KiB、连接窗口 4 MiB、心跳配置 5 秒；硬帧上限 16 KiB、metadata 4 KiB、消息 8 MiB。服务端和 SDK 每连接 outbound body 限额 16 MiB，服务端 inbound reassembly 每连接 16 MiB、全进程 128 MiB。control 队列最多 64 帧与 256 KiB；writer 和 credit 通道各 256 项。这些只是资源边界，不是容量或最优性能实测结论。观察固定名称的 `business_rpc_v3_*` 指标及原有认证、事件指标，不把标识符、令牌或证书内容作为指标 label。
+默认 DATA payload 8 KiB、并发流 256、流窗口 256 KiB、连接窗口 4 MiB、心跳配置 5 秒；硬帧上限 16 KiB、metadata 4 KiB、消息 8 MiB。服务端和 SDK 每连接 outbound body 限额 16 MiB，服务端 inbound reassembly 每连接 16 MiB、全进程 128 MiB。control 队列最多 64 帧与 256 KiB；writer 和 credit 通道各 256 项。这些只是资源边界，不是容量或最优性能实测结论。观察固定名称的 `business_rpc_mux_*` 指标及原有认证、事件指标，不把标识符、令牌或证书内容作为指标 label。
 
 开发环境在 `business_rpc` 中配置当前限额，并设置显式 `business_tcp` 监听器：
 

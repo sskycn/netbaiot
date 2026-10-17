@@ -123,14 +123,14 @@ class ShutdownEvidenceTests(unittest.TestCase):
     def test_path_scrubbing_preserves_ascii_recovery_bytes_and_manifest_hashes(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            source = root / "v3-8192-spool"
+            source = root / "rpc-8192-spool"
             source.mkdir()
             opaque = f"opaque recovery fixture {ROOT}/path".encode()
             for name in shutdown.COMMITTED_FILES:
                 (source / name).write_bytes(opaque)
             # Directory exclusion applies even to JSON files inside spool state.
             (source / "metadata.json").write_text(json.dumps({"path": str(ROOT / "path")}))
-            manifest = shutdown.preserve_committed_spool(source, root / "v3-8192-committed-spool")
+            manifest = shutdown.preserve_committed_spool(source, root / "rpc-8192-committed-spool")
             (root / "experiment.json").write_text(json.dumps({"path": str(ROOT / "path")}))
             (root / "gateway.log").write_text(f"fixture at {ROOT}/path\n")
             changed = shutdown.scrub_evidence(root, repo_root=ROOT, write=True)
@@ -138,7 +138,7 @@ class ShutdownEvidenceTests(unittest.TestCase):
             self.assertIn("<repo>/path", (root / "experiment.json").read_text())
             self.assertIn("<repo>/path", (root / "gateway.log").read_text())
             for file in manifest["files"]:
-                for directory in [source, root / "v3-8192-committed-spool"]:
+                for directory in [source, root / "rpc-8192-committed-spool"]:
                     actual = (directory / file["name"]).read_bytes()
                     self.assertEqual(actual, opaque)
                     self.assertEqual(hashlib.sha256(actual).hexdigest(), file["sha256"])

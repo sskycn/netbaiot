@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run a disposable local mTLS V3 Auth/Event/Command mixed workload."""
+"""Run a disposable local mTLS Business RPC Auth/Event/Command mixed workload."""
 
 import argparse
 import atexit
@@ -201,7 +201,7 @@ def run():
         "command_transport": tls_client(
             "business-command-client.pem", "business-command-client-key.pem"
         ),
-        "topology": profile.get("topology", "v3"),
+        "topology": profile.get("topology", "rpc"),
         "network_profile": "local_mtls",
         "event_payload_bytes": profile.get("event_payload_bytes", 1024),
     }
@@ -263,10 +263,10 @@ def run():
             gauges = {
                 name: metric(final_metrics, name)
                 for name in (
-                    "business_rpc_v3_active_connections",
-                    "business_rpc_v3_active_streams",
-                    "business_rpc_v3_queued_bytes",
-                    "business_rpc_v3_reassembly_reserved_bytes",
+                    "business_rpc_mux_active_connections",
+                    "business_rpc_mux_active_streams",
+                    "business_rpc_mux_queued_bytes",
+                    "business_rpc_mux_reassembly_reserved_bytes",
                     "business_rpc_pending",
                     "business_rpc_pending_bytes",
                     "command_dedup_entries",
@@ -302,10 +302,10 @@ def run():
                     and counts.get("publish_errors") == counts.get("publish_offline", 0) + counts.get("publish_overloaded", 0)
                     and len(publish_failures) == counts.get("publish_errors")
                 ),
-                "connections_released": gauges["business_rpc_v3_active_connections"] == 0,
-                "streams_released": gauges["business_rpc_v3_active_streams"] == 0,
-                "queued_bytes_released": gauges["business_rpc_v3_queued_bytes"] == 0,
-                "reassembly_released": gauges["business_rpc_v3_reassembly_reserved_bytes"] == 0,
+                "connections_released": gauges["business_rpc_mux_active_connections"] == 0,
+                "streams_released": gauges["business_rpc_mux_active_streams"] == 0,
+                "queued_bytes_released": gauges["business_rpc_mux_queued_bytes"] == 0,
+                "reassembly_released": gauges["business_rpc_mux_reassembly_reserved_bytes"] == 0,
                 "rpc_pending_released": gauges["business_rpc_pending"] == 0 and gauges["business_rpc_pending_bytes"] == 0,
                 "required_events_drained": final_status.get("pending_required") == 0,
                 "dedup_inflight_released": gauges["command_dedup_inflight"] == 0,
@@ -346,7 +346,7 @@ def run():
                     "command_dedup_ttl_ms": 300000,
                     "command_dedup_max_entries": 4096,
                 },
-                "v3_limits": RPC_LIMITS,
+                "rpc_limits": RPC_LIMITS,
                 "random_seed": None,
                 "gateway_config": "gateway-config.json",
                 "loadgen_config": "loadgen-config.json",

@@ -27,7 +27,9 @@ RPC loadgen。
 fencing、取消和命令结果语义。`StaleRevision` 要求 Provider reset sync。底层 readiness
 wait 是持续等待；应用应自行设置 timeout/cancellation。loadgen 不再暴露 V2 topology 或
 空的 V2-only handshake/sync latency 字段。旧 Event/Command response-queue metric class
-已移除；当前 control-queue gauge 和 `business_rpc_v3_*` metric 保留。
+已移除；当前 control-queue gauge 保留。多路复用指标使用 `business_rpc_mux_*`，
+socket trace 使用 `NETBAIOT_BUSINESS_RPC_SOCKET_TRACE`，loadgen 使用 `rpc`/`rpc_dual`
+topology 和 `rpc_*` 测量字段。监控与配置需同步更新，不保留旧版命名别名。
 
 ## 恢复目录升级
 

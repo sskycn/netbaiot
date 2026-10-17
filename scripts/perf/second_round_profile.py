@@ -116,7 +116,7 @@ def rpc():
             socket_send_buffer_bytes=None, no_proxy=True, trace_gateway=False,
             trace_socket=False, warmup_secs=3, recovery_secs=2,
             bytes_per_second=32768, delay_ms=0, output=output)
-        module.run_mode('v3-8192', args)
+        module.run_mode('rpc-8192', args)
 
 
 if __name__ == '__main__':
