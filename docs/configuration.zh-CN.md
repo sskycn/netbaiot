@@ -85,7 +85,7 @@ sink quota。
 
 ## 厂商数值字段
 
-`main`（公开 `v0.3.3` 之后尚未发布的修改）的整数值字段使用字符串参数：
+自 `v0.3.4` 起，整数值字段使用字符串参数：
 `"conversion":{"mode":"decimal_exact","scale":"0.1","bias":"0"}`。
 恒等转换省略 `conversion`；整数旧 `scale/bias` 包括 `null`、`1`、`0` 都不能出现。
 `f32/f64` 继续使用数字型 `scale/bias`，显式 null 仍等同省略。Decimal 输出同时受公共

@@ -85,8 +85,10 @@ Subscription Identifier, Enhanced Authentication, bridge mode and `$SYS` service
 are outside the supported profile. HTTP is management-only, not device ingress.
 Current production capacity has not been established; see [measurement scope](docs/benchmarks.md).
 
-Documentation follows `main`. The workspace version is `0.3.3`, but `main` includes
-unreleased integer Decimal and diagnostic changes after the `v0.3.3` tag. Review
+Documentation follows `main`; the workspace version is `0.4.0`. This version
+requires Business RPC V4 and includes the exact integer Decimal conversion and
+configuration diagnostics introduced in `v0.3.4`. Review the
+[v0.4.0 release notes](docs/releases/v0.4.0.md) and
 [version and upgrade notes](docs/README.md#versions-and-upgrades) before upgrading.
 
 ## Development and license

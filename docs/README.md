@@ -25,20 +25,25 @@ share the same contracts.
 
 ## Versions and upgrades
 
-Documentation follows `main`, not just the Cargo version. The workspace reports
-`0.3.3`, while integer exact-Decimal conversion and configuration diagnostic changes
-on `main` are unreleased after the [v0.3.3 tag](https://github.com/sskycn/netbaiot/releases/tag/v0.3.3).
-See [integer conversion migration](migration/integer-decimal.md) before using those
-examples with a release binary.
+Documentation follows `main`; the workspace version is `0.4.0`. The
+[v0.4.0 release](releases/v0.4.0.md) requires Business RPC V4 and version-independent
+Rust API, configuration and monitoring names. Upgrade business clients together
+with the gateway; V3 and earlier handshakes are rejected.
+
+Exact integer Decimal conversion and configuration diagnostics were introduced in
+[v0.3.4](releases/v0.3.4.md) and remain part of `v0.4.0`. When upgrading from
+`v0.3.3` or earlier, follow the [integer conversion migration](migration/integer-decimal.md)
+before loading an existing vendor codec configuration.
 
 Only Business RPC V4, MQTT recovery NBMQ v6 and EventBus recovery NBSP v3 are
 supported. Old or unknown versions fail explicitly without fallback or migration;
 read the [upgrade guide](migration/current-protocol-only.md). MQTT 3.1.1/5.0 and
 management `/api/v1` remain supported.
 
-The current [release notes](releases/v0.3.3.md) and [release template](release-template.md)
-remain in the tree. Earlier release notes are available through Git tags/history
-and [GitHub Releases](https://github.com/sskycn/netbaiot/releases).
+The current [release notes](releases/v0.4.0.md), preceding
+[v0.3.4](releases/v0.3.4.md) and [v0.3.3](releases/v0.3.3.md) notes, and
+[release template](release-template.md) remain in the tree. Other release history
+is available through Git and [GitHub Releases](https://github.com/sskycn/netbaiot/releases).
 
 ## Keeping documentation small
 

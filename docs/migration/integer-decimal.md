@@ -1,10 +1,11 @@
-# Vendor integer conversion on unreleased main
+# Vendor integer conversion migration (v0.3.4+)
 
 [中文](integer-decimal.zh-CN.md)
 
-This migration applies to `main` after public `v0.3.3`, while the workspace still
-reports `0.3.3`. It does not rewrite that release's behavior or change device
-transport framing. See [version status](../README.md#versions-and-upgrades).
+This migration applies when upgrading from `v0.3.3` or earlier to `v0.3.4` or
+later, including `v0.4.0`. It does not change device transport framing. See
+[version status](../README.md#versions-and-upgrades); `v0.4.0` also requires the
+[Business RPC V4 client upgrade](current-protocol-only.md).
 
 Integer **value** fields in telemetry, event values and command arguments now
 always use exact Decimal arithmetic. Remove the legacy numeric `scale` and `bias`
@@ -35,7 +36,7 @@ Scalar oneof field 6 (`string decimal`). This diagnostic fix changes no field nu
 or wire encoding. When moving from public `v0.3.3`, Rust consumers must account for
 the new `Scalar::Decimal` variant in exhaustive matches.
 
-Check with a binary built from the same `main` checkout:
+Check with the target version's CLI; from a matching source checkout:
 
 ```bash
 cargo run --locked -p netbaiot-cli -- config check --config configs/vendor-codec.json

@@ -1,9 +1,10 @@
-# 尚未发布的 main：厂商整数转换迁移
+# 厂商整数转换迁移（v0.3.4+）
 
 [English](integer-decimal.md)
 
-本说明适用于公开 `v0.3.3` 之后的 `main`，workspace 版本仍为 `0.3.3`。
-它不改写该 Release 的历史行为，也不改变设备传输封包。见[版本状态](../README.zh-CN.md#版本与升级)。
+本说明适用于从 `v0.3.3` 或更早版本升级到 `v0.3.4` 及后续版本，包括 `v0.4.0`。
+设备传输封包不变。见[版本状态](../README.zh-CN.md#版本与升级)；`v0.4.0` 还要求完成
+[Business RPC V4 客户端升级](current-protocol-only.zh-CN.md)。
 
 遥测、Event 值和 Command 参数中的整数**值字段**统一使用精确 Decimal 运算。
 删除旧数字型 `scale` 和 `bias` 成员，包括显式 `null`、`1`、`0`。例如：
@@ -29,7 +30,7 @@ JSON、CBOR、MessagePack 使用显式 Decimal 对象；Protobuf 使用既有 Sc
 字段 6（`string decimal`）。本次诊断修复不改变字段编号或 wire 编码。
 从公开 `v0.3.3` 升级时，Rust 消费端的穷举匹配需要处理新增 `Scalar::Decimal`。
 
-使用同一份 `main` 源码编译的 binary 检查：
+使用目标版本的 CLI 检查；对应版本的源码 checkout 可运行：
 
 ```bash
 cargo run --locked -p netbaiot-cli -- config check --config configs/vendor-codec.json

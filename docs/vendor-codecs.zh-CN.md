@@ -2,8 +2,8 @@
 
 [English](vendor-codecs.md)
 
-本文描述 `main`；整数 Decimal 契约与诊断改进尚未包含在公开 `v0.3.3` 中。
-升级现有厂商配置前阅读[迁移步骤](migration/integer-decimal.zh-CN.md)。
+本文描述 `main`，当前为 `v0.4.0`；整数 Decimal 契约与配置诊断自 `v0.3.4` 引入。
+从 `v0.3.3` 或更早版本升级已有厂商配置前，阅读[迁移步骤](migration/integer-decimal.zh-CN.md)。
 
 厂商 Codec 复用同步 `DeviceCodec` 与 `CodecRegistry`，只负责 Payload 转换。
 认证、传输封包、ACK、EventAccepted、背压和命令排队继续由现有模块负责。

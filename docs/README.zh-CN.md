@@ -21,16 +21,20 @@
 
 ## 版本与升级
 
-文档跟随 `main`，不能只凭 Cargo 版本推断发布内容。Workspace 仍为 `0.3.3`，但 `main`
-已包含 [v0.3.3 标签](https://github.com/sskycn/netbaiot/releases/tag/v0.3.3)之后尚未发布的
-整数精确 Decimal 与配置诊断改进。使用发布版运行相关示例前，请阅读[整数转换迁移](migration/integer-decimal.zh-CN.md)。
+文档跟随 `main`，当前 Workspace 版本为 `0.4.0`。
+[v0.4.0](releases/v0.4.0.md) 要求 Business RPC V4，并采用不带版本号的 Rust API、配置与监控命名。
+业务客户端应与网关一起升级，V3 及更早版本的握手会被拒绝。
+
+整数精确 Decimal 转换与配置诊断自 [v0.3.4](releases/v0.3.4.md) 引入，`v0.4.0` 继续包含这些改动。
+从 `v0.3.3` 或更早版本升级时，加载现有厂商 Codec 配置前请完成[整数转换迁移](migration/integer-decimal.zh-CN.md)。
 
 当前仅支持 Business RPC V4、MQTT 恢复 NBMQ v6 与 EventBus 恢复 NBSP v3。
 旧版或未知版本直接失败，不自动回退或迁移；升级前阅读[协议升级指南](migration/current-protocol-only.zh-CN.md)。
 MQTT 3.1.1/5.0 与管理 `/api/v1` 继续支持。
 
-目录保留[当前发布说明（英文）](releases/v0.3.3.md)与[发布模板](release-template.md)。
-更早的发布说明通过 Git 标签、历史及 [GitHub Releases](https://github.com/sskycn/netbaiot/releases)查阅。
+目录保留[当前发布说明（英文）](releases/v0.4.0.md)、此前的 [v0.3.4](releases/v0.3.4.md)
+与 [v0.3.3](releases/v0.3.3.md) 说明，以及[发布模板](release-template.md)。
+其他发布历史通过 Git 及 [GitHub Releases](https://github.com/sskycn/netbaiot/releases)查阅。
 
 ## 精简与维护约定
 

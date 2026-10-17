@@ -14,10 +14,10 @@ using that device's bound profile. Business consumers still deduplicate `event_i
 | `netbaiot-protobuf` | 1 | Same four kinds | Protobuf DeviceCommand message |
 
 Vendor binary declarations and native Rust registration are documented in
-[vendor payload codecs](vendor-codecs.md). The exact integer Decimal changes on
-`main` are [unreleased](README.md#versions-and-upgrades); JSON/CBOR/MessagePack's explicit Decimal
-object and Protobuf Scalar field 6 retain their wire representation. `v0.3.3`
-release behavior must be read from its release notes and source tag.
+[vendor payload codecs](vendor-codecs.md). Exact integer Decimal conversion is
+included since `v0.3.4`; existing integer mappings need the
+[migration steps](migration/integer-decimal.md). JSON/CBOR/MessagePack's explicit
+Decimal object and Protobuf Scalar field 6 retain their wire representation.
 
 ## Selection and product consistency
 

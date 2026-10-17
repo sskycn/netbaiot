@@ -1,8 +1,9 @@
 # Configuration examples / 配置示例
 
-These files target `main`; its exact integer Decimal changes are
-[unreleased since v0.3.3](../docs/README.md#versions-and-upgrades).
-示例跟随 `main`；整数精确转换尚未包含在公开 `v0.3.3` 中，见[迁移](../docs/migration/integer-decimal.zh-CN.md)。
+These files target `main`, currently `v0.4.0`. Exact integer Decimal conversion
+and its configuration diagnostics are included since `v0.3.4`; see
+[version and upgrade notes](../docs/README.md#versions-and-upgrades).
+示例跟随 `main`，当前为 `v0.4.0`；从 `v0.3.3` 或更早版本升级时，见[整数转换迁移](../docs/migration/integer-decimal.zh-CN.md)。
 All device credentials in these fixtures are public development values.
 
 | Files | Parser / use | 注意事项 |

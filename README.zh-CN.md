@@ -75,8 +75,9 @@ MQTT over WebSocket、共享订阅、MQTT-SN、Topic Alias、Subscription Identi
 Authentication、bridge mode 与 `$SYS` 不在支持范围。HTTP 仅用于管理，不是设备入口。
 当前生产容量尚未确定，详见[测量范围](docs/benchmarks.zh-CN.md)。
 
-文档跟随 `main`。Workspace 版本仍为 `0.3.3`，但 `main` 已包含 `v0.3.3` 标签之后尚未发布的
-整数 Decimal 与诊断改进。升级前请阅读[版本与升级说明](docs/README.zh-CN.md#版本与升级)。
+文档跟随 `main`，当前 Workspace 版本为 `0.4.0`。此版本要求 Business RPC V4，并包含
+`v0.3.4` 引入的整数精确 Decimal 转换与配置诊断。升级前请阅读
+[v0.4.0 发布说明（英文）](docs/releases/v0.4.0.md)与[版本与升级说明](docs/README.zh-CN.md#版本与升级)。
 
 ## 开发与许可
 

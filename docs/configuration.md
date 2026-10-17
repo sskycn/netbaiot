@@ -119,7 +119,7 @@ The fixed connection admission allowance has a validated 16 KiB minimum, indepen
 
 ## Vendor numeric fields
 
-For `main` (unreleased since `v0.3.3`), integer value fields use string parameters:
+Since `v0.3.4`, integer value fields use string parameters:
 `"conversion":{"mode":"decimal_exact","scale":"0.1","bias":"0"}`. Omit
 `conversion` for exact identity; never include legacy integer `scale/bias`, even
 `null`, `1` or `0`. Float `f32/f64` fields keep numeric `scale/bias`; explicit null

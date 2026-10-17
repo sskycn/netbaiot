@@ -2,9 +2,10 @@
 
 [中文](vendor-codecs.zh-CN.md)
 
-This page describes `main`. Its integer Decimal contract and diagnostic updates
-are **not included in public v0.3.3**. See the [migration steps](migration/integer-decimal.md)
-before upgrading an existing vendor configuration.
+This page describes `main`, currently `v0.4.0`. The integer Decimal contract and
+configuration diagnostics were introduced in `v0.3.4`. When upgrading an existing
+vendor configuration from `v0.3.3` or earlier, follow the
+[migration steps](migration/integer-decimal.md).
 
 Vendor codecs are synchronous payload transformations behind the existing
 `DeviceCodec` / `CodecRegistry`. They do not implement transport framing,
