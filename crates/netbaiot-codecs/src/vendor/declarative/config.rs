@@ -104,9 +104,9 @@ pub enum ConversionMode {
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct DecimalConversion {
     pub mode: ConversionMode,
-    /// Exact decimal scale. At most 38 significant digits and exponent magnitude 38.
+    /// Exact integer scale. At most 38 significant digits and exponent magnitude 38.
     pub scale: String,
-    /// Exact decimal bias. At most 38 significant digits and exponent magnitude 38.
+    /// Exact integer bias. At most 38 significant digits and exponent magnitude 38.
     #[serde(default = "zero_decimal")]
     pub bias: String,
 }
@@ -127,13 +127,13 @@ pub struct Field {
     pub endian: Endian,
     /// Required only for UTF-8: exact byte length, without padding or terminator.
     pub length: Option<usize>,
-    /// Legacy numeric scale. Omission means 1. Conflicts with `conversion`.
+    /// IEEE 754 floating-point scale. Valid only for f32/f64; omission means 1.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub scale: Option<f64>,
-    /// Legacy numeric bias. Omission means 0. Conflicts with `conversion`.
+    /// IEEE 754 floating-point bias. Valid only for f32/f64; omission means 0.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub bias: Option<f64>,
-    /// Explicit exact-decimal conversion for integer wire types only.
+    /// Exact-decimal conversion for integer wire types only; omission is exact identity.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub conversion: Option<DecimalConversion>,
 }

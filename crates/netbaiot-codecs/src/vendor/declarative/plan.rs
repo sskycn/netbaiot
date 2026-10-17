@@ -1,6 +1,6 @@
 use super::*;
 use crate::common::valid_text;
-use crate::vendor::numeric::{Decimal, FloatConversion, IntegerConversion, IntegerOutput};
+use crate::vendor::numeric::{Decimal, FloatConversion, IntegerConversion};
 use std::{collections::BTreeMap, ops::Range};
 use wire::{Check, Integer, Value};
 
@@ -230,43 +230,6 @@ impl<'a> Builder<'a> {
                 "Only UTF-8 fields have a configurable length.",
             ));
         }
-        if f.conversion.is_some() && (f.scale.is_some() || f.bias.is_some()) {
-            return Err(ConfigError::new(
-                "conversion",
-                "Exact conversion conflicts with legacy scale or bias.",
-            ));
-        }
-        let legacy_scale = f.scale.unwrap_or(1.0);
-        let legacy_bias = f.bias.unwrap_or(0.0);
-        if f.conversion.is_none() && (!legacy_scale.is_finite() || legacy_scale == 0.0) {
-            return Err(ConfigError::new(
-                "scale",
-                "Scale must be finite and nonzero.",
-            ));
-        }
-        if f.conversion.is_none() && !legacy_bias.is_finite() {
-            return Err(ConfigError::new("bias", "Bias must be finite."));
-        }
-        if matches!(f.data_type, DataType::Bool | DataType::Utf8) {
-            if f.conversion.is_some() {
-                return Err(ConfigError::new(
-                    "conversion",
-                    "Non-numeric fields cannot have numeric conversion settings.",
-                ));
-            }
-            if legacy_scale != 1.0 {
-                return Err(ConfigError::new(
-                    "scale",
-                    "Non-numeric fields cannot be scaled.",
-                ));
-            }
-            if legacy_bias != 0.0 {
-                return Err(ConfigError::new(
-                    "bias",
-                    "Non-numeric fields cannot have a bias.",
-                ));
-            }
-        }
         let integer_bounds = match f.data_type {
             DataType::U8 => Some((0, i128::from(u8::MAX))),
             DataType::U16 => Some((0, i128::from(u16::MAX))),
@@ -278,43 +241,64 @@ impl<'a> Builder<'a> {
             DataType::I64 => Some((i128::from(i64::MIN), i128::from(i64::MAX))),
             _ => None,
         };
+        if integer_bounds.is_some() {
+            if f.scale.is_some() {
+                return Err(ConfigError::new(
+                    "scale",
+                    "Integer fields no longer support floating-point scale; migrate to conversion with mode decimal_exact and string scale/bias values.",
+                ));
+            }
+            if f.bias.is_some() {
+                return Err(ConfigError::new(
+                    "bias",
+                    "Integer fields no longer support floating-point bias; migrate to conversion with mode decimal_exact and string scale/bias values.",
+                ));
+            }
+        }
+        let float_scale = f.scale.unwrap_or(1.0);
+        let float_bias = f.bias.unwrap_or(0.0);
+        if integer_bounds.is_none() && (!float_scale.is_finite() || float_scale == 0.0) {
+            return Err(ConfigError::new(
+                "scale",
+                "Scale must be finite and nonzero.",
+            ));
+        }
+        if integer_bounds.is_none() && !float_bias.is_finite() {
+            return Err(ConfigError::new("bias", "Bias must be finite."));
+        }
+        if matches!(f.data_type, DataType::Bool | DataType::Utf8) {
+            if f.conversion.is_some() {
+                return Err(ConfigError::new(
+                    "conversion",
+                    "Non-numeric fields cannot have numeric conversion settings.",
+                ));
+            }
+            if float_scale != 1.0 {
+                return Err(ConfigError::new(
+                    "scale",
+                    "Non-numeric fields cannot be scaled.",
+                ));
+            }
+            if float_bias != 0.0 {
+                return Err(ConfigError::new(
+                    "bias",
+                    "Non-numeric fields cannot have a bias.",
+                ));
+            }
+        }
         let integer = integer_bounds
             .map(|(minimum, maximum)| {
-                if let Some(conversion) = &f.conversion {
-                    let scale = Decimal::parse(&conversion.scale)
+                let (scale, bias) = if let Some(conversion) = &f.conversion {
+                    let scale = Decimal::parse_parameter(&conversion.scale)
                         .map_err(|message| ConfigError::new("conversion.scale", message))?;
-                    let bias = Decimal::parse(&conversion.bias)
+                    let bias = Decimal::parse_parameter(&conversion.bias)
                         .map_err(|message| ConfigError::new("conversion.bias", message))?;
-                    IntegerConversion::compile(
-                        scale,
-                        bias,
-                        IntegerOutput::Decimal,
-                        minimum,
-                        maximum,
-                    )
-                    .map_err(|message| ConfigError::new("conversion", message))
+                    (scale, bias)
                 } else {
-                    let scale = Decimal::from_f64(legacy_scale).map_err(|_| {
-                        ConfigError::new(
-                            "scale",
-                            "Legacy scale exceeds the bounded decimal conversion engine.",
-                        )
-                    })?;
-                    let bias = Decimal::from_f64(legacy_bias).map_err(|_| {
-                        ConfigError::new(
-                            "bias",
-                            "Legacy bias exceeds the bounded decimal conversion engine.",
-                        )
-                    })?;
-                    IntegerConversion::legacy_compiled(
-                        scale,
-                        bias,
-                        (legacy_scale, legacy_bias),
-                        minimum,
-                        maximum,
-                    )
-                    .map_err(|message| ConfigError::new("scale", message))
-                }
+                    (Decimal::ONE, Decimal::ZERO)
+                };
+                IntegerConversion::compile(scale, bias, minimum, maximum)
+                    .map_err(|message| ConfigError::new("conversion", message))
             })
             .transpose()?;
         let float = match f.data_type {
@@ -326,7 +310,7 @@ impl<'a> Builder<'a> {
                     ));
                 }
                 Some(
-                    FloatConversion::compile(legacy_scale, legacy_bias)
+                    FloatConversion::compile(float_scale, float_bias)
                         .map_err(|message| ConfigError::new("scale", message))?,
                 )
             }

@@ -41,7 +41,8 @@ fn compiled_codecs_have_bounded_output_and_allocation_free_structural_rejection(
         let event = codec.decode(&ctx, &bytes).unwrap();
         let stats = region.change();
         assert!(stats.bytes_allocated <= 2048);
-        assert!(stats.allocations <= 8);
+        // The two exact integer fields each own one bounded DecimalScalar allocation.
+        assert!(stats.allocations <= 10);
         drop(event);
         let region = Region::new(ALLOCATOR);
         assert!(codec.decode(&ctx, &bytes[..18]).is_err());

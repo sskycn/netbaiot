@@ -94,7 +94,12 @@ def main():
                     assert event['source_message_id']=='42'
                     assert event['tenant_id']=='demo' and event['device_id']=='device-1'
                     assert event['payload']['kind']=='telemetry'
-                    assert event['payload']['data']=={'temperature':-123*0.1,'humidity':654*0.1,'alarm':True,'model':'A100'}
+                    assert event['payload']['data']=={
+                        'temperature':{'decimal':'-12.3'},
+                        'humidity':{'decimal':'65.4'},
+                        'alarm':True,
+                        'model':'A100',
+                    }
                 expected={}
                 for event in (e for e in received if e['product_id']!='acme'):
                     assert event['source_message_id']=='sample:1'

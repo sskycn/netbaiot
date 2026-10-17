@@ -1,7 +1,7 @@
 //! Independent native implementation of the ACME example telemetry and set_temperature payloads.
 //! Explicit opt-in only; this is not a built-in or a production industrial protocol.
 use crate::common::{Parsed, event, valid_text, validate_command};
-use crate::vendor::numeric::IntegerConversion;
+use crate::vendor::numeric::{Decimal, IntegerConversion};
 use netbaiot_core::*;
 
 pub struct AcmeV1 {
@@ -21,15 +21,20 @@ impl AcmeV1 {
         }
         Ok(Self {
             limits,
-            temperature: IntegerConversion::legacy(
-                0.1,
-                0.0,
+            temperature: IntegerConversion::compile(
+                Decimal::parse_parameter("0.1").map_err(|_| CodecError)?,
+                Decimal::ZERO,
                 i128::from(i16::MIN),
                 i128::from(i16::MAX),
             )
             .map_err(|_| CodecError)?,
-            humidity: IntegerConversion::legacy(0.1, 0.0, 0, i128::from(u16::MAX))
-                .map_err(|_| CodecError)?,
+            humidity: IntegerConversion::compile(
+                Decimal::parse_parameter("0.1").map_err(|_| CodecError)?,
+                Decimal::ZERO,
+                0,
+                i128::from(u16::MAX),
+            )
+            .map_err(|_| CodecError)?,
         })
     }
     fn parse(&self, p: &[u8]) -> Result<Parsed, CodecError> {

@@ -56,16 +56,21 @@ fuzz_target!(|data: &[u8]| {
     } else {
         Endian::Little
     };
-    if selector & 2 == 0 && data.len() >= 24 {
-        field.scale = Some(f64::from_le_bytes(data[8..16].try_into().unwrap()));
-        field.bias = Some(f64::from_le_bytes(data[16..24].try_into().unwrap()));
+    if matches!(field.data_type, DataType::F32 | DataType::F64) {
         field.conversion = None;
+        if data.len() >= 24 {
+            field.scale = Some(f64::from_le_bytes(data[8..16].try_into().unwrap()));
+            field.bias = Some(f64::from_le_bytes(data[16..24].try_into().unwrap()));
+        } else {
+            field.scale = None;
+            field.bias = None;
+        }
     } else {
         let scales = ["0.1", "-0.001", "1", "0", "1e39", "1e-39", "invalid"];
         let biases = ["0", "0.3", "-1", "1e38", "1e-38", "invalid"];
         field.scale = None;
         field.bias = None;
-        field.conversion = Some(DecimalConversion {
+        field.conversion = (selector & 2 != 0).then(|| DecimalConversion {
             mode: ConversionMode::DecimalExact,
             scale: scales[usize::from(selector) % scales.len()].into(),
             bias: biases[usize::from(selector.rotate_right(3)) % biases.len()].into(),
@@ -133,4 +138,79 @@ fuzz_target!(|data: &[u8]| {
         .encode(&EncodeContext { device: &device }, &command)
         .unwrap();
     assert_eq!(&encoded[18..20], &raw_bytes);
+
+    // Exercise exact round trips for every integer width, signedness and byte order.
+    // Configuration compilation happens once; arbitrary raw bytes cover the runtime
+    // property while vendor_invariants checks successful command math independently.
+    static INTEGER_ROUND_TRIPS: OnceLock<Vec<(DeclarativeCodec, usize)>> = OnceLock::new();
+    let integer_round_trips = INTEGER_ROUND_TRIPS.get_or_init(|| {
+        let mut codecs = Vec::new();
+        for (kind, width) in [
+            ("u8", 1),
+            ("i8", 1),
+            ("u16", 2),
+            ("i16", 2),
+            ("u32", 4),
+            ("i32", 4),
+            ("u64", 8),
+            ("i64", 8),
+        ] {
+            for endian in ["big", "little"] {
+                let config: DeclarativeConfig = serde_json::from_value(serde_json::json!({
+                    "id":"vendor-fuzz-round-trip","version":1,"header":[17],
+                    "message_type":{"offset":1,"type":"u8"},
+                    "messages":[{"tag":1,"size":3+width,
+                        "source_message_id":{"offset":2,"type":"u8"},
+                        "payload":{"kind":"telemetry","fields":[{"name":"value","field":{
+                            "offset":3,"type":kind,"endian":endian,
+                            "conversion":{"mode":"decimal_exact","scale":"-0.1","bias":"0.3"}
+                        }}]}}],
+                    "commands":[{"name":"set","tag":2,"size":18+width,"command_id_offset":2,
+                        "fields":[{"name":"value","field":{"offset":18,"type":kind,
+                            "endian":endian,"conversion":{"mode":"decimal_exact",
+                            "scale":"-0.1","bias":"0.3"}}}]}]
+                }))
+                .unwrap();
+                codecs.push((
+                    DeclarativeCodec::compile(&config, CodecLimits::default()).unwrap(),
+                    width,
+                ));
+            }
+        }
+        codecs
+    });
+    let (round_trip, width) =
+        &integer_round_trips[usize::from(selector) % integer_round_trips.len()];
+    let mut raw = [0u8; 8];
+    for (slot, byte) in raw[..*width].iter_mut().zip(data) {
+        *slot = *byte;
+    }
+    let mut payload = vec![17, 1, 1];
+    payload.extend_from_slice(&raw[..*width]);
+    let event = round_trip
+        .decode(
+            &DecodeContext {
+                device: &device,
+                received_at: 0,
+            },
+            &payload,
+        )
+        .unwrap()
+        .remove(0);
+    let DeviceEventKind::Telemetry(fields) = event.kind else {
+        unreachable!()
+    };
+    let command = DeviceCommand {
+        command_id: serde_json::from_str("\"00000000-0000-0000-0000-000000000000\"").unwrap(),
+        device: device.clone(),
+        expires_at: None,
+        payload: DeviceCommandPayload {
+            name: "set".into(),
+            arguments: [("value".into(), fields["value"].clone())].into(),
+        },
+    };
+    let encoded = round_trip
+        .encode(&EncodeContext { device: &device }, &command)
+        .unwrap();
+    assert_eq!(&encoded[18..18 + *width], &raw[..*width]);
 });

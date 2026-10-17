@@ -127,6 +127,14 @@ Schema does not replace `netbaiot config check`; cross-field, TLS, secret-source
 | `identity` | "#/$defs/AuthenticatedDevice" | `required/no default` |  |
 | `secret_hex` | "string" | `required/no default` |  |
 
+## DecimalConversion
+
+| Field | Schema type | Default | Description |
+| --- | --- | --- | --- |
+| `bias` | "string" | `"0"` | Exact integer bias. At most 38 significant digits and exponent magnitude 38. |
+| `mode` | "#/$defs/ConversionMode" | `required/no default` |  |
+| `scale` | "string" | `required/no default` | Exact integer scale. At most 38 significant digits and exponent magnitude 38. |
+
 ## DeclarativeConfig
 
 | Field | Schema type | Default | Description |
@@ -151,11 +159,12 @@ Schema does not replace `netbaiot config check`; cross-field, TLS, secret-source
 
 | Field | Schema type | Default | Description |
 | --- | --- | --- | --- |
-| `bias` | "number" | `0.0` |  |
+| `bias` | ["number","null"] | `required/no default` | IEEE 754 floating-point bias. Valid only for f32/f64; omission means 0. |
+| `conversion` | union/object | `required/no default` | Exact-decimal conversion for integer wire types only; omission is exact identity. |
 | `endian` | "#/$defs/Endian" | `"big"` |  |
 | `length` | ["integer","null"] | `required/no default` | Required only for UTF-8: exact byte length, without padding or terminator. |
 | `offset` | "integer" | `required/no default` |  |
-| `scale` | "number" | `1.0` |  |
+| `scale` | ["number","null"] | `required/no default` | IEEE 754 floating-point scale. Valid only for f32/f64; omission means 1. |
 | `type` | "#/$defs/DataType" | `required/no default` |  |
 
 ## IntegerField

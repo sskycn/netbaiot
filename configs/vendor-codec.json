@@ -64,7 +64,11 @@
                   "offset": 9,
                   "type": "i16",
                   "endian": "little",
-                  "scale": 0.1
+                  "conversion": {
+                    "mode": "decimal_exact",
+                    "scale": "0.1",
+                    "bias": "0"
+                  }
                 }
               },
               {
@@ -72,7 +76,11 @@
                 "field": {
                   "offset": 11,
                   "type": "u16",
-                  "scale": 0.1
+                  "conversion": {
+                    "mode": "decimal_exact",
+                    "scale": "0.1",
+                    "bias": "0"
+                  }
                 }
               },
               {
@@ -188,7 +196,11 @@
                 "offset": 21,
                 "type": "i16",
                 "endian": "little",
-                "scale": 0.1
+                "conversion": {
+                  "mode": "decimal_exact",
+                  "scale": "0.1",
+                  "bias": "0"
+                }
               }
             }
           ],

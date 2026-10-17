@@ -3,6 +3,8 @@ use std::fmt::{self, Write};
 
 pub(crate) const MAX_DECIMAL_PARAMETER_EXPONENT: i16 = 38;
 pub(crate) const MAX_DECIMAL_SIGNIFICANT_DIGITS: usize = 38;
+const MAX_DECIMAL_SCALAR_EXPONENT: i16 = 324;
+const MAX_DECIMAL_SCALAR_SIGNIFICANT_DIGITS: usize = 39;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct Decimal {
@@ -15,8 +17,32 @@ impl Decimal {
         coefficient: 0,
         exponent: 0,
     };
+    pub(crate) const ONE: Self = Self {
+        coefficient: 1,
+        exponent: 0,
+    };
 
     pub(crate) fn parse(text: &str) -> Result<Self, &'static str> {
+        Self::parse_bounded(
+            text,
+            MAX_DECIMAL_SCALAR_SIGNIFICANT_DIGITS,
+            MAX_DECIMAL_SCALAR_EXPONENT,
+        )
+    }
+
+    pub(crate) fn parse_parameter(text: &str) -> Result<Self, &'static str> {
+        Self::parse_bounded(
+            text,
+            MAX_DECIMAL_SIGNIFICANT_DIGITS,
+            MAX_DECIMAL_PARAMETER_EXPONENT,
+        )
+    }
+
+    fn parse_bounded(
+        text: &str,
+        maximum_significant_digits: usize,
+        maximum_exponent: i16,
+    ) -> Result<Self, &'static str> {
         let bytes = text.as_bytes();
         if bytes.is_empty() || bytes.len() > netbaiot_core::MAX_DECIMAL_BYTES {
             return Err("Decimal text must contain between 1 and 64 bytes.");
@@ -50,19 +76,21 @@ impl Decimal {
                 at += 1;
             }
             let exponent_start = at;
-            let mut exponent = 0i16;
+            let mut exponent = 0i32;
             while let Some(digit) = bytes.get(at).filter(|digit| digit.is_ascii_digit()) {
                 exponent = exponent
                     .checked_mul(10)
-                    .and_then(|n| n.checked_add(i16::from(*digit - b'0')))
+                    .and_then(|n| n.checked_add(i32::from(*digit - b'0')))
                     .ok_or("Decimal exponent exceeds the supported range.")?;
                 at += 1;
             }
-            if at == exponent_start || exponent > MAX_DECIMAL_PARAMETER_EXPONENT {
-                return Err("Decimal exponent exceeds the supported range of -38 through 38.");
+            if at == exponent_start {
+                return Err("Decimal exponent requires digits.");
             }
             if exponent_negative {
-                -exponent
+                exponent
+                    .checked_neg()
+                    .ok_or("Decimal exponent exceeds the supported range.")?
             } else {
                 exponent
             }
@@ -87,43 +115,57 @@ impl Decimal {
             digit_index += 1;
         }
         let Some(first_nonzero) = first_nonzero else {
+            if !(-i32::from(maximum_exponent)..=i32::from(maximum_exponent))
+                .contains(&explicit_exponent)
+            {
+                return Err("Decimal exponent exceeds the supported bounded range.");
+            }
             return Ok(Self::ZERO);
         };
         let last_nonzero = last_nonzero.ok_or("Decimal coefficient is invalid.")?;
         let significant_digits = last_nonzero - first_nonzero + 1;
-        if significant_digits > MAX_DECIMAL_SIGNIFICANT_DIGITS {
-            return Err("Decimal has more than 38 significant digits.");
+        if significant_digits > maximum_significant_digits {
+            return Err("Decimal has too many significant digits for the bounded decimal engine.");
         }
 
         let trailing_zeros = digit_index - last_nonzero - 1;
-        let mut coefficient = 0i128;
+        let mut magnitude = 0u128;
         let mut current_digit = 0usize;
         for byte in &bytes[usize::from(negative)..mantissa_end] {
             if *byte == b'.' {
                 continue;
             }
             if (first_nonzero..=last_nonzero).contains(&current_digit) {
-                coefficient = coefficient
+                magnitude = magnitude
                     .checked_mul(10)
-                    .and_then(|n| n.checked_add(i128::from(*byte - b'0')))
+                    .and_then(|n| n.checked_add(u128::from(*byte - b'0')))
                     .ok_or("Decimal coefficient exceeds i128.")?;
             }
             current_digit += 1;
         }
-        if negative {
-            coefficient = -coefficient;
-        }
-        let exponent = i32::from(explicit_exponent)
+        let coefficient = if negative {
+            if magnitude == (i128::MAX as u128) + 1 {
+                i128::MIN
+            } else {
+                i128::try_from(magnitude)
+                    .ok()
+                    .and_then(i128::checked_neg)
+                    .ok_or("Decimal coefficient exceeds i128.")?
+            }
+        } else {
+            i128::try_from(magnitude).map_err(|_| "Decimal coefficient exceeds i128.")?
+        };
+        let exponent = explicit_exponent
             .checked_sub(i32::try_from(fraction_digits).map_err(|_| "Decimal is too long.")?)
             .and_then(|n| n.checked_add(i32::try_from(trailing_zeros).ok()?))
-            .and_then(|n| i16::try_from(n).ok())
             .ok_or("Decimal exponent exceeds the supported range.")?;
-        if !(-MAX_DECIMAL_PARAMETER_EXPONENT..=MAX_DECIMAL_PARAMETER_EXPONENT).contains(&exponent) {
-            return Err("Decimal exponent exceeds the supported range of -38 through 38.");
+        if !(-i32::from(maximum_exponent)..=i32::from(maximum_exponent)).contains(&exponent) {
+            return Err("Decimal exponent exceeds the supported bounded range.");
         }
         Ok(Self {
             coefficient,
-            exponent,
+            exponent: i16::try_from(exponent)
+                .map_err(|_| "Decimal exponent exceeds the supported range.")?,
         })
     }
 
@@ -135,45 +177,11 @@ impl Decimal {
         Self::parse(buffer.format_finite(value)).map_err(|_| CodecError)
     }
 
-    fn checked_add(self, other: Self) -> Option<Self> {
-        if self.coefficient == 0 {
-            return Some(other);
-        }
-        if other.coefficient == 0 {
-            return Some(self);
-        }
-        let exponent = self.exponent.min(other.exponent);
-        let left = self
-            .coefficient
-            .checked_mul(pow10(u32::from(self.exponent.abs_diff(exponent)))?)?;
-        let right = other
-            .coefficient
-            .checked_mul(pow10(u32::from(other.exponent.abs_diff(exponent)))?)?;
-        normalize(left.checked_add(right)?, exponent)
-    }
-
-    fn checked_sub(self, other: Self) -> Option<Self> {
-        self.checked_add(Self {
-            coefficient: other.coefficient.checked_neg()?,
-            exponent: other.exponent,
-        })
-    }
-
-    fn checked_mul_integer(self, integer: i128) -> Option<Self> {
-        normalize(self.coefficient.checked_mul(integer)?, self.exponent)
-    }
-
-    fn formatted_len(self) -> Option<usize> {
-        let mut counter = Length(0);
-        self.write_to(&mut counter).ok()?;
-        Some(counter.0)
-    }
-
     fn into_scalar(self) -> Result<Scalar, CodecError> {
-        let mut value = String::with_capacity(self.formatted_len().ok_or(CodecError)?);
+        let mut value = DecimalText::default();
         self.write_to(&mut value).map_err(|_| CodecError)?;
         Ok(Scalar::Decimal(
-            DecimalScalar::new(value).map_err(|_| CodecError)?,
+            DecimalScalar::new(value.as_str()?).map_err(|_| CodecError)?,
         ))
     }
 
@@ -239,202 +247,145 @@ fn pow10(exponent: u32) -> Option<i128> {
     Some(value)
 }
 
-fn gcd(mut left: u128, mut right: u128) -> u128 {
-    while right != 0 {
-        (left, right) = (right, left % right);
-    }
-    left
-}
-
-fn exact_integer_ratio(numerator: Decimal, denominator: Decimal) -> Option<i128> {
-    if denominator.coefficient == 0 {
-        return None;
-    }
-    if numerator.coefficient == 0 {
-        return Some(0);
-    }
-    let negative = (numerator.coefficient < 0) != (denominator.coefficient < 0);
-    let mut top = numerator.coefficient.unsigned_abs();
-    let mut bottom = denominator.coefficient.unsigned_abs();
-    let common = gcd(top, bottom);
-    top /= common;
-    bottom /= common;
-    let exponent = i32::from(numerator.exponent) - i32::from(denominator.exponent);
-    if exponent >= 0 {
-        let mut twos = exponent as u32;
-        let mut fives = exponent as u32;
-        while twos != 0 && bottom.is_multiple_of(2) {
-            bottom /= 2;
-            twos -= 1;
-        }
-        while fives != 0 && bottom.is_multiple_of(5) {
-            bottom /= 5;
-            fives -= 1;
-        }
-        if bottom != 1 {
-            return None;
-        }
-        for _ in 0..twos {
-            top = top.checked_mul(2)?;
-        }
-        for _ in 0..fives {
-            top = top.checked_mul(5)?;
-        }
-    } else {
-        if bottom != 1 {
-            return None;
-        }
-        for _ in 0..exponent.unsigned_abs() {
-            if !top.is_multiple_of(10) {
-                return None;
-            }
-            top /= 10;
-        }
-    }
-    if negative {
-        if top == (i128::MAX as u128) + 1 {
-            Some(i128::MIN)
-        } else {
-            i128::try_from(top).ok()?.checked_neg()
-        }
-    } else {
-        i128::try_from(top).ok()
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum IntegerOutput {
-    Number,
-    Decimal,
-}
-
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct IntegerConversion {
-    scale: Decimal,
-    bias: Decimal,
-    output: IntegerOutput,
+    multiplier: i128,
+    offset: i128,
+    exponent: i16,
     minimum: i128,
     maximum: i128,
-    legacy: Option<Legacy>,
-}
-
-#[derive(Clone, Copy, Debug)]
-struct Legacy {
-    scale: f64,
-    bias: f64,
 }
 
 impl IntegerConversion {
-    pub(crate) fn legacy(
-        scale: f64,
-        bias: f64,
-        minimum: i128,
-        maximum: i128,
-    ) -> Result<Self, &'static str> {
-        let legacy = (scale, bias);
-        let scale = Decimal::from_f64(scale).map_err(
-            |_| "Legacy scale cannot be represented by the bounded decimal conversion engine.",
-        )?;
-        let bias = Decimal::from_f64(bias).map_err(
-            |_| "Legacy bias cannot be represented by the bounded decimal conversion engine.",
-        )?;
-        Self::legacy_compiled(scale, bias, legacy, minimum, maximum)
-    }
-
-    pub(crate) fn legacy_compiled(
-        scale: Decimal,
-        bias: Decimal,
-        legacy: (f64, f64),
-        minimum: i128,
-        maximum: i128,
-    ) -> Result<Self, &'static str> {
-        let mut plan = Self::compile(scale, bias, IntegerOutput::Number, minimum, maximum)?;
-        let (scale, bias) = legacy;
-        let legacy = Legacy { scale, bias };
-        plan.legacy = Some(legacy);
-        Ok(plan)
-    }
-
     pub(crate) fn compile(
         scale: Decimal,
         bias: Decimal,
-        output: IntegerOutput,
         minimum: i128,
         maximum: i128,
     ) -> Result<Self, &'static str> {
         if scale.coefficient == 0 {
             return Err("Scale must be nonzero.");
         }
+        let exponent = if bias.coefficient == 0 {
+            scale.exponent
+        } else {
+            scale.exponent.min(bias.exponent)
+        };
+        let align = |value: Decimal| {
+            if value.coefficient == 0 {
+                return Some(0);
+            }
+            value
+                .coefficient
+                .checked_mul(pow10(u32::from(value.exponent.abs_diff(exponent)))?)
+        };
+        let multiplier = align(scale)
+            .ok_or("Integer conversion parameters exceed the bounded i128 decimal engine.")?;
+        let offset = align(bias)
+            .ok_or("Integer conversion parameters exceed the bounded i128 decimal engine.")?;
         let plan = Self {
-            scale,
-            bias,
-            output,
+            multiplier,
+            offset,
+            exponent,
             minimum,
             maximum,
-            legacy: None,
         };
-        for raw in [minimum, maximum] {
-            let value = plan
-                .decimal(raw)
+
+        // Every runtime coefficient is the affine integer `multiplier * raw + offset`
+        // at one fixed decimal exponent. Multiplication magnitude and the affine result
+        // reach their extrema at an endpoint, so checking both operations at both
+        // endpoints proves that every raw value in the complete integer domain is
+        // representable. This deliberately does not rely on endpoint normalization:
+        // interior values need not contain the same helpful trailing zeroes.
+        let mut endpoint_coefficients = [0i128; 2];
+        for (index, raw) in [minimum, maximum].into_iter().enumerate() {
+            multiplier
+                .checked_mul(raw)
                 .ok_or("Integer conversion exceeds the bounded i128 decimal engine.")?;
-            if output == IntegerOutput::Decimal
-                && value
-                    .formatted_len()
-                    .is_none_or(|length| length > netbaiot_core::MAX_DECIMAL_BYTES)
-            {
-                return Err("Exact decoded value exceeds the 64-byte decimal scalar limit.");
-            }
+            endpoint_coefficients[index] = plan.coefficient(raw).ok_or(
+                "Integer conversion exceeds the bounded i128 decimal engine for part of the raw range.",
+            )?;
+        }
+        if maximum_formatted_len(endpoint_coefficients, exponent)
+            .is_none_or(|length| length > netbaiot_core::MAX_DECIMAL_BYTES)
+        {
+            return Err("Exact decoded value exceeds the 64-byte decimal scalar limit.");
         }
         Ok(plan)
     }
 
+    fn coefficient(self, raw: i128) -> Option<i128> {
+        self.multiplier.checked_mul(raw)?.checked_add(self.offset)
+    }
+
     fn decimal(self, raw: i128) -> Option<Decimal> {
-        self.scale.checked_mul_integer(raw)?.checked_add(self.bias)
+        normalize(self.coefficient(raw)?, self.exponent)
     }
 
     pub(crate) fn decode(self, raw: i128) -> Result<Scalar, CodecError> {
         if !(self.minimum..=self.maximum).contains(&raw) {
             return Err(CodecError);
         }
-        let decimal = self.decimal(raw).ok_or(CodecError)?;
-        match self.output {
-            IntegerOutput::Decimal => decimal.into_scalar(),
-            IntegerOutput::Number => {
-                let legacy = self.legacy.ok_or(CodecError)?;
-                let number = raw as f64 * legacy.scale + legacy.bias;
-                if !number.is_finite() || Decimal::from_f64(number)? != decimal {
-                    return Err(CodecError);
-                }
-                for neighbor in [raw.checked_sub(1), raw.checked_add(1)]
-                    .into_iter()
-                    .flatten()
-                    .filter(|neighbor| (self.minimum..=self.maximum).contains(neighbor))
-                {
-                    if neighbor as f64 * legacy.scale + legacy.bias == number {
-                        return Err(CodecError);
-                    }
-                }
-                Ok(Scalar::Number(number))
-            }
-        }
+        self.decimal(raw).ok_or(CodecError)?.into_scalar()
     }
 
     pub(crate) fn encode(self, scalar: &Scalar) -> Result<i128, CodecError> {
         let value = match scalar {
             Scalar::Number(number) => Decimal::from_f64(*number)?,
-            Scalar::Decimal(decimal) if self.output == IntegerOutput::Decimal => {
-                Decimal::parse(decimal.as_str()).map_err(|_| CodecError)?
-            }
+            Scalar::Decimal(decimal) => Decimal::parse(decimal.as_str()).map_err(|_| CodecError)?,
             _ => return Err(CodecError),
         };
-        let difference = value.checked_sub(self.bias).ok_or(CodecError)?;
-        let raw = exact_integer_ratio(difference, self.scale).ok_or(CodecError)?;
-        if !(self.minimum..=self.maximum).contains(&raw)
-            || self.decimal(raw).ok_or(CodecError)? != value
-        {
+        let exponent_difference = i32::from(value.exponent) - i32::from(self.exponent);
+        let coefficient = if exponent_difference >= 0 {
+            value
+                .coefficient
+                .checked_mul(pow10(exponent_difference as u32).ok_or(CodecError)?)
+                .ok_or(CodecError)?
+        } else {
+            let mut coefficient = value.coefficient;
+            for _ in 0..exponent_difference.unsigned_abs() {
+                if coefficient % 10 != 0 {
+                    return Err(CodecError);
+                }
+                coefficient /= 10;
+            }
+            coefficient
+        };
+        let numerator = coefficient.checked_sub(self.offset).ok_or(CodecError)?;
+        if numerator.checked_rem(self.multiplier) != Some(0) {
+            return Err(CodecError);
+        }
+        let raw = numerator.checked_div(self.multiplier).ok_or(CodecError)?;
+        if !(self.minimum..=self.maximum).contains(&raw) || self.decimal(raw) != Some(value) {
             return Err(CodecError);
         }
         Ok(raw)
+    }
+}
+
+fn maximum_formatted_len(endpoint_coefficients: [i128; 2], exponent: i16) -> Option<usize> {
+    let maximum_magnitude = endpoint_coefficients
+        .into_iter()
+        .map(i128::unsigned_abs)
+        .max()?;
+    let negative = endpoint_coefficients.into_iter().min()? < 0;
+    let mut digits = 1usize;
+    let mut remaining = maximum_magnitude;
+    while remaining >= 10 {
+        remaining /= 10;
+        digits = digits.checked_add(1)?;
+    }
+    let sign = usize::from(negative);
+    if exponent >= 0 {
+        sign.checked_add(digits)?
+            .checked_add(usize::from(exponent.unsigned_abs()))
+    } else {
+        let fractional = usize::from(exponent.unsigned_abs());
+        if digits > fractional {
+            sign.checked_add(digits)?.checked_add(1)
+        } else {
+            sign.checked_add(2)?.checked_add(fractional)
+        }
     }
 }
 
@@ -490,11 +441,34 @@ impl FloatConversion {
     }
 }
 
-struct Length(usize);
+struct DecimalText {
+    bytes: [u8; netbaiot_core::MAX_DECIMAL_BYTES],
+    length: usize,
+}
 
-impl Write for Length {
+impl Default for DecimalText {
+    fn default() -> Self {
+        Self {
+            bytes: [0; netbaiot_core::MAX_DECIMAL_BYTES],
+            length: 0,
+        }
+    }
+}
+
+impl DecimalText {
+    fn as_str(&self) -> Result<&str, CodecError> {
+        std::str::from_utf8(&self.bytes[..self.length]).map_err(|_| CodecError)
+    }
+}
+
+impl Write for DecimalText {
     fn write_str(&mut self, text: &str) -> fmt::Result {
-        self.0 = self.0.checked_add(text.len()).ok_or(fmt::Error)?;
+        let end = self.length.checked_add(text.len()).ok_or(fmt::Error)?;
+        self.bytes
+            .get_mut(self.length..end)
+            .ok_or(fmt::Error)?
+            .copy_from_slice(text.as_bytes());
+        self.length = end;
         Ok(())
     }
 }
@@ -521,17 +495,28 @@ mod tests {
             };
             assert_eq!(output_value.as_str(), output, "{input}");
         }
-        for invalid in ["", ".1", "1.", "+1", "1e", "1e39", "1e-39", "NaN"] {
+        for invalid in ["", ".1", "1.", "+1", "1e", "NaN"] {
             assert!(Decimal::parse(invalid).is_err(), "{invalid}");
         }
+        for invalid in ["1e39", "1e-39"] {
+            assert!(Decimal::parse_parameter(invalid).is_err(), "{invalid}");
+            assert!(Decimal::parse(invalid).is_ok(), "{invalid}");
+        }
+        assert!(Decimal::parse_parameter("0e39").is_err());
+        assert!(Decimal::parse("0e325").is_err());
+        assert_eq!(
+            Decimal::parse("-170141183460469231731687303715884105728")
+                .unwrap()
+                .coefficient,
+            i128::MIN
+        );
     }
 
     #[test]
     fn exact_integer_inverse_never_rounds() {
         let plan = IntegerConversion::compile(
-            Decimal::parse("0.1").unwrap(),
-            Decimal::parse("0.3").unwrap(),
-            IntegerOutput::Decimal,
+            Decimal::parse_parameter("0.1").unwrap(),
+            Decimal::parse_parameter("0.3").unwrap(),
             i16::MIN.into(),
             i16::MAX.into(),
         )
@@ -551,14 +536,8 @@ mod tests {
             (i128::from(i64::MIN), i128::from(i64::MAX)),
             (0, i128::from(u64::MAX)),
         ] {
-            let plan = IntegerConversion::compile(
-                Decimal::parse("1").unwrap(),
-                Decimal::ZERO,
-                IntegerOutput::Decimal,
-                minimum,
-                maximum,
-            )
-            .unwrap();
+            let plan =
+                IntegerConversion::compile(Decimal::ONE, Decimal::ZERO, minimum, maximum).unwrap();
             for raw in [minimum, 0, maximum] {
                 let scalar = plan.decode(raw).unwrap();
                 assert_eq!(plan.encode(&scalar).unwrap(), raw);
@@ -566,13 +545,109 @@ mod tests {
         }
         assert!(
             IntegerConversion::compile(
-                Decimal::parse("99999999999999999999999999999999999999").unwrap(),
+                Decimal::parse_parameter("99999999999999999999999999999999999999").unwrap(),
                 Decimal::ZERO,
-                IntegerOutput::Decimal,
                 0,
                 i128::from(u64::MAX),
             )
             .is_err()
         );
+    }
+
+    #[test]
+    fn compiled_integer_plans_round_trip_every_i16_and_extreme_exponents() {
+        for (scale, bias) in [("0.1", "0.3"), ("-0.001", "1"), ("1e38", "0")] {
+            let plan = IntegerConversion::compile(
+                Decimal::parse_parameter(scale).unwrap(),
+                Decimal::parse_parameter(bias).unwrap(),
+                i16::MIN.into(),
+                i16::MAX.into(),
+            )
+            .unwrap();
+            for raw in i16::MIN..=i16::MAX {
+                let decoded = plan.decode(i128::from(raw)).unwrap();
+                assert_eq!(
+                    plan.encode(&decoded).unwrap(),
+                    i128::from(raw),
+                    "{scale} {bias}"
+                );
+            }
+        }
+        let plan = IntegerConversion::compile(
+            Decimal::parse_parameter("1e38").unwrap(),
+            Decimal::ZERO,
+            i16::MIN.into(),
+            i16::MAX.into(),
+        )
+        .unwrap();
+        let Scalar::Decimal(value) = plan.decode(10).unwrap() else {
+            panic!()
+        };
+        assert_eq!(value.as_str(), "1000000000000000000000000000000000000000");
+        assert_eq!(plan.encode(&Scalar::Decimal(value)).unwrap(), 10);
+    }
+
+    #[test]
+    fn exact_identity_exhaustively_round_trips_all_small_integer_types() {
+        for (minimum, maximum) in [
+            (i128::from(i8::MIN), i128::from(i8::MAX)),
+            (0, i128::from(u8::MAX)),
+            (i128::from(i16::MIN), i128::from(i16::MAX)),
+            (0, i128::from(u16::MAX)),
+        ] {
+            let plan =
+                IntegerConversion::compile(Decimal::ONE, Decimal::ZERO, minimum, maximum).unwrap();
+            for raw in minimum..=maximum {
+                let decoded = plan.decode(raw).unwrap();
+                assert!(matches!(decoded, Scalar::Decimal(_)));
+                assert_eq!(plan.encode(&decoded).unwrap(), raw);
+            }
+        }
+    }
+
+    #[test]
+    fn large_integer_domains_round_trip_boundaries_and_deterministic_samples() {
+        let configurations = [("1", "0"), ("-0.001", "1.25"), ("0.0000001", "-12.3")];
+        for (minimum, maximum) in [
+            (i128::from(i32::MIN), i128::from(i32::MAX)),
+            (0, i128::from(u32::MAX)),
+            (i128::from(i64::MIN), i128::from(i64::MAX)),
+            (0, i128::from(u64::MAX)),
+        ] {
+            for (scale, bias) in configurations {
+                let plan = IntegerConversion::compile(
+                    Decimal::parse_parameter(scale).unwrap(),
+                    Decimal::parse_parameter(bias).unwrap(),
+                    minimum,
+                    maximum,
+                )
+                .unwrap();
+                for raw in [
+                    minimum,
+                    minimum + 1,
+                    (-1i128).max(minimum),
+                    0,
+                    1,
+                    maximum - 1,
+                    maximum,
+                ]
+                .into_iter()
+                .filter(|raw| (minimum..=maximum).contains(raw))
+                {
+                    let decoded = plan.decode(raw).unwrap();
+                    assert_eq!(plan.encode(&decoded).unwrap(), raw, "{scale} {bias} {raw}");
+                }
+                let span = u128::try_from(maximum - minimum).unwrap() + 1;
+                let mut state = 0x6a09_e667_f3bc_c909u64;
+                for _ in 0..1_000 {
+                    state = state
+                        .wrapping_mul(6_364_136_223_846_793_005)
+                        .wrapping_add(1_442_695_040_888_963_407);
+                    let raw = minimum + i128::try_from(u128::from(state) % span).unwrap();
+                    let decoded = plan.decode(raw).unwrap();
+                    assert_eq!(plan.encode(&decoded).unwrap(), raw, "{scale} {bias} {raw}");
+                }
+            }
+        }
     }
 }

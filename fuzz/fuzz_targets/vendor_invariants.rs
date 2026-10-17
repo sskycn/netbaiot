@@ -152,10 +152,7 @@ pub fn commands(config: &DeclarativeConfig, codec: &dyn DeviceCodec, data: &[u8]
                                 decimal(&conversion.bias).unwrap(),
                             )
                         } else {
-                            (
-                                decimal(&field.scale.unwrap_or(1.0).to_string()).unwrap(),
-                                decimal(&field.bias.unwrap_or(0.0).to_string()).unwrap(),
-                            )
+                            (BigRational::from_integer(1.into()), BigRational::default())
                         };
                         assert_eq!(
                             scalar_decimal(&command.payload.arguments[&named.name]).unwrap(),
@@ -171,10 +168,7 @@ pub fn commands(config: &DeclarativeConfig, codec: &dyn DeviceCodec, data: &[u8]
                                 decimal(&conversion.bias).unwrap(),
                             )
                         } else {
-                            (
-                                decimal(&field.scale.unwrap_or(1.0).to_string()).unwrap(),
-                                decimal(&field.bias.unwrap_or(0.0).to_string()).unwrap(),
-                            )
+                            (BigRational::from_integer(1.into()), BigRational::default())
                         };
                         assert_eq!(
                             scalar_decimal(&command.payload.arguments[&named.name]).unwrap(),

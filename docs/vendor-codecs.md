@@ -95,20 +95,13 @@ Big endian is the default. UTF-8 requires an exact positive byte `length` withou
 padding/terminators; other types must omit `length`. Text cannot contain control
 characters. Boolean bytes are strictly 0 or 1. IEEE floats must be finite.
 
-Numeric normalization is `wire * scale + bias` (`scale=1`, `bias=0` by default),
-but integer and IEEE floating-point wire types have separate contracts.
+Numeric normalization is `wire * scale + bias`, but integer and IEEE floating-point
+wire types have separate, intentionally incompatible configuration contracts.
 
-Integer fields compile `scale` and `bias` into a bounded exact decimal plan. Legacy
-JSON numbers remain compatible: their already-parsed f64 values are interpreted by
-the shortest decimal text that round-trips to the same f64. This fixes ordinary
-decimal cases such as `5.1 / 0.1`, but it cannot recover digits lost before the
-configuration or command reached the codec. At runtime, the inverse transform uses
-checked i128 coefficient/exponent arithmetic and exact division. A nonzero remainder,
-target-type overflow, intermediate overflow, unsupported precision, or lossy/colliding
-legacy f64 output is rejected; integer `round()` and error tolerances are not used.
-
-Use an explicit conversion when the protocol requires decimal values that must never
-pass through f64:
+Every integer field uses the exact decimal engine. Omitting `conversion` means the
+exact identity mapping (`scale = 1`, `bias = 0`); decoded values are still
+`Scalar::Decimal`, including full-width i64/u64 values. A non-identity integer mapping
+must use the explicit string form:
 
 ```json
 {
@@ -124,22 +117,33 @@ pass through f64:
 
 `conversion` is supported only by `i8/i16/i32/i64/u8/u16/u32/u64`. Its scale and
 bias are strings, the scale must be nonzero, each parameter is at most 64 bytes and
-38 significant digits, and the normalized decimal exponent must be between -38 and
-38. The compiler also proves that both raw type endpoints fit the i128 plan and that
-exact output fits the 64-byte public decimal scalar. Supplying legacy `scale` or
-`bias` together with `conversion` is an error, even when the legacy value equals its
-default. The JSON format remains backward compatible, but Rust callers that construct
-or mutate `Field` directly must now use `Option<f64>` for `scale` and `bias` and set
-the new `conversion` member; that is a source-level API change.
+38 significant digits, and the normalized configuration exponent must be between
+-38 and 38. Startup compilation aligns scale and bias to one checked i128 affine
+coefficient. It separately proves that multiplication and addition are representable
+over the complete raw integer interval and that every output fits the 64-byte public
+decimal scalar; it does not assume endpoint normalization proves interior values.
+Configurations that cannot satisfy that proof are rejected before ingress starts.
 
-Exact-mode uplinks return `Scalar::Decimal`, serialized as
-`{"decimal":"1.001"}`. Exact downlinks accept that form, and also accept an ordinary
-`Scalar::Number` under the shortest-round-trip interpretation above. Ordinary text is
-never treated as a number. Exact output is canonical non-exponent decimal text and is
-formed directly from the integer plan, without an f64 conversion. Adding the public
-`Decimal` enum variant is source-breaking for exhaustive Rust matches; JSON, CBOR and
-MessagePack add the object form, while Protobuf v1 adds Scalar oneof field 6
-(`string decimal`) without changing existing field numbers.
+The old numeric `scale` or `bias` members are rejected on every integer field, even
+when set to `1` or `0`, with a diagnostic pointing to the obsolete member. Migrate
+them to `conversion: {"mode":"decimal_exact","scale":"...","bias":"..."}`.
+This is an intentional breaking configuration change. Those numeric members now
+belong only to `f32/f64` fields.
+
+Integer uplinks always return `Scalar::Decimal`, serialized as
+`{"decimal":"1.001"}`. Integer downlinks accept that form, and also accept an ordinary
+`Scalar::Number` after converting its finite f64 value to the shortest decimal text
+that round-trips to the same f64. This convenience cannot recover precision lost
+before the value reached the codec. Ordinary text is never treated as a number.
+The exact engine accepts at most 39 significant digits and a normalized scalar
+exponent magnitude of 324; plan outputs are additionally limited to canonical,
+non-exponent decimal text of at most 64 bytes. Unsupported precision, exponent,
+intermediate arithmetic, nonintegral inverse results, and target range overflow are
+hard errors—there is no rounding, epsilon, ULP, or f64 fallback.
+
+JSON, CBOR and MessagePack preserve the decimal object rather than converting it to a
+JSON number. Protobuf v1 uses Scalar oneof field 6 (`string decimal`) and retains all
+existing field numbers.
 
 `f32/f64` fields keep IEEE 754 semantics. NaN, infinity, inverse overflow and
 nonzero-to-zero underflow are rejected. f64 stores the finite inverse result. f32

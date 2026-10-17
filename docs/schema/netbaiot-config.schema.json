@@ -403,6 +403,12 @@
       ],
       "type": "object"
     },
+    "ConversionMode": {
+      "enum": [
+        "decimal_exact"
+      ],
+      "type": "string"
+    },
     "Credential": {
       "additionalProperties": false,
       "description": "Provisioned high-entropy 256-bit key. Deliberately no Debug implementation.",
@@ -444,6 +450,28 @@
         "utf8"
       ],
       "type": "string"
+    },
+    "DecimalConversion": {
+      "additionalProperties": false,
+      "properties": {
+        "bias": {
+          "default": "0",
+          "description": "Exact integer bias. At most 38 significant digits and exponent magnitude 38.",
+          "type": "string"
+        },
+        "mode": {
+          "$ref": "#/$defs/ConversionMode"
+        },
+        "scale": {
+          "description": "Exact integer scale. At most 38 significant digits and exponent magnitude 38.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "mode",
+        "scale"
+      ],
+      "type": "object"
     },
     "DeclarativeConfig": {
       "additionalProperties": false,
@@ -555,9 +583,23 @@
       "additionalProperties": false,
       "properties": {
         "bias": {
-          "default": 0.0,
+          "description": "IEEE 754 floating-point bias. Valid only for f32/f64; omission means 0.",
           "format": "double",
-          "type": "number"
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "conversion": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DecimalConversion"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Exact-decimal conversion for integer wire types only; omission is exact identity."
         },
         "endian": {
           "$ref": "#/$defs/Endian",
@@ -579,9 +621,12 @@
           "type": "integer"
         },
         "scale": {
-          "default": 1.0,
+          "description": "IEEE 754 floating-point scale. Valid only for f32/f64; omission means 1.",
           "format": "double",
-          "type": "number"
+          "type": [
+            "number",
+            "null"
+          ]
         },
         "type": {
           "$ref": "#/$defs/DataType"
