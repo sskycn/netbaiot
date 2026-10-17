@@ -92,6 +92,29 @@ pub enum DataType {
     Utf8,
 }
 
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub enum ConversionMode {
+    DecimalExact,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct DecimalConversion {
+    pub mode: ConversionMode,
+    /// Exact decimal scale. At most 38 significant digits and exponent magnitude 38.
+    pub scale: String,
+    /// Exact decimal bias. At most 38 significant digits and exponent magnitude 38.
+    #[serde(default = "zero_decimal")]
+    pub bias: String,
+}
+
+fn zero_decimal() -> String {
+    "0".into()
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
@@ -104,13 +127,15 @@ pub struct Field {
     pub endian: Endian,
     /// Required only for UTF-8: exact byte length, without padding or terminator.
     pub length: Option<usize>,
-    #[serde(default = "one")]
-    pub scale: f64,
-    #[serde(default)]
-    pub bias: f64,
-}
-fn one() -> f64 {
-    1.0
+    /// Legacy numeric scale. Omission means 1. Conflicts with `conversion`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scale: Option<f64>,
+    /// Legacy numeric bias. Omission means 0. Conflicts with `conversion`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bias: Option<f64>,
+    /// Explicit exact-decimal conversion for integer wire types only.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub conversion: Option<DecimalConversion>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

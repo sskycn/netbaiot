@@ -100,10 +100,14 @@ unknown envelope/data fields, malformed UTF-8 and trailing bytes are rejected.
 Scalar maps integer values in **[-2^53, 2^53]** exactly to Number(f64). Larger
 integer representations are rejected even when a particular value is representable;
 use a finite floating representation when floating semantics are intended. Finite
-floats map to Number, booleans to Boolean, UTF-8 text to Text. Scalars cannot be
-maps, arrays, bytes, null, nonfinite numbers, or control-character text. Names and
-text are byte-bounded, and telemetry names cannot be empty. This stricter integer
-policy applies to the new binary codecs; JSON's existing policy is preserved.
+floats map to Number, booleans to Boolean, and UTF-8 text to Text. The one explicit
+scalar object is Decimal, encoded as `{"decimal":"1.001"}` with a 64-byte maximum;
+it preserves decimal text for vendor exact-integer conversion and is never inferred
+from Text. Other maps, arrays, bytes, null, nonfinite numbers, and control-character
+text are rejected. Names and text are byte-bounded, and telemetry names cannot be
+empty. This stricter integer policy applies to the new binary codecs; JSON's existing
+number policy is preserved. Adding `Scalar::Decimal` is source-breaking for exhaustive
+Rust matches, while all pre-existing scalar wire forms remain unchanged.
 
 Downlinks are maps with `schema_version=1`, `command_id` (UUID text), `device`
 (map containing tenant_id/product_id/device_id text), `expires_at` (Unix milliseconds
@@ -124,7 +128,7 @@ protocol crate. Other clients generate their own language bindings from the sche
 | Message | Stable field numbers |
 | --- | --- |
 | Uplink | schema_version 1; source_message_id 2; optional occurred_at 3; oneof telemetry 10 / event 11 / heartbeat 12 / command_ack 13 |
-| Scalar | oneof double number 1 / boolean 2 / text 3 / sint64 signed_integer 4 / uint64 unsigned_integer 5 |
+| Scalar | oneof double number 1 / boolean 2 / text 3 / sint64 signed_integer 4 / uint64 unsigned_integer 5 / string decimal 6 |
 | Field | name 1; Scalar value 2 |
 | Telemetry | repeated Field fields 1 |
 | DeviceEvent | name 1; optional Scalar value 2 |
@@ -137,8 +141,9 @@ Execution values are UNKNOWN=0 (rejected), RUNNING=1, SUCCEEDED=2, FAILED=3.
 An Uplink must contain schema_version=1, a valid source_message_id and exactly one
 known kind. Scalar must contain one known value. Telemetry entries require name and
 value, and duplicate names fail. Semantic validation matches the other codecs;
-integer Scalars use the same exact conversion interval. Optional occurred_at must
-be nonnegative i64. Nonfinite double values and unknown enum values fail.
+integer Scalars use the same exact conversion interval. Decimal field 6 uses the
+same explicit bounded decimal text as the map codecs. Optional occurred_at must be
+nonnegative i64. Nonfinite double values and unknown enum values fail.
 
 Unknown Protobuf fields of wire types 0/1/2/5 are bounded and skipped, without
 allocating a buffer for unknown content. Unknown fields are not retained in the

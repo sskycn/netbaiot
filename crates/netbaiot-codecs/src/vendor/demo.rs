@@ -1,10 +1,13 @@
 //! Independent native implementation of the ACME example telemetry and set_temperature payloads.
 //! Explicit opt-in only; this is not a built-in or a production industrial protocol.
 use crate::common::{Parsed, event, valid_text, validate_command};
+use crate::vendor::numeric::IntegerConversion;
 use netbaiot_core::*;
 
 pub struct AcmeV1 {
     limits: CodecLimits,
+    temperature: IntegerConversion,
+    humidity: IntegerConversion,
 }
 impl AcmeV1 {
     pub fn new(limits: CodecLimits) -> Result<Self, CodecError> {
@@ -16,7 +19,18 @@ impl AcmeV1 {
         {
             return Err(CodecError);
         }
-        Ok(Self { limits })
+        Ok(Self {
+            limits,
+            temperature: IntegerConversion::legacy(
+                0.1,
+                0.0,
+                i128::from(i16::MIN),
+                i128::from(i16::MAX),
+            )
+            .map_err(|_| CodecError)?,
+            humidity: IntegerConversion::legacy(0.1, 0.0, 0, i128::from(u16::MAX))
+                .map_err(|_| CodecError)?,
+        })
     }
     fn parse(&self, p: &[u8]) -> Result<Parsed, CodecError> {
         if p.len() != 19
@@ -37,11 +51,13 @@ impl AcmeV1 {
                 [
                     (
                         "temperature".into(),
-                        Scalar::Number(f64::from(i16::from_le_bytes([p[9], p[10]])) * 0.1),
+                        self.temperature
+                            .decode(i128::from(i16::from_le_bytes([p[9], p[10]])))?,
                     ),
                     (
                         "humidity".into(),
-                        Scalar::Number(f64::from(u16::from_be_bytes([p[11], p[12]])) * 0.1),
+                        self.humidity
+                            .decode(i128::from(u16::from_be_bytes([p[11], p[12]])))?,
                     ),
                     ("alarm".into(), Scalar::Boolean(p[13] == 1)),
                     ("model".into(), Scalar::Text(model.to_owned())),
@@ -78,22 +94,21 @@ impl DeviceCodec for AcmeV1 {
         {
             return Err(CodecError);
         }
-        let Some(Scalar::Number(temperature)) = command.payload.arguments.get("temperature") else {
-            return Err(CodecError);
-        };
-        let raw = temperature / 0.1;
-        let rounded = raw.round();
-        if !(f64::from(i16::MIN)..=f64::from(i16::MAX)).contains(&rounded)
-            || !super::inverse_number_matches(raw, rounded)
-            || !super::normalized_number_matches(*temperature, rounded * 0.1)
-        {
-            return Err(CodecError);
-        }
+        let raw = i16::try_from(
+            self.temperature.encode(
+                command
+                    .payload
+                    .arguments
+                    .get("temperature")
+                    .ok_or(CodecError)?,
+            )?,
+        )
+        .map_err(|_| CodecError)?;
         let expires = u64::try_from(command.expires_at.unwrap_or(0)).map_err(|_| CodecError)?;
         let mut out = vec![0; 32];
         out[..5].copy_from_slice(&[165, 90, 0, 32, 129]);
         out[5..21].copy_from_slice(command.command_id.0.as_bytes());
-        out[21..23].copy_from_slice(&(rounded as i16).to_le_bytes());
+        out[21..23].copy_from_slice(&raw.to_le_bytes());
         out[23..31].copy_from_slice(&expires.to_be_bytes());
         out[31] = out[..31].iter().fold(0u8, |s, b| s.wrapping_add(*b));
         Ok(out)

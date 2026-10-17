@@ -56,13 +56,81 @@ fuzz_target!(|data: &[u8]| {
     } else {
         Endian::Little
     };
-    if data.len() >= 24 {
-        field.scale = f64::from_le_bytes(data[8..16].try_into().unwrap());
-        field.bias = f64::from_le_bytes(data[16..24].try_into().unwrap());
+    if selector & 2 == 0 && data.len() >= 24 {
+        field.scale = Some(f64::from_le_bytes(data[8..16].try_into().unwrap()));
+        field.bias = Some(f64::from_le_bytes(data[16..24].try_into().unwrap()));
+        field.conversion = None;
+    } else {
+        let scales = ["0.1", "-0.001", "1", "0", "1e39", "1e-39", "invalid"];
+        let biases = ["0", "0.3", "-1", "1e38", "1e-38", "invalid"];
+        field.scale = None;
+        field.bias = None;
+        field.conversion = Some(DecimalConversion {
+            mode: ConversionMode::DecimalExact,
+            scale: scales[usize::from(selector) % scales.len()].into(),
+            bias: biases[usize::from(selector.rotate_right(3)) % biases.len()].into(),
+        });
     }
     config.commands[0].expires_at = None;
     config.commands[0].checksum = None;
     if let Ok(custom) = DeclarativeCodec::compile(&config, limits) {
         vendor_invariants::commands(&config, &custom, data);
     }
+
+    // Keep exact-decimal raw -> normalized value -> raw round trips reachable for
+    // every i16 bit pattern. The command invariant independently verifies the
+    // accepted wire value with BigRational rather than the production arithmetic.
+    static EXACT: OnceLock<DeclarativeCodec> = OnceLock::new();
+    let exact = EXACT.get_or_init(|| {
+        DeclarativeCodec::from_json(
+            br#"{"id":"vendor-fuzz-exact","version":1,"header":[17],
+                "message_type":{"offset":1,"type":"u8"},
+                "messages":[{"tag":1,"size":5,
+                    "source_message_id":{"offset":2,"type":"u8"},
+                    "payload":{"kind":"telemetry","fields":[{"name":"value","field":{
+                        "offset":3,"type":"i16","conversion":{"mode":"decimal_exact",
+                        "scale":"0.1","bias":"0.3"}}}]}}],
+                "commands":[{"name":"set","tag":2,"size":20,"command_id_offset":2,
+                    "fields":[{"name":"value","field":{"offset":18,"type":"i16",
+                    "conversion":{"mode":"decimal_exact","scale":"0.1","bias":"0.3"}}}]}]}"#,
+            CodecLimits::default(),
+        )
+        .unwrap()
+    });
+    let raw_bytes = [
+        data.first().copied().unwrap_or(0),
+        data.get(1).copied().unwrap_or(0),
+    ];
+    let device = DeviceKey {
+        tenant_id: TenantId::new("t").unwrap(),
+        product_id: ProductId::new("p").unwrap(),
+        device_id: DeviceId::new("d").unwrap(),
+    };
+    let payload = [17, 1, 1, raw_bytes[0], raw_bytes[1]];
+    let event = exact
+        .decode(
+            &DecodeContext {
+                device: &device,
+                received_at: 0,
+            },
+            &payload,
+        )
+        .unwrap()
+        .remove(0);
+    let DeviceEventKind::Telemetry(fields) = event.kind else {
+        unreachable!()
+    };
+    let command = DeviceCommand {
+        command_id: serde_json::from_str("\"00000000-0000-0000-0000-000000000000\"").unwrap(),
+        device: device.clone(),
+        expires_at: None,
+        payload: DeviceCommandPayload {
+            name: "set".into(),
+            arguments: [("value".into(), fields["value"].clone())].into(),
+        },
+    };
+    let encoded = exact
+        .encode(&EncodeContext { device: &device }, &command)
+        .unwrap();
+    assert_eq!(&encoded[18..20], &raw_bytes);
 });

@@ -356,6 +356,80 @@ fn all_command_encoders_preserve_identity_expiry_and_typed_arguments() {
         assert!(codec.encode(&EncodeContext { device: &k }, &c).is_err());
     }
 }
+
+#[test]
+fn explicit_decimal_scalar_round_trips_across_all_public_codec_formats() {
+    let decimal = DecimalScalar::new("12345678901234567890.001").unwrap();
+    let uplink = DeviceUplink::new(
+        SourceMessageId::new("decimal:1").unwrap(),
+        DeviceUplinkKind::Telemetry(BTreeMap::from([(
+            "value".into(),
+            Scalar::Decimal(decimal.clone()),
+        )])),
+    );
+    let uplink_value = serde_json::to_value(&uplink).unwrap();
+    let mut cbor = Vec::new();
+    ciborium::into_writer(&uplink_value, &mut cbor).unwrap();
+    let msgpack = rmp_serde::to_vec_named(&uplink_value).unwrap();
+    let protobuf = wire::Uplink {
+        schema_version: 1,
+        source_message_id: "decimal:1".into(),
+        occurred_at: None,
+        kind: Some(wire::uplink::Kind::Telemetry(wire::Telemetry {
+            fields: vec![wire::Field {
+                name: "value".into(),
+                value: Some(wire::Scalar {
+                    value: Some(wire::scalar::Value::Decimal(decimal.as_str().into())),
+                }),
+            }],
+        })),
+    }
+    .encode_to_vec();
+    let payloads = [
+        serde_json::to_vec(&uplink_value).unwrap(),
+        cbor,
+        msgpack,
+        protobuf,
+    ];
+    let codecs: [Box<dyn DeviceCodec>; 4] = [
+        Box::new(JsonV1::default()),
+        Box::new(CborV1::default()),
+        Box::new(MsgpackV1::default()),
+        Box::new(ProtobufV1::default()),
+    ];
+    let device = key();
+    let context = DecodeContext {
+        device: &device,
+        received_at: 1,
+    };
+    for (index, (codec, payload)) in codecs.iter().zip(payloads).enumerate() {
+        let mut events = codec
+            .decode(&context, &payload)
+            .unwrap_or_else(|_| panic!("decimal payload rejected by codec {index}"));
+        let event = events.remove(0);
+        let DeviceEventKind::Telemetry(fields) = event.kind else {
+            panic!()
+        };
+        assert_eq!(fields["value"], Scalar::Decimal(decimal.clone()));
+    }
+
+    let command = DeviceCommand {
+        command_id: CommandId(uuid::Uuid::from_u128(1)),
+        device: device.clone(),
+        expires_at: None,
+        payload: DeviceCommandPayload {
+            name: "set".into(),
+            arguments: BTreeMap::from([("value".into(), Scalar::Decimal(decimal.clone()))]),
+        },
+    };
+    for codec in codecs {
+        assert!(
+            codec
+                .encode(&EncodeContext { device: &device }, &command)
+                .is_ok()
+        );
+    }
+}
 #[test]
 fn deterministic_arbitrary_binary_input_never_panics() {
     let k = key();

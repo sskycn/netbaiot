@@ -1,5 +1,7 @@
 use netbaiot_codecs::vendor::{declarative::*, demo::AcmeV1};
 use netbaiot_core::*;
+use num_bigint::BigInt;
+use num_rational::BigRational;
 use serde_json::{Value, json};
 
 const CONFIG: &[u8] = include_bytes!("../../../configs/codecs/acme-v1.json");
@@ -203,7 +205,7 @@ fn invalid_layouts_fail_at_startup() {
         );
     }
     let mut c = config();
-    c.messages[0].source_message_id.bias = f64::NAN;
+    c.messages[0].source_message_id.bias = Some(f64::NAN);
     assert!(DeclarativeCodec::compile(&c, CodecLimits::default()).is_err());
     let mut c = config();
     c.messages = vec![c.messages[0].clone(); MAX_LAYOUTS + 1];
@@ -235,7 +237,7 @@ fn command_identity_types_quantization_limits_and_arguments_are_strict() {
             c.payload.arguments.insert("temperature".into(), value);
             assert!(codec.encode(&ctx, &c).is_err());
         }
-        for value in [-32768.0 * 0.1, 32767.0 * 0.1, 0.0, 12.3] {
+        for value in [-3276.8, 3276.7, 0.0, 12.3] {
             let mut c = command();
             c.payload
                 .arguments
@@ -302,6 +304,194 @@ fn ordinary_decimal_commands_encode_consistently() {
         assert_eq!(declared, native, "{value}");
         assert_eq!(&declared[21..23], &raw.to_le_bytes(), "{value}");
     }
+}
+
+fn exact_i16_config(scale: &str, bias: &str, endian: &str) -> DeclarativeConfig {
+    serde_json::from_value(json!({
+        "id":"vendor-exact","version":1,"header":[0x11],
+        "message_type":{"offset":1,"type":"u8"},
+        "messages":[{
+            "tag":1,"size":5,"source_message_id":{"offset":2,"type":"u8"},
+            "payload":{"kind":"telemetry","fields":[{
+                "name":"value","field":{"offset":3,"type":"i16","endian":endian,
+                    "conversion":{"mode":"decimal_exact","scale":scale,"bias":bias}}
+            }]}
+        }],
+        "commands":[{
+            "name":"set","tag":2,"size":20,"command_id_offset":2,
+            "fields":[{"name":"value","field":{"offset":18,"type":"i16","endian":endian,
+                "conversion":{"mode":"decimal_exact","scale":scale,"bias":bias}}}]
+        }]
+    }))
+    .unwrap()
+}
+
+fn exact_command(value: Scalar) -> DeviceCommand {
+    DeviceCommand {
+        command_id: CommandId(uuid::Uuid::from_u128(1)),
+        device: key(),
+        expires_at: None,
+        payload: DeviceCommandPayload {
+            name: "set".into(),
+            arguments: [("value".into(), value)].into(),
+        },
+    }
+}
+
+#[test]
+fn integer_decimal_regressions_use_exact_inverse_math() {
+    for (scale, bias, value, raw) in [
+        ("0.1", "0", 5.1, 51i16),
+        ("0.001", "1", 1.001, 1),
+        ("0.1", "0.3", 0.0, -3),
+        ("-0.1", "0", -5.1, 51),
+    ] {
+        for endian in ["big", "little"] {
+            let codec = DeclarativeCodec::compile(
+                &exact_i16_config(scale, bias, endian),
+                CodecLimits::default(),
+            )
+            .unwrap();
+            let command = exact_command(Scalar::Number(value));
+            let bytes = codec
+                .encode(
+                    &EncodeContext {
+                        device: &command.device,
+                    },
+                    &command,
+                )
+                .unwrap();
+            let expected = if endian == "big" {
+                raw.to_be_bytes()
+            } else {
+                raw.to_le_bytes()
+            };
+            assert_eq!(&bytes[18..20], &expected, "{scale} {bias} {value}");
+        }
+    }
+
+    for (scale, bias, value) in [("0.1", "0", 5.15), ("-1", "0", 1.0000000000000002)] {
+        let codec = DeclarativeCodec::compile(
+            &exact_i16_config(scale, bias, "big"),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        let command = exact_command(Scalar::Number(value));
+        assert!(
+            codec
+                .encode(
+                    &EncodeContext {
+                        device: &command.device,
+                    },
+                    &command
+                )
+                .is_err(),
+            "{scale} {bias} {value}"
+        );
+    }
+
+    let codec = DeclarativeCodec::compile(
+        &exact_i16_config("0.001", "1", "big"),
+        CodecLimits::default(),
+    )
+    .unwrap();
+    let command = exact_command(Scalar::Decimal(DecimalScalar::new("1.001").unwrap()));
+    assert_eq!(
+        &codec
+            .encode(
+                &EncodeContext {
+                    device: &command.device,
+                },
+                &command
+            )
+            .unwrap()[18..20],
+        &1i16.to_be_bytes()
+    );
+}
+
+fn reference_decimal(text: &str) -> BigRational {
+    let (negative, text) = text
+        .strip_prefix('-')
+        .map_or((false, text), |rest| (true, rest));
+    let (integer, fraction) = text.split_once('.').unwrap_or((text, ""));
+    let digits = format!("{integer}{fraction}");
+    let mut numerator = digits.parse::<BigInt>().unwrap();
+    if negative {
+        numerator = -numerator;
+    }
+    BigRational::new(numerator, BigInt::from(10u8).pow(fraction.len() as u32))
+}
+
+#[test]
+fn exact_i16_round_trip_matches_independent_big_rational_reference() {
+    let device = key();
+    let decode_context = DecodeContext {
+        device: &device,
+        received_at: 1,
+    };
+    for endian in ["big", "little"] {
+        let codec = DeclarativeCodec::compile(
+            &exact_i16_config("0.1", "0.3", endian),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        for raw in i16::MIN..=i16::MAX {
+            let wire = if endian == "big" {
+                raw.to_be_bytes()
+            } else {
+                raw.to_le_bytes()
+            };
+            let payload = [0x11, 1, 42, wire[0], wire[1]];
+            let event = codec.decode(&decode_context, &payload).unwrap().remove(0);
+            let DeviceEventKind::Telemetry(fields) = event.kind else {
+                panic!()
+            };
+            let Scalar::Decimal(decimal) = &fields["value"] else {
+                panic!()
+            };
+            let reference = BigRational::new(BigInt::from(raw) + 3, BigInt::from(10));
+            assert_eq!(reference_decimal(decimal.as_str()), reference, "{raw}");
+
+            let command = exact_command(fields["value"].clone());
+            let encoded = codec
+                .encode(
+                    &EncodeContext {
+                        device: &command.device,
+                    },
+                    &command,
+                )
+                .unwrap();
+            assert_eq!(&encoded[18..20], &wire, "{raw}");
+        }
+    }
+}
+
+#[test]
+fn exact_config_conflicts_bounds_and_legacy_collisions_are_rejected() {
+    let mut conflict: Value = serde_json::to_value(exact_i16_config("0.1", "0", "big")).unwrap();
+    conflict["commands"][0]["fields"][0]["field"]["scale"] = json!(0.1);
+    let conflict: DeclarativeConfig = serde_json::from_value(conflict).unwrap();
+    let error = match DeclarativeCodec::compile_diagnostic(&conflict, CodecLimits::default()) {
+        Ok(_) => panic!("conflicting conversion unexpectedly compiled"),
+        Err(error) => error,
+    };
+    assert_eq!(error.path, "commands[0].fields[0].field.conversion");
+
+    for scale in ["1e39", "1e-39", "123456789012345678901234567890123456789"] {
+        let config = exact_i16_config(scale, "0", "big");
+        assert!(DeclarativeCodec::compile(&config, CodecLimits::default()).is_err());
+    }
+    let extreme = single_field("i16", json!({"scale":1e300,"bias":1e20}), 2);
+    assert!(DeclarativeCodec::compile(&extreme, CodecLimits::default()).is_err());
+
+    let collision = DeclarativeCodec::compile(
+        &single_field("u64", json!({"scale":0.5,"bias":2.0}), 8),
+        CodecLimits::default(),
+    )
+    .unwrap();
+    let mut packet = vec![0x11, 1, 42];
+    packet.extend_from_slice(&(1u64 << 53).to_be_bytes());
+    assert!(!parity(&collision, &packet));
 }
 
 #[test]
@@ -394,8 +584,8 @@ fn all_numeric_widths_endianness_and_nonfinite_or_lossy_values() {
         ("i16", &[0x80, 0], -32768.),
         ("u32", &[0xff; 4], 4294967295.),
         ("i32", &[0x80, 0, 0, 0], -2147483648.),
-        ("u64", &[0, 0x20, 0, 0, 0, 0, 0, 0], 9007199254740992.),
-        ("i64", &[0xff, 0xe0, 0, 0, 0, 0, 0, 0], -9007199254740992.),
+        ("u64", &[0, 0x10, 0, 0, 0, 0, 0, 0], 4503599627370496.),
+        ("i64", &[0xff, 0xf0, 0, 0, 0, 0, 0, 0], -4503599627370496.),
         ("f32", &[0x3f, 0xa0, 0, 0], 1.25),
         ("f64", &[0x3f, 0xf4, 0, 0, 0, 0, 0, 0], 1.25),
     ];

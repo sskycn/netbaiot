@@ -8,6 +8,7 @@ fn text(value: &str, limit: usize) {
 fn scalar(value: &Scalar, limit: usize) {
     match value {
         Scalar::Number(n) => assert!(n.is_finite()),
+        Scalar::Decimal(decimal) => assert!(decimal.as_str().len() <= limit),
         Scalar::Text(s) => text(s, limit),
         Scalar::Boolean(_) => {}
     }

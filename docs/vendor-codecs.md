@@ -95,22 +95,61 @@ Big endian is the default. UTF-8 requires an exact positive byte `length` withou
 padding/terminators; other types must omit `length`. Text cannot contain control
 characters. Boolean bytes are strictly 0 or 1. IEEE floats must be finite.
 
-Numeric normalization is `wire * scale + bias` (`scale=1`, `bias=0` by default).
-Scale must be finite and nonzero; bias and the normalized result must be finite.
-Text and bool cannot be scaled. Since `Scalar::Number` is f64, scalar integer wire
-values outside ±2^53 are rejected before conversion. Full u64 remains available
-for source IDs, heartbeat sequences and integer metadata. Downlink reverses this
-formula and rejects integer overflow or fractional raw values, allowing only a
-raw-signal-relative f64 roundoff budget, capped at 1e-7 raw units, when selecting an
-integer or f32 candidate. The budget approaches zero with the raw signal, so a
-nonzero raw value cannot round or underflow to zero. Every numeric output is then
-read back with the same normalization. Unscaled values must match exactly. Scaled
-values use a separate relative budget of four f64 machine epsilons for multiply/add
-roundoff, and a nonzero normalized signal may not collapse to the bias. Keeping raw
-quantization and normalized arithmetic as independent checks admits ordinary decimal
-scaling with a bias while rejecting larger quantization, overflow, underflow, and
-precision loss. Arguments must match the configured names,
-count and types exactly; there are no silent defaults or extra ignored arguments.
+Numeric normalization is `wire * scale + bias` (`scale=1`, `bias=0` by default),
+but integer and IEEE floating-point wire types have separate contracts.
+
+Integer fields compile `scale` and `bias` into a bounded exact decimal plan. Legacy
+JSON numbers remain compatible: their already-parsed f64 values are interpreted by
+the shortest decimal text that round-trips to the same f64. This fixes ordinary
+decimal cases such as `5.1 / 0.1`, but it cannot recover digits lost before the
+configuration or command reached the codec. At runtime, the inverse transform uses
+checked i128 coefficient/exponent arithmetic and exact division. A nonzero remainder,
+target-type overflow, intermediate overflow, unsupported precision, or lossy/colliding
+legacy f64 output is rejected; integer `round()` and error tolerances are not used.
+
+Use an explicit conversion when the protocol requires decimal values that must never
+pass through f64:
+
+```json
+{
+  "offset": 9,
+  "type": "i16",
+  "conversion": {
+    "mode": "decimal_exact",
+    "scale": "0.001",
+    "bias": "1.0"
+  }
+}
+```
+
+`conversion` is supported only by `i8/i16/i32/i64/u8/u16/u32/u64`. Its scale and
+bias are strings, the scale must be nonzero, each parameter is at most 64 bytes and
+38 significant digits, and the normalized decimal exponent must be between -38 and
+38. The compiler also proves that both raw type endpoints fit the i128 plan and that
+exact output fits the 64-byte public decimal scalar. Supplying legacy `scale` or
+`bias` together with `conversion` is an error, even when the legacy value equals its
+default. The JSON format remains backward compatible, but Rust callers that construct
+or mutate `Field` directly must now use `Option<f64>` for `scale` and `bias` and set
+the new `conversion` member; that is a source-level API change.
+
+Exact-mode uplinks return `Scalar::Decimal`, serialized as
+`{"decimal":"1.001"}`. Exact downlinks accept that form, and also accept an ordinary
+`Scalar::Number` under the shortest-round-trip interpretation above. Ordinary text is
+never treated as a number. Exact output is canonical non-exponent decimal text and is
+formed directly from the integer plan, without an f64 conversion. Adding the public
+`Decimal` enum variant is source-breaking for exhaustive Rust matches; JSON, CBOR and
+MessagePack add the object form, while Protobuf v1 adds Scalar oneof field 6
+(`string decimal`) without changing existing field numbers.
+
+`f32/f64` fields keep IEEE 754 semantics. NaN, infinity, inverse overflow and
+nonzero-to-zero underflow are rejected. f64 stores the finite inverse result. f32
+narrowing is accepted only when converting the candidate back to f64 exactly
+reproduces that inverse value. The forward multiply/add may incur only the documented
+four-f64-epsilon relative IEEE operation error and may not collapse a nonzero signal
+to the bias. These floating rules are not used to quantize integer fields. Text and
+bool cannot be scaled. Full u64 remains available for source IDs, heartbeat sequences
+and integer metadata. Arguments must match configured names, count and types exactly;
+there are no silent defaults or extra ignored arguments.
 
 The source ID is an unscaled unsigned integer rendered as decimal, or an exact
 namespace-safe UTF-8 identifier of at most 64 bytes. No payload field changes the

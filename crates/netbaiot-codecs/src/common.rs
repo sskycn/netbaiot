@@ -16,6 +16,7 @@ pub(crate) fn scalar(s: &Scalar, limit: usize) -> bool {
     match s {
         Scalar::Text(s) => valid_text(s, limit),
         Scalar::Number(n) => n.is_finite(),
+        Scalar::Decimal(decimal) => decimal.as_str().len() <= limit,
         Scalar::Boolean(_) => true,
     }
 }
@@ -58,6 +59,7 @@ pub(crate) enum Atom {
     Unsigned(u64),
     Signed(i64),
     Float(f64),
+    Decimal(DecimalScalar),
     Bool(bool),
     Text(String),
     Null,
@@ -65,7 +67,7 @@ pub(crate) enum Atom {
 impl<'de> Deserialize<'de> for Atom {
     fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
         struct V;
-        impl Visitor<'_> for V {
+        impl<'de> Visitor<'de> for V {
             type Value = Atom;
             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 f.write_str("a scalar")
@@ -85,6 +87,21 @@ impl<'de> Deserialize<'de> for Atom {
             }
             fn visit_bool<E: de::Error>(self, v: bool) -> Result<Atom, E> {
                 Ok(Atom::Bool(v))
+            }
+            fn visit_map<M: MapAccess<'de>>(self, mut map: M) -> Result<Atom, M::Error> {
+                let Some(key) = map.next_key::<String>()? else {
+                    return Err(de::Error::custom("empty scalar object"));
+                };
+                if key != "decimal" {
+                    return Err(de::Error::custom("unknown scalar object"));
+                }
+                let value = map.next_value::<String>()?;
+                if map.next_key::<de::IgnoredAny>()?.is_some() {
+                    return Err(de::Error::custom("duplicate or unknown decimal field"));
+                }
+                Ok(Atom::Decimal(
+                    DecimalScalar::new(value).map_err(de::Error::custom)?,
+                ))
             }
             fn visit_str<E: de::Error>(self, v: &str) -> Result<Atom, E> {
                 Ok(Atom::Text(v.into()))
@@ -117,6 +134,7 @@ impl Atom {
             Self::Unsigned(n) => unsigned_scalar(n),
             Self::Signed(n) => signed_scalar(n),
             Self::Float(n) => Ok(Scalar::Number(n)),
+            Self::Decimal(n) => Ok(Scalar::Decimal(n)),
             Self::Bool(b) => Ok(Scalar::Boolean(b)),
             Self::Text(s) => Ok(Scalar::Text(s)),
             Self::Null => Err(CodecError),
@@ -308,6 +326,27 @@ impl Write for BoundedWriter {
 #[cfg(test)]
 mod writer_tests {
     use super::*;
+
+    #[test]
+    fn explicit_decimal_atom_deserializes_from_nested_map_formats() {
+        let scalar = Scalar::Decimal(DecimalScalar::new("123.001").unwrap());
+        let mut cbor = Vec::new();
+        ciborium::into_writer(&scalar, &mut cbor).unwrap();
+        let decoded: Atom = ciborium::from_reader(cbor.as_slice()).unwrap();
+        assert!(matches!(decoded, Atom::Decimal(value) if value.as_str() == "123.001"));
+        let msgpack = rmp_serde::to_vec_named(&scalar).unwrap();
+        let decoded: Atom = rmp_serde::from_slice(&msgpack).unwrap();
+        assert!(matches!(decoded, Atom::Decimal(value) if value.as_str() == "123.001"));
+
+        let uplink = DeviceUplink::new(
+            SourceMessageId::new("decimal:1").unwrap(),
+            DeviceUplinkKind::Telemetry(BTreeMap::from([("value".into(), scalar)])),
+        );
+        let mut cbor = Vec::new();
+        ciborium::into_writer(&uplink, &mut cbor).unwrap();
+        let _: MapUplink = ciborium::from_reader(cbor.as_slice()).unwrap();
+    }
+
     #[test]
     fn whole_slice_writes_preserve_bytes_on_rejection_and_cap_growth() {
         for limit in [0, 1, 2, 3, 64, 257] {

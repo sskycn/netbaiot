@@ -10,6 +10,8 @@ message Scalar {
     string text = 3;
     sint64 signed_integer = 4;
     uint64 unsigned_integer = 5;
+    // Explicit decimal text, never interpreted as an ordinary string scalar.
+    string decimal = 6;
   }
 }
 // Repeated entries (rather than a protobuf map) make duplicate names detectable.

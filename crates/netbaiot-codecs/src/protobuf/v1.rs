@@ -40,7 +40,7 @@ fn field(schema: Schema, n: u32, l: &CodecLimits) -> Option<Type> {
         (Schema::Uplink, 12) => Some(Type::Message(Schema::Heartbeat)),
         (Schema::Uplink, 13) => Some(Type::Message(Schema::Ack)),
         (Schema::Telemetry, 1) => Some(Type::Message(Schema::Field)),
-        (Schema::Field, 1) | (Schema::Event, 1) | (Schema::Scalar, 3) => {
+        (Schema::Field, 1) | (Schema::Event, 1) | (Schema::Scalar, 3 | 6) => {
             Some(Type::Text(l.field_bytes))
         }
         (Schema::Ack, 1) => Some(Type::Text(64)),
@@ -151,6 +151,9 @@ fn domain_scalar(value: wire::Scalar) -> Result<Scalar, CodecError> {
         Value::Number(n) if n.is_finite() => Ok(Scalar::Number(n)),
         Value::Boolean(b) => Ok(Scalar::Boolean(b)),
         Value::Text(t) => Ok(Scalar::Text(t)),
+        Value::Decimal(decimal) => Ok(Scalar::Decimal(
+            DecimalScalar::new(decimal).map_err(|_| CodecError)?,
+        )),
         Value::SignedInteger(n) => signed_scalar(n),
         Value::UnsignedInteger(n) => unsigned_scalar(n),
         _ => Err(CodecError),
@@ -163,6 +166,7 @@ fn wire_scalar(v: &Scalar) -> wire::Scalar {
             Scalar::Number(n) => Value::Number(*n),
             Scalar::Boolean(b) => Value::Boolean(*b),
             Scalar::Text(t) => Value::Text(t.clone()),
+            Scalar::Decimal(decimal) => Value::Decimal(decimal.as_str().into()),
         }),
     }
 }
@@ -247,6 +251,7 @@ impl DeviceCodec for ProtobufV1 {
             .try_fold(c.payload.name.len(), |n, (k, v)| {
                 n.checked_add(k.len())?.checked_add(match v {
                     Scalar::Text(s) => s.len(),
+                    Scalar::Decimal(decimal) => decimal.as_str().len(),
                     _ => 0,
                 })
             })

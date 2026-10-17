@@ -18,6 +18,7 @@ pub use business_rpc::*;
 pub const PROTOCOL_VERSION: u16 = 1;
 pub const MAX_IDENTIFIER_BYTES: usize = 64;
 pub const MAX_FILTER_EVENT_TYPES: usize = 16;
+pub const MAX_DECIMAL_BYTES: usize = 64;
 
 pub mod paths {
     pub const HEALTH: &str = "/api/v1/health";
@@ -136,11 +137,88 @@ pub struct DeviceKey {
 
 pub type Timestamp = i64;
 
+/// An explicitly decimal scalar. Unlike [`Scalar::Number`], its value is not
+/// first rounded to IEEE 754 binary floating point.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize)]
+#[serde(deny_unknown_fields)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct DecimalScalar {
+    decimal: Arc<str>,
+}
+
+impl DecimalScalar {
+    pub fn new(value: impl AsRef<str>) -> Result<Self, ProtocolError> {
+        let value = value.as_ref();
+        if !valid_decimal_text(value) {
+            return Err(ProtocolError);
+        }
+        Ok(Self {
+            decimal: Arc::from(value),
+        })
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.decimal
+    }
+}
+
+impl<'de> Deserialize<'de> for DecimalScalar {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        #[derive(Deserialize)]
+        #[serde(deny_unknown_fields)]
+        struct Wire {
+            decimal: String,
+        }
+
+        Self::new(Wire::deserialize(deserializer)?.decimal).map_err(serde::de::Error::custom)
+    }
+}
+
+fn valid_decimal_text(value: &str) -> bool {
+    if value.is_empty() || value.len() > MAX_DECIMAL_BYTES {
+        return false;
+    }
+    let bytes = value.as_bytes();
+    let mut at = usize::from(matches!(bytes.first(), Some(b'-')));
+    let integer_start = at;
+    while bytes.get(at).is_some_and(u8::is_ascii_digit) {
+        at += 1;
+    }
+    if at == integer_start {
+        return false;
+    }
+    if bytes.get(at) == Some(&b'.') {
+        at += 1;
+        let fraction_start = at;
+        while bytes.get(at).is_some_and(u8::is_ascii_digit) {
+            at += 1;
+        }
+        if at == fraction_start {
+            return false;
+        }
+    }
+    if matches!(bytes.get(at), Some(b'e' | b'E')) {
+        at += 1;
+        if matches!(bytes.get(at), Some(b'+' | b'-')) {
+            at += 1;
+        }
+        let exponent_start = at;
+        while bytes.get(at).is_some_and(u8::is_ascii_digit) {
+            at += 1;
+        }
+        if at == exponent_start {
+            return false;
+        }
+    }
+    at == bytes.len()
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum Scalar {
     Number(f64),
     Boolean(bool),
+    Decimal(DecimalScalar),
     Text(String),
 }
 
@@ -509,6 +587,27 @@ pub struct RoutesUpdate {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn explicit_decimal_scalar_has_a_distinct_bounded_wire_shape() {
+        let scalar = Scalar::Decimal(DecimalScalar::new("-1.001e+2").unwrap());
+        assert_eq!(
+            serde_json::to_value(&scalar).unwrap(),
+            serde_json::json!({"decimal":"-1.001e+2"})
+        );
+        assert_eq!(
+            serde_json::from_value::<Scalar>(serde_json::json!({"decimal":"-1.001e+2"})).unwrap(),
+            scalar
+        );
+        for invalid in [
+            serde_json::json!({"decimal":""}),
+            serde_json::json!({"decimal":".1"}),
+            serde_json::json!({"decimal":"1."}),
+            serde_json::json!({"decimal":"1","extra":true}),
+        ] {
+            assert!(serde_json::from_value::<Scalar>(invalid).is_err());
+        }
+    }
 
     #[test]
     fn typed_identifiers_preserve_string_serialization_and_validation() {

@@ -83,9 +83,12 @@ Map 顺序与整数编码宽度不携带语义；重复键、未知字段、非�
 
 Scalar 整数仅接受闭区间 **[-2^53, 2^53]**，精确转换为 Number(f64)；区间外的整数
 表示一律拒绝，包括偶然能精确表示的整数。需要浮点语义时显式使用有限浮点表示。
-有限浮点映射 Number，布尔映射 Boolean，UTF-8 文本映射 Text。Scalar 不支持
-复杂结构、bytes、null/nil、非有限数和控制字符文本。名称/文本按 UTF-8 字节计限。
-此严格整数策略仅适用于新二进制 Codec，JSON 原有策略保持不变。
+有限浮点映射 Number，布尔映射 Boolean，UTF-8 文本映射 Text。唯一允许的标量对象
+是 Decimal，形式为 `{"decimal":"1.001"}`，最长 64 字节；它为厂商整数精确转换
+保留十进制文本，绝不会从 Text 推断。其他复杂结构、bytes、null/nil、非有限数和
+控制字符文本均拒绝。名称／文本按 UTF-8 字节计限。此严格整数策略仅适用于新二进制
+Codec，JSON 原有数字策略保持不变。公共 Rust API 新增 `Scalar::Decimal`，因此穷举
+匹配需要更新；已有标量的线格式不变。
 
 下行 Map 字段固定为 schema_version=1、UUID 文本 command_id、device（含
  tenant_id/product_id/device_id 文本）、expires_at（毫秒或 null/nil）、payload
@@ -103,7 +106,7 @@ UDP 无下行，也没有离线命令队列。
 | 消息 | 稳定字段编号 |
 | --- | --- |
 | Uplink | schema_version=1，source_message_id=2，optional occurred_at=3；oneof telemetry=10 / event=11 / heartbeat=12 / command_ack=13 |
-| Scalar | oneof double number=1 / boolean=2 / text=3 / sint64 signed_integer=4 / uint64 unsigned_integer=5 |
+| Scalar | oneof double number=1 / boolean=2 / text=3 / sint64 signed_integer=4 / uint64 unsigned_integer=5 / string decimal=6 |
 | Field | name=1，Scalar value=2 |
 | Telemetry | repeated Field fields=1 |
 | DeviceEvent | name=1，可选 Scalar value=2 |
@@ -115,8 +118,9 @@ UDP 无下行，也没有离线命令队列。
 Execution 枚举 UNKNOWN=0（拒绝），RUNNING=1，SUCCEEDED=2，FAILED=3。
 Uplink 必须携带 schema_version=1、合法消息标识和一个已知类别；Scalar 必须包含一个
 已知 value。Telemetry 用 repeated Field 保留重复名称检查能力，名称和值均必需。
-整数 Scalar 范围同上；有限 double 直接映射 Number。未知枚举、缺失类别、非法字段
-类型、非有限数、负 occurred_at 拒绝。
+整数 Scalar 范围同上；有限 double 直接映射 Number；字段 6 使用与 Map Codec 相同的
+显式有界十进制文本。未知枚举、缺失类别、非法字段类型、非有限数、负 occurred_at
+拒绝。
 
 Protobuf 的未知字段采用可演进策略：wire type 0/1/2/5 在预算内跳过，不分配未知内容
 副本，也不进入业务事件；仅包含未知类别时仍拒绝。已知 singular/oneof 重复字段明确

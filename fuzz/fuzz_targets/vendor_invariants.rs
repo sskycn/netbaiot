@@ -1,5 +1,7 @@
 use netbaiot_codecs::vendor::declarative::*;
 use netbaiot_core::*;
+use num_bigint::BigInt;
+use num_rational::BigRational;
 
 fn unsigned(bytes: &[u8], endian: Endian) -> u64 {
     match endian {
@@ -8,15 +10,45 @@ fn unsigned(bytes: &[u8], endian: Endian) -> u64 {
     }
 }
 
-fn inverse_matches(calculated: f64, representable: f64) -> bool {
-    if !calculated.is_finite() || !representable.is_finite() {
-        return false;
+fn decimal(text: &str) -> Option<BigRational> {
+    let (mantissa, exponent) = if let Some(index) = text.find(['e', 'E']) {
+        (&text[..index], text[index + 1..].parse::<i32>().ok()?)
+    } else {
+        (text, 0)
+    };
+    let (negative, mantissa) = mantissa
+        .strip_prefix('-')
+        .map_or((false, mantissa), |rest| (true, rest));
+    let (integer, fraction) = mantissa.split_once('.').unwrap_or((mantissa, ""));
+    if integer.is_empty()
+        || !integer.bytes().all(|byte| byte.is_ascii_digit())
+        || !fraction.bytes().all(|byte| byte.is_ascii_digit())
+    {
+        return None;
     }
-    if calculated == representable {
-        return true;
+    let mut numerator = format!("{integer}{fraction}").parse::<BigInt>().ok()?;
+    if negative {
+        numerator = -numerator;
     }
-    (calculated - representable).abs()
-        <= (4.0 * f64::EPSILON * calculated.abs().max(representable.abs())).min(1e-7)
+    let decimal_places = i32::try_from(fraction.len()).ok()?.checked_sub(exponent)?;
+    if decimal_places >= 0 {
+        Some(BigRational::new(
+            numerator,
+            BigInt::from(10u8).pow(decimal_places as u32),
+        ))
+    } else {
+        Some(BigRational::from_integer(
+            numerator * BigInt::from(10u8).pow(decimal_places.unsigned_abs()),
+        ))
+    }
+}
+
+fn scalar_decimal(scalar: &Scalar) -> Option<BigRational> {
+    match scalar {
+        Scalar::Number(number) if number.is_finite() => decimal(&number.to_string()),
+        Scalar::Decimal(number) => decimal(number.as_str()),
+        _ => None,
+    }
 }
 
 // Independently inspect the actual command bytes. Encoding success must never
@@ -32,7 +64,7 @@ pub fn commands(config: &DeclarativeConfig, codec: &dyn DeviceCodec, data: &[u8]
     seed[..len].copy_from_slice(&data[..len]);
     let arbitrary = f64::from_le_bytes(seed);
     for plan in &config.commands {
-        for sample in [0.0, 1.25, arbitrary] {
+        for (sample_index, sample) in [0.0, 1.25, arbitrary].into_iter().enumerate() {
             let mut command = DeviceCommand {
                 command_id: serde_json::from_str("\"00000000-0000-0000-0000-000000000001\"")
                     .unwrap(),
@@ -52,6 +84,10 @@ pub fn commands(config: &DeclarativeConfig, codec: &dyn DeviceCodec, data: &[u8]
                 let value = match field.data_type {
                     DataType::Bool => Scalar::Boolean(seed[0] & 1 != 0),
                     DataType::Utf8 => Scalar::Text("x".repeat(field.length.unwrap())),
+                    _ if field.conversion.is_some() && sample_index == 1 => Scalar::Decimal(
+                        DecimalScalar::new(["0", "0.1", "-5.1", "5.15"][usize::from(seed[0]) % 4])
+                            .unwrap(),
+                    ),
                     _ => Scalar::Number(sample),
                 };
                 command.payload.arguments.insert(named.name.clone(), value);
@@ -90,7 +126,7 @@ pub fn commands(config: &DeclarativeConfig, codec: &dyn DeviceCodec, data: &[u8]
                     continue;
                 }
                 let bits = unsigned(bytes, field.endian);
-                let raw = match field.data_type {
+                match field.data_type {
                     DataType::Bool => {
                         assert_eq!(
                             Scalar::Boolean(bits == 1),
@@ -98,29 +134,54 @@ pub fn commands(config: &DeclarativeConfig, codec: &dyn DeviceCodec, data: &[u8]
                         );
                         continue;
                     }
-                    DataType::F32 => f64::from(f32::from_bits(bits as u32)),
-                    DataType::F64 => f64::from_bits(bits),
+                    DataType::F32 => {
+                        assert!(f32::from_bits(bits as u32).is_finite());
+                        continue;
+                    }
+                    DataType::F64 => {
+                        assert!(f64::from_bits(bits).is_finite());
+                        continue;
+                    }
                     DataType::I8 | DataType::I16 | DataType::I32 | DataType::I64 => {
                         let shift = (8 - width) * 8;
-                        (((bits << shift) as i64) >> shift) as f64
+                        let raw = ((bits << shift) as i64) >> shift;
+                        let raw = BigRational::from_integer(BigInt::from(raw));
+                        let (scale, bias) = if let Some(conversion) = &field.conversion {
+                            (
+                                decimal(&conversion.scale).unwrap(),
+                                decimal(&conversion.bias).unwrap(),
+                            )
+                        } else {
+                            (
+                                decimal(&field.scale.unwrap_or(1.0).to_string()).unwrap(),
+                                decimal(&field.bias.unwrap_or(0.0).to_string()).unwrap(),
+                            )
+                        };
+                        assert_eq!(
+                            scalar_decimal(&command.payload.arguments[&named.name]).unwrap(),
+                            raw * scale + bias
+                        );
+                        continue;
                     }
-                    _ => bits as f64,
-                };
-                let actual = raw * field.scale + field.bias;
-                let Scalar::Number(expected) = &command.payload.arguments[&named.name] else {
-                    panic!("encoded numeric field has a nonnumeric argument");
-                };
-                assert!(inverse_matches(
-                    (*expected - field.bias) / field.scale,
-                    raw
-                ));
-                assert!(
-                    actual == *expected
-                        || ((field.scale != 1.0 || field.bias != 0.0)
-                            && !(actual == field.bias && *expected != field.bias)
-                            && (actual - *expected).abs()
-                                <= 4.0 * f64::EPSILON * actual.abs().max(expected.abs()))
-                );
+                    _ => {
+                        let raw = BigRational::from_integer(BigInt::from(bits));
+                        let (scale, bias) = if let Some(conversion) = &field.conversion {
+                            (
+                                decimal(&conversion.scale).unwrap(),
+                                decimal(&conversion.bias).unwrap(),
+                            )
+                        } else {
+                            (
+                                decimal(&field.scale.unwrap_or(1.0).to_string()).unwrap(),
+                                decimal(&field.bias.unwrap_or(0.0).to_string()).unwrap(),
+                            )
+                        };
+                        assert_eq!(
+                            scalar_decimal(&command.payload.arguments[&named.name]).unwrap(),
+                            raw * scale + bias
+                        );
+                    }
+                }
             }
         }
     }

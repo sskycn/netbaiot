@@ -1,5 +1,6 @@
 use super::*;
 use crate::common::valid_text;
+use crate::vendor::numeric::{FloatConversion, IntegerConversion};
 use std::ops::Range;
 
 pub(super) struct Integer {
@@ -44,8 +45,8 @@ pub(super) struct Value {
     pub range: Range<usize>,
     pub data_type: DataType,
     pub endian: Endian,
-    pub scale: f64,
-    pub bias: f64,
+    pub integer: Option<IntegerConversion>,
+    pub float: Option<FloatConversion>,
 }
 impl Value {
     fn bytes<'a>(&self, data: &'a [u8]) -> Result<&'a [u8], CodecError> {
@@ -71,36 +72,27 @@ impl Value {
             return Ok(Scalar::Text(text.to_owned()));
         }
         let bits = unsigned(bytes, self.endian);
-        let raw = match self.data_type {
-            DataType::Bool => {
-                return match bits {
-                    0 => Ok(Scalar::Boolean(false)),
-                    1 => Ok(Scalar::Boolean(true)),
-                    _ => Err(CodecError),
-                };
-            }
-            DataType::F32 => f64::from(f32::from_bits(bits as u32)),
-            DataType::F64 => f64::from_bits(bits),
+        match self.data_type {
+            DataType::Bool => match bits {
+                0 => Ok(Scalar::Boolean(false)),
+                1 => Ok(Scalar::Boolean(true)),
+                _ => Err(CodecError),
+            },
+            DataType::F32 => self
+                .float
+                .ok_or(CodecError)?
+                .decode(f64::from(f32::from_bits(bits as u32))),
+            DataType::F64 => self.float.ok_or(CodecError)?.decode(f64::from_bits(bits)),
             DataType::I8 | DataType::I16 | DataType::I32 | DataType::I64 => {
                 let shift = (8 - bytes.len()) * 8;
                 let signed = ((bits << shift) as i64) >> shift;
-                if signed.unsigned_abs() > (1 << 53) {
-                    return Err(CodecError);
-                }
-                signed as f64
+                self.integer.ok_or(CodecError)?.decode(i128::from(signed))
             }
-            _ => {
-                if bits > (1 << 53) {
-                    return Err(CodecError);
-                }
-                bits as f64
+            DataType::U8 | DataType::U16 | DataType::U32 | DataType::U64 => {
+                self.integer.ok_or(CodecError)?.decode(i128::from(bits))
             }
-        };
-        let number = raw * self.scale + self.bias;
-        if !raw.is_finite() || !number.is_finite() {
-            return Err(CodecError);
+            DataType::Utf8 => Err(CodecError),
         }
-        Ok(Scalar::Number(number))
     }
     pub fn write(&self, data: &mut [u8], scalar: &Scalar) -> Result<(), CodecError> {
         let bytes = data.get_mut(self.range.clone()).ok_or(CodecError)?;
@@ -113,75 +105,41 @@ impl Value {
             }
             (DataType::Bool, Scalar::Boolean(b)) => u64::from(*b),
             (DataType::Utf8 | DataType::Bool, _) => return Err(CodecError),
-            (kind, Scalar::Number(number)) if number.is_finite() => {
-                let raw = (number - self.bias) / self.scale;
-                if !raw.is_finite() || (raw == 0.0 && *number != self.bias) {
+            (DataType::F64, _) => self.float.ok_or(CodecError)?.encode_f64(scalar)?.to_bits(),
+            (DataType::F32, _) => {
+                let conversion = self.float.ok_or(CodecError)?;
+                let raw = conversion.encode_f64(scalar)?;
+                let narrowed = raw as f32;
+                let Scalar::Number(expected) = scalar else {
+                    return Err(CodecError);
+                };
+                if !narrowed.is_finite()
+                    || f64::from(narrowed) != raw
+                    || !conversion.preserves(f64::from(narrowed), *expected)
+                {
                     return Err(CodecError);
                 }
-                match kind {
-                    DataType::F64 => raw.to_bits(),
-                    DataType::F32 => {
-                        let value = raw as f32;
-                        if !value.is_finite()
-                            || !crate::vendor::inverse_number_matches(raw, f64::from(value))
-                        {
-                            return Err(CodecError);
-                        }
-                        u64::from(value.to_bits())
-                    }
-                    _ => {
-                        // Prove representability in the raw domain before checking the
-                        // normalized readback. This prevents a large scale or bias from
-                        // hiding integer quantization, especially a nonzero raw value
-                        // rounded to zero.
-                        let integer = raw.round();
-                        if !crate::vendor::inverse_number_matches(raw, integer)
-                            || integer.abs() > (1u64 << 53) as f64
-                        {
-                            return Err(CodecError);
-                        }
-                        let signed = matches!(
-                            kind,
-                            DataType::I8 | DataType::I16 | DataType::I32 | DataType::I64
-                        );
-                        let width = bytes.len() * 8;
-                        let (min, max_exclusive) = if signed {
-                            let magnitude = 2f64.powi((width - 1) as i32);
-                            (-magnitude, magnitude)
-                        } else {
-                            (0.0, 2f64.powi(width as i32))
-                        };
-                        if integer < min || integer >= max_exclusive {
-                            return Err(CodecError);
-                        }
-                        if signed {
-                            integer as i64 as u64
-                        } else {
-                            integer as u64
-                        }
-                    }
-                }
+                u64::from(narrowed.to_bits())
             }
-            _ => return Err(CodecError),
+            (DataType::I8 | DataType::I16 | DataType::I32 | DataType::I64, _) => {
+                let raw = self.integer.ok_or(CodecError)?.encode(scalar)?;
+                raw as i64 as u64
+            }
+            (DataType::U8 | DataType::U16 | DataType::U32 | DataType::U64, _) => {
+                u64::try_from(self.integer.ok_or(CodecError)?.encode(scalar)?)
+                    .map_err(|_| CodecError)?
+            }
         };
         put(bytes, bits, self.endian);
-        // Quantization was checked in the raw domain above. The readback check now
-        // has only one job: admit bounded multiply/add roundoff without allowing a
-        // scale/bias combination to erase the entire nonzero signal.
-        let actual = self.read(data)?;
-        let preserves_value = match (&actual, scalar) {
-            (Scalar::Number(actual), Scalar::Number(expected)) => {
-                if self.scale == 1.0 && self.bias == 0.0 {
-                    actual == expected
-                } else {
-                    !(*actual == self.bias && *expected != self.bias)
-                        && crate::vendor::normalized_number_matches(*expected, *actual)
-                }
+        if let (Some(conversion), Scalar::Number(expected)) = (self.float, scalar) {
+            let stored = match self.data_type {
+                DataType::F32 => f64::from(f32::from_bits(bits as u32)),
+                DataType::F64 => f64::from_bits(bits),
+                _ => return Ok(()),
+            };
+            if !conversion.preserves(stored, *expected) {
+                return Err(CodecError);
             }
-            _ => actual == *scalar,
-        };
-        if !preserves_value {
-            return Err(CodecError);
         }
         Ok(())
     }
@@ -222,165 +180,6 @@ impl Check {
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[test]
-    fn numeric_commands_reject_material_round_trip_loss() {
-        for endian in [Endian::Big, Endian::Little] {
-            for (kind, width, scale, bias, number) in [
-                (DataType::F32, 4, 1.0, 0.0, 16_777_217.0),
-                (DataType::F32, 4, 1.0, 0.0, 1e-50),
-                (DataType::F32, 4, 1.0, 0.0, 1.0f64.next_up()),
-                (DataType::I16, 2, 1.0, 0.0, 5.0f64.next_up()),
-                (DataType::F64, 8, 1.0, 1e20, 1.0),
-                (DataType::F64, 8, 1e300, 0.0, 1e-300),
-                (DataType::I16, 2, 0.1, 0.0, 12.30000000001),
-                (DataType::U64, 8, 1.0, 1e20, 1.0),
-            ] {
-                let field = Value {
-                    range: 0..width,
-                    data_type: kind,
-                    endian,
-                    scale,
-                    bias,
-                };
-                assert!(
-                    field.write(&mut [0; 8], &Scalar::Number(number)).is_err(),
-                    "{kind:?} scale={scale} bias={bias} number={number}"
-                );
-            }
-        }
-    }
-
-    #[test]
-    fn decimal_scales_and_extremes_only_admit_bounded_roundoff() {
-        for endian in [Endian::Big, Endian::Little] {
-            for (kind, width, scale, bias, number) in [
-                (DataType::I16, 2, 0.1, 0.0, 5.1),
-                (DataType::I16, 2, -0.1, 0.0, -5.1),
-                (DataType::U16, 2, 0.1, 0.0, 0.3),
-                (DataType::F32, 4, 0.1, 0.0, 1.7),
-                (DataType::F64, 8, 0.1, 2.0, 5.1),
-                (DataType::F64, 8, 1e-300, 0.0, 1e-300),
-                (DataType::F64, 8, 1e300, 0.0, 1e300),
-            ] {
-                let field = Value {
-                    range: 0..width,
-                    data_type: kind,
-                    endian,
-                    scale,
-                    bias,
-                };
-                let mut bytes = [0; 8];
-                field.write(&mut bytes, &Scalar::Number(number)).unwrap();
-                let Scalar::Number(actual) = field.read(&bytes).unwrap() else {
-                    panic!()
-                };
-                assert!(crate::vendor::normalized_number_matches(number, actual));
-            }
-            for (scale, number) in [(1e-300, 1e300), (1e300, 1e-300)] {
-                let field = Value {
-                    range: 0..8,
-                    data_type: DataType::F64,
-                    endian,
-                    scale,
-                    bias: 0.0,
-                };
-                assert!(field.write(&mut [0; 8], &Scalar::Number(number)).is_err());
-            }
-        }
-        assert!(!crate::vendor::normalized_number_matches(
-            0.0,
-            f64::from_bits(1)
-        ));
-        assert!(!crate::vendor::normalized_number_matches(
-            f64::from_bits(1),
-            f64::from_bits(2)
-        ));
-    }
-
-    #[test]
-    fn biased_decimal_inverse_preserves_the_command_value() {
-        for endian in [Endian::Big, Endian::Little] {
-            let decimal = Value {
-                range: 0..2,
-                data_type: DataType::I16,
-                endian,
-                scale: 0.1,
-                bias: 1.0,
-            };
-            for (number, raw) in [(-0.1, -11i16), (0.0, -10), (0.1, -9), (1.0, 0), (1.1, 1)] {
-                let mut bytes = [0; 2];
-                decimal.write(&mut bytes, &Scalar::Number(number)).unwrap();
-                assert_eq!(unsigned(&bytes, endian) as u16, raw as u16, "{number}");
-            }
-        }
-    }
-
-    #[test]
-    fn extreme_scale_does_not_hide_integer_quantization() {
-        for endian in [Endian::Big, Endian::Little] {
-            for (data_type, width) in [(DataType::I16, 2), (DataType::F32, 4)] {
-                let extreme = Value {
-                    range: 0..width,
-                    data_type,
-                    endian,
-                    scale: 1e300,
-                    bias: 1e20,
-                };
-                for number in [1e20f64.next_down(), 1e20f64.next_up()] {
-                    assert!(
-                        extreme.write(&mut [0; 8], &Scalar::Number(number)).is_err(),
-                        "{data_type:?} {number}"
-                    );
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn representable_numeric_boundaries_survive_both_endiannesses() {
-        for endian in [Endian::Big, Endian::Little] {
-            for (kind, width, values) in [
-                (DataType::U8, 1, [0.0, 1.0, 255.0]),
-                (DataType::I8, 1, [-128.0, 0.0, 127.0]),
-                (DataType::U16, 2, [0.0, 1.0, 65535.0]),
-                (DataType::I16, 2, [-32768.0, 0.0, 32767.0]),
-                (DataType::U32, 4, [0.0, 1.0, f64::from(u32::MAX)]),
-                (
-                    DataType::I32,
-                    4,
-                    [f64::from(i32::MIN), 0.0, f64::from(i32::MAX)],
-                ),
-                (DataType::U64, 8, [0.0, 1.0, 9007199254740992.0]),
-                (
-                    DataType::I64,
-                    8,
-                    [-9007199254740992.0, 0.0, 9007199254740992.0],
-                ),
-                (
-                    DataType::F32,
-                    4,
-                    [f64::from(f32::from_bits(1)), 0.0, f64::from(f32::MAX)],
-                ),
-                (DataType::F64, 8, [f64::from_bits(1), 0.0, f64::MAX]),
-            ] {
-                for raw in values {
-                    for (scale, bias) in [(1.0, 0.0), (-0.5, 0.0)] {
-                        let field = Value {
-                            range: 0..width,
-                            data_type: kind,
-                            endian,
-                            scale,
-                            bias,
-                        };
-                        let scalar = Scalar::Number(raw * scale + bias);
-                        let mut bytes = [0; 8];
-                        field.write(&mut bytes, &scalar).unwrap();
-                        assert_eq!(field.read(&bytes).unwrap(), scalar);
-                    }
-                }
-            }
-        }
-    }
 
     #[test]
     fn crc16_modbus_standard_check_vector() {

@@ -1281,10 +1281,13 @@ version = "0.3.3"
 dependencies = [
  "ciborium",
  "netbaiot-core",
+ "num-bigint",
+ "num-rational",
  "prost",
  "prost-build",
  "protoc-bin-vendored",
  "rmp-serde",
+ "ryu",
  "schemars",
  "serde",
  "serde_json",

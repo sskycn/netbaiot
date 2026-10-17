@@ -773,7 +773,7 @@ checksum = "1d87ecb2933e8aeadb3e3a02b828fed80a7528047e68b4f424523a0981a3a084"
 
 [[package]]
 name = "netbaiot-codecs"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "ciborium",
  "netbaiot-core",
@@ -781,6 +781,7 @@ dependencies = [
  "prost-build",
  "protoc-bin-vendored",
  "rmp-serde",
+ "ryu",
  "serde",
  "serde_json",
  "uuid",
@@ -788,7 +789,7 @@ dependencies = [
 
 [[package]]
 name = "netbaiot-core"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "hkdf",
  "netbaiot-protocol",
@@ -810,20 +811,22 @@ dependencies = [
  "netbaiot-runtime",
  "netbaiot-transports",
  "netbaiot-v3-mux",
+ "num-bigint",
+ "num-rational",
  "serde_json",
  "sha2",
 ]
 
 [[package]]
 name = "netbaiot-mqtt-wire"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "bytes",
 ]
 
 [[package]]
 name = "netbaiot-protocol"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "serde",
  "thiserror",
@@ -832,7 +835,7 @@ dependencies = [
 
 [[package]]
 name = "netbaiot-runtime"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "async-trait",
  "atomicwrites",
@@ -858,7 +861,7 @@ dependencies = [
 
 [[package]]
 name = "netbaiot-transports"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "async-trait",
  "bytes",
@@ -884,7 +887,7 @@ dependencies = [
 
 [[package]]
 name = "netbaiot-v3-mux"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "bytes",
  "netbaiot-protocol",
@@ -913,6 +916,17 @@ version = "0.1.47"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7ce2d95d4b3734dc35aa2f45e1aa22cd416814592a4f9d9205e11affd5b8e10b"
 dependencies = [
+ "num-traits",
+]
+
+[[package]]
+name = "num-rational"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f83d14da390562dca69fc84082e73e548e1ad308d24accdedd2720017cb37824"
+dependencies = [
+ "num-bigint",
+ "num-integer",
  "num-traits",
 ]
 
@@ -1411,9 +1425,9 @@ dependencies = [
 
 [[package]]
 name = "rustversion"
-version = "1.0.23"
+version = "1.0.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cf54715a573b99ac80df0bc206da022bcd442c974952c7b9720069370852e21f"
+checksum = "b39cdef0fa800fc44525c84ccb54a029961a8215f9619753635a9c0d2538d46d"
 
 [[package]]
 name = "ryu"
