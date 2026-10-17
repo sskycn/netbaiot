@@ -84,7 +84,7 @@ impl DeviceCodec for AcmeV1 {
         let raw = temperature / 0.1;
         let rounded = raw.round();
         if !(f64::from(i16::MIN)..=f64::from(i16::MAX)).contains(&rounded)
-            || (raw - rounded).abs() > 4.0 * f64::EPSILON * raw.abs().max(1.0)
+            || !super::inverse_number_matches(raw, rounded)
             || !super::normalized_number_matches(*temperature, rounded * 0.1)
         {
             return Err(CodecError);

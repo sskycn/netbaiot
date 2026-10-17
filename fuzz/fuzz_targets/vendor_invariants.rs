@@ -8,6 +8,17 @@ fn unsigned(bytes: &[u8], endian: Endian) -> u64 {
     }
 }
 
+fn inverse_matches(calculated: f64, representable: f64) -> bool {
+    if !calculated.is_finite() || !representable.is_finite() {
+        return false;
+    }
+    if calculated == representable {
+        return true;
+    }
+    (calculated - representable).abs()
+        <= (4.0 * f64::EPSILON * calculated.abs().max(representable.abs())).min(1e-7)
+}
+
 // Independently inspect the actual command bytes. Encoding success must never
 // silently quantize a number, lose timestamp bits, or exceed the codec bound.
 pub fn commands(config: &DeclarativeConfig, codec: &dyn DeviceCodec, data: &[u8]) {
@@ -99,11 +110,14 @@ pub fn commands(config: &DeclarativeConfig, codec: &dyn DeviceCodec, data: &[u8]
                 let Scalar::Number(expected) = &command.payload.arguments[&named.name] else {
                     panic!("encoded numeric field has a nonnumeric argument");
                 };
-                let adjacent = actual == expected.next_up() || actual == expected.next_down();
+                assert!(inverse_matches(
+                    (*expected - field.bias) / field.scale,
+                    raw
+                ));
                 assert!(
                     actual == *expected
                         || ((field.scale != 1.0 || field.bias != 0.0)
-                            && adjacent
+                            && !(actual == field.bias && *expected != field.bias)
                             && (actual - *expected).abs()
                                 <= 4.0 * f64::EPSILON * actual.abs().max(expected.abs()))
                 );

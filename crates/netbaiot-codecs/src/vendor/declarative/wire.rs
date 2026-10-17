@@ -115,23 +115,27 @@ impl Value {
             (DataType::Utf8 | DataType::Bool, _) => return Err(CodecError),
             (kind, Scalar::Number(number)) if number.is_finite() => {
                 let raw = (number - self.bias) / self.scale;
-                if !raw.is_finite() {
+                if !raw.is_finite() || (raw == 0.0 && *number != self.bias) {
                     return Err(CodecError);
                 }
                 match kind {
                     DataType::F64 => raw.to_bits(),
                     DataType::F32 => {
                         let value = raw as f32;
-                        if !value.is_finite() {
+                        if !value.is_finite()
+                            || !crate::vendor::inverse_number_matches(raw, f64::from(value))
+                        {
                             return Err(CodecError);
                         }
                         u64::from(value.to_bits())
                     }
                     _ => {
-                        // Allow only floating-point roundoff, never truncate fractional commands.
+                        // Prove representability in the raw domain before checking the
+                        // normalized readback. This prevents a large scale or bias from
+                        // hiding integer quantization, especially a nonzero raw value
+                        // rounded to zero.
                         let integer = raw.round();
-                        if (raw - integer).abs()
-                            > (4.0 * f64::EPSILON * raw.abs().max(1.0)).min(1e-7)
+                        if !crate::vendor::inverse_number_matches(raw, integer)
                             || integer.abs() > (1u64 << 53) as f64
                         {
                             return Err(CodecError);
@@ -161,15 +165,17 @@ impl Value {
             _ => return Err(CodecError),
         };
         put(bytes, bits, self.endian);
-        // Check the actual normalized wire value. One f64 ULP admits arithmetic
-        // roundoff from decimal scales while rejecting larger quantization steps.
+        // Quantization was checked in the raw domain above. The readback check now
+        // has only one job: admit bounded multiply/add roundoff without allowing a
+        // scale/bias combination to erase the entire nonzero signal.
         let actual = self.read(data)?;
         let preserves_value = match (&actual, scalar) {
             (Scalar::Number(actual), Scalar::Number(expected)) => {
                 if self.scale == 1.0 && self.bias == 0.0 {
                     actual == expected
                 } else {
-                    crate::vendor::normalized_number_matches(*expected, *actual)
+                    !(*actual == self.bias && *expected != self.bias)
+                        && crate::vendor::normalized_number_matches(*expected, *actual)
                 }
             }
             _ => actual == *scalar,
@@ -289,6 +295,45 @@ mod tests {
             f64::from_bits(1),
             f64::from_bits(2)
         ));
+    }
+
+    #[test]
+    fn biased_decimal_inverse_preserves_the_command_value() {
+        for endian in [Endian::Big, Endian::Little] {
+            let decimal = Value {
+                range: 0..2,
+                data_type: DataType::I16,
+                endian,
+                scale: 0.1,
+                bias: 1.0,
+            };
+            for (number, raw) in [(-0.1, -11i16), (0.0, -10), (0.1, -9), (1.0, 0), (1.1, 1)] {
+                let mut bytes = [0; 2];
+                decimal.write(&mut bytes, &Scalar::Number(number)).unwrap();
+                assert_eq!(unsigned(&bytes, endian) as u16, raw as u16, "{number}");
+            }
+        }
+    }
+
+    #[test]
+    fn extreme_scale_does_not_hide_integer_quantization() {
+        for endian in [Endian::Big, Endian::Little] {
+            for (data_type, width) in [(DataType::I16, 2), (DataType::F32, 4)] {
+                let extreme = Value {
+                    range: 0..width,
+                    data_type,
+                    endian,
+                    scale: 1e300,
+                    bias: 1e20,
+                };
+                for number in [1e20f64.next_down(), 1e20f64.next_up()] {
+                    assert!(
+                        extreme.write(&mut [0; 8], &Scalar::Number(number)).is_err(),
+                        "{data_type:?} {number}"
+                    );
+                }
+            }
+        }
     }
 
     #[test]

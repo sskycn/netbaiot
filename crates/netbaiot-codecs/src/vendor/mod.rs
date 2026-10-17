@@ -7,8 +7,25 @@ use crate::CodecRegistration;
 use netbaiot_core::{CodecError, CodecId, DeviceCodec};
 use std::sync::Arc;
 
-/// The wire transform uses f64 arithmetic. Admit at most one adjacent f64 value
-/// of roundoff, and never let an absolute ULP near zero hide relative loss.
+/// The inverse transform may accumulate representation, subtraction and division
+/// roundoff. Bound that error relative to the raw signal and retain the absolute
+/// 1e-7 ceiling. Zero is exact: treating a nonzero raw value as zero is quantization
+/// or underflow, not roundoff.
+pub(crate) fn inverse_number_matches(calculated: f64, representable: f64) -> bool {
+    if !calculated.is_finite() || !representable.is_finite() {
+        return false;
+    }
+    if calculated == representable {
+        return true;
+    }
+    let difference = (calculated - representable).abs();
+    difference <= (4.0 * f64::EPSILON * calculated.abs().max(representable.abs())).min(1e-7)
+}
+
+/// Once raw-value representability has been proved separately, allow only the
+/// existing relative error budget for the multiply/add normalization. This is
+/// deliberately not an absolute or ULP tolerance: cancellation can span more
+/// than one output ULP while still being tiny relative to the command value.
 pub(crate) fn normalized_number_matches(expected: f64, actual: f64) -> bool {
     if !expected.is_finite() || !actual.is_finite() {
         return false;
@@ -17,8 +34,7 @@ pub(crate) fn normalized_number_matches(expected: f64, actual: f64) -> bool {
         return true;
     }
     let difference = (expected - actual).abs();
-    (actual == expected.next_up() || actual == expected.next_down())
-        && difference <= 4.0 * f64::EPSILON * expected.abs().max(actual.abs())
+    difference <= 4.0 * f64::EPSILON * expected.abs().max(actual.abs())
 }
 
 /// A vendor ID occupies the existing codec namespace. Reserved built-ins cannot be replaced.
