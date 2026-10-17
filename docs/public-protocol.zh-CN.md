@@ -8,7 +8,7 @@
 
 `DeviceEvent` 包含稳定的 `event_id`、来源消息 ID、权威设备身份、接收/发生时间，以及一种有类型的事件：telemetry、heartbeat、设备事件或命令 ACK。重启重放会保留 event ID。`DeliveryId` 标识一次流投递尝试，重连后可能变化。
 
-当前 Business RPC 使用有界 Hello/Ready JSON bootstrap 和二进制 stream framing。Provider 与 EventSubscription 独立拥有状态；应用 ACK 必须匹配当前 epoch/stream、delivery 与 event identity。当前 ACK DTO 为 `V3EventAck`，旧 `EventAck` 和 stream/V2 envelope 已移除。写入或解码不是业务 ACK，见[当前协议](business-rpc-v3.zh-CN.md)。
+当前 Business RPC 使用有界 Hello/Ready JSON bootstrap 和二进制 stream framing。Provider 与 EventSubscription 独立拥有状态；应用 ACK 必须匹配当前 epoch/stream、delivery 与 event identity。当前 ACK DTO 为 `RpcEventAck`，旧 `EventAck` 和 stream/V2 envelope 已移除。写入或解码不是业务 ACK，见[当前协议](business-rpc.zh-CN.md)。
 
 管理错误使用 `ApiError { code, message, request_id, required_scope }`。稳定错误码包括认证、授权、请求无效/版本不匹配、设备离线、过载、draining、超时、连接丢失、未找到、冲突、服务端不可用和内部错误。客户端无需解析错误文案。服务端响应和事件模型会容忍 wire v1 中无害的额外 JSON 字段；为避免歧义，在需要保护服务端时，请求解析可继续采用严格策略。官方管理客户端仅允许在 `localhost` 或 loopback IP endpoint 使用明文 HTTP；非 loopback endpoint 必须使用 HTTPS。
 

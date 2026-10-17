@@ -190,7 +190,7 @@
           "type": "array"
         },
         "limits": {
-          "$ref": "#/$defs/V3Limits",
+          "$ref": "#/$defs/RpcLimits",
           "default": {
             "heartbeat_ms": 5000,
             "initial_connection_window_bytes": 4194304,
@@ -215,7 +215,7 @@
         "send_ahead": {
           "anyOf": [
             {
-              "$ref": "#/$defs/V3SendAhead"
+              "$ref": "#/$defs/RpcSendAhead"
             },
             {
               "type": "null"
@@ -2025,23 +2025,7 @@
       ],
       "type": "object"
     },
-    "TlsFiles": {
-      "additionalProperties": false,
-      "properties": {
-        "certificate": {
-          "type": "string"
-        },
-        "private_key": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "certificate",
-        "private_key"
-      ],
-      "type": "object"
-    },
-    "V3Limits": {
+    "RpcLimits": {
       "additionalProperties": false,
       "properties": {
         "heartbeat_ms": {
@@ -2079,7 +2063,7 @@
       ],
       "type": "object"
     },
-    "V3SendAhead": {
+    "RpcSendAhead": {
       "additionalProperties": false,
       "description": "Sender-local V3 scheduling limits; these are never sent in the V3 Hello.",
       "properties": {
@@ -2097,6 +2081,22 @@
       "required": [
         "stream_bytes",
         "connection_bytes"
+      ],
+      "type": "object"
+    },
+    "TlsFiles": {
+      "additionalProperties": false,
+      "properties": {
+        "certificate": {
+          "type": "string"
+        },
+        "private_key": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "certificate",
+        "private_key"
       ],
       "type": "object"
     }

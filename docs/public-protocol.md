@@ -19,7 +19,7 @@ device event, or command ACK. Restart replay retains
 the event ID. `DeliveryId` instead identifies one stream delivery attempt and may
 change after reconnect.
 
-Connection presence belongs to Sessions and management queries, rather than business event variants. Current Business RPC uses bounded length-prefixed Hello/Ready followed by binary stream framing. Provider and EventSubscription parents have independent ownership; application ACK matches the delivery/event identity on its current epoch/stream. `V3EventAck` is the current ACK DTO; the old standalone `EventAck` and stream/V2 envelopes are removed. A write or decode is never a business ACK. See [current framing and methods](business-rpc-v3.md) and [upgrade requirements](migration/current-protocol-only.md).
+Connection presence belongs to Sessions and management queries, rather than business event variants. Current Business RPC uses bounded length-prefixed Hello/Ready followed by binary stream framing. Provider and EventSubscription parents have independent ownership; application ACK matches the delivery/event identity on its current epoch/stream. `RpcEventAck` is the current ACK DTO; the old standalone `EventAck` and stream/V2 envelopes are removed. A write or decode is never a business ACK. See [current framing and methods](business-rpc.md) and [upgrade requirements](migration/current-protocol-only.md).
 
 Management errors use `ApiError { code, message, request_id, required_scope }`.
 Stable codes include authentication, authorization, invalid request/version,

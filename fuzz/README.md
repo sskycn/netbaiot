@@ -3,6 +3,16 @@
 Requires nightly Rust and cargo-fuzz. Targets are independent of listeners/storage.
 Every harness caps its own input, and incremental harnesses cap buffered bytes.
 
+Business RPC uses the version-independent `business_rpc_bootstrap` and
+`business_rpc_wire` target names. They exercise the current V3 Hello/Ready and
+binary stream protocol; the wire version remains 3. `seed_corpus.py` writes their
+seeds under those target names.
+
+```sh
+cargo +nightly fuzz run business_rpc_bootstrap -- -runs=10000 -max_len=4097
+cargo +nightly fuzz run business_rpc_wire -- -runs=10000 -max_len=65536
+```
+
 ```sh
 cargo +nightly fuzz run mqtt_fixed_header -- -max_total_time=30 -max_len=65540
 cargo +nightly fuzz run mqtt_remaining_length -- -max_total_time=30 -max_len=8

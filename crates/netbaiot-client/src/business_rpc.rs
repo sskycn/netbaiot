@@ -1,6 +1,7 @@
 //! Shared current Business RPC TLS, structured errors and auth method interface.
-mod v3;
+mod client;
 use async_trait::async_trait;
+pub use client::{BusinessRpcClient, BusinessRpcClientConfig, BusinessRpcDelivery};
 use netbaiot_protocol::{
     DeviceCommand,
     business_rpc::{
@@ -21,7 +22,6 @@ use tokio::{
     net::TcpStream,
 };
 use tokio_rustls::{TlsConnector, rustls};
-pub use v3::{BusinessRpcV3Client, BusinessRpcV3ClientConfig, BusinessRpcV3Delivery};
 
 trait Io: AsyncRead + AsyncWrite + Unpin + Send {}
 impl<T: AsyncRead + AsyncWrite + Unpin + Send> Io for T {}
@@ -84,7 +84,7 @@ pub trait BusinessAuthHandler: Send + Sync + 'static {
 }
 
 async fn connect_io(
-    config: &BusinessRpcV3ClientConfig,
+    config: &BusinessRpcClientConfig,
 ) -> Result<Box<dyn Io>, BusinessRpcClientError> {
     let socket = tokio::time::timeout(config.connect_timeout, TcpStream::connect(config.address))
         .await

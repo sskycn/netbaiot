@@ -23,7 +23,7 @@ from scrub_paths import scrub_text
 from business_rpc_harness_support import scrub_evidence, shutdown_gateway, write_shutdown
 FIXTURES = ROOT / "tests" / "fixtures"
 ADMIN_SECRET = "a" * 64
-V3_LIMITS = {
+RPC_LIMITS = {
     "max_frame_payload_bytes": 8192,
     "max_concurrent_streams": 256,
     "initial_stream_window_bytes": 262144,
@@ -140,7 +140,7 @@ def run():
         requests_per_ip_second=loopback_headroom,
     )
     gateway["business_rpc"] = {
-        "limits": V3_LIMITS,
+        "limits": RPC_LIMITS,
         "send_ahead": None,
         "experiment_socket_send_buffer_bytes": None,
         "tls": {
@@ -346,7 +346,7 @@ def run():
                     "command_dedup_ttl_ms": 300000,
                     "command_dedup_max_entries": 4096,
                 },
-                "v3_limits": V3_LIMITS,
+                "v3_limits": RPC_LIMITS,
                 "random_seed": None,
                 "gateway_config": "gateway-config.json",
                 "loadgen_config": "loadgen-config.json",

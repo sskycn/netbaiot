@@ -90,10 +90,10 @@ pub enum EventDeliverySource {
 pub struct BusinessRpcConfig {
     /// Limits for the sole current Business RPC wire format.
     #[serde(default)]
-    pub limits: business_rpc_v3::V3Limits,
+    pub limits: netbaiot_core::business_rpc::wire::RpcLimits,
     /// Local sender policy, separate from the negotiated V3 receive windows.
     #[serde(default)]
-    pub send_ahead: Option<V3SendAhead>,
+    pub send_ahead: Option<RpcSendAhead>,
     #[serde(default)]
     pub experiment_socket_send_buffer_bytes: Option<usize>,
     pub tls: Option<ManagementTlsFiles>,

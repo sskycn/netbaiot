@@ -1,7 +1,7 @@
 //! Scheduler-only microbenchmark. Peer credit is synthetic; results are not network throughput.
 use bytes::Bytes;
-use netbaiot_protocol::business_rpc_v3::V3Limits;
-use netbaiot_v3_mux::{DataClass, MuxScheduler, SendAheadLimits};
+use netbaiot_protocol::business_rpc::wire::RpcLimits;
+use netbaiot_rpc_mux::{DataClass, MuxScheduler, SendAheadLimits};
 use std::{hint::black_box, time::Instant};
 
 fn main() {
@@ -19,10 +19,10 @@ fn main() {
         "frame_bytes,stream_send_ahead_bytes,runs,late_rpc_event_bytes_before_rpc,frames_per_second"
     );
     for (frame_bytes, stream_bytes) in cases {
-        let limits = V3Limits {
+        let limits = RpcLimits {
             max_frame_payload_bytes: frame_bytes,
             initial_stream_window_bytes: 1024 * 1024,
-            ..V3Limits::default()
+            ..RpcLimits::default()
         };
         let policy = Some(SendAheadLimits {
             stream_bytes,

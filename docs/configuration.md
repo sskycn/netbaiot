@@ -142,4 +142,4 @@ TLS/identities, development token environment and connection/auth limits. Old
 `v3_experiment_socket_send_buffer_bytes` are unknown fields. Production uses mTLS
 with mapped principals; plaintext is restricted to loopback development tokens.
 See [upgrade requirements](migration/current-protocol-only.md) and
-[Business RPC V3](business-rpc-v3.md).
+[Business RPC V3](business-rpc.md).

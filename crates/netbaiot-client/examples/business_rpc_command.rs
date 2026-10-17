@@ -1,5 +1,5 @@
 //! Send one online command over Business RPC V3. Run only against a V3-enabled gateway.
-use netbaiot_client::business_rpc::{BusinessRpcV3Client, BusinessRpcV3ClientConfig};
+use netbaiot_client::business_rpc::{BusinessRpcClient, BusinessRpcClientConfig};
 use netbaiot_protocol::{
     CommandId, DeviceCommand, DeviceCommandPayload, DeviceId, DeviceKey, ProductId, TenantId,
 };
@@ -8,10 +8,10 @@ use netbaiot_protocol::{
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let address = std::env::var("NETBAIOT_BUSINESS_RPC_ADDRESS")?.parse()?;
     let token = std::env::var("NETBAIOT_BUSINESS_RPC_TOKEN")?;
-    let mut config = BusinessRpcV3ClientConfig::development(address, token);
+    let mut config = BusinessRpcClientConfig::development(address, token);
     config.provider = false;
     config.events = false;
-    let (business, _) = BusinessRpcV3Client::connect(config, None)?;
+    let (business, _) = BusinessRpcClient::connect(config, None)?;
     business.wait_ready().await?;
 
     // Persist the command_id in the business application before submission.

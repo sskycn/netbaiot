@@ -19,7 +19,7 @@ netbaiot-codecs = { path = "../crates/netbaiot-codecs" }
 netbaiot-runtime = { path = "../crates/netbaiot-runtime" }
 netbaiot-transports = { path = "../crates/netbaiot-transports" }
 netbaiot-mqtt-wire = { path = "../crates/netbaiot-mqtt-wire" }
-netbaiot-v3-mux = { path = "../crates/netbaiot-v3-mux" }
+netbaiot-rpc-mux = { path = "../crates/netbaiot-rpc-mux" }
 
 [workspace]
 members = ["."]
@@ -137,8 +137,8 @@ doc = false
 bench = false
 
 [[bin]]
-name = "business_rpc_v3"
-path = "fuzz_targets/business_rpc_v3.rs"
+name = "business_rpc_wire"
+path = "fuzz_targets/business_rpc_wire.rs"
 test = false
 doc = false
 bench = false

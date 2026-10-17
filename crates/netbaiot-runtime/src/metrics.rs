@@ -78,23 +78,23 @@ pub enum Metric {
     BusinessRpcReconnects,
     BusinessRpcRevisionGaps,
     BusinessRpcOfflineGraceExpirations,
-    BusinessRpcV3Connections,
-    BusinessRpcV3AbnormalClosures,
-    BusinessRpcV3StreamsOpened,
-    BusinessRpcV3StreamsReset,
-    BusinessRpcV3FramesSent,
-    BusinessRpcV3FramesReceived,
-    BusinessRpcV3DataBytesSent,
-    BusinessRpcV3DataBytesSelected,
-    BusinessRpcV3DataBytesReceived,
-    BusinessRpcV3ConnectionWindowStalls,
-    BusinessRpcV3StreamWindowStalls,
-    BusinessRpcV3SendAheadStalls,
-    BusinessRpcV3Overloads,
-    BusinessRpcV3ProtocolErrors,
-    BusinessRpcV3CommandRequests,
-    BusinessRpcV3CommandAccepted,
-    BusinessRpcV3CommandErrors,
+    BusinessRpcMuxConnections,
+    BusinessRpcMuxAbnormalClosures,
+    BusinessRpcMuxStreamsOpened,
+    BusinessRpcMuxStreamsReset,
+    BusinessRpcMuxFramesSent,
+    BusinessRpcMuxFramesReceived,
+    BusinessRpcMuxDataBytesSent,
+    BusinessRpcMuxDataBytesSelected,
+    BusinessRpcMuxDataBytesReceived,
+    BusinessRpcMuxConnectionWindowStalls,
+    BusinessRpcMuxStreamWindowStalls,
+    BusinessRpcMuxSendAheadStalls,
+    BusinessRpcMuxOverloads,
+    BusinessRpcMuxProtocolErrors,
+    BusinessRpcMuxCommandRequests,
+    BusinessRpcMuxCommandAccepted,
+    BusinessRpcMuxCommandErrors,
 }
 #[derive(Clone, Copy)]
 #[repr(usize)]
@@ -255,8 +255,8 @@ pub enum Histogram {
     BusinessRpcAdmission,
     BusinessRpcRemoteWait,
     BusinessRpcQueueWait,
-    BusinessRpcV3SchedulerWait,
-    BusinessRpcV3WriterWait,
+    BusinessRpcMuxSchedulerWait,
+    BusinessRpcMuxWriterWait,
     Authentication,
     CodecLatency,
     IngressLatency,
@@ -475,13 +475,13 @@ impl Drop for MetricTimer<'_> {
 pub struct Metrics {
     values: [AtomicU64; NAMES.len()],
     business_rpc_active: AtomicU64,
-    business_rpc_v3_active: AtomicU64,
-    business_rpc_v3_streams: AtomicU64,
-    business_rpc_v3_streams_peak: AtomicU64,
-    business_rpc_v3_queued_bytes: AtomicU64,
-    business_rpc_v3_queued_bytes_peak: AtomicU64,
-    business_rpc_v3_reassembly_bytes: AtomicU64,
-    business_rpc_v3_reassembly_bytes_peak: AtomicU64,
+    business_rpc_mux_active: AtomicU64,
+    business_rpc_mux_streams: AtomicU64,
+    business_rpc_mux_streams_peak: AtomicU64,
+    business_rpc_mux_queued_bytes: AtomicU64,
+    business_rpc_mux_queued_bytes_peak: AtomicU64,
+    business_rpc_mux_reassembly_bytes: AtomicU64,
+    business_rpc_mux_reassembly_bytes_peak: AtomicU64,
     business_rpc_method_results: [[AtomicU64; 6]; 2],
     business_rpc_remote_errors: [[AtomicU64; 11]; 2],
     management_auth_attempts: [AtomicU64; 15],
@@ -502,13 +502,13 @@ impl Default for Metrics {
         Self {
             values: std::array::from_fn(|_| AtomicU64::new(0)),
             business_rpc_active: AtomicU64::new(0),
-            business_rpc_v3_active: AtomicU64::new(0),
-            business_rpc_v3_streams: AtomicU64::new(0),
-            business_rpc_v3_streams_peak: AtomicU64::new(0),
-            business_rpc_v3_queued_bytes: AtomicU64::new(0),
-            business_rpc_v3_queued_bytes_peak: AtomicU64::new(0),
-            business_rpc_v3_reassembly_bytes: AtomicU64::new(0),
-            business_rpc_v3_reassembly_bytes_peak: AtomicU64::new(0),
+            business_rpc_mux_active: AtomicU64::new(0),
+            business_rpc_mux_streams: AtomicU64::new(0),
+            business_rpc_mux_streams_peak: AtomicU64::new(0),
+            business_rpc_mux_queued_bytes: AtomicU64::new(0),
+            business_rpc_mux_queued_bytes_peak: AtomicU64::new(0),
+            business_rpc_mux_reassembly_bytes: AtomicU64::new(0),
+            business_rpc_mux_reassembly_bytes_peak: AtomicU64::new(0),
             business_rpc_method_results: std::array::from_fn(|_| {
                 std::array::from_fn(|_| AtomicU64::new(0))
             }),
@@ -564,14 +564,14 @@ impl Metrics {
     pub fn business_rpc_connection_finished(&self) {
         self.business_rpc_active.fetch_sub(1, Ordering::Relaxed);
     }
-    pub fn business_rpc_v3_connection_started(&self) {
-        self.business_rpc_v3_active.fetch_add(1, Ordering::Relaxed);
-        self.inc(Metric::BusinessRpcV3Connections);
+    pub fn business_rpc_mux_connection_started(&self) {
+        self.business_rpc_mux_active.fetch_add(1, Ordering::Relaxed);
+        self.inc(Metric::BusinessRpcMuxConnections);
     }
-    pub fn business_rpc_v3_connection_finished(&self) {
-        self.business_rpc_v3_active.fetch_sub(1, Ordering::Relaxed);
+    pub fn business_rpc_mux_connection_finished(&self) {
+        self.business_rpc_mux_active.fetch_sub(1, Ordering::Relaxed);
     }
-    fn adjust_v3_gauge(gauge: &AtomicU64, previous: usize, current: usize) {
+    fn adjust_rpc_gauge(gauge: &AtomicU64, previous: usize, current: usize) {
         let delta = previous.abs_diff(current) as u64;
         if current >= previous {
             gauge.fetch_add(delta, Ordering::Relaxed);
@@ -579,31 +579,31 @@ impl Metrics {
             gauge.fetch_sub(delta, Ordering::Relaxed);
         }
     }
-    pub fn business_rpc_v3_connection_gauges(
+    pub fn business_rpc_mux_connection_gauges(
         &self,
         previous: (usize, usize),
         current: (usize, usize),
     ) {
-        Self::adjust_v3_gauge(&self.business_rpc_v3_streams, previous.0, current.0);
-        Self::adjust_v3_gauge(
-            &self.business_rpc_v3_reassembly_bytes,
+        Self::adjust_rpc_gauge(&self.business_rpc_mux_streams, previous.0, current.0);
+        Self::adjust_rpc_gauge(
+            &self.business_rpc_mux_reassembly_bytes,
             previous.1,
             current.1,
         );
-        self.business_rpc_v3_streams_peak.fetch_max(
-            self.business_rpc_v3_streams.load(Ordering::Relaxed),
+        self.business_rpc_mux_streams_peak.fetch_max(
+            self.business_rpc_mux_streams.load(Ordering::Relaxed),
             Ordering::Relaxed,
         );
-        self.business_rpc_v3_reassembly_bytes_peak.fetch_max(
-            self.business_rpc_v3_reassembly_bytes
+        self.business_rpc_mux_reassembly_bytes_peak.fetch_max(
+            self.business_rpc_mux_reassembly_bytes
                 .load(Ordering::Relaxed),
             Ordering::Relaxed,
         );
     }
-    pub fn business_rpc_v3_writer_bytes(&self, previous: usize, current: usize) {
-        Self::adjust_v3_gauge(&self.business_rpc_v3_queued_bytes, previous, current);
-        self.business_rpc_v3_queued_bytes_peak.fetch_max(
-            self.business_rpc_v3_queued_bytes.load(Ordering::Relaxed),
+    pub fn business_rpc_mux_writer_bytes(&self, previous: usize, current: usize) {
+        Self::adjust_rpc_gauge(&self.business_rpc_mux_queued_bytes, previous, current);
+        self.business_rpc_mux_queued_bytes_peak.fetch_max(
+            self.business_rpc_mux_queued_bytes.load(Ordering::Relaxed),
             Ordering::Relaxed,
         );
     }
@@ -754,19 +754,19 @@ impl Metrics {
         ));
         output.push_str(&format!(
             "netbaiot_business_rpc_v3_active_connections {}\n",
-            self.business_rpc_v3_active.load(Ordering::Relaxed)
+            self.business_rpc_mux_active.load(Ordering::Relaxed)
         ));
         output.push_str(&format!(
             "netbaiot_business_rpc_v3_active_streams {}\nnetbaiot_business_rpc_v3_queued_bytes {}\nnetbaiot_business_rpc_v3_reassembly_reserved_bytes {}\n",
-            self.business_rpc_v3_streams.load(Ordering::Relaxed),
-            self.business_rpc_v3_queued_bytes.load(Ordering::Relaxed),
-            self.business_rpc_v3_reassembly_bytes.load(Ordering::Relaxed),
+            self.business_rpc_mux_streams.load(Ordering::Relaxed),
+            self.business_rpc_mux_queued_bytes.load(Ordering::Relaxed),
+            self.business_rpc_mux_reassembly_bytes.load(Ordering::Relaxed),
         ));
         output.push_str(&format!(
             "netbaiot_business_rpc_v3_peak_active_streams {}\nnetbaiot_business_rpc_v3_peak_queued_bytes {}\nnetbaiot_business_rpc_v3_peak_reassembly_reserved_bytes {}\n",
-            self.business_rpc_v3_streams_peak.load(Ordering::Relaxed),
-            self.business_rpc_v3_queued_bytes_peak.load(Ordering::Relaxed),
-            self.business_rpc_v3_reassembly_bytes_peak.load(Ordering::Relaxed),
+            self.business_rpc_mux_streams_peak.load(Ordering::Relaxed),
+            self.business_rpc_mux_queued_bytes_peak.load(Ordering::Relaxed),
+            self.business_rpc_mux_reassembly_bytes_peak.load(Ordering::Relaxed),
         ));
         for (method_index, method) in ["device.authenticate", "device.resolve_verifier"]
             .iter()
@@ -919,6 +919,82 @@ impl Metrics {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn rpc_mux_names_preserve_prometheus_contract_and_gauge_cleanup() {
+        let metrics = Metrics::default();
+        let counters = [
+            (Metric::BusinessRpcMuxConnections, "connections"),
+            (Metric::BusinessRpcMuxAbnormalClosures, "abnormal_closures"),
+            (Metric::BusinessRpcMuxStreamsOpened, "streams_opened"),
+            (Metric::BusinessRpcMuxStreamsReset, "streams_reset"),
+            (Metric::BusinessRpcMuxFramesSent, "frames_sent"),
+            (Metric::BusinessRpcMuxFramesReceived, "frames_received"),
+            (Metric::BusinessRpcMuxDataBytesSent, "data_bytes_sent"),
+            (
+                Metric::BusinessRpcMuxDataBytesSelected,
+                "data_bytes_selected",
+            ),
+            (
+                Metric::BusinessRpcMuxDataBytesReceived,
+                "data_bytes_received",
+            ),
+            (
+                Metric::BusinessRpcMuxConnectionWindowStalls,
+                "connection_window_stalls",
+            ),
+            (
+                Metric::BusinessRpcMuxStreamWindowStalls,
+                "stream_window_stalls",
+            ),
+            (Metric::BusinessRpcMuxSendAheadStalls, "send_ahead_stalls"),
+            (Metric::BusinessRpcMuxOverloads, "overloads"),
+            (Metric::BusinessRpcMuxProtocolErrors, "protocol_errors"),
+            (Metric::BusinessRpcMuxCommandRequests, "command_requests"),
+            (Metric::BusinessRpcMuxCommandAccepted, "command_accepted"),
+            (Metric::BusinessRpcMuxCommandErrors, "command_errors"),
+        ];
+        metrics.business_rpc_mux_connection_started();
+        for (counter, _) in counters.into_iter().skip(1) {
+            metrics.inc(counter);
+        }
+        metrics.business_rpc_mux_connection_gauges((0, 0), (2, 4096));
+        metrics.business_rpc_mux_writer_bytes(0, 1024);
+        metrics.observe(Histogram::BusinessRpcMuxSchedulerWait, 25);
+        metrics.observe(Histogram::BusinessRpcMuxWriterWait, 50);
+        let rendered = metrics.render();
+        for (_, suffix) in counters {
+            assert!(rendered.contains(&format!("netbaiot_business_rpc_v3_{suffix}_total 1\n")));
+        }
+        for (suffix, value) in [
+            ("active_connections", 1),
+            ("active_streams", 2),
+            ("queued_bytes", 1024),
+            ("reassembly_reserved_bytes", 4096),
+            ("peak_active_streams", 2),
+            ("peak_queued_bytes", 1024),
+            ("peak_reassembly_reserved_bytes", 4096),
+            ("scheduler_wait_us_count", 1),
+            ("scheduler_wait_us_sum", 25),
+            ("writer_wait_us_count", 1),
+            ("writer_wait_us_sum", 50),
+        ] {
+            assert!(rendered.contains(&format!("netbaiot_business_rpc_v3_{suffix} {value}\n")));
+        }
+        metrics.business_rpc_mux_connection_gauges((2, 4096), (0, 0));
+        metrics.business_rpc_mux_writer_bytes(1024, 0);
+        metrics.business_rpc_mux_connection_finished();
+        let rendered = metrics.render();
+        for suffix in [
+            "active_connections",
+            "active_streams",
+            "queued_bytes",
+            "reassembly_reserved_bytes",
+        ] {
+            assert!(rendered.contains(&format!("netbaiot_business_rpc_v3_{suffix} 0\n")));
+        }
+        assert!(!rendered.contains("netbaiot_business_rpc_mux_"));
+    }
+
     #[test]
     fn production_timings_count_error_exits_and_have_no_dynamic_labels() {
         let metrics = Metrics::default();

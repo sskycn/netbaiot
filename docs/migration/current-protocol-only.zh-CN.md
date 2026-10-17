@@ -11,7 +11,7 @@ v1/v2 reader、JSON recovery、迁移路径和历史 fixture 都已移除。旧�
 
 ## 客户端与配置
 
-部署当前 listener 前，把业务客户端升级到 `BusinessRpcV3Client` 或当前
+部署当前 listener 前，把业务客户端升级到 `BusinessRpcClient` 或当前
 `NetbaIoTClient` event façade。旧公共 stream/V2 frame/client/config type 已删除，没有
 deprecated wrapper。Python V1 示例与 V1 capacity harness 已移除；使用当前 Rust 示例与
 RPC loadgen。

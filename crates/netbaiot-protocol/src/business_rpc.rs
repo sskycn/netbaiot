@@ -1,4 +1,6 @@
 //! Shared method DTOs and authorization/error vocabulary for current Business RPC.
+pub mod wire;
+
 use crate::{AuthInvalidation, CodecId, CommandDispatch, DeviceCommand, DeviceKey};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -221,12 +223,12 @@ mod tests {
         let mut malformed = wire;
         malformed["command"]["payload"]["arguments"] = serde_json::json!({"bad": [1, 2]});
         assert!(serde_json::from_value::<DeviceCommandSendRequest>(malformed).is_err());
-        let oversized = crate::business_rpc_v3::V3Open::Rpc {
+        let oversized = crate::business_rpc::wire::RpcOpen::Rpc {
             parent_stream_id: None,
             request_id: Uuid::new_v4(),
             method: "device.command.send".into(),
             deadline_ms: 1_000,
-            content_length: (crate::business_rpc_v3::V3_MAX_MESSAGE_BYTES + 1) as u32,
+            content_length: (crate::business_rpc::wire::RPC_MAX_MESSAGE_BYTES + 1) as u32,
         };
         assert!(oversized.validate().is_err());
     }

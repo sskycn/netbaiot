@@ -10,7 +10,6 @@ use thiserror::Error;
 use uuid::Uuid;
 
 pub mod business_rpc;
-pub mod business_rpc_v3;
 pub mod tcp_ack;
 pub mod tcp_frame;
 pub use business_rpc::*;
@@ -734,8 +733,8 @@ mod tests {
         );
 
         let event_id = EventId(Uuid::nil());
-        let ack = business_rpc_v3::V3EventAck {
-            status: business_rpc_v3::V3EventStatus::Ok,
+        let ack = business_rpc::wire::RpcEventAck {
+            status: business_rpc::wire::RpcEventStatus::Ok,
             delivery_id: Uuid::nil(),
             event_id: event_id.0,
         };
@@ -776,14 +775,14 @@ mod tests {
         });
         assert!(serde_json::from_value::<EventAccepted>(accepted).is_ok());
 
-        let mut strict_client = serde_json::to_value(business_rpc_v3::V3Bootstrap::Hello {
-            version: business_rpc_v3::BUSINESS_RPC_V3_VERSION,
+        let mut strict_client = serde_json::to_value(business_rpc::wire::RpcBootstrap::Hello {
+            version: business_rpc::wire::BUSINESS_RPC_PROTOCOL_VERSION,
             token: Some("x".into()),
-            limits: business_rpc_v3::V3Limits::default(),
+            limits: business_rpc::wire::RpcLimits::default(),
         })
         .unwrap();
         strict_client["future_client_field"] = serde_json::json!(true);
-        assert!(serde_json::from_value::<business_rpc_v3::V3Bootstrap>(strict_client).is_err());
+        assert!(serde_json::from_value::<business_rpc::wire::RpcBootstrap>(strict_client).is_err());
     }
     #[test]
     fn connection_lifecycle_is_not_an_event_or_subscription_filter() {

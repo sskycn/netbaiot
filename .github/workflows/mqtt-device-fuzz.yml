@@ -6,7 +6,7 @@ on:
     paths:
       - ".github/workflows/mqtt-device-fuzz.yml"
       - "apps/netbaiot-server/tests/**"
-      - "crates/netbaiot-transports/src/business_rpc/v3.rs"
+      - "crates/netbaiot-transports/src/business_rpc/session.rs"
       - "tools/netbaiot-xtask/**"
       - "crates/netbaiot-mqtt-wire/**"
       - "fuzz/**"
@@ -18,7 +18,7 @@ on:
     paths:
       - ".github/workflows/mqtt-device-fuzz.yml"
       - "apps/netbaiot-server/tests/**"
-      - "crates/netbaiot-transports/src/business_rpc/v3.rs"
+      - "crates/netbaiot-transports/src/business_rpc/session.rs"
       - "tools/netbaiot-xtask/**"
       - "crates/netbaiot-mqtt-wire/**"
       - "fuzz/**"

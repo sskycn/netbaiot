@@ -732,7 +732,7 @@ impl Events {
                 message: "event stream address is not configured".into(),
                 request_id: None,
             })?;
-        let mut settings = business_rpc::BusinessRpcV3ClientConfig::development(
+        let mut settings = business_rpc::BusinessRpcClientConfig::development(
             address,
             self.0.inner.event_token.expose().to_owned(),
         );
@@ -747,8 +747,8 @@ impl Events {
         settings.request_timeout = self.0.inner.ack_timeout;
         settings.reconnect_initial = self.0.inner.reconnect.initial_backoff;
         settings.reconnect_max = self.0.inner.reconnect.maximum_backoff;
-        let (rpc, deliveries) = business_rpc::BusinessRpcV3Client::connect(settings, None)
-            .map_err(current_rpc_error)?;
+        let (rpc, deliveries) =
+            business_rpc::BusinessRpcClient::connect(settings, None).map_err(current_rpc_error)?;
         tokio::time::timeout(self.0.inner.stream_handshake_timeout, rpc.wait_ready())
             .await
             .map_err(|_| ClientError::Timeout)?
@@ -769,7 +769,7 @@ impl Events {
 }
 
 enum DeliveryPayload {
-    Manual(business_rpc::BusinessRpcV3Delivery),
+    Manual(business_rpc::BusinessRpcDelivery),
     Immediate(EventDelivery),
 }
 pub struct Delivery {
@@ -894,8 +894,8 @@ use netbaiot_protocol::business_rpc::RpcErrorCode as RpcCode;
 async fn run_event_subscription(
     inner: Arc<ClientInner>,
     ack_mode: AckMode,
-    rpc: business_rpc::BusinessRpcV3Client,
-    mut deliveries: mpsc::Receiver<business_rpc::BusinessRpcV3Delivery>,
+    rpc: business_rpc::BusinessRpcClient,
+    mut deliveries: mpsc::Receiver<business_rpc::BusinessRpcDelivery>,
     sender: mpsc::Sender<Result<Delivery, ClientError>>,
     cancel: CancellationToken,
 ) {

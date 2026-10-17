@@ -773,7 +773,7 @@ checksum = "1d87ecb2933e8aeadb3e3a02b828fed80a7528047e68b4f424523a0981a3a084"
 
 [[package]]
 name = "netbaiot-codecs"
-version = "0.3.3"
+version = "0.3.4"
 dependencies = [
  "ciborium",
  "netbaiot-core",
@@ -789,7 +789,7 @@ dependencies = [
 
 [[package]]
 name = "netbaiot-core"
-version = "0.3.3"
+version = "0.3.4"
 dependencies = [
  "hkdf",
  "netbaiot-protocol",
@@ -808,9 +808,9 @@ dependencies = [
  "netbaiot-codecs",
  "netbaiot-core",
  "netbaiot-mqtt-wire",
+ "netbaiot-rpc-mux",
  "netbaiot-runtime",
  "netbaiot-transports",
- "netbaiot-v3-mux",
  "num-bigint",
  "num-rational",
  "serde_json",
@@ -819,14 +819,14 @@ dependencies = [
 
 [[package]]
 name = "netbaiot-mqtt-wire"
-version = "0.3.3"
+version = "0.3.4"
 dependencies = [
  "bytes",
 ]
 
 [[package]]
 name = "netbaiot-protocol"
-version = "0.3.3"
+version = "0.3.4"
 dependencies = [
  "serde",
  "thiserror",
@@ -834,8 +834,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "netbaiot-rpc-mux"
+version = "0.3.4"
+dependencies = [
+ "bytes",
+ "netbaiot-protocol",
+ "tokio",
+]
+
+[[package]]
 name = "netbaiot-runtime"
-version = "0.3.3"
+version = "0.3.4"
 dependencies = [
  "async-trait",
  "atomicwrites",
@@ -861,7 +870,7 @@ dependencies = [
 
 [[package]]
 name = "netbaiot-transports"
-version = "0.3.3"
+version = "0.3.4"
 dependencies = [
  "async-trait",
  "bytes",
@@ -871,8 +880,8 @@ dependencies = [
  "hyper-util",
  "netbaiot-core",
  "netbaiot-mqtt-wire",
+ "netbaiot-rpc-mux",
  "netbaiot-runtime",
- "netbaiot-v3-mux",
  "serde",
  "serde_json",
  "sha2",
@@ -883,15 +892,6 @@ dependencies = [
  "tokio-util",
  "tracing",
  "uuid",
-]
-
-[[package]]
-name = "netbaiot-v3-mux"
-version = "0.3.3"
-dependencies = [
- "bytes",
- "netbaiot-protocol",
- "tokio",
 ]
 
 [[package]]

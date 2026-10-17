@@ -1,11 +1,12 @@
 //! Current binary stream engine; the parent owns TLS/bootstrap and shared control state.
 use super::*;
 use bytes::Bytes;
-use netbaiot_core::business_rpc_v3::{
-    BUSINESS_RPC_V3_VERSION, V3_END_STREAM, V3Accept, V3Bootstrap, V3EventAck, V3EventStatus,
-    V3FrameType, V3GoAway, V3Limits, V3Open, V3Reset, V3ResetCode, V3Response,
+use netbaiot_core::business_rpc::wire::{
+    BUSINESS_RPC_PROTOCOL_VERSION, RPC_END_STREAM, RpcAccept, RpcBootstrap, RpcEventAck,
+    RpcEventStatus, RpcFrameType, RpcGoAway, RpcLimits, RpcOpen, RpcReset, RpcResetCode,
+    RpcResponse,
 };
-use netbaiot_v3_mux::{
+use netbaiot_rpc_mux::{
     DataClass, Frame, FrameReader, Initiator, MuxError, MuxScheduler, ReassemblyBudget, StreamTable,
 };
 use serde::de::DeserializeOwned;
@@ -16,16 +17,16 @@ const CONNECTION_REASSEMBLY_BYTES: usize = 16 * 1024 * 1024;
 const GLOBAL_REASSEMBLY_BYTES: usize = 128 * 1024 * 1024;
 const OUTBOUND_BYTES: usize = 16 * 1024 * 1024;
 static REASSEMBLY: OnceLock<Arc<ReassemblyBudget>> = OnceLock::new();
-struct ActiveV3 {
+struct ActiveRpcConnection {
     metrics: Arc<Metrics>,
     epoch: u64,
 }
-impl Drop for ActiveV3 {
+impl Drop for ActiveRpcConnection {
     fn drop(&mut self) {
-        self.metrics.business_rpc_v3_connection_finished();
+        self.metrics.business_rpc_mux_connection_finished();
         tracing::debug!(
             connection_epoch = self.epoch,
-            "business RPC V3 ActiveV3 dropped"
+            "business RPC V3 ActiveRpcConnection dropped"
         );
     }
 }
@@ -37,14 +38,14 @@ impl StreamGauges {
     fn sync(&mut self, streams: &StreamTable) {
         let current = (streams.active(), streams.reserved_bytes());
         self.metrics
-            .business_rpc_v3_connection_gauges(self.reported, current);
+            .business_rpc_mux_connection_gauges(self.reported, current);
         self.reported = current;
     }
 }
 impl Drop for StreamGauges {
     fn drop(&mut self) {
         self.metrics
-            .business_rpc_v3_connection_gauges(self.reported, (0, 0));
+            .business_rpc_mux_connection_gauges(self.reported, (0, 0));
     }
 }
 struct WriterGauge {
@@ -55,13 +56,13 @@ impl WriterGauge {
     fn sync(&mut self, scheduler: &MuxScheduler) {
         let current = scheduler.queued_bytes();
         self.metrics
-            .business_rpc_v3_writer_bytes(self.reported, current);
+            .business_rpc_mux_writer_bytes(self.reported, current);
         self.reported = current;
     }
 }
 impl Drop for WriterGauge {
     fn drop(&mut self) {
-        self.metrics.business_rpc_v3_writer_bytes(self.reported, 0);
+        self.metrics.business_rpc_mux_writer_bytes(self.reported, 0);
     }
 }
 
@@ -81,7 +82,12 @@ fn decode<T: DeserializeOwned>(frame: &Frame) -> Result<T> {
     }
     serde_json::from_slice(&frame.payload).map_err(|_| Error::Invalid)
 }
-fn metadata<T: Serialize>(id: u32, ty: V3FrameType, value: &T, limits: &V3Limits) -> Result<Frame> {
+fn metadata<T: Serialize>(
+    id: u32,
+    ty: RpcFrameType,
+    value: &T,
+    limits: &RpcLimits,
+) -> Result<Frame> {
     let bytes = serde_json::to_vec(value).map_err(|_| Error::Internal)?;
     if bytes.len() > 4096 {
         return Err(Error::Overloaded);
@@ -95,7 +101,7 @@ fn metadata<T: Serialize>(id: u32, ty: V3FrameType, value: &T, limits: &V3Limits
     )
     .map_err(|_| Error::Invalid)
 }
-fn fixed(id: u32, ty: V3FrameType, bytes: &[u8], limits: &V3Limits) -> Result<Frame> {
+fn fixed(id: u32, ty: RpcFrameType, bytes: &[u8], limits: &RpcLimits) -> Result<Frame> {
     Frame::new(
         id,
         ty,
@@ -105,11 +111,11 @@ fn fixed(id: u32, ty: V3FrameType, bytes: &[u8], limits: &V3Limits) -> Result<Fr
     )
     .map_err(|_| Error::Invalid)
 }
-fn reset(id: u32, code: V3ResetCode, limits: &V3Limits) -> Result<Frame> {
+fn reset(id: u32, code: RpcResetCode, limits: &RpcLimits) -> Result<Frame> {
     metadata(
         id,
-        V3FrameType::ResetStream,
-        &V3Reset {
+        RpcFrameType::ResetStream,
+        &RpcReset {
             code,
             message: String::new(),
         },
@@ -119,7 +125,7 @@ fn reset(id: u32, code: V3ResetCode, limits: &V3Limits) -> Result<Frame> {
 
 async fn bootstrap_write(
     io: &mut Box<dyn Io>,
-    ready: &V3Bootstrap,
+    ready: &RpcBootstrap,
     timeout: Duration,
 ) -> Result<()> {
     let bytes = serde_json::to_vec(ready).map_err(|_| Error::Internal)?;
@@ -205,8 +211,8 @@ type PendingWrite = (
     Option<std::time::Instant>,
 );
 struct WriterContext {
-    limits: V3Limits,
-    send_ahead: Option<V3SendAhead>,
+    limits: RpcLimits,
+    send_ahead: Option<RpcSendAhead>,
     timeout: Duration,
     stop: CancellationToken,
     credit_tx: mpsc::Sender<(u32, u32)>,
@@ -226,9 +232,12 @@ async fn writer_loop<W: AsyncWrite + Unpin>(
         credit_tx,
         metrics,
     } = context;
-    let mut scheduler =
-        MuxScheduler::with_send_ahead(&limits, OUTBOUND_BYTES, send_ahead.map(V3SendAhead::as_mux))
-            .map_err(|_| Error::Configuration)?;
+    let mut scheduler = MuxScheduler::with_send_ahead(
+        &limits,
+        OUTBOUND_BYTES,
+        send_ahead.map(RpcSendAhead::as_mux),
+    )
+    .map_err(|_| Error::Configuration)?;
     let mut gauge = WriterGauge {
         metrics: metrics.clone(),
         reported: 0,
@@ -255,47 +264,47 @@ async fn writer_loop<W: AsyncWrite + Unpin>(
         if let Some(frame) = scheduler.next_frame() {
             gauge.sync(&scheduler);
             let id = frame.header.stream_id;
-            if frame.header.frame_type == V3FrameType::Data
+            if frame.header.frame_type == RpcFrameType::Data
                 && let Some((_, _, queued_at)) = bodies.get_mut(&id)
                 && let Some(queued_at) = queued_at.take()
             {
                 metrics.observe(
-                    Histogram::BusinessRpcV3SchedulerWait,
+                    Histogram::BusinessRpcMuxSchedulerWait,
                     queued_at.elapsed().as_micros().min(u64::MAX as u128) as u64,
                 );
             }
             let selected_at = std::time::Instant::now();
-            if frame.header.frame_type == V3FrameType::Data {
+            if frame.header.frame_type == RpcFrameType::Data {
                 metrics.add(
-                    Metric::BusinessRpcV3DataBytesSelected,
+                    Metric::BusinessRpcMuxDataBytesSelected,
                     frame.payload.len() as u64,
                 );
             }
             tracing::debug!(stream_id = id, frame_type = ?frame.header.frame_type, payload_bytes = frame.payload.len(), "business RPC V3 selected frame");
-            let completed =
-                frame.header.frame_type == V3FrameType::Data && frame.header.flags == V3_END_STREAM;
+            let completed = frame.header.frame_type == RpcFrameType::Data
+                && frame.header.flags == RPC_END_STREAM;
             let sent = tokio::select! {
                 biased;
                 _ = stop.cancelled() => return Ok(()),
-                sent = netbaiot_v3_mux::write_frame(&mut writer, &frame, timeout) => {
+                sent = netbaiot_rpc_mux::write_frame(&mut writer, &frame, timeout) => {
                     sent.map_err(|_| Error::Unavailable)
                 }
             };
             if sent.is_ok() {
                 metrics.observe(
-                    Histogram::BusinessRpcV3WriterWait,
+                    Histogram::BusinessRpcMuxWriterWait,
                     selected_at.elapsed().as_micros().min(u64::MAX as u128) as u64,
                 );
                 tracing::debug!(stream_id = id, frame_type = ?frame.header.frame_type, payload_bytes = frame.payload.len(), "business RPC V3 writer completed frame");
-                metrics.inc(Metric::BusinessRpcV3FramesSent);
-                if frame.header.frame_type == V3FrameType::Data {
+                metrics.inc(Metric::BusinessRpcMuxFramesSent);
+                if frame.header.frame_type == RpcFrameType::Data {
                     metrics.add(
-                        Metric::BusinessRpcV3DataBytesSent,
+                        Metric::BusinessRpcMuxDataBytesSent,
                         frame.payload.len() as u64,
                     );
                 }
             }
-            if sent.is_ok() && frame.header.frame_type == V3FrameType::WindowUpdate {
+            if sent.is_ok() && frame.header.frame_type == RpcFrameType::WindowUpdate {
                 let increment = u32::from_be_bytes(
                     frame
                         .payload
@@ -322,14 +331,14 @@ async fn writer_loop<W: AsyncWrite + Unpin>(
         }
         let (connection_stall, stream_stall) = scheduler.stalled_windows();
         if connection_stall {
-            metrics.inc(Metric::BusinessRpcV3ConnectionWindowStalls);
+            metrics.inc(Metric::BusinessRpcMuxConnectionWindowStalls);
         }
         if stream_stall {
-            metrics.inc(Metric::BusinessRpcV3StreamWindowStalls);
+            metrics.inc(Metric::BusinessRpcMuxStreamWindowStalls);
         }
         let (connection_ahead_stall, stream_ahead_stall) = scheduler.stalled_send_ahead();
         if connection_ahead_stall || stream_ahead_stall {
-            metrics.inc(Metric::BusinessRpcV3SendAheadStalls);
+            metrics.inc(Metric::BusinessRpcMuxSendAheadStalls);
         }
         if let Some((frame, done, deadline)) = goaway.take() {
             // The reader has stopped admitting streams. Drain frames already queued by its
@@ -346,7 +355,7 @@ async fn writer_loop<W: AsyncWrite + Unpin>(
             let result = tokio::select! {
                 biased;
                 _ = stop.cancelled() => return Ok(()),
-                sent = netbaiot_v3_mux::write_frame(&mut writer, &frame, timeout) => {
+                sent = netbaiot_rpc_mux::write_frame(&mut writer, &frame, timeout) => {
                     sent.map_err(|_| Error::Unavailable)
                 }
             };
@@ -444,9 +453,9 @@ pub(super) async fn connection(
     stop: CancellationToken,
 ) -> Result<()> {
     let server_limits = config.limits.clone();
-    let hello: V3Bootstrap = serde_json::from_slice(&hello).map_err(|_| Error::Invalid)?;
+    let hello: RpcBootstrap = serde_json::from_slice(&hello).map_err(|_| Error::Invalid)?;
     hello.validate().map_err(|_| Error::Invalid)?;
-    let V3Bootstrap::Hello {
+    let RpcBootstrap::Hello {
         version,
         token,
         limits: requested,
@@ -454,7 +463,7 @@ pub(super) async fn connection(
     else {
         return Err(Error::Invalid);
     };
-    if version != BUSINESS_RPC_V3_VERSION {
+    if version != BUSINESS_RPC_PROTOCOL_VERSION {
         return Err(Error::Invalid);
     }
     let principal = principal_for(&config, certificate.as_deref(), token.as_deref())?;
@@ -468,7 +477,7 @@ pub(super) async fn connection(
     );
     bootstrap_write(
         &mut io,
-        &V3Bootstrap::Ready {
+        &RpcBootstrap::Ready {
             version: 3,
             connection_epoch: epoch,
             limits: limits.clone(),
@@ -478,8 +487,8 @@ pub(super) async fn connection(
     .await?;
     tracing::debug!(connection_epoch = epoch, "business RPC V3 bootstrap ready");
     let metrics = services.ingress.metrics.clone();
-    metrics.business_rpc_v3_connection_started();
-    let _active = ActiveV3 {
+    metrics.business_rpc_mux_connection_started();
+    let _active = ActiveRpcConnection {
         metrics: metrics.clone(),
         epoch,
     };
@@ -562,11 +571,11 @@ pub(super) async fn connection(
     );
     if let Err(error) = &result {
         tracing::warn!(%error, "business RPC V3 connection closed abnormally");
-        metrics.inc(Metric::BusinessRpcV3AbnormalClosures);
+        metrics.inc(Metric::BusinessRpcMuxAbnormalClosures);
     }
     match &result {
-        Err(Error::Invalid) => metrics.inc(Metric::BusinessRpcV3ProtocolErrors),
-        Err(Error::Overloaded) => metrics.inc(Metric::BusinessRpcV3Overloads),
+        Err(Error::Invalid) => metrics.inc(Metric::BusinessRpcMuxProtocolErrors),
+        Err(Error::Overloaded) => metrics.inc(Metric::BusinessRpcMuxOverloads),
         _ => {}
     }
     tracing::debug!(
@@ -606,23 +615,23 @@ fn rpc_error_reply(
     tx: &mpsc::Sender<WriterMessage>,
     id: u32,
     code: RpcErrorCode,
-    limits: &V3Limits,
+    limits: &RpcLimits,
 ) -> Result<()> {
-    let value = V3Response {
+    let value = RpcResponse {
         content_length: 0,
         error: Some(RpcError::new(code, "request rejected")),
     };
-    let mut frame = metadata(id, V3FrameType::Response, &value, limits)?;
-    frame.header.flags = V3_END_STREAM;
+    let mut frame = metadata(id, RpcFrameType::Response, &value, limits)?;
+    frame.header.flags = RPC_END_STREAM;
     send(tx, frame)
 }
-fn classify_stream_error(error: MuxError) -> Option<V3ResetCode> {
+fn classify_stream_error(error: MuxError) -> Option<RpcResetCode> {
     match error {
         MuxError::Connection(_) | MuxError::Io | MuxError::Timeout => None,
-        MuxError::Overloaded => Some(V3ResetCode::Overloaded),
-        MuxError::MessageTooLarge => Some(V3ResetCode::MessageTooLarge),
-        MuxError::FlowControl => Some(V3ResetCode::FlowControlError),
-        MuxError::Stream => Some(V3ResetCode::ProtocolError),
+        MuxError::Overloaded => Some(RpcResetCode::Overloaded),
+        MuxError::MessageTooLarge => Some(RpcResetCode::MessageTooLarge),
+        MuxError::FlowControl => Some(RpcResetCode::FlowControlError),
+        MuxError::Stream => Some(RpcResetCode::ProtocolError),
     }
 }
 struct CancelWork<'a> {
@@ -632,7 +641,7 @@ struct CancelWork<'a> {
     command_handles: &'a mut HashMap<u32, AbortHandle>,
     control_requests: &'a mut HashMap<Uuid, u32>,
     outbound_auth: &'a mut HashMap<u32, (Uuid, String)>,
-    response_meta: &'a mut HashMap<u32, V3Response>,
+    response_meta: &'a mut HashMap<u32, RpcResponse>,
     pending_event: &'a mut Option<PendingEvent>,
 }
 fn cancel_stream_work(id: u32, epoch: u64, work: CancelWork<'_>) {
@@ -679,7 +688,7 @@ fn complete_response(
     provider: &Option<(u32, Arc<ProviderLease>)>,
     services: &BusinessRpcServices,
     outbound_auth: &mut HashMap<u32, (Uuid, String)>,
-    response_meta: &mut HashMap<u32, V3Response>,
+    response_meta: &mut HashMap<u32, RpcResponse>,
     pending_event: &mut Option<PendingEvent>,
 ) -> Result<()> {
     let response = response_meta.remove(&id).ok_or(Error::Invalid)?;
@@ -698,10 +707,10 @@ fn complete_response(
             .complete(epoch, request_id, &method, result);
     } else if pending_event.as_ref().is_some_and(|event| event.id == id) {
         let event = pending_event.take().ok_or(Error::Invalid)?;
-        let ack = serde_json::from_slice::<V3EventAck>(body).ok();
+        let ack = serde_json::from_slice::<RpcEventAck>(body).ok();
         let success = response.error.is_none()
             && ack.as_ref().is_some_and(|ack| {
-                ack.status == V3EventStatus::Ok
+                ack.status == RpcEventStatus::Ok
                     && ack.delivery_id == event.delivery_id.0
                     && ack.event_id == event.event_id.0
             });
@@ -733,7 +742,7 @@ struct ReaderContext {
     tx: mpsc::Sender<WriterMessage>,
     credit_rx: mpsc::Receiver<(u32, u32)>,
     outbound: Arc<Semaphore>,
-    limits: V3Limits,
+    limits: RpcLimits,
     principal: BusinessPrincipal,
     services: Arc<BusinessRpcServices>,
     config: BusinessRpcTransportConfig,
@@ -786,7 +795,7 @@ async fn reader_loop<R: AsyncRead + Unpin + Send + 'static>(
     let mut command_handles = HashMap::<u32, AbortHandle>::new();
     let mut control_requests = HashMap::<Uuid, u32>::new();
     let mut outbound_auth = HashMap::<u32, (Uuid, String)>::new();
-    let mut response_meta = HashMap::<u32, V3Response>::new();
+    let mut response_meta = HashMap::<u32, RpcResponse>::new();
     let mut frames = FrameReader::spawn(
         reader,
         limits.max_frame_payload_bytes as usize,
@@ -885,7 +894,7 @@ async fn reader_loop<R: AsyncRead + Unpin + Send + 'static>(
             }
             _ = tokio::time::sleep_until(expiry_deadline.unwrap_or_else(tokio::time::Instant::now)), if expiry_deadline.is_some() => break Err(Error::Forbidden),
             _ = tokio::time::sleep_until(event_deadline.unwrap_or_else(tokio::time::Instant::now)), if event_deadline.is_some() => {
-                if let Some(event) = pending_event.as_ref() { let id = event.id; services.ingress.metrics.inc(Metric::BusinessRpcTimeouts); close_stream!(id); let _ = send(&tx, reset(id, V3ResetCode::Cancel, &limits)?); }
+                if let Some(event) = pending_event.as_ref() { let id = event.id; services.ingress.metrics.inc(Metric::BusinessRpcTimeouts); close_stream!(id); let _ = send(&tx, reset(id, RpcResetCode::Cancel, &limits)?); }
             }
             _ = tokio::time::sleep_until(command_deadline.unwrap_or_else(tokio::time::Instant::now)), if command_deadline.is_some() => {
                 let now = tokio::time::Instant::now();
@@ -895,7 +904,7 @@ async fn reader_loop<R: AsyncRead + Unpin + Send + 'static>(
                 for id in expired {
                     incoming_rpc.remove(&id);
                     let _ = streams.reset(id);
-                    services.ingress.metrics.inc(Metric::BusinessRpcV3CommandErrors);
+                    services.ingress.metrics.inc(Metric::BusinessRpcMuxCommandErrors);
                     rpc_error_reply(&tx, id, RpcErrorCode::Timeout, &limits)?;
                 }
             }
@@ -908,8 +917,8 @@ async fn reader_loop<R: AsyncRead + Unpin + Send + 'static>(
                 };
                 command_handles.remove(&id);
                 let accepted = result.is_ok();
-                if accepted { services.ingress.metrics.inc(Metric::BusinessRpcV3CommandAccepted); }
-                else { services.ingress.metrics.inc(Metric::BusinessRpcV3CommandErrors); }
+                if accepted { services.ingress.metrics.inc(Metric::BusinessRpcMuxCommandAccepted); }
+                else { services.ingress.metrics.inc(Metric::BusinessRpcMuxCommandErrors); }
                 let bytes = match result {
                     Ok(dispatch) => serde_json::to_vec(&DeviceCommandSendResponse { dispatch }).map_err(|_| Error::Internal)?,
                     Err(error) => {
@@ -920,11 +929,11 @@ async fn reader_loop<R: AsyncRead + Unpin + Send + 'static>(
                     }
                 };
                 if streams.mark_local_end(id).is_err() { continue; }
-                let response = V3Response { content_length: u32::try_from(bytes.len()).map_err(|_| Error::Overloaded)?, error: None };
-                send(&tx, metadata(id, V3FrameType::Response, &response, &limits)?)?;
+                let response = RpcResponse { content_length: u32::try_from(bytes.len()).map_err(|_| Error::Overloaded)?, error: None };
+                send(&tx, metadata(id, RpcFrameType::Response, &response, &limits)?)?;
                 if send_body(&tx, &outbound, id, DataClass::Rpc, Bytes::from(bytes)).is_err() {
                     close_stream!(id);
-                    send(&tx, reset(id, V3ResetCode::Overloaded, &limits)?)?;
+                    send(&tx, reset(id, RpcResetCode::Overloaded, &limits)?)?;
                 }
             }
             written = event_written(&mut pending_event), if pending_event.as_ref().is_some_and(|event| event.written.is_some()) => {
@@ -939,7 +948,7 @@ async fn reader_loop<R: AsyncRead + Unpin + Send + 'static>(
                 if written.is_some_and(|result| result.is_ok()) {
                     let nonce = Uuid::new_v4().as_u128() as u64;
                     sync_ping = Some(nonce);
-                    send(&tx, fixed(0, V3FrameType::Ping, &nonce.to_be_bytes(), &limits)?)?;
+                    send(&tx, fixed(0, RpcFrameType::Ping, &nonce.to_be_bytes(), &limits)?)?;
                 }
             }
             auth_call = optional_recv(&mut auth_rx) => {
@@ -958,24 +967,24 @@ async fn reader_loop<R: AsyncRead + Unpin + Send + 'static>(
                             Err(_) => { let _ = services.registry.complete(epoch, request_id, method, Err(Error::Invalid)); continue; }
                         };
                         let len = u32::try_from(bytes.len()).map_err(|_| Error::Overloaded)?;
-                        let open = V3Open::Rpc { parent_stream_id: Some(parent), request_id, method: method.into(), deadline_ms, content_length: len };
+                        let open = RpcOpen::Rpc { parent_stream_id: Some(parent), request_id, method: method.into(), deadline_ms, content_length: len };
                         let id = match streams.open_local(&open) {
                             Ok(id) => id,
                             Err(_) => { let _ = services.registry.complete(epoch, request_id, method, Err(Error::Overloaded)); continue; }
                         };
-                        services.ingress.metrics.inc(Metric::BusinessRpcV3StreamsOpened);
+                        services.ingress.metrics.inc(Metric::BusinessRpcMuxStreamsOpened);
                         outbound_auth.insert(id, (request_id, method.into()));
-                        send(&tx, metadata(id, V3FrameType::Open, &open, &limits)?)?;
+                        send(&tx, metadata(id, RpcFrameType::Open, &open, &limits)?)?;
                         if send_body(&tx, &outbound, id, DataClass::Rpc, Bytes::from(bytes)).is_err() {
                             close_stream!(id);
-                            send(&tx, reset(id, V3ResetCode::Overloaded, &limits)?)?;
+                            send(&tx, reset(id, RpcResetCode::Overloaded, &limits)?)?;
                             continue;
                         }
                         streams.mark_local_end(id).map_err(|_| Error::Internal)?;
                     }
                     BusinessRpcCall::Cancel { request_id } => {
                         if let Some((&id, _)) = outbound_auth.iter().find(|(_, (id, _))| *id == request_id) {
-                            send(&tx, reset(id, V3ResetCode::Cancel, &limits)?)?;
+                            send(&tx, reset(id, RpcResetCode::Cancel, &limits)?)?;
                             close_stream!(id);
                         }
                     }
@@ -987,15 +996,15 @@ async fn reader_loop<R: AsyncRead + Unpin + Send + 'static>(
                 let Some(id) = control_requests.remove(&request_id) else { continue; };
                 let bytes = match body { Some(body) => serde_json::to_vec(&body).map_err(|_| Error::Internal)?, None => Vec::new() };
                 let len = u32::try_from(bytes.len()).map_err(|_| Error::Overloaded)?;
-                let meta = V3Response { content_length: len, error: error.clone() };
-                let mut response = metadata(id, V3FrameType::Response, &meta, &limits)?;
-                if bytes.is_empty() { response.header.flags = V3_END_STREAM; }
+                let meta = RpcResponse { content_length: len, error: error.clone() };
+                let mut response = metadata(id, RpcFrameType::Response, &meta, &limits)?;
+                if bytes.is_empty() { response.header.flags = RPC_END_STREAM; }
                 send(&tx, response)?;
                 if bytes.is_empty() { streams.mark_local_end(id).map_err(|_| Error::Invalid)?; }
                 else {
                     let written = match send_body(&tx, &outbound, id, DataClass::Rpc, Bytes::from(bytes)) {
                         Ok(written) => written,
-                        Err(_) => { close_stream!(id); send(&tx, reset(id, V3ResetCode::Overloaded, &limits)?)?; continue; }
+                        Err(_) => { close_stream!(id); send(&tx, reset(id, RpcResetCode::Overloaded, &limits)?)?; continue; }
                     };
                     streams.mark_local_end(id).map_err(|_| Error::Invalid)?;
                     if method == "auth.sync" && error.is_none() { sync_written = Some(written); }
@@ -1009,16 +1018,16 @@ async fn reader_loop<R: AsyncRead + Unpin + Send + 'static>(
                 let dto = EventDeliveryRef { delivery_id, subscription_id: *subscription_id, event: delivery.delivery.event.as_ref(), attempt: delivery.delivery.attempt };
                 let bytes = serde_json::to_vec(&dto).map_err(|_| Error::Overloaded)?;
                 let len = u32::try_from(bytes.len()).map_err(|_| Error::Overloaded)?;
-                let open = V3Open::EventDelivery { parent_stream_id: *parent, delivery_id: delivery_id.0, event_id: event_id.0, attempt: dto.attempt, content_length: len };
+                let open = RpcOpen::EventDelivery { parent_stream_id: *parent, delivery_id: delivery_id.0, event_id: event_id.0, attempt: dto.attempt, content_length: len };
                 let id = match streams.open_local(&open) {
                     Ok(id) => id,
                     Err(_) => { let _ = delivery.result.send(Err(SinkError::Retryable)); continue; }
                 };
-                services.ingress.metrics.inc(Metric::BusinessRpcV3StreamsOpened);
-                send(&tx, metadata(id, V3FrameType::Open, &open, &limits)?)?;
+                services.ingress.metrics.inc(Metric::BusinessRpcMuxStreamsOpened);
+                send(&tx, metadata(id, RpcFrameType::Open, &open, &limits)?)?;
                 let written = match send_body(&tx, &outbound, id, DataClass::Event, Bytes::from(bytes)) {
                     Ok(written) => written,
-                    Err(_) => { close_stream!(id); let _ = delivery.result.send(Err(SinkError::Retryable)); send(&tx, reset(id, V3ResetCode::Overloaded, &limits)?)?; continue; }
+                    Err(_) => { close_stream!(id); let _ = delivery.result.send(Err(SinkError::Retryable)); send(&tx, reset(id, RpcResetCode::Overloaded, &limits)?)?; continue; }
                 };
                 streams.mark_local_end(id).map_err(|_| Error::Invalid)?;
                 pending_event = Some(PendingEvent { id, queued_at: std::time::Instant::now(), delivery_id, event_id, result: delivery.result, written: Some(written), deadline: None, started: None });
@@ -1033,68 +1042,68 @@ async fn reader_loop<R: AsyncRead + Unpin + Send + 'static>(
                     })
                 }, None => break Err(Error::Unavailable) };
                 tracing::debug!(stream_id = frame.header.stream_id, frame_type = ?frame.header.frame_type, payload_bytes = frame.payload.len(), "business RPC V3 received frame");
-                services.ingress.metrics.inc(Metric::BusinessRpcV3FramesReceived);
-                if frame.header.frame_type == V3FrameType::Data {
-                    services.ingress.metrics.add(Metric::BusinessRpcV3DataBytesReceived, frame.payload.len() as u64);
+                services.ingress.metrics.inc(Metric::BusinessRpcMuxFramesReceived);
+                if frame.header.frame_type == RpcFrameType::Data {
+                    services.ingress.metrics.add(Metric::BusinessRpcMuxDataBytesReceived, frame.payload.len() as u64);
                 }
                 let id = frame.header.stream_id;
                 match frame.header.frame_type {
-                    V3FrameType::Open => {
+                    RpcFrameType::Open => {
                         if streams.check_peer_id(id).is_err() { break Err(Error::Invalid); }
                         if draining.is_some() {
                             streams.refuse_peer(id).map_err(|_| Error::Invalid)?;
-                            send(&tx, reset(id, V3ResetCode::RefusedStream, &limits)?)?;
+                            send(&tx, reset(id, RpcResetCode::RefusedStream, &limits)?)?;
                             continue;
                         }
-                        let open: V3Open = match decode(&frame) {
+                        let open: RpcOpen = match decode(&frame) {
                             Ok(open) => open,
                             Err(_) => {
                                 streams.refuse_peer(id).map_err(|_| Error::Invalid)?;
-                                send(&tx, reset(id, V3ResetCode::ProtocolError, &limits)?)?;
+                                send(&tx, reset(id, RpcResetCode::ProtocolError, &limits)?)?;
                                 continue;
                             }
                         };
                         if open.validate().is_err() {
                             streams.refuse_peer(id).map_err(|_| Error::Invalid)?;
-                            send(&tx, reset(id, V3ResetCode::ProtocolError, &limits)?)?;
+                            send(&tx, reset(id, RpcResetCode::ProtocolError, &limits)?)?;
                             continue;
                         }
-                        if let V3Open::Provider { provider_id } = &open {
+                        if let RpcOpen::Provider { provider_id } = &open {
                             if principal.provider_id.as_deref() != Some(provider_id) || provider.is_some() || !principal.provide_methods.iter().any(|method| method == "device.authenticate") {
                                 streams.refuse_peer(id).map_err(|_| Error::Invalid)?;
-                                send(&tx, reset(id, V3ResetCode::RefusedStream, &limits)?)?; continue;
+                                send(&tx, reset(id, RpcResetCode::RefusedStream, &limits)?)?; continue;
                             }
                             if let Err(error) = streams.open_peer(id, &open) {
                                 if let Some(code) = classify_stream_error(error) { send(&tx, reset(id, code, &limits)?)?; continue; }
                                 break Err(Error::Invalid);
                             }
-                            services.ingress.metrics.inc(Metric::BusinessRpcV3StreamsOpened);
+                            services.ingress.metrics.inc(Metric::BusinessRpcMuxStreamsOpened);
                             let (auth_tx, rx) = mpsc::channel(config.auth_max_inflight);
                             let lease = match services.registry.register_with_expiry(auth_tx, BusinessProviderScope { global: principal.global, tenants: principal.tenants.clone() }, principal.expires_at_ms) {
-                                Ok(lease) => Arc::new(lease), Err(_) => { let _ = streams.reset(id); send(&tx, reset(id, V3ResetCode::RefusedStream, &limits)?)?; continue; }
+                                Ok(lease) => Arc::new(lease), Err(_) => { let _ = streams.reset(id); send(&tx, reset(id, RpcResetCode::RefusedStream, &limits)?)?; continue; }
                             };
                             let (work_tx, work_rx) = mpsc::channel(16);
                             let (reply_tx, reply_rx) = mpsc::channel(16);
                             let worker = tokio::spawn(control_loop(work_rx, reply_tx, Arc::new(Semaphore::new(16 * BUSINESS_RPC_AUTH_MAX_BYTES)), services.clone(), (lease.clone(), principal.clone()), confirmation.clone(), stop.child_token()));
-                            send(&tx, metadata(id, V3FrameType::Accept, &V3Accept { provider_epoch: Some(lease.epoch()), sync_required: true }, &limits)?)?;
+                            send(&tx, metadata(id, RpcFrameType::Accept, &RpcAccept { provider_epoch: Some(lease.epoch()), sync_required: true }, &limits)?)?;
                             provider = Some((id, lease)); auth_rx = Some(rx); control_tx = Some(work_tx); control_rx = Some(reply_rx); control_worker = Some(worker);
-                        } else if let V3Open::EventSubscription { subscription_id, filter } = &open {
+                        } else if let RpcOpen::EventSubscription { subscription_id, filter } = &open {
                             if principal.sink_id.as_deref() != Some("tcp-rpc") || subscription.is_some() || filter.validate().is_err() || (!principal.global && filter.tenant.as_ref().is_none_or(|tenant| !principal.allows_tenant(tenant))) {
                                 streams.refuse_peer(id).map_err(|_| Error::Invalid)?;
-                                send(&tx, reset(id, V3ResetCode::RefusedStream, &limits)?)?; continue;
+                                send(&tx, reset(id, RpcResetCode::RefusedStream, &limits)?)?; continue;
                             }
                             if let Err(error) = streams.open_peer(id, &open) {
                                 if let Some(code) = classify_stream_error(error) { send(&tx, reset(id, code, &limits)?)?; continue; }
                                 break Err(Error::Invalid);
                             }
-                            services.ingress.metrics.inc(Metric::BusinessRpcV3StreamsOpened);
+                            services.ingress.metrics.inc(Metric::BusinessRpcMuxStreamsOpened);
                             let (event_tx, event_rx) = mpsc::channel(1);
                             let generation = match services.sink.claim(event_tx, filter.clone()) {
-                                Ok(generation) => generation, Err(_) => { let _ = streams.reset(id); send(&tx, reset(id, V3ResetCode::RefusedStream, &limits)?)?; continue; }
+                                Ok(generation) => generation, Err(_) => { let _ = streams.reset(id); send(&tx, reset(id, RpcResetCode::RefusedStream, &limits)?)?; continue; }
                             };
-                            send(&tx, metadata(id, V3FrameType::Accept, &V3Accept { provider_epoch: None, sync_required: false }, &limits)?)?;
+                            send(&tx, metadata(id, RpcFrameType::Accept, &RpcAccept { provider_epoch: None, sync_required: false }, &limits)?)?;
                             subscription = Some((id, *subscription_id, generation)); events_rx = Some(event_rx);
-                        } else if let V3Open::Rpc { parent_stream_id, request_id, method, deadline_ms, content_length } = &open {
+                        } else if let RpcOpen::Rpc { parent_stream_id, request_id, method, deadline_ms, content_length } = &open {
                             let is_command = method == "device.command.send";
                             let parent_valid = if is_command {
                                 parent_stream_id.is_none()
@@ -1108,24 +1117,24 @@ async fn reader_loop<R: AsyncRead + Unpin + Send + 'static>(
                             // Authorization precedes any command-specific body admission.
                             if is_command && (*content_length as usize > services.ingress.limits.max_command_bytes.saturating_add(32)) {
                                 streams.refuse_peer(id).map_err(|_| Error::Invalid)?;
-                                services.ingress.metrics.inc(Metric::BusinessRpcV3CommandErrors);
+                                services.ingress.metrics.inc(Metric::BusinessRpcMuxCommandErrors);
                                 rpc_error_reply(&tx, id, RpcErrorCode::InvalidRequest, &limits)?; continue;
                             }
-                            if *deadline_ms == 0 { streams.refuse_peer(id).map_err(|_| Error::Invalid)?; send(&tx, reset(id, V3ResetCode::ProtocolError, &limits)?)?; continue; }
+                            if *deadline_ms == 0 { streams.refuse_peer(id).map_err(|_| Error::Invalid)?; send(&tx, reset(id, RpcResetCode::ProtocolError, &limits)?)?; continue; }
                             if let Err(error) = streams.open_peer(id, &open) {
                                 if let Some(code) = classify_stream_error(error) { send(&tx, reset(id, code, &limits)?)?; continue; }
                                 break Err(Error::Invalid);
                             }
-                            services.ingress.metrics.inc(Metric::BusinessRpcV3StreamsOpened);
+                            services.ingress.metrics.inc(Metric::BusinessRpcMuxStreamsOpened);
                             incoming_rpc.insert(id, IncomingRpc {
                                 request_id: *request_id,
                                 method: method.clone(),
                                 deadline: tokio::time::Instant::now() + Duration::from_millis(u64::from(*deadline_ms)),
                             });
-                        } else { streams.refuse_peer(id).map_err(|_| Error::Invalid)?; send(&tx, reset(id, V3ResetCode::RefusedStream, &limits)?)?; }
+                        } else { streams.refuse_peer(id).map_err(|_| Error::Invalid)?; send(&tx, reset(id, RpcResetCode::RefusedStream, &limits)?)?; }
                     }
-                    V3FrameType::Data => {
-                        let received = match streams.receive_data(id, &frame.payload, frame.header.flags == V3_END_STREAM) {
+                    RpcFrameType::Data => {
+                        let received = match streams.receive_data(id, &frame.payload, frame.header.flags == RPC_END_STREAM) {
                             Ok(received) => received,
                             Err(error) => {
                                 if let Some(code) = classify_stream_error(error) { close_stream!(id); send(&tx, reset(id, code, &limits)?)?; continue; }
@@ -1133,15 +1142,15 @@ async fn reader_loop<R: AsyncRead + Unpin + Send + 'static>(
                             }
                         };
                         if received.connection_update > 0 {
-                            send(&tx, fixed(0, V3FrameType::WindowUpdate, &received.connection_update.to_be_bytes(), &limits)?)?;
-                            if received.stream_update > 0 { send(&tx, fixed(id, V3FrameType::WindowUpdate, &received.stream_update.to_be_bytes(), &limits)?)?; }
+                            send(&tx, fixed(0, RpcFrameType::WindowUpdate, &received.connection_update.to_be_bytes(), &limits)?)?;
+                            if received.stream_update > 0 { send(&tx, fixed(id, RpcFrameType::WindowUpdate, &received.stream_update.to_be_bytes(), &limits)?)?; }
                         }
                         if let Some(body) = received.complete {
                             if let Some(rpc) = incoming_rpc.remove(&id) {
                                 if rpc.method == "device.command.send" {
-                                    services.ingress.metrics.inc(Metric::BusinessRpcV3CommandRequests);
+                                    services.ingress.metrics.inc(Metric::BusinessRpcMuxCommandRequests);
                                     if tokio::time::Instant::now() >= rpc.deadline {
-                                        services.ingress.metrics.inc(Metric::BusinessRpcV3CommandErrors);
+                                        services.ingress.metrics.inc(Metric::BusinessRpcMuxCommandErrors);
                                         rpc_error_reply(&tx, id, RpcErrorCode::Timeout, &limits)?;
                                         streams.mark_local_end(id).map_err(|_| Error::Invalid)?;
                                         continue;
@@ -1149,20 +1158,20 @@ async fn reader_loop<R: AsyncRead + Unpin + Send + 'static>(
                                     let request: DeviceCommandSendRequest = match serde_json::from_slice(&body) {
                                         Ok(request) => request,
                                         Err(_) => {
-                                            services.ingress.metrics.inc(Metric::BusinessRpcV3CommandErrors);
+                                            services.ingress.metrics.inc(Metric::BusinessRpcMuxCommandErrors);
                                             rpc_error_reply(&tx, id, RpcErrorCode::InvalidRequest, &limits)?;
                                             streams.mark_local_end(id).map_err(|_| Error::Invalid)?;
                                             continue;
                                         }
                                     };
                                     if !principal.allows_tenant(&request.command.device.tenant_id) {
-                                        services.ingress.metrics.inc(Metric::BusinessRpcV3CommandErrors);
+                                        services.ingress.metrics.inc(Metric::BusinessRpcMuxCommandErrors);
                                         rpc_error_reply(&tx, id, RpcErrorCode::Forbidden, &limits)?;
                                         streams.mark_local_end(id).map_err(|_| Error::Invalid)?;
                                         continue;
                                     }
                                     if command_jobs.len() >= config.auth_max_inflight {
-                                        services.ingress.metrics.inc(Metric::BusinessRpcV3CommandErrors);
+                                        services.ingress.metrics.inc(Metric::BusinessRpcMuxCommandErrors);
                                         rpc_error_reply(&tx, id, RpcErrorCode::Overloaded, &limits)?;
                                         streams.mark_local_end(id).map_err(|_| Error::Invalid)?;
                                         continue;
@@ -1188,36 +1197,36 @@ async fn reader_loop<R: AsyncRead + Unpin + Send + 'static>(
                             }
                         }
                     }
-                    V3FrameType::Response => {
-                        let response: V3Response = match decode::<V3Response>(&frame) {
+                    RpcFrameType::Response => {
+                        let response: RpcResponse = match decode::<RpcResponse>(&frame) {
                             Ok(response) if response.validate().is_ok() => response,
-                            _ => { close_stream!(id); send(&tx, reset(id, V3ResetCode::ProtocolError, &limits)?)?; continue; }
+                            _ => { close_stream!(id); send(&tx, reset(id, RpcResetCode::ProtocolError, &limits)?)?; continue; }
                         };
                         if !outbound_auth.contains_key(&id) && pending_event.as_ref().is_none_or(|event| event.id != id) {
-                            send(&tx, reset(id, V3ResetCode::StreamClosed, &limits)?)?; continue;
+                            send(&tx, reset(id, RpcResetCode::StreamClosed, &limits)?)?; continue;
                         }
                         if let Err(error) = streams.mark_response(id, response.content_length as usize) {
                             if let Some(code) = classify_stream_error(error) { close_stream!(id); send(&tx, reset(id, code, &limits)?)?; continue; }
                             break Err(Error::Invalid);
                         }
                         response_meta.insert(id, response);
-                        if frame.header.flags == V3_END_STREAM {
+                        if frame.header.flags == RPC_END_STREAM {
                             let received = match streams.receive_data(id, &[], true) {
                                 Ok(received) => received,
-                                Err(_) => { close_stream!(id); send(&tx, reset(id, V3ResetCode::ProtocolError, &limits)?)?; continue; }
+                                Err(_) => { close_stream!(id); send(&tx, reset(id, RpcResetCode::ProtocolError, &limits)?)?; continue; }
                             };
                             if let Some(body) = received.complete {
                                 complete_response(id, &body, &provider, &services, &mut outbound_auth, &mut response_meta, &mut pending_event)?;
                             }
                         }
                     }
-                    V3FrameType::WindowUpdate => {
+                    RpcFrameType::WindowUpdate => {
                         let increment = u32::from_be_bytes(frame.payload.as_ref().try_into().map_err(|_| Error::Invalid)?);
                         if increment == 0 { break Err(Error::Invalid); }
                         tx.try_send(WriterMessage::WindowUpdate { id, increment }).map_err(|_| Error::Overloaded)?;
                     }
-                    V3FrameType::Ping => { send(&tx, fixed(0, V3FrameType::Pong, &frame.payload, &limits)?)?; }
-                    V3FrameType::Pong => {
+                    RpcFrameType::Ping => { send(&tx, fixed(0, RpcFrameType::Pong, &frame.payload, &limits)?)?; }
+                    RpcFrameType::Pong => {
                         let nonce = u64::from_be_bytes(frame.payload.as_ref().try_into().map_err(|_| Error::Invalid)?);
                         if sync_ping == Some(nonce) {
                             sync_ping = None;
@@ -1226,16 +1235,16 @@ async fn reader_loop<R: AsyncRead + Unpin + Send + 'static>(
                                 && let Ok(_admission) = services.ingress.lifecycle.begin_admission() { lease.mark_serving(revision)?; }
                         }
                     }
-                    V3FrameType::ResetStream | V3FrameType::CloseStream => {
-                        if frame.header.frame_type == V3FrameType::ResetStream {
-                            let reason: V3Reset = decode(&frame)?;
+                    RpcFrameType::ResetStream | RpcFrameType::CloseStream => {
+                        if frame.header.frame_type == RpcFrameType::ResetStream {
+                            let reason: RpcReset = decode(&frame)?;
                             reason.validate().map_err(|_| Error::Invalid)?;
                         }
-                        if frame.header.frame_type == V3FrameType::ResetStream { services.ingress.metrics.inc(Metric::BusinessRpcV3StreamsReset); }
+                        if frame.header.frame_type == RpcFrameType::ResetStream { services.ingress.metrics.inc(Metric::BusinessRpcMuxStreamsReset); }
                         close_stream!(id);
                     }
-                    V3FrameType::GoAway => {
-                        let away: V3GoAway = decode(&frame)?;
+                    RpcFrameType::GoAway => {
+                        let away: RpcGoAway = decode(&frame)?;
                         away.validate().map_err(|_| Error::Invalid)?;
                         // The peer will accept no new gateway streams above its last_stream_id.
                         // Existing responses and EventAck get a bounded chance to finish.
@@ -1259,7 +1268,7 @@ async fn reader_loop<R: AsyncRead + Unpin + Send + 'static>(
                             events_rx = None;
                         }
                     }
-                    V3FrameType::Accept => { send(&tx, reset(id, V3ResetCode::ProtocolError, &limits)?)?; }
+                    RpcFrameType::Accept => { send(&tx, reset(id, RpcResetCode::ProtocolError, &limits)?)?; }
                 }
             }
         }
@@ -1279,12 +1288,12 @@ async fn reader_loop<R: AsyncRead + Unpin + Send + 'static>(
     );
     let last_stream_id = streams.goaway();
     let code = match &result {
-        Ok(()) if stop.is_cancelled() => netbaiot_core::business_rpc_v3::V3GoAwayCode::Shutdown,
-        Ok(()) => netbaiot_core::business_rpc_v3::V3GoAwayCode::NoError,
+        Ok(()) if stop.is_cancelled() => netbaiot_core::business_rpc::wire::RpcGoAwayCode::Shutdown,
+        Ok(()) => netbaiot_core::business_rpc::wire::RpcGoAwayCode::NoError,
         Err(Error::Forbidden) | Err(Error::Authentication) => {
-            netbaiot_core::business_rpc_v3::V3GoAwayCode::Unauthorized
+            netbaiot_core::business_rpc::wire::RpcGoAwayCode::Unauthorized
         }
-        Err(_) => netbaiot_core::business_rpc_v3::V3GoAwayCode::ProtocolError,
+        Err(_) => netbaiot_core::business_rpc::wire::RpcGoAwayCode::ProtocolError,
     };
     // EOF or a failed writer cannot complete a GOAWAY exchange. Return ownership
     // immediately so connection() cancels and joins the writer instead of waiting
@@ -1292,8 +1301,8 @@ async fn reader_loop<R: AsyncRead + Unpin + Send + 'static>(
     if !matches!(&result, Err(Error::Unavailable))
         && let Ok(frame) = metadata(
             0,
-            V3FrameType::GoAway,
-            &V3GoAway {
+            RpcFrameType::GoAway,
+            &RpcGoAway {
                 last_stream_id,
                 code,
                 message: String::new(),
@@ -1393,7 +1402,7 @@ mod send_ahead_tests {
 
     #[tokio::test(start_paused = true)]
     async fn shutdown_cancels_writer_waiting_on_socket() {
-        let limits = V3Limits::default();
+        let limits = RpcLimits::default();
         let (writer, mut reader) = tokio::io::duplex(1);
         let (tx, rx) = mpsc::channel(8);
         let (credit_tx, _credit_rx) = mpsc::channel(8);
@@ -1411,7 +1420,7 @@ mod send_ahead_tests {
             },
         ));
         tx.send(WriterMessage::Frame(
-            fixed(0, V3FrameType::Ping, &[0; 8], &limits).unwrap(),
+            fixed(0, RpcFrameType::Ping, &[0; 8], &limits).unwrap(),
         ))
         .await
         .unwrap();
@@ -1429,7 +1438,7 @@ mod send_ahead_tests {
 
     #[tokio::test(start_paused = true)]
     async fn shutdown_cancels_goaway_waiting_for_peer_credit() {
-        let limits = V3Limits::default();
+        let limits = RpcLimits::default();
         let (writer, mut reader) = tokio::io::duplex(32 * 1024);
         let (tx, rx) = mpsc::channel(8);
         let (credit_tx, _credit_rx) = mpsc::channel(8);
@@ -1440,7 +1449,7 @@ mod send_ahead_tests {
             rx,
             WriterContext {
                 limits: limits.clone(),
-                send_ahead: Some(V3SendAhead {
+                send_ahead: Some(RpcSendAhead {
                     stream_bytes: 8192,
                     connection_bytes: 8192,
                 }),
@@ -1460,7 +1469,7 @@ mod send_ahead_tests {
         })
         .await
         .unwrap();
-        let first = netbaiot_v3_mux::read_frame(&mut reader, 8192, Duration::from_secs(5))
+        let first = netbaiot_rpc_mux::read_frame(&mut reader, 8192, Duration::from_secs(5))
             .await
             .unwrap();
         assert_eq!(first.payload.len(), 8192);
@@ -1468,10 +1477,10 @@ mod send_ahead_tests {
         tx.send(WriterMessage::GoAway {
             frame: metadata(
                 0,
-                V3FrameType::GoAway,
-                &V3GoAway {
+                RpcFrameType::GoAway,
+                &RpcGoAway {
                     last_stream_id: 0,
-                    code: netbaiot_core::business_rpc_v3::V3GoAwayCode::Shutdown,
+                    code: netbaiot_core::business_rpc::wire::RpcGoAwayCode::Shutdown,
                     message: String::new(),
                 },
                 &limits,
@@ -1504,7 +1513,7 @@ mod send_ahead_tests {
 
     #[tokio::test(start_paused = true)]
     async fn exhausted_send_ahead_waits_for_a_wake_source() {
-        let limits = V3Limits::default();
+        let limits = RpcLimits::default();
         let metrics = Arc::new(Metrics::default());
         let (writer, mut reader) = tokio::io::duplex(32 * 1024);
         let (tx, rx) = mpsc::channel(8);
@@ -1515,7 +1524,7 @@ mod send_ahead_tests {
             rx,
             WriterContext {
                 limits: limits.clone(),
-                send_ahead: Some(V3SendAhead {
+                send_ahead: Some(RpcSendAhead {
                     stream_bytes: 8192,
                     connection_bytes: 8192,
                 }),
@@ -1537,7 +1546,7 @@ mod send_ahead_tests {
         })
         .await
         .unwrap();
-        let first = netbaiot_v3_mux::read_frame(&mut reader, 8192, Duration::from_secs(5))
+        let first = netbaiot_rpc_mux::read_frame(&mut reader, 8192, Duration::from_secs(5))
             .await
             .unwrap();
         assert_eq!(first.payload.len(), 8192);
@@ -1628,7 +1637,7 @@ mod ack_tests {
                 started: None,
             });
             let id = if case == 1 { 4 } else { 2 };
-            let ack = V3EventAck {
+            let ack = RpcEventAck {
                 delivery_id: if case == 2 {
                     Uuid::new_v4()
                 } else {
@@ -1640,9 +1649,9 @@ mod ack_tests {
                     event_id.0
                 },
                 status: if case == 4 {
-                    V3EventStatus::Error
+                    RpcEventStatus::Error
                 } else {
-                    V3EventStatus::Ok
+                    RpcEventStatus::Ok
                 },
             };
             let bytes = if case == 6 {
@@ -1652,7 +1661,7 @@ mod ack_tests {
             };
             let mut meta = HashMap::from([(
                 id,
-                V3Response {
+                RpcResponse {
                     content_length: bytes.len() as u32,
                     error: (case == 5)
                         .then(|| RpcError::new(RpcErrorCode::Unavailable, "not committed")),

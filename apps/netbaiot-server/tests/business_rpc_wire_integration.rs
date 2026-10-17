@@ -1,19 +1,19 @@
 use async_trait::async_trait;
 use netbaiot_client::NetbaIoTClient;
 use netbaiot_client::business_rpc::{
-    BusinessAuthHandler, BusinessRpcClientError, BusinessRpcV3Client, BusinessRpcV3ClientConfig,
+    BusinessAuthHandler, BusinessRpcClient, BusinessRpcClientConfig, BusinessRpcClientError,
 };
 use netbaiot_core::{
     AuthInvalidation, CodecId, CommandId, DeliveryState, DeviceCommand, DeviceCommandPayload,
     DeviceEventKind, DeviceId, DeviceKey, DeviceUplink, DeviceUplinkKind, ExecutionState,
     Heartbeat, ProductId, Scalar, SourceMessageId, TenantId,
+    business_rpc::wire::{
+        RPC_END_STREAM, RpcBootstrap, RpcFrameHeader, RpcFrameType, RpcLimits, RpcOpen, RpcReset,
+        RpcResetCode, RpcResponse,
+    },
     business_rpc::{
         AuthenticatedDeviceWire, BusinessRole, DeviceAuthenticateRequest, DeviceCommandSendRequest,
         ResolveVerifierRequest, ResolveVerifierResponse, RpcError, RpcErrorCode,
-    },
-    business_rpc_v3::{
-        V3_END_STREAM, V3Bootstrap, V3FrameHeader, V3FrameType, V3Limits, V3Open, V3Reset,
-        V3ResetCode, V3Response,
     },
 };
 use netbaiot_device_sdk::{DeviceClient, DeviceCredentials, PublishQos};
@@ -50,8 +50,8 @@ fn lifecycle_log_tail(path: &std::path::Path) -> String {
 }
 
 async fn wait_for_business_ready(
-    business: &BusinessRpcV3Client,
-    config: &BusinessRpcV3ClientConfig,
+    business: &BusinessRpcClient,
+    config: &BusinessRpcClientConfig,
     server: &mut tokio::process::Child,
     log: &std::path::Path,
 ) -> Result<(), String> {
@@ -98,13 +98,13 @@ async fn business_ready_diagnostic_reports_early_server_exit() {
     let pid = server.id().unwrap();
     // Keep the address reserved: this client cannot become Ready or contact an unrelated server.
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-    let mut config = BusinessRpcV3ClientConfig::development(
+    let mut config = BusinessRpcClientConfig::development(
         listener.local_addr().unwrap(),
         "diagnostic-test-token".into(),
     );
     config.provider = false;
     config.events = false;
-    let (business, _) = BusinessRpcV3Client::connect(config.clone(), None).unwrap();
+    let (business, _) = BusinessRpcClient::connect(config.clone(), None).unwrap();
     let failure = wait_for_business_ready(&business, &config, &mut server, &log)
         .await
         .unwrap_err();
@@ -223,10 +223,16 @@ async fn read_mqtt_packet(socket: &mut TcpStream) -> (u8, Vec<u8>) {
     (first[0], body)
 }
 
-async fn write_v3_frame(socket: &mut TcpStream, id: u32, ty: V3FrameType, flags: u8, body: &[u8]) {
+async fn write_rpc_frame(
+    socket: &mut TcpStream,
+    id: u32,
+    ty: RpcFrameType,
+    flags: u8,
+    body: &[u8],
+) {
     socket
         .write_all(
-            &V3FrameHeader {
+            &RpcFrameHeader {
                 payload_len: body.len() as u32,
                 stream_id: id,
                 frame_type: ty,
@@ -239,10 +245,10 @@ async fn write_v3_frame(socket: &mut TcpStream, id: u32, ty: V3FrameType, flags:
     socket.write_all(body).await.unwrap();
 }
 
-async fn read_v3_frame(socket: &mut TcpStream) -> (V3FrameHeader, Vec<u8>) {
+async fn read_rpc_frame(socket: &mut TcpStream) -> (RpcFrameHeader, Vec<u8>) {
     let mut header = [0u8; 12];
     socket.read_exact(&mut header).await.unwrap();
-    let header = V3FrameHeader::parse(&header, 8192).unwrap();
+    let header = RpcFrameHeader::parse(&header, 8192).unwrap();
     let mut body = vec![0u8; header.payload_len as usize];
     socket.read_exact(&mut body).await.unwrap();
     (header, body)
@@ -266,7 +272,7 @@ async fn read_typed_tcp_device(
 }
 
 #[tokio::test]
-async fn v3_command_real_tcp_short_dedup_ttl_and_shorter_command_ttl() {
+async fn rpc_command_real_tcp_short_dedup_ttl_and_shorter_command_ttl() {
     let root = std::env::temp_dir().join(format!("netbaiot-v3-tcp-ttl-{}", uuid::Uuid::new_v4()));
     std::fs::create_dir_all(&root).unwrap();
     let mut config: Config =
@@ -289,7 +295,7 @@ async fn v3_command_real_tcp_short_dedup_ttl_and_shorter_command_ttl() {
     config.limits.command_dedup_ttl_ms = 500;
     config.spool_directory = root.join("spool");
     config.business_rpc = Some(BusinessRpcConfig {
-        limits: V3Limits::default(),
+        limits: RpcLimits::default(),
         send_ahead: None,
         experiment_socket_send_buffer_bytes: None,
         tls: None,
@@ -316,10 +322,10 @@ async fn v3_command_real_tcp_short_dedup_ttl_and_shorter_command_ttl() {
         .spawn()
         .unwrap();
     let mut client_config =
-        BusinessRpcV3ClientConfig::development(addresses[2], "v3-ttl-token".into());
+        BusinessRpcClientConfig::development(addresses[2], "v3-ttl-token".into());
     client_config.provider = false;
     client_config.events = false;
-    let (business, _) = BusinessRpcV3Client::connect(client_config, None).unwrap();
+    let (business, _) = BusinessRpcClient::connect(client_config, None).unwrap();
     tokio::time::timeout(Duration::from_secs(10), business.wait_ready())
         .await
         .unwrap()
@@ -368,7 +374,7 @@ async fn v3_command_real_tcp_short_dedup_ttl_and_shorter_command_ttl() {
 }
 
 #[tokio::test]
-async fn v3_planned_restart_replays_event_but_resets_command_dedup() {
+async fn rpc_planned_restart_replays_event_but_resets_command_dedup() {
     let root = std::env::temp_dir().join(format!("netbaiot-v3-restart-{}", uuid::Uuid::new_v4()));
     std::fs::create_dir_all(&root).unwrap();
     let mut config: Config =
@@ -391,7 +397,7 @@ async fn v3_planned_restart_replays_event_but_resets_command_dedup() {
     config.limits.shutdown_drain_timeout_ms = 300;
     config.spool_directory = root.join("spool");
     config.business_rpc = Some(BusinessRpcConfig {
-        limits: V3Limits::default(),
+        limits: RpcLimits::default(),
         send_ahead: None,
         experiment_socket_send_buffer_bytes: None,
         tls: None,
@@ -421,7 +427,7 @@ async fn v3_planned_restart_replays_event_but_resets_command_dedup() {
     };
     let client_config = || {
         let mut value =
-            BusinessRpcV3ClientConfig::development(addresses[2], "v3-restart-token".into());
+            BusinessRpcClientConfig::development(addresses[2], "v3-restart-token".into());
         value.provider = false;
         value
     };
@@ -444,7 +450,7 @@ async fn v3_planned_restart_replays_event_but_resets_command_dedup() {
         device
     };
     let mut first = start();
-    let (business, mut events) = BusinessRpcV3Client::connect(client_config(), None).unwrap();
+    let (business, mut events) = BusinessRpcClient::connect(client_config(), None).unwrap();
     tokio::time::timeout(Duration::from_secs(10), business.wait_ready())
         .await
         .unwrap()
@@ -498,7 +504,7 @@ async fn v3_planned_restart_replays_event_but_resets_command_dedup() {
     drop(device);
 
     let mut second = start();
-    let (business, mut events) = BusinessRpcV3Client::connect(client_config(), None).unwrap();
+    let (business, mut events) = BusinessRpcClient::connect(client_config(), None).unwrap();
     tokio::time::timeout(Duration::from_secs(10), business.wait_ready())
         .await
         .unwrap()
@@ -537,7 +543,7 @@ async fn v3_planned_restart_replays_event_but_resets_command_dedup() {
 }
 
 #[tokio::test]
-async fn v3_command_real_tcp_tenant_scope_and_capacity() {
+async fn rpc_command_real_tcp_tenant_scope_and_capacity() {
     use netbaiot_client::business_rpc::BusinessRpcTls;
     use netbaiot_server::{BusinessRpcIdentityConfig, ManagementTlsFiles};
     use sha2::{Digest, Sha256};
@@ -577,7 +583,7 @@ async fn v3_command_real_tcp_tenant_scope_and_capacity() {
         .map(|byte| format!("{byte:02x}"))
         .collect();
     config.business_rpc = Some(BusinessRpcConfig {
-        limits: V3Limits::default(),
+        limits: RpcLimits::default(),
         send_ahead: None,
         experiment_socket_send_buffer_bytes: None,
         tls: Some(ManagementTlsFiles {
@@ -620,7 +626,7 @@ async fn v3_command_real_tcp_tenant_scope_and_capacity() {
         .kill_on_drop(true)
         .spawn()
         .unwrap();
-    let mut client_config = BusinessRpcV3ClientConfig::development(addresses[2], "unused".into());
+    let mut client_config = BusinessRpcClientConfig::development(addresses[2], "unused".into());
     client_config.token = None;
     client_config.tls = Some(BusinessRpcTls {
         server_name: "localhost".into(),
@@ -630,7 +636,7 @@ async fn v3_command_real_tcp_tenant_scope_and_capacity() {
     });
     client_config.provider = false;
     client_config.events = false;
-    let (business, _) = BusinessRpcV3Client::connect(client_config.clone(), None).unwrap();
+    let (business, _) = BusinessRpcClient::connect(client_config.clone(), None).unwrap();
     wait_for_business_ready(
         &business,
         &client_config,
@@ -647,7 +653,7 @@ async fn v3_command_real_tcp_tenant_scope_and_capacity() {
         certificate_pem: fixtures.join("management-client.pem"),
         private_key_pem: fixtures.join("management-client-key.pem"),
     });
-    let (other, _) = BusinessRpcV3Client::connect(other_config.clone(), None).unwrap();
+    let (other, _) = BusinessRpcClient::connect(other_config.clone(), None).unwrap();
     wait_for_business_ready(&other, &other_config, &mut server, &root.join("server.log"))
         .await
         .unwrap_or_else(|diagnostic| panic!("{diagnostic}"));
@@ -718,7 +724,7 @@ async fn v3_command_real_tcp_tenant_scope_and_capacity() {
 }
 
 #[tokio::test]
-async fn v3_command_real_mqtt_dedup_http_ack_and_lost_response() {
+async fn rpc_command_real_mqtt_dedup_http_ack_and_lost_response() {
     let root = std::env::temp_dir().join(format!("netbaiot-v3-command-{}", uuid::Uuid::new_v4()));
     std::fs::create_dir_all(&root).unwrap();
     let mut config: Config =
@@ -739,7 +745,7 @@ async fn v3_command_real_mqtt_dedup_http_ack_and_lost_response() {
     config.event_delivery = Some(EventDeliverySource::BusinessRpc);
     config.spool_directory = root.join("spool");
     config.business_rpc = Some(BusinessRpcConfig {
-        limits: V3Limits::default(),
+        limits: RpcLimits::default(),
         send_ahead: None,
         experiment_socket_send_buffer_bytes: None,
         tls: None,
@@ -761,16 +767,19 @@ async fn v3_command_real_mqtt_dedup_http_ack_and_lost_response() {
         .arg(&path)
         .env("NETBAIOT_ADMIN_SECRET", "a".repeat(64))
         .env("NETBAIOT_BUSINESS_RPC_TOKEN", "v3-command-token")
-        .env("RUST_LOG", "netbaiot_transports::business_rpc::v3=debug")
+        .env(
+            "RUST_LOG",
+            "netbaiot_transports::business_rpc::session=debug",
+        )
         .stdout(Stdio::null())
         .stderr(Stdio::from(stderr))
         .kill_on_drop(true)
         .spawn()
         .unwrap();
     let mut client_config =
-        BusinessRpcV3ClientConfig::development(addresses[2], "v3-command-token".into());
+        BusinessRpcClientConfig::development(addresses[2], "v3-command-token".into());
     client_config.provider = false;
-    let (business, mut events) = BusinessRpcV3Client::connect(client_config, None).unwrap();
+    let (business, mut events) = BusinessRpcClient::connect(client_config, None).unwrap();
     tokio::select! {
         ready=tokio::time::timeout(Duration::from_secs(10),business.wait_ready())=>ready.unwrap().unwrap(),
         status=server.wait()=>panic!("server exited before business readiness: {status:?}; {}",std::fs::read_to_string(root.join("server.log")).unwrap_or_default()),
@@ -965,10 +974,10 @@ async fn v3_command_real_mqtt_dedup_http_ack_and_lost_response() {
 
     let lost = command("lost-response");
     let mut raw = TcpStream::connect(addresses[2]).await.unwrap();
-    let hello = serde_json::to_vec(&V3Bootstrap::Hello {
+    let hello = serde_json::to_vec(&RpcBootstrap::Hello {
         version: 3,
         token: Some("v3-command-token".into()),
-        limits: V3Limits::default(),
+        limits: RpcLimits::default(),
     })
     .unwrap();
     raw.write_all(&(hello.len() as u32).to_be_bytes())
@@ -980,30 +989,30 @@ async fn v3_command_real_mqtt_dedup_http_ack_and_lost_response() {
     let mut ready = vec![0u8; u32::from_be_bytes(prefix) as usize];
     raw.read_exact(&mut ready).await.unwrap();
     assert!(matches!(
-        serde_json::from_slice::<V3Bootstrap>(&ready).unwrap(),
-        V3Bootstrap::Ready { .. }
+        serde_json::from_slice::<RpcBootstrap>(&ready).unwrap(),
+        RpcBootstrap::Ready { .. }
     ));
     let malformed = br#"{"command":"bad"}"#;
-    let malformed_open = V3Open::Rpc {
+    let malformed_open = RpcOpen::Rpc {
         parent_stream_id: None,
         request_id: uuid::Uuid::new_v4(),
         method: "device.command.send".into(),
         deadline_ms: 5000,
         content_length: malformed.len() as u32,
     };
-    write_v3_frame(
+    write_rpc_frame(
         &mut raw,
         1,
-        V3FrameType::Open,
+        RpcFrameType::Open,
         0,
         &serde_json::to_vec(&malformed_open).unwrap(),
     )
     .await;
-    write_v3_frame(&mut raw, 1, V3FrameType::Data, V3_END_STREAM, malformed).await;
+    write_rpc_frame(&mut raw, 1, RpcFrameType::Data, RPC_END_STREAM, malformed).await;
     let (header, response) = tokio::time::timeout(Duration::from_secs(5), async {
         loop {
-            let frame = read_v3_frame(&mut raw).await;
-            if frame.0.stream_id == 1 && frame.0.frame_type == V3FrameType::Response {
+            let frame = read_rpc_frame(&mut raw).await;
+            if frame.0.stream_id == 1 && frame.0.frame_type == RpcFrameType::Response {
                 break frame;
             }
         }
@@ -1012,7 +1021,7 @@ async fn v3_command_real_mqtt_dedup_http_ack_and_lost_response() {
     .unwrap();
     assert_eq!(header.stream_id, 1);
     assert!(matches!(
-        serde_json::from_slice::<V3Response>(&response)
+        serde_json::from_slice::<RpcResponse>(&response)
             .unwrap()
             .error,
         Some(RpcError {
@@ -1025,27 +1034,27 @@ async fn v3_command_real_mqtt_dedup_http_ack_and_lost_response() {
         command: cancelled.clone(),
     })
     .unwrap();
-    let cancelled_open = V3Open::Rpc {
+    let cancelled_open = RpcOpen::Rpc {
         parent_stream_id: None,
         request_id: uuid::Uuid::new_v4(),
         method: "device.command.send".into(),
         deadline_ms: 5000,
         content_length: cancelled_body.len() as u32,
     };
-    write_v3_frame(
+    write_rpc_frame(
         &mut raw,
         3,
-        V3FrameType::Open,
+        RpcFrameType::Open,
         0,
         &serde_json::to_vec(&cancelled_open).unwrap(),
     )
     .await;
-    let cancel = serde_json::to_vec(&V3Reset {
-        code: V3ResetCode::Cancel,
+    let cancel = serde_json::to_vec(&RpcReset {
+        code: RpcResetCode::Cancel,
         message: String::new(),
     })
     .unwrap();
-    write_v3_frame(&mut raw, 3, V3FrameType::ResetStream, 0, &cancel).await;
+    write_rpc_frame(&mut raw, 3, RpcFrameType::ResetStream, 0, &cancel).await;
     assert_eq!(
         business.send_command(&cancelled).await.unwrap().state,
         DeliveryState::Queued
@@ -1063,17 +1072,17 @@ async fn v3_command_real_mqtt_dedup_http_ack_and_lost_response() {
         command: expired.clone(),
     })
     .unwrap();
-    let expired_open = V3Open::Rpc {
+    let expired_open = RpcOpen::Rpc {
         parent_stream_id: None,
         request_id: uuid::Uuid::new_v4(),
         method: "device.command.send".into(),
         deadline_ms: 1,
         content_length: expired_body.len() as u32,
     };
-    write_v3_frame(
+    write_rpc_frame(
         &mut raw,
         5,
-        V3FrameType::Open,
+        RpcFrameType::Open,
         0,
         &serde_json::to_vec(&expired_open).unwrap(),
     )
@@ -1096,22 +1105,22 @@ async fn v3_command_real_mqtt_dedup_http_ack_and_lost_response() {
         command: lost.clone(),
     })
     .unwrap();
-    let open = V3Open::Rpc {
+    let open = RpcOpen::Rpc {
         parent_stream_id: None,
         request_id: uuid::Uuid::new_v4(),
         method: "device.command.send".into(),
         deadline_ms: 5000,
         content_length: body.len() as u32,
     };
-    write_v3_frame(
+    write_rpc_frame(
         &mut raw,
         7,
-        V3FrameType::Open,
+        RpcFrameType::Open,
         0,
         &serde_json::to_vec(&open).unwrap(),
     )
     .await;
-    write_v3_frame(&mut raw, 7, V3FrameType::Data, V3_END_STREAM, &body).await;
+    write_rpc_frame(&mut raw, 7, RpcFrameType::Data, RPC_END_STREAM, &body).await;
     assert_eq!(
         tokio::time::timeout(Duration::from_secs(5), commands.recv())
             .await
@@ -1120,7 +1129,7 @@ async fn v3_command_real_mqtt_dedup_http_ack_and_lost_response() {
             .command_id,
         lost.command_id
     );
-    write_v3_frame(&mut raw, 7, V3FrameType::ResetStream, 0, &cancel).await;
+    write_rpc_frame(&mut raw, 7, RpcFrameType::ResetStream, 0, &cancel).await;
     // Signal EOF explicitly while keeping the read half owned. Dropping a socket
     // with unread replies does not establish that the peer observed its closure.
     // The application still never processes the lost command response.
@@ -1211,7 +1220,7 @@ async fn v3_command_real_mqtt_dedup_http_ack_and_lost_response() {
 }
 
 #[tokio::test]
-async fn real_socket_v3_provider_event_and_invalidation() {
+async fn real_socket_rpc_provider_event_and_invalidation() {
     let root = std::env::temp_dir().join(format!("netbaiot-v3-e2e-{}", uuid::Uuid::new_v4()));
     std::fs::create_dir_all(&root).unwrap();
     let mut config: Config =
@@ -1232,7 +1241,7 @@ async fn real_socket_v3_provider_event_and_invalidation() {
     config.event_delivery = Some(EventDeliverySource::BusinessRpc);
     config.spool_directory = root.join("spool");
     config.business_rpc = Some(BusinessRpcConfig {
-        limits: V3Limits::default(),
+        limits: RpcLimits::default(),
         send_ahead: None,
         experiment_socket_send_buffer_bytes: None,
         tls: None,
@@ -1264,10 +1273,9 @@ async fn real_socket_v3_provider_event_and_invalidation() {
         inflight: AtomicUsize::new(0),
         peak_inflight: AtomicUsize::new(0),
     });
-    let client_config =
-        BusinessRpcV3ClientConfig::development(addresses[2], "v3-test-token".into());
+    let client_config = BusinessRpcClientConfig::development(addresses[2], "v3-test-token".into());
     let (client, mut events) =
-        BusinessRpcV3Client::connect(client_config, Some(handler.clone())).unwrap();
+        BusinessRpcClient::connect(client_config, Some(handler.clone())).unwrap();
     tokio::time::timeout(Duration::from_secs(10), client.wait_ready())
         .await
         .expect("V3 readiness deadline")
@@ -1277,10 +1285,10 @@ async fn real_socket_v3_provider_event_and_invalidation() {
         Err(BusinessRpcClientError::Remote(RpcErrorCode::Forbidden))
     ));
     let mut replacement_config =
-        BusinessRpcV3ClientConfig::development(addresses[2], "v3-test-token".into());
+        BusinessRpcClientConfig::development(addresses[2], "v3-test-token".into());
     replacement_config.events = false;
     let (replacement, _) =
-        BusinessRpcV3Client::connect(replacement_config, Some(handler.clone())).unwrap();
+        BusinessRpcClient::connect(replacement_config, Some(handler.clone())).unwrap();
     assert!(
         tokio::time::timeout(Duration::from_millis(300), replacement.wait_ready())
             .await
@@ -1392,7 +1400,7 @@ async fn real_socket_v3_provider_event_and_invalidation() {
 }
 
 #[tokio::test]
-async fn v3_mtls_authenticates_before_role_free_stream_authorization() {
+async fn rpc_mtls_authenticates_before_role_free_stream_authorization() {
     use netbaiot_client::business_rpc::BusinessRpcTls;
     use netbaiot_server::{BusinessRpcIdentityConfig, ManagementTlsFiles};
     use sha2::{Digest, Sha256};
@@ -1428,7 +1436,7 @@ async fn v3_mtls_authenticates_before_role_free_stream_authorization() {
     config.event_delivery = Some(EventDeliverySource::DevelopmentAudit);
     config.spool_directory = root.join("spool");
     config.business_rpc = Some(BusinessRpcConfig {
-        limits: V3Limits::default(),
+        limits: RpcLimits::default(),
         send_ahead: None,
         experiment_socket_send_buffer_bytes: None,
         tls: Some(ManagementTlsFiles {
@@ -1477,7 +1485,7 @@ async fn v3_mtls_authenticates_before_role_free_stream_authorization() {
         inflight: AtomicUsize::new(0),
         peak_inflight: AtomicUsize::new(0),
     });
-    let mut client_config = BusinessRpcV3ClientConfig::development(addresses[2], String::new());
+    let mut client_config = BusinessRpcClientConfig::development(addresses[2], String::new());
     client_config.token = None;
     client_config.events = false;
     client_config.tls = Some(BusinessRpcTls {
@@ -1487,7 +1495,7 @@ async fn v3_mtls_authenticates_before_role_free_stream_authorization() {
         private_key_pem: fixtures.join("management-client-key.pem"),
     });
     let (provider, _) =
-        BusinessRpcV3Client::connect(client_config.clone(), Some(handler.clone())).unwrap();
+        BusinessRpcClient::connect(client_config.clone(), Some(handler.clone())).unwrap();
     tokio::time::timeout(Duration::from_secs(10), provider.wait_ready())
         .await
         .unwrap()
@@ -1495,7 +1503,7 @@ async fn v3_mtls_authenticates_before_role_free_stream_authorization() {
     let mut unauthorized = client_config.clone();
     unauthorized.provider = false;
     unauthorized.events = true;
-    let (events_only, _) = BusinessRpcV3Client::connect(unauthorized, None).unwrap();
+    let (events_only, _) = BusinessRpcClient::connect(unauthorized, None).unwrap();
     assert!(
         tokio::time::timeout(Duration::from_millis(500), events_only.wait_ready())
             .await
@@ -1503,8 +1511,7 @@ async fn v3_mtls_authenticates_before_role_free_stream_authorization() {
     );
     let mut wrong_name = client_config;
     wrong_name.tls.as_mut().unwrap().server_name = "wrong.local".into();
-    let (wrong_server, _) =
-        BusinessRpcV3Client::connect(wrong_name, Some(handler.clone())).unwrap();
+    let (wrong_server, _) = BusinessRpcClient::connect(wrong_name, Some(handler.clone())).unwrap();
     assert!(
         tokio::time::timeout(Duration::from_millis(500), wrong_server.wait_ready())
             .await
@@ -1543,8 +1550,8 @@ fn current_config(
     address: std::net::SocketAddr,
     token: String,
     role: BusinessRole,
-) -> BusinessRpcV3ClientConfig {
-    let mut settings = BusinessRpcV3ClientConfig::development(address, token);
+) -> BusinessRpcClientConfig {
+    let mut settings = BusinessRpcClientConfig::development(address, token);
     settings.provider = role.auth_control();
     settings.events = role.events();
     settings

@@ -3,8 +3,8 @@
 use async_trait::async_trait;
 use hmac::{Hmac, Mac};
 use netbaiot_client::business_rpc::{
-    BusinessAuthHandler, BusinessRpcClientError, BusinessRpcTls, BusinessRpcV3Client,
-    BusinessRpcV3ClientConfig, BusinessRpcV3Delivery,
+    BusinessAuthHandler, BusinessRpcClient, BusinessRpcClientConfig, BusinessRpcClientError,
+    BusinessRpcDelivery, BusinessRpcTls,
 };
 use netbaiot_core::{
     AuthInvalidation, CodecId, CommandAck, CommandDispatch, CommandId, DeliveryState,
@@ -134,12 +134,14 @@ impl BusinessTransport {
 #[serde(rename_all = "snake_case")]
 enum Topology {
     #[default]
-    V3,
-    V3Dual,
+    #[serde(rename = "v3")]
+    Rpc,
+    #[serde(rename = "v3_dual")]
+    RpcDual,
 }
 impl Topology {
     fn separate(self) -> bool {
-        matches!(self, Self::V3Dual)
+        matches!(self, Self::RpcDual)
     }
 }
 impl Config {
@@ -455,7 +457,7 @@ impl CommandTrace {
 }
 type SharedStats = Arc<Mutex<Stats>>;
 
-fn command_ack_id(delivery: &BusinessRpcV3Delivery) -> Option<CommandId> {
+fn command_ack_id(delivery: &BusinessRpcDelivery) -> Option<CommandId> {
     match &delivery.delivery.event.kind {
         DeviceEventKind::CommandAck(ack) => Some(ack.command_id),
         _ => None,
@@ -467,10 +469,10 @@ async fn connect_business(
     handler: Arc<Handler>,
     role: BusinessRole,
 ) -> Result<(
-    BusinessRpcV3Client,
-    tokio::sync::mpsc::Receiver<BusinessRpcV3Delivery>,
+    BusinessRpcClient,
+    tokio::sync::mpsc::Receiver<BusinessRpcDelivery>,
 )> {
-    let mut settings = BusinessRpcV3ClientConfig::development(
+    let mut settings = BusinessRpcClientConfig::development(
         config.business_address,
         std::env::var("NETBAIOT_BUSINESS_RPC_TOKEN").unwrap_or_default(),
     );
@@ -499,13 +501,13 @@ async fn connect_business(
         settings.limits.initial_stream_window_bytes = window_bytes;
     }
     settings.reconnect_initial = Duration::from_millis(100);
-    let (client, deliveries) = BusinessRpcV3Client::connect(settings, Some(handler))?;
+    let (client, deliveries) = BusinessRpcClient::connect(settings, Some(handler))?;
     tokio::time::timeout(Duration::from_secs(10), client.wait_ready()).await??;
     Ok((client, deliveries))
 }
 
-async fn connect_command_business(config: &Config) -> Result<BusinessRpcV3Client> {
-    let mut settings = BusinessRpcV3ClientConfig::development(
+async fn connect_command_business(config: &Config) -> Result<BusinessRpcClient> {
+    let mut settings = BusinessRpcClientConfig::development(
         config.business_address,
         std::env::var("NETBAIOT_BUSINESS_RPC_TOKEN").unwrap_or_default(),
     );
@@ -526,7 +528,7 @@ async fn connect_command_business(config: &Config) -> Result<BusinessRpcV3Client
             private_key_pem: private_key_pem.clone(),
         });
     }
-    let (client, _) = BusinessRpcV3Client::connect(settings, None)?;
+    let (client, _) = BusinessRpcClient::connect(settings, None)?;
     tokio::time::timeout(Duration::from_secs(10), client.wait_ready()).await??;
     Ok(client)
 }
@@ -1391,12 +1393,18 @@ struct Peaks {
     pending_bytes_last: u64,
     active_business_connections_peak: u64,
     active_business_connections_last: u64,
-    v3_active_streams_peak: u64,
-    v3_active_streams_last: u64,
-    v3_queued_bytes_peak: u64,
-    v3_queued_bytes_last: u64,
-    v3_reassembly_bytes_peak: u64,
-    v3_reassembly_bytes_last: u64,
+    #[serde(rename = "v3_active_streams_peak")]
+    rpc_active_streams_peak: u64,
+    #[serde(rename = "v3_active_streams_last")]
+    rpc_active_streams_last: u64,
+    #[serde(rename = "v3_queued_bytes_peak")]
+    rpc_queued_bytes_peak: u64,
+    #[serde(rename = "v3_queued_bytes_last")]
+    rpc_queued_bytes_last: u64,
+    #[serde(rename = "v3_reassembly_bytes_peak")]
+    rpc_reassembly_bytes_peak: u64,
+    #[serde(rename = "v3_reassembly_bytes_last")]
+    rpc_reassembly_bytes_last: u64,
     command_dedup_entries_peak: u64,
     command_dedup_entries_last: u64,
     command_dedup_inflight_peak: u64,
@@ -1428,9 +1436,12 @@ struct Milestone {
     pending_items: Option<u64>,
     pending_bytes: Option<u64>,
     connections: Option<u64>,
-    v3_active_streams: Option<u64>,
-    v3_queued_bytes: Option<u64>,
-    v3_reassembly_bytes: Option<u64>,
+    #[serde(rename = "v3_active_streams")]
+    rpc_active_streams: Option<u64>,
+    #[serde(rename = "v3_queued_bytes")]
+    rpc_queued_bytes: Option<u64>,
+    #[serde(rename = "v3_reassembly_bytes")]
+    rpc_reassembly_bytes: Option<u64>,
     command_dedup_entries: Option<u64>,
     command_dedup_inflight: Option<u64>,
     control_queue_bytes: Option<u64>,
@@ -1582,18 +1593,19 @@ async fn sample_gateway(
             guard.active_business_connections_peak = guard
                 .active_business_connections_peak
                 .max(guard.active_business_connections_last);
-            guard.v3_active_streams_last =
+            guard.rpc_active_streams_last =
                 metric(&body, "netbaiot_business_rpc_v3_active_streams ");
-            guard.v3_active_streams_peak = guard
-                .v3_active_streams_peak
-                .max(guard.v3_active_streams_last);
-            guard.v3_queued_bytes_last = metric(&body, "netbaiot_business_rpc_v3_queued_bytes ");
-            guard.v3_queued_bytes_peak = guard.v3_queued_bytes_peak.max(guard.v3_queued_bytes_last);
-            guard.v3_reassembly_bytes_last =
+            guard.rpc_active_streams_peak = guard
+                .rpc_active_streams_peak
+                .max(guard.rpc_active_streams_last);
+            guard.rpc_queued_bytes_last = metric(&body, "netbaiot_business_rpc_v3_queued_bytes ");
+            guard.rpc_queued_bytes_peak =
+                guard.rpc_queued_bytes_peak.max(guard.rpc_queued_bytes_last);
+            guard.rpc_reassembly_bytes_last =
                 metric(&body, "netbaiot_business_rpc_v3_reassembly_reserved_bytes ");
-            guard.v3_reassembly_bytes_peak = guard
-                .v3_reassembly_bytes_peak
-                .max(guard.v3_reassembly_bytes_last);
+            guard.rpc_reassembly_bytes_peak = guard
+                .rpc_reassembly_bytes_peak
+                .max(guard.rpc_reassembly_bytes_last);
             guard.command_dedup_entries_last = metric(&body, "netbaiot_command_dedup_entries ");
             guard.command_dedup_entries_peak = guard
                 .command_dedup_entries_peak
@@ -1662,13 +1674,15 @@ async fn sample_gateway(
                 connections: guard
                     .metrics_observed
                     .then_some(guard.active_business_connections_last),
-                v3_active_streams: guard
+                rpc_active_streams: guard
                     .metrics_observed
-                    .then_some(guard.v3_active_streams_last),
-                v3_queued_bytes: guard.metrics_observed.then_some(guard.v3_queued_bytes_last),
-                v3_reassembly_bytes: guard
+                    .then_some(guard.rpc_active_streams_last),
+                rpc_queued_bytes: guard
                     .metrics_observed
-                    .then_some(guard.v3_reassembly_bytes_last),
+                    .then_some(guard.rpc_queued_bytes_last),
+                rpc_reassembly_bytes: guard
+                    .metrics_observed
+                    .then_some(guard.rpc_reassembly_bytes_last),
                 command_dedup_entries: guard
                     .metrics_observed
                     .then_some(guard.command_dedup_entries_last),
@@ -1752,7 +1766,7 @@ async fn main() -> Result<()> {
         }
         "topology_compare" => {
             let mut results = Vec::new();
-            for topology in [Topology::V3, Topology::V3Dual] {
+            for topology in [Topology::Rpc, Topology::RpcDual] {
                 let mut run_config = config.clone();
                 run_config.topology = topology;
                 let run_stats = Arc::new(Mutex::new(Stats::default()));
@@ -1951,7 +1965,36 @@ mod configuration_examples {
     use super::*;
 
     #[test]
-    fn checked_in_load_configs_match_the_current_v3_parser() {
+    fn rpc_rust_names_preserve_loadgen_json_names() {
+        for (topology, json) in [
+            (Topology::Rpc, "\"v3\""),
+            (Topology::RpcDual, "\"v3_dual\""),
+        ] {
+            assert_eq!(serde_json::to_string(&topology).unwrap(), json);
+            assert!(serde_json::from_str::<Topology>(json).unwrap() == topology);
+        }
+        let peaks = serde_json::to_value(Peaks::default()).unwrap();
+        for field in [
+            "v3_active_streams_peak",
+            "v3_active_streams_last",
+            "v3_queued_bytes_peak",
+            "v3_queued_bytes_last",
+            "v3_reassembly_bytes_peak",
+            "v3_reassembly_bytes_last",
+        ] {
+            assert_eq!(peaks[field], 0);
+        }
+        assert!(
+            peaks
+                .as_object()
+                .unwrap()
+                .keys()
+                .all(|key| !key.starts_with("rpc_"))
+        );
+    }
+
+    #[test]
+    fn checked_in_load_configs_match_the_current_rpc_parser() {
         for json in [
             include_str!("../../../../configs/business-rpc-load.example.json"),
             include_str!("../../../../configs/business-rpc-production-readiness/smoke-30m.json"),

@@ -6,17 +6,17 @@ pub use crate::business_rpc::{DeviceCommandSendRequest, DeviceCommandSendRespons
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-pub const BUSINESS_RPC_V3_VERSION: u16 = 3;
-pub const V3_HEADER_BYTES: usize = 12;
-pub const V3_MAX_METADATA_BYTES: usize = 4 * 1024;
-pub const V3_HARD_MAX_FRAME_PAYLOAD_BYTES: usize = 16 * 1024;
-pub const V3_MAX_STREAM_ID: u32 = 0x7fff_ffff;
-pub const V3_END_STREAM: u8 = 0x01;
-pub const V3_MAX_MESSAGE_BYTES: usize = 8 * 1024 * 1024;
+pub const BUSINESS_RPC_PROTOCOL_VERSION: u16 = 3;
+pub const RPC_HEADER_BYTES: usize = 12;
+pub const RPC_MAX_METADATA_BYTES: usize = 4 * 1024;
+pub const RPC_HARD_MAX_FRAME_PAYLOAD_BYTES: usize = 16 * 1024;
+pub const RPC_MAX_STREAM_ID: u32 = 0x7fff_ffff;
+pub const RPC_END_STREAM: u8 = 0x01;
+pub const RPC_MAX_MESSAGE_BYTES: usize = 8 * 1024 * 1024;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[repr(u8)]
-pub enum V3FrameType {
+pub enum RpcFrameType {
     Open = 0x01,
     Accept = 0x02,
     Response = 0x03,
@@ -28,8 +28,8 @@ pub enum V3FrameType {
     Pong = 0x09,
     GoAway = 0x0a,
 }
-impl TryFrom<u8> for V3FrameType {
-    type Error = V3WireError;
+impl TryFrom<u8> for RpcFrameType {
+    type Error = RpcWireError;
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
             1 => Ok(Self::Open),
@@ -42,13 +42,13 @@ impl TryFrom<u8> for V3FrameType {
             8 => Ok(Self::Ping),
             9 => Ok(Self::Pong),
             10 => Ok(Self::GoAway),
-            _ => Err(V3WireError::UnknownFrameType),
+            _ => Err(RpcWireError::UnknownFrameType),
         }
     }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum V3WireError {
+pub enum RpcWireError {
     Truncated,
     UnknownFrameType,
     Reserved,
@@ -60,63 +60,63 @@ pub enum V3WireError {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct V3FrameHeader {
+pub struct RpcFrameHeader {
     pub payload_len: u32,
     pub stream_id: u32,
-    pub frame_type: V3FrameType,
+    pub frame_type: RpcFrameType,
     pub flags: u8,
 }
-impl V3FrameHeader {
-    pub fn parse(bytes: &[u8], max_frame_payload: usize) -> Result<Self, V3WireError> {
-        let raw: [u8; V3_HEADER_BYTES] = bytes.try_into().map_err(|_| V3WireError::Truncated)?;
+impl RpcFrameHeader {
+    pub fn parse(bytes: &[u8], max_frame_payload: usize) -> Result<Self, RpcWireError> {
+        let raw: [u8; RPC_HEADER_BYTES] = bytes.try_into().map_err(|_| RpcWireError::Truncated)?;
         let payload_len =
-            u32::from_be_bytes(raw[0..4].try_into().map_err(|_| V3WireError::Truncated)?);
+            u32::from_be_bytes(raw[0..4].try_into().map_err(|_| RpcWireError::Truncated)?);
         let stream_id =
-            u32::from_be_bytes(raw[4..8].try_into().map_err(|_| V3WireError::Truncated)?);
-        let frame_type = V3FrameType::try_from(raw[8])?;
+            u32::from_be_bytes(raw[4..8].try_into().map_err(|_| RpcWireError::Truncated)?);
+        let frame_type = RpcFrameType::try_from(raw[8])?;
         let flags = raw[9];
         if raw[10] != 0 || raw[11] != 0 {
-            return Err(V3WireError::Reserved);
+            return Err(RpcWireError::Reserved);
         }
-        if flags & !V3_END_STREAM != 0
-            || (flags != 0 && !matches!(frame_type, V3FrameType::Data | V3FrameType::Response))
+        if flags & !RPC_END_STREAM != 0
+            || (flags != 0 && !matches!(frame_type, RpcFrameType::Data | RpcFrameType::Response))
         {
-            return Err(V3WireError::Flags);
+            return Err(RpcWireError::Flags);
         }
-        if stream_id > V3_MAX_STREAM_ID
+        if stream_id > RPC_MAX_STREAM_ID
             || (stream_id == 0
                 && !matches!(
                     frame_type,
-                    V3FrameType::Ping
-                        | V3FrameType::Pong
-                        | V3FrameType::WindowUpdate
-                        | V3FrameType::GoAway
+                    RpcFrameType::Ping
+                        | RpcFrameType::Pong
+                        | RpcFrameType::WindowUpdate
+                        | RpcFrameType::GoAway
                 ))
             || (stream_id != 0
                 && matches!(
                     frame_type,
-                    V3FrameType::Ping | V3FrameType::Pong | V3FrameType::GoAway
+                    RpcFrameType::Ping | RpcFrameType::Pong | RpcFrameType::GoAway
                 ))
         {
-            return Err(V3WireError::StreamId);
+            return Err(RpcWireError::StreamId);
         }
-        let len = usize::try_from(payload_len).map_err(|_| V3WireError::Length)?;
-        if len > max_frame_payload.min(V3_HARD_MAX_FRAME_PAYLOAD_BYTES)
-            || (!matches!(frame_type, V3FrameType::Data) && len > V3_MAX_METADATA_BYTES)
-            || (matches!(frame_type, V3FrameType::WindowUpdate) && len != 4)
-            || (matches!(frame_type, V3FrameType::Ping | V3FrameType::Pong) && len != 8)
-            || (matches!(frame_type, V3FrameType::CloseStream) && len != 0)
-            || (matches!(frame_type, V3FrameType::Data) && len == 0 && flags != V3_END_STREAM)
+        let len = usize::try_from(payload_len).map_err(|_| RpcWireError::Length)?;
+        if len > max_frame_payload.min(RPC_HARD_MAX_FRAME_PAYLOAD_BYTES)
+            || (!matches!(frame_type, RpcFrameType::Data) && len > RPC_MAX_METADATA_BYTES)
+            || (matches!(frame_type, RpcFrameType::WindowUpdate) && len != 4)
+            || (matches!(frame_type, RpcFrameType::Ping | RpcFrameType::Pong) && len != 8)
+            || (matches!(frame_type, RpcFrameType::CloseStream) && len != 0)
+            || (matches!(frame_type, RpcFrameType::Data) && len == 0 && flags != RPC_END_STREAM)
             || (matches!(
                 frame_type,
-                V3FrameType::Open
-                    | V3FrameType::Accept
-                    | V3FrameType::Response
-                    | V3FrameType::ResetStream
-                    | V3FrameType::GoAway
+                RpcFrameType::Open
+                    | RpcFrameType::Accept
+                    | RpcFrameType::Response
+                    | RpcFrameType::ResetStream
+                    | RpcFrameType::GoAway
             ) && len == 0)
         {
-            return Err(V3WireError::Length);
+            return Err(RpcWireError::Length);
         }
         Ok(Self {
             payload_len,
@@ -125,8 +125,8 @@ impl V3FrameHeader {
             flags,
         })
     }
-    pub fn encode(self) -> [u8; V3_HEADER_BYTES] {
-        let mut raw = [0; V3_HEADER_BYTES];
+    pub fn encode(self) -> [u8; RPC_HEADER_BYTES] {
+        let mut raw = [0; RPC_HEADER_BYTES];
         raw[0..4].copy_from_slice(&self.payload_len.to_be_bytes());
         raw[4..8].copy_from_slice(&self.stream_id.to_be_bytes());
         raw[8] = self.frame_type as u8;
@@ -138,14 +138,14 @@ impl V3FrameHeader {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-pub struct V3Limits {
+pub struct RpcLimits {
     pub max_frame_payload_bytes: u32,
     pub max_concurrent_streams: u32,
     pub initial_stream_window_bytes: u32,
     pub initial_connection_window_bytes: u32,
     pub heartbeat_ms: u32,
 }
-impl Default for V3Limits {
+impl Default for RpcLimits {
     fn default() -> Self {
         Self {
             max_frame_payload_bytes: 8192,
@@ -156,9 +156,9 @@ impl Default for V3Limits {
         }
     }
 }
-impl V3Limits {
-    pub fn validate(&self) -> Result<(), V3WireError> {
-        if !(4096..=V3_HARD_MAX_FRAME_PAYLOAD_BYTES as u32).contains(&self.max_frame_payload_bytes)
+impl RpcLimits {
+    pub fn validate(&self) -> Result<(), RpcWireError> {
+        if !(4096..=RPC_HARD_MAX_FRAME_PAYLOAD_BYTES as u32).contains(&self.max_frame_payload_bytes)
             || self.max_concurrent_streams == 0
             || self.max_concurrent_streams > 4096
             || self.initial_stream_window_bytes < self.max_frame_payload_bytes
@@ -167,11 +167,11 @@ impl V3Limits {
             || self.heartbeat_ms == 0
             || self.heartbeat_ms > 60_000
         {
-            return Err(V3WireError::Limits);
+            return Err(RpcWireError::Limits);
         }
         Ok(())
     }
-    pub fn negotiate(&self, peer: &Self) -> Result<Self, V3WireError> {
+    pub fn negotiate(&self, peer: &Self) -> Result<Self, RpcWireError> {
         self.validate()?;
         peer.validate()?;
         let limits = Self {
@@ -194,19 +194,19 @@ impl V3Limits {
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
-pub enum V3Bootstrap {
+pub enum RpcBootstrap {
     Hello {
         version: u16,
         token: Option<String>,
-        limits: V3Limits,
+        limits: RpcLimits,
     },
     Ready {
         version: u16,
         connection_epoch: u64,
-        limits: V3Limits,
+        limits: RpcLimits,
     },
 }
-impl std::fmt::Debug for V3Bootstrap {
+impl std::fmt::Debug for RpcBootstrap {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Hello {
@@ -232,18 +232,18 @@ impl std::fmt::Debug for V3Bootstrap {
         }
     }
 }
-impl V3Bootstrap {
-    pub fn validate(&self) -> Result<(), V3WireError> {
+impl RpcBootstrap {
+    pub fn validate(&self) -> Result<(), RpcWireError> {
         match self {
             Self::Hello {
                 version,
                 token,
                 limits,
             } => {
-                if *version != BUSINESS_RPC_V3_VERSION
+                if *version != BUSINESS_RPC_PROTOCOL_VERSION
                     || token.as_ref().is_some_and(|s| s.len() > 256)
                 {
-                    return Err(V3WireError::Limits);
+                    return Err(RpcWireError::Limits);
                 }
                 limits.validate()
             }
@@ -252,8 +252,8 @@ impl V3Bootstrap {
                 connection_epoch,
                 limits,
             } => {
-                if *version != BUSINESS_RPC_V3_VERSION || *connection_epoch == 0 {
-                    return Err(V3WireError::Limits);
+                if *version != BUSINESS_RPC_PROTOCOL_VERSION || *connection_epoch == 0 {
+                    return Err(RpcWireError::Limits);
                 }
                 limits.validate()
             }
@@ -263,7 +263,7 @@ impl V3Bootstrap {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
-pub enum V3Open {
+pub enum RpcOpen {
     Provider {
         provider_id: String,
     },
@@ -286,12 +286,12 @@ pub enum V3Open {
         content_length: u32,
     },
 }
-impl V3Open {
-    pub fn validate(&self) -> Result<(), V3WireError> {
+impl RpcOpen {
+    pub fn validate(&self) -> Result<(), RpcWireError> {
         match self {
             Self::Provider { provider_id } => {
                 if provider_id.is_empty() || provider_id.len() > 64 {
-                    return Err(V3WireError::Metadata);
+                    return Err(RpcWireError::Metadata);
                 }
             }
             Self::EventSubscription {
@@ -299,7 +299,7 @@ impl V3Open {
                 filter,
             } => {
                 if subscription_id.0.is_nil() || filter.validate().is_err() {
-                    return Err(V3WireError::Metadata);
+                    return Err(RpcWireError::Metadata);
                 }
             }
             Self::Rpc {
@@ -317,10 +317,10 @@ impl V3Open {
                     || !method
                         .bytes()
                         .all(|byte| byte.is_ascii_lowercase() || byte == b'.' || byte == b'_')
-                    || parent_stream_id.is_some_and(|id| id == 0 || id > V3_MAX_STREAM_ID)
-                    || *content_length as usize > V3_MAX_MESSAGE_BYTES
+                    || parent_stream_id.is_some_and(|id| id == 0 || id > RPC_MAX_STREAM_ID)
+                    || *content_length as usize > RPC_MAX_MESSAGE_BYTES
                 {
-                    return Err(V3WireError::Metadata);
+                    return Err(RpcWireError::Metadata);
                 }
             }
             Self::EventDelivery {
@@ -331,13 +331,13 @@ impl V3Open {
                 content_length,
             } => {
                 if *parent_stream_id == 0
-                    || *parent_stream_id > V3_MAX_STREAM_ID
+                    || *parent_stream_id > RPC_MAX_STREAM_ID
                     || delivery_id.is_nil()
                     || event_id.is_nil()
                     || *attempt == 0
-                    || *content_length as usize > V3_MAX_MESSAGE_BYTES
+                    || *content_length as usize > RPC_MAX_MESSAGE_BYTES
                 {
-                    return Err(V3WireError::Metadata);
+                    return Err(RpcWireError::Metadata);
                 }
             }
         }
@@ -366,26 +366,26 @@ impl V3Open {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct V3Accept {
+pub struct RpcAccept {
     pub provider_epoch: Option<u64>,
     pub sync_required: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct V3Response {
+pub struct RpcResponse {
     pub content_length: u32,
     pub error: Option<RpcError>,
 }
-impl V3Response {
-    pub fn validate(&self) -> Result<(), V3WireError> {
-        if self.content_length as usize > V3_MAX_MESSAGE_BYTES
+impl RpcResponse {
+    pub fn validate(&self) -> Result<(), RpcWireError> {
+        if self.content_length as usize > RPC_MAX_MESSAGE_BYTES
             || self
                 .error
                 .as_ref()
                 .is_some_and(|error| error.message.len() > 256)
         {
-            Err(V3WireError::Metadata)
+            Err(RpcWireError::Metadata)
         } else {
             Ok(())
         }
@@ -394,21 +394,21 @@ impl V3Response {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum V3EventStatus {
+pub enum RpcEventStatus {
     Ok,
     Error,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct V3EventAck {
-    pub status: V3EventStatus,
+pub struct RpcEventAck {
+    pub status: RpcEventStatus,
     pub delivery_id: Uuid,
     pub event_id: Uuid,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum V3ResetCode {
+pub enum RpcResetCode {
     Cancel,
     RefusedStream,
     ProtocolError,
@@ -420,14 +420,14 @@ pub enum V3ResetCode {
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct V3Reset {
-    pub code: V3ResetCode,
+pub struct RpcReset {
+    pub code: RpcResetCode,
     pub message: String,
 }
-impl V3Reset {
-    pub fn validate(&self) -> Result<(), V3WireError> {
+impl RpcReset {
+    pub fn validate(&self) -> Result<(), RpcWireError> {
         if self.message.len() > 256 {
-            Err(V3WireError::Metadata)
+            Err(RpcWireError::Metadata)
         } else {
             Ok(())
         }
@@ -435,7 +435,7 @@ impl V3Reset {
 }
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum V3GoAwayCode {
+pub enum RpcGoAwayCode {
     NoError,
     ProtocolError,
     FlowControlError,
@@ -444,15 +444,15 @@ pub enum V3GoAwayCode {
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct V3GoAway {
+pub struct RpcGoAway {
     pub last_stream_id: u32,
-    pub code: V3GoAwayCode,
+    pub code: RpcGoAwayCode,
     pub message: String,
 }
-impl V3GoAway {
-    pub fn validate(&self) -> Result<(), V3WireError> {
-        if self.last_stream_id > V3_MAX_STREAM_ID || self.message.len() > 256 {
-            Err(V3WireError::Metadata)
+impl RpcGoAway {
+    pub fn validate(&self) -> Result<(), RpcWireError> {
+        if self.last_stream_id > RPC_MAX_STREAM_ID || self.message.len() > 256 {
+            Err(RpcWireError::Metadata)
         } else {
             Ok(())
         }
@@ -464,67 +464,73 @@ mod tests {
     use super::*;
     #[test]
     fn frozen_wire_numbers_and_versions() {
-        assert_eq!(BUSINESS_RPC_V3_VERSION, 3);
+        assert_eq!(BUSINESS_RPC_PROTOCOL_VERSION, 3);
         assert_eq!(
             [
-                V3FrameType::Open as u8,
-                V3FrameType::Accept as u8,
-                V3FrameType::Response as u8,
-                V3FrameType::Data as u8,
-                V3FrameType::WindowUpdate as u8,
-                V3FrameType::ResetStream as u8,
-                V3FrameType::CloseStream as u8,
-                V3FrameType::Ping as u8,
-                V3FrameType::Pong as u8,
-                V3FrameType::GoAway as u8
+                RpcFrameType::Open as u8,
+                RpcFrameType::Accept as u8,
+                RpcFrameType::Response as u8,
+                RpcFrameType::Data as u8,
+                RpcFrameType::WindowUpdate as u8,
+                RpcFrameType::ResetStream as u8,
+                RpcFrameType::CloseStream as u8,
+                RpcFrameType::Ping as u8,
+                RpcFrameType::Pong as u8,
+                RpcFrameType::GoAway as u8
             ],
             [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
         );
     }
     #[test]
     fn header_rejects_before_payload_allocation() {
-        let header = V3FrameHeader {
+        let header = RpcFrameHeader {
             payload_len: 8192,
             stream_id: 2,
-            frame_type: V3FrameType::Data,
-            flags: V3_END_STREAM,
+            frame_type: RpcFrameType::Data,
+            flags: RPC_END_STREAM,
         };
-        assert_eq!(V3FrameHeader::parse(&header.encode(), 8192), Ok(header));
+        assert_eq!(RpcFrameHeader::parse(&header.encode(), 8192), Ok(header));
         let mut bad = header.encode();
         bad[10] = 1;
-        assert_eq!(V3FrameHeader::parse(&bad, 8192), Err(V3WireError::Reserved));
+        assert_eq!(
+            RpcFrameHeader::parse(&bad, 8192),
+            Err(RpcWireError::Reserved)
+        );
         bad = header.encode();
         bad[9] = 2;
-        assert_eq!(V3FrameHeader::parse(&bad, 8192), Err(V3WireError::Flags));
+        assert_eq!(RpcFrameHeader::parse(&bad, 8192), Err(RpcWireError::Flags));
         bad = header.encode();
         bad[8] = 99;
         assert_eq!(
-            V3FrameHeader::parse(&bad, 8192),
-            Err(V3WireError::UnknownFrameType)
+            RpcFrameHeader::parse(&bad, 8192),
+            Err(RpcWireError::UnknownFrameType)
         );
         bad = header.encode();
         bad[0..4].copy_from_slice(&u32::MAX.to_be_bytes());
-        assert_eq!(V3FrameHeader::parse(&bad, 8192), Err(V3WireError::Length));
+        assert_eq!(RpcFrameHeader::parse(&bad, 8192), Err(RpcWireError::Length));
         bad = header.encode();
         bad[4..8].copy_from_slice(&0u32.to_be_bytes());
-        assert_eq!(V3FrameHeader::parse(&bad, 8192), Err(V3WireError::StreamId));
         assert_eq!(
-            V3FrameHeader::parse(&bad[..11], 8192),
-            Err(V3WireError::Truncated)
+            RpcFrameHeader::parse(&bad, 8192),
+            Err(RpcWireError::StreamId)
+        );
+        assert_eq!(
+            RpcFrameHeader::parse(&bad[..11], 8192),
+            Err(RpcWireError::Truncated)
         );
     }
     #[test]
     fn bootstrap_is_versioned_and_role_free() {
-        let hello = V3Bootstrap::Hello {
+        let hello = RpcBootstrap::Hello {
             version: 3,
             token: None,
-            limits: V3Limits::default(),
+            limits: RpcLimits::default(),
         };
         let wire = serde_json::to_value(&hello).unwrap();
         assert_eq!(wire["version"], 3);
         assert!(wire.get("role").is_none());
         assert!(
-            serde_json::from_value::<V3Bootstrap>(wire)
+            serde_json::from_value::<RpcBootstrap>(wire)
                 .unwrap()
                 .validate()
                 .is_ok()
@@ -532,10 +538,10 @@ mod tests {
     }
     #[test]
     fn hello_debug_redacts_token_without_changing_wire() {
-        let hello = V3Bootstrap::Hello {
-            version: BUSINESS_RPC_V3_VERSION,
+        let hello = RpcBootstrap::Hello {
+            version: BUSINESS_RPC_PROTOCOL_VERSION,
             token: Some("private-test-token".into()),
-            limits: V3Limits::default(),
+            limits: RpcLimits::default(),
         };
         assert!(!format!("{hello:?}").contains("private-test-token"));
         let wire = serde_json::to_value(&hello).unwrap();
@@ -544,18 +550,18 @@ mod tests {
     #[test]
     fn current_bootstrap_rejects_old_unknown_and_corrupt_versions() {
         for version in [0, 1, 2, 4, u16::MAX] {
-            let hello = V3Bootstrap::Hello {
+            let hello = RpcBootstrap::Hello {
                 version,
                 token: None,
-                limits: V3Limits::default(),
+                limits: RpcLimits::default(),
             };
             assert!(hello.validate().is_err());
         }
         assert!(
-            V3Bootstrap::Hello {
-                version: BUSINESS_RPC_V3_VERSION,
+            RpcBootstrap::Hello {
+                version: BUSINESS_RPC_PROTOCOL_VERSION,
                 token: None,
-                limits: V3Limits::default()
+                limits: RpcLimits::default()
             }
             .validate()
             .is_ok()

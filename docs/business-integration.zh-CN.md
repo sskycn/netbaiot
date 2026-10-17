@@ -72,7 +72,7 @@ python3 examples/business_http_sink.py
 
 ## Confirmed Business RPC
 
-业务监听器只支持 [Business RPC V3](business-rpc-v3.zh-CN.md)，必须显式配置 `business_tcp` 与 `business_rpc`。生产使用 mTLS principal；回环开发配置独立 `NETBAIOT_BUSINESS_RPC_TOKEN`，并在客户端显式设置事件 token。管理或设备凭据不授权这个监听器。
+业务监听器只支持 [Business RPC V3](business-rpc.zh-CN.md)，必须显式配置 `business_tcp` 与 `business_rpc`。生产使用 mTLS principal；回环开发配置独立 `NETBAIOT_BUSINESS_RPC_TOKEN`，并在客户端显式设置事件 token。管理或设备凭据不授权这个监听器。
 
 bootstrap 为有界 Hello/Ready JSON；后续是 12-byte header 的二进制 stream framing。Provider、EventSubscription 和在线命令 RPC 分别管理。唯一活动 required sink `tcp-rpc` 所有者每次只有一个事件在途。应用事务成功后调用 ACK，匹配当前 epoch/stream、delivery 与 event identity；socket write 与 WINDOW_UPDATE 都不是业务 ACK。filter 改变不能丢弃已经接受的 required 工作。重连可以重放稳定 EventId，业务必须幂等。
 
@@ -86,7 +86,7 @@ bootstrap 为有界 Hello/Ready JSON；后续是 12-byte header 的二进制 str
 
 - [完整消费与命令示例](../crates/netbaiot-client/examples/business_complete.rs)。
 - [Provider 与事件流](../crates/netbaiot-client/examples/business_rpc_current.rs)。
-- [在线命令 RPC](../crates/netbaiot-client/examples/business_v3_command.rs)。
+- [在线命令 RPC](../crates/netbaiot-client/examples/business_rpc_command.rs)。
 
 Provider 与 EventSubscription 可独立启用。Provider 实现 `BusinessAuthHandler`、
 reset sync、认证、UDP verifier 查询和 revisioned invalidation；revision gap 撤销
@@ -94,7 +94,7 @@ reset sync、认证、UDP verifier 查询和 revisioned invalidation；revision 
 
 命令 principal 需允许 `device.command.send` 并限制租户；同时消费事件时增加
 `sink_id: "tcp-rpc"`。仅发命令的客户端设置 `provider = false`、`events = false`，
-就绪后调用 `BusinessRpcV3Client::send_command(&command)`。`OutcomeUnknown` 表示结果
+就绪后调用 `BusinessRpcClient::send_command(&command)`。`OutcomeUnknown` 表示结果
 不确定，由业务决定是否以相同内容及 `command_id` 重试；HTTP 命令共用进程内去重表。
 
 ## Command/downlink

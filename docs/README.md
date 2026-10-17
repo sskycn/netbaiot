@@ -13,7 +13,7 @@ are authoritative for configuration structure.
 | Understand the runtime | [Architecture](architecture.md), [delivery semantics and EventBus](delivery-semantics.md), [resource budgets](resource-budgets.md) |
 | Connect devices | [Protocol matrix](protocol-support.md), [MQTT](mqtt.md), [device framing](device-protocol.md), [device SDK](device-sdk.md) |
 | Decode payloads | [Built-in codecs](codecs.md), [vendor codecs](vendor-codecs.md) |
-| Integrate business systems | [Business integration](business-integration.md), [Business RPC V3](business-rpc-v3.md), [Rust client](client.md), [public protocol](public-protocol.md) |
+| Integrate business systems | [Business integration](business-integration.md), [Business RPC V3](business-rpc.md), [Rust client](client.md), [public protocol](public-protocol.md) |
 | Manage and secure | [HTTP API](http-api.md), [management auth](management-auth.md), [auth cache](authentication-cache.md), [control plane](control-plane.md), [security](security.md), [UDP key provisioning](device-key-security.md) |
 | Deploy and recover | [Platform support](platform-support.md), [graceful restart](graceful-restart.md), [restart spool](restart-spool.md), [MQTT recovery](mqtt-session-recovery.md) |
 | Validate and maintain | [Maintenance](maintenance.md), [MQTT conformance](mqtt-3.1.1-conformance.md), [benchmarks](benchmarks.md), [production validation](production-readiness.md), [measurement evidence](performance/README.md), [reproduction scripts](../scripts/perf/README.md) |

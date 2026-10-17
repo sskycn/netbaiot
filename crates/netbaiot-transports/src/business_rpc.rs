@@ -1,5 +1,5 @@
 //! Current Business RPC transport and shared authorization/control state.
-mod v3;
+mod session;
 use crate::mqtt::broker::MqttBroker;
 use netbaiot_core::{
     AuthInvalidation, SubscriptionId, TenantId,
@@ -145,8 +145,8 @@ pub enum BusinessIdentity {
 pub struct BusinessRpcTransportConfig {
     pub identity: BusinessIdentity,
     pub tls: Option<TlsAcceptor>,
-    pub limits: netbaiot_core::business_rpc_v3::V3Limits,
-    pub send_ahead: Option<V3SendAhead>,
+    pub limits: netbaiot_core::business_rpc::wire::RpcLimits,
+    pub send_ahead: Option<RpcSendAhead>,
     /// Experiment only: OS socket send buffer request, outside the V3 protocol.
     pub experiment_socket_send_buffer_bytes: Option<usize>,
     pub max_connections: usize,
@@ -160,13 +160,13 @@ pub struct BusinessRpcTransportConfig {
 #[derive(Clone, Copy, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-pub struct V3SendAhead {
+pub struct RpcSendAhead {
     pub stream_bytes: u32,
     pub connection_bytes: u32,
 }
-impl V3SendAhead {
-    pub fn as_mux(self) -> netbaiot_v3_mux::SendAheadLimits {
-        netbaiot_v3_mux::SendAheadLimits {
+impl RpcSendAhead {
+    pub fn as_mux(self) -> netbaiot_rpc_mux::SendAheadLimits {
+        netbaiot_rpc_mux::SendAheadLimits {
             stream_bytes: self.stream_bytes,
             connection_bytes: self.connection_bytes,
         }
@@ -414,7 +414,7 @@ async fn connection_inner(
         config.handshake_timeout,
     )
     .await?;
-    v3::connection(io, certificate, hello, config, services, stop).await
+    session::connection(io, certificate, hello, config, services, stop).await
 }
 
 struct ControlRequest {
@@ -837,8 +837,10 @@ mod tests {
             );
         }
         assert!(
-            serde_json::from_slice::<netbaiot_core::business_rpc_v3::V3Bootstrap>(b"{not json}")
-                .is_err()
+            serde_json::from_slice::<netbaiot_core::business_rpc::wire::RpcBootstrap>(
+                b"{not json}"
+            )
+            .is_err()
         );
     }
 

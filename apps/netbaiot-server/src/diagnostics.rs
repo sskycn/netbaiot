@@ -128,7 +128,7 @@ impl Config {
             "NBI-CFG-008",
             "business_rpc",
             "Business listener, roles, identities or protocol limits are inconsistent.",
-            "Check the version, listener, mTLS identity roles and development token settings in docs/business-rpc-v3.md.",
+            "Check the version, listener, mTLS identity roles and development token settings in docs/business-rpc.md.",
         );
         let auth = self
             .device_auth

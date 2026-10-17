@@ -68,7 +68,7 @@ role/permission 约束、环境 secret source、真实 PEM/key 匹配以及运�
 开发 token env 和连接/认证上限。旧 `version`、`allow_v1`、`v3`、`v3_send_ahead` 与
 `v3_experiment_socket_send_buffer_bytes` 会因未知字段失败。生产使用 mTLS 和明确映射的
 principal；无 TLS 只允许 loopback 开发 token。详见
-[协议升级指南](migration/current-protocol-only.zh-CN.md)与[Business RPC V3](business-rpc-v3.zh-CN.md)。
+[协议升级指南](migration/current-protocol-only.zh-CN.md)与[Business RPC V3](business-rpc.zh-CN.md)。
 
 ## 每租户事件 backlog
 

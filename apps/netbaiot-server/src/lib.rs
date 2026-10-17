@@ -5,7 +5,7 @@ use netbaiot_transports::{
     Services,
     business_rpc::{
         self, BusinessIdentity, BusinessPrincipal, BusinessRpcServices, BusinessRpcTransportConfig,
-        V3SendAhead,
+        RpcSendAhead,
     },
     mqtt::broker::MqttBroker,
     serve_device_ingress, serve_management_http, udp,
@@ -50,7 +50,7 @@ mod reliability_tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     #[test]
-    fn business_rpc_v3_config_is_explicit_and_limits_are_checked() {
+    fn business_rpc_mux_config_is_explicit_and_limits_are_checked() {
         let mut config: Config =
             serde_json::from_str(include_str!("../../../configs/development.json")).unwrap();
         config.business_tcp = Some("127.0.0.1:19002".parse().unwrap());
@@ -68,7 +68,7 @@ mod reliability_tests {
         );
         assert!(config.validate().is_ok());
 
-        let mut limits = business_rpc_v3::V3Limits::default();
+        let mut limits = netbaiot_core::business_rpc::wire::RpcLimits::default();
         config.business_rpc.as_mut().unwrap().limits = limits.clone();
         assert!(config.validate().is_ok());
 
@@ -85,13 +85,13 @@ mod reliability_tests {
         assert!(config.validate().is_err());
 
         let rpc = config.business_rpc.as_mut().unwrap();
-        rpc.limits = business_rpc_v3::V3Limits::default();
-        rpc.send_ahead = Some(V3SendAhead {
+        rpc.limits = netbaiot_core::business_rpc::wire::RpcLimits::default();
+        rpc.send_ahead = Some(RpcSendAhead {
             stream_bytes: 1,
             connection_bytes: 8192,
         });
         assert!(config.validate().is_err());
-        config.business_rpc.as_mut().unwrap().send_ahead = Some(V3SendAhead {
+        config.business_rpc.as_mut().unwrap().send_ahead = Some(RpcSendAhead {
             stream_bytes: 8192,
             connection_bytes: 131072,
         });
@@ -115,7 +115,7 @@ mod reliability_tests {
                 serde_json::from_str(include_str!("../../../configs/development.json")).unwrap();
             config.business_tcp = Some("127.0.0.1:19002".parse().unwrap());
             config.business_rpc = Some(BusinessRpcConfig {
-                limits: netbaiot_core::business_rpc_v3::V3Limits::default(),
+                limits: netbaiot_core::business_rpc::wire::RpcLimits::default(),
                 send_ahead: None,
                 experiment_socket_send_buffer_bytes: None,
                 tls: Some(ManagementTlsFiles {

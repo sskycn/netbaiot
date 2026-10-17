@@ -10,8 +10,8 @@ import sys
 
 
 ROOT = Path(__file__).resolve().parents[2]
-HARNESS = ROOT / "tools/netbaiot-loadgen/run_business_rpc_v3_hol.py"
-ANALYZER = ROOT / "tools/netbaiot-loadgen/analyze_business_rpc_v3_hol.py"
+HARNESS = ROOT / "tools/netbaiot-loadgen/run_business_rpc_hol.py"
+ANALYZER = ROOT / "tools/netbaiot-loadgen/analyze_business_rpc_hol.py"
 VARIANTS = ("v3-dual", "v3-baseline", "v3-ahead-8192", "v3-ahead-16384")
 
 

@@ -2,9 +2,9 @@
 //! A connection has exactly one writer. That writer obtains frames from `MuxScheduler`;
 //! no stream may write directly to the socket.
 use bytes::Bytes;
-use netbaiot_protocol::business_rpc_v3::{
-    V3_END_STREAM, V3_MAX_MESSAGE_BYTES, V3_MAX_STREAM_ID, V3FrameHeader, V3FrameType, V3Limits,
-    V3Open, V3WireError,
+use netbaiot_protocol::business_rpc::wire::{
+    RPC_END_STREAM, RPC_MAX_MESSAGE_BYTES, RPC_MAX_STREAM_ID, RpcFrameHeader, RpcFrameType,
+    RpcLimits, RpcOpen, RpcWireError,
 };
 use std::{
     collections::{HashMap, VecDeque},
@@ -19,7 +19,7 @@ use tokio::{sync::mpsc, task::JoinHandle};
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum MuxError {
-    Connection(V3WireError),
+    Connection(RpcWireError),
     Stream,
     FlowControl,
     Overloaded,
@@ -30,7 +30,7 @@ pub enum MuxError {
 
 #[derive(Clone)]
 pub struct Frame {
-    pub header: V3FrameHeader,
+    pub header: RpcFrameHeader,
     pub payload: Bytes,
 }
 impl std::fmt::Debug for Frame {
@@ -45,19 +45,19 @@ impl std::fmt::Debug for Frame {
 impl Frame {
     pub fn new(
         stream_id: u32,
-        frame_type: V3FrameType,
+        frame_type: RpcFrameType,
         flags: u8,
         payload: Bytes,
         max: usize,
     ) -> Result<Self, MuxError> {
         let payload_len = u32::try_from(payload.len()).map_err(|_| MuxError::MessageTooLarge)?;
-        let header = V3FrameHeader {
+        let header = RpcFrameHeader {
             payload_len,
             stream_id,
             frame_type,
             flags,
         };
-        V3FrameHeader::parse(&header.encode(), max).map_err(MuxError::Connection)?;
+        RpcFrameHeader::parse(&header.encode(), max).map_err(MuxError::Connection)?;
         Ok(Self { header, payload })
     }
 }
@@ -74,7 +74,7 @@ pub async fn read_frame<R: AsyncRead + Unpin>(
             .read_exact(&mut raw)
             .await
             .map_err(|_| MuxError::Io)?;
-        let header = V3FrameHeader::parse(&raw, max).map_err(MuxError::Connection)?;
+        let header = RpcFrameHeader::parse(&raw, max).map_err(MuxError::Connection)?;
         let mut payload = vec![0; header.payload_len as usize];
         reader
             .read_exact(&mut payload)
@@ -151,7 +151,7 @@ pub enum Initiator {
 }
 impl Initiator {
     fn owns(self, id: u32) -> bool {
-        id != 0 && id <= V3_MAX_STREAM_ID && (id & 1 == if self == Self::Client { 1 } else { 0 })
+        id != 0 && id <= RPC_MAX_STREAM_ID && (id & 1 == if self == Self::Client { 1 } else { 0 })
     }
     fn opposite(self) -> Self {
         if self == Self::Client {
@@ -210,13 +210,13 @@ pub enum StreamKind {
     Rpc,
     EventDelivery,
 }
-impl From<&V3Open> for StreamKind {
-    fn from(open: &V3Open) -> Self {
+impl From<&RpcOpen> for StreamKind {
+    fn from(open: &RpcOpen) -> Self {
         match open {
-            V3Open::Provider { .. } => Self::Provider,
-            V3Open::EventSubscription { .. } => Self::EventSubscription,
-            V3Open::Rpc { .. } => Self::Rpc,
-            V3Open::EventDelivery { .. } => Self::EventDelivery,
+            RpcOpen::Provider { .. } => Self::Provider,
+            RpcOpen::EventSubscription { .. } => Self::EventSubscription,
+            RpcOpen::Rpc { .. } => Self::Rpc,
+            RpcOpen::EventDelivery { .. } => Self::EventDelivery,
         }
     }
 }
@@ -249,7 +249,7 @@ pub struct StreamTable {
     local: Initiator,
     highest_peer: u32,
     next_local: u32,
-    limits: V3Limits,
+    limits: RpcLimits,
     streams: HashMap<u32, Stream>,
     connection_window: u32,
     connection_reserved: usize,
@@ -260,7 +260,7 @@ pub struct StreamTable {
 impl StreamTable {
     pub fn new(
         local: Initiator,
-        limits: V3Limits,
+        limits: RpcLimits,
         connection_budget: usize,
         global_budget: Arc<ReassemblyBudget>,
     ) -> Result<Self, MuxError> {
@@ -292,7 +292,7 @@ impl StreamTable {
     }
     /// The final legal local ID is consumed before GOAWAY; IDs never wrap or restart in place.
     pub fn local_ids_exhausted(&self) -> bool {
-        self.next_local > V3_MAX_STREAM_ID
+        self.next_local > RPC_MAX_STREAM_ID
     }
     /// GOAWAY's last ID is the highest accepted peer stream, not an arbitrary future ID.
     pub fn goaway(&mut self) -> u32 {
@@ -301,14 +301,14 @@ impl StreamTable {
     }
     pub fn check_peer_id(&self, id: u32) -> Result<(), MuxError> {
         if !self.local.opposite().owns(id) || id <= self.highest_peer {
-            return Err(MuxError::Connection(V3WireError::StreamId));
+            return Err(MuxError::Connection(RpcWireError::StreamId));
         }
         if !self.accepting {
             return Err(MuxError::Stream);
         }
         Ok(())
     }
-    fn check_parent(&self, open: &V3Open) -> Result<(), MuxError> {
+    fn check_parent(&self, open: &RpcOpen) -> Result<(), MuxError> {
         let Some(parent) = open.parent() else {
             return Ok(());
         };
@@ -319,8 +319,8 @@ impl StreamTable {
             return Err(MuxError::Stream);
         }
         match open {
-            V3Open::EventDelivery { .. } if owner.kind == StreamKind::EventSubscription => Ok(()),
-            V3Open::Rpc { method, .. }
+            RpcOpen::EventDelivery { .. } if owner.kind == StreamKind::EventSubscription => Ok(()),
+            RpcOpen::Rpc { method, .. }
                 if method.starts_with("auth.")
                     || method.starts_with("device.authenticate")
                     || method == "device.resolve_verifier" =>
@@ -331,18 +331,18 @@ impl StreamTable {
                     Err(MuxError::Stream)
                 }
             }
-            V3Open::Rpc { .. } => Ok(()),
+            RpcOpen::Rpc { .. } => Ok(()),
             _ => Err(MuxError::Stream),
         }
     }
-    fn insert(&mut self, id: u32, open: &V3Open, inbound: bool) -> Result<(), MuxError> {
+    fn insert(&mut self, id: u32, open: &RpcOpen, inbound: bool) -> Result<(), MuxError> {
         if self.streams.len() >= self.limits.max_concurrent_streams as usize {
             return Err(MuxError::Overloaded);
         }
         self.check_parent(open)?;
         let kind = StreamKind::from(open);
         let length = if inbound { open.content_length() } else { 0 };
-        if length > V3_MAX_MESSAGE_BYTES {
+        if length > RPC_MAX_MESSAGE_BYTES {
             return Err(MuxError::MessageTooLarge);
         }
         let reserved = self
@@ -385,17 +385,17 @@ impl StreamTable {
         Ok(())
     }
     /// Caller authorizes kind, method, and scope before this resource admission.
-    pub fn open_peer(&mut self, id: u32, open: &V3Open) -> Result<(), MuxError> {
+    pub fn open_peer(&mut self, id: u32, open: &RpcOpen) -> Result<(), MuxError> {
         self.refuse_peer(id)?;
         self.insert(id, open, true)
     }
-    pub fn open_local(&mut self, open: &V3Open) -> Result<u32, MuxError> {
+    pub fn open_local(&mut self, open: &RpcOpen) -> Result<u32, MuxError> {
         let id = self.next_local;
-        if !self.accepting || id > V3_MAX_STREAM_ID {
+        if !self.accepting || id > RPC_MAX_STREAM_ID {
             return Err(MuxError::Stream);
         }
         self.insert(id, open, false)?;
-        self.next_local = id.checked_add(2).unwrap_or(V3_MAX_STREAM_ID + 1);
+        self.next_local = id.checked_add(2).unwrap_or(RPC_MAX_STREAM_ID + 1);
         Ok(id)
     }
     pub fn receive_data(
@@ -411,7 +411,7 @@ impl StreamTable {
         let body = stream.body.as_mut().ok_or(MuxError::Stream)?;
         let length = u32::try_from(bytes.len()).map_err(|_| MuxError::MessageTooLarge)?;
         if length > self.connection_window {
-            return Err(MuxError::Connection(V3WireError::Length));
+            return Err(MuxError::Connection(RpcWireError::Length));
         }
         if length > stream.recv_window {
             return Err(MuxError::FlowControl);
@@ -458,7 +458,7 @@ impl StreamTable {
                 .connection_window
                 .checked_add(increment)
                 .filter(|window| *window <= self.limits.initial_connection_window_bytes)
-                .ok_or(MuxError::Connection(V3WireError::Length))?;
+                .ok_or(MuxError::Connection(RpcWireError::Length))?;
         } else {
             let stream = self.streams.get_mut(&id).ok_or(MuxError::Stream)?;
             stream.recv_window = stream
@@ -474,7 +474,7 @@ impl StreamTable {
         if stream.response_seen
             || stream.body.is_some()
             || !stream.local_closed
-            || expected > V3_MAX_MESSAGE_BYTES
+            || expected > RPC_MAX_MESSAGE_BYTES
         {
             return Err(MuxError::Stream);
         }
@@ -557,7 +557,7 @@ pub struct SendAheadLimits {
     pub connection_bytes: u32,
 }
 impl SendAheadLimits {
-    pub fn validate(self, limits: &V3Limits) -> Result<(), MuxError> {
+    pub fn validate(self, limits: &RpcLimits) -> Result<(), MuxError> {
         if self.stream_bytes < limits.max_frame_payload_bytes
             || self.connection_bytes < self.stream_bytes
             || self.connection_bytes > 16 * 1024 * 1024
@@ -594,11 +594,11 @@ pub struct MuxScheduler {
     control_burst: u8,
 }
 impl MuxScheduler {
-    pub fn new(limits: &V3Limits, byte_limit: usize) -> Result<Self, MuxError> {
+    pub fn new(limits: &RpcLimits, byte_limit: usize) -> Result<Self, MuxError> {
         Self::with_send_ahead(limits, byte_limit, None)
     }
     pub fn with_send_ahead(
-        limits: &V3Limits,
+        limits: &RpcLimits,
         byte_limit: usize,
         send_ahead: Option<SendAheadLimits>,
     ) -> Result<Self, MuxError> {
@@ -694,9 +694,9 @@ impl MuxScheduler {
     }
     pub fn queue_body(&mut self, id: u32, class: DataClass, bytes: Bytes) -> Result<(), MuxError> {
         if id == 0
-            || id > V3_MAX_STREAM_ID
+            || id > RPC_MAX_STREAM_ID
             || self.bodies.contains_key(&id)
-            || bytes.len() > V3_MAX_MESSAGE_BYTES
+            || bytes.len() > RPC_MAX_MESSAGE_BYTES
         {
             return Err(MuxError::MessageTooLarge);
         }
@@ -730,7 +730,7 @@ impl MuxScheduler {
                 .conn_window
                 .checked_add(increment)
                 .filter(|n| *n <= self.conn_max)
-                .ok_or(MuxError::Connection(V3WireError::Length))?;
+                .ok_or(MuxError::Connection(RpcWireError::Length))?;
             self.conn_uncredited = self.conn_uncredited.saturating_sub(increment);
         } else {
             let window = self.windows.get_mut(&id).ok_or(MuxError::Stream)?;
@@ -760,7 +760,7 @@ impl MuxScheduler {
                 frame.header.stream_id == id
                     && matches!(
                         frame.header.frame_type,
-                        V3FrameType::Open | V3FrameType::Response
+                        RpcFrameType::Open | RpcFrameType::Response
                     )
             }) {
                 queue.push_back(id);
@@ -823,8 +823,8 @@ impl MuxScheduler {
             }
             return Frame::new(
                 id,
-                V3FrameType::Data,
-                if end { V3_END_STREAM } else { 0 },
+                RpcFrameType::Data,
+                if end { RPC_END_STREAM } else { 0 },
                 payload,
                 self.max_frame,
             )
@@ -872,17 +872,17 @@ impl MuxScheduler {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use netbaiot_protocol::business_rpc_v3::V3Open;
+    use netbaiot_protocol::business_rpc::wire::RpcOpen;
     use uuid::Uuid;
-    fn limits() -> V3Limits {
-        V3Limits::default()
+    fn limits() -> RpcLimits {
+        RpcLimits::default()
     }
     #[test]
     fn frame_debug_omits_application_body() {
         let frame = Frame::new(
             2,
-            V3FrameType::Data,
-            V3_END_STREAM,
+            RpcFrameType::Data,
+            RPC_END_STREAM,
             Bytes::from_static(b"private-device-credential"),
             8192,
         )
@@ -893,7 +893,7 @@ mod tests {
     }
     #[test]
     fn local_id_exhaustion_is_detected_before_reuse() {
-        let request = V3Open::Rpc {
+        let request = RpcOpen::Rpc {
             parent_stream_id: None,
             request_id: Uuid::new_v4(),
             method: "auth.invalidate".into(),
@@ -907,8 +907,8 @@ mod tests {
             ReassemblyBudget::new(100_000),
         )
         .unwrap();
-        client.next_local = V3_MAX_STREAM_ID;
-        assert_eq!(client.open_local(&request), Ok(V3_MAX_STREAM_ID));
+        client.next_local = RPC_MAX_STREAM_ID;
+        assert_eq!(client.open_local(&request), Ok(RPC_MAX_STREAM_ID));
         assert!(client.local_ids_exhausted());
         assert!(client.open_local(&request).is_err());
 
@@ -919,8 +919,8 @@ mod tests {
             ReassemblyBudget::new(100_000),
         )
         .unwrap();
-        server.next_local = V3_MAX_STREAM_ID - 1;
-        assert_eq!(server.open_local(&request), Ok(V3_MAX_STREAM_ID - 1));
+        server.next_local = RPC_MAX_STREAM_ID - 1;
+        assert_eq!(server.open_local(&request), Ok(RPC_MAX_STREAM_ID - 1));
         assert!(server.local_ids_exhausted());
     }
     #[test]
@@ -935,7 +935,7 @@ mod tests {
             .unwrap();
         let second = s.next_frame().unwrap();
         assert_eq!(second.header.stream_id, 3);
-        assert_eq!(second.header.flags, V3_END_STREAM);
+        assert_eq!(second.header.flags, RPC_END_STREAM);
         assert!(s.queued_bytes() > 0);
     }
     #[test]
@@ -1064,7 +1064,7 @@ mod tests {
             ReassemblyBudget::new(100_000),
         )
         .unwrap();
-        let request = V3Open::Rpc {
+        let request = RpcOpen::Rpc {
             parent_stream_id: None,
             request_id: Uuid::new_v4(),
             method: "auth.sync".into(),
@@ -1128,12 +1128,19 @@ mod tests {
         let mut s = MuxScheduler::new(&limits(), 128 * 1024).unwrap();
         for id in [1, 3, 5, 7] {
             s.queue_control(
-                Frame::new(id, V3FrameType::Accept, 0, Bytes::from_static(b"{}"), 8192).unwrap(),
+                Frame::new(id, RpcFrameType::Accept, 0, Bytes::from_static(b"{}"), 8192).unwrap(),
             )
             .unwrap();
         }
         s.queue_control(
-            Frame::new(9, V3FrameType::Response, 0, Bytes::from_static(b"{}"), 8192).unwrap(),
+            Frame::new(
+                9,
+                RpcFrameType::Response,
+                0,
+                Bytes::from_static(b"{}"),
+                8192,
+            )
+            .unwrap(),
         )
         .unwrap();
         s.queue_body(9, DataClass::Rpc, Bytes::from_static(b"reply"))
@@ -1142,8 +1149,8 @@ mod tests {
             .filter_map(|_| s.next_frame())
             .map(|frame| frame.header.frame_type)
             .collect();
-        assert_eq!(frames[4], V3FrameType::Response);
-        assert_eq!(frames[5], V3FrameType::Data);
+        assert_eq!(frames[4], RpcFrameType::Response);
+        assert_eq!(frames[5], RpcFrameType::Data);
     }
     #[test]
     fn blocked_stream_does_not_block_other_stream() {
@@ -1165,7 +1172,7 @@ mod tests {
     fn reassembly_reservation_and_cleanup() {
         let budget = ReassemblyBudget::new(100);
         let mut table = StreamTable::new(Initiator::Server, limits(), 100, budget.clone()).unwrap();
-        let rpc = |len| V3Open::Rpc {
+        let rpc = |len| RpcOpen::Rpc {
             parent_stream_id: None,
             request_id: Uuid::new_v4(),
             method: "auth.sync".into(),
@@ -1183,7 +1190,7 @@ mod tests {
         assert_eq!(budget.used(), 0);
         assert_eq!(
             table.open_peer(1, &rpc(1)),
-            Err(MuxError::Connection(V3WireError::StreamId))
+            Err(MuxError::Connection(RpcWireError::StreamId))
         );
     }
     #[test]
@@ -1194,7 +1201,7 @@ mod tests {
         let budget = ReassemblyBudget::new(100_000);
         let mut table =
             StreamTable::new(Initiator::Server, limits.clone(), 100_000, budget.clone()).unwrap();
-        let request = V3Open::Rpc {
+        let request = RpcOpen::Rpc {
             parent_stream_id: None,
             request_id: Uuid::new_v4(),
             method: "auth.sync".into(),
@@ -1231,7 +1238,7 @@ mod tests {
         table
             .open_peer(
                 1,
-                &V3Open::Provider {
+                &RpcOpen::Provider {
                     provider_id: "primary".into(),
                 },
             )
@@ -1239,13 +1246,13 @@ mod tests {
         table
             .open_peer(
                 3,
-                &V3Open::EventSubscription {
+                &RpcOpen::EventSubscription {
                     subscription_id: netbaiot_protocol::SubscriptionId::generate(),
                     filter: Default::default(),
                 },
             )
             .unwrap();
-        let rpc = V3Open::Rpc {
+        let rpc = RpcOpen::Rpc {
             parent_stream_id: Some(1),
             request_id: Uuid::new_v4(),
             method: "auth.sync".into(),
@@ -1264,7 +1271,7 @@ mod tests {
     fn ids_and_response_state_reject_reuse_and_duplicate_metadata() {
         let budget = ReassemblyBudget::new(100_000);
         let mut table = StreamTable::new(Initiator::Client, limits(), 100_000, budget).unwrap();
-        let request = V3Open::Rpc {
+        let request = RpcOpen::Rpc {
             parent_stream_id: None,
             request_id: Uuid::new_v4(),
             method: "auth.sync".into(),
@@ -1304,7 +1311,7 @@ mod tests {
         limits.initial_connection_window_bytes = 8192;
         let budget = ReassemblyBudget::new(8192);
         let mut table = StreamTable::new(Initiator::Server, limits, 8192, budget.clone()).unwrap();
-        let request = V3Open::Rpc {
+        let request = RpcOpen::Rpc {
             parent_stream_id: None,
             request_id: Uuid::new_v4(),
             method: "auth.sync".into(),
@@ -1314,12 +1321,12 @@ mod tests {
         table.open_peer(1, &request).unwrap();
         assert_eq!(
             table.grant_credit(0, 1),
-            Err(MuxError::Connection(V3WireError::Length))
+            Err(MuxError::Connection(RpcWireError::Length))
         );
         assert_eq!(table.grant_credit(1, 1), Err(MuxError::FlowControl));
         assert_eq!(
             table.grant_credit(0, u32::MAX),
-            Err(MuxError::Connection(V3WireError::Length))
+            Err(MuxError::Connection(RpcWireError::Length))
         );
         table.reset(1).unwrap();
         assert_eq!(budget.used(), 0);
@@ -1352,11 +1359,11 @@ mod tests {
         use tokio::io::AsyncWriteExt;
         let (mut writer, mut reader) = tokio::io::duplex(100);
         let first =
-            Frame::new(1, V3FrameType::Data, 0, Bytes::from_static(b"hello"), 8192).unwrap();
+            Frame::new(1, RpcFrameType::Data, 0, Bytes::from_static(b"hello"), 8192).unwrap();
         let second = Frame::new(
             3,
-            V3FrameType::Data,
-            V3_END_STREAM,
+            RpcFrameType::Data,
+            RPC_END_STREAM,
             Bytes::from_static(b"world"),
             8192,
         )
@@ -1382,7 +1389,7 @@ mod tests {
             (&a.payload[..], &b.payload[..]),
             (&b"hello"[..], &b"world"[..])
         );
-        assert_eq!(b.header.flags, V3_END_STREAM);
+        assert_eq!(b.header.flags, RPC_END_STREAM);
     }
     #[tokio::test]
     async fn cancelled_state_machine_wait_does_not_discard_partial_data() {
@@ -1390,8 +1397,8 @@ mod tests {
         let (mut socket, reader) = tokio::io::duplex(20_000);
         let frame = Frame::new(
             2,
-            V3FrameType::Data,
-            V3_END_STREAM,
+            RpcFrameType::Data,
+            RPC_END_STREAM,
             Bytes::from(vec![7; 8192]),
             8192,
         )

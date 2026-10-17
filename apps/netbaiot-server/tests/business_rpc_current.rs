@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use hmac::{Hmac, Mac};
 use netbaiot_client::NetbaIoTClient;
 use netbaiot_client::business_rpc::{
-    BusinessAuthHandler, BusinessRpcV3Client, BusinessRpcV3ClientConfig,
+    BusinessAuthHandler, BusinessRpcClient, BusinessRpcClientConfig,
 };
 use netbaiot_core::{
     AuthInvalidation, CodecId, CommandId, DeliveryState, DeviceCommand, DeviceCommandPayload,
@@ -110,7 +110,7 @@ async fn command_pressure_preserves_auth_invalidation_and_event_ack() {
             .collect::<String>()
     };
     config.business_rpc = Some(BusinessRpcConfig {
-        limits: netbaiot_protocol::business_rpc_v3::V3Limits::default(),
+        limits: netbaiot_protocol::business_rpc::wire::RpcLimits::default(),
         send_ahead: None,
         experiment_socket_send_buffer_bytes: None,
         tls: Some(ManagementTlsFiles {
@@ -186,7 +186,7 @@ async fn command_pressure_preserves_auth_invalidation_and_event_ack() {
     let mut auth_config = current_config(addresses[2], "unused".into(), BusinessRole::AuthControl);
     auth_config.token = None;
     auth_config.tls = Some(tls("management-client.pem", "management-client-key.pem"));
-    let (auth, _) = BusinessRpcV3Client::connect(auth_config, Some(handler.clone())).unwrap();
+    let (auth, _) = BusinessRpcClient::connect(auth_config, Some(handler.clone())).unwrap();
     tokio::time::timeout(Duration::from_secs(10), auth.wait_ready())
         .await
         .unwrap()
@@ -198,7 +198,7 @@ async fn command_pressure_preserves_auth_invalidation_and_event_ack() {
         "business-command-client-key.pem",
     ));
     app_config.limits.heartbeat_ms = 100;
-    let (application, mut events) = BusinessRpcV3Client::connect(app_config, None).unwrap();
+    let (application, mut events) = BusinessRpcClient::connect(app_config, None).unwrap();
     tokio::time::timeout(Duration::from_secs(10), application.wait_ready())
         .await
         .unwrap()
@@ -307,7 +307,7 @@ async fn commands_role_dispatches_to_real_tcp_and_shares_http_dedup() {
         .map(|byte| format!("{byte:02x}"))
         .collect::<String>();
     config.business_rpc = Some(BusinessRpcConfig {
-        limits: netbaiot_protocol::business_rpc_v3::V3Limits::default(),
+        limits: netbaiot_protocol::business_rpc::wire::RpcLimits::default(),
         send_ahead: None,
         experiment_socket_send_buffer_bytes: None,
         tls: Some(ManagementTlsFiles {
@@ -355,7 +355,7 @@ async fn commands_role_dispatches_to_real_tcp_and_shares_http_dedup() {
         certificate_pem: fixtures.join("management-client.pem"),
         private_key_pem: fixtures.join("management-client-key.pem"),
     });
-    let (business, mut events) = BusinessRpcV3Client::connect(client_config, None).unwrap();
+    let (business, mut events) = BusinessRpcClient::connect(client_config, None).unwrap();
     tokio::time::timeout(Duration::from_secs(10), business.wait_ready())
         .await
         .unwrap()
@@ -438,7 +438,7 @@ async fn business_rpc_command_mqtt_dedup_and_ack_use_real_sockets() {
     config.device_auth = Some(DeviceAuthSource::Static);
     config.event_delivery = Some(EventDeliverySource::BusinessRpc);
     config.business_rpc = Some(BusinessRpcConfig {
-        limits: netbaiot_protocol::business_rpc_v3::V3Limits::default(),
+        limits: netbaiot_protocol::business_rpc::wire::RpcLimits::default(),
         send_ahead: None,
         experiment_socket_send_buffer_bytes: None,
         tls: None,
@@ -463,7 +463,7 @@ async fn business_rpc_command_mqtt_dedup_and_ack_use_real_sockets() {
         .kill_on_drop(true)
         .spawn()
         .unwrap();
-    let (business, mut events) = BusinessRpcV3Client::connect(
+    let (business, mut events) = BusinessRpcClient::connect(
         current_config(
             addresses[2],
             "rpc-command-token".into(),
@@ -843,7 +843,7 @@ async fn one_socket_authentication_progresses_while_event_ack_waits() {
     config.device_auth = Some(DeviceAuthSource::BusinessRpc);
     config.event_delivery = Some(EventDeliverySource::BusinessRpc);
     config.business_rpc = Some(BusinessRpcConfig {
-        limits: netbaiot_protocol::business_rpc_v3::V3Limits::default(),
+        limits: netbaiot_protocol::business_rpc::wire::RpcLimits::default(),
         send_ahead: None,
         experiment_socket_send_buffer_bytes: None,
         tls: None,
@@ -886,7 +886,7 @@ async fn one_socket_authentication_progresses_while_event_ack_waits() {
     client_config.reconnect_initial = Duration::from_millis(1);
     client_config.reconnect_max = Duration::from_millis(1);
     let (business, mut events) =
-        BusinessRpcV3Client::connect(client_config, Some(handler.clone())).unwrap();
+        BusinessRpcClient::connect(client_config, Some(handler.clone())).unwrap();
     tokio::time::timeout(Duration::from_secs(10), business.wait_ready())
         .await
         .unwrap()
@@ -1060,7 +1060,7 @@ async fn one_socket_authentication_progresses_while_event_ack_waits() {
     })
     .await
     .unwrap();
-    let (auth_only, _unused) = BusinessRpcV3Client::connect(
+    let (auth_only, _unused) = BusinessRpcClient::connect(
         current_config(
             addresses[2],
             "rpc-test-token".into(),
@@ -1069,7 +1069,7 @@ async fn one_socket_authentication_progresses_while_event_ack_waits() {
         Some(handler.clone()),
     )
     .unwrap();
-    let (events_only, mut dual_events) = BusinessRpcV3Client::connect(
+    let (events_only, mut dual_events) = BusinessRpcClient::connect(
         current_config(addresses[2], "rpc-test-token".into(), BusinessRole::Events),
         None,
     )
@@ -1134,7 +1134,7 @@ async fn zero_offline_grace_revokes_live_session_and_requires_reset_sync() {
     config.device_auth = Some(DeviceAuthSource::BusinessRpc);
     config.event_delivery = Some(EventDeliverySource::DevelopmentAudit);
     config.business_rpc = Some(BusinessRpcConfig {
-        limits: netbaiot_protocol::business_rpc_v3::V3Limits::default(),
+        limits: netbaiot_protocol::business_rpc::wire::RpcLimits::default(),
         send_ahead: None,
         experiment_socket_send_buffer_bytes: None,
         tls: None,
@@ -1171,7 +1171,7 @@ async fn zero_offline_grace_revokes_live_session_and_requires_reset_sync() {
         BusinessRole::AuthControl,
     );
     let (business, _) =
-        BusinessRpcV3Client::connect(settings.clone(), Some(handler.clone())).unwrap();
+        BusinessRpcClient::connect(settings.clone(), Some(handler.clone())).unwrap();
     tokio::time::timeout(Duration::from_secs(10), business.wait_ready())
         .await
         .unwrap()
@@ -1216,7 +1216,7 @@ async fn zero_offline_grace_revokes_live_session_and_requires_reset_sync() {
         "new miss must fail closed"
     );
     handler.revision.store(2, Ordering::SeqCst);
-    let (replacement, _) = BusinessRpcV3Client::connect(settings, Some(handler)).unwrap();
+    let (replacement, _) = BusinessRpcClient::connect(settings, Some(handler)).unwrap();
     tokio::time::timeout(Duration::from_secs(10), replacement.wait_ready())
         .await
         .unwrap()
@@ -1277,7 +1277,7 @@ async fn mtls_verifies_server_and_maps_exact_client_certificate() {
         .collect::<String>();
     let principal_expiry = netbaiot_runtime::now_ms().saturating_add(12_000);
     config.business_rpc = Some(BusinessRpcConfig {
-        limits: netbaiot_protocol::business_rpc_v3::V3Limits::default(),
+        limits: netbaiot_protocol::business_rpc::wire::RpcLimits::default(),
         send_ahead: None,
         experiment_socket_send_buffer_bytes: None,
         tls: Some(ManagementTlsFiles {
@@ -1335,7 +1335,7 @@ async fn mtls_verifies_server_and_maps_exact_client_certificate() {
         private_key_pem: fixtures.join("management-client-key.pem"),
     });
     let (business, _) =
-        BusinessRpcV3Client::connect(client_config.clone(), Some(handler.clone())).unwrap();
+        BusinessRpcClient::connect(client_config.clone(), Some(handler.clone())).unwrap();
     tokio::time::timeout(Duration::from_secs(10), business.wait_ready())
         .await
         .unwrap()
@@ -1349,7 +1349,7 @@ async fn mtls_verifies_server_and_maps_exact_client_certificate() {
     let mut unauthorized_role = client_config.clone();
     unauthorized_role.provider = false;
     unauthorized_role.events = true;
-    let (event_only, _) = BusinessRpcV3Client::connect(unauthorized_role, None).unwrap();
+    let (event_only, _) = BusinessRpcClient::connect(unauthorized_role, None).unwrap();
     assert!(
         !matches!(
             tokio::time::timeout(Duration::from_secs(5), event_only.wait_ready()).await,
@@ -1360,7 +1360,7 @@ async fn mtls_verifies_server_and_maps_exact_client_certificate() {
     event_only.shutdown().await;
     let mut wrong_name = client_config.clone();
     wrong_name.tls.as_mut().unwrap().server_name = "not-localhost.example".into();
-    let (untrusted, _) = BusinessRpcV3Client::connect(wrong_name, Some(handler.clone())).unwrap();
+    let (untrusted, _) = BusinessRpcClient::connect(wrong_name, Some(handler.clone())).unwrap();
     assert!(!matches!(
         tokio::time::timeout(Duration::from_secs(5), untrusted.wait_ready()).await,
         Ok(Ok(()))
@@ -1403,7 +1403,7 @@ async fn mtls_verifies_server_and_maps_exact_client_certificate() {
         tls.ca_pem = fixtures.join(ca);
         tls.certificate_pem = fixtures.join(cert);
         tls.private_key_pem = fixtures.join(key);
-        let (client, _) = BusinessRpcV3Client::connect(invalid, Some(handler.clone())).unwrap();
+        let (client, _) = BusinessRpcClient::connect(invalid, Some(handler.clone())).unwrap();
         assert!(
             !matches!(
                 tokio::time::timeout(Duration::from_secs(1), client.wait_ready()).await,
@@ -1465,14 +1465,14 @@ async fn mtls_verifies_server_and_maps_exact_client_certificate() {
     replacement_config.tls.as_mut().unwrap().certificate_pem =
         fixtures.join("management-unmapped.pem");
     let (replacement, _) =
-        BusinessRpcV3Client::connect(replacement_config, Some(handler.clone())).unwrap();
+        BusinessRpcClient::connect(replacement_config, Some(handler.clone())).unwrap();
     tokio::time::timeout(Duration::from_secs(10), replacement.wait_ready())
         .await
         .unwrap()
         .unwrap();
     device_result(addresses[0], "rotated").await.unwrap();
     let (old_certificate, _) =
-        BusinessRpcV3Client::connect(client_config, Some(handler.clone())).unwrap();
+        BusinessRpcClient::connect(client_config, Some(handler.clone())).unwrap();
     assert!(!matches!(
         tokio::time::timeout(Duration::from_secs(1), old_certificate.wait_ready()).await,
         Ok(Ok(()))
@@ -1502,7 +1502,7 @@ async fn required_spooled_event_replays_to_current_with_stable_event_id() {
     config.business_tcp = Some(addresses[2]);
     config.business_rpc = Some(
         serde_json::from_value(serde_json::json!({
-            "limits":netbaiot_protocol::business_rpc_v3::V3Limits::default(),
+            "limits":netbaiot_protocol::business_rpc::wire::RpcLimits::default(),
             "tls":null,"development_token_env":"NETBAIOT_BUSINESS_RPC_TOKEN",
             "development_role":"events"
         }))
@@ -1574,7 +1574,7 @@ async fn required_spooled_event_replays_to_current_with_stable_event_id() {
     drop(operator);
 
     config.business_rpc = Some(BusinessRpcConfig {
-        limits: netbaiot_protocol::business_rpc_v3::V3Limits::default(),
+        limits: netbaiot_protocol::business_rpc::wire::RpcLimits::default(),
         send_ahead: None,
         experiment_socket_send_buffer_bytes: None,
         tls: None,
@@ -1594,7 +1594,7 @@ async fn required_spooled_event_replays_to_current_with_stable_event_id() {
     config.limits.sink_timeout_ms = netbaiot_runtime::Limits::default().sink_timeout_ms;
     write_config(&root, &config);
     let mut second = start();
-    let (events, mut receiver) = BusinessRpcV3Client::connect(
+    let (events, mut receiver) = BusinessRpcClient::connect(
         current_config(addresses[2], "rpc-test-token".into(), BusinessRole::Events),
         None,
     )
@@ -1631,8 +1631,8 @@ fn current_config(
     address: std::net::SocketAddr,
     token: String,
     role: BusinessRole,
-) -> BusinessRpcV3ClientConfig {
-    let mut settings = BusinessRpcV3ClientConfig::development(address, token);
+) -> BusinessRpcClientConfig {
+    let mut settings = BusinessRpcClientConfig::development(address, token);
     settings.provider = role.auth_control();
     settings.events = role.events();
     settings

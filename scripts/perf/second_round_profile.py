@@ -100,7 +100,7 @@ def startup():
 
 def rpc():
     spec = importlib.util.spec_from_file_location(
-        'hol', ROOT / 'tools/netbaiot-loadgen/run_business_rpc_v3_hol.py')
+        'hol', ROOT / 'tools/netbaiot-loadgen/run_business_rpc_hol.py')
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     module.LOADGEN = ROOT / 'target/second-round/baseline/bin/business_rpc'

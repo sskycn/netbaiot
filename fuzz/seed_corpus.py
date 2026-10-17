@@ -122,10 +122,10 @@ for version in [0, 1, 2, 3, 4, 65535]:
 
 for flags in [0, 1]:
     header = struct.pack('!IIBBH', 1, 2, 4, flags, 0)
-    seed('business_rpc_v3', f'data-{flags}', header + b'x')
+    seed('business_rpc_wire', f'data-{flags}', header + b'x')
 open_request = json.dumps({"kind": "rpc", "parent_stream_id": None, "request_id": "00000000-0000-0000-0000-000000000001",
                            "method": "device.command.send", "deadline_ms": 1000, "content_length": 0}).encode()
-seed('business_rpc_v3', 'rpc-open', struct.pack('!IIBBH', len(open_request), 1, 1, 0, 0) + open_request)
+seed('business_rpc_wire', 'rpc-open', struct.pack('!IIBBH', len(open_request), 1, 1, 0, 0) + open_request)
 
 record = json.dumps({"event": {"event_id": "00000000-0000-0000-0000-000000000001", "source_message_id": "seed:1",
     "device": {"tenant_id": "demo", "product_id": "sensor", "device_id": "device-1"}, "received_at": 1,
@@ -136,7 +136,7 @@ framed = b'NBSP' + struct.pack('!IQ', 3, 1) + struct.pack('!I', len(record)) + r
 trailer = b'SEND' + struct.pack('!QQ', 1, len(framed))
 seed('restart_spool', 'current-heartbeat', framed + trailer + hashlib.sha256(framed + trailer).digest())
 provider = json.dumps({"kind": "provider", "provider_id": "primary"}).encode()
-seed('business_rpc_v3', 'provider-rpc', struct.pack('!IIBBH', len(provider), 1, 1, 0, 0) + provider
+seed('business_rpc_wire', 'provider-rpc', struct.pack('!IIBBH', len(provider), 1, 1, 0, 0) + provider
      + struct.pack('!IIBBH', len(open_request), 3, 1, 0, 0) + open_request.replace(b'null', b'1   ', 1))
 
 # Vendor payloads and configurations need valid seeds to pass header/layout/checksum gates.
