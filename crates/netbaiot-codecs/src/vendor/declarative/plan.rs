@@ -1,6 +1,7 @@
+use super::config::is_explicit_null_legacy_float;
 use super::*;
 use crate::common::valid_text;
-use crate::vendor::numeric::{Decimal, FloatConversion, IntegerConversion};
+use crate::vendor::numeric::{Decimal, FloatConversion, IntegerConversion, IntegerConversionError};
 use std::{collections::BTreeMap, ops::Range};
 use wire::{Check, Integer, Value};
 
@@ -255,8 +256,14 @@ impl<'a> Builder<'a> {
                 ));
             }
         }
-        let float_scale = f.scale.unwrap_or(1.0);
-        let float_bias = f.bias.unwrap_or(0.0);
+        let float_scale = f
+            .scale
+            .filter(|value| !is_explicit_null_legacy_float(*value))
+            .unwrap_or(1.0);
+        let float_bias = f
+            .bias
+            .filter(|value| !is_explicit_null_legacy_float(*value))
+            .unwrap_or(0.0);
         if integer_bounds.is_none() && (!float_scale.is_finite() || float_scale == 0.0) {
             return Err(ConfigError::new(
                 "scale",
@@ -297,8 +304,13 @@ impl<'a> Builder<'a> {
                 } else {
                     (Decimal::ONE, Decimal::ZERO)
                 };
-                IntegerConversion::compile(scale, bias, minimum, maximum)
-                    .map_err(|message| ConfigError::new("conversion", message))
+                IntegerConversion::compile(scale, bias, minimum, maximum, self.limits.field_bytes)
+                    .map_err(|error| match error {
+                        IntegerConversionError::FieldBytes => ConfigError::new("", error.message()),
+                        IntegerConversionError::Conversion(_) => {
+                            ConfigError::new("conversion", error.message())
+                        }
+                    })
             })
             .transpose()?;
         let float = match f.data_type {

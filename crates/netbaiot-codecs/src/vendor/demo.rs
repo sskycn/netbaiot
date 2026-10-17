@@ -19,6 +19,7 @@ impl AcmeV1 {
         {
             return Err(CodecError);
         }
+        let field_bytes = limits.field_bytes;
         Ok(Self {
             limits,
             temperature: IntegerConversion::compile(
@@ -26,6 +27,7 @@ impl AcmeV1 {
                 Decimal::ZERO,
                 i128::from(i16::MIN),
                 i128::from(i16::MAX),
+                field_bytes,
             )
             .map_err(|_| CodecError)?,
             humidity: IntegerConversion::compile(
@@ -33,6 +35,7 @@ impl AcmeV1 {
                 Decimal::ZERO,
                 0,
                 i128::from(u16::MAX),
+                field_bytes,
             )
             .map_err(|_| CodecError)?,
         })

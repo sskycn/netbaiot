@@ -133,6 +133,16 @@ fn check_payload_bounds(
     Ok(())
 }
 
+// A telemetry scalar contributes one logical field member. Decimal's stable JSON
+// representation contributes one additional, bounded `decimal` member. The eight
+// remaining members cover the outer envelope and every non-telemetry payload shape.
+fn maximum_structural_members(logical_fields: usize) -> Result<usize, CodecError> {
+    logical_fields
+        .checked_mul(2)
+        .and_then(|members| members.checked_add(8))
+        .ok_or(CodecError)
+}
+
 /// Bound nesting before serde can recurse. Braces inside strings are ignored.
 pub fn check_json_depth(input: &[u8], maximum: usize) -> Result<(), CodecError> {
     let (mut depth, mut string, mut escape) = (0usize, false, false);
@@ -184,7 +194,7 @@ impl JsonV1 {
         check_payload_bounds(
             payload,
             self.limits.nesting_depth,
-            self.limits.fields.saturating_add(8),
+            maximum_structural_members(self.limits.fields)?,
         )?;
         let wire: WireMessage<'_> = serde_json::from_slice(payload).map_err(|_| CodecError)?;
         let decoded = match wire.kind {
@@ -343,6 +353,114 @@ mod hostile {
             r#"{{"schema_version":1,"source_message_id":"1","kind":"telemetry","data":{{{fields}}}}}"#
         );
         assert!(codec.decode(&ctx, wire.as_bytes()).is_ok());
+    }
+}
+
+#[cfg(test)]
+mod decimal_resource_limits {
+    use super::*;
+
+    fn key() -> DeviceKey {
+        DeviceKey {
+            tenant_id: TenantId::new("t").unwrap(),
+            product_id: ProductId::new("p").unwrap(),
+            device_id: DeviceId::new("d").unwrap(),
+        }
+    }
+
+    fn telemetry(fields: impl IntoIterator<Item = String>) -> Vec<u8> {
+        format!(
+            r#"{{"schema_version":1,"source_message_id":"1","kind":"telemetry","data":{{{}}}}}"#,
+            fields.into_iter().collect::<Vec<_>>().join(",")
+        )
+        .into_bytes()
+    }
+
+    fn decimal_fields(count: usize) -> Vec<u8> {
+        telemetry((0..count).map(|index| format!(r#""f{index}":{{"decimal":"25.3"}}"#)))
+    }
+
+    #[test]
+    fn decimal_members_do_not_consume_the_logical_field_budget() {
+        let key = key();
+        let context = DecodeContext {
+            device: &key,
+            received_at: 0,
+        };
+        let codec = JsonV1::default();
+        for count in [34, 35, 64] {
+            assert!(
+                codec.decode(&context, &decimal_fields(count)).is_ok(),
+                "{count}"
+            );
+        }
+        assert!(codec.decode(&context, &decimal_fields(65)).is_err());
+    }
+
+    #[test]
+    fn mixed_scalars_and_custom_field_limits_count_logical_fields() {
+        let key = key();
+        let context = DecodeContext {
+            device: &key,
+            received_at: 0,
+        };
+        let codec = JsonV1::new(CodecLimits {
+            fields: 4,
+            ..CodecLimits::default()
+        });
+        let valid = telemetry([
+            r#""decimal":{"decimal":"1.25"}"#.into(),
+            r#""number":2.5"#.into(),
+            r#""boolean":true"#.into(),
+            r#""text":"ok""#.into(),
+        ]);
+        assert!(codec.decode(&context, &valid).is_ok());
+        let invalid = telemetry([
+            r#""decimal":{"decimal":"1.25"}"#.into(),
+            r#""number":2.5"#.into(),
+            r#""boolean":true"#.into(),
+            r#""text":"ok""#.into(),
+            r#""extra":0"#.into(),
+        ]);
+        assert!(codec.decode(&context, &invalid).is_err());
+    }
+
+    #[test]
+    fn malformed_decimal_duplicates_and_hostile_structures_remain_rejected() {
+        let key = key();
+        let context = DecodeContext {
+            device: &key,
+            received_at: 0,
+        };
+        let codec = JsonV1::default();
+        for payload in [
+            telemetry([
+                r#""x":{"decimal":"1"}"#.into(),
+                r#""x":{"decimal":"2"}"#.into(),
+            ]),
+            telemetry([r#""x":{"decimal":"1","extra":true}"#.into()]),
+            telemetry([r#""x":[{"decimal":"1"}]"#.into()]),
+            telemetry([r#""x":{"decimal":{"decimal":{"decimal":{"decimal":{"decimal":{"decimal":"1"}}}}}}}"#.into()]),
+        ] {
+            assert!(codec.decode(&context, &payload).is_err());
+        }
+
+        let too_many_members = format!(
+            "{{{}}}",
+            (0..137)
+                .map(|index| format!(r#""m{index}":0"#))
+                .collect::<Vec<_>>()
+                .join(",")
+        );
+        assert!(
+            check_payload_bounds(
+                too_many_members.as_bytes(),
+                CodecLimits::default().nesting_depth,
+                maximum_structural_members(CodecLimits::default().fields).unwrap(),
+            )
+            .is_err()
+        );
+        assert!(maximum_structural_members(usize::MAX).is_err());
     }
 }
 

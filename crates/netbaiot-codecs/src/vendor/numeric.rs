@@ -256,15 +256,33 @@ pub(crate) struct IntegerConversion {
     maximum: i128,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum IntegerConversionError {
+    Conversion(&'static str),
+    FieldBytes,
+}
+
+impl IntegerConversionError {
+    pub(crate) const fn message(self) -> &'static str {
+        match self {
+            Self::Conversion(message) => message,
+            Self::FieldBytes => {
+                "Exact decoded Decimal output exceeds CodecLimits.field_bytes for part of the integer range."
+            }
+        }
+    }
+}
+
 impl IntegerConversion {
     pub(crate) fn compile(
         scale: Decimal,
         bias: Decimal,
         minimum: i128,
         maximum: i128,
-    ) -> Result<Self, &'static str> {
+        field_bytes: usize,
+    ) -> Result<Self, IntegerConversionError> {
         if scale.coefficient == 0 {
-            return Err("Scale must be nonzero.");
+            return Err(IntegerConversionError::Conversion("Scale must be nonzero."));
         }
         let exponent = if bias.coefficient == 0 {
             scale.exponent
@@ -279,10 +297,12 @@ impl IntegerConversion {
                 .coefficient
                 .checked_mul(pow10(u32::from(value.exponent.abs_diff(exponent)))?)
         };
-        let multiplier = align(scale)
-            .ok_or("Integer conversion parameters exceed the bounded i128 decimal engine.")?;
-        let offset = align(bias)
-            .ok_or("Integer conversion parameters exceed the bounded i128 decimal engine.")?;
+        let multiplier = align(scale).ok_or(IntegerConversionError::Conversion(
+            "Integer conversion parameters exceed the bounded i128 decimal engine.",
+        ))?;
+        let offset = align(bias).ok_or(IntegerConversionError::Conversion(
+            "Integer conversion parameters exceed the bounded i128 decimal engine.",
+        ))?;
         let plan = Self {
             multiplier,
             offset,
@@ -301,15 +321,27 @@ impl IntegerConversion {
         for (index, raw) in [minimum, maximum].into_iter().enumerate() {
             multiplier
                 .checked_mul(raw)
-                .ok_or("Integer conversion exceeds the bounded i128 decimal engine.")?;
+                .ok_or(IntegerConversionError::Conversion(
+                    "Integer conversion exceeds the bounded i128 decimal engine.",
+                ))?;
             endpoint_coefficients[index] = plan.coefficient(raw).ok_or(
-                "Integer conversion exceeds the bounded i128 decimal engine for part of the raw range.",
+                IntegerConversionError::Conversion(
+                    "Integer conversion exceeds the bounded i128 decimal engine for part of the raw range.",
+                ),
             )?;
         }
-        if maximum_formatted_len(endpoint_coefficients, exponent)
-            .is_none_or(|length| length > netbaiot_core::MAX_DECIMAL_BYTES)
-        {
-            return Err("Exact decoded value exceeds the 64-byte decimal scalar limit.");
+        let maximum_length = maximum_formatted_len(endpoint_coefficients, exponent).ok_or(
+            IntegerConversionError::Conversion(
+                "Exact decoded value length exceeds the bounded decimal engine.",
+            ),
+        )?;
+        if maximum_length > netbaiot_core::MAX_DECIMAL_BYTES {
+            return Err(IntegerConversionError::Conversion(
+                "Exact decoded value exceeds the 64-byte decimal scalar limit.",
+            ));
+        }
+        if maximum_length > field_bytes {
+            return Err(IntegerConversionError::FieldBytes);
         }
         Ok(plan)
     }
@@ -363,12 +395,12 @@ impl IntegerConversion {
     }
 }
 
-fn maximum_formatted_len(endpoint_coefficients: [i128; 2], exponent: i16) -> Option<usize> {
-    let maximum_magnitude = endpoint_coefficients
-        .into_iter()
-        .map(i128::unsigned_abs)
-        .max()?;
-    let negative = endpoint_coefficients.into_iter().min()? < 0;
+fn formatted_len_upper_bound(coefficient: i128, exponent: i16) -> Option<usize> {
+    if coefficient == 0 {
+        return Some(1);
+    }
+    let maximum_magnitude = coefficient.unsigned_abs();
+    let negative = coefficient < 0;
     let mut digits = 1usize;
     let mut remaining = maximum_magnitude;
     while remaining >= 10 {
@@ -387,6 +419,13 @@ fn maximum_formatted_len(endpoint_coefficients: [i128; 2], exponent: i16) -> Opt
             sign.checked_add(2)?.checked_add(fractional)
         }
     }
+}
+
+fn maximum_formatted_len(endpoint_coefficients: [i128; 2], exponent: i16) -> Option<usize> {
+    endpoint_coefficients
+        .into_iter()
+        .map(|coefficient| formatted_len_upper_bound(coefficient, exponent))
+        .try_fold(0usize, |maximum, length| Some(maximum.max(length?)))
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -519,6 +558,7 @@ mod tests {
             Decimal::parse_parameter("0.3").unwrap(),
             i16::MIN.into(),
             i16::MAX.into(),
+            netbaiot_core::MAX_DECIMAL_BYTES,
         )
         .unwrap();
         assert_eq!(plan.encode(&Scalar::Number(0.0)).unwrap(), -3);
@@ -536,8 +576,14 @@ mod tests {
             (i128::from(i64::MIN), i128::from(i64::MAX)),
             (0, i128::from(u64::MAX)),
         ] {
-            let plan =
-                IntegerConversion::compile(Decimal::ONE, Decimal::ZERO, minimum, maximum).unwrap();
+            let plan = IntegerConversion::compile(
+                Decimal::ONE,
+                Decimal::ZERO,
+                minimum,
+                maximum,
+                netbaiot_core::MAX_DECIMAL_BYTES,
+            )
+            .unwrap();
             for raw in [minimum, 0, maximum] {
                 let scalar = plan.decode(raw).unwrap();
                 assert_eq!(plan.encode(&scalar).unwrap(), raw);
@@ -549,6 +595,7 @@ mod tests {
                 Decimal::ZERO,
                 0,
                 i128::from(u64::MAX),
+                netbaiot_core::MAX_DECIMAL_BYTES,
             )
             .is_err()
         );
@@ -562,6 +609,7 @@ mod tests {
                 Decimal::parse_parameter(bias).unwrap(),
                 i16::MIN.into(),
                 i16::MAX.into(),
+                netbaiot_core::MAX_DECIMAL_BYTES,
             )
             .unwrap();
             for raw in i16::MIN..=i16::MAX {
@@ -578,6 +626,7 @@ mod tests {
             Decimal::ZERO,
             i16::MIN.into(),
             i16::MAX.into(),
+            netbaiot_core::MAX_DECIMAL_BYTES,
         )
         .unwrap();
         let Scalar::Decimal(value) = plan.decode(10).unwrap() else {
@@ -595,8 +644,14 @@ mod tests {
             (i128::from(i16::MIN), i128::from(i16::MAX)),
             (0, i128::from(u16::MAX)),
         ] {
-            let plan =
-                IntegerConversion::compile(Decimal::ONE, Decimal::ZERO, minimum, maximum).unwrap();
+            let plan = IntegerConversion::compile(
+                Decimal::ONE,
+                Decimal::ZERO,
+                minimum,
+                maximum,
+                netbaiot_core::MAX_DECIMAL_BYTES,
+            )
+            .unwrap();
             for raw in minimum..=maximum {
                 let decoded = plan.decode(raw).unwrap();
                 assert!(matches!(decoded, Scalar::Decimal(_)));
@@ -620,6 +675,7 @@ mod tests {
                     Decimal::parse_parameter(bias).unwrap(),
                     minimum,
                     maximum,
+                    netbaiot_core::MAX_DECIMAL_BYTES,
                 )
                 .unwrap();
                 for raw in [

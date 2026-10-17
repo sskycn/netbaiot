@@ -1,6 +1,26 @@
 //! Versioned, bounded binary payload descriptions. Offsets are payload-relative.
 use serde::{Deserialize, Serialize};
 
+const EXPLICIT_NULL_LEGACY_FLOAT_BITS: u64 = 0x7ff8_4e55_4c4c_0000;
+
+pub(super) fn is_explicit_null_legacy_float(value: f64) -> bool {
+    value.to_bits() == EXPLICIT_NULL_LEGACY_FLOAT_BITS
+}
+
+fn deserialize_optional_legacy_float<'de, D>(deserializer: D) -> Result<Option<f64>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    // Plain `Option<f64>` collapses an explicit null and a missing member to
+    // `None`. A private non-finite sentinel preserves presence until compile-time:
+    // integer fields reject it with the complete path, while float fields retain
+    // the existing behavior that treats null like omission.
+    Ok(Some(
+        Option::<f64>::deserialize(deserializer)?
+            .unwrap_or_else(|| f64::from_bits(EXPLICIT_NULL_LEGACY_FLOAT_BITS)),
+    ))
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
@@ -128,10 +148,18 @@ pub struct Field {
     /// Required only for UTF-8: exact byte length, without padding or terminator.
     pub length: Option<usize>,
     /// IEEE 754 floating-point scale. Valid only for f32/f64; omission means 1.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        deserialize_with = "deserialize_optional_legacy_float",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub scale: Option<f64>,
     /// IEEE 754 floating-point bias. Valid only for f32/f64; omission means 0.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        deserialize_with = "deserialize_optional_legacy_float",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub bias: Option<f64>,
     /// Exact-decimal conversion for integer wire types only; omission is exact identity.
     #[serde(default, skip_serializing_if = "Option::is_none")]

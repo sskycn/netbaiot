@@ -622,6 +622,173 @@ fn single_field(kind: &str, extra: Value, width: usize) -> DeclarativeConfig {
     }))
     .unwrap()
 }
+
+fn single_named_field(kind: &str, name: &str, extra: Value, width: usize) -> DeclarativeConfig {
+    let mut field = json!({"offset":3,"type":kind});
+    field
+        .as_object_mut()
+        .unwrap()
+        .extend(extra.as_object().unwrap().clone());
+    serde_json::from_value(json!({
+        "id":"vendor-types","version":1,"header":[0x11],"message_type":{"offset":1,"type":"u8"},
+        "messages":[{"tag":1,"size":3+width,
+          "source_message_id":{"offset":2,"type":"utf8","length":1},
+          "payload":{"kind":"telemetry","fields":[{"name":name,"field":field}]}}]
+    }))
+    .unwrap()
+}
+
+fn limits_with_field_bytes(field_bytes: usize) -> CodecLimits {
+    CodecLimits {
+        field_bytes,
+        ..CodecLimits::default()
+    }
+}
+
+#[test]
+fn exact_integer_output_lengths_honor_field_bytes_for_every_wire_type() {
+    let cases: &[(&str, &[u8], &str, usize)] = &[
+        ("u8", &[u8::MAX], "255", 3),
+        ("i8", &[i8::MIN as u8], "-128", 4),
+        ("u16", &u16::MAX.to_be_bytes(), "65535", 5),
+        ("i16", &i16::MIN.to_be_bytes(), "-32768", 6),
+        ("u32", &u32::MAX.to_be_bytes(), "4294967295", 10),
+        ("i32", &i32::MIN.to_be_bytes(), "-2147483648", 11),
+        ("u64", &u64::MAX.to_be_bytes(), "18446744073709551615", 20),
+        ("i64", &i64::MIN.to_be_bytes(), "-9223372036854775808", 20),
+    ];
+    let device = key();
+    let context = DecodeContext {
+        device: &device,
+        received_at: 1,
+    };
+    for (kind, wire, expected, required) in cases {
+        let config = single_named_field(kind, "v", json!({}), wire.len());
+        let error =
+            DeclarativeCodec::compile_diagnostic(&config, limits_with_field_bytes(required - 1))
+                .err()
+                .unwrap();
+        assert_eq!(error.path, "messages[0].payload.fields[0].field");
+        assert!(error.message.contains("field_bytes"));
+
+        let codec = DeclarativeCodec::compile(&config, limits_with_field_bytes(*required)).unwrap();
+        let mut payload = vec![0x11, 1, b'1'];
+        payload.extend_from_slice(wire);
+        let DeviceEventKind::Telemetry(fields) =
+            codec.decode(&context, &payload).unwrap().remove(0).kind
+        else {
+            panic!()
+        };
+        assert_eq!(
+            fields["v"],
+            Scalar::Decimal(DecimalScalar::new(expected).unwrap()),
+            "{kind}"
+        );
+    }
+}
+
+#[test]
+fn u64_identity_and_exact_affine_length_boundaries_are_proved_at_compile_time() {
+    let u64_identity = single_named_field("u64", "v", json!({}), 8);
+    for field_bytes in [4, 19] {
+        let error = DeclarativeCodec::compile_diagnostic(
+            &u64_identity,
+            limits_with_field_bytes(field_bytes),
+        )
+        .err()
+        .unwrap();
+        assert_eq!(error.path, "messages[0].payload.fields[0].field");
+        assert!(error.message.contains("field_bytes"));
+    }
+    assert!(DeclarativeCodec::compile(&u64_identity, limits_with_field_bytes(20)).is_ok());
+
+    for (scale, bias, required) in [
+        ("-1", "0", 4),
+        ("0.01", "0", 4),
+        ("1", "-1000", 5),
+        ("1e2", "0", 5),
+        ("10.0", "0", 4),
+        ("1e38", "0", 41),
+        ("1e-38", "0", 40),
+        ("-1e-38", "0", 41),
+    ] {
+        let config = single_named_field(
+            "u8",
+            "v",
+            json!({"conversion":{"mode":"decimal_exact","scale":scale,"bias":bias}}),
+            1,
+        );
+        assert!(
+            DeclarativeCodec::compile(&config, limits_with_field_bytes(required)).is_ok(),
+            "{scale} {bias} {required}"
+        );
+        let error =
+            DeclarativeCodec::compile_diagnostic(&config, limits_with_field_bytes(required - 1))
+                .err()
+                .unwrap();
+        assert_eq!(error.path, "messages[0].payload.fields[0].field");
+        assert!(error.message.contains("field_bytes"));
+    }
+}
+
+#[test]
+fn explicit_null_legacy_integer_conversion_members_are_rejected_with_paths() {
+    for setting in ["scale", "bias"] {
+        let config = single_named_field("i16", "v", json!({setting:Value::Null}), 2);
+        let error = DeclarativeCodec::compile_diagnostic(&config, CodecLimits::default())
+            .err()
+            .unwrap();
+        assert_eq!(
+            error.path,
+            format!("messages[0].payload.fields[0].field.{setting}")
+        );
+        assert!(error.message.contains("migrate"));
+    }
+
+    assert!(
+        DeclarativeCodec::compile(
+            &single_named_field("i16", "v", json!({}), 2),
+            CodecLimits::default(),
+        )
+        .is_ok()
+    );
+    assert!(
+        DeclarativeCodec::compile(
+            &single_named_field(
+                "i16",
+                "v",
+                json!({"conversion":{"mode":"decimal_exact","scale":"0.1","bias":"2"}}),
+                2,
+            ),
+            CodecLimits::default(),
+        )
+        .is_ok()
+    );
+    assert!(
+        DeclarativeCodec::compile(
+            &single_named_field("f64", "v", json!({"scale":0.5,"bias":2.0}), 8),
+            CodecLimits::default(),
+        )
+        .is_ok()
+    );
+    for kind in ["f32", "f64"] {
+        for setting in ["scale", "bias"] {
+            assert!(
+                DeclarativeCodec::compile(
+                    &single_named_field(
+                        kind,
+                        "v",
+                        json!({setting:Value::Null}),
+                        if kind == "f32" { 4 } else { 8 },
+                    ),
+                    CodecLimits::default(),
+                )
+                .is_ok(),
+                "{kind} {setting}"
+            );
+        }
+    }
+}
 #[test]
 fn all_numeric_widths_endianness_and_nonfinite_or_lossy_values() {
     let values: &[(&str, &[u8], &str)] = &[

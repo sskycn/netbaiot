@@ -4,6 +4,7 @@ from pathlib import Path
 import struct
 import hashlib
 import importlib.util
+import json
 
 root = Path(__file__).parent / 'corpus'
 def text(b):
@@ -86,6 +87,16 @@ for i, body in enumerate([b'{"schema_version":1,"source_message_id":"1","kind":"
     seed('json_codec', f'valid-{i}', body)
     udp = b'NBI1\x01a' + struct.pack('!I',1) + b'\x01'*16 + struct.pack('!QqH',1,1000,len(body)) + body + b'\x00'*32
     seed('udp_envelope', f'valid-{i}', udp)
+for count in [34, 35, 64, 65]:
+    body = json.dumps({"schema_version": 1, "source_message_id": "decimal", "kind": "telemetry",
+                       "data": {f"f{i}": {"decimal": "25.3"} for i in range(count)}},
+                      separators=(',', ':')).encode()
+    seed('json_codec', f'decimal-fields-{count}', body)
+for name, scalar in [('decimal-extra-key', {"decimal": "1", "extra": True}),
+                     ('decimal-array', [{"decimal": "1"}]),
+                     ('decimal-nested', {"decimal": {"decimal": {"decimal": "1"}}})]:
+    seed('json_codec', name, json.dumps({"schema_version": 1, "source_message_id": "decimal",
+         "kind": "telemetry", "data": {"value": scalar}}, separators=(',', ':')).encode())
 for i, data in enumerate([b'\x7f', b'\x80\x01', b'\xff\xff\xff\x7f', b'\xff\xff\xff\xff']):
     seed('mqtt_remaining_length', str(i), data)
     seed('mqtt_fixed_header', str(i), b'\x30'+data)
@@ -102,7 +113,6 @@ for version in [0, 1, 2, 4, 0xffffffff]:
 for version in [0, 1, 2, 3, 4, 5, 7, 0xffffffff]:
     seed('mqtt_recovery', f'unsupported-{version}', b'NBMQ' + struct.pack('!I', version))
 
-import json
 limits = {"max_frame_payload_bytes": 8192, "max_concurrent_streams": 256,
           "initial_stream_window_bytes": 262144, "initial_connection_window_bytes": 4194304,
           "heartbeat_ms": 5000}
@@ -168,6 +178,17 @@ for size in [0, 31, 32, 65536, 65537]:
 seed('vendor_codec', 'oversized', bytes(65537))
 seed('vendor_config', 'oversized', b' ' * (262144+1))
 seed('vendor_config', 'unknown-field', json.dumps(dict(vendor, unknown='rejected')).encode())
+for setting in ['scale', 'bias']:
+    config = copy.deepcopy(vendor)
+    config['messages'][0]['payload']['fields'][0]['field'][setting] = None
+    seed('vendor_config', f'integer-{setting}-null', json.dumps(config).encode())
+config = {"id": "vendor-fuzz-u64", "version": 1, "header": [17],
+          "message_type": {"offset": 1, "type": "u8"},
+          "messages": [{"tag": 1, "size": 11,
+                        "source_message_id": {"offset": 2, "type": "u8"},
+                        "payload": {"kind": "telemetry", "fields": [{"name": "v",
+                                    "field": {"offset": 3, "type": "u64"}}]}}]}
+seed('vendor_config', 'integer-u64-identity', json.dumps(config).encode())
 
 valid = (root / 'vendor_codec' / 'valid-1').read_bytes()
 for name, offset, value in [('bool', 13, 2), ('utf8', 14, 255), ('text-control', 14, 0), ('tag', 4, 255), ('length', 3, 18)]:

@@ -51,14 +51,15 @@ fn second_round_json() {
                                 "depth" => {
                                     check_json_depth(input, codec.limits.nesting_depth).is_ok()
                                 }
-                                "members" => {
-                                    check_members(input, codec.limits.fields.saturating_add(8))
-                                        .is_ok()
-                                }
+                                "members" => check_members(
+                                    input,
+                                    maximum_structural_members(codec.limits.fields).unwrap(),
+                                )
+                                .is_ok(),
                                 "guards" => check_payload_bounds(
                                     input,
                                     codec.limits.nesting_depth,
-                                    codec.limits.fields.saturating_add(8),
+                                    maximum_structural_members(codec.limits.fields).unwrap(),
                                 )
                                 .is_ok(),
                                 "serde" => serde_json::from_slice::<WireMessage<'_>>(input).is_ok(),
