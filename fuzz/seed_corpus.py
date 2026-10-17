@@ -116,7 +116,7 @@ for version in [0, 1, 2, 3, 4, 5, 7, 0xffffffff]:
 limits = {"max_frame_payload_bytes": 8192, "max_concurrent_streams": 256,
           "initial_stream_window_bytes": 262144, "initial_connection_window_bytes": 4194304,
           "heartbeat_ms": 5000}
-for version in [0, 1, 2, 3, 4, 65535]:
+for version in [0, 1, 2, 3, 4, 5, 65535]:
     bootstrap = json.dumps({"type": "hello", "version": version, "token": "test-token", "limits": limits}).encode()
     seed('business_rpc_bootstrap', f'hello-{version}', bootstrap)
 

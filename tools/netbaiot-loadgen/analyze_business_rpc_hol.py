@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Summarize bounded V3 experiment traces without storing application payloads."""
+"""Summarize bounded Business RPC experiment traces without storing application payloads."""
 import argparse
 from datetime import datetime
 import json
@@ -40,7 +40,7 @@ def analyze(directory, mode):
             if match:
                 socket_bytes += int(match.group(1))
                 socket_writes += 1
-        if "business RPC V3" not in line:
+        if not any(marker in line for marker in ("business RPC V3", "business RPC V4")):
             continue
         stream = ID.search(line)
         if stream is None:

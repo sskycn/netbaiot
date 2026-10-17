@@ -1,4 +1,4 @@
-//! Business RPC V3 stream machinery shared by gateway and SDK.
+//! Business RPC V4 stream machinery shared by gateway and SDK.
 //! A connection has exactly one writer. That writer obtains frames from `MuxScheduler`;
 //! no stream may write directly to the socket.
 use bytes::Bytes;

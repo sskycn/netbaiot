@@ -179,6 +179,120 @@ fn rss_kib(pid: u32) -> Option<u64> {
 }
 
 #[tokio::test]
+async fn business_rpc_v4_handshake_rejects_v3_and_delivers_decimal_with_ack() {
+    use business_rpc::wire::{BUSINESS_RPC_PROTOCOL_VERSION, RpcBootstrap, RpcLimits};
+
+    let root = std::env::temp_dir().join(format!("netbaiot-wire-upgrade-{}", uuid::Uuid::new_v4()));
+    let mut config = test_config(&root).await;
+    config.limits.requests_per_ip_second = 256;
+    config.business_rpc.as_mut().unwrap().max_connections = 8;
+    let path = write_config(&root, &config);
+    let admin = "d".repeat(64);
+    let token = "wire-upgrade-token";
+    let mut server = start_server(&path, &admin, token);
+    let business = business_client(&config, &admin, token).await;
+    wait_ready(&business, &mut server).await;
+    assert_eq!(BUSINESS_RPC_PROTOCOL_VERSION, 4);
+
+    // Repeat beyond the connection bound: rejected bootstraps must release admission.
+    for version in [0, 1, 2, 3, 5, u16::MAX].into_iter().cycle().take(48) {
+        let mut peer = TcpStream::connect(config.business_tcp.unwrap())
+            .await
+            .unwrap();
+        let hello = serde_json::to_vec(&RpcBootstrap::Hello {
+            version,
+            token: Some(token.into()),
+            limits: RpcLimits::default(),
+        })
+        .unwrap();
+        peer.write_all(&(hello.len() as u32).to_be_bytes())
+            .await
+            .unwrap();
+        peer.write_all(&hello).await.unwrap();
+        let mut reply = [0; 1];
+        assert_eq!(
+            tokio::time::timeout(Duration::from_secs(2), peer.read(&mut reply))
+                .await
+                .unwrap()
+                .unwrap(),
+            0,
+            "version {version} must close before Ready or stream processing",
+        );
+    }
+
+    let mut peer = TcpStream::connect(config.business_tcp.unwrap())
+        .await
+        .unwrap();
+    let hello = serde_json::to_vec(&RpcBootstrap::Hello {
+        version: BUSINESS_RPC_PROTOCOL_VERSION,
+        token: Some(token.into()),
+        limits: RpcLimits::default(),
+    })
+    .unwrap();
+    assert_eq!(
+        serde_json::from_slice::<serde_json::Value>(&hello).unwrap()["version"],
+        4
+    );
+    peer.write_all(&(hello.len() as u32).to_be_bytes())
+        .await
+        .unwrap();
+    peer.write_all(&hello).await.unwrap();
+    let ready = tokio::time::timeout(Duration::from_secs(2), async {
+        let length = peer.read_u32().await.unwrap();
+        assert!(length <= 4096);
+        let mut bytes = vec![0; length as usize];
+        peer.read_exact(&mut bytes).await.unwrap();
+        serde_json::from_slice::<RpcBootstrap>(&bytes).unwrap()
+    })
+    .await
+    .unwrap();
+    ready.validate().unwrap();
+    assert!(matches!(ready, RpcBootstrap::Ready { version: 4, .. }));
+    drop(peer);
+
+    // Real MQTT ingress -> DeviceEvent -> Business RPC -> SDK deserialization -> ACK.
+    let mut events = business
+        .events()
+        .subscribe(EventFilter::default())
+        .await
+        .unwrap();
+    let device = device_client(&config).await;
+    let values = BTreeMap::from([(
+        "temperature".into(),
+        Scalar::Decimal(DecimalScalar::new("25.3").unwrap()),
+    )]);
+    device.publish_telemetry(values.clone()).await.unwrap();
+    let delivery = next_event(&mut events).await;
+    assert_eq!(delivery.event().kind, DeviceEventKind::Telemetry(values));
+    assert_eq!(business.metrics().events_acked, 0);
+    assert!(business.runtime().status().await.unwrap().pending_required > 0);
+    delivery.ack().await.unwrap();
+    tokio::time::timeout(Duration::from_secs(5), async {
+        while business.runtime().status().await.unwrap().pending_required != 0 {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .unwrap();
+    assert_eq!(business.metrics().events_acked, 1);
+    assert!(server.try_wait().unwrap().is_none());
+    device
+        .shutdown_with_timeout(Duration::from_secs(2))
+        .await
+        .unwrap();
+    drop(events);
+    business.runtime().drain().await.unwrap();
+    assert!(
+        tokio::time::timeout(Duration::from_secs(5), server.wait())
+            .await
+            .unwrap()
+            .unwrap()
+            .success()
+    );
+    std::fs::remove_dir_all(root).unwrap();
+}
+
+#[tokio::test]
 async fn official_clients_cover_mqtt_tcp_command_ack_status_and_offline_contracts() {
     let root = std::env::temp_dir().join(format!("netbaiot-official-e2e-{}", uuid::Uuid::new_v4()));
     let mut config = test_config(&root).await;
@@ -205,7 +319,7 @@ async fn official_clients_cover_mqtt_tcp_command_ack_status_and_offline_contract
         0
     );
 
-    for version in [0, 1, 2, 4, u16::MAX] {
+    for version in [0, 1, 2, 3, 5, u16::MAX] {
         let mut peer = TcpStream::connect(config.business_tcp.unwrap())
             .await
             .unwrap();

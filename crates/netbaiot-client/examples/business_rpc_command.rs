@@ -1,4 +1,4 @@
-//! Send one online command over Business RPC V3. Run only against a V3-enabled gateway.
+//! Send one online command over Business RPC V4. Run only against a V4-enabled gateway.
 use netbaiot_client::business_rpc::{BusinessRpcClient, BusinessRpcClientConfig};
 use netbaiot_protocol::{
     CommandId, DeviceCommand, DeviceCommandPayload, DeviceId, DeviceKey, ProductId, TenantId,

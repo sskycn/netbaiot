@@ -222,7 +222,7 @@
             }
           ],
           "default": null,
-          "description": "Local sender policy, separate from the negotiated V3 receive windows."
+          "description": "Local sender policy, separate from the negotiated V4 receive windows."
         },
         "tls": {
           "anyOf": [
@@ -2065,7 +2065,7 @@
     },
     "RpcSendAhead": {
       "additionalProperties": false,
-      "description": "Sender-local V3 scheduling limits; these are never sent in the V3 Hello.",
+      "description": "Sender-local V4 scheduling limits; these are never sent in the V4 Hello.",
       "properties": {
         "connection_bytes": {
           "format": "uint32",

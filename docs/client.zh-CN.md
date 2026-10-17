@@ -1,6 +1,6 @@
 # Rust 业务客户端
 
-`netbaiot-client` 是面向业务和管理集成的官方异步 Rust 客户端。控制操作使用连接池化的 HTTP 客户端，事件使用当前 Business RPC V3 流。客户端不会创建 Tokio runtime 或数据库。
+`netbaiot-client` 是面向业务和管理集成的官方异步 Rust 客户端。控制操作使用连接池化的 HTTP 客户端，事件使用当前 Business RPC V4 流。客户端不会创建 Tokio runtime 或数据库。
 
 ```rust
 let client = NetbaIoTClient::builder()

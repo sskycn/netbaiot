@@ -2,7 +2,7 @@
 
 [English](current-protocol-only.md)
 
-本轮清理移除了 Business RPC V1 与 V2 实现；Business RPC V3 是唯一接受的业务流。
+本轮清理移除了 Business RPC V1 与 V2 实现；Business RPC V4 是唯一接受的业务流。V3 及更早客户端必须升级；握手阶段即被拒绝，无降级或兼容转换。V4 正式采用既有 Scalar::Decimal 契约，帧结构和业务语义保持不变。
 MQTT 恢复只接受 NBMQ v6，独立 EventBus spool 只接受 NBSP v3。NBMQ v1–v5、NBSP
 v1/v2 reader、JSON recovery、迁移路径和历史 fixture 都已移除。旧版/未知 header 会返回
 `UnsupportedRecoveryVersion(version)`，或触发协议拒绝/关闭连接。当前 framing、payload

@@ -71,7 +71,7 @@ Best-effort sinks follow their configured bounded overflow policy. See
 
 | Surface | Supported format | Rejected formats |
 | --- | --- | --- |
-| Business RPC | V3 only | V1, V2 and unknown versions |
+| Business RPC | V4 only | V1, V2, V3 and unknown versions |
 | MQTT restart recovery | NBMQ v6 only | NBMQ v1–v5 and unknown versions |
 | EventBus restart spool | NBSP v3 only | NBSP v1/v2 and unknown versions |
 | Device MQTT | 3.1.1 and 5.0 | See the implemented profile above |

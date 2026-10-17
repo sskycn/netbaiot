@@ -30,7 +30,7 @@ netbaiot-server --print-default-limits
 | `device_ingress` | TCP：MQTT/通用 TCP；UDP：NBI1/NBA1 | loopback `8080` | 同号 TCP/UDP `443`；TCP 必须 TLS，UDP 只认证不加密 |
 | `management_http` | `/api/v1/...` listener | loopback `9090` | 优先 loopback/管理网；非 loopback 必须 TLS |
 | `business_tcp` | confirmed stream listener | null | 显式 `business_rpc`；生产 mTLS，开发回环 token；与 webhook 二选一 |
-| `business_rpc` | 唯一当前 Business RPC V3 的 limits、send-ahead、TLS 与 principal | null | 启用 `business_tcp` 时必填；旧 V1/V2 字段会被拒绝 |
+| `business_rpc` | 唯一当前 Business RPC V4 的 limits、send-ahead、TLS 与 principal | null | 启用 `business_tcp` 时必填；旧 V1/V2 字段会被拒绝 |
 | `device_auth` | `static` / `http` / `business_rpc` 认证源 | 未设置时按 URL 推导为 static | 生产建议显式选择，与对应 provider 配套 |
 | `event_delivery` | `http` / `business_rpc` / `development_audit` | 未设置时按 listener/URL 推导 | 生产必须是已确认 HTTP 或 Business RPC sink |
 | `development` | 强制所有 listener loopback | true | false |

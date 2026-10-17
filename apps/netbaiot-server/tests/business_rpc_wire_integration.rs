@@ -8,8 +8,8 @@ use netbaiot_core::{
     DeviceEventKind, DeviceId, DeviceKey, DeviceUplink, DeviceUplinkKind, ExecutionState,
     Heartbeat, ProductId, Scalar, SourceMessageId, TenantId,
     business_rpc::wire::{
-        RPC_END_STREAM, RpcBootstrap, RpcFrameHeader, RpcFrameType, RpcLimits, RpcOpen, RpcReset,
-        RpcResetCode, RpcResponse,
+        BUSINESS_RPC_PROTOCOL_VERSION, RPC_END_STREAM, RpcBootstrap, RpcFrameHeader, RpcFrameType,
+        RpcLimits, RpcOpen, RpcReset, RpcResetCode, RpcResponse,
     },
     business_rpc::{
         AuthenticatedDeviceWire, BusinessRole, DeviceAuthenticateRequest, DeviceCommandSendRequest,
@@ -84,7 +84,7 @@ async fn wait_for_business_ready(
 
 #[tokio::test]
 async fn business_ready_diagnostic_reports_early_server_exit() {
-    let root = std::env::temp_dir().join(format!("netbaiot-v3-ready-{}", uuid::Uuid::new_v4()));
+    let root = std::env::temp_dir().join(format!("netbaiot-rpc-ready-{}", uuid::Uuid::new_v4()));
     std::fs::create_dir_all(&root).unwrap();
     let log = root.join("server.log");
     let output = std::fs::File::create(&log).unwrap();
@@ -146,7 +146,7 @@ impl BusinessAuthHandler for Handler {
                 "unknown credential",
             ));
         };
-        if device_id != "v3" && !device_id.starts_with("v3-concurrent-") {
+        if device_id != "rpc" && !device_id.starts_with("rpc-concurrent-") {
             return Err(RpcError::new(
                 netbaiot_core::business_rpc::RpcErrorCode::DeviceRejected,
                 "unknown credential",
@@ -168,7 +168,7 @@ impl BusinessAuthHandler for Handler {
     }
 }
 fn identity() -> AuthenticatedDeviceWire {
-    identity_for("v3")
+    identity_for("rpc")
 }
 fn identity_for(device_id: &str) -> AuthenticatedDeviceWire {
     AuthenticatedDeviceWire {
@@ -273,7 +273,7 @@ async fn read_typed_tcp_device(
 
 #[tokio::test]
 async fn rpc_command_real_tcp_short_dedup_ttl_and_shorter_command_ttl() {
-    let root = std::env::temp_dir().join(format!("netbaiot-v3-tcp-ttl-{}", uuid::Uuid::new_v4()));
+    let root = std::env::temp_dir().join(format!("netbaiot-rpc-tcp-ttl-{}", uuid::Uuid::new_v4()));
     std::fs::create_dir_all(&root).unwrap();
     let mut config: Config =
         serde_json::from_str(include_str!("../../../configs/development.json")).unwrap();
@@ -315,14 +315,14 @@ async fn rpc_command_real_tcp_short_dedup_ttl_and_shorter_command_ttl() {
     let mut server = Command::new(env!("CARGO_BIN_EXE_netbaiot-server"))
         .arg(&path)
         .env("NETBAIOT_ADMIN_SECRET", "a".repeat(64))
-        .env("NETBAIOT_BUSINESS_RPC_TOKEN", "v3-ttl-token")
+        .env("NETBAIOT_BUSINESS_RPC_TOKEN", "rpc-ttl-token")
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .kill_on_drop(true)
         .spawn()
         .unwrap();
     let mut client_config =
-        BusinessRpcClientConfig::development(addresses[2], "v3-ttl-token".into());
+        BusinessRpcClientConfig::development(addresses[2], "rpc-ttl-token".into());
     client_config.provider = false;
     client_config.events = false;
     let (business, _) = BusinessRpcClient::connect(client_config, None).unwrap();
@@ -375,7 +375,7 @@ async fn rpc_command_real_tcp_short_dedup_ttl_and_shorter_command_ttl() {
 
 #[tokio::test]
 async fn rpc_planned_restart_replays_event_but_resets_command_dedup() {
-    let root = std::env::temp_dir().join(format!("netbaiot-v3-restart-{}", uuid::Uuid::new_v4()));
+    let root = std::env::temp_dir().join(format!("netbaiot-rpc-restart-{}", uuid::Uuid::new_v4()));
     std::fs::create_dir_all(&root).unwrap();
     let mut config: Config =
         serde_json::from_str(include_str!("../../../configs/development.json")).unwrap();
@@ -418,7 +418,7 @@ async fn rpc_planned_restart_replays_event_but_resets_command_dedup() {
         Command::new(env!("CARGO_BIN_EXE_netbaiot-server"))
             .arg(&path)
             .env("NETBAIOT_ADMIN_SECRET", "a".repeat(64))
-            .env("NETBAIOT_BUSINESS_RPC_TOKEN", "v3-restart-token")
+            .env("NETBAIOT_BUSINESS_RPC_TOKEN", "rpc-restart-token")
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .kill_on_drop(true)
@@ -427,7 +427,7 @@ async fn rpc_planned_restart_replays_event_but_resets_command_dedup() {
     };
     let client_config = || {
         let mut value =
-            BusinessRpcClientConfig::development(addresses[2], "v3-restart-token".into());
+            BusinessRpcClientConfig::development(addresses[2], "rpc-restart-token".into());
         value.provider = false;
         value
     };
@@ -465,7 +465,7 @@ async fn rpc_planned_restart_replays_event_but_resets_command_dedup() {
         serde_json::from_slice(&read_tcp_device(&mut device).await).unwrap();
     assert_eq!(delivered.command_id, command.command_id);
     let uplink = DeviceUplink::new(
-        SourceMessageId::new("v3-restart-heartbeat").unwrap(),
+        SourceMessageId::new("rpc-restart-heartbeat").unwrap(),
         DeviceUplinkKind::Heartbeat(Heartbeat { sequence: 1 }),
     );
     let body = serde_json::to_vec(&uplink).unwrap();
@@ -549,7 +549,7 @@ async fn rpc_command_real_tcp_tenant_scope_and_capacity() {
     use sha2::{Digest, Sha256};
 
     let root =
-        std::env::temp_dir().join(format!("netbaiot-v3-tcp-command-{}", uuid::Uuid::new_v4()));
+        std::env::temp_dir().join(format!("netbaiot-rpc-tcp-command-{}", uuid::Uuid::new_v4()));
     std::fs::create_dir_all(&root).unwrap();
     let mut config: Config =
         serde_json::from_str(include_str!("../../../configs/development.json")).unwrap();
@@ -594,7 +594,7 @@ async fn rpc_command_real_tcp_tenant_scope_and_capacity() {
         }),
         identities: vec![BusinessRpcIdentityConfig {
             certificate_sha256: fingerprint,
-            principal_id: "v3-command".into(),
+            principal_id: "rpc-command".into(),
             role: BusinessRole::Commands,
             provider_id: None,
             sink_id: None,
@@ -671,7 +671,7 @@ async fn rpc_command_real_tcp_tenant_scope_and_capacity() {
         read_tcp_device(&mut socket).await,
         br#"{"authenticated":true}"#
     );
-    let accepted_command = command("v3-tcp");
+    let accepted_command = command("rpc-tcp");
     let mut forbidden = accepted_command.clone();
     forbidden.device.tenant_id = TenantId::new("other").unwrap();
     assert!(matches!(
@@ -725,7 +725,7 @@ async fn rpc_command_real_tcp_tenant_scope_and_capacity() {
 
 #[tokio::test]
 async fn rpc_command_real_mqtt_dedup_http_ack_and_lost_response() {
-    let root = std::env::temp_dir().join(format!("netbaiot-v3-command-{}", uuid::Uuid::new_v4()));
+    let root = std::env::temp_dir().join(format!("netbaiot-rpc-command-{}", uuid::Uuid::new_v4()));
     std::fs::create_dir_all(&root).unwrap();
     let mut config: Config =
         serde_json::from_str(include_str!("../../../configs/development.json")).unwrap();
@@ -766,7 +766,7 @@ async fn rpc_command_real_mqtt_dedup_http_ack_and_lost_response() {
     let mut server = Command::new(env!("CARGO_BIN_EXE_netbaiot-server"))
         .arg(&path)
         .env("NETBAIOT_ADMIN_SECRET", "a".repeat(64))
-        .env("NETBAIOT_BUSINESS_RPC_TOKEN", "v3-command-token")
+        .env("NETBAIOT_BUSINESS_RPC_TOKEN", "rpc-command-token")
         .env(
             "RUST_LOG",
             "netbaiot_transports::business_rpc::session=debug",
@@ -777,7 +777,7 @@ async fn rpc_command_real_mqtt_dedup_http_ack_and_lost_response() {
         .spawn()
         .unwrap();
     let mut client_config =
-        BusinessRpcClientConfig::development(addresses[2], "v3-command-token".into());
+        BusinessRpcClientConfig::development(addresses[2], "rpc-command-token".into());
     client_config.provider = false;
     let (business, mut events) = BusinessRpcClient::connect(client_config, None).unwrap();
     tokio::select! {
@@ -807,7 +807,7 @@ async fn rpc_command_real_mqtt_dedup_http_ack_and_lost_response() {
     let mut connect_body = Vec::new();
     for text in [
         b"MQTT".as_slice(),
-        b"v3-unready",
+        b"rpc-unready",
         b"demo-device",
         SECRET.as_bytes(),
     ] {
@@ -854,7 +854,7 @@ async fn rpc_command_real_mqtt_dedup_http_ack_and_lost_response() {
         .device(retry.device.clone())
         .credentials(DeviceCredentials::new("demo-device", SECRET).unwrap())
         .mqtt_endpoint(format!("mqtt://{}", addresses[0]))
-        .client_id("v3-command-mqtt")
+        .client_id("rpc-command-mqtt")
         .connect()
         .await
         .unwrap();
@@ -901,7 +901,7 @@ async fn rpc_command_real_mqtt_dedup_http_ack_and_lost_response() {
         &http_dispatch,
     );
 
-    let mut fragmented = command("fragmented-v3-data");
+    let mut fragmented = command("fragmented-rpc-data");
     for index in 0..40 {
         fragmented
             .payload
@@ -975,8 +975,8 @@ async fn rpc_command_real_mqtt_dedup_http_ack_and_lost_response() {
     let lost = command("lost-response");
     let mut raw = TcpStream::connect(addresses[2]).await.unwrap();
     let hello = serde_json::to_vec(&RpcBootstrap::Hello {
-        version: 3,
-        token: Some("v3-command-token".into()),
+        version: BUSINESS_RPC_PROTOCOL_VERSION,
+        token: Some("rpc-command-token".into()),
         limits: RpcLimits::default(),
     })
     .unwrap();
@@ -990,7 +990,7 @@ async fn rpc_command_real_mqtt_dedup_http_ack_and_lost_response() {
     raw.read_exact(&mut ready).await.unwrap();
     assert!(matches!(
         serde_json::from_slice::<RpcBootstrap>(&ready).unwrap(),
-        RpcBootstrap::Ready { .. }
+        RpcBootstrap::Ready { version: 4, .. }
     ));
     let malformed = br#"{"command":"bad"}"#;
     let malformed_open = RpcOpen::Rpc {
@@ -1147,7 +1147,7 @@ async fn rpc_command_real_mqtt_dedup_http_ack_and_lost_response() {
     let cleanup_started = std::time::Instant::now();
     business.shutdown().await;
     device.shutdown();
-    // Closing the V3 client must release every command RPC stream, queued body,
+    // Closing the V4 client must release every command RPC stream, queued body,
     // and reassembly reservation, including the reset and lost-response paths.
     // Diagnostic polling is not a rate-limit test. Stay below the configured
     // 32/IP/s request ceiling without changing the five-second cleanup bound.
@@ -1207,12 +1207,12 @@ async fn rpc_command_real_mqtt_dedup_http_ack_and_lost_response() {
     .await;
     assert!(
         cleanup.is_ok(),
-        "V3 cleanup timed out: {observed}; elapsed since client shutdown: {:?}; lifecycle log {}:\n{}",
+        "V4 cleanup timed out: {observed}; elapsed since client shutdown: {:?}; lifecycle log {}:\n{}",
         cleanup_started.elapsed(),
         root.join("server.log").display(),
         lifecycle_log_tail(&root.join("server.log")),
     );
-    eprintln!("V3 cleanup completed in {:?}", cleanup_started.elapsed());
+    eprintln!("V4 cleanup completed in {:?}", cleanup_started.elapsed());
     drop(raw);
     server.start_kill().unwrap();
     let _ = server.wait().await;
@@ -1221,7 +1221,7 @@ async fn rpc_command_real_mqtt_dedup_http_ack_and_lost_response() {
 
 #[tokio::test]
 async fn real_socket_rpc_provider_event_and_invalidation() {
-    let root = std::env::temp_dir().join(format!("netbaiot-v3-e2e-{}", uuid::Uuid::new_v4()));
+    let root = std::env::temp_dir().join(format!("netbaiot-rpc-e2e-{}", uuid::Uuid::new_v4()));
     std::fs::create_dir_all(&root).unwrap();
     let mut config: Config =
         serde_json::from_str(include_str!("../../../configs/development.json")).unwrap();
@@ -1262,7 +1262,7 @@ async fn real_socket_rpc_provider_event_and_invalidation() {
     let mut server = Command::new(env!("CARGO_BIN_EXE_netbaiot-server"))
         .arg(&path)
         .env("NETBAIOT_ADMIN_SECRET", "a".repeat(64))
-        .env("NETBAIOT_BUSINESS_RPC_TOKEN", "v3-test-token")
+        .env("NETBAIOT_BUSINESS_RPC_TOKEN", "rpc-test-token")
         .stdout(Stdio::null())
         .stderr(Stdio::from(stderr))
         .kill_on_drop(true)
@@ -1273,19 +1273,19 @@ async fn real_socket_rpc_provider_event_and_invalidation() {
         inflight: AtomicUsize::new(0),
         peak_inflight: AtomicUsize::new(0),
     });
-    let client_config = BusinessRpcClientConfig::development(addresses[2], "v3-test-token".into());
+    let client_config = BusinessRpcClientConfig::development(addresses[2], "rpc-test-token".into());
     let (client, mut events) =
         BusinessRpcClient::connect(client_config, Some(handler.clone())).unwrap();
     tokio::time::timeout(Duration::from_secs(10), client.wait_ready())
         .await
-        .expect("V3 readiness deadline")
+        .expect("V4 readiness deadline")
         .unwrap();
     assert!(matches!(
         client.send_command(&command("method-forbidden")).await,
         Err(BusinessRpcClientError::Remote(RpcErrorCode::Forbidden))
     ));
     let mut replacement_config =
-        BusinessRpcClientConfig::development(addresses[2], "v3-test-token".into());
+        BusinessRpcClientConfig::development(addresses[2], "rpc-test-token".into());
     replacement_config.events = false;
     let (replacement, _) =
         BusinessRpcClient::connect(replacement_config, Some(handler.clone())).unwrap();
@@ -1296,16 +1296,16 @@ async fn real_socket_rpc_provider_event_and_invalidation() {
     );
     let device = DeviceClient::builder()
         .device(identity().device_key)
-        .credentials(DeviceCredentials::new("cred-v3", SECRET).unwrap())
+        .credentials(DeviceCredentials::new("cred-rpc", SECRET).unwrap())
         .mqtt_endpoint(format!("mqtt://{}", addresses[0]))
-        .client_id("v3-e2e")
+        .client_id("rpc-e2e")
         .connect()
         .await
         .unwrap();
     device
         .publish(
             DeviceUplink::new(
-                SourceMessageId::new("v3-heartbeat").unwrap(),
+                SourceMessageId::new("rpc-heartbeat").unwrap(),
                 DeviceUplinkKind::Heartbeat(Heartbeat { sequence: 1 }),
             ),
             PublishQos::AtLeastOnce,
@@ -1325,7 +1325,7 @@ async fn real_socket_rpc_provider_event_and_invalidation() {
     device
         .publish(
             DeviceUplink::new(
-                SourceMessageId::new("v3-heartbeat-retry").unwrap(),
+                SourceMessageId::new("rpc-heartbeat-retry").unwrap(),
                 DeviceUplinkKind::Heartbeat(Heartbeat { sequence: 2 }),
             ),
             PublishQos::AtLeastOnce,
@@ -1360,12 +1360,12 @@ async fn real_socket_rpc_provider_event_and_invalidation() {
     for index in 0..8 {
         let endpoint = addresses[0];
         concurrent.spawn(async move {
-            let id = format!("v3-concurrent-{index}");
+            let id = format!("rpc-concurrent-{index}");
             let device = DeviceClient::builder()
                 .device(identity_for(&id).device_key)
                 .credentials(DeviceCredentials::new(format!("cred-{id}"), SECRET).unwrap())
                 .mqtt_endpoint(format!("mqtt://{endpoint}"))
-                .client_id(format!("v3-concurrent-client-{index}"))
+                .client_id(format!("rpc-concurrent-client-{index}"))
                 .connect()
                 .await
                 .unwrap();
@@ -1406,7 +1406,7 @@ async fn rpc_mtls_authenticates_before_role_free_stream_authorization() {
     use sha2::{Digest, Sha256};
     use std::path::Path;
 
-    let root = std::env::temp_dir().join(format!("netbaiot-v3-mtls-{}", uuid::Uuid::new_v4()));
+    let root = std::env::temp_dir().join(format!("netbaiot-rpc-mtls-{}", uuid::Uuid::new_v4()));
     std::fs::create_dir_all(&root).unwrap();
     let fixtures = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures");
     let certificate = std::fs::read(fixtures.join("management-client.pem")).unwrap();
@@ -1447,7 +1447,7 @@ async fn rpc_mtls_authenticates_before_role_free_stream_authorization() {
         }),
         identities: vec![BusinessRpcIdentityConfig {
             certificate_sha256: fingerprint,
-            principal_id: "v3-provider".into(),
+            principal_id: "rpc-provider".into(),
             role: BusinessRole::AuthControl,
             provider_id: Some("primary".into()),
             sink_id: None,
@@ -1519,9 +1519,9 @@ async fn rpc_mtls_authenticates_before_role_free_stream_authorization() {
     );
     let device = DeviceClient::builder()
         .device(identity().device_key)
-        .credentials(DeviceCredentials::new("cred-v3", SECRET).unwrap())
+        .credentials(DeviceCredentials::new("cred-rpc", SECRET).unwrap())
         .mqtt_endpoint(format!("mqtt://{}", addresses[0]))
-        .client_id("v3-mtls-device")
+        .client_id("rpc-mtls-device")
         .connect()
         .await
         .unwrap();

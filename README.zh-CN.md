@@ -48,7 +48,7 @@ Linux x86_64/ARM64 是生产平台，macOS 用于开发测试，Windows 为实�
 | MQTT | 内嵌 3.1.1 与有界 5.0 profile；QoS0/1/2、持久会话、retain、Will、exact/`+`/`#` 订阅 |
 | TCP | 长度前缀帧与二进制 EventAccepted ACK v1；与 MQTT 共用设备 TCP listener |
 | UDP | NBI1 HMAC 上行、时间戳/replay 校验、签名 NBA1 回执；不加密，无下行 |
-| 业务 | 需确认的 HTTP webhook 或 Business RPC V3 |
+| 业务 | 需确认的 HTTP webhook 或 Business RPC V4 |
 | 管理 | 独立认证的 HTTP listener，路径为 `/api/v1` |
 
 Payload 支持 JSON V1、CBOR V1、MessagePack V1、Protobuf V1 及显式注册的[厂商 Codec](docs/vendor-codecs.zh-CN.md)。

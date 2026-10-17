@@ -13,7 +13,7 @@ are authoritative for configuration structure.
 | Understand the runtime | [Architecture](architecture.md), [delivery semantics and EventBus](delivery-semantics.md), [resource budgets](resource-budgets.md) |
 | Connect devices | [Protocol matrix](protocol-support.md), [MQTT](mqtt.md), [device framing](device-protocol.md), [device SDK](device-sdk.md) |
 | Decode payloads | [Built-in codecs](codecs.md), [vendor codecs](vendor-codecs.md) |
-| Integrate business systems | [Business integration](business-integration.md), [Business RPC V3](business-rpc.md), [Rust client](client.md), [public protocol](public-protocol.md) |
+| Integrate business systems | [Business integration](business-integration.md), [Business RPC V4](business-rpc.md), [Rust client](client.md), [public protocol](public-protocol.md) |
 | Manage and secure | [HTTP API](http-api.md), [management auth](management-auth.md), [auth cache](authentication-cache.md), [control plane](control-plane.md), [security](security.md), [UDP key provisioning](device-key-security.md) |
 | Deploy and recover | [Platform support](platform-support.md), [graceful restart](graceful-restart.md), [restart spool](restart-spool.md), [MQTT recovery](mqtt-session-recovery.md) |
 | Validate and maintain | [Maintenance](maintenance.md), [MQTT conformance](mqtt-3.1.1-conformance.md), [benchmarks](benchmarks.md), [production validation](production-readiness.md), [measurement evidence](performance/README.md), [reproduction scripts](../scripts/perf/README.md) |
@@ -31,7 +31,7 @@ on `main` are unreleased after the [v0.3.3 tag](https://github.com/sskycn/netbai
 See [integer conversion migration](migration/integer-decimal.md) before using those
 examples with a release binary.
 
-Only Business RPC V3, MQTT recovery NBMQ v6 and EventBus recovery NBSP v3 are
+Only Business RPC V4, MQTT recovery NBMQ v6 and EventBus recovery NBSP v3 are
 supported. Old or unknown versions fail explicitly without fallback or migration;
 read the [upgrade guide](migration/current-protocol-only.md). MQTT 3.1.1/5.0 and
 management `/api/v1` remain supported.

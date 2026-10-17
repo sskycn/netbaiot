@@ -2,7 +2,7 @@
 
 设备载荷支持 JSON V1、CBOR V1、MessagePack V1、Protobuf V1，详见[wire 格式、认证选择与扩展](codecs.zh-CN.md)。
 
-`netbaiot-protocol` 是 NetbaIoT 公共 wire 契约的权威、独立于 runtime 的 Rust 模型。其正常依赖为序列化、UUID 和错误模型相关 crate，不依赖 Tokio、HTTP、MQTT、服务端或 runtime 内部实现。Crate SemVer 与 wire `PROTOCOL_VERSION` 是两个独立的兼容性维度；设备 JSON 的 `PROTOCOL_VERSION` 为 `1`；Business RPC 独立使用当前版本 3；恢复文件分别为 NBMQ v6 和 NBSP v3，管理 HTTP 保留 `/api/v1`。
+`netbaiot-protocol` 是 NetbaIoT 公共 wire 契约的权威、独立于 runtime 的 Rust 模型。其正常依赖为序列化、UUID 和错误模型相关 crate，不依赖 Tokio、HTTP、MQTT、服务端或 runtime 内部实现。Crate SemVer 与 wire `PROTOCOL_VERSION` 是两个独立的兼容性维度；设备 JSON 的 `PROTOCOL_VERSION` 为 `1`；Business RPC 独立使用当前版本 4；恢复文件分别为 NBMQ v6 和 NBSP v3，管理 HTTP 保留 `/api/v1`。
 
 强类型公共标识包括 `TenantId`、`ProductId`、`DeviceId`、`DeviceKey`、`EventId`、`DeliveryId`、`CommandId`、`SinkId` 和 `SubscriptionId`。使用前会验证这些标识。UTC 时间戳使用 Unix 毫秒。
 
@@ -19,11 +19,11 @@
 本次 0.x 清理是有意的 source/control API 破坏性变更：删除 `TransportKind::Http` 和
 `ConnectionCounts.http`，传输字符串只剩 `mqtt`、`tcp`、`udp`；status 只输出这三项，
 不包含管理连接。UDP 无会话，活动连接数为零。该 HTTP 清理本身没有改变设备 JSON v1、
-MQTT 3.1.1、TCP 分帧、NBI1/NBA1 及当前 Business RPC V3 的 wire bytes；上述独立的
+MQTT 3.1.1、TCP 分帧、NBI1/NBA1 及当时 Business RPC V3 的 wire bytes；上述独立的
 TCP ACK 变更则需要更新分帧读取逻辑。公共客户端应与服务器一起重新构建。
 详见[协议支持](protocol-support.zh-CN.md)。
 
 连接 presence 属于 Sessions 和管理连接查询，不是业务事件。此次 0.x 清理从公共
 Rust/JSON 模型和筛选条件中移除了未使用的连接生命周期类型，属于公共 API 破坏性变更。
-请删除旧筛选条件并重新构建客户端；设备 JSON v1 和当前 Business RPC V3 分别保留其 wire bytes。
+请删除旧筛选条件并重新构建客户端；该清理保留了设备 JSON v1 和当时 Business RPC V3 的 wire bytes。
 参阅[当前格式升级步骤](migration/current-protocol-only.zh-CN.md)。

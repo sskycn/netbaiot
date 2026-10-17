@@ -4,8 +4,8 @@ Requires nightly Rust and cargo-fuzz. Targets are independent of listeners/stora
 Every harness caps its own input, and incremental harnesses cap buffered bytes.
 
 Business RPC uses the version-independent `business_rpc_bootstrap` and
-`business_rpc_wire` target names. They exercise the current V3 Hello/Ready and
-binary stream protocol; the wire version remains 3. `seed_corpus.py` writes their
+`business_rpc_wire` target names. They exercise the current V4 Hello/Ready and
+binary stream protocol; the wire version is 4. `seed_corpus.py` writes their
 seeds under those target names.
 
 ```sh

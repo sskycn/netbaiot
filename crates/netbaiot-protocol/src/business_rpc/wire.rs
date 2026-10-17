@@ -1,12 +1,12 @@
-//! Business RPC V3 bootstrap and binary framing contract.
+//! Business RPC V4 bootstrap and binary framing contract.
 //! The sole supported Business RPC wire format.
 use crate::{EventFilter, SubscriptionId, business_rpc::RpcError};
-// The V3 application method uses the established command JSON DTO unchanged.
+// The current application method uses the established command JSON DTO unchanged.
 pub use crate::business_rpc::{DeviceCommandSendRequest, DeviceCommandSendResponse};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-pub const BUSINESS_RPC_PROTOCOL_VERSION: u16 = 3;
+pub const BUSINESS_RPC_PROTOCOL_VERSION: u16 = 4;
 pub const RPC_HEADER_BYTES: usize = 12;
 pub const RPC_MAX_METADATA_BYTES: usize = 4 * 1024;
 pub const RPC_HARD_MAX_FRAME_PAYLOAD_BYTES: usize = 16 * 1024;
@@ -464,7 +464,7 @@ mod tests {
     use super::*;
     #[test]
     fn frozen_wire_numbers_and_versions() {
-        assert_eq!(BUSINESS_RPC_PROTOCOL_VERSION, 3);
+        assert_eq!(BUSINESS_RPC_PROTOCOL_VERSION, 4);
         assert_eq!(
             [
                 RpcFrameType::Open as u8,
@@ -522,12 +522,12 @@ mod tests {
     #[test]
     fn bootstrap_is_versioned_and_role_free() {
         let hello = RpcBootstrap::Hello {
-            version: 3,
+            version: BUSINESS_RPC_PROTOCOL_VERSION,
             token: None,
             limits: RpcLimits::default(),
         };
         let wire = serde_json::to_value(&hello).unwrap();
-        assert_eq!(wire["version"], 3);
+        assert_eq!(wire["version"], 4);
         assert!(wire.get("role").is_none());
         assert!(
             serde_json::from_value::<RpcBootstrap>(wire)
@@ -549,7 +549,7 @@ mod tests {
     }
     #[test]
     fn current_bootstrap_rejects_old_unknown_and_corrupt_versions() {
-        for version in [0, 1, 2, 4, u16::MAX] {
+        for version in [0, 1, 2, 3, 5, u16::MAX] {
             let hello = RpcBootstrap::Hello {
                 version,
                 token: None,

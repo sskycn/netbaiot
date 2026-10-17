@@ -11,7 +11,7 @@
 | 理解运行时 | [架构](architecture.zh-CN.md)、[投递语义](delivery-semantics.zh-CN.md)、[EventBus 实现（英文）](delivery-semantics.md#eventbus-ownership-and-accounting)、[资源预算](resource-budgets.md) |
 | 设备接入 | [接入指南](device-integration-guide.md)、[协议矩阵](protocol-support.zh-CN.md)、[MQTT](mqtt.zh-CN.md)、[设备封包](device-protocol.zh-CN.md)、[设备 SDK](device-sdk.zh-CN.md) |
 | Payload 解码 | [内置 Codec](codecs.zh-CN.md)、[厂商 Codec](vendor-codecs.zh-CN.md) |
-| 业务集成 | [集成指南](business-integration.zh-CN.md)、[Business RPC V3](business-rpc.zh-CN.md)、[Rust 客户端](client.zh-CN.md)、[公共协议](public-protocol.zh-CN.md) |
+| 业务集成 | [集成指南](business-integration.zh-CN.md)、[Business RPC V4](business-rpc.zh-CN.md)、[Rust 客户端](client.zh-CN.md)、[公共协议](public-protocol.zh-CN.md) |
 | 管理与安全 | [HTTP API](http-api.zh-CN.md)、[管理认证](management-auth.zh-CN.md)、[认证缓存（英文）](authentication-cache.md)、[控制面](control-plane.zh-CN.md)、[安全](security.zh-CN.md)、[UDP 密钥配置（英文）](device-key-security.md) |
 | 部署与恢复 | [运维指南](operations-guide.md)、[故障排查](troubleshooting.md)、[平台支持](platform-support.zh-CN.md)、[优雅重启](graceful-restart.zh-CN.md)、[Spool](restart-spool.zh-CN.md)、[MQTT 恢复（英文）](mqtt-session-recovery.md) |
 | 验证与维护 | [维护命令（英文）](maintenance.md)、[MQTT 一致性（英文）](mqtt-3.1.1-conformance.md)、[测量范围](benchmarks.zh-CN.md)、[生产验证](production-readiness.zh-CN.md)、[测量证据](performance/README.md)、[复现脚本](../scripts/perf/README.md) |
@@ -25,7 +25,7 @@
 已包含 [v0.3.3 标签](https://github.com/sskycn/netbaiot/releases/tag/v0.3.3)之后尚未发布的
 整数精确 Decimal 与配置诊断改进。使用发布版运行相关示例前，请阅读[整数转换迁移](migration/integer-decimal.zh-CN.md)。
 
-当前仅支持 Business RPC V3、MQTT 恢复 NBMQ v6 与 EventBus 恢复 NBSP v3。
+当前仅支持 Business RPC V4、MQTT 恢复 NBMQ v6 与 EventBus 恢复 NBSP v3。
 旧版或未知版本直接失败，不自动回退或迁移；升级前阅读[协议升级指南](migration/current-protocol-only.zh-CN.md)。
 MQTT 3.1.1/5.0 与管理 `/api/v1` 继续支持。
 

@@ -72,7 +72,7 @@ python3 examples/business_http_sink.py
 
 ## Confirmed Business RPC
 
-业务监听器只支持 [Business RPC V3](business-rpc.zh-CN.md)，必须显式配置 `business_tcp` 与 `business_rpc`。生产使用 mTLS principal；回环开发配置独立 `NETBAIOT_BUSINESS_RPC_TOKEN`，并在客户端显式设置事件 token。管理或设备凭据不授权这个监听器。
+业务监听器只支持 [Business RPC V4](business-rpc.zh-CN.md)，必须显式配置 `business_tcp` 与 `business_rpc`。生产使用 mTLS principal；回环开发配置独立 `NETBAIOT_BUSINESS_RPC_TOKEN`，并在客户端显式设置事件 token。管理或设备凭据不授权这个监听器。
 
 bootstrap 为有界 Hello/Ready JSON；后续是 12-byte header 的二进制 stream framing。Provider、EventSubscription 和在线命令 RPC 分别管理。唯一活动 required sink `tcp-rpc` 所有者每次只有一个事件在途。应用事务成功后调用 ACK，匹配当前 epoch/stream、delivery 与 event identity；socket write 与 WINDOW_UPDATE 都不是业务 ACK。filter 改变不能丢弃已经接受的 required 工作。重连可以重放稳定 EventId，业务必须幂等。
 

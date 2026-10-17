@@ -20,7 +20,7 @@ JSON/CBOR/MessagePack 的显式 Decimal 对象与 Protobuf Scalar 字段 6 的 w
 
 ## 认证与产品配置
 
-静态凭据、HTTP 认证及 Business RPC V3 均通过可信 `AuthenticatedDevice` 中的
+静态凭据、HTTP 认证及 Business RPC V4 均通过可信 `AuthenticatedDevice` 中的
 `codec_id` / `codec_version` 选择 Codec。返回未知 ID、版本 0 或未注册版本时，
 在建立会话前拒绝，并在最终注册的认证失效同步边界内再次检查。普通 MQTT/TCP
 数据包不访问远程认证服务。UDP 每个数据报仍验证 HMAC、版本、时间戳与 replay。

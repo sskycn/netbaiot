@@ -22,7 +22,7 @@ release behavior must be read from its release notes and source tag.
 ## Selection and product consistency
 
 Provision `AuthenticatedDevice.codec_id` and `codec_version` through static
-credentials, the HTTP auth provider or Business RPC V3. All providers pass through
+credentials, the HTTP auth provider or Business RPC V4. All providers pass through
 the same registered-profile check before session registration, and registration
 rechecks under the existing auth-registration fence. Normal MQTT/TCP packets do
 not call the provider. A payload cannot select or override its trusted codec or

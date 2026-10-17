@@ -1,4 +1,4 @@
-//! Isolated experiment for the V3 event serialization expression. This compares
+//! Isolated experiment for the V4 event serialization expression. This compares
 //! owned and borrowed DTOs; it does not establish network throughput or RSS.
 use netbaiot_core::*;
 use serde::Serialize;
@@ -30,7 +30,7 @@ fn serialize(event: &DeviceEvent, borrowed: bool) -> Vec<u8> {
         })
         .unwrap()
     } else {
-        // Exact expression used by the current V3 server delivery path.
+        // Exact expression used by the current V4 server delivery path.
         serde_json::to_vec(&EventDelivery {
             delivery_id,
             subscription_id,

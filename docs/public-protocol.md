@@ -6,7 +6,7 @@ Device payloads support JSON V1, CBOR V1, MessagePack V1 and Protobuf V1. See [c
 public NetbaIoT wire contracts. Normal dependencies are serialization, UUID, and
 error-model crates. It does not depend on Tokio, HTTP, MQTT, the server, or runtime
 internals. Crate SemVer and wire `PROTOCOL_VERSION` are separate compatibility
-dimensions. `PROTOCOL_VERSION = 1` identifies device JSON; Business RPC uses its independent current version 3. Restart files use NBMQ v6 and NBSP v3. Management remains `/api/v1`.
+dimensions. `PROTOCOL_VERSION = 1` identifies device JSON; Business RPC uses its independent current version 4. Restart files use NBMQ v6 and NBSP v3. Management remains `/api/v1`.
 
 Strong public identifiers include `TenantId`, `ProductId`, `DeviceId`, `DeviceKey`,
 `EventId`, `DeliveryId`, `CommandId`, `SinkId`, and
@@ -45,6 +45,6 @@ The 0.x device-HTTP removal is an intentional source/control-API breaking change
 are now `mqtt`, `tcp`, `udp`; the status summary serializes exactly those three
 counts and excludes management connections. UDP remains sessionless (active count
 zero). That HTTP removal did not change Device JSON v1, MQTT 3.1.1, TCP framing,
-NBI1/NBA1 or the current Business RPC V3 wire bytes; the separate TCP ACK change
+NBI1/NBA1 or the then-current Business RPC V3 wire bytes; the separate TCP ACK change
 above requires updated framing readers. Rebuild public clients
 together with the server. See [protocol support](protocol-support.md).

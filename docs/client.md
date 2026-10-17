@@ -1,7 +1,7 @@
 # Rust business client
 
 `netbaiot-client` is the official async Rust client for business and management
-integrations. It uses a pooled HTTP client for control operations and the current Business RPC V3 stream for events. It creates no Tokio runtime and no database.
+integrations. It uses a pooled HTTP client for control operations and the current Business RPC V4 stream for events. It creates no Tokio runtime and no database.
 
 ```rust
 let client = NetbaIoTClient::builder()
@@ -45,4 +45,4 @@ execution, while application code decides convergence, retries and rollback. `ru
 
 ## Current Business RPC client
 
-`netbaiot-client::business_rpc` exposes `BusinessRpcClient`, current `BusinessAuthHandler`, reset sync, invalidation, event ACK and online commands. See [Business RPC V3](business-rpc.md) and the compilable [current example](../crates/netbaiot-client/examples/business_rpc_current.rs). Low-level `wait_ready()` is persistent; wrap it in a timeout or cancellation. The root event façade uses this same current driver. Configure a separate development `event_token`, or `event_tls(BusinessRpcTls)` for mTLS; no management-token fallback exists. Old wire/client APIs have been removed; see [upgrade requirements](migration/current-protocol-only.md).
+`netbaiot-client::business_rpc` exposes `BusinessRpcClient`, current `BusinessAuthHandler`, reset sync, invalidation, event ACK and online commands. See [Business RPC V4](business-rpc.md) and the compilable [current example](../crates/netbaiot-client/examples/business_rpc_current.rs). Low-level `wait_ready()` is persistent; wrap it in a timeout or cancellation. The root event façade uses this same current driver. Configure a separate development `event_token`, or `event_tls(BusinessRpcTls)` for mTLS; no management-token fallback exists. Old wire/client APIs have been removed; see [upgrade requirements](migration/current-protocol-only.md).

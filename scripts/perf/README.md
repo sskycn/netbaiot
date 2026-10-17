@@ -7,7 +7,7 @@ evidence for the current architecture.
 
 Published evidence uses `<repo>`, `<tmp>`, and `<home>` path placeholders. These
 are archival inputs, not directly runnable configurations: substitute your own
-paths before replaying a run. The V3 command-readiness and HOL harnesses scrub
+paths before replaying a run. The Business RPC command-readiness and HOL harnesses scrub
 their completed output (including failure logs) after child processes stop, using
 dynamically discovered roots. Live configs retain real paths while a run is active.
 For other drivers, sanitize evidence before copying it into documentation:
@@ -138,7 +138,7 @@ send failures separately: their accounting intervals differ. Kernel socket drops
 are host-wide deltas over warmup, measurement and cooldown, not per-process loss.
 Summaries retain hashes, per-run plans, queue/RSS peaks and graceful-stop results.
 
-The V3 HOL and command-readiness harnesses wait for the configured gateway
+The Business RPC HOL and command-readiness harnesses wait for the configured gateway
 shutdown deadline plus five seconds. They retain the authoritative recovery
 directory and copy committed files with permissions, byte counts and SHA256
 metadata. A forced exit, missing MQTT snapshot or failed evidence copy fails the

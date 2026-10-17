@@ -91,7 +91,7 @@ pub struct BusinessRpcConfig {
     /// Limits for the sole current Business RPC wire format.
     #[serde(default)]
     pub limits: netbaiot_core::business_rpc::wire::RpcLimits,
-    /// Local sender policy, separate from the negotiated V3 receive windows.
+    /// Local sender policy, separate from the negotiated V4 receive windows.
     #[serde(default)]
     pub send_ahead: Option<RpcSendAhead>,
     #[serde(default)]

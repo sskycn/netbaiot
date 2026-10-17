@@ -1,4 +1,4 @@
-//! Current Business RPC V3 client with owned bounded drivers.
+//! Current Business RPC V4 client with owned bounded drivers.
 use super::{
     BorrowedCommandRequest, BoundedCommandBody, BusinessAuthHandler,
     BusinessRpcClientError as Error, BusinessRpcTls, Io, connect_io,
@@ -1321,6 +1321,47 @@ mod tests {
             .await
             .unwrap();
         socket.write_all(&ready).await.unwrap();
+    }
+    #[tokio::test]
+    async fn bootstrap_sends_v4_and_rejects_non_v4_ready() {
+        let config = BusinessRpcClientConfig::development(
+            "127.0.0.1:1".parse().unwrap(),
+            "bootstrap-test-token".into(),
+        );
+        for version in [0, 1, 2, 3, 4, 5, u16::MAX] {
+            let (client, mut server) = tokio::io::duplex(4096);
+            let mut client: Box<dyn Io> = Box::new(client);
+            let reply = async {
+                let length = server.read_u32().await.unwrap();
+                assert!(length <= 4096);
+                let mut bytes = vec![0; length as usize];
+                server.read_exact(&mut bytes).await.unwrap();
+                assert!(matches!(
+                    serde_json::from_slice::<RpcBootstrap>(&bytes).unwrap(),
+                    RpcBootstrap::Hello { version: 4, .. }
+                ));
+                let ready = serde_json::to_vec(&RpcBootstrap::Ready {
+                    version,
+                    connection_epoch: 42,
+                    limits: RpcLimits::default(),
+                })
+                .unwrap();
+                server
+                    .write_all(&(ready.len() as u32).to_be_bytes())
+                    .await
+                    .unwrap();
+                server.write_all(&ready).await.unwrap();
+            };
+            let (result, ()) = tokio::join!(bootstrap(&mut client, &config), reply);
+            if version == 4 {
+                assert_eq!(result.unwrap(), (42, RpcLimits::default()));
+            } else {
+                assert!(
+                    matches!(result, Err(Error::Protocol)),
+                    "Ready version {version}"
+                );
+            }
+        }
     }
     async fn subscription(socket: &mut TcpStream) -> (u32, SubscriptionId) {
         let frame = read(socket).await;

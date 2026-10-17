@@ -1,4 +1,4 @@
-//! Frozen V3 wire fixtures exercised through the version-independent public API.
+//! Frozen V4 wire fixtures exercised through the version-independent public API.
 use netbaiot_protocol::business_rpc::wire::*;
 use serde::{Serialize, de::DeserializeOwned};
 
@@ -8,18 +8,18 @@ fn round_trip<T: DeserializeOwned + Serialize>(json: &str) {
 }
 
 #[test]
-fn hello_and_ready_keep_exact_json_and_version_three() {
-    let hello = r#"{"type":"hello","version":3,"token":"fixture-token","limits":{"max_frame_payload_bytes":8192,"max_concurrent_streams":256,"initial_stream_window_bytes":262144,"initial_connection_window_bytes":4194304,"heartbeat_ms":5000}}"#;
-    let ready = r#"{"type":"ready","version":3,"connection_epoch":42,"limits":{"max_frame_payload_bytes":8192,"max_concurrent_streams":256,"initial_stream_window_bytes":262144,"initial_connection_window_bytes":4194304,"heartbeat_ms":5000}}"#;
-    assert_eq!(BUSINESS_RPC_PROTOCOL_VERSION, 3);
+fn hello_and_ready_keep_exact_json_and_version_four() {
+    let hello = r#"{"type":"hello","version":4,"token":"fixture-token","limits":{"max_frame_payload_bytes":8192,"max_concurrent_streams":256,"initial_stream_window_bytes":262144,"initial_connection_window_bytes":4194304,"heartbeat_ms":5000}}"#;
+    let ready = r#"{"type":"ready","version":4,"connection_epoch":42,"limits":{"max_frame_payload_bytes":8192,"max_concurrent_streams":256,"initial_stream_window_bytes":262144,"initial_connection_window_bytes":4194304,"heartbeat_ms":5000}}"#;
+    assert_eq!(BUSINESS_RPC_PROTOCOL_VERSION, 4);
     for json in [hello, ready] {
         round_trip::<RpcBootstrap>(json);
         serde_json::from_str::<RpcBootstrap>(json)
             .unwrap()
             .validate()
             .unwrap();
-        for version in [0, 1, 2, 4, u16::MAX] {
-            let invalid = json.replace("\"version\":3", &format!("\"version\":{version}"));
+        for version in [0, 1, 2, 3, 5, u16::MAX] {
+            let invalid = json.replace("\"version\":4", &format!("\"version\":{version}"));
             assert_eq!(
                 serde_json::from_str::<RpcBootstrap>(&invalid)
                     .unwrap()
@@ -31,7 +31,7 @@ fn hello_and_ready_keep_exact_json_and_version_three() {
 }
 
 #[test]
-fn header_bytes_and_resource_constants_keep_the_v3_contract() {
+fn header_bytes_and_resource_constants_keep_the_current_contract() {
     assert_eq!(RPC_HEADER_BYTES, 12);
     assert_eq!(RPC_END_STREAM, 1);
     assert_eq!(RPC_MAX_STREAM_ID, 0x7fff_ffff);

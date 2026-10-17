@@ -147,7 +147,7 @@ pub struct BusinessRpcTransportConfig {
     pub tls: Option<TlsAcceptor>,
     pub limits: netbaiot_core::business_rpc::wire::RpcLimits,
     pub send_ahead: Option<RpcSendAhead>,
-    /// Experiment only: OS socket send buffer request, outside the V3 protocol.
+    /// Experiment only: OS socket send buffer request, outside the V4 protocol.
     pub experiment_socket_send_buffer_bytes: Option<usize>,
     pub max_connections: usize,
     pub auth_max_inflight: usize,
@@ -156,7 +156,7 @@ pub struct BusinessRpcTransportConfig {
     pub write_timeout: Duration,
     pub event_ack_timeout: Duration,
 }
-/// Sender-local V3 scheduling limits; these are never sent in the V3 Hello.
+/// Sender-local V4 scheduling limits; these are never sent in the V4 Hello.
 #[derive(Clone, Copy, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
@@ -794,8 +794,8 @@ mod tests {
     #[tokio::test]
     async fn framing_handles_split_and_coalesced_frames() {
         let (mut sender, mut receiver) = tokio::io::duplex(256);
-        let first = br#"{"type":"hello","version":3,"token":"one"}"#;
-        let second = br#"{"type":"hello","version":3,"token":"two"}"#;
+        let first = br#"{"type":"hello","version":4,"token":"one"}"#;
+        let second = br#"{"type":"hello","version":4,"token":"two"}"#;
         let first_len = u32::try_from(first.len()).unwrap().to_be_bytes();
         let second_len = u32::try_from(second.len()).unwrap().to_be_bytes();
         sender.write_all(&first_len[..2]).await.unwrap();

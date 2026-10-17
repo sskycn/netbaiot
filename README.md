@@ -52,7 +52,7 @@ experimental. See [platform support](docs/platform-support.md).
 | MQTT | Embedded 3.1.1 and bounded 5.0 profile; QoS0/1/2, persistent sessions, retained messages, Will, exact/`+`/`#` subscriptions |
 | TCP | Length-prefixed frames and binary EventAccepted ACK v1; shares the device TCP listener with MQTT |
 | UDP | NBI1 HMAC uplink, timestamp/replay checks and signed NBA1 receipt; no encryption or downlink |
-| Business | Confirmed HTTP webhook or Business RPC V3 |
+| Business | Confirmed HTTP webhook or Business RPC V4 |
 | Management | Independent authenticated HTTP listener under `/api/v1` |
 
 Payloads support JSON V1, CBOR V1, MessagePack V1, Protobuf V1 and explicitly

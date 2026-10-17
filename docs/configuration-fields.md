@@ -79,7 +79,7 @@ Schema does not replace `netbaiot config check`; cross-field, TLS, secret-source
 | `limits` | "#/$defs/RpcLimits" | `{"heartbeat_ms":5000,"initial_connection_window_bytes":4194304,"initial_stream_window_bytes":262144,"max_concurrent_streams":256,"max_frame_payload_bytes":8192}` | Limits for the sole current Business RPC wire format. |
 | `max_auth_control_offline_ms` | "integer" | `30000` |  |
 | `max_connections` | "integer" | `8` |  |
-| `send_ahead` | union/object | `null` | Local sender policy, separate from the negotiated V3 receive windows. |
+| `send_ahead` | union/object | `null` | Local sender policy, separate from the negotiated V4 receive windows. |
 | `tls` | union/object | `required/no default` |  |
 
 ## BusinessRpcIdentityConfig

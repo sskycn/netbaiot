@@ -1,15 +1,19 @@
-# Business RPC V3 多流协议
+# Business RPC V4 多流协议
 
-Business RPC V3 是 `business_tcp` 唯一支持的业务流协议。配置 `business_rpc.limits`（也可使用有界默认值），监听器直接进入当前解析器。Hello/Ready 的版本字段用于拒绝旧版及未知客户端。Hello 不声明角色；已认证 principal、OPEN 类型、方法和租户范围共同决定权限。生产环境使用 mTLS，并按证书指纹精确映射身份；独立的回环开发 token 只授予配置的开发角色。管理凭据及设备凭据不能授权业务监听器。
+Business RPC V4 是 `business_tcp` 唯一支持的业务流协议。配置 `business_rpc.limits`（也可使用有界默认值），监听器直接进入当前解析器。Hello/Ready 的版本字段用于拒绝旧版及未知客户端。Hello 不声明角色；已认证 principal、OPEN 类型、方法和租户范围共同决定权限。生产环境使用 mTLS，并按证书指纹精确映射身份；独立的回环开发 token 只授予配置的开发角色。管理凭据及设备凭据不能授权业务监听器。
 
 ## Wire 协议
 
 Rust 源码采用无版本号名称：通用 DTO 仍位于
 `netbaiot_protocol::business_rpc`，wire 类型位于 `business_rpc::wire`
 （`RpcBootstrap`、`RpcFrameHeader`、`RpcLimits` 等 `Rpc*` 类型），流复用 crate
-改名为 `netbaiot-rpc-mux`。本次是 Rust 源码 API 与包名的 breaking change，
-不保留旧名称兼容别名；下游需要更新 import 和 Cargo 依赖。网络协议无需升级：
-`BUSINESS_RPC_PROTOCOL_VERSION`、Hello.version 和 Ready.version 仍为 `3`。
+为 `netbaiot-rpc-mux`。这些无版本号名称保持不变。
+`BUSINESS_RPC_PROTOCOL_VERSION`、Hello.version 和 Ready.version 均为 `4`。
+V4 正式采用已实现的 `Scalar::Decimal` 数据契约，例如
+`{"temperature":{"decimal":"25.3"}}`；不改变帧结构、DTO、认证、流控、ACK 语义或方法。
+V3 及更早客户端、未知版本均在握手阶段被拒绝，不返回成功 Ready，也不进入正常业务流。
+不存在降级、V3 转换器或兼容层，旧业务客户端必须升级后才能连接。
+软件 SemVer 与此 wire 版本相互独立。
 对外 Prometheus 名称、`NETBAIOT_V3_SOCKET_TRACE`、loadgen topology 值
 （`v3`/`v3_dual`）与序列化 `v3_*` 测量字段保持不变。
 
@@ -21,7 +25,7 @@ Provider 和 EventSubscription 是长寿命父流。Provider 下有网关发起�
 
 ## 在线设备命令
 
-`device.command.send` 使用独立的客户端 RPC 流，不需要父流。OPEN 带方法名、每次新生成的 `request_id`、deadline 和 body 长度；DATA 带 `DeviceCommandSendRequest { command }` JSON 并以 END_STREAM 结束。网关用 RESPONSE/DATA 返回 `DeviceCommandSendResponse { dispatch }`。BusinessPrincipal 的 `call_methods` 必须允许此方法，租户范围也必须涵盖目标设备。方法授权先于 DTO 解码，租户授权先于会话查询；V3 帧与 mux wire 均未改变。
+`device.command.send` 使用独立的客户端 RPC 流，不需要父流。OPEN 带方法名、每次新生成的 `request_id`、deadline 和 body 长度；DATA 带 `DeviceCommandSendRequest { command }` JSON 并以 END_STREAM 结束。网关用 RESPONSE/DATA 返回 `DeviceCommandSendResponse { dispatch }`。BusinessPrincipal 的 `call_methods` 必须允许此方法，租户范围也必须涵盖目标设备。方法授权先于 DTO 解码，租户授权先于会话查询；固定帧与 mux wire 均未改变。
 
 业务端调用 `BusinessRpcClient::send_command(&command)`。`Queued` 只表示当前本地 MQTT/TCP 设备会话已接受下发，不表示设备已收到或执行。设备稍后上报的 `CommandAck` 仍作为普通 EventDelivery 按 `command_id` 匹配。提交后断线或超时返回 `OutcomeUnknown`；重连后用相同内容和 `command_id` 显式重试。每次 RPC 有新的 `request_id` 和 stream ID。同一 `(tenant_id, command_id)` 内容冲突返回 `Conflict`；设备离线或命令未就绪返回 `Unavailable`。下发成功后 RESET_STREAM 不撤销命令。排空期间所有命令提交（包括去重重试）均被拒绝。
 
@@ -45,7 +49,7 @@ HTTP `/api/v1/devices/commands` 和当前 Business RPC 共用一个 `CommandServ
 }
 ```
 
-客户端显式使用 `BusinessRpcClientConfig` 与 `BusinessRpcClient::connect`，在依赖 Provider/订阅前等待 `wait_ready()`。重连有有界退避并重建父流；旧事件句柄受 epoch 栅栏保护，不能在新连接上 ACK。TCP 自身仍有队头阻塞，丢包可能暂停所有流；V3 解决的是应用层整帧写入造成的阻塞。部署当前监听器前必须升级业务客户端，见[兼容性变更与升级](migration/current-protocol-only.zh-CN.md)。`StaleRevision` 会重建 Provider 流并执行 reset sync，事件订阅保持独立所有权。底层 `wait_ready()` 持续等待服务就绪；调用方应配置自己的超时或取消。
+客户端显式使用 `BusinessRpcClientConfig` 与 `BusinessRpcClient::connect`，在依赖 Provider/订阅前等待 `wait_ready()`。重连有有界退避并重建父流；旧事件句柄受 epoch 栅栏保护，不能在新连接上 ACK。TCP 自身仍有队头阻塞，丢包可能暂停所有流；多路复用解决的是应用层整帧写入造成的阻塞。部署当前监听器前必须升级业务客户端，见[兼容性变更与升级](migration/current-protocol-only.zh-CN.md)。`StaleRevision` 会重建 Provider 流并执行 reset sync，事件订阅保持独立所有权。底层 `wait_ready()` 持续等待服务就绪；调用方应配置自己的超时或取消。
 
 多流复用不代表已证明生产容量或认证尾延迟保证。部署前应在目标硬件上测量实际事件大小、流窗口和业务 consumer，详见[测量要求](benchmarks.zh-CN.md)。
 

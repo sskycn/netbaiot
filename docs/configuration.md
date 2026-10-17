@@ -135,11 +135,11 @@ rejects obsolete members and compilation proves layout/numeric/resource rules.
 
 ## Current Business RPC configuration
 
-`business_tcp` accepts Business RPC V3 only and requires explicit `business_rpc`.
+`business_tcp` accepts Business RPC V4 only and requires explicit `business_rpc`.
 Current fields include `limits`, `send_ahead`, `experiment_socket_send_buffer_bytes`,
 TLS/identities, development token environment and connection/auth limits. Old
 `version`, `allow_v1`, `v3`, `v3_send_ahead` and
 `v3_experiment_socket_send_buffer_bytes` are unknown fields. Production uses mTLS
 with mapped principals; plaintext is restricted to loopback development tokens.
 See [upgrade requirements](migration/current-protocol-only.md) and
-[Business RPC V3](business-rpc.md).
+[Business RPC V4](business-rpc.md).

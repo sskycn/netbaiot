@@ -63,7 +63,7 @@ TCP 帧不会调用远程认证服务。UDP 对每个数据报验证 HMAC，并�
 
 | 接口面 | 支持格式 | 明确拒绝的格式 |
 | --- | --- | --- |
-| Business RPC | 仅 V3 | V1、V2 与未知版本 |
+| Business RPC | 仅 V4 | V1、V2、V3 与未知版本 |
 | MQTT 重启恢复 | 仅 NBMQ v6 | NBMQ v1–v5 与未知版本 |
 | EventBus 重启 spool | 仅 NBSP v3 | NBSP v1/v2 与未知版本 |
 | 设备 MQTT | 3.1.1 与 5.0 | 见上面的实现 profile |

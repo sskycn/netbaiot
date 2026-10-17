@@ -12,7 +12,7 @@ optional bearer token comes from `NETBAIOT_DELIVERY_TOKEN` and is never logged.
 
 ## Current Business RPC
 
-[Business RPC V3](business-rpc.md) is the only business stream protocol. The explicit `business_rpc` configuration supplies current limits and an mTLS principal map, or a development-only loopback token. The bootstrap is bounded length-prefixed JSON; application traffic uses the binary stream framing. No listener version dispatch or downgrade exists.
+[Business RPC V4](business-rpc.md) is the only business stream protocol. The explicit `business_rpc` configuration supplies current limits and an mTLS principal map, or a development-only loopback token. The bootstrap is bounded length-prefixed JSON; application traffic uses the binary stream framing. No listener version dispatch or downgrade exists.
 
 An authenticated EventSubscription installs the one active owner of required sink `tcp-rpc`. Its filter controls eligibility: an already accepted required event cannot be discarded because a reconnect uses a different filter. Each EventDelivery has a stable `event_id`, a separate `delivery_id`, `subscription_id` and attempt. Commit application work before ACK; a socket write or WINDOW_UPDATE is not acknowledgement. Missing, malformed or mismatched ACKs retain retryable responsibility. Reconnect/restart may replay the same `event_id`, so business processing must be idempotent. Use the [official Rust client](client.md) for bounded buffering, cancellation and manual ACK.
 

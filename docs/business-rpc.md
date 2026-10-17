@@ -1,17 +1,22 @@
-# Business RPC V3 streams
+# Business RPC V4 streams
 
-Business RPC V3 is the only supported business stream protocol on `business_tcp`. Configure `business_rpc.limits` (or use its bounded defaults); the listener enters the current parser directly. The version field remains in Hello/Ready to reject obsolete and unknown clients. Hello has no role: the authenticated principal, each OPEN kind, method and tenant scope determine permission. Production uses mTLS and exact certificate-fingerprint mapping. A separate loopback development token grants only the configured development role. Management and device credentials never authorize this listener.
+Business RPC V4 is the only supported business stream protocol on `business_tcp`. Configure `business_rpc.limits` (or use its bounded defaults); the listener enters the current parser directly. The version field remains in Hello/Ready to reject obsolete and unknown clients. Hello has no role: the authenticated principal, each OPEN kind, method and tenant scope determine permission. Production uses mTLS and exact certificate-fingerprint mapping. A separate loopback development token grants only the configured development role. Management and device credentials never authorize this listener.
 
 ## Wire contract
 
 Rust source names are version independent: shared DTOs remain in
 `netbaiot_protocol::business_rpc`, wire types live in `business_rpc::wire`
 (`RpcBootstrap`, `RpcFrameHeader`, `RpcLimits`, and the other `Rpc*` types), and
-stream machinery is provided by `netbaiot-rpc-mux`. The naming refactor is a
-breaking Rust source API/package change with no compatibility aliases; downstream
-imports and Cargo dependencies must be updated. It does not require a wire
-upgrade: `BUSINESS_RPC_PROTOCOL_VERSION`, Hello.version and Ready.version remain
-`3`. Existing Prometheus names, `NETBAIOT_V3_SOCKET_TRACE`, loadgen topology values
+stream machinery is provided by `netbaiot-rpc-mux`. These version-independent
+names remain unchanged. `BUSINESS_RPC_PROTOCOL_VERSION`, Hello.version and
+Ready.version are `4`. V4 formalizes the existing `Scalar::Decimal` data contract,
+including `{"temperature":{"decimal":"25.3"}}`, without changing the frame layout,
+DTOs, authentication, flow control, ACK semantics or methods. V3 and earlier
+clients, and unknown versions, are rejected during bootstrap without a successful
+Ready or entry into normal stream handling. There is no downgrade, V3 converter
+or compatibility layer; old business clients must upgrade before connecting.
+Software SemVer is independent of this wire version.
+Existing Prometheus names, `NETBAIOT_V3_SOCKET_TRACE`, loadgen topology values
 (`v3`/`v3_dual`) and serialized `v3_*` measurement fields remain unchanged.
 
 The bootstrap Hello and Ready are bounded length-prefixed JSON. Ready returns a fresh `connection_epoch` and negotiated limits. Subsequent frames use a 12-byte header: `payload_length: u32 BE`, `stream_id: u32 BE` (high bit clear), `frame_type: u8`, `flags: u8`, `reserved: u16 BE` (zero), followed by payload. The stable type numbers are OPEN 1, ACCEPT 2, RESPONSE 3, DATA 4, WINDOW_UPDATE 5, RESET_STREAM 6, CLOSE_STREAM 7, PING 8, PONG 9, GOAWAY 10. `END_STREAM = 1` is valid only on DATA and RESPONSE; all other flag bits are invalid. Header type, flags, ID and negotiated payload limit are checked before payload allocation. Metadata remains bounded JSON (4 KiB); DATA contains raw application body bytes (currently JSON DTOs). A declared `content_length` is checked against the exact reassembled byte count.
@@ -22,7 +27,7 @@ Provider and EventSubscription are long-lived parent streams. A provider parent 
 
 ## Online commands
 
-`device.command.send` is an independent client-initiated RPC with no parent stream. OPEN carries the method, a fresh `request_id`, a deadline and the declared body length; DATA carries JSON `DeviceCommandSendRequest { command }` and END_STREAM. The gateway returns `DeviceCommandSendResponse { dispatch }` in RESPONSE/DATA. The principal must list `device.command.send` in `call_methods` and allow the command's tenant. Method authorization precedes DTO decoding; tenant authorization precedes session lookup. No new V3 frame or mux rule is involved.
+`device.command.send` is an independent client-initiated RPC with no parent stream. OPEN carries the method, a fresh `request_id`, a deadline and the declared body length; DATA carries JSON `DeviceCommandSendRequest { command }` and END_STREAM. The gateway returns `DeviceCommandSendResponse { dispatch }` in RESPONSE/DATA. The principal must list `device.command.send` in `call_methods` and allow the command's tenant. Method authorization precedes DTO decoding; tenant authorization precedes session lookup. No new frame or mux rule is involved.
 
 Use `BusinessRpcClient::send_command(&command)`. A `Queued` result means the current local MQTT/TCP device session accepted dispatch; it does not mean the device received or executed it. The device's later `CommandAck` arrives as a normal EventDelivery and is matched by `command_id`. A connection loss or timeout after submission is `OutcomeUnknown`; retry the identical command with the same `command_id` after reconnect. Each RPC attempt has a new `request_id` and stream ID. Conflicting contents for one `(tenant_id, command_id)` return `Conflict`; offline or command-unready devices return `Unavailable`. RESET_STREAM after dispatch does not cancel the device command. All command send requests, including dedup retries, are rejected during drain.
 
@@ -32,7 +37,7 @@ Each RPC or delivery body is sliced lazily into DATA frames of at most the negot
 
 ## Bounds and operation
 
-Defaults: 8 KiB DATA payload, 256 concurrent streams, 256 KiB stream window, 4 MiB connection window and 5 s heartbeat setting. The hard frame payload ceiling is 16 KiB, metadata 4 KiB, message 8 MiB, server and SDK outbound body budgets 16 MiB per connection, server inbound reassembly 16 MiB per connection and 128 MiB across V3 connections. Control queues are limited to 64 frames and 256 KiB; per-connection writer and credit channels hold 256 items. These are configured limits, not measured capacity or optimal performance claims. Monitor the fixed-name `business_rpc_v3_*` metrics alongside existing auth and event metrics. Identifiers, tokens and certificate material must never become metric labels.
+Defaults: 8 KiB DATA payload, 256 concurrent streams, 256 KiB stream window, 4 MiB connection window and 5 s heartbeat setting. The hard frame payload ceiling is 16 KiB, metadata 4 KiB, message 8 MiB, server and SDK outbound body budgets 16 MiB per connection, server inbound reassembly 16 MiB per connection and 128 MiB across Business RPC connections. Control queues are limited to 64 frames and 256 KiB; per-connection writer and credit channels hold 256 items. These are configured limits, not measured capacity or optimal performance claims. Monitor the fixed-name `business_rpc_v3_*` metrics alongside existing auth and event metrics. Identifiers, tokens and certificate material must never become metric labels.
 
 The gateway can optionally bound sender-local DATA submitted before peer progress without reducing the negotiated receive windows. Set `business_rpc.send_ahead` to `{"stream_bytes": 16384, "connection_bytes": 131072}` for an experiment. Both values must be at least the configured frame payload, the connection value must be at least the stream value, and the connection value may not exceed 16 MiB. Invalid configurations fail startup. The default is `null`, which preserves the original window-only scheduling behavior. Stream `WINDOW_UPDATE` releases the corresponding stream counter; connection `WINDOW_UPDATE` releases the connection counter. Local `AsyncWrite` completion does not release either counter. The current receiver sends an update after every non-final DATA frame, so an 8 KiB sender limit with an 8 KiB frame does not wait for a larger batching threshold. On RESET, queued body bytes and the stream counter are removed; submitted connection bytes remain charged until peer connection credit arrives or the connection closes. This is a local policy and adds no Hello setting or wire field. A sender can only reorder frames that it has not yet submitted to the ordered TLS/TCP stream.
 
@@ -52,7 +57,7 @@ For a loopback development setup, add an explicit `business_tcp` listener and th
 }
 ```
 
-Use `BusinessRpcClientConfig` and `BusinessRpcClient::connect` then `wait_ready()` before relying on provider or subscription service. The client reconnects with bounded backoff and rebuilds parent streams. An old delivery handle is fenced by its connection epoch and cannot ACK on a replacement connection. TCP still has transport-level head-of-line blocking and packet loss can stall all streams; V3 only interleaves application DATA frames. Upgrade all business clients before deploying the current-only listener. See the [breaking-change upgrade guide](migration/current-protocol-only.md). A failed auth revision with `StaleRevision` resets the Provider stream and performs reset sync while preserving the separately owned event subscription. Low-level `wait_ready()` waits for service readiness; callers should apply their own timeout or cancellation.
+Use `BusinessRpcClientConfig` and `BusinessRpcClient::connect` then `wait_ready()` before relying on provider or subscription service. The client reconnects with bounded backoff and rebuilds parent streams. An old delivery handle is fenced by its connection epoch and cannot ACK on a replacement connection. TCP still has transport-level head-of-line blocking and packet loss can stall all streams; Business RPC only interleaves application DATA frames. Upgrade all business clients before deploying the current-only listener. See the [breaking-change upgrade guide](migration/current-protocol-only.md). A failed auth revision with `StaleRevision` resets the Provider stream and performs reset sync while preserving the separately owned event subscription. Low-level `wait_ready()` waits for service readiness; callers should apply their own timeout or cancellation.
 
 Stream multiplexing does not establish production capacity or an authentication latency guarantee. Measure the intended event sizes, stream windows and consumers on the deployment hardware; see [measurement requirements](benchmarks.md).
 

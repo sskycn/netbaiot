@@ -26,7 +26,7 @@ impl Drop for ActiveRpcConnection {
         self.metrics.business_rpc_mux_connection_finished();
         tracing::debug!(
             connection_epoch = self.epoch,
-            "business RPC V3 ActiveRpcConnection dropped"
+            "business RPC V4 ActiveRpcConnection dropped"
         );
     }
 }
@@ -280,7 +280,7 @@ async fn writer_loop<W: AsyncWrite + Unpin>(
                     frame.payload.len() as u64,
                 );
             }
-            tracing::debug!(stream_id = id, frame_type = ?frame.header.frame_type, payload_bytes = frame.payload.len(), "business RPC V3 selected frame");
+            tracing::debug!(stream_id = id, frame_type = ?frame.header.frame_type, payload_bytes = frame.payload.len(), "business RPC V4 selected frame");
             let completed = frame.header.frame_type == RpcFrameType::Data
                 && frame.header.flags == RPC_END_STREAM;
             let sent = tokio::select! {
@@ -295,7 +295,7 @@ async fn writer_loop<W: AsyncWrite + Unpin>(
                     Histogram::BusinessRpcMuxWriterWait,
                     selected_at.elapsed().as_micros().min(u64::MAX as u128) as u64,
                 );
-                tracing::debug!(stream_id = id, frame_type = ?frame.header.frame_type, payload_bytes = frame.payload.len(), "business RPC V3 writer completed frame");
+                tracing::debug!(stream_id = id, frame_type = ?frame.header.frame_type, payload_bytes = frame.payload.len(), "business RPC V4 writer completed frame");
                 metrics.inc(Metric::BusinessRpcMuxFramesSent);
                 if frame.header.frame_type == RpcFrameType::Data {
                     metrics.add(
@@ -395,7 +395,7 @@ fn apply_writer_message(
             done,
             _permit,
         } => {
-            tracing::debug!(stream_id = id, class = ?class, body_bytes = body.len(), "business RPC V3 body entered scheduler");
+            tracing::debug!(stream_id = id, class = ?class, body_bytes = body.len(), "business RPC V4 body entered scheduler");
             scheduler
                 .queue_body(id, class, body)
                 .map_err(|_| Error::Overloaded)?;
@@ -473,19 +473,19 @@ pub(super) async fn connection(
     let epoch = (Uuid::new_v4().as_u128() as u64).max(1);
     tracing::debug!(
         connection_epoch = epoch,
-        "business RPC V3 connection accepted"
+        "business RPC V4 connection accepted"
     );
     bootstrap_write(
         &mut io,
         &RpcBootstrap::Ready {
-            version: 3,
+            version: BUSINESS_RPC_PROTOCOL_VERSION,
             connection_epoch: epoch,
             limits: limits.clone(),
         },
         config.write_timeout,
     )
     .await?;
-    tracing::debug!(connection_epoch = epoch, "business RPC V3 bootstrap ready");
+    tracing::debug!(connection_epoch = epoch, "business RPC V4 bootstrap ready");
     let metrics = services.ingress.metrics.clone();
     metrics.business_rpc_mux_connection_started();
     let _active = ActiveRpcConnection {
@@ -509,7 +509,7 @@ pub(super) async fn connection(
         async move {
             tracing::debug!(
                 connection_epoch = epoch,
-                "business RPC V3 writer loop entered"
+                "business RPC V4 writer loop entered"
             );
             let result = writer_loop(
                 writer,
@@ -527,7 +527,7 @@ pub(super) async fn connection(
             tracing::debug!(
                 connection_epoch = epoch,
                 ?result,
-                "business RPC V3 writer loop exited"
+                "business RPC V4 writer loop exited"
             );
             writer_closed.cancel();
             result
@@ -535,7 +535,7 @@ pub(super) async fn connection(
     });
     tracing::debug!(
         connection_epoch = epoch,
-        "business RPC V3 reader loop entered"
+        "business RPC V4 reader loop entered"
     );
     let result = reader_loop(
         reader,
@@ -556,21 +556,21 @@ pub(super) async fn connection(
     tracing::debug!(
         connection_epoch = epoch,
         ?result,
-        "business RPC V3 reader returned"
+        "business RPC V4 reader returned"
     );
     writer_stop.cancel();
     tracing::debug!(
         connection_epoch = epoch,
-        "business RPC V3 writer_stop cancelled"
+        "business RPC V4 writer_stop cancelled"
     );
     let joined = writer_task.await;
     tracing::debug!(
         connection_epoch = epoch,
         ?joined,
-        "business RPC V3 writer task joined"
+        "business RPC V4 writer task joined"
     );
     if let Err(error) = &result {
-        tracing::warn!(%error, "business RPC V3 connection closed abnormally");
+        tracing::warn!(%error, "business RPC V4 connection closed abnormally");
         metrics.inc(Metric::BusinessRpcMuxAbnormalClosures);
     }
     match &result {
@@ -581,7 +581,7 @@ pub(super) async fn connection(
     tracing::debug!(
         connection_epoch = epoch,
         ?result,
-        "business RPC V3 connection returning"
+        "business RPC V4 connection returning"
     );
     result
 }
@@ -718,7 +718,7 @@ fn complete_response(
             tracing::debug!(
                 stream_id = id,
                 completion_us = event.queued_at.elapsed().as_micros(),
-                "business RPC V3 Event delivery acknowledged"
+                "business RPC V4 Event delivery acknowledged"
             );
             services.ingress.metrics.inc(Metric::BusinessRpcEventAcks);
             if let Some(started) = event.started {
@@ -1034,14 +1034,14 @@ async fn reader_loop<R: AsyncRead + Unpin + Send + 'static>(
             }
             frame = frames.recv() => {
                 let frame = match frame { Some(Ok(frame)) => frame, Some(Err(error)) => {
-                    tracing::debug!(?error, "business RPC V3 frame read failed");
+                    tracing::debug!(?error, "business RPC V4 frame read failed");
                     break Err(match error {
                         MuxError::Connection(_) => Error::Invalid,
                         MuxError::Timeout => Error::Timeout,
                         _ => Error::Unavailable,
                     })
                 }, None => break Err(Error::Unavailable) };
-                tracing::debug!(stream_id = frame.header.stream_id, frame_type = ?frame.header.frame_type, payload_bytes = frame.payload.len(), "business RPC V3 received frame");
+                tracing::debug!(stream_id = frame.header.stream_id, frame_type = ?frame.header.frame_type, payload_bytes = frame.payload.len(), "business RPC V4 received frame");
                 services.ingress.metrics.inc(Metric::BusinessRpcMuxFramesReceived);
                 if frame.header.frame_type == RpcFrameType::Data {
                     services.ingress.metrics.add(Metric::BusinessRpcMuxDataBytesReceived, frame.payload.len() as u64);
@@ -1284,7 +1284,7 @@ async fn reader_loop<R: AsyncRead + Unpin + Send + 'static>(
         pending_command_jobs = command_jobs.len(),
         pending_commands = incoming_rpc.len(),
         pending_event = pending_event.is_some(),
-        "business RPC V3 reader loop exited"
+        "business RPC V4 reader loop exited"
     );
     let last_stream_id = streams.goaway();
     let code = match &result {
@@ -1314,12 +1314,12 @@ async fn reader_loop<R: AsyncRead + Unpin + Send + 'static>(
         if tx.try_send(WriterMessage::GoAway { frame, done }).is_ok() {
             tracing::debug!(
                 connection_epoch = epoch,
-                "business RPC V3 GOAWAY write waiting"
+                "business RPC V4 GOAWAY write waiting"
             );
             let _ = tokio::time::timeout(config.write_timeout, written).await;
             tracing::debug!(
                 connection_epoch = epoch,
-                "business RPC V3 GOAWAY write wait finished"
+                "business RPC V4 GOAWAY write wait finished"
             );
         }
     }
