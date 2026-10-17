@@ -2,7 +2,7 @@
 
 本页按使用场景组织中文文档。当前 workspace 版本为 `0.3.3`，最低 Rust 版本为
 `1.88`。以下指南描述 `main`；最新公开 Release 为 `v0.3.3`（2026-10-17 核对），
-整数精确 Decimal 与后续诊断改进尚未发布。详见[版本与文档状态](documentation.zh-CN.md)。
+整数精确 Decimal 与后续诊断改进尚未发布。详见[版本与文档状态](README.zh-CN.md)。
 测量结果只适用于其标注的环境和版本。
 
 > 当前只支持 Business RPC V3、MQTT 恢复 NBMQ v6 和 EventBus 恢复 NBSP v3。
@@ -24,7 +24,7 @@
 - [设备 Codec](codecs.zh-CN.md)：JSON、CBOR、MessagePack、Protobuf V1 wire 格式。
 - [厂商 Payload Codec](vendor-codecs.zh-CN.md)：声明式布局、原生注册、整数精确转换与迁移。
 - [MQTT 3.1.1 / 5.0 profile](mqtt.zh-CN.md)与[设备 wire 格式](device-protocol.zh-CN.md)。
-- [业务系统集成指南](business-integration-guide.md)：webhook、Business RPC V3、命令和错误处理。
+- [业务系统集成指南](business-integration.zh-CN.md)：webhook、Business RPC V3、命令和错误处理。
 - [业务 RPC V3](business-rpc-v3.zh-CN.md)、[业务客户端](client.zh-CN.md)、
   [设备 SDK](device-sdk.zh-CN.md)。
 - [管理 HTTP API](http-api.zh-CN.md)与[管理认证](management-auth.zh-CN.md)。

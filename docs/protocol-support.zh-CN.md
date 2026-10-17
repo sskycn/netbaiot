@@ -57,7 +57,7 @@ TCP 帧不会调用远程认证服务。UDP 对每个数据报验证 HMAC，并�
 服务端组合有界业务 sink。已确认 HTTP webhook 以配置认可的 2xx 为 ACK；已确认的
 分帧 TCP/RPC 投递要求应用发送匹配 `event_id` 的 ACK。socket write 不是业务确认。
 尽力而为 sink 按各自有界溢出策略处理。详见
-[投递语义](delivery-semantics.zh-CN.md)与[业务系统集成](business-integration-guide.md)。
+[投递语义](delivery-semantics.zh-CN.md)与[业务系统集成](business-integration.zh-CN.md)。
 
 ## 当前业务与恢复格式
 

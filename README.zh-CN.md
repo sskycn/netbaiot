@@ -1,232 +1,87 @@
 # NetbaIoT
 
-设备载荷支持 JSON V1、CBOR V1、MessagePack V1、Protobuf V1，以及显式注册的厂商 Codec。
-详见 [wire 格式](docs/codecs.zh-CN.md)和[厂商 Payload 配置](docs/vendor-codecs.zh-CN.md)。
+[English](README.md) · [文档导航](docs/README.zh-CN.md) · [发布版本](https://github.com/sskycn/netbaiot/releases)
 
-截至 2026-10-17，workspace 版本为 `0.3.3`，最新公开 Release 为
-[v0.3.3](https://github.com/sskycn/netbaiot/releases/tag/v0.3.3)。本文档描述 `main`，
-包含**尚未发布**的整数精确 Decimal 转换和配置诊断改进。用发布版运行 `main` 示例前，
-请先阅读[版本与文档状态](docs/documentation.zh-CN.md)。
+NetbaIoT 是使用 Rust 编写、无运行时数据库、以内存为主的 IoT 接入网关与实时事件路由器。
+它直接实现 MQTT，将 MQTT、分帧 TCP 和认证 UDP 上行规范化为 `DeviceEvent`，再投递给业务系统。
+长期数据、工作流、设备配置和离线命令由业务系统负责。
 
-**当前协议说明：** Business RPC 仅支持 V3；计划重启恢复仅支持 MQTT NBMQ v6 与
-EventBus NBSP v3。MQTT 3.1.1/5.0 和管理接口 `/api/v1` 继续支持。详见
-[协议支持](docs/protocol-support.zh-CN.md)与[升级要求](docs/migration/current-protocol-only.zh-CN.md)。
-
-[English](README.md)
-
-**一个保持网关边界的 IoT 网关。**
-
-NetbaIoT 是使用 Rust 编写、无需运行时数据库、以内存为主的 IoT 设备接入
-网关与实时事件路由器。设备通过 MQTT 3.1.1、MQTT 5.0、分帧 TCP 或经过认证的
-UDP 接入。网关验证并规范化上行数据为 `DeviceEvent`，再路由给业务服务。
-
-**MQTT 3.1.1 / MQTT 5.0 / 分帧 TCP / 认证 UDP 进入 → `DeviceEvent` 输出。**
-业务数据仍由你的后端负责。
-
-[![CI](https://img.shields.io/github/actions/workflow/status/sskycn/netbaiot/ci.yml?branch=main)](https://github.com/sskycn/netbaiot/actions/workflows/ci.yml)
-[![License](https://img.shields.io/github/license/sskycn/netbaiot)](LICENSE)
-[![Latest release](https://img.shields.io/github/v/release/sskycn/netbaiot)](https://github.com/sskycn/netbaiot/releases)
-[![Rust](https://img.shields.io/badge/rust-1.88%2B-orange?logo=rust)](Cargo.toml)
-
-**快速入口：**[5 分钟快速开始](docs/quick-start.zh-CN.md) · [中文文档导航](docs/README.zh-CN.md) · [架构](docs/architecture.zh-CN.md) · [协议支持](docs/protocol-support.zh-CN.md) · [投递语义](docs/delivery-semantics.zh-CN.md) · [基准与测量](docs/benchmarks.zh-CN.md) · [安全](docs/security.zh-CN.md)
-
-```mermaid
-flowchart LR
-    M[MQTT 3.1.1 / MQTT 5.0]
-    T[分帧 TCP]
-    U[认证 UDP]
-    M --> G
-    T --> G
-    U --> G
-    G[NetbaIoT]
-    G --> A[认证与 ACL]
-    A --> C[版本化设备 Codec]
-    C --> E[统一 DeviceEvent]
-    E --> R[有界事件路由]
-    R --> B[你的业务系统]
+```text
+设备 → 传输 → 认证 → 版本化 Codec → DeviceEvent
+     → 有界路由 → 独立有界的业务 Sink
 ```
-
-## 为什么是 NetbaIoT？
-
-- **运行时不依赖数据库。** 网关无需 PostgreSQL、Redis 或消息存储即可接收并
-  路由设备流量。业务系统负责长期遥测、工作流、分析和离线命令意图。
-- **多种设备传输，共用一种事件模型。** MQTT、分帧 TCP 和签名 UDP 上行均使用
-  配置的版本化 Codec，输出相同的公开 `DeviceEvent` 类型。
-- **接纳边界有明确定义。** 设备回执表示必需 Sink 队列已完成资源接纳和入队，
-  不表示业务数据库已提交。详见[投递语义](docs/delivery-semantics.zh-CN.md)。
-- **资源有界。** 连接、报文、缓存、事件、队列、Sink、命令、订阅、重放和恢复
-  状态都有数量与字节上限。
-- **计划重启恢复语义明确。** 优雅关机时会排空必需投递，或把未完成工作提交到本地
-  recovery spool。这不是崩溃持久化；突然故障可能丢失近期内存工作。
 
 ## 快速开始
 
-Linux x86_64 与 ARM64 是正式支持的生产部署平台。macOS x86_64 / Apple Silicon
-用于开发与测试；Windows 属于实验性兼容平台，不保证每个版本都有官方二进制或生产稳定性。
-详见[平台支持](docs/platform-support.zh-CN.md)。
-
-源码用户（Rust 1.88+）：
+源码用户需要 Rust 1.88+：
 
 ```bash
-cargo run --locked -p netbaiot-cli -- demo
+cargo run --locked -p netbaiot-cli -- demo --once
 ```
 
-解压二进制发布包后：
+解压发布包后：
 
 ```bash
-./netbaiot demo
-# 完成一条端到端示例后退出：
 ./netbaiot demo --once
 ```
 
-Windows PowerShell 使用 `.\netbaiot.exe demo`。这个纯 Rust demo 在 loopback
-动态端口启动网关与有界业务接收器，通过真实 MQTT 认证和发布 heartbeat，分别等待
-PUBACK 与业务 sink ACK，再打印包含实际端口的 `mosquitto_pub` 命令。第一次体验无需
-Python 或 Mosquitto；按 Ctrl-C 排空并清理临时 recovery 目录。演示设备凭据**不可用于生产**。
+Demo 通过真实 MQTT 认证并发布心跳，等待业务 Sink ACK 后排空退出，无需外部 broker、
+Python 或 Mosquitto。演示凭据仅限本地开发。去掉 `--once` 可持续运行并获得标准 MQTT
+客户端命令。Windows PowerShell 使用 `.\netbaiot.exe`。
 
-NetbaIoT 自己实现 MQTT broker，普通 MQTT 客户端仍是一等使用方式。可执行 demo
-打印的命令，或使用[手动 MQTT 示例](docs/quick-start.zh-CN.md#手动-mqtt-示例)中的
-`mosquitto_pub -V mqttv311`；MQTT 5 改为 `-V mqttv5`。
-
-检查并启动自己的 JSON 配置：
+创建自己的配置：
 
 ```bash
-./netbaiot config check --config configs/tutorial.json
-./netbaiot serve --config configs/tutorial.json
+./netbaiot init my-gateway
+cd my-gateway
+../netbaiot config check --config netbaiot.json
+../netbaiot serve --config netbaiot.json
 ```
 
-教程配置需要手动 webhook；只体验设备接入可使用带进程内 audit sink 的
-`configs/development.json`。详见 [CLI](docs/cli.zh-CN.md)、[快速开始](docs/quick-start.zh-CN.md)
-和[运维指南](docs/operations-guide.md)。
-
-可用 `netbaiot init my-gateway` 创建开发项目，进入目录后执行
-`netbaiot config check --config netbaiot.json`、`netbaiot doctor --config netbaiot.json`。
-详见[配置与 IDE](docs/configuration.zh-CN.md)、[环境诊断](docs/doctor.md)及[维护命令](docs/maintenance.md)。
-
-## 工作方式
-
-```text
-设备 → 传输与认证 → 版本化 Codec → DeviceEvent
-     → 有界 EventBus → 业务 webhook 或已确认的 TCP/RPC 消费端
-```
-
-公开 Rust `DeviceEvent` 类型包含 `DeviceKey` 和带标签的事件类型。内置 HTTP webhook
-会将它映射为下面的业务 JSON envelope，这也是 Quick Start 接收端实际打印的结构：
-
-```json
-{
-  "event_id": "2b13d944-bb18-40df-8043-a636807fc023",
-  "source_message_id": "demo:1",
-  "tenant_id": "demo",
-  "product_id": "sensor",
-  "device_id": "device-1",
-  "event_type": "heartbeat",
-  "received_at": 1791203077827,
-  "occurred_at": null,
-  "payload": { "kind": "heartbeat", "data": { "sequence": 1 } }
-}
-```
-
-`event_id` 由网关生成，在重试和计划重启重放时保持稳定。业务消费端应将它与业务
-更新一并持久化并据此去重。你的后端可以按现有方式保存或转发事件；NetbaIoT 不要求
-使用某个特定数据库或队列。
-
-## 适合哪些场景？
-
-当你已有业务后端，需要 MQTT/TCP/UDP 设备接入，希望多种设备协议归一为一种事件类型，
-并且希望长期业务状态与离线工作流由应用持有时，NetbaIoT 可能适合你。它也适用于把
-有界队列和明确的接纳/失败语义作为设计约束的系统。
-
-## 哪些场景不适合？
-
-如果你需要完整 IoT 云平台（内置仪表盘、时序存储、设备 OTA 或规则引擎 UI）、集群或
-高可用 MQTT 服务、MQTT over WebSocket、共享订阅、MQTT-SN、Broker bridge，或崩溃持久化
-消息存储，请选择其他组件或与 NetbaIoT 组合。这些能力不是本网关提供的功能。
+手动 MQTT 示例见[快速开始](docs/quick-start.zh-CN.md)，生产配置见[配置参考](docs/configuration.zh-CN.md)。
+Linux x86_64/ARM64 是生产平台，macOS 用于开发测试，Windows 为实验性支持，详见[平台支持](docs/platform-support.zh-CN.md)。
 
 ## 协议支持
 
-| 接入 | 当前配置 |
+| 边界 | 能力 |
 | --- | --- |
-| MQTT | 内嵌 MQTT 3.1.1 和 MQTT 5.0 broker；QoS 0/1/2、保留消息、Will、有界持久会话、精确/`+`/`#` 订阅 |
-| TCP | 长度前缀通用帧与 MQTT 共用设备 TCP 监听器；非 loopback TCP 必须启用 TLS |
-| UDP | NBI1 上行使用 HMAC 认证、时间戳检查、重放保护和签名 NBA1 接纳回执；不加密、无下行 |
-| 业务出口 | 已确认 HTTP webhook 或分帧 TCP/RPC 消费端；队列和确认策略相互独立且有界 |
+| MQTT | 内嵌 3.1.1 与有界 5.0 profile；QoS0/1/2、持久会话、retain、Will、exact/`+`/`#` 订阅 |
+| TCP | 长度前缀帧与二进制 EventAccepted ACK v1；与 MQTT 共用设备 TCP listener |
+| UDP | NBI1 HMAC 上行、时间戳/replay 校验、签名 NBA1 回执；不加密，无下行 |
+| 业务 | 需确认的 HTTP webhook 或 Business RPC V3 |
+| 管理 | 独立认证的 HTTP listener，路径为 `/api/v1` |
 
-详见[协议支持矩阵](docs/protocol-support.zh-CN.md)和 [MQTT profile](docs/mqtt.zh-CN.md)。UDP 认证不
-提供机密性：**经过认证不代表已经加密**。
+Payload 支持 JSON V1、CBOR V1、MessagePack V1、Protobuf V1 及显式注册的[厂商 Codec](docs/vendor-codecs.zh-CN.md)。
+公网设备 TCP 必须使用 TLS；UDP 认证不提供加密。完整契约见[协议矩阵](docs/protocol-support.zh-CN.md)
+与[设备协议](docs/device-protocol.zh-CN.md)。
 
-## 命令与可靠性
+## 投递与命令
 
-命令只发送到当前连接的本机 MQTT/TCP 会话。设备离线时返回不可用；网关不会将命令排队
-留待以后投递。传输写入、设备接收和设备执行是不同状态。执行确认作为普通
-`DeviceEvent` 返回。业务应用负责持久化命令意图和重试策略。
+设备回执表示 `EventAccepted`：校验、路由、数量/字节准入和全部 required sink 原子入队
+已完成，不表示业务持久化。Required sink 必须显式 ACK；重试与计划重启重放可能重复
+相同的 `event_id`，业务端必须据此幂等处理。
 
-必需 Sink 扇出采用原子接纳。必需 Sink 显式确认投递；尽力而为 Sink 按有界丢弃策略
-处理。投递是 at-least-once，重试和恢复可能造成重复。MQTT PUBACK 表示 `EventAccepted`，
-不表示业务数据库已提交。详见[投递语义](docs/delivery-semantics.zh-CN.md)、[可靠性](docs/reliability.zh-CN.md)
-和[重启恢复](docs/restart-spool.zh-CN.md)。
+计划关机先排空 required 工作，或将其持久提交到有界本地 restart spool。提交失败时
+进程保持存活且 unready。突然崩溃可能丢失近期内存工作。详见[投递语义](docs/delivery-semantics.zh-CN.md)
+与[重启恢复](docs/restart-spool.zh-CN.md)。
 
-## 安全
-
-MQTT 和 TCP 在连接时认证并绑定设备身份。非 loopback 设备 TCP 必须使用 TLS。管理 HTTP
-使用独立授权边界，设备凭据不能授权管理操作。UDP 使用 HMAC 和重放检查，但不加密载荷。
-应通过受保护的配置或环境注入密钥，不要记录密钥。部署前阅读[安全概述](docs/security.zh-CN.md)
-和[运维指南](docs/operations-guide.md)。未公开漏洞请通过[安全报告政策](SECURITY.md)私下报告。
-
-## 基准测试
-
-[基准概述](docs/benchmarks.zh-CN.md)汇总精简的 Codec 与 loopback 测量及环境限制。
-当前生产容量尚未建立；[容量与稳定性测试](docs/production-readiness.zh-CN.md)介绍负载工具
-和实际验证范围。
+命令只发往本节点当前在线的 MQTT/TCP 会话。离线返回 `DEVICE_OFFLINE`，不保存离线命令。
+传输 SENT、设备收到与执行 ACK 分别处理。详见[业务集成](docs/business-integration.zh-CN.md)。
 
 ## 当前限制
 
-- NetbaIoT 当前是单节点网关，尚未实现跨节点共享在线会话、命令路由或集群高可用。
-- HTTP 不是设备接入协议。HTTP 监听器用于管理接口，与设备连接分离。
-- 不提供内置仪表盘、业务数据库、离线命令存储、设备配置协调器、OTA 或规则引擎 UI。
-- MQTT over WebSocket、MQTT-SN、共享订阅、Broker bridge 和 `$SYS` 服务不在支持范围内。
-- UDP 经过认证但不加密、无会话，也不支持命令下行。
-- 恢复只覆盖成功完成的计划优雅关机；它不是通用数据库，不能让任意进程或机器崩溃变得持久。
-- Workspace 版本为 `0.3.3`，尚未到 1.0。升级前请阅读协议和迁移说明，不要默认所有 API 均稳定。
+当前为单节点网关，不支持集群和跨节点在线会话路由；不提供仪表盘、遥测数据库、OTA 或配置协调。
+MQTT over WebSocket、共享订阅、MQTT-SN、Topic Alias、Subscription Identifier、Enhanced
+Authentication、bridge mode 与 `$SYS` 不在支持范围。HTTP 仅用于管理，不是设备入口。
+当前生产容量尚未确定，详见[测量范围](docs/benchmarks.zh-CN.md)。
 
-## 文档
+文档跟随 `main`。Workspace 版本仍为 `0.3.3`，但 `main` 已包含 `v0.3.3` 标签之后尚未发布的
+整数 Decimal 与诊断改进。升级前请阅读[版本与升级说明](docs/README.zh-CN.md#版本与升级)。
 
-- [中文文档导航](docs/README.zh-CN.md) · [5 分钟快速开始](docs/quick-start.zh-CN.md) · [10 分钟端到端教程](docs/getting-started.md)
-- [设计理念](docs/design-philosophy.zh-CN.md) · [按项目定位比较](docs/comparison.zh-CN.md)
-- [协议支持](docs/protocol-support.zh-CN.md) · [MQTT 3.1.1/5.0](docs/mqtt.zh-CN.md) · [设备报文格式](docs/device-protocol.zh-CN.md)
-- [投递语义](docs/delivery-semantics.zh-CN.md) · [可靠性](docs/reliability.zh-CN.md) · [重启 spool](docs/restart-spool.zh-CN.md)
-- [安全](docs/security.zh-CN.md) · [运维](docs/operations-guide.md) · [故障排查](docs/troubleshooting.md)
-- [业务集成与客户端](docs/business-integration-guide.md) · [CLI](docs/cli.zh-CN.md) · [设备 SDK](docs/device-sdk.zh-CN.md)
-- [配置与 IDE](docs/configuration.zh-CN.md) · [平台支持](docs/platform-support.zh-CN.md) · [当前协议升级](docs/migration/current-protocol-only.zh-CN.md)
-- [基准概述](docs/benchmarks.zh-CN.md) · [容量与稳定性测试](docs/production-readiness.zh-CN.md)
-- [v0.3.3 发布说明（英文）](docs/releases/v0.3.3.md) · [文档状态](docs/documentation.zh-CN.md) · [发布模板](docs/release-template.md)
+## 开发与许可
 
-## 构建与发布
+开发和验证见 [CONTRIBUTING.md](CONTRIBUTING.md)，架构约束见 [AGENTS.md](AGENTS.md)。
+部署前阅读[安全参考](docs/security.zh-CN.md)，漏洞通过 [SECURITY.md](SECURITY.md) 私密报告。
 
-Linux x86_64 和 ARM64 是正式支持且推荐的生产部署平台。macOS x86_64 / Apple Silicon
-用于开发与测试。Windows 属于实验性兼容平台，保留源码编译和独立手动检查，
-不保证生产稳定性或每次发布都有 Windows 二进制。详见[平台支持](docs/platform-support.zh-CN.md)。
-
-使用 workspace 最低支持版本构建：
-
-```bash
-cargo +1.88.0 build --locked
-```
-
-GitHub Actions 正式发布必须通过两个 Linux 原生包、SHA256SUMS 与实际运行 smoke。
-macOS/Windows 可选构建独立进行，失败不阻断 Linux 发布，见
-[Releases](https://github.com/sskycn/netbaiot/releases)。仓库目前没有官方 Docker 镜像。
-命令行客户端程序名为 `netbaiot`，详见 [CLI 指南](docs/cli.md)。
-
-## 参与贡献
-
-环境准备和验证要求见 [CONTRIBUTING.md](CONTRIBUTING.md)；架构和正确性约束见 [AGENTS.md](AGENTS.md)。欢迎提交问题和聚焦的 Pull Request。公开协议
-或 MQTT 行为改动需要兼容性证据和针对性测试。
-
-贡献者许可协议草案提供[中文版](CLA.zh-CN.md)和[英文版](CLA.md)，明确维护方在持续提供
-开源版本的同时进行独立商业授权的权限。草案尚待定稿，签署要求尚未启用，详见
-[CONTRIBUTING.md](CONTRIBUTING.md)。
-
-## 许可证
-
-NetbaIoT 使用 [AGPL-3.0-or-later](LICENSE) 许可证。
+采用 [AGPL-3.0-or-later](LICENSE) 许可。CLA 草案提供[英文](CLA.md)与[中文](CLA.zh-CN.md)，
+状态与签署要求见 [CONTRIBUTING.md](CONTRIBUTING.md)。

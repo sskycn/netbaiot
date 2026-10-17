@@ -4,7 +4,7 @@
 
 This migration applies to `main` after public `v0.3.3`, while the workspace still
 reports `0.3.3`. It does not rewrite that release's behavior or change device
-transport framing. See [version status](../documentation.md).
+transport framing. See [version status](../README.md).
 
 Integer **value** fields in telemetry, event values and command arguments now
 always use exact Decimal arithmetic. Remove the legacy numeric `scale` and `bias`

@@ -142,7 +142,7 @@ cargo run -p netbaiot-cli -- --output json server status
 cargo run -p netbaiot-cli -- device status device-1 --tenant demo --product sensor
 ```
 
-CLI binary 名是 `netbaiot`，Cargo package 名是 `netbaiot-cli`。完整命令见[业务集成指南](business-integration-guide.md#cli)。
+CLI binary 名是 `netbaiot`，Cargo package 名是 `netbaiot-cli`。完整命令见[业务集成指南](cli.zh-CN.md)。
 
 ## 11. 优雅停止
 
@@ -155,4 +155,4 @@ curl --noproxy '*' -i -X POST http://127.0.0.1:9090/api/v1/drain \
 
 进程会停止新接纳、等待 required sink，必要时提交 EventBus spool 和 MQTT snapshot，成功后打印 `shutdown complete` 并退出。不要在看到 readiness 变 false 后立刻 SIGKILL；那会把计划重启变成允许丢失近期内存工作的突发崩溃。
 
-下一步：设备侧详见[设备接入指南](device-integration-guide.md)，业务 ACK/SDK/CLI 详见[业务集成指南](business-integration-guide.md)，生产部署详见[运维指南](operations-guide.md)。
+下一步：设备侧详见[设备接入指南](device-integration-guide.md)，业务 ACK/SDK/CLI 详见[业务集成指南](business-integration.zh-CN.md)，生产部署详见[运维指南](operations-guide.md)。

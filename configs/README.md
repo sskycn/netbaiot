@@ -1,7 +1,7 @@
 # Configuration examples / 配置示例
 
 These files target `main`; its exact integer Decimal changes are
-[unreleased since v0.3.3](../docs/documentation.md).
+[unreleased since v0.3.3](../docs/README.md).
 示例跟随 `main`；整数精确转换尚未包含在公开 `v0.3.3` 中，见[迁移](../docs/migration/integer-decimal.zh-CN.md)。
 All device credentials in these fixtures are public development values.
 

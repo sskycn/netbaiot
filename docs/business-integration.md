@@ -1,5 +1,7 @@
 # Business integration
 
+[中文](business-integration.zh-CN.md)
+
 ## HTTP webhook
 
 The built-in confirmed webhook sends the complete transport-independent event and
