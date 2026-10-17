@@ -141,16 +141,3 @@ reset sync、认证、UDP verifier 查询和 revisioned invalidation；revision 
 | `internal` | 安全的内部错误 | 记录 request_id，检查 server 日志 |
 
 管理错误响应为 `{code,message,request_id,required_scope}`；不要解析 message 文本。管理 HTTP 典型映射为 400/401/403/409/413/429/503/504。
-
-## 常用场景
-
-1. 100 个 MQTT sensor：每设备独立 credential/ClientId，QoS1 上报；业务 webhook 按 event ID 幂等；用实际 payload、TLS、sink latency 做负载验证。
-2. TCP 设备：连接时认证，此后发送分帧 codec payload 并等待 EventAccepted；业务仍处理重复。
-3. Stream consumer：先 ready，事务后 ACK；断线让官方 client 重连，同 event ID 去重。
-4. 离线命令：业务系统持有命令意图，先查询 `devices().connection()`，在线后显式发送；不要期待 gateway 排队。
-5. Credential rotation：更新 provider/snapshot，调用对应 auth invalidation，受影响 live/session 状态被移除，设备用新凭据重连。
-
-NetbaIoT 不持有或持久化设备期望配置。业务系统负责 desired/reported 状态、版本历史、
-重试、发布/回滚及离线协调。配置变更可作为普通 `DeviceCommand` 发往在线 MQTT/TCP 设备，
-设备通过 `CommandAck` 返回执行结果；是否收敛由业务系统判断。命令仅支持在线投递，
-UDP 无会话且没有下行。参阅[职责边界](architecture.zh-CN.md)。

@@ -177,4 +177,4 @@ command 内容由绑定 Codec 决定。EventAccepted 使用固定 46 字节二�
 
 **解决**：`cargo run -p netbaiot-cli -- ...` 启动的 binary 名为 `netbaiot`。`--help`/`--version` 正常返回 0，未知命令/参数返回 2。本地
 `serve/demo/init/doctor/config/version` 不要求管理 endpoint/token；远程管理命令才设置
-`NETBAIOT_ENDPOINT`/相应管理凭据。以[业务集成命令表](cli.zh-CN.md)和 `apps/netbaiot-cli/src/main.rs` 为当前事实来源。
+`NETBAIOT_ENDPOINT`/相应管理凭据。以[CLI 参考](cli.zh-CN.md)和 `apps/netbaiot-cli/src/main.rs` 为当前事实来源。

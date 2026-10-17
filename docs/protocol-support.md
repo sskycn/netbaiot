@@ -65,7 +65,7 @@ acknowledged by configured 2xx status. Confirmed framed TCP/RPC delivery require
 application `ACK event_id`. A socket write alone is not a business acknowledgement.
 Best-effort sinks follow their configured bounded overflow policy. See
 [delivery semantics](delivery-semantics.md) and
-[business integration](business-integration.zh-CN.md).
+[business integration](business-integration.md).
 
 ## Current business and recovery formats
 

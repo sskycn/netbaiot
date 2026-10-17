@@ -14,7 +14,7 @@
 
 厂商二进制 JSON 声明、原生 Rust 示例、校验和与资源边界见
 [厂商自定义 Payload Codec](vendor-codecs.zh-CN.md)。声明位于 `payload_codecs`，
-共用现有认证绑定的注册表。`main` 的整数精确 Decimal 修改[尚未发布](README.zh-CN.md)；
+共用现有认证绑定的注册表。`main` 的整数精确 Decimal 修改[尚未发布](README.zh-CN.md#版本与升级)；
 JSON/CBOR/MessagePack 的显式 Decimal 对象与 Protobuf Scalar 字段 6 的 wire 形式保持不变。
 `v0.3.3` 行为应以对应发布说明和源码标签为准。
 

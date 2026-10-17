@@ -142,7 +142,7 @@ cargo run -p netbaiot-cli -- --output json server status
 cargo run -p netbaiot-cli -- device status device-1 --tenant demo --product sensor
 ```
 
-CLI binary 名是 `netbaiot`，Cargo package 名是 `netbaiot-cli`。完整命令见[业务集成指南](cli.zh-CN.md)。
+CLI binary 名是 `netbaiot`，Cargo package 名是 `netbaiot-cli`。完整命令见[CLI 参考](cli.zh-CN.md)。
 
 ## 11. 优雅停止
 

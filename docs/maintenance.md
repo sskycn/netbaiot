@@ -54,6 +54,6 @@ python3 -m unittest discover -s tests -p test_check_docs.py -v
 
 Release preflight checks local Markdown links/anchors as well as Schema/reference
 drift and release-tool tests. The inventory distinguishes current references,
-compatibility guides and dated historical evidence. See [documentation status](README.md)
-for authority, language conventions and preservation rules. External URLs and
+compatibility guides and dated historical evidence. See the [documentation index](README.md)
+for references, language conventions and retention rules. External URLs and
 production claims require separate source/evidence review.

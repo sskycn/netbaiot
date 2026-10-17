@@ -77,7 +77,7 @@ independent static errors are collected.
 | NBI-CFG-015 | Codec registration, declarative layout, numeric proof or resource-budget failure |
 | NBI-CFG-016 | Legacy integer scale/bias (including null); exact path and migration help |
 
-`NBI-CFG-016` is an [unreleased main change](README.md). Remove obsolete
+`NBI-CFG-016` is an [unreleased main change](README.md#versions-and-upgrades). Remove obsolete
 integer members, use string `decimal_exact` for non-identity mappings, or omit
 `conversion` for identity. Malformed JSON, illegal types/float values and unknown
 fields retain their previous categories. See [integer migration](migration/integer-decimal.md).

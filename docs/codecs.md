@@ -15,7 +15,7 @@ using that device's bound profile. Business consumers still deduplicate `event_i
 
 Vendor binary declarations and native Rust registration are documented in
 [vendor payload codecs](vendor-codecs.md). The exact integer Decimal changes on
-`main` are [unreleased](README.md); JSON/CBOR/MessagePack's explicit Decimal
+`main` are [unreleased](README.md#versions-and-upgrades); JSON/CBOR/MessagePack's explicit Decimal
 object and Protobuf Scalar field 6 retain their wire representation. `v0.3.3`
 release behavior must be read from its release notes and source tag.
 

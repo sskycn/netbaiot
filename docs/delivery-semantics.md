@@ -85,8 +85,9 @@ dropped with a metric. Fanout and routing-filter counts are hard limited.
 Each sink owns a `VecDeque`, byte/count accounting, a notification, and one bounded
 runner with at most the configured delivery concurrency. Delivery calls have a
 timeout. Retry uses bounded exponential full-jitter scheduling and no per-retry
-owner task. Required work that exhausts its retry policy stays owned for explicit
-shutdown spooling; best-effort failure releases its resources.
+owner task. Required work that exhausts its normal retry budget remains owned in
+the bounded degraded retry lane and stays eligible for shutdown spooling;
+best-effort failure releases its resources.
 
 The bus stores one shared `Arc<DeviceEvent>` for fanout. Per-sink accounting charges
 the serialized event bytes, while global accounting charges each active event once.

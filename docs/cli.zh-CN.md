@@ -61,7 +61,7 @@ JSON stdout 形如 `{"valid":true,"diagnostics":[]}`；错误项契约为
 | NBI-CFG-015 | Codec 注册/声明式布局、数值证明或资源预算错误 |
 | NBI-CFG-016 | 整数旧 scale/bias，含 null；路径和 help 提供精确迁移建议 |
 
-`NBI-CFG-016` 属于[尚未发布的 main](README.zh-CN.md)。迁移时删除旧字段，
+`NBI-CFG-016` 属于[尚未发布的 main](README.zh-CN.md#版本与升级)。迁移时删除旧字段，
 非恒等映射使用字符串 `decimal_exact`，恒等映射省略 `conversion`。
 非法 JSON、错误类型/浮点值、未知字段保留原类别。见[完整迁移](migration/integer-decimal.zh-CN.md)。
 HTTP provider/sink 地址要求 HTTPS（literal loopback/localhost 可 HTTP），禁止 URL 凭据，
