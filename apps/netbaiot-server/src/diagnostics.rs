@@ -304,6 +304,65 @@ fn payload_codec_path(path: &serde_path_to_error::Path) -> String {
     out
 }
 
+// Cross-field validation in Field runs after its temporary input is read.
+// Serde tracks the enclosing Field (or the internally tagged payload), so restore
+// the known member suffix without exposing input values or arbitrary map keys.
+fn payload_codec_parse_path(
+    path: &serde_path_to_error::Path,
+    bytes: &[u8],
+    message: &str,
+) -> String {
+    let mut out = payload_codec_path(path);
+    let member = if message.starts_with("scale: Integer fields cannot contain legacy scale;") {
+        "scale"
+    } else if message.starts_with("bias: Integer fields cannot contain legacy bias;") {
+        "bias"
+    } else {
+        return out;
+    };
+    if out.ends_with(".payload") {
+        // Only rejected startup configuration takes this extra bounded parse.
+        let Ok(json) = serde_json::from_slice::<serde_json::Value>(bytes) else {
+            return out;
+        };
+        let mut value = &json;
+        for segment in path {
+            let next = match segment {
+                serde_path_to_error::Segment::Map { key } => value.get(key),
+                serde_path_to_error::Segment::Seq { index } => value.get(index),
+                _ => None,
+            };
+            let Some(next) = next else {
+                return out;
+            };
+            value = next;
+        }
+        let invalid = |field: &serde_json::Value| {
+            serde_json::from_value::<netbaiot_codecs::vendor::declarative::Field>(field.clone())
+                .err()
+                .is_some_and(|error| {
+                    error
+                        .to_string()
+                        .starts_with(&format!("{member}: Integer fields"))
+                })
+        };
+        if let Some(fields) = value.get("fields").and_then(serde_json::Value::as_array)
+            && let Some(index) = fields
+                .iter()
+                .position(|named| named.get("field").is_some_and(invalid))
+        {
+            out.push_str(&format!(".fields[{index}].field"));
+        } else if value.get("value").is_some_and(invalid) {
+            out.push_str(".value");
+        } else {
+            return out;
+        }
+    }
+    out.push('.');
+    out.push_str(member);
+    out
+}
+
 /// Read bounded JSON and report the field path without displaying its value.
 pub async fn load_config_diagnostic(path: &Path) -> std::result::Result<Config, ConfigReport> {
     let bytes = match crate::config::read_bounded_path(path, 16_777_216).await {
@@ -332,7 +391,8 @@ pub async fn load_config_diagnostic(path: &Path) -> std::result::Result<Config, 
             let raw = error.path().to_string();
             // Paths are schema fields/array positions; never echo an unknown user field.
             let root = raw.split(['.', '[']).next().unwrap_or("config");
-            let payload_path = payload_codec_path(error.path());
+            let payload_path =
+                payload_codec_parse_path(error.path(), &bytes, &error.inner().to_string());
             let path = if root == "payload_codecs" {
                 payload_path.as_str()
             } else if [
@@ -562,6 +622,54 @@ mod tests {
             let report = load_config_diagnostic(&file).await.err().unwrap();
             assert_eq!(report.diagnostics[0].path, expected);
             assert!(!report.human().contains("secret-never-print"));
+        }
+        std::fs::remove_file(file).unwrap();
+    }
+
+    #[tokio::test]
+    async fn legacy_integer_members_keep_complete_diagnostic_paths() {
+        let original: serde_json::Value =
+            serde_json::from_str(include_str!("../../../configs/vendor-codec.json")).unwrap();
+        let file = std::env::temp_dir().join(format!(
+            "netbaiot-legacy-diagnostic-{}.json",
+            uuid::Uuid::new_v4()
+        ));
+        for (pointer, path) in [
+            (
+                "/payload_codecs/0/messages/0/source_message_id",
+                "payload_codecs[0].messages[0].source_message_id",
+            ),
+            (
+                "/payload_codecs/0/messages/0/payload/fields/1/field",
+                "payload_codecs[0].messages[0].payload.fields[1].field",
+            ),
+            (
+                "/payload_codecs/0/commands/0/fields/0/field",
+                "payload_codecs[0].commands[0].fields[0].field",
+            ),
+        ] {
+            for (member, value) in [
+                ("scale", serde_json::Value::Null),
+                ("bias", serde_json::Value::Null),
+                ("scale", serde_json::json!(1)),
+                ("bias", serde_json::json!(0)),
+            ] {
+                let mut config = original.clone();
+                config.pointer_mut(pointer).unwrap()[member] = value;
+                std::fs::write(&file, serde_json::to_vec(&config).unwrap()).unwrap();
+                let report = load_config_diagnostic(&file).await.err().unwrap();
+                assert_eq!(report.diagnostics[0].path, format!("{path}.{member}"));
+            }
+        }
+        for member in ["scale", "bias"] {
+            let mut config = original.clone();
+            config["payload_codecs"][0]["messages"][0]["payload"] = serde_json::json!({"kind":"event","name":"test","value":{"offset":9,"type":"i8",member:null}});
+            std::fs::write(&file, serde_json::to_vec(&config).unwrap()).unwrap();
+            let report = load_config_diagnostic(&file).await.err().unwrap();
+            assert_eq!(
+                report.diagnostics[0].path,
+                format!("payload_codecs[0].messages[0].payload.value.{member}")
+            );
         }
         std::fs::remove_file(file).unwrap();
     }

@@ -204,11 +204,12 @@ fn invalid_layouts_fail_at_startup() {
         let mut c = original.clone();
         let (parent, name) = pointer.rsplit_once('/').unwrap();
         c.pointer_mut(parent).unwrap()[name] = value;
-        let c: DeclarativeConfig = serde_json::from_value(c).unwrap();
-        assert!(
-            DeclarativeCodec::compile(&c, CodecLimits::default()).is_err(),
-            "{pointer}"
-        );
+        if let Ok(c) = serde_json::from_value::<DeclarativeConfig>(c) {
+            assert!(
+                DeclarativeCodec::compile(&c, CodecLimits::default()).is_err(),
+                "{pointer}"
+            );
+        }
     }
     let mut c = config();
     c.messages[0].source_message_id.bias = Some(f64::NAN);
@@ -474,9 +475,8 @@ fn exact_i16_round_trip_matches_independent_big_rational_reference() {
 
 #[test]
 fn exact_config_conflicts_bounds_and_legacy_collisions_are_rejected() {
-    let mut conflict: Value = serde_json::to_value(exact_i16_config("0.1", "0", "big")).unwrap();
-    conflict["commands"][0]["fields"][0]["field"]["scale"] = json!(0.1);
-    let conflict: DeclarativeConfig = serde_json::from_value(conflict).unwrap();
+    let mut conflict = exact_i16_config("0.1", "0", "big");
+    conflict.commands[0].fields[0].field.scale = Some(0.1);
     let error = match DeclarativeCodec::compile_diagnostic(&conflict, CodecLimits::default()) {
         Ok(_) => panic!("conflicting conversion unexpectedly compiled"),
         Err(error) => error,
@@ -489,7 +489,15 @@ fn exact_config_conflicts_bounds_and_legacy_collisions_are_rejected() {
         assert!(DeclarativeCodec::compile(&config, CodecLimits::default()).is_err());
     }
     for (setting, value) in [("scale", json!(1.0)), ("bias", json!(0.0))] {
-        let config = single_field("i16", json!({setting:value}), 2);
+        let mut config = single_field("i16", json!({}), 2);
+        let MessagePayload::Telemetry { fields } = &mut config.messages[0].payload else {
+            panic!()
+        };
+        if setting == "scale" {
+            fields[0].field.scale = value.as_f64();
+        } else {
+            fields[0].field.bias = value.as_f64();
+        }
         let error = DeclarativeCodec::compile_diagnostic(&config, CodecLimits::default())
             .err()
             .unwrap();
@@ -732,61 +740,247 @@ fn u64_identity_and_exact_affine_length_boundaries_are_proved_at_compile_time() 
 }
 
 #[test]
-fn explicit_null_legacy_integer_conversion_members_are_rejected_with_paths() {
-    for setting in ["scale", "bias"] {
-        let config = single_named_field("i16", "v", json!({setting:Value::Null}), 2);
-        let error = DeclarativeCodec::compile_diagnostic(&config, CodecLimits::default())
-            .err()
-            .unwrap();
-        assert_eq!(
-            error.path,
-            format!("messages[0].payload.fields[0].field.{setting}")
-        );
-        assert!(error.message.contains("migrate"));
-    }
-
-    assert!(
-        DeclarativeCodec::compile(
-            &single_named_field("i16", "v", json!({}), 2),
-            CodecLimits::default(),
-        )
-        .is_ok()
-    );
-    assert!(
-        DeclarativeCodec::compile(
-            &single_named_field(
-                "i16",
-                "v",
-                json!({"conversion":{"mode":"decimal_exact","scale":"0.1","bias":"2"}}),
-                2,
-            ),
-            CodecLimits::default(),
-        )
-        .is_ok()
-    );
-    assert!(
-        DeclarativeCodec::compile(
-            &single_named_field("f64", "v", json!({"scale":0.5,"bias":2.0}), 8),
-            CodecLimits::default(),
-        )
-        .is_ok()
-    );
-    for kind in ["f32", "f64"] {
-        for setting in ["scale", "bias"] {
-            assert!(
-                DeclarativeCodec::compile(
-                    &single_named_field(
-                        kind,
-                        "v",
-                        json!({setting:Value::Null}),
-                        if kind == "f32" { 4 } else { 8 },
-                    ),
-                    CodecLimits::default(),
-                )
-                .is_ok(),
-                "{kind} {setting}"
-            );
+fn legacy_integer_members_are_rejected_during_deserialization_in_any_key_order() {
+    for kind in ["u8", "i8", "u16", "i16", "u32", "i32", "u64", "i64"] {
+        for (member, value) in [
+            ("scale", "null"),
+            ("bias", "null"),
+            ("scale", "1"),
+            ("bias", "0"),
+        ] {
+            for json in [
+                format!(r#"{{"offset":0,"type":"{kind}","{member}":{value}}}"#),
+                format!(r#"{{"{member}":{value},"type":"{kind}","offset":0}}"#),
+            ] {
+                let error = serde_json::from_str::<Field>(&json)
+                    .unwrap_err()
+                    .to_string();
+                assert!(error.starts_with(&format!("{member}:")), "{error}");
+                assert!(error.contains("migrate"));
+            }
         }
+    }
+    let mut json = serde_json::to_value(single_named_field("i8", "v", json!({}), 1)).unwrap();
+    for member in ["scale", "bias"] {
+        json["messages"][0]["payload"]["fields"][0]["field"][member] = Value::Null;
+        assert!(
+            DeclarativeCodec::from_json(
+                &serde_json::to_vec(&json).unwrap(),
+                CodecLimits::default()
+            )
+            .is_err()
+        );
+        assert!(serde_json::from_value::<DeclarativeConfig>(json.clone()).is_err());
+        json["messages"][0]["payload"]["fields"][0]["field"]
+            .as_object_mut()
+            .unwrap()
+            .remove(member);
+    }
+}
+
+#[test]
+fn field_round_trips_preserve_public_options_and_float_null_means_omission() {
+    for (kind, width) in [("f32", 4), ("f64", 8)] {
+        let config = single_named_field(kind, "v", json!({"scale":null,"bias":null}), width);
+        let MessagePayload::Telemetry { fields } = &config.messages[0].payload else {
+            panic!()
+        };
+        let field = &fields[0].field;
+        assert_eq!(field.scale, None);
+        assert_eq!(field.bias, None);
+        for (scale, bias) in [(None, None), (Some(0.5), Some(2.0)), (Some(1.0), Some(0.0))] {
+            let field = Field {
+                scale,
+                bias,
+                ..field.clone()
+            };
+            let json = serde_json::to_string(&field).unwrap();
+            assert!(!json.contains("NaN") && !json.contains("Infinity"));
+            let parsed: Field = serde_json::from_str(&json).unwrap();
+            assert_eq!(parsed.scale, scale);
+            assert_eq!(parsed.bias, bias);
+        }
+        let parsed = DeclarativeCodec::from_json(
+            &serde_json::to_vec(&config).unwrap(),
+            CodecLimits::default(),
+        )
+        .unwrap();
+        let compiled = DeclarativeCodec::compile(&config, CodecLimits::default()).unwrap();
+        let mut payload = vec![0x11, 1, b'1'];
+        if width == 4 {
+            payload.extend_from_slice(&1.25f32.to_be_bytes());
+        } else {
+            payload.extend_from_slice(&1.25f64.to_be_bytes());
+        }
+        let device = key();
+        let context = DecodeContext {
+            device: &device,
+            received_at: 1,
+        };
+        for codec in [&parsed, &compiled] {
+            let DeviceEventKind::Telemetry(fields) =
+                codec.decode(&context, &payload).unwrap().remove(0).kind
+            else {
+                panic!()
+            };
+            assert_eq!(fields["v"], Scalar::Number(1.25));
+        }
+    }
+    for extra in [
+        json!({}),
+        json!({"conversion":{"mode":"decimal_exact","scale":"0.1","bias":"2"}}),
+    ] {
+        let config = single_named_field("i8", "v", extra, 1);
+        let bytes = serde_json::to_vec(&config).unwrap();
+        let reparsed: DeclarativeConfig = serde_json::from_slice(&bytes).unwrap();
+        assert!(DeclarativeCodec::compile(&config, CodecLimits::default()).is_ok());
+        assert!(DeclarativeCodec::compile(&reparsed, CodecLimits::default()).is_ok());
+    }
+}
+
+fn source_config(kind: DataType, length: Option<usize>, width: usize) -> DeclarativeConfig {
+    let mut config = single_named_field("i8", "v", json!({}), 1);
+    config.messages[0].source_message_id = Field {
+        offset: 2,
+        data_type: kind,
+        endian: Endian::Big,
+        length,
+        scale: None,
+        bias: None,
+        conversion: None,
+    };
+    config.messages[0].size = 3 + width;
+    let MessagePayload::Telemetry { fields } = &mut config.messages[0].payload else {
+        panic!()
+    };
+    fields[0].field.offset = 2 + width;
+    config
+}
+
+#[test]
+fn source_ids_use_identifier_limits_instead_of_scalar_field_bytes() {
+    let device = key();
+    let context = DecodeContext {
+        device: &device,
+        received_at: 1,
+    };
+    for (kind, width, raw) in [
+        (DataType::U32, 4, u64::from(u32::MAX)),
+        (DataType::U64, 8, u64::MAX),
+    ] {
+        for endian in [Endian::Big, Endian::Little] {
+            let mut config = source_config(kind, None, width);
+            config.messages[0].source_message_id.endian = endian;
+            let codec = DeclarativeCodec::from_json(
+                &serde_json::to_vec(&config).unwrap(),
+                limits_with_field_bytes(4),
+            )
+            .unwrap();
+            for raw in [0, 42, raw] {
+                let mut payload = vec![0x11, 1];
+                match endian {
+                    Endian::Big => payload.extend_from_slice(&raw.to_be_bytes()[8 - width..]),
+                    Endian::Little => payload.extend_from_slice(&raw.to_le_bytes()[..width]),
+                }
+                payload.push(i8::MIN as u8);
+                let event = codec.decode(&context, &payload).unwrap().remove(0);
+                assert_eq!(event.source_message_id.as_str(), raw.to_string());
+                let DeviceEventKind::Telemetry(fields) = event.kind else {
+                    panic!()
+                };
+                assert_eq!(
+                    fields["v"],
+                    Scalar::Decimal(DecimalScalar::new("-128").unwrap())
+                );
+            }
+        }
+    }
+    for id in ["source:42".to_owned(), "x".repeat(MAX_IDENTIFIER_BYTES)] {
+        let config = source_config(DataType::Utf8, Some(id.len()), id.len());
+        let codec = DeclarativeCodec::compile(&config, limits_with_field_bytes(4)).unwrap();
+        let mut payload = vec![0x11, 1];
+        payload.extend_from_slice(id.as_bytes());
+        payload.push(1);
+        assert_eq!(
+            codec.decode(&context, &payload).unwrap()[0]
+                .source_message_id
+                .as_str(),
+            id
+        );
+    }
+    let codec = DeclarativeCodec::compile(
+        &source_config(DataType::Utf8, Some(5), 5),
+        limits_with_field_bytes(4),
+    )
+    .unwrap();
+    for id in [
+        b"bad i",
+        b"ba/id",
+        b"ba\0id",
+        b"\xff\xff\xff\xff\xff",
+        "中ab".as_bytes(),
+    ] {
+        let mut payload = vec![0x11, 1];
+        payload.extend_from_slice(id);
+        payload.push(1);
+        assert!(codec.decode(&context, &payload).is_err());
+    }
+    for length in [0, MAX_IDENTIFIER_BYTES + 1, usize::MAX] {
+        let error = DeclarativeCodec::compile_diagnostic(
+            &source_config(DataType::Utf8, Some(length), 1),
+            limits_with_field_bytes(4),
+        )
+        .err()
+        .unwrap();
+        assert_eq!(error.path, "messages[0].source_message_id.length");
+    }
+    // The metadata exemption does not change business string limits.
+    let config = single_named_field("utf8", "v", json!({"length":5}), 5);
+    assert!(DeclarativeCodec::compile(&config, limits_with_field_bytes(4)).is_err());
+}
+
+#[test]
+fn business_event_and_command_decimal_limits_remain_enforced() {
+    for field_bytes in [4, 19, 20] {
+        let mut config = single_named_field("u64", "v", json!({}), 8);
+        let MessagePayload::Telemetry { fields } = &config.messages[0].payload else {
+            panic!()
+        };
+        let value = fields[0].field.clone();
+        config.messages[0].payload = MessagePayload::Event {
+            name: "v".into(),
+            value: Some(value.clone()),
+        };
+        assert_eq!(
+            DeclarativeCodec::compile(&config, limits_with_field_bytes(field_bytes)).is_ok(),
+            field_bytes == 20
+        );
+        config.messages[0].payload = MessagePayload::Heartbeat {
+            sequence: IntegerField {
+                offset: 3,
+                data_type: IntegerType::U64,
+                endian: Endian::Big,
+            },
+        };
+        config.commands.push(Command {
+            name: "set".into(),
+            tag: 2,
+            size: 26,
+            command_id_offset: 2,
+            expires_at: None,
+            checksum: None,
+            fields: vec![NamedField {
+                name: "v".into(),
+                field: Field {
+                    offset: 18,
+                    ..value
+                },
+            }],
+        });
+        assert_eq!(
+            DeclarativeCodec::compile(&config, limits_with_field_bytes(field_bytes)).is_ok(),
+            field_bytes == 20
+        );
     }
 }
 #[test]

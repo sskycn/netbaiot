@@ -1,9 +1,8 @@
-use super::config::is_explicit_null_legacy_float;
 use super::*;
 use crate::common::valid_text;
 use crate::vendor::numeric::{Decimal, FloatConversion, IntegerConversion, IntegerConversionError};
 use std::{collections::BTreeMap, ops::Range};
-use wire::{Check, Integer, Value};
+use wire::{Check, Integer, Source, Value};
 
 pub(super) struct Layout {
     pub size: usize,
@@ -108,7 +107,7 @@ impl Kind {
 pub(super) struct MessagePlan {
     pub tag: u64,
     pub layout: Layout,
-    pub source: Value,
+    pub source: Source,
     pub occurred_at: Option<Integer>,
     pub kind: Kind,
 }
@@ -206,6 +205,64 @@ impl<'a> Builder<'a> {
             endian: f.endian,
         })
     }
+    fn source(&mut self, f: &Field) -> Result<Source, ConfigError> {
+        let data_type = match f.data_type {
+            DataType::U8 => Some(IntegerType::U8),
+            DataType::U16 => Some(IntegerType::U16),
+            DataType::U32 => Some(IntegerType::U32),
+            DataType::U64 => Some(IntegerType::U64),
+            DataType::Utf8 => None,
+            _ => {
+                return Err(ConfigError::new(
+                    "type",
+                    "Source IDs require an unsigned integer or UTF-8.",
+                ));
+            }
+        };
+        if f.scale
+            .is_some_and(|scale| data_type.is_some() || scale != 1.0)
+        {
+            return Err(ConfigError::new("scale", "Source IDs cannot be scaled."));
+        }
+        if f.bias
+            .is_some_and(|bias| data_type.is_some() || bias != 0.0)
+        {
+            return Err(ConfigError::new("bias", "Source IDs cannot have a bias."));
+        }
+        if f.conversion.is_some() {
+            return Err(ConfigError::new(
+                "conversion",
+                "Source IDs cannot have a numeric conversion.",
+            ));
+        }
+        if let Some(data_type) = data_type {
+            if f.length.is_some() {
+                return Err(ConfigError::new(
+                    "length",
+                    "Only UTF-8 fields have a configurable length.",
+                ));
+            }
+            self.charge(128 + 3 * data_type.width())?;
+            return self
+                .integer(&IntegerField {
+                    offset: f.offset,
+                    data_type,
+                    endian: f.endian,
+                })
+                .map(Source::Unsigned);
+        }
+        let length = f
+            .length
+            .ok_or_else(|| ConfigError::new("length", "UTF-8 requires an exact byte length."))?;
+        if length == 0 || length > MAX_IDENTIFIER_BYTES {
+            return Err(ConfigError::new(
+                "length",
+                "Source IDs require between 1 and 64 bytes.",
+            ));
+        }
+        self.charge(128 + 3 * length)?;
+        self.claim(f.offset, length).map(Source::Utf8)
+    }
     fn value(&mut self, f: &Field) -> Result<Value, ConfigError> {
         let width = match f.data_type {
             DataType::U8 | DataType::I8 | DataType::Bool => 1,
@@ -256,14 +313,8 @@ impl<'a> Builder<'a> {
                 ));
             }
         }
-        let float_scale = f
-            .scale
-            .filter(|value| !is_explicit_null_legacy_float(*value))
-            .unwrap_or(1.0);
-        let float_bias = f
-            .bias
-            .filter(|value| !is_explicit_null_legacy_float(*value))
-            .unwrap_or(0.0);
+        let float_scale = f.scale.unwrap_or(1.0);
+        let float_bias = f.bias.unwrap_or(0.0);
         if integer_bounds.is_none() && (!float_scale.is_finite() || float_scale == 0.0) {
             return Err(ConfigError::new(
                 "scale",
@@ -505,41 +556,9 @@ impl DeclarativeCodec {
                         "Message tag is duplicated or does not fit its integer type.",
                     ));
                 }
-                let s = &m.source_message_id;
-                if !matches!(
-                    s.data_type,
-                    DataType::U8 | DataType::U16 | DataType::U32 | DataType::U64 | DataType::Utf8
-                ) {
-                    return Err(ConfigError::new(
-                        "source_message_id.type",
-                        "Source IDs require an unsigned integer or UTF-8.",
-                    ));
-                }
-                if s.scale.is_some_and(|scale| scale != 1.0) {
-                    return Err(ConfigError::new(
-                        "source_message_id.scale",
-                        "Source IDs cannot be scaled.",
-                    ));
-                }
-                if s.bias.is_some_and(|bias| bias != 0.0) {
-                    return Err(ConfigError::new(
-                        "source_message_id.bias",
-                        "Source IDs cannot have a bias.",
-                    ));
-                }
-                if s.conversion.is_some() {
-                    return Err(ConfigError::new(
-                        "source_message_id.conversion",
-                        "Source IDs cannot have a numeric conversion.",
-                    ));
-                }
-                if s.length.is_some_and(|n| n > 64) {
-                    return Err(ConfigError::new(
-                        "source_message_id.length",
-                        "Source IDs are limited to 64 bytes.",
-                    ));
-                }
-                let source = b.value(s).map_err(|e| e.at("source_message_id"))?;
+                let source = b
+                    .source(&m.source_message_id)
+                    .map_err(|e| e.at("source_message_id"))?;
                 let occurred_at = m
                     .occurred_at
                     .as_ref()

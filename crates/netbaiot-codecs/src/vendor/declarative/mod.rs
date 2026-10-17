@@ -68,7 +68,7 @@ impl DeclarativeCodec {
             .map_err(|_| CodecError)?;
         let message = &self.messages[index];
         message.layout.validate(payload, self.length.as_ref())?;
-        let source = message.source.source(payload)?;
+        let source = message.source.read(payload)?;
         let occurred_at = message
             .occurred_at
             .as_ref()

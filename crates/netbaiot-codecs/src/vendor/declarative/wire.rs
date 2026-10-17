@@ -41,6 +41,24 @@ impl Integer {
     }
 }
 
+/// Protocol metadata never carries a Scalar or a numeric conversion plan.
+pub(super) enum Source {
+    Unsigned(Integer),
+    Utf8(Range<usize>),
+}
+impl Source {
+    pub fn read(&self, data: &[u8]) -> Result<SourceMessageId, CodecError> {
+        match self {
+            Self::Unsigned(integer) => crate::vendor::sequence_id(integer.read(data)?),
+            Self::Utf8(range) => {
+                let bytes = data.get(range.clone()).ok_or(CodecError)?;
+                SourceMessageId::new(std::str::from_utf8(bytes).map_err(|_| CodecError)?)
+                    .map_err(|_| CodecError)
+            }
+        }
+    }
+}
+
 pub(super) struct Value {
     pub range: Range<usize>,
     pub data_type: DataType,
@@ -51,16 +69,6 @@ pub(super) struct Value {
 impl Value {
     fn bytes<'a>(&self, data: &'a [u8]) -> Result<&'a [u8], CodecError> {
         data.get(self.range.clone()).ok_or(CodecError)
-    }
-    pub fn source(&self, data: &[u8]) -> Result<SourceMessageId, CodecError> {
-        let bytes = self.bytes(data)?;
-        match self.data_type {
-            DataType::Utf8 => {
-                SourceMessageId::new(std::str::from_utf8(bytes).map_err(|_| CodecError)?)
-                    .map_err(|_| CodecError)
-            }
-            _ => crate::vendor::sequence_id(unsigned(bytes, self.endian)),
-        }
     }
     pub fn read(&self, data: &[u8]) -> Result<Scalar, CodecError> {
         let bytes = self.bytes(data)?;

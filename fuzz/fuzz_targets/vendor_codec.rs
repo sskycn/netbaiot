@@ -213,4 +213,52 @@ fuzz_target!(|data: &[u8]| {
         .encode(&EncodeContext { device: &device }, &command)
         .unwrap();
     assert_eq!(&encoded[18..18 + *width], &raw[..*width]);
+
+    // Metadata has an independent identifier bound, even with four-byte Scalars.
+    static SOURCE_IDS: OnceLock<Vec<(DeclarativeCodec, usize)>> = OnceLock::new();
+    let source_ids = SOURCE_IDS.get_or_init(|| {
+        [("u32", 4), ("u64", 8), ("utf8", 64)]
+            .into_iter()
+            .map(|(kind, width)| {
+                let mut source = serde_json::json!({"offset":2,"type":kind});
+                if kind == "utf8" {
+                    source["length"] = width.into();
+                }
+                let config = serde_json::from_value(serde_json::json!({
+                    "id":"vendor-fuzz-source","version":1,"header":[17],
+                    "message_type":{"offset":1,"type":"u8"},
+                    "messages":[{"tag":1,"size":3+width,"source_message_id":source,
+                        "payload":{"kind":"telemetry","fields":[{"name":"v",
+                            "field":{"offset":2+width,"type":"i8"}}]}}]
+                }))
+                .unwrap();
+                (
+                    DeclarativeCodec::compile(
+                        &config,
+                        CodecLimits {
+                            field_bytes: 4,
+                            ..CodecLimits::default()
+                        },
+                    )
+                    .unwrap(),
+                    width,
+                )
+            })
+            .collect()
+    });
+    let (source_codec, width) = &source_ids[usize::from(selector) % source_ids.len()];
+    let mut payload = vec![b'x'; 3 + width];
+    payload[..2].copy_from_slice(&[17, 1]);
+    for (slot, byte) in payload[2..2 + width].iter_mut().zip(data) {
+        *slot = *byte;
+    }
+    payload[2 + width] = selector;
+    codec_invariants::check(
+        source_codec,
+        &CodecLimits {
+            field_bytes: 4,
+            ..CodecLimits::default()
+        },
+        &payload,
+    );
 });
