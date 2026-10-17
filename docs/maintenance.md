@@ -44,3 +44,16 @@ Bottom-level tools remain available: cargo fmt/clippy/test/audit,
 scripts/release_preflight.py, scripts/release_package.py,
 tests/mqtt_protocol_regressions.py, tests/mqtt_conformance/run.py,
 v5_smoke.py, v5_mosquitto.py and run_device_profile_mosquitto.py.
+
+## Documentation checks
+
+```bash
+python3 scripts/check_docs.py --inventory target/docs-audit/inventory.json
+python3 -m unittest discover -s tests -p test_check_docs.py -v
+```
+
+Release preflight checks local Markdown links/anchors as well as Schema/reference
+drift and release-tool tests. The inventory distinguishes current references,
+compatibility guides and dated historical evidence. See [documentation status](documentation.md)
+for authority, language conventions and preservation rules. External URLs and
+production claims require separate source/evidence review.

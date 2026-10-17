@@ -3,13 +3,14 @@
 管理接口的 API Key、JWT、mTLS、Scope、资源授权和旧令牌迁移参阅[管理认证](management-auth.zh-CN.md)。
 
 > 当前职责边界见[架构](architecture.zh-CN.md)。<br>
-> Workspace 版本：`0.2.4`；Rust MSRV：`1.88`。
+> Workspace 版本：`0.3.3`；Rust MSRV：`1.88`。最新公开 Release 为 `v0.3.3`；
+> 本文描述含未发布 Codec 修改的 `main`，见[文档状态](documentation.zh-CN.md)。
 
 本指南面向第一次部署 NetbaIoT 的开发者、设备开发者和业务系统开发者。它以当前代码、测试和配置 schema 为准；若与更早的文档冲突，以当前代码和链接的迁移报告为准。
 
 ## NetbaIoT 是什么
 
-NetbaIoT 是无数据库、以内存为主的 IoT 协议网关和实时事件路由器。它直接实现 MQTT 3.1.1 broker，同时接收分帧 TCP 和带 HMAC 的 UDP 设备流量，把它们转换为统一的 `DeviceEvent`，再投递到有明确容量上限的业务 sink。
+NetbaIoT 是无数据库、以内存为主的 IoT 协议网关和实时事件路由器。它直接实现 MQTT 3.1.1 与有界 MQTT 5.0 broker，同时接收分帧 TCP 和带 HMAC 的 UDP 设备流量，把它们转换为统一的 `DeviceEvent`，再投递到有明确容量上限的业务 sink。
 
 它不是遥测仓库、工作流引擎、通用消息持久化系统或离线命令队列。长期业务数据、设备 desired/reported 配置及版本历史、离线协调、分析、工作流、离线命令和幂等记录由业务系统负责。唯一运行时持久化是计划重启所用的本地 recovery spool。
 
@@ -69,7 +70,8 @@ else:
 - 公共协议：`netbaiot-protocol`。
 - 业务客户端：`netbaiot-client`。
 - 可选设备 SDK：`netbaiot-device-sdk`。
-- 当前 codec：`netbaiot-json` version `1`。
+- 内置 Codec：`netbaiot-json`、`netbaiot-cbor`、`netbaiot-msgpack`、`netbaiot-protobuf`，版本均为 `1`。
+- 厂商 Codec：显式版本绑定的声明式布局或原生 Rust 注册；[整数转换与迁移](vendor-codecs.zh-CN.md)以 `main` 为准。
 - 业务 sink：required HTTP webhook，或单个 required confirmed TCP/RPC stream；开发配置可使用即时 ACK 的 audit sink。
 - MQTT：3.1.1 与有界 5.0 profile；QoS0/1/2、持久会话、exact/`+`/`#`、retain、Will、计划重启恢复。
 - 当前业务流与恢复格式：Business RPC V3、MQTT NBMQ v6、EventBus NBSP v3；旧版/未知格式不会自动回退或迁移。

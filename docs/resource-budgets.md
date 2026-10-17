@@ -30,6 +30,7 @@ spool relationship values.
 | Presence registry | bounded by configured devices / 1 h offline TTL / oldest-offline eviction |
 | Sinks/routes/fanout | 32 sinks / 256 filters / 8 per event |
 | Global active events | 16,384 / 64 MiB |
+| Per-tenant active events | 16,384 / 64 MiB, also subject to the global ceiling |
 | Per-sink delivery | 4,096 / 16 MiB / concurrency 8 |
 | Sink timeout/retry | 5 s / 5 attempts / max age 1 h |
 | Restart spool | 100,000 records / 256 MiB total |
@@ -101,4 +102,8 @@ retained for control safety, not preallocated memory; deleting device state does
 not imply a 16 MiB idle RSS reduction. All transport, EventBus, connection, auth
 and spool state remain independently bounded.
 
-The fixed connection admission allowance has a validated 16 KiB minimum, independent of maximum frame size. Actual reader capacities are admitted on demand; logical quotas are not RSS or kernel socket measurements. See [connection density audit](performance/connection-density-20261013.md).
+See the [connection density audit](performance/connection-density-20261013.md) for
+measurements at its pinned revision. Vendor integer value outputs must satisfy both
+public Decimal's 64-byte bound and `CodecLimits.field_bytes`; source IDs use the
+independent 64-byte identifier contract, including full unsigned `u64`. These are
+validation limits, not measured throughput. See [vendor codecs](vendor-codecs.md).

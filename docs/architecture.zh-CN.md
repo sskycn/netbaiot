@@ -42,7 +42,8 @@ DeviceEvent(event_id)
 
 共享 TCP listener 在启动所属连接任务前预留现有全局数量/字节和每 IP 配额，并执行有界 IP 限流。
 分类后原 lease 转为协议计数，错误/EOF/取消只释放一次。MQTT 配额和设备/租户 admission 保持原语义。管理 HTTP 保留有界请求 slots 和全局/IP/字节 lease，
-但不计入设备 `active_connections`；没有增加协议独占连接池，原有全局/IP 池仍共享，因此不承诺协议间绝对无饥饿。
+但不计入设备 `active_connections`。MQTT/TCP 分类后各有默认 192 条连接上限，同时共享
+全局/IP/字节池；这些重叠上限不是协议独占预留，因此不承诺协议间绝对无饥饿。
 
 探测缓冲固定 12 字节：1 字节包头、最多 4 字节 Remaining Length、2 字节协议名长度、4 字节名称及 1 字节版本。MQTT 复用 Remaining Length 解码，
 校验 `00 04 MQTT` 和版本字节，level 4 进入 MQTT 3.1.1 解析器，level 5 进入有界 MQTT 5.0 解析器。

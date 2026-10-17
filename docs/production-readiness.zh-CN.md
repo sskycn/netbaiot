@@ -1,5 +1,7 @@
 # 容量与稳定性测试
 
+[English](production-readiness.md)
+
 `netbaiot-loadgen` 是独立 Rust 进程，通过真实 MQTT 3.1.1/5.0、TCP 和签名 UDP
 发送四种现有 V1 Codec，不用服务器内部调用代替网络。测试不增加 Codec/传输，
 也不改变 MQTT、TCP framing、NBI1/NBA1 或 EventAccepted 语义。
@@ -51,7 +53,12 @@ receipt、业务应用发出 ACK、网关观察到 Sink ACK、拒绝/丢弃。�
 
 增长检查排除预热并生成候选 `reproducer.json`。候选仍需缩小、确认原因、添加回归、
 修复并实际重跑，不能直接称为已证明的最小泄漏复现。`--profiling` 会区分带接纳拒绝的
-诊断运行与正常容量 PASS；Linux perf/heaptrack 尚未完成成功验证。
+诊断运行与正常容量 PASS。Linux perf/heaptrack 已有成功验证：
+2026-10-16 的 [原生 CI run 38886325364](https://github.com/sskycn/netbaiot/actions/runs/38886325364)
+在 revision `8c41c55` 上完成 Linux x86_64 / ARM64 的真实短负载、异常设备、
+CPU 栈/折叠栈/火焰图和 heaptrack 输出步骤。工作流用 `test -s` 检查 CPU 产物并运行
+`heaptrack_print`；更早的[独立 artifact 核对](performance/strict-review-20261013.md#native-linux-ci-profiling)
+还保留两架构非空 profiling 证据。这些记录不覆盖之后所有 `main` 修改，也不证明长期稳定性。
 
 ## 当前验证范围
 
@@ -63,6 +70,10 @@ macOS ARM64 同机四 Codec、TLS MQTT 3.1.1、1000 台、12 秒预检各完成 
 34,999 条确认，端到端 P95 0.41 ms、P99 3.23 ms，RSS 峰值 55,040 KiB。
 这些短测不代表最大稳定吞吐或生产容量。
 
-6/24 小时运行约 14 分钟后停止；完整 Linux 容量/异常矩阵、专用 NIC/WAN 和长期
-泄漏验证未完成。目前不给出 1000/5000/10000 台生产 CPU/内存/网络数值。
+本地 6/24 小时运行约 14 分钟后停止，不能记为完成 Soak。原生 CI 默认运行
+100 台、每例 10 秒的四 Codec/传输短测及七种异常脚本，CPU profile 使用
+1000 台 MQTT5/TLS telemetry64、60 秒负载/20 秒采样，heaptrack 负载为 30 秒。
+某些不支持的异常 profile 在启动时拒绝，须与实际网络异常区分。
+工作流提供可选 192 例/架构、最高 10000 台的 capacity 模式；默认 CI 成功不证明该模式
+或 6/24 小时 Soak 完成。完整目标硬件容量/异常矩阵、专用 NIC/WAN 和长期泄漏验证仍未完成。目前不给出 1000/5000/10000 台生产 CPU/内存/网络数值。
 部署安全与恢复要求见[运维指南](operations-guide.md)，测量要求见[基准说明](benchmarks.zh-CN.md)。

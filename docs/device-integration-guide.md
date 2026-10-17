@@ -46,7 +46,9 @@ export DOWN_TOPIC=v1/t/demo/p/sensor/d/device-1/down
 
 Telemetry 必须是非空 scalar map，不支持数组/任意嵌套对象。默认上限为输入/输出 64 KiB、64 个字段、字段名/文本 256 字节、JSON 深度 8；未知字段、重复字段、无效 UTF-8、非有限数或错误 schema version 会被拒绝。
 
-要增加厂商 codec，应在 `netbaiot-codecs` 实现同步、可替换的 `DeviceCodec`，并由控制面绑定版本；传输 framing 不能混入 codec。
+厂商协议可以使用 `payload_codecs` 声明式布局，或显式注册原生 Rust `DeviceCodec`，
+由可信认证/控制面绑定版本；传输 framing 不能混入 Codec。整数精确转换、来源 ID 与
+迁移规则见[厂商 Payload Codec](vendor-codecs.zh-CN.md)。
 
 ## MQTT 3.1.1
 

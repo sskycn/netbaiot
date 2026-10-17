@@ -174,7 +174,9 @@ cargo run -p netbaiot-cli -- command send device-1 \
 ```
 
 - MQTT session：发送到 `v1/t/.../down`，默认 QoS1；设备订阅 QoS 可降低实际 QoS。
-- Generic TCP session：发送一个 length-prefixed `DeviceCommand` JSON frame。
+- Generic TCP session：发送一个普通 length-prefixed frame，其内容按设备绑定 Codec 编码；
+  选择 JSON profile 时是 `DeviceCommand` JSON，厂商布局则是对应二进制数据。设备上行
+  接纳回执另用带标记的二进制 ACK v1，不能与命令帧混淆。
 - UDP 设备：没有 live downlink session，因此返回 device offline。
 
 队列按 device、tenant、process 的 count/bytes 和 TTL 有界。没有当前本地 live session 时立即返回 `DEVICE_OFFLINE`；不会写数据库、MQTT 离线队列或 restart spool。多节点 session routing 不在当前范围。

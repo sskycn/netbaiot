@@ -88,7 +88,7 @@ restart replay preflight all global, tenant and required sink quotas before comm
 
 ## Connection memory admission
 
-`connection_memory_reservation` defaults to 16 KiB and reserves a conservative
+`limits.connection_memory_reservation` defaults to 16 KiB and reserves a conservative
 fixed allowance when the socket is admitted. It does not allocate that many
 bytes or represent exact heap, RSS, TLS or kernel socket memory. MQTT session,
 auth, command and event state retain their independently bounded accounts.
@@ -116,3 +116,30 @@ limits. `max_tls_handshakes` independently bounds concurrent TLS handshakes
 Deployment capacity requires measured process and kernel memory.
 
 The fixed connection admission allowance has a validated 16 KiB minimum, independent of maximum frame size. Actual reader capacities are admitted on demand; logical quotas are not RSS or kernel socket measurements. See [connection density audit](performance/connection-density-20261013.md).
+
+## Vendor numeric fields
+
+For `main` (unreleased since `v0.3.3`), integer value fields use string parameters:
+`"conversion":{"mode":"decimal_exact","scale":"0.1","bias":"0"}`. Omit
+`conversion` for exact identity; never include legacy integer `scale/bias`, even
+`null`, `1` or `0`. Float `f32/f64` fields keep numeric `scale/bias`; explicit null
+still means omission. Decimal output must fit both 64 public bytes and
+`CodecLimits.field_bytes`. `source_message_id` is independent identifier metadata,
+with full unsigned `u64` support or the public 64-byte identifier rules, rather
+than Scalar output-length rules. See [vendor codecs](vendor-codecs.md) and
+[migration](migration/integer-decimal.md).
+
+`config check` reports recognized obsolete integer members as `NBI-CFG-016` with
+the member path and migration help. Schema describes structure; deserialization
+rejects obsolete members and compilation proves layout/numeric/resource rules.
+
+## Current Business RPC configuration
+
+`business_tcp` accepts Business RPC V3 only and requires explicit `business_rpc`.
+Current fields include `limits`, `send_ahead`, `experiment_socket_send_buffer_bytes`,
+TLS/identities, development token environment and connection/auth limits. Old
+`version`, `allow_v1`, `v3`, `v3_send_ahead` and
+`v3_experiment_socket_send_buffer_bytes` are unknown fields. Production uses mTLS
+with mapped principals; plaintext is restricted to loopback development tokens.
+See [upgrade requirements](migration/current-protocol-only.md) and
+[Business RPC V3](business-rpc-v3.md).

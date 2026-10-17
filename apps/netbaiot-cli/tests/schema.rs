@@ -22,6 +22,12 @@ fn generated_schema_matches_examples_and_rejects_unknown_types_and_invalid_limit
             "schema rejects {}",
             path.display()
         );
+        let parsed: netbaiot_server::Config = serde_json::from_value(value).unwrap();
+        assert!(
+            parsed.validate().is_ok(),
+            "server rejects {}",
+            path.display()
+        );
         count += 1;
     }
     assert!(count >= 2);
@@ -70,4 +76,19 @@ fn vendor_schema_exposes_json_plans_but_not_native_code_loading() {
     config["payload_codecs"][0]["messages"][0]["size"] = 19.into();
     config["native_codecs"] = serde_json::json!([]);
     assert!(!validator.is_valid(&config));
+}
+
+#[test]
+fn documented_default_limits_and_standalone_vendor_example_match_runtime() {
+    let limits: serde_json::Value =
+        serde_json::from_str(include_str!("../../../configs/resource-limits.json")).unwrap();
+    assert_eq!(
+        limits,
+        serde_json::to_value(netbaiot_runtime::Limits::default()).unwrap()
+    );
+    let standalone: serde_json::Value =
+        serde_json::from_str(include_str!("../../../configs/codecs/acme-v1.json")).unwrap();
+    let embedded: serde_json::Value =
+        serde_json::from_str(include_str!("../../../configs/vendor-codec.json")).unwrap();
+    assert_eq!(standalone, embedded["payload_codecs"][0]);
 }

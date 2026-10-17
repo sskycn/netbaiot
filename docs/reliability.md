@@ -51,6 +51,9 @@ general event log. A process crash, OS crash, power loss, or hardware failure ma
 lose work that remained only in memory since the last successful planned snapshot.
 MQTT protocol recovery does not promise business exactly-once processing.
 
+Current recovery accepts EventBus NBSP v3 and MQTT NBMQ v6 only; older or unknown
+formats fail explicitly. See the [upgrade guide](migration/current-protocol-only.md).
+
 More detail: [delivery semantics](delivery-semantics.md),
 [EventBus](event-bus.md), [restart spool](restart-spool.md),
 [MQTT session recovery](mqtt-session-recovery.md), and

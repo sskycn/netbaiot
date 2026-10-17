@@ -2,6 +2,10 @@
 
 [中文](vendor-codecs.zh-CN.md)
 
+This page describes `main`. Its integer Decimal contract and diagnostic updates
+are **not included in public v0.3.3**. See the [migration steps](migration/integer-decimal.md)
+before upgrading an existing vendor configuration.
+
 Vendor codecs are synchronous payload transformations behind the existing
 `DeviceCodec` / `CodecRegistry`. They do not implement transport framing,
 authentication, acknowledgement, event admission, persistence, or command queuing.
@@ -98,7 +102,7 @@ characters. Boolean bytes are strictly 0 or 1. IEEE floats must be finite.
 Numeric normalization is `wire * scale + bias`, but integer and IEEE floating-point
 wire types have separate, intentionally incompatible configuration contracts.
 
-Every integer field uses the exact decimal engine. Omitting `conversion` means the
+Every integer value field (telemetry, event value or command argument) uses the exact decimal engine. Omitting `conversion` means the
 exact identity mapping (`scale = 1`, `bias = 0`); decoded values are still
 `Scalar::Decimal`, including full-width i64/u64 values. A non-identity integer mapping
 must use the explicit string form:
@@ -120,15 +124,16 @@ bias are strings, the scale must be nonzero, each parameter is at most 64 bytes 
 38 significant digits, and the normalized configuration exponent must be between
 -38 and 38. Startup compilation aligns scale and bias to one checked i128 affine
 coefficient. It separately proves that multiplication and addition are representable
-over the complete raw integer interval and that every output fits the 64-byte public
-decimal scalar; it does not assume endpoint normalization proves interior values.
+over the complete raw integer interval and that every output fits both the 64-byte public
+Decimal limit and `CodecLimits.field_bytes`; it does not assume endpoint normalization proves interior values.
 Configurations that cannot satisfy that proof are rejected before ingress starts.
 
 The old numeric `scale` or `bias` members are rejected on every integer field, even
-when set to `1` or `0`, with a diagnostic pointing to the obsolete member. Migrate
+when explicitly `null` or set to `1` or `0`, with a diagnostic pointing to the obsolete member. Migrate
 them to `conversion: {"mode":"decimal_exact","scale":"...","bias":"..."}`.
 This is an intentional breaking configuration change. Those numeric members now
-belong only to `f32/f64` fields.
+belong only to `f32/f64` fields. Explicit `null` on a float still means omission
+(default scale 1, bias 0).
 
 Integer uplinks always return `Scalar::Decimal`, serialized as
 `{"decimal":"1.001"}`. Integer downlinks accept that form, and also accept an ordinary
@@ -156,7 +161,12 @@ and integer metadata. Arguments must match configured names, count and types exa
 there are no silent defaults or extra ignored arguments.
 
 The source ID is an unscaled unsigned integer rendered as decimal, or an exact
-namespace-safe UTF-8 identifier of at most 64 bytes. No payload field changes the
+namespace-safe UTF-8 identifier of at most 64 bytes. It is independent metadata:
+unsigned IDs support the full `u64` range without the business Scalar Decimal
+output-length proof or `CodecLimits.field_bytes` scalar-text ceiling. Source fields
+cannot use a non-null `conversion` or legacy numeric conversion. UTF-8 IDs must
+use the public identifier characters (ASCII letters, digits, `-`, `_`, `.`, `:`);
+empty IDs and other characters are rejected. No payload field changes the
 authenticated device identity. Vendors must provide source IDs unique within the
 device's message namespace (including across message types). The gateway generates
 a fresh event ID when decoding; EventBus retry/spool replay preserves the accepted
@@ -201,6 +211,14 @@ layout overlaps, metadata ranges, uniqueness, budgets and cross-field rules.
 Invalid plans produce configuration diagnostics before network service starts,
 including schema field paths such as `payload_codecs[0].commands[0].expires_at.type`.
 Diagnostic paths and messages omit configuration values and unknown user keys.
+
+Legacy integer `scale/bias` is rejected during deserialization. Legal numeric or
+null legacy values produce `NBI-CFG-016` with the full member path and advice to
+remove the old members, use string `decimal_exact` parameters, or omit identity
+conversion. Invalid types, unknown fields and malformed JSON retain their original
+error categories. Numeric proofs, layouts and resource budgets are checked during
+compilation (`NBI-CFG-015`); Schema alone cannot prove these cross-field rules.
+Human and `--output json` reports share the same `code/path/message/help` fields.
 
 Command layouts must fit `max_command_bytes` at startup. All codecs, including
 native implementations, also undergo encoded-size admission before queue ownership.

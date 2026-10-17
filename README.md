@@ -1,6 +1,14 @@
 # NetbaIoT
 
-Device payloads support JSON V1, CBOR V1, MessagePack V1 and Protobuf V1. See [codec wire formats, selection and extension](docs/codecs.md).
+Device payloads support JSON V1, CBOR V1, MessagePack V1 and Protobuf V1, plus
+explicitly registered vendor codecs. See [codec wire formats](docs/codecs.md)
+and [vendor payload configuration](docs/vendor-codecs.md).
+
+As checked on 2026-10-17, the workspace version and latest public release are
+`0.3.3` / [v0.3.3](https://github.com/sskycn/netbaiot/releases/tag/v0.3.3).
+These docs describe `main`, including **unreleased** exact integer Decimal conversion
+and configuration diagnostics. See [version and documentation status](docs/documentation.md)
+before using `main` examples with a release binary.
 
 Business RPC supports V3 only. Planned restart uses MQTT NBMQ v6 and EventBus NBSP v3 only; MQTT 3.1.1/5.0 and management `/api/v1` remain supported. See [protocol support](docs/protocol-support.md) and [upgrade requirements](docs/migration/current-protocol-only.md).
 
@@ -207,7 +215,7 @@ for the load tools and validation scope.
   downlink.
 - Recovery is for successful planned graceful shutdowns. It is not a general
   database and does not make arbitrary process or machine crashes durable.
-- The workspace is version `0.2.4` and has not reached 1.0. Review protocol and
+- The workspace is version `0.3.3` and has not reached 1.0. Review protocol and
   migration notes before upgrading; do not assume every API is stable.
 
 ## Documentation
@@ -219,7 +227,7 @@ for the load tools and validation scope.
 - [Security](docs/security.md) · [Operations](docs/operations-guide.md) · [Troubleshooting](docs/troubleshooting.md)
 - [Business integration and clients](docs/business-integration-guide.md) · [CLI](docs/cli.md) · [Device SDK](docs/device-sdk.md)
 - [Benchmark overview](docs/benchmarks.md) · [Capacity and stability testing](docs/production-readiness.zh-CN.md)
-- [v0.2.4 release notes](docs/releases/v0.2.4.md) · [Release notes template](docs/release-template.md)
+- [v0.3.3 release notes](docs/releases/v0.3.3.md) · [Documentation status](docs/documentation.md) · [Release notes template](docs/release-template.md)
 
 ## Build and release
 

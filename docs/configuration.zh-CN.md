@@ -82,3 +82,29 @@ queued、retrying 和 inflight delivery。序列化事件字节无论 fanout 数
 上限。可把租户值设低以给其他 tenant 保留全局容量。全局和 sink 限制仍独立生效；租户
 上限高于全局上限不会增加容量。接纳和重启重放会在提交前预检全局、租户及 required
 sink quota。
+
+## 厂商数值字段
+
+`main`（公开 `v0.3.3` 之后尚未发布的修改）的整数值字段使用字符串参数：
+`"conversion":{"mode":"decimal_exact","scale":"0.1","bias":"0"}`。
+恒等转换省略 `conversion`；整数旧 `scale/bias` 包括 `null`、`1`、`0` 都不能出现。
+`f32/f64` 继续使用数字型 `scale/bias`，显式 null 仍等同省略。Decimal 输出同时受公共
+64 字节与 `CodecLimits.field_bytes` 限制。`source_message_id` 是独立标识元数据，
+支持完整无符号 `u64` 或公共 64 字节标识符规则，不使用 Scalar 输出长度规则。
+详见[厂商 Codec](vendor-codecs.zh-CN.md)与[迁移](migration/integer-decimal.zh-CN.md)。
+
+`config check` 对已识别的整数旧字段返回 `NBI-CFG-016`，包含成员路径和迁移建议。
+Schema 描述结构；反序列化拒绝旧成员，编译阶段证明布局、数值及资源约束。
+
+## 连接内存接纳
+
+`limits.connection_memory_reservation` 默认 16 KiB，仅为固定接纳预算，不是预分配内存
+或 RSS。reader 按需分配，并按实际容量计入连接、租户、全局字节预算；稳定容量默认
+最多 65,540 字节（含 TCP 四字节封包和共享帧别名）。独占同步替换可短暂达到两倍
+单连接上限，但新旧分配必须同时符合未扩大的租户/全局预算；共享旧分配没有此例外。
+最后一个别名释放后才归还预算，空闲命令队列不预分配最大 payload。
+
+全局账户同时包括认证前预算；认证后还要符合租户预算。连接数、协议/IP/租户数量、
+MQTT/session/auth/command/event 上限独立生效。TLS 握手并发由 `max_tls_handshakes`
+限制（默认 64、最大 65,536），超额立即关闭，不创建等待任务。部署容量必须另测
+进程、TLS 和内核内存。见[连接密度审计](performance/connection-density-20261013.md)。

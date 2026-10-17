@@ -1,5 +1,7 @@
 # `netbaiot` CLI
 
+[中文](cli.zh-CN.md)
+
 The unified CLI runs the gateway, provides a development demo and local config
 checks, and manages a running gateway through `netbaiot-client`. Both
 `netbaiot serve` and the compatibility `netbaiot-server` call the same server
@@ -66,12 +68,19 @@ independent static errors are collected.
 | NBI-CFG-005 | Public management missing TLS |
 | NBI-CFG-006 | TLS file/CA/key parse or matching failure |
 | NBI-CFG-007 | Invalid management authentication, mTLS mapping or admin secret source |
-| NBI-CFG-008 | Inconsistent business RPC/legacy stream settings |
+| NBI-CFG-008 | Inconsistent business RPC/listener/identity settings |
 | NBI-CFG-009 | Missing/unsafe business endpoint or delivery selection |
 | NBI-CFG-010 | Invalid count/byte/deadline limits or hierarchy |
 | NBI-CFG-011 | Invalid device authentication/credential/codec settings |
 | NBI-CFG-012 | Invalid/inaccessible recovery directory path |
 | NBI-CFG-013 | Missing/unreadable/oversized configuration file |
+| NBI-CFG-015 | Codec registration, declarative layout, numeric proof or resource-budget failure |
+| NBI-CFG-016 | Legacy integer scale/bias (including null); exact path and migration help |
+
+`NBI-CFG-016` is an [unreleased main change](documentation.md). Remove obsolete
+integer members, use string `decimal_exact` for non-identity mappings, or omit
+`conversion` for identity. Malformed JSON, illegal types/float values and unknown
+fields retain their previous categories. See [integer migration](migration/integer-decimal.md).
 
 Both HTTP provider and sink URLs use one security predicate: HTTPS, or HTTP on
 literal loopback/localhost, without URL username/password. The runtime keeps its

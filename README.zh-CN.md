@@ -1,6 +1,12 @@
 # NetbaIoT
 
-设备载荷支持 JSON V1、CBOR V1、MessagePack V1、Protobuf V1，详见[wire 格式、认证选择与扩展](docs/codecs.zh-CN.md)。
+设备载荷支持 JSON V1、CBOR V1、MessagePack V1、Protobuf V1，以及显式注册的厂商 Codec。
+详见 [wire 格式](docs/codecs.zh-CN.md)和[厂商 Payload 配置](docs/vendor-codecs.zh-CN.md)。
+
+截至 2026-10-17，workspace 版本为 `0.3.3`，最新公开 Release 为
+[v0.3.3](https://github.com/sskycn/netbaiot/releases/tag/v0.3.3)。本文档描述 `main`，
+包含**尚未发布**的整数精确 Decimal 转换和配置诊断改进。用发布版运行 `main` 示例前，
+请先阅读[版本与文档状态](docs/documentation.zh-CN.md)。
 
 **当前协议说明：** Business RPC 仅支持 V3；计划重启恢复仅支持 MQTT NBMQ v6 与
 EventBus NBSP v3。MQTT 3.1.1/5.0 和管理接口 `/api/v1` 继续支持。详见
@@ -181,7 +187,7 @@ MQTT 和 TCP 在连接时认证并绑定设备身份。非 loopback 设备 TCP �
 - MQTT over WebSocket、MQTT-SN、共享订阅、Broker bridge 和 `$SYS` 服务不在支持范围内。
 - UDP 经过认证但不加密、无会话，也不支持命令下行。
 - 恢复只覆盖成功完成的计划优雅关机；它不是通用数据库，不能让任意进程或机器崩溃变得持久。
-- Workspace 版本为 `0.2.4`，尚未到 1.0。升级前请阅读协议和迁移说明，不要默认所有 API 均稳定。
+- Workspace 版本为 `0.3.3`，尚未到 1.0。升级前请阅读协议和迁移说明，不要默认所有 API 均稳定。
 
 ## 文档
 
@@ -193,7 +199,7 @@ MQTT 和 TCP 在连接时认证并绑定设备身份。非 loopback 设备 TCP �
 - [业务集成与客户端](docs/business-integration-guide.md) · [CLI](docs/cli.zh-CN.md) · [设备 SDK](docs/device-sdk.zh-CN.md)
 - [配置与 IDE](docs/configuration.zh-CN.md) · [平台支持](docs/platform-support.zh-CN.md) · [当前协议升级](docs/migration/current-protocol-only.zh-CN.md)
 - [基准概述](docs/benchmarks.zh-CN.md) · [容量与稳定性测试](docs/production-readiness.zh-CN.md)
-- [v0.2.4 中文发布说明](docs/releases/v0.2.4.zh-CN.md) · [发布模板](docs/release-template.md)
+- [v0.3.3 发布说明（英文）](docs/releases/v0.3.3.md) · [文档状态](docs/documentation.zh-CN.md) · [发布模板](docs/release-template.md)
 
 ## 构建与发布
 

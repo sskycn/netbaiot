@@ -51,8 +51,9 @@ bounded source-IP rate limiter. Classification converts that lease in place to
 MQTT/TCP accounting; cancellation, EOF, TLS error and detection failure release
 it exactly once. MQTT limits and per-device/tenant admission remain unchanged. Management HTTP
 retains bounded request slots and global/IP/byte leases but is excluded from device
-`active_connections` counts. There are no new per-protocol connection reservations:
-the original global/IP pool remains shared, so this is not starvation-proof QoS.
+`active_connections` counts. MQTT and TCP each have a classified connection ceiling (default 192) while sharing
+the global/IP/byte pool. These overlapping maxima are not reserved partitions or
+a starvation-proof QoS guarantee.
 
 Detection uses a fixed 12-byte buffer: one packet byte, up to four Remaining Length
 bytes, two protocol-name length bytes, four name bytes and one level byte. MQTT reuses the bounded fixed-header/Remaining-Length decoder and requires the

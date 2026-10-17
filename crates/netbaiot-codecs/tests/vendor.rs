@@ -747,6 +747,8 @@ fn legacy_integer_members_are_rejected_during_deserialization_in_any_key_order()
             ("bias", "null"),
             ("scale", "1"),
             ("bias", "0"),
+            ("scale", "-0.125"),
+            ("bias", "1e3"),
         ] {
             for json in [
                 format!(r#"{{"offset":0,"type":"{kind}","{member}":{value}}}"#),
@@ -755,7 +757,12 @@ fn legacy_integer_members_are_rejected_during_deserialization_in_any_key_order()
                 let error = serde_json::from_str::<Field>(&json)
                     .unwrap_err()
                     .to_string();
-                assert!(error.starts_with(&format!("{member}:")), "{error}");
+                let code = if member == "scale" {
+                    LEGACY_INTEGER_SCALE_CODE
+                } else {
+                    LEGACY_INTEGER_BIAS_CODE
+                };
+                assert!(error.starts_with(&format!("{code}:")), "{error}");
                 assert!(error.contains("migrate"));
             }
         }

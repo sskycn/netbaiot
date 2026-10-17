@@ -1,6 +1,11 @@
 //! Versioned, bounded binary payload descriptions. Offsets are payload-relative.
 use serde::{Deserialize, Serialize};
 
+/// Stable serde error identifiers for obsolete integer members. Consumers may
+/// inspect the identifier before `:`; the following human text is not a contract.
+pub const LEGACY_INTEGER_SCALE_CODE: &str = "NBI-CODEC-001";
+pub const LEGACY_INTEGER_BIAS_CODE: &str = "NBI-CODEC-002";
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
@@ -190,14 +195,14 @@ impl<'de> Deserialize<'de> for Field {
                 | DataType::I64
         ) {
             if matches!(input.scale, LegacyFloat::Present(_)) {
-                return Err(serde::de::Error::custom(
-                    "scale: Integer fields cannot contain legacy scale; migrate to conversion with mode decimal_exact and string scale/bias values.",
-                ));
+                return Err(serde::de::Error::custom(format_args!(
+                    "{LEGACY_INTEGER_SCALE_CODE}: Integer fields cannot contain legacy scale; migrate to conversion with mode decimal_exact and string scale/bias values."
+                )));
             }
             if matches!(input.bias, LegacyFloat::Present(_)) {
-                return Err(serde::de::Error::custom(
-                    "bias: Integer fields cannot contain legacy bias; migrate to conversion with mode decimal_exact and string scale/bias values.",
-                ));
+                return Err(serde::de::Error::custom(format_args!(
+                    "{LEGACY_INTEGER_BIAS_CODE}: Integer fields cannot contain legacy bias; migrate to conversion with mode decimal_exact and string scale/bias values."
+                )));
             }
         }
         Ok(Self {

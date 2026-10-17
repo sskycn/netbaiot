@@ -85,6 +85,52 @@ async fn local_commands_help_diagnostics_and_limits_need_no_management_credentia
     }
 }
 #[tokio::test]
+async fn legacy_integer_config_check_reports_migration_in_both_output_formats() {
+    let root = tempfile::tempdir().unwrap();
+    let path = root.path().join("legacy-integer.json");
+    let mut config: serde_json::Value =
+        serde_json::from_str(include_str!("../../../configs/vendor-codec.json")).unwrap();
+    config["credentials"][0]["secret_hex"] = serde_json::json!("secret-never-print");
+    for member in ["scale", "bias"] {
+        let mut config = config.clone();
+        config["payload_codecs"][0]["messages"][0]["payload"]["fields"][0]["field"][member] =
+            serde_json::Value::Null;
+        std::fs::write(&path, serde_json::to_vec(&config).unwrap()).unwrap();
+        for format in ["human", "json"] {
+            let result = output(&[
+                "config",
+                "check",
+                "--config",
+                path.to_str().unwrap(),
+                "--output",
+                format,
+            ])
+            .await;
+            assert_eq!(result.status.code(), Some(2));
+            assert!(result.stderr.is_empty());
+            let output = String::from_utf8(result.stdout).unwrap();
+            for required in [
+                "NBI-CFG-016",
+                &format!("payload_codecs[0].messages[0].payload.fields[0].field.{member}"),
+                "Integer fields",
+                "Remove legacy scale/bias",
+                "decimal_exact",
+                "string scale/bias",
+                "identity mapping",
+            ] {
+                assert!(output.contains(required), "{output}");
+            }
+            assert!(!output.contains("secret-never-print"));
+            if format == "json" {
+                let report: serde_json::Value = serde_json::from_str(&output).unwrap();
+                assert_eq!(report["valid"], false);
+                assert_eq!(report["diagnostics"][0].as_object().unwrap().len(), 4);
+            }
+        }
+    }
+}
+
+#[tokio::test]
 async fn actual_demo_once_uses_real_mqtt_and_cleans_private_directory() {
     let temp = tempfile::tempdir().unwrap();
     let result = tokio::time::timeout(

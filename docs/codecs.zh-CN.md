@@ -14,7 +14,9 @@
 
 厂商二进制 JSON 声明、原生 Rust 示例、校验和与资源边界见
 [厂商自定义 Payload Codec](vendor-codecs.zh-CN.md)。声明位于 `payload_codecs`，
-共用现有认证绑定的注册表。
+共用现有认证绑定的注册表。`main` 的整数精确 Decimal 修改[尚未发布](documentation.zh-CN.md)；
+JSON/CBOR/MessagePack 的显式 Decimal 对象与 Protobuf Scalar 字段 6 的 wire 形式保持不变。
+`v0.3.3` 行为应以对应发布说明和源码标签为准。
 
 ## 认证与产品配置
 
@@ -47,8 +49,8 @@ admission guard，并与最终会话注册、认证失效共用注册同步边�
 必须使用 Ingress 的联合提交 API。
 
 [多编码配置示例](../configs/multi-codec.json) 使用原有配置字段，为四种编码分别
-配置产品；公开凭据仅用于开发。没有增加配置字段或修改公共领域协议，JSON Schema
-保持原样。配置检查中的错误不会显示凭据或载荷。
+配置产品；公开凭据仅用于开发。选择四个内置编码使用既有认证字段；厂商 `payload_codecs`
+另有生成的 Schema 和启动编译校验。配置检查中的错误不会显示凭据或载荷。
 
 ## JSON V1
 

@@ -42,6 +42,7 @@ netbaiot-server --print-default-limits
 | `auth_provider_url` | 外部认证 provider | null + static credentials | HTTPS provider；loopback 可 HTTP |
 | `spool_directory` | planned-restart recovery | `./var/...` | 独立、本地、受监控、权限受限目录 |
 | `credentials` | static demo/bootstrap credential | 固定演示值 | 建议 provider/安全生成的配置，不进 Git |
+| `payload_codecs` | 启动时编译的厂商布局 | 可选 | 显式 ID/版本绑定，见[厂商 Codec](vendor-codecs.zh-CN.md) |
 
 Environment variables：
 
@@ -49,6 +50,7 @@ Environment variables：
 |---|---|
 | `NETBAIOT_ADMIN_SECRET` | 可选 64-hex 全局 bootstrap management bearer；没有任何可用管理 provider 时请求 forbidden |
 | `NETBAIOT_DELIVERY_TOKEN` | webhook bearer |
+| `NETBAIOT_AUTH_PROVIDER_TOKEN` | HTTP auth provider 的独立 service bearer，不是设备凭据 |
 | `NETBAIOT_BUSINESS_RPC_TOKEN` | 回环开发 Business RPC token；生产使用 mTLS principal |
 | `RUST_LOG` | tracing filter，如 `info` 或 `netbaiot_server=debug` |
 | `NETBAIOT_PERF_LOCK_METRICS=1` | 仅性能实验的额外 lock timing；生产默认关闭 |
@@ -86,7 +88,8 @@ Environment variables：
 }
 ```
 
-同一 `tls` 接受器用于 management HTTP、MQTT 和 generic TCP。TLS 验证必须使用真实 CA/hostname；不要在生产客户端长期使用 insecure 选项。UDP payload 不加密。
+MQTT 与 generic TCP 共用 `tls`；管理 HTTP 优先使用独立 `management_tls`，未配置时
+才使用 `tls` fallback。TLS 验证必须使用真实 CA/hostname；不要在生产客户端长期使用 insecure 选项。UDP payload 不加密。
 
 ## 资源限制与 backpressure
 
@@ -119,7 +122,8 @@ Environment variables：
 
 ## Management API
 
-所有 endpoint，包括 health/ready，都要求独立 management bearer：
+所有 endpoint，包括 health/ready，都要求独立管理身份：bootstrap bearer、API Key、
+JWT 或映射的 mTLS。以下是 bootstrap 示例，细粒度授权见[管理认证](management-auth.zh-CN.md)：
 
 ```bash
 ADMIN=abababababababababababababababababababababababababababababababab
@@ -159,7 +163,9 @@ curl -X POST http://127.0.0.1:9090/api/v1/auth/invalidate \
 
 响应分别报告 `invalidated_cache_entries`、`disconnected_connections` 和 `invalidated_mqtt_sessions`（另保留 legacy `invalidated`/`disconnected`）。Invalidation 与 session registration/MQTT attachment 共用同步边界；完成前已返回的 stale provider result 不能随后注册。
 
-Management 应只暴露在 loopback、受控管理网或强认证的 reverse proxy 后。当前 static admin token 是 all-or-nothing，不要虚构不存在的细粒度 RBAC。
+Management 应只暴露在 loopback、受控管理网或正确配置 TLS/管理认证的入口。
+旧 bootstrap token 为全局权限；API Key、JWT 和 mTLS principal 支持 Scope 与资源限制。
+迁移完成后可禁用旧 token，不能把设备凭据用于管理授权。
 
 ## 可观测性
 
@@ -170,7 +176,12 @@ curl -H "Authorization: Bearer $ADMIN" http://127.0.0.1:9090/api/v1/metrics
 
 稳定、低基数 counters 包括 connections accepted/rejected、MQTT connect/packets/publishes/subscriptions/PUBACK/protocol violations、management HTTP requests（`management_http_requests`）及 TCP/UDP traffic、auth cache/failures、codec/ingress/admission/queue rejects、command lifecycle、events accepted/rejected/bytes、sink ACK/retry/failure/drop、spool/recovery 和 timeouts。Histogram 提供关键阶段延迟。
 
-`/status` 提供当前 transport connection counts、EventBus `event_count/event_bytes/pending_required`、auth cache 和 runtime task 数。当前公共 metrics **没有直接导出** persistent session 数、offline message 数、QoS inflight 数、retained 数或逐 sink backlog gauge；不要在 dashboard 中假装这些指标存在。可用 rejection/sink counters、status、日志和外部 black-box probe 监控，若运维必须精确观测这些状态，应单独提出受控指标扩展。
+`/status` 提供当前 transport connection counts、EventBus `event_count/event_bytes/pending_required`、auth cache 和 runtime task 数。`/status.sink_diagnostics` 逐 Sink 提供 queue count/bytes、inflight、retry/failure/drop、
+oldest age 和 paused 状态；Prometheus 导出不带动态 Sink 标签的聚合
+`netbaiot_sink_queue_count`、`netbaiot_sink_queue_bytes`、`netbaiot_sink_inflight`、
+`netbaiot_sink_paused`、`netbaiot_sink_oldest_pending_age_ms` 等指标。
+当前未直接导出 persistent session、offline message、MQTT QoS inflight 或 retained 数量。
+这些状态需结合拒绝 counters、日志和 black-box probe 观察，不能编造不存在的 gauge。
 
 日志不得包含 password、token、Authorization、HMAC key、raw credential 或完整敏感 spool。device/event/command/client ID、revision、sink URL 可进入受控日志/trace，但不能成为 metric label。高流量 debug 会增加开销，不应长期启用。
 
@@ -224,7 +235,7 @@ EnvironmentFile=/etc/netbaiot/secrets.env
 WorkingDirectory=/var/lib/netbaiot
 Restart=on-failure
 RestartSec=5s
-TimeoutStopSec=90s
+TimeoutStopSec=infinity
 KillSignal=SIGTERM
 LimitNOFILE=65536
 NoNewPrivileges=true
@@ -235,6 +246,10 @@ ReadWritePaths=/var/lib/netbaiot/recovery
 [Install]
 WantedBy=multi-user.target
 ```
+
+`TimeoutStopSec=infinity` 保留 spool 提交失败时继续存活并重试的责任；固定 90 秒等强杀
+期限不能保证安全退出。应监控 unready/pending/spool 错误并由运维处理，不能把超时强杀称为
+成功优雅关机。
 
 确保 certificate/private key、config、environment file 和 spool 权限允许 service user 最小读取/写入。`LimitNOFILE` 必须依据连接规模和 host 全局限制测量；不是越大越好。
 

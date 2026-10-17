@@ -8,7 +8,7 @@ provide deployment specifications for 1000, 5000 or 10000 devices.
 
 ## Available evidence
 
-- [Capacity and stability testing](production-readiness.zh-CN.md): the independent
+- [Capacity and stability testing](production-readiness.md): the independent
   load tool, report definitions and incomplete production validation.
 - [Codec comparison results](performance/codec-audit/README.md): compact results
   with source, executable and environment provenance. Codec microbenchmarks and
@@ -35,3 +35,13 @@ Successful socket writes do not prove acceptance or business processing.
 Sustained capacity requires stable resources and queues after warmup, completed
 long-duration runs, and verified fault/restart behavior. CPU/RSS readings include
 runtime, TLS, allocator and kernel effects beyond logical payload accounting.
+
+## Evidence categories
+
+CI smoke confirms a bounded scenario at its pinned revision. Real-load tests use
+actual sockets and ACKs; codec microbenchmarks isolate conversion cost. Profiling
+identifies sampled CPU/heap behavior, while soak requires the full declared wall
+clock duration and stable resources after warmup. Production capacity additionally
+requires the intended hardware/network/sinks, fault and restart coverage.
+[Native Linux profiling passed](production-readiness.md), but that success is not
+certification of long-duration stability or the capacity of current `main`.

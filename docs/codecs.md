@@ -13,6 +13,12 @@ using that device's bound profile. Business consumers still deduplicate `event_i
 | `netbaiot-msgpack` | 1 | Same four kinds | Native MessagePack DeviceCommand map |
 | `netbaiot-protobuf` | 1 | Same four kinds | Protobuf DeviceCommand message |
 
+Vendor binary declarations and native Rust registration are documented in
+[vendor payload codecs](vendor-codecs.md). The exact integer Decimal changes on
+`main` are [unreleased](documentation.md); JSON/CBOR/MessagePack's explicit Decimal
+object and Protobuf Scalar field 6 retain their wire representation. `v0.3.3`
+release behavior must be read from its release notes and source tag.
+
 ## Selection and product consistency
 
 Provision `AuthenticatedDevice.codec_id` and `codec_version` through static
@@ -60,8 +66,8 @@ and independent library components; live gateway composition must use Ingress.
 [configs/multi-codec.json](../configs/multi-codec.json) provisions four separate
 products on one gateway, using only the existing configuration fields. Its public
 keys are development fixtures. Production deployments provision their own keys.
-The configuration JSON Schema is unchanged because no configuration fields or
-public protocol fields were added.
+Selecting these four built-ins uses the existing authentication fields. Vendor
+`payload_codecs` has its own generated Schema and startup compilation checks.
 
 ## JSON V1
 

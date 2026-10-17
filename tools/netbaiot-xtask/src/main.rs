@@ -682,6 +682,17 @@ fn package(target: Option<String>, no_build: bool) -> Result<(), String> {
     ])
 }
 fn preflight() -> Result<(), String> {
+    python(&["scripts/check_docs.py"])?;
+    python(&[
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-p",
+        "test_check_docs.py",
+        "-v",
+    ])?;
     execute(Task::Schema { check: true })?;
     execute(Task::ConfigReference { check: true })?;
     let tag = std::env::var("RELEASE_TAG").unwrap_or_default();

@@ -1,7 +1,9 @@
 # NetbaIoT 中文文档导航
 
-本页按使用场景组织中文文档。当前 workspace 版本为 `0.2.4`，最低 Rust 版本为
-`1.88`。以下指南描述当前实现；测量结果只适用于其标注的环境和版本。
+本页按使用场景组织中文文档。当前 workspace 版本为 `0.3.3`，最低 Rust 版本为
+`1.88`。以下指南描述 `main`；最新公开 Release 为 `v0.3.3`（2026-10-17 核对），
+整数精确 Decimal 与后续诊断改进尚未发布。详见[版本与文档状态](documentation.zh-CN.md)。
+测量结果只适用于其标注的环境和版本。
 
 > 当前只支持 Business RPC V3、MQTT 恢复 NBMQ v6 和 EventBus 恢复 NBSP v3。
 > 旧版或未知协议/恢复文件不会自动回退或迁移。升级现有部署前先阅读
@@ -20,6 +22,7 @@
 - [设备接入指南](device-integration-guide.md)：身份、codec、MQTT/TCP/UDP 和设备 SDK。
 - [协议支持矩阵](protocol-support.zh-CN.md)：当前支持与明确不支持的能力。
 - [设备 Codec](codecs.zh-CN.md)：JSON、CBOR、MessagePack、Protobuf V1 wire 格式。
+- [厂商 Payload Codec](vendor-codecs.zh-CN.md)：声明式布局、原生注册、整数精确转换与迁移。
 - [MQTT 3.1.1 / 5.0 profile](mqtt.zh-CN.md)与[设备 wire 格式](device-protocol.zh-CN.md)。
 - [业务系统集成指南](business-integration-guide.md)：webhook、Business RPC V3、命令和错误处理。
 - [业务 RPC V3](business-rpc-v3.zh-CN.md)、[业务客户端](client.zh-CN.md)、
@@ -43,7 +46,7 @@
 - [公共协议](public-protocol.zh-CN.md)与[配置字段参考](configuration-fields.md)。
 - [基准与测量说明](benchmarks.zh-CN.md)、[容量与稳定性测试](production-readiness.zh-CN.md)。
   当前生产容量与完整长测尚未验证。
-- [v0.2.4 中文发布说明](releases/v0.2.4.zh-CN.md)。
+- [v0.3.3 发布说明（英文）](releases/v0.3.3.md)；[v0.2.4 中文历史说明](releases/v0.2.4.zh-CN.md)继续保留。
 
 ## 文档约定
 

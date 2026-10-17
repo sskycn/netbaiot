@@ -1,5 +1,7 @@
 # Graceful restart
 
+[中文](graceful-restart.zh-CN.md)
+
 The explicit lifecycle is `STARTING`, `RUNNING`, `QUIESCING`, `DRAINING`, optional
 `SPOOLING`, then `DRAINED`. Readiness is true only in `RUNNING`; liveness remains true
 until process exit.
@@ -42,6 +44,12 @@ Recovery validates topic/filter syntax, packet identifiers, legal QoS per
 state, non-QoS0 offline backlog, retained consistency, ordering, duplicates, and
 authorization/codec provenance and session ACL ownership before the replacement
 broker state becomes visible.
+
+EventBus recovery reads/writes NBSP v3 authoritative snapshots with complete events,
+stable `event_id`, pending sinks, routing revision and attempt metadata. Per-record
+checksums and the whole-stream trailer protect integrity. NBSP v1/v2, NBMQ v1–v5
+and unknown versions fail explicitly; there is no old reader or automatic converter.
+Follow the [upgrade guide](migration/current-protocol-only.md) before switching binaries.
 
 Control mutations acquire lifecycle admission before their first side effect and
 retain it through completion: HTTP auth invalidation, control/routes replacement,

@@ -1945,3 +1945,21 @@ async fn main() -> Result<()> {
     );
     Ok(())
 }
+
+#[cfg(test)]
+mod configuration_examples {
+    use super::*;
+
+    #[test]
+    fn checked_in_load_configs_match_the_current_v3_parser() {
+        for json in [
+            include_str!("../../../../configs/business-rpc-load.example.json"),
+            include_str!("../../../../configs/business-rpc-production-readiness/smoke-30m.json"),
+            include_str!("../../../../configs/business-rpc-production-readiness/readiness-1h.json"),
+            include_str!("../../../../configs/business-rpc-production-readiness/optional-6h.json"),
+        ] {
+            let config: Config = serde_json::from_str(json).unwrap();
+            config.validate().unwrap();
+        }
+    }
+}

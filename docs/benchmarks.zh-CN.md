@@ -27,3 +27,11 @@ socket 写入成功不证明接纳或业务处理。
 
 稳定容量需要预热后资源与队列稳定、完整长期运行，以及故障/重启验证。
 CPU/RSS 包含 runtime、TLS、allocator 和 kernel 成本，不能用逻辑 payload 记账代替。
+
+## 证据类别
+
+CI Smoke 验证固定 revision 的有界场景；真实负载使用实际 socket 和 ACK；Codec
+微基准只测转换成本；profiling 记录采样 CPU/heap。Soak 必须完整运行声明的真实时长，
+预热后资源稳定；生产容量还需目标硬件/网络/业务 Sink 及故障和重启覆盖。
+[Linux 原生 profiling 已通过](production-readiness.zh-CN.md)，不等于长期稳定性或当前
+`main` 的生产容量认证。

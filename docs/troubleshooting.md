@@ -1,5 +1,9 @@
 # 故障排查
 
+先用 `netbaiot config check --config configs/vendor-codec.json`（替换为自己的配置）检查
+配置；需要机器可读报告时加 `--output json`。整数旧 `scale/bias` 的 `NBI-CFG-016`
+包含完整路径和迁移建议，见[整数迁移](migration/integer-decimal.zh-CN.md)。
+
 先固定四项信息：`git rev-parse HEAD`、实际 config 路径、server 启动日志、客户端明确使用的 protocol/address。再查询：
 
 ```bash
@@ -55,7 +59,8 @@ curl --noproxy '*' http://127.0.0.1:9090/api/v1/metrics \
 
 ## 6. 管理 HTTP 返回 401/403/400/413/415/429/503/504
 
-**症状与处理**：401 检查精确 `Bearer credential-id:secret`；403 检查 permission/management token；400 检查严格 JSON/endpoint kind；413 降低 body；415 移除 `Content-Encoding`；429 是 admission/rate/queue overload，退避；503 检查 draining/provider/device offline/storage；504 检查 request/sink timeout。
+**症状与处理**：401 按实际 Provider 检查 bootstrap/JWT Bearer、`ApiKey key_id.secret` 或映射的管理 mTLS；
+403 检查 Scope/资源权限；400 检查严格 JSON/endpoint kind；413 降低 body；415 移除 `Content-Encoding`；429 是 admission/rate/queue overload，退避；503 检查 draining/provider/device offline/storage；504 检查 request/sink timeout。
 
 ## 7. 业务系统没收到事件
 
@@ -111,19 +116,22 @@ curl --noproxy '*' http://127.0.0.1:9090/api/v1/metrics \
 
 **原因**：发布未带 `-r`、payload/ACL/EventAccepted 失败、被 zero-length retained publish 删除、订阅 filter 不匹配、retain replay preflight 容量不足、使用 `-R` 排除了 retained。
 
-**确认/解决**：用 exact topic、合法 codec payload、`-q 1 -r` 创建；新 client 用 `-C 1 -v` 订阅。实时 publish 的 retain flag 为 0，新订阅 replay 才为 1。
+**确认/解决**：用 exact topic、合法 codec payload、`-q 1 -r` 创建；新 client 用 `-C 1 -v` 订阅。MQTT 3.1.1 实时转发 retain 为 0、订阅 replay 为 1；MQTT 5 还受
+Retain As Published / Retain Handling 订阅选项影响。
 
 ## 15. Will 没触发
 
 **原因**：客户端正常发送 MQTT DISCONNECT；Will topic/payload/ACL 不合法导致 CONNECT 被拒；观察者 filter 不匹配；测试 process 实际优雅退出。
 
-**解决**：先确认带 Will 的连接成功；payload 必须是 `/up` 可接受的 codec JSON；用隔离测试 process 的 SIGKILL 或真实 network loss。注意服务端 planned shutdown 当前会发布 armed Will。
+**解决**：先确认带 Will 的连接成功；payload 必须是 `/up` 可接受的已绑定 Codec 数据；用隔离测试 process 的 SIGKILL 或真实 network loss。注意服务端 planned shutdown 当前会发布 armed Will。
 
 ## 16. TCP device 卡住或 frame invalid
 
 **原因**：把 TCP 当 message stream；长度不是 4-byte big-endian；长度含了 header；首帧不是 handshake；长度为 0/超限；只读一次 `recv()`。
 
-**解决**：对照 `examples/device_tcp.py`，使用 `recv_exact`，长度只计算 JSON payload。认证 reply、EventAccepted、command 都同样分帧。
+**解决**：对照 `examples/device_tcp.py`，使用 `recv_exact`，认证/业务 payload 长度不包含四字节前缀；认证 reply 和 command 的普通帧长度最高位为 0，
+command 内容由绑定 Codec 决定。EventAccepted 使用固定 46 字节二进制 ACK，前缀为
+`80 00 00 2a`，不能当 JSON 或普通未标记长度解码。见[设备协议](device-protocol.zh-CN.md)。
 
 ## 17. UDP 无回执或被丢弃
 
@@ -167,4 +175,6 @@ curl --noproxy '*' http://127.0.0.1:9090/api/v1/metrics \
 
 **症状**：`--help` 不是常规成功输出、package/binary 名混淆。
 
-**解决**：`cargo run -p netbaiot-cli -- ...` 启动的 binary 名为 `netbaiot`。当前 CLI 在 usage error 时打印帮助，先设置 `NETBAIOT_ENDPOINT`/`NETBAIOT_TOKEN`；以[业务集成命令表](business-integration-guide.md#cli)和 `apps/netbaiot-cli/src/main.rs` 为当前事实来源。
+**解决**：`cargo run -p netbaiot-cli -- ...` 启动的 binary 名为 `netbaiot`。`--help`/`--version` 正常返回 0，未知命令/参数返回 2。本地
+`serve/demo/init/doctor/config/version` 不要求管理 endpoint/token；远程管理命令才设置
+`NETBAIOT_ENDPOINT`/相应管理凭据。以[业务集成命令表](business-integration-guide.md#cli)和 `apps/netbaiot-cli/src/main.rs` 为当前事实来源。

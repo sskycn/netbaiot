@@ -1,10 +1,12 @@
 # 优雅重启
 
+[English](graceful-restart.md)
+
 明确的生命周期依次为 `STARTING`、`RUNNING`、`QUIESCING`、`DRAINING`、可选的 `SPOOLING`，最后到 `DRAINED`。只有处于 `RUNNING` 时 readiness 才为 true；进程退出前 liveness 始终为 true。
 
 `begin_admission` 先检查状态是否为 `RUNNING`，增加活动 guard 计数，然后再次检查状态。Quiesce 会原子关闭状态并等待所有先前的 guard。因此，与关机竞争的工作要么完成 `EventAccepted` 边界并纳入跟踪，要么失败且不会收到成功确认。
 
-Quiesce 会拒绝新的设备事件和命令，并停止监听器/连接。除非客户端发送了 MQTT DISCONNECT，否则 MQTT 连接 owner 会发布自己的 Will；MQTT 3.1.1 的 Will 约定适用于服务端关闭 Network Connection 的场景。所有 owner 分离后，会生成一致的 broker 快照，其中包含持久会话、订阅、离线消息、入站/出站 QoS 状态、packet 分配器位置、retain 消息，以及等待订阅者容量的有界 Will。成功退出前必须提交此快照。
+Quiesce 会拒绝新的设备事件和命令，并停止监听器/连接。除非客户端发送了 MQTT DISCONNECT，否则 MQTT 连接 owner 会发布自己的 Will；MQTT 3.1.1 的 Will 约定适用于服务端关闭 Network Connection 的场景。所有 owner 分离后，会生成一致的 broker 快照，其中包含持久会话、订阅、离线消息、入站/出站 QoS 状态、packet 分配器位置、retain 消息，以及等待延迟期限或订阅者容量的有界 Will。成功退出前必须提交此快照。
 
 Drain 期间，必需 sink worker 会继续工作。如果待处理必需责任数量降至零，进程无需新建 spool 即可退出。否则会进入 `SPOOLING` 阶段，此时 worker 仍持有工作并可能继续完成投递。只有精确待处理责任已持久提交后，才会停止 worker 并允许优雅退出。
 
@@ -20,3 +22,10 @@ EventBus 恢复只读写 NBSP v3 权威快照，记录完整事件、稳定 `eve
 [当前协议升级指南](migration/current-protocol-only.zh-CN.md)处理旧文件。
 
 控制面 mutation、当前 Business RPC auth.sync/auth.invalidate、provider 离线撤销、命令提交（含去重重试）与 MQTT/TCP 最终建连均持有 lifecycle admission guard。Quiescing 后拒绝新操作，等待已获准操作完成，再等待 MQTT owner 的 QoS/Will 清理并写入快照。诊断读取和幂等 drain 请求仍可使用。
+
+启动先构造暂停的 EventBus，验证两个恢复域、管理凭据、全部 TLS 和监听绑定，之后才
+启动 Sink worker 和发布 RUNNING；准备期间恢复事件不能投递。库使用者的
+`EventBus::new` 仍会启动 worker，需调用 `stop_workers`；组合入口使用 `new_paused` /
+`start_owned_workers`，由 owner 负责正常 join、Drop 时取消/abort。
+放弃 startup/run future 会释放准备的 socket、取消 listener、终止所属 worker，并在
+阻塞 I/O owner 结束后释放目录锁；该紧急取消路径不承诺优雅排空或 spool 提交。
