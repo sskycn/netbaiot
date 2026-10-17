@@ -360,6 +360,14 @@ pub async fn connection(
     services.ingress.metrics.inc(Metric::MqttConnectSuccess);
     machine.transition(ConnectionState::Connected)?;
     let down_topic = topic(&auth.device_key, TopicKind::Down);
+    live_session.restrict_command_payload(codec::command_payload_limit(
+        &down_topic,
+        limits
+            .max_mqtt_packet_size
+            .min(limits.max_write_buffer_per_connection),
+        codec::MqttVersion::V311,
+        limits,
+    ))?;
     live_session.set_command_ready(
         services
             .mqtt

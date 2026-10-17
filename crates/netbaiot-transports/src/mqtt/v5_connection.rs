@@ -457,6 +457,15 @@ pub(super) async fn connection(
     send_v5(&mut stream, &services, &response, client_maximum, None).await?;
     services.ingress.metrics.inc(Metric::MqttConnectSuccess);
     let down_topic = topic(&auth.device_key, TopicKind::Down);
+    live_session.restrict_command_payload(super::codec::command_payload_limit(
+        &down_topic,
+        limits
+            .max_mqtt_packet_size
+            .min(client_maximum)
+            .min(limits.max_write_buffer_per_connection),
+        codec::MqttVersion::V5,
+        limits,
+    ))?;
     live_session.set_command_ready(
         services
             .mqtt

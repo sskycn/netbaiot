@@ -72,6 +72,7 @@ impl DeviceCodec for AcmeV1 {
         command: &DeviceCommand,
     ) -> Result<Vec<u8>, CodecError> {
         if !validate_command(ctx, command, &self.limits)
+            || self.limits.input_bytes < 32
             || command.payload.name != "set_temperature"
             || command.payload.arguments.len() != 1
         {
@@ -84,6 +85,7 @@ impl DeviceCodec for AcmeV1 {
         let rounded = raw.round();
         if !(f64::from(i16::MIN)..=f64::from(i16::MAX)).contains(&rounded)
             || (raw - rounded).abs() > 4.0 * f64::EPSILON * raw.abs().max(1.0)
+            || rounded * 0.1 != *temperature
         {
             return Err(CodecError);
         }

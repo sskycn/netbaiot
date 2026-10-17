@@ -101,8 +101,11 @@ Text and bool cannot be scaled. Since `Scalar::Number` is f64, scalar integer wi
 values outside ±2^53 are rejected before conversion. Full u64 remains available
 for source IDs, heartbeat sequences and integer metadata. Downlink reverses this
 formula and rejects integer overflow or fractional raw values, allowing only a
-small floating-point roundoff tolerance (at most 1e-7 raw units). f32 commands use
-IEEE rounding and reject overflow. Arguments must match the configured names,
+small floating-point roundoff tolerance (at most 1e-7 raw units) when selecting an
+integer candidate. Every numeric output is then read back with the same normalization
+and must equal the original f64 value exactly. Narrowing to f32, inverse scaling,
+underflow or cancellation that changes the value is rejected. Some decimal literals
+are therefore rejected even if they appear close to a representable wire value. Arguments must match the configured names,
 count and types exactly; there are no silent defaults or extra ignored arguments.
 
 The source ID is an unscaled unsigned integer rendered as decimal, or an exact
@@ -111,7 +114,9 @@ authenticated device identity. Vendors must provide source IDs unique within the
 device's message namespace (including across message types). The gateway generates
 a fresh event ID when decoding; EventBus retry/spool replay preserves the accepted
 event ID as before. `occurred_at` and `expires_at` are unsigned Unix milliseconds,
-bounded to the public timestamp range. Expiry omitted from a command is encoded
+bounded to the public timestamp range. A configured `expires_at` must use `u64`
+to represent the full nonnegative i64 range (0 through 2^63−1); smaller types fail
+compilation. Expiry omitted from a command is encoded
 as zero when that field is configured. Gateway command TTL/admission still applies
 whether or not expiry appears on the wire.
 
@@ -146,7 +151,17 @@ uses its existing 16 MiB outer config-file limit, at most 60 custom profiles, an
 the same per-profile compilation bounds. The generated configuration Schema
 validates structure and simple limits; `netbaiot config check` additionally checks
 layout overlaps, metadata ranges, uniqueness, budgets and cross-field rules.
-Invalid plans produce configuration diagnostics before network service starts.
+Invalid plans produce configuration diagnostics before network service starts,
+including schema field paths such as `payload_codecs[0].commands[0].expires_at.type`.
+Diagnostic paths and messages omit configuration values and unknown user keys.
+
+Command layouts must fit `max_command_bytes` at startup. All codecs, including
+native implementations, also undergo encoded-size admission before queue ownership.
+The active session further bounds commands by TCP frame/write capacity or MQTT
+packet/write capacity, including topic, framing and MQTT 5 expiry metadata and the
+client's Maximum Packet Size. MQTT reserves a packet identifier even at QoS0 (two
+bytes), so a later resubscription to QoS1/2 cannot make an already queued command
+unsendable. Rejected commands do not reserve queue capacity or disconnect devices.
 
 QoS2 prevalidation and decode call the exact same parser, including source IDs,
 checksums, reserved bytes, numeric bounds and execution states. Successful

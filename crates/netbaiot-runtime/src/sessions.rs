@@ -31,6 +31,11 @@ impl Drop for QueuedCommand {
     }
 }
 
+struct CommandAdmission {
+    ready: AtomicBool,
+    payload_limit: AtomicUsize,
+}
+
 #[derive(Clone)]
 pub struct SessionEndpoint {
     pub generation: u64,
@@ -48,12 +53,12 @@ pub struct SessionEndpoint {
     tenant_bytes: ByteBudget,
     global_bytes: ByteBudget,
     queued: Arc<AtomicUsize>,
-    command_ready: Arc<AtomicBool>,
+    command_admission: Arc<CommandAdmission>,
 }
 
 impl SessionEndpoint {
     pub fn command_ready(&self) -> bool {
-        self.command_ready.load(Ordering::Acquire)
+        self.command_admission.ready.load(Ordering::Acquire)
     }
 
     pub fn enqueue(&self, command: &DeviceCommand, bytes: Vec<u8>) -> Result<()> {
@@ -69,6 +74,13 @@ impl SessionEndpoint {
         let expires_at = command.expires_at.ok_or(Error::Invalid)?;
         if self.cancel.is_cancelled() || command.device != self.auth.device_key {
             return Err(Error::Unavailable);
+        }
+        let maximum = self.command_admission.payload_limit.load(Ordering::Acquire);
+        if maximum == 0
+            || bytes.len() > maximum
+            || (self.transport == Transport::Tcp && bytes.is_empty())
+        {
+            return Err(Error::Invalid);
         }
         let slots = vec![
             self.connection_slots
@@ -293,7 +305,22 @@ impl Sessions {
             tenant_bytes,
             global_bytes: self.global_bytes.clone(),
             queued: self.queued.clone(),
-            command_ready: Arc::new(AtomicBool::new(transport == Transport::Tcp)),
+            command_admission: Arc::new(CommandAdmission {
+                ready: AtomicBool::new(transport == Transport::Tcp),
+                payload_limit: AtomicUsize::new(if transport == Transport::Tcp {
+                    self.limits
+                        .max_command_bytes
+                        .min(self.limits.max_tcp_frame_size)
+                        .min(tcp_frame::ACK_FLAG as usize - 1)
+                        .min(
+                            self.limits
+                                .max_write_buffer_per_connection
+                                .saturating_sub(4),
+                        )
+                } else {
+                    self.limits.max_command_bytes
+                }),
+            }),
         };
         if let Some(old) = state.sessions.insert(device.clone(), endpoint) {
             tracing::debug!(
@@ -566,6 +593,21 @@ impl Sessions {
 }
 
 impl SessionLease {
+    /// Bind a transport's payload capacity before enabling command dispatch. Only
+    /// reductions are allowed, so a later subscription change cannot enlarge it.
+    pub fn restrict_command_payload(&self, maximum: usize) -> Result<()> {
+        let state = lock(&self.owner.state)?;
+        let endpoint = state.sessions.get(&self.device).ok_or(Error::Unavailable)?;
+        if endpoint.generation != self.generation {
+            return Err(Error::Unavailable);
+        }
+        endpoint
+            .command_admission
+            .payload_limit
+            .fetch_min(maximum, Ordering::AcqRel);
+        Ok(())
+    }
+
     /// Update only the current transport generation. A replaced connection cannot
     /// mark the replacement's command channel ready.
     pub fn set_command_ready(&self, ready: bool) -> Result<()> {
@@ -574,7 +616,10 @@ impl SessionLease {
         if endpoint.generation != self.generation {
             return Err(Error::Unavailable);
         }
-        endpoint.command_ready.store(ready, Ordering::Release);
+        endpoint
+            .command_admission
+            .ready
+            .store(ready, Ordering::Release);
         Ok(())
     }
 }
@@ -1218,6 +1263,66 @@ mod tests {
                 .unwrap()
                 .command_ready()
         );
+    }
+
+    #[test]
+    fn command_capacity_is_generation_fenced_and_never_enlarged() {
+        let sessions = Sessions::new(Arc::new(Limits::default()));
+        let auth = auth("d");
+        let (old, _) = sessions.register(auth.clone(), Transport::Mqtt).unwrap();
+        old.restrict_command_payload(10).unwrap();
+        old.restrict_command_payload(20).unwrap();
+        let endpoint = sessions.lookup(&auth.device_key).unwrap().unwrap();
+        assert_eq!(
+            endpoint
+                .command_admission
+                .payload_limit
+                .load(Ordering::Acquire),
+            10
+        );
+        let (new, _) = sessions.register(auth.clone(), Transport::Mqtt).unwrap();
+        new.restrict_command_payload(30).unwrap();
+        assert!(matches!(
+            old.restrict_command_payload(1),
+            Err(Error::Unavailable)
+        ));
+        let endpoint = sessions.lookup(&auth.device_key).unwrap().unwrap();
+        assert_eq!(
+            endpoint
+                .command_admission
+                .payload_limit
+                .load(Ordering::Acquire),
+            30
+        );
+    }
+
+    #[test]
+    fn tcp_commands_reject_unsendable_payload_before_queueing() {
+        let limits = Arc::new(Limits {
+            max_tcp_frame_size: 128,
+            max_command_bytes: 256,
+            ..Default::default()
+        });
+        let sessions = Sessions::new(limits);
+        let auth = auth("d");
+        let (_lease, mut rx) = sessions.register(auth.clone(), Transport::Tcp).unwrap();
+        let endpoint = sessions.lookup(&auth.device_key).unwrap().unwrap();
+        let command = DeviceCommand {
+            command_id: CommandId::generate(),
+            device: auth.device_key.clone(),
+            expires_at: Some(now_ms() + 1000),
+            payload: DeviceCommandPayload {
+                name: "set".into(),
+                arguments: Default::default(),
+            },
+        };
+        assert!(matches!(
+            endpoint.enqueue(&command, vec![0; 129]),
+            Err(Error::Invalid)
+        ));
+        assert!(rx.try_recv().is_err());
+        endpoint.enqueue(&command, vec![0; 128]).unwrap();
+        assert_eq!(rx.try_recv().unwrap().bytes.len(), 128);
     }
 
     #[test]

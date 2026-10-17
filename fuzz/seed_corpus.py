@@ -128,3 +128,50 @@ seed('restart_spool', 'current-heartbeat', framed + trailer + hashlib.sha256(fra
 provider = json.dumps({"kind": "provider", "provider_id": "primary"}).encode()
 seed('business_rpc_v3', 'provider-rpc', struct.pack('!IIBBH', len(provider), 1, 1, 0, 0) + provider
      + struct.pack('!IIBBH', len(open_request), 3, 1, 0, 0) + open_request.replace(b'null', b'1   ', 1))
+
+# Vendor payloads and configurations need valid seeds to pass header/layout/checksum gates.
+import copy
+vendor = json.loads((Path(__file__).parents[1] / 'configs/codecs/acme-v1.json').read_text())
+seed('vendor_config', 'acme-valid', json.dumps(vendor).encode())
+for tag, body in [(1, struct.pack('<Ih', 42, -123) + struct.pack('!H', 654) + b'\x01A100'),
+                  (2, struct.pack('<I', 42) + struct.pack('!Q', 2**64-1)),
+                  (3, struct.pack('<I', 42) + b'\0\x07'),
+                  (4, struct.pack('<I', 42) + bytes(15) + b'\x01\x02')]:
+    wire = b'\xa5\x5a' + struct.pack('!HB', len(body)+6, tag) + body
+    wire += bytes([sum(wire) & 255])
+    seed('vendor_codec', f'valid-{tag}', wire)
+    for n in range(len(wire)):
+        seed('vendor_codec', f'truncated-{tag}-{n}', wire[:n])
+    seed('vendor_codec', f'trailing-{tag}', wire+b'\0')
+    for n in [0, 2, 4, len(wire)-1]:
+        mutated = bytearray(wire)
+        mutated[n] ^= 255
+        seed('vendor_codec', f'malformed-{tag}-{n}', mutated)
+for value in [0., 1.25, 16777217., 1e-300, float('inf'), float('nan')]:
+    for scale, bias in [(1., 0.), (0.1, 0.), (1., 1e20), (1e300, 0.)]:
+        seed('vendor_codec', f'numeric-{value}-{scale}-{bias}', struct.pack('<ddd', value, scale, bias))
+for kind in ['u8', 'u16', 'u32', 'u64']:
+    config = copy.deepcopy(vendor)
+    config['commands'][0]['expires_at']['type'] = kind
+    seed('vendor_config', f'expiry-{kind}', json.dumps(config).encode())
+for field, values in [('scale', [0, 0.1, -1, 1e300]), ('offset', [0, 21, 2**64-1]), ('type', ['f32', 'f64', 'u64'])]:
+    for value in values:
+        config = copy.deepcopy(vendor)
+        config['commands'][0]['expires_at'] = None
+        config['commands'][0]['checksum'] = None
+        config['commands'][0]['fields'][0]['field'][field] = value
+        seed('vendor_config', f'field-{field}-{value}', json.dumps(config).encode())
+for size in [0, 31, 32, 65536, 65537]:
+    config = copy.deepcopy(vendor)
+    config['commands'][0]['size'] = size
+    seed('vendor_config', f'size-{size}', json.dumps(config).encode())
+seed('vendor_codec', 'oversized', bytes(65537))
+seed('vendor_config', 'oversized', b' ' * (262144+1))
+seed('vendor_config', 'unknown-field', json.dumps(dict(vendor, unknown='rejected')).encode())
+
+valid = (root / 'vendor_codec' / 'valid-1').read_bytes()
+for name, offset, value in [('bool', 13, 2), ('utf8', 14, 255), ('text-control', 14, 0), ('tag', 4, 255), ('length', 3, 18)]:
+    malformed = bytearray(valid)
+    malformed[offset] = value
+    malformed[-1] = sum(malformed[:-1]) & 255
+    seed('vendor_codec', f'invalid-{name}-with-checksum', malformed)

@@ -131,13 +131,18 @@ impl<'a> Builder<'a> {
         config: &DeclarativeConfig,
         size: usize,
         limits: &'a CodecLimits,
-    ) -> Result<Self, CodecError> {
+        path: &str,
+    ) -> Result<Self, ConfigError> {
         if size == 0
+            || size < config.header.len()
             || size > MAX_FRAME_BYTES
             || size > limits.input_bytes
             || size > limits.decoded_bytes
         {
-            return Err(CodecError);
+            return Err(ConfigError::new(
+                format!("{path}.size"),
+                "Layout size exceeds codec byte limits or is zero.",
+            ));
         }
         let mut b = Self {
             size,
@@ -145,46 +150,69 @@ impl<'a> Builder<'a> {
             limits,
             budget: 512,
         };
-        b.claim(0, config.header.len())?;
-        b.integer(&config.message_type)?;
+        b.claim(0, config.header.len())
+            .map_err(|e| e.at("header"))?;
+        b.integer(&config.message_type)
+            .map_err(|e| e.at("message_type"))?;
         if let Some(length) = &config.length {
-            b.integer(&length.field)?;
-            let n = u64::try_from(size as i64 - i64::from(length.adjustment))
-                .map_err(|_| CodecError)?;
+            b.integer(&length.field).map_err(|e| e.at("length.field"))?;
+            let n = u64::try_from(size as i64 - i64::from(length.adjustment)).map_err(|_| {
+                ConfigError::new("length.adjustment", "Length adjustment is out of range.")
+            })?;
             if !length.field.data_type.fits(n) {
-                return Err(CodecError);
+                return Err(ConfigError::new(
+                    "length.adjustment",
+                    "Adjusted length does not fit the length field.",
+                ));
             }
         }
         Ok(b)
     }
-    fn charge(&mut self, bytes: usize) -> Result<(), CodecError> {
-        self.budget = self.budget.checked_add(bytes).ok_or(CodecError)?;
+    fn charge(&mut self, bytes: usize) -> Result<(), ConfigError> {
+        self.budget = self
+            .budget
+            .checked_add(bytes)
+            .ok_or_else(|| ConfigError::new("", "Layout arithmetic exceeds its bound."))?;
         if self.budget > self.limits.decoded_bytes {
-            return Err(CodecError);
+            return Err(ConfigError::new(
+                "",
+                "Compiled layout exceeds decoded byte budget.",
+            ));
         }
         Ok(())
     }
-    fn claim(&mut self, start: usize, len: usize) -> Result<Range<usize>, CodecError> {
-        let end = start.checked_add(len).ok_or(CodecError)?;
+    fn claim(&mut self, start: usize, len: usize) -> Result<Range<usize>, ConfigError> {
+        let end = start
+            .checked_add(len)
+            .ok_or_else(|| ConfigError::new("offset", "Field end overflows."))?;
         if len == 0
             || end > self.size
             || self.occupied.iter().any(|r| start < r.end && r.start < end)
         {
-            return Err(CodecError);
+            return Err(ConfigError::new(
+                "offset",
+                "Field is empty, overlaps another field, or exceeds the layout.",
+            ));
         }
         let range = start..end;
         self.occupied.push(range.clone());
         Ok(range)
     }
-    fn integer(&mut self, f: &IntegerField) -> Result<Integer, CodecError> {
+    fn integer(&mut self, f: &IntegerField) -> Result<Integer, ConfigError> {
         Ok(Integer {
             range: self.claim(f.offset, f.data_type.width())?,
             endian: f.endian,
         })
     }
-    fn value(&mut self, f: &Field) -> Result<Value, CodecError> {
-        if !f.scale.is_finite() || f.scale == 0.0 || !f.bias.is_finite() {
-            return Err(CodecError);
+    fn value(&mut self, f: &Field) -> Result<Value, ConfigError> {
+        if !f.scale.is_finite() || f.scale == 0.0 {
+            return Err(ConfigError::new(
+                "scale",
+                "Scale must be finite and nonzero.",
+            ));
+        }
+        if !f.bias.is_finite() {
+            return Err(ConfigError::new("bias", "Bias must be finite."));
         }
         let width = match f.data_type {
             DataType::U8 | DataType::I8 | DataType::Bool => 1,
@@ -192,18 +220,37 @@ impl<'a> Builder<'a> {
             DataType::U32 | DataType::I32 | DataType::F32 => 4,
             DataType::U64 | DataType::I64 | DataType::F64 => 8,
             DataType::Utf8 => {
-                let n = f.length.ok_or(CodecError)?;
+                let n = f.length.ok_or_else(|| {
+                    ConfigError::new("length", "UTF-8 requires an exact byte length.")
+                })?;
                 if n == 0 || n > self.limits.field_bytes.min(MAX_FIELD_BYTES) {
-                    return Err(CodecError);
+                    return Err(ConfigError::new(
+                        "length",
+                        "UTF-8 length exceeds field limits or is zero.",
+                    ));
                 }
                 n
             }
         };
-        if (!matches!(f.data_type, DataType::Utf8) && f.length.is_some())
-            || (matches!(f.data_type, DataType::Bool | DataType::Utf8)
-                && (f.scale != 1.0 || f.bias != 0.0))
-        {
-            return Err(CodecError);
+        if !matches!(f.data_type, DataType::Utf8) && f.length.is_some() {
+            return Err(ConfigError::new(
+                "length",
+                "Only UTF-8 fields have a configurable length.",
+            ));
+        }
+        if matches!(f.data_type, DataType::Bool | DataType::Utf8) {
+            if f.scale != 1.0 {
+                return Err(ConfigError::new(
+                    "scale",
+                    "Non-numeric fields cannot be scaled.",
+                ));
+            }
+            if f.bias != 0.0 {
+                return Err(ConfigError::new(
+                    "bias",
+                    "Non-numeric fields cannot have a bias.",
+                ));
+            }
         }
         self.charge(128 + 3 * width)?;
         Ok(Value {
@@ -214,32 +261,41 @@ impl<'a> Builder<'a> {
             bias: f.bias,
         })
     }
-    fn name(&mut self, name: &str) -> Result<String, CodecError> {
+    fn name(&mut self, name: &str) -> Result<String, ConfigError> {
         if name.is_empty() || !valid_text(name, self.limits.field_bytes.min(MAX_FIELD_BYTES)) {
-            return Err(CodecError);
+            return Err(ConfigError::new("", "Invalid binary payload layout."));
         }
         self.charge(3 * name.len())?;
         Ok(name.to_owned())
     }
-    fn fields(&mut self, fields: &[NamedField]) -> Result<Vec<(String, Value)>, CodecError> {
+    fn fields(&mut self, fields: &[NamedField]) -> Result<Vec<(String, Value)>, ConfigError> {
         if fields.len() > self.limits.fields.min(MAX_FIELDS) {
-            return Err(CodecError);
+            return Err(ConfigError::new("", "Invalid binary payload layout."));
         }
         let mut compiled = Vec::with_capacity(fields.len());
-        for f in fields {
-            compiled.push((self.name(&f.name)?, self.value(&f.field)?));
+        for (index, f) in fields.iter().enumerate() {
+            let path = format!("[{index}]");
+            if fields[..index].iter().any(|other| other.name == f.name) {
+                return Err(ConfigError::new(
+                    format!("{path}.name"),
+                    "Duplicate field name.",
+                ));
+            }
+            compiled.push((
+                self.name(&f.name)
+                    .map_err(|e| e.at(&format!("{path}.name")))?,
+                self.value(&f.field)
+                    .map_err(|e| e.at(&format!("{path}.field")))?,
+            ));
         }
         compiled.sort_unstable_by(|a, b| a.0.cmp(&b.0));
-        if compiled.windows(2).any(|p| p[0].0 == p[1].0) {
-            return Err(CodecError);
-        }
         Ok(compiled)
     }
     fn finish(
         mut self,
         checksum: &Option<Checksum>,
         total: &mut usize,
-    ) -> Result<Layout, CodecError> {
+    ) -> Result<Layout, ConfigError> {
         let checksum = checksum
             .as_ref()
             .map(|c| {
@@ -247,12 +303,15 @@ impl<'a> Builder<'a> {
                     ChecksumAlgorithm::Crc16Modbus => 2,
                     _ => 1,
                 };
-                let range = self.claim(c.offset, width)?;
+                let range = self.claim(c.offset, width).map_err(|e| e.at("checksum"))?;
                 if c.start >= c.end
                     || c.end > self.size
                     || (c.start < range.end && range.start < c.end)
                 {
-                    return Err(CodecError);
+                    return Err(ConfigError::new(
+                        "checksum",
+                        "Checksum coverage is empty, out of bounds, or overlaps its own bytes.",
+                    ));
                 }
                 Ok(Check {
                     value: Integer {
@@ -267,9 +326,9 @@ impl<'a> Builder<'a> {
         // Bound cumulative retained plan structures, including metadata and reserved ranges.
         *total = total
             .checked_add(self.budget + self.occupied.len() * 64)
-            .ok_or(CodecError)?;
+            .ok_or_else(|| ConfigError::new("", "Layout arithmetic exceeds its bound."))?;
         if *total > MAX_CONFIG_BYTES {
-            return Err(CodecError);
+            return Err(ConfigError::new("", "Invalid binary payload layout."));
         }
         self.occupied.sort_unstable_by_key(|r| r.start);
         let mut reserved = Vec::new();
@@ -294,136 +353,207 @@ impl<'a> Builder<'a> {
 impl DeclarativeCodec {
     /// Validate all layouts, compile checked ranges, sort dispatch tables and discard JSON.
     pub fn compile(config: &DeclarativeConfig, limits: CodecLimits) -> Result<Self, CodecError> {
-        super::super::vendor_id(&config.id, config.version)?;
-        if config.header.is_empty()
-            || config.header.len() > 64
-            || config.messages.is_empty()
-            || config.messages.len() > MAX_LAYOUTS
-            || config.commands.len() > MAX_LAYOUTS
+        Self::compile_diagnostic(config, limits).map_err(|_| CodecError)
+    }
+
+    /// Same compiler as `compile`, with schema-only paths for configuration tools.
+    pub fn compile_diagnostic(
+        config: &DeclarativeConfig,
+        limits: CodecLimits,
+    ) -> Result<Self, ConfigError> {
+        if config.version == 0 {
+            return Err(ConfigError::new(
+                "version",
+                "Codec version must be nonzero.",
+            ));
+        }
+        super::super::vendor_id(&config.id, config.version)
+            .map_err(|_| ConfigError::new("id", "Codec ID must be a valid vendor ID."))?;
+        if config.header.is_empty() || config.header.len() > 64 {
+            return Err(ConfigError::new(
+                "header",
+                "Header length must be between 1 and 64 bytes.",
+            ));
+        }
+        if config.messages.is_empty() || config.messages.len() > MAX_LAYOUTS {
+            return Err(ConfigError::new(
+                "messages",
+                "At least one message and at most 64 layouts are required.",
+            ));
+        }
+        if config.commands.len() > MAX_LAYOUTS
             || config.messages.len() + config.commands.len() > MAX_LAYOUTS
-            || limits.output_messages == 0
+        {
+            return Err(ConfigError::new(
+                "commands",
+                "Combined message and command layout count exceeds 64.",
+            ));
+        }
+        if limits.output_messages == 0
             || limits.fields == 0
             || limits.field_bytes == 0
             || limits.decoded_bytes < 512
         {
-            return Err(CodecError);
+            return Err(ConfigError::new(
+                "",
+                "Codec resource limits are insufficient.",
+            ));
         }
-        let message_type = Integer {
-            range: config.message_type.offset
-                ..config
-                    .message_type
-                    .offset
-                    .checked_add(config.message_type.data_type.width())
-                    .ok_or(CodecError)?,
-            endian: config.message_type.endian,
+        let integer = |f: &IntegerField, path: &str| -> Result<Integer, ConfigError> {
+            Ok(Integer {
+                range: f.offset..f.offset.checked_add(f.data_type.width()).ok_or_else(|| {
+                    ConfigError::new(format!("{path}.offset"), "Field end overflows.")
+                })?,
+                endian: f.endian,
+            })
         };
+        let message_type = integer(&config.message_type, "message_type")?;
         let length = config
             .length
             .as_ref()
-            .map(|l| {
-                Ok((
-                    Integer {
-                        range: l.field.offset
-                            ..l.field
-                                .offset
-                                .checked_add(l.field.data_type.width())
-                                .ok_or(CodecError)?,
-                        endian: l.field.endian,
-                    },
-                    l.adjustment,
-                ))
-            })
+            .map(|l| Ok((integer(&l.field, "length.field")?, l.adjustment)))
             .transpose()?;
         let mut total = config.header.len();
         let mut messages = Vec::with_capacity(config.messages.len());
-        for m in &config.messages {
-            if !config.message_type.data_type.fits(m.tag) {
-                return Err(CodecError);
-            }
-            let mut b = Builder::new(config, m.size, &limits)?;
-            let s = &m.source_message_id;
-            if !matches!(
-                s.data_type,
-                DataType::U8 | DataType::U16 | DataType::U32 | DataType::U64 | DataType::Utf8
-            ) || s.scale != 1.0
-                || s.bias != 0.0
-                || s.length.is_some_and(|n| n > 64)
-            {
-                return Err(CodecError);
-            }
-            let source = b.value(s)?;
-            let occurred_at = m.occurred_at.as_ref().map(|f| b.integer(f)).transpose()?;
-            let kind = match &m.payload {
-                MessagePayload::Telemetry { fields } => {
-                    if fields.is_empty() {
-                        return Err(CodecError);
-                    }
-                    Kind::Telemetry(b.fields(fields)?)
+        for (index, m) in config.messages.iter().enumerate() {
+            let path = format!("messages[{index}]");
+            let mut b = Builder::new(config, m.size, &limits, &path)?;
+            let plan = (|| -> Result<MessagePlan, ConfigError> {
+                if !config.message_type.data_type.fits(m.tag)
+                    || config.messages[..index]
+                        .iter()
+                        .any(|other| other.tag == m.tag)
+                {
+                    return Err(ConfigError::new(
+                        "tag",
+                        "Message tag is duplicated or does not fit its integer type.",
+                    ));
                 }
-                MessagePayload::Heartbeat { sequence } => Kind::Heartbeat(b.integer(sequence)?),
-                MessagePayload::Event { name, value } => Kind::Event(
-                    b.name(name)?,
-                    value.as_ref().map(|f| b.value(f)).transpose()?,
-                ),
-                MessagePayload::CommandAck {
-                    command_id_offset,
-                    execution,
-                    running,
-                    succeeded,
-                    failed,
-                } => {
-                    if running == succeeded
-                        || running == failed
-                        || succeeded == failed
-                        || [running, succeeded, failed]
-                            .into_iter()
-                            .any(|n| !execution.data_type.fits(*n))
-                    {
-                        return Err(CodecError);
-                    }
-                    Kind::CommandAck {
-                        id: b.claim(*command_id_offset, 16)?,
-                        execution: b.integer(execution)?,
-                        states: [*running, *succeeded, *failed],
-                    }
+                let s = &m.source_message_id;
+                if !matches!(
+                    s.data_type,
+                    DataType::U8 | DataType::U16 | DataType::U32 | DataType::U64 | DataType::Utf8
+                ) {
+                    return Err(ConfigError::new(
+                        "source_message_id.type",
+                        "Source IDs require an unsigned integer or UTF-8.",
+                    ));
                 }
-            };
-            messages.push(MessagePlan {
-                tag: m.tag,
-                source,
-                occurred_at,
-                kind,
-                layout: b.finish(&m.checksum, &mut total)?,
-            });
+                if s.scale != 1.0 {
+                    return Err(ConfigError::new(
+                        "source_message_id.scale",
+                        "Source IDs cannot be scaled.",
+                    ));
+                }
+                if s.bias != 0.0 {
+                    return Err(ConfigError::new(
+                        "source_message_id.bias",
+                        "Source IDs cannot have a bias.",
+                    ));
+                }
+                if s.length.is_some_and(|n| n > 64) {
+                    return Err(ConfigError::new(
+                        "source_message_id.length",
+                        "Source IDs are limited to 64 bytes.",
+                    ));
+                }
+                let source = b.value(s).map_err(|e| e.at("source_message_id"))?;
+                let occurred_at = m
+                    .occurred_at
+                    .as_ref()
+                    .map(|f| b.integer(f).map_err(|e| e.at("occurred_at")))
+                    .transpose()?;
+                let kind = match &m.payload {
+                    MessagePayload::Telemetry { fields } => {
+                        if fields.is_empty() {
+                            return Err(ConfigError::new(
+                                "payload.fields",
+                                "Telemetry requires at least one field.",
+                            ));
+                        }
+                        Kind::Telemetry(b.fields(fields).map_err(|e| e.at("payload.fields"))?)
+                    }
+                    MessagePayload::Heartbeat { sequence } => {
+                        Kind::Heartbeat(b.integer(sequence).map_err(|e| e.at("payload.sequence"))?)
+                    }
+                    MessagePayload::Event { name, value } => Kind::Event(
+                        b.name(name).map_err(|e| e.at("payload.name"))?,
+                        value
+                            .as_ref()
+                            .map(|f| b.value(f).map_err(|e| e.at("payload.value")))
+                            .transpose()?,
+                    ),
+                    MessagePayload::CommandAck {
+                        command_id_offset,
+                        execution,
+                        running,
+                        succeeded,
+                        failed,
+                    } => {
+                        if running == succeeded
+                            || running == failed
+                            || succeeded == failed
+                            || [running, succeeded, failed]
+                                .into_iter()
+                                .any(|n| !execution.data_type.fits(*n))
+                        {
+                            return Err(ConfigError::new(
+                                "payload.execution",
+                                "Execution values must be distinct and fit their integer type.",
+                            ));
+                        }
+                        Kind::CommandAck {
+                            id: b.claim(*command_id_offset, 16).map_err(|_| {
+                                ConfigError::new(
+                                    "payload.command_id_offset",
+                                    "Command UUID overlaps or exceeds the layout.",
+                                )
+                            })?,
+                            execution: b
+                                .integer(execution)
+                                .map_err(|e| e.at("payload.execution"))?,
+                            states: [*running, *succeeded, *failed],
+                        }
+                    }
+                };
+                Ok(MessagePlan {
+                    tag: m.tag,
+                    source,
+                    occurred_at,
+                    kind,
+                    layout: b.finish(&m.checksum, &mut total)?,
+                })
+            })()
+            .map_err(|e| e.at(&path))?;
+            messages.push(plan);
         }
         messages.sort_unstable_by_key(|m| m.tag);
-        if messages.windows(2).any(|p| p[0].tag == p[1].tag) {
-            return Err(CodecError);
-        }
         let mut commands = Vec::with_capacity(config.commands.len());
-        for c in &config.commands {
-            if !config.message_type.data_type.fits(c.tag) {
-                return Err(CodecError);
-            }
-            let mut b = Builder::new(config, c.size, &limits)?;
-            commands.push(CommandPlan {
-                name: b.name(&c.name)?,
-                tag: c.tag,
-                command_id: b.claim(c.command_id_offset, 16)?,
-                expires_at: c.expires_at.as_ref().map(|f| b.integer(f)).transpose()?,
-                fields: b.fields(&c.fields)?,
-                layout: b.finish(&c.checksum, &mut total)?,
-            });
+        for (index, c) in config.commands.iter().enumerate() {
+            let path = format!("commands[{index}]");
+            let mut b = Builder::new(config, c.size, &limits, &path)?;
+            let plan = (|| -> Result<CommandPlan, ConfigError> {
+                if !config.message_type.data_type.fits(c.tag) || config.commands[..index].iter().any(|other| other.tag == c.tag) {
+                    return Err(ConfigError::new("tag", "Command tag is duplicated or does not fit its integer type."));
+                }
+                if config.commands[..index].iter().any(|other| other.name == c.name) {
+                    return Err(ConfigError::new("name", "Duplicate command name."));
+                }
+                // Expiry is an absolute nonnegative i64 millisecond timestamp, not a TTL.
+                if c.expires_at.as_ref().is_some_and(|f| !f.data_type.fits(i64::MAX as u64)) {
+                    return Err(ConfigError::new("expires_at.type", "Expiry requires u64 to represent the complete nonnegative i64 millisecond range."));
+                }
+                Ok(CommandPlan {
+                    name: b.name(&c.name).map_err(|e| e.at("name"))?, tag: c.tag,
+                    command_id: b.claim(c.command_id_offset, 16).map_err(|_| ConfigError::new("command_id_offset", "Command UUID overlaps or exceeds the layout."))?,
+                    expires_at: c.expires_at.as_ref().map(|f| b.integer(f).map_err(|e| e.at("expires_at"))).transpose()?,
+                    fields: b.fields(&c.fields).map_err(|e| e.at("fields"))?,
+                    layout: b.finish(&c.checksum, &mut total)?,
+                })
+            })().map_err(|e| e.at(&path))?;
+            commands.push(plan);
         }
         commands.sort_unstable_by(|a, b| a.name.cmp(&b.name));
-        if commands.windows(2).any(|p| p[0].name == p[1].name)
-            || commands
-                .iter()
-                .enumerate()
-                .any(|(i, c)| commands[..i].iter().any(|other| c.tag == other.tag))
-        {
-            return Err(CodecError);
-        }
         Ok(Self {
             limits,
             header: config.header.clone().into_boxed_slice(),

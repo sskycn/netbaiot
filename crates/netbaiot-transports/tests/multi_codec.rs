@@ -219,6 +219,14 @@ fn fixture_with_sink(
     delivery: Option<Arc<dyn EventSink>>,
     limits: Option<Limits>,
 ) -> (Arc<Ingress>, Arc<Services>, Arc<Capture>, CancellationToken) {
+    fixture_with_vendor(provider, delivery, limits, None)
+}
+fn fixture_with_vendor(
+    provider: Option<Arc<dyn DeviceAuthenticator>>,
+    delivery: Option<Arc<dyn EventSink>>,
+    limits: Option<Limits>,
+    vendor_config: Option<netbaiot_codecs::vendor::declarative::DeclarativeConfig>,
+) -> (Arc<Ingress>, Arc<Services>, Arc<Capture>, CancellationToken) {
     let l = Arc::new(limits.unwrap_or(Limits {
         requests_per_second: 10000,
         messages_per_device_second: 10000,
@@ -246,8 +254,11 @@ fn fixture_with_sink(
     )
     .unwrap();
     let mut entries = netbaiot_codecs::builtins(CodecLimits::default()).unwrap();
-    let vendor = netbaiot_codecs::vendor::declarative::DeclarativeCodec::from_json(
-        include_bytes!("../../../configs/codecs/acme-v1.json"),
+    let vendor_config = vendor_config.unwrap_or_else(|| {
+        serde_json::from_slice(include_bytes!("../../../configs/codecs/acme-v1.json")).unwrap()
+    });
+    let vendor = netbaiot_codecs::vendor::declarative::DeclarativeCodec::compile(
+        &vendor_config,
         CodecLimits::default(),
     )
     .unwrap();
@@ -531,12 +542,25 @@ async fn mqtt_connect(
     a: &AuthenticatedDevice,
     v5: bool,
 ) -> TcpStream {
+    mqtt_connect_with_maximum(address, a, v5, None).await
+}
+async fn mqtt_connect_with_maximum(
+    address: std::net::SocketAddr,
+    a: &AuthenticatedDevice,
+    v5: bool,
+    maximum: Option<u32>,
+) -> TcpStream {
     let mut s = TcpStream::connect(address).await.unwrap();
     let mut body = Vec::new();
     mqtt_string("MQTT", &mut body);
     body.extend_from_slice(&[if v5 { 5 } else { 4 }, 0xc2, 0, 30]);
     if v5 {
-        body.push(0);
+        if let Some(maximum) = maximum {
+            body.extend_from_slice(&[5, 0x27]);
+            body.extend_from_slice(&maximum.to_be_bytes());
+        } else {
+            body.push(0);
+        }
     }
     let id = format!("{}-mqtt", a.device_key.product_id.as_str());
     mqtt_string(&id, &mut body);
@@ -1361,4 +1385,143 @@ async fn vendor_payloads_use_authenticated_codec_on_real_mqtt_tcp_udp_and_comman
     tcp_owner.await.unwrap().unwrap();
     udp_owner.await.unwrap().unwrap();
     ingress.events.stop_workers().await.unwrap();
+}
+
+#[tokio::test]
+async fn vendor_command_transport_limits_reject_before_queue_and_keep_connections_alive() {
+    use netbaiot_codecs::vendor::declarative::DeclarativeConfig;
+    // Include the MQTT Remaining Length expansion and MQTT 5 expiry property.
+    for (transport, maximum) in [
+        ("tcp", 256),
+        ("mqtt", 256),
+        ("mqtt5", 256),
+        ("mqtt5-client", 128),
+        ("write", 256),
+        ("global", 256),
+    ] {
+        let mqtt = transport.starts_with("mqtt");
+        let v5 = transport.starts_with("mqtt5");
+        let auth = identity("acme", if mqtt { "mqtt" } else { "tcp" });
+        let overhead = if mqtt {
+            2 + topic(&auth.device_key, TopicKind::Down).len() + 2 + if v5 { 6 } else { 0 }
+        } else {
+            0
+        };
+        let capacity = if mqtt {
+            maximum - if maximum <= 128 { 2 } else { 3 } - overhead
+        } else if transport == "write" {
+            maximum - 4
+        } else {
+            maximum
+        };
+        let mut config: DeclarativeConfig =
+            serde_json::from_slice(include_bytes!("../../../configs/codecs/acme-v1.json")).unwrap();
+        config.commands[0].checksum = None;
+        config.commands[0].size = capacity;
+        let mut large = config.commands[0].clone();
+        large.name = "oversized".into();
+        large.tag += 1;
+        large.size += 1;
+        config.commands.push(large);
+        let limits = Limits {
+            max_tcp_frame_size: if transport == "tcp" { maximum } else { 65536 },
+            max_mqtt_packet_size: if mqtt && transport != "mqtt5-client" {
+                maximum
+            } else {
+                65536
+            },
+            max_write_buffer_per_connection: if transport == "write" { maximum } else { 65536 },
+            max_command_bytes: if transport == "global" {
+                maximum
+            } else {
+                16384
+            },
+            ..Default::default()
+        };
+        let (ingress, services, _, stop) =
+            fixture_with_vendor(None, None, Some(limits), Some(config));
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let owner = tokio::spawn(serve_device_ingress(
+            listener,
+            services.clone(),
+            None,
+            stop.clone(),
+        ));
+        let mut client = if mqtt {
+            mqtt_connect_with_maximum(
+                address,
+                &auth,
+                v5,
+                (transport == "mqtt5-client").then_some(maximum as u32),
+            )
+            .await
+        } else {
+            let mut stream = TcpStream::connect(address).await.unwrap();
+            let hello = serde_json::to_vec(
+                &serde_json::json!({"credential_id":"acme-tcp","secret":"07".repeat(32)}),
+            )
+            .unwrap();
+            stream.write_all(&frame(&hello)).await.unwrap();
+            assert_eq!(
+                read_tcp(&mut stream, tcp_frame::FrameKind::Payload).await,
+                br#"{"authenticated":true}"#
+            );
+            stream
+        };
+        let mut cmd = command(&auth);
+        cmd.payload.name = "oversized".into();
+        // CommandService must also roll back its dedup reservation on rejection.
+        assert!(
+            matches!(
+                services.commands.send(cmd.clone()).await,
+                Err(Error::Invalid)
+            ),
+            "{transport}"
+        );
+        assert_eq!(services.commands.usage().unwrap(), (0, 0));
+        assert_eq!(ingress.metrics.get(Metric::CommandQueued), 0);
+        assert!(
+            !ingress
+                .sessions
+                .lookup(&auth.device_key)
+                .unwrap()
+                .unwrap()
+                .cancel
+                .is_cancelled()
+        );
+        if mqtt {
+            client.write_all(&[0xc0, 0]).await.unwrap();
+            assert_eq!(read_mqtt(&mut client).await.0, 0xd0);
+        } else {
+            client.write_all(&frame(&payload("acme"))).await.unwrap();
+            assert!(
+                tcp_ack::decode(&read_tcp(&mut client, tcp_frame::FrameKind::EventAccepted).await)
+                    .is_ok()
+            );
+        }
+        cmd.payload.name = "set_temperature".into();
+        services.router.send(cmd).unwrap();
+        if mqtt {
+            let (header, body) = read_mqtt(&mut client).await;
+            assert_eq!(header & 0xf0, 0x30);
+            assert_eq!(body.len(), overhead + capacity);
+            let offset = 2 + topic(&auth.device_key, TopicKind::Down).len();
+            client
+                .write_all(&[0x40, 2, body[offset], body[offset + 1]])
+                .await
+                .unwrap();
+            client.write_all(&[0xe0, 0]).await.unwrap();
+        } else {
+            assert_eq!(
+                read_tcp(&mut client, tcp_frame::FrameKind::Payload)
+                    .await
+                    .len(),
+                capacity
+            );
+        }
+        stop.cancel();
+        owner.await.unwrap().unwrap();
+        ingress.events.stop_workers().await.unwrap();
+    }
 }

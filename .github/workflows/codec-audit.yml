@@ -57,7 +57,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [cbor_codec, msgpack_codec, protobuf_codec]
+        target: [cbor_codec, msgpack_codec, protobuf_codec, vendor_codec, vendor_config]
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly
@@ -65,7 +65,7 @@ jobs:
       - run: python3 fuzz/seed_corpus.py
       - name: Bounded ASan smoke
         working-directory: fuzz
-        run: cargo +nightly fuzz run ${{ matrix.target }} -- -max_total_time=30 -timeout=5 -max_len=65536 -seed=42
+        run: cargo +nightly fuzz run ${{ matrix.target }} -- -max_total_time=30 -timeout=5 -max_len=${{ matrix.target == 'vendor_config' && 262145 || matrix.target == 'vendor_codec' && 65537 || 65536 }} -rss_limit_mb=1024 -seed=42
       - name: Retain reproduction inputs (public fixtures and mutations only)
         if: always()
         uses: actions/upload-artifact@v4

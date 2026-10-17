@@ -161,8 +161,11 @@ impl Value {
             _ => return Err(CodecError),
         };
         put(bytes, bits, self.endian);
-        // Reject inverse scaling that would produce nonfinite normalized values.
-        self.read(data)?;
+        // Compare the actual wire value after normalization, including f32 narrowing,
+        // integer quantization and cancellation/underflow in the inverse transform.
+        if self.read(data)? != *scalar {
+            return Err(CodecError);
+        }
         Ok(())
     }
 }
@@ -202,6 +205,78 @@ impl Check {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn numeric_commands_must_round_trip_exactly() {
+        for endian in [Endian::Big, Endian::Little] {
+            for (kind, width, scale, bias, number) in [
+                (DataType::F32, 4, 1.0, 0.0, 16_777_217.0),
+                (DataType::F32, 4, 1.0, 0.0, 1e-50),
+                (DataType::F64, 8, 1.0, 1e20, 1.0),
+                (DataType::F64, 8, 1e300, 0.0, 1e-300),
+                (DataType::I16, 2, 0.1, 0.0, 12.300000000000002),
+                (DataType::U64, 8, 1.0, 1e20, 1.0),
+            ] {
+                let field = Value {
+                    range: 0..width,
+                    data_type: kind,
+                    endian,
+                    scale,
+                    bias,
+                };
+                assert!(
+                    field.write(&mut [0; 8], &Scalar::Number(number)).is_err(),
+                    "{kind:?} scale={scale} bias={bias} number={number}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn representable_numeric_boundaries_survive_both_endiannesses() {
+        for endian in [Endian::Big, Endian::Little] {
+            for (kind, width, values) in [
+                (DataType::U8, 1, [0.0, 1.0, 255.0]),
+                (DataType::I8, 1, [-128.0, 0.0, 127.0]),
+                (DataType::U16, 2, [0.0, 1.0, 65535.0]),
+                (DataType::I16, 2, [-32768.0, 0.0, 32767.0]),
+                (DataType::U32, 4, [0.0, 1.0, f64::from(u32::MAX)]),
+                (
+                    DataType::I32,
+                    4,
+                    [f64::from(i32::MIN), 0.0, f64::from(i32::MAX)],
+                ),
+                (DataType::U64, 8, [0.0, 1.0, 9007199254740992.0]),
+                (
+                    DataType::I64,
+                    8,
+                    [-9007199254740992.0, 0.0, 9007199254740992.0],
+                ),
+                (
+                    DataType::F32,
+                    4,
+                    [f64::from(f32::from_bits(1)), 0.0, f64::from(f32::MAX)],
+                ),
+                (DataType::F64, 8, [f64::from_bits(1), 0.0, f64::MAX]),
+            ] {
+                for raw in values {
+                    for (scale, bias) in [(1.0, 0.0), (-0.5, 0.0)] {
+                        let field = Value {
+                            range: 0..width,
+                            data_type: kind,
+                            endian,
+                            scale,
+                            bias,
+                        };
+                        let scalar = Scalar::Number(raw * scale + bias);
+                        let mut bytes = [0; 8];
+                        field.write(&mut bytes, &scalar).unwrap();
+                        assert_eq!(field.read(&bytes).unwrap(), scalar);
+                    }
+                }
+            }
+        }
+    }
+
     #[test]
     fn crc16_modbus_standard_check_vector() {
         let check = Check {

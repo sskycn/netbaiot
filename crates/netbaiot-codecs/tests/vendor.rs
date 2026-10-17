@@ -235,7 +235,7 @@ fn command_identity_types_quantization_limits_and_arguments_are_strict() {
             c.payload.arguments.insert("temperature".into(), value);
             assert!(codec.encode(&ctx, &c).is_err());
         }
-        for value in [-3276.8, 3276.7, 0.0, 12.3] {
+        for value in [-32768.0 * 0.1, 32767.0 * 0.1, 0.0, 12.3] {
             let mut c = command();
             c.payload
                 .arguments
@@ -504,5 +504,117 @@ fn downlink_fields_reject_lossy_integers_and_enforce_text_width() {
         assert_eq!(d.encode(&ctx, &cmd).unwrap().len(), 21 + width);
         cmd.payload.arguments.insert("temperature".into(), invalid);
         assert!(d.encode(&ctx, &cmd).is_err(), "{kind}");
+    }
+}
+
+#[test]
+fn command_expiry_requires_the_complete_timestamp_range_at_compile_time() {
+    for kind in [IntegerType::U8, IntegerType::U16, IntegerType::U32] {
+        let mut c = config();
+        c.commands[0].expires_at.as_mut().unwrap().data_type = kind;
+        assert!(
+            DeclarativeCodec::compile(&c, CodecLimits::default()).is_err(),
+            "{kind:?}"
+        );
+    }
+}
+
+#[test]
+fn native_command_respects_codec_byte_limit() {
+    let codec = AcmeV1::new(CodecLimits {
+        input_bytes: 31,
+        ..Default::default()
+    })
+    .unwrap();
+    assert!(
+        codec
+            .encode(&EncodeContext { device: &key() }, &command())
+            .is_err()
+    );
+}
+
+#[test]
+fn expiry_encodes_full_nonnegative_i64_range_without_float_conversion() {
+    let d = codec();
+    let n = AcmeV1::new(CodecLimits::default()).unwrap();
+    for codec in [&d as &dyn DeviceCodec, &n] {
+        for endian in [Endian::Big, Endian::Little] {
+            let mut cfg = config();
+            cfg.commands[0].expires_at.as_mut().unwrap().endian = endian;
+            let compiled = DeclarativeCodec::compile(&cfg, CodecLimits::default()).unwrap();
+            for expiry in [None, Some(0), Some(1_800_000_000_000), Some(i64::MAX)] {
+                let mut cmd = command();
+                cmd.expires_at = expiry;
+                let ctx = EncodeContext {
+                    device: &cmd.device,
+                };
+                assert_eq!(
+                    &codec.encode(&ctx, &cmd).unwrap()[23..31],
+                    &expiry.unwrap_or(0).to_be_bytes()
+                );
+                let expected = match endian {
+                    Endian::Big => expiry.unwrap_or(0).to_be_bytes(),
+                    Endian::Little => expiry.unwrap_or(0).to_le_bytes(),
+                };
+                assert_eq!(&compiled.encode(&ctx, &cmd).unwrap()[23..31], &expected);
+            }
+        }
+    }
+}
+
+#[test]
+fn compiler_reports_original_field_indices_and_schema_paths() {
+    let original: Value = serde_json::from_slice(CONFIG).unwrap();
+    for (pointer, value, path) in [
+        (
+            "/messages/0/payload/fields/1/field/scale",
+            json!(0),
+            "messages[0].payload.fields[1].field.scale",
+        ),
+        (
+            "/messages/0/payload/fields/1/field/offset",
+            json!(9),
+            "messages[0].payload.fields[1].field.offset",
+        ),
+        (
+            "/messages/0/payload/fields/1/name",
+            json!("temperature"),
+            "messages[0].payload.fields[1].name",
+        ),
+        (
+            "/commands/0/expires_at/type",
+            json!("u32"),
+            "commands[0].expires_at.type",
+        ),
+        (
+            "/commands/0/expires_at/offset",
+            json!(usize::MAX),
+            "commands[0].expires_at.offset",
+        ),
+        (
+            "/commands/0/command_id_offset",
+            json!(0),
+            "commands[0].command_id_offset",
+        ),
+        (
+            "/messages/0/checksum/end",
+            json!(999),
+            "messages[0].checksum",
+        ),
+        (
+            "/message_type/offset",
+            json!(usize::MAX),
+            "message_type.offset",
+        ),
+        ("/version", json!(0), "version"),
+    ] {
+        let mut value_config = original.clone();
+        *value_config.pointer_mut(pointer).unwrap() = value;
+        let c = serde_json::from_value(value_config).unwrap();
+        let error = DeclarativeCodec::compile_diagnostic(&c, CodecLimits::default())
+            .err()
+            .unwrap();
+        assert_eq!(error.path, path);
+        assert!(DeclarativeCodec::compile(&c, CodecLimits::default()).is_err());
     }
 }

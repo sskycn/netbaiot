@@ -13,6 +13,31 @@ pub const MAX_LAYOUTS: usize = 64;
 pub const MAX_FIELDS: usize = 64;
 pub const MAX_FIELD_BYTES: usize = 256;
 
+/// Startup-only diagnostic. Paths contain schema fields/indices, never input values.
+#[derive(Debug)]
+pub struct ConfigError {
+    pub path: String,
+    pub message: &'static str,
+}
+impl ConfigError {
+    pub fn new(path: impl Into<String>, message: &'static str) -> Self {
+        Self {
+            path: path.into(),
+            message,
+        }
+    }
+    fn at(mut self, prefix: &str) -> Self {
+        self.path = if self.path.is_empty() {
+            prefix.into()
+        } else if self.path.starts_with('[') {
+            format!("{prefix}{}", self.path)
+        } else {
+            format!("{prefix}.{}", self.path)
+        };
+        self
+    }
+}
+
 /// Immutable startup plan, safely shared by all connections bound to this profile.
 pub struct DeclarativeCodec {
     limits: CodecLimits,

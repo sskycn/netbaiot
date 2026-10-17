@@ -137,24 +137,24 @@ impl Config {
             } else {
                 DeviceAuthSource::Static
             });
-        let registry = crate::bootstrap::configured_codec_registry(
+        let registry = crate::bootstrap::configured_codec_registry_diagnostic(
             &self.limits,
             &self.payload_codecs,
             &self.native_codecs,
         );
+        if let Err(error) = &registry {
+            issue(
+                true,
+                "NBI-CFG-015",
+                &error.path,
+                error.message,
+                "Use unique vendor ID/version pairs, bounded non-overlapping fields and valid checksum/length ranges; see docs/codecs.md.",
+            );
+        }
         issue(
-            registry.is_err(),
-            "NBI-CFG-015",
-            "payload_codecs",
-            "Codec registration or binary payload layout is invalid.",
-            "Use unique vendor ID/version pairs, bounded non-overlapping fields and valid checksum/length ranges; see docs/codecs.md.",
-        );
-        issue(
-            self.credentials.iter().any(|c| {
-                registry
-                    .as_ref()
-                    .map_or(true, |r| r.get(&c.identity).is_err())
-            }),
+            self.credentials
+                .iter()
+                .any(|c| registry.as_ref().is_ok_and(|r| r.get(&c.identity).is_err())),
             "NBI-CFG-011",
             "credentials",
             "A credential refers to an unavailable codec profile.",
@@ -245,6 +245,65 @@ impl Config {
     }
 }
 
+// Preserve useful payload-codec array positions and known schema keys. Never echo
+// arbitrary map keys from hostile JSON, even when serde includes one in a path.
+fn payload_codec_path(path: &serde_path_to_error::Path) -> String {
+    use serde_path_to_error::Segment;
+    let mut out = String::new();
+    for segment in path {
+        match segment {
+            Segment::Seq { index } => out.push_str(&format!("[{index}]")),
+            Segment::Map { key }
+                if [
+                    "payload_codecs",
+                    "id",
+                    "version",
+                    "header",
+                    "message_type",
+                    "length",
+                    "field",
+                    "adjustment",
+                    "offset",
+                    "type",
+                    "endian",
+                    "scale",
+                    "bias",
+                    "messages",
+                    "commands",
+                    "tag",
+                    "size",
+                    "source_message_id",
+                    "occurred_at",
+                    "payload",
+                    "kind",
+                    "fields",
+                    "name",
+                    "sequence",
+                    "value",
+                    "command_id_offset",
+                    "execution",
+                    "running",
+                    "succeeded",
+                    "failed",
+                    "expires_at",
+                    "checksum",
+                    "algorithm",
+                    "start",
+                    "end",
+                ]
+                .contains(&key.as_str()) =>
+            {
+                if !out.is_empty() {
+                    out.push('.');
+                }
+                out.push_str(key);
+            }
+            _ => break,
+        }
+    }
+    out
+}
+
 /// Read bounded JSON and report the field path without displaying its value.
 pub async fn load_config_diagnostic(path: &Path) -> std::result::Result<Config, ConfigReport> {
     let bytes = match crate::config::read_bounded_path(path, 16_777_216).await {
@@ -273,7 +332,10 @@ pub async fn load_config_diagnostic(path: &Path) -> std::result::Result<Config, 
             let raw = error.path().to_string();
             // Paths are schema fields/array positions; never echo an unknown user field.
             let root = raw.split(['.', '[']).next().unwrap_or("config");
-            let path = if [
+            let payload_path = payload_codec_path(error.path());
+            let path = if root == "payload_codecs" {
+                payload_path.as_str()
+            } else if [
                 "device_ingress",
                 "management_http",
                 "business_tcp",
@@ -469,6 +531,41 @@ mod tests {
     fn config() -> Config {
         serde_json::from_str(include_str!("../../../configs/development.json")).unwrap()
     }
+    #[tokio::test]
+    async fn payload_codec_parse_errors_keep_schema_paths_without_echoing_unknown_keys() {
+        let original: serde_json::Value =
+            serde_json::from_str(include_str!("../../../configs/vendor-codec.json")).unwrap();
+        let file = std::env::temp_dir().join(format!(
+            "netbaiot-payload-diagnostic-{}.json",
+            uuid::Uuid::new_v4()
+        ));
+        for (pointer, value, expected) in [
+            (
+                "/payload_codecs/0/commands/0/expires_at/type",
+                serde_json::json!("secret-never-print"),
+                "payload_codecs[0].commands[0].expires_at.type",
+            ),
+            (
+                "/payload_codecs/0/messages/0/size",
+                serde_json::json!("secret-never-print"),
+                "payload_codecs[0].messages[0].size",
+            ),
+            (
+                "/payload_codecs/0/commands/0/expires_at",
+                serde_json::json!({"offset":23,"type":"u64","secret-never-print":"secret-never-print"}),
+                "payload_codecs[0].commands[0].expires_at",
+            ),
+        ] {
+            let mut value_config = original.clone();
+            *value_config.pointer_mut(pointer).unwrap() = value;
+            std::fs::write(&file, serde_json::to_vec(&value_config).unwrap()).unwrap();
+            let report = load_config_diagnostic(&file).await.err().unwrap();
+            assert_eq!(report.diagnostics[0].path, expected);
+            assert!(!report.human().contains("secret-never-print"));
+        }
+        std::fs::remove_file(file).unwrap();
+    }
+
     #[tokio::test]
     async fn diagnostics_are_shared_specific_and_secret_safe_without_startup() {
         let mut config = config();

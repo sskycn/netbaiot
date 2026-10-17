@@ -48,9 +48,21 @@ pub(crate) fn configured_codec_registry(
     plans: &[netbaiot_codecs::vendor::declarative::DeclarativeConfig],
     native: &[netbaiot_codecs::CodecRegistration],
 ) -> Result<CodecRegistry> {
+    configured_codec_registry_diagnostic(limits, plans, native).map_err(|_| Error::Configuration)
+}
+
+pub(crate) fn configured_codec_registry_diagnostic(
+    limits: &Limits,
+    plans: &[netbaiot_codecs::vendor::declarative::DeclarativeConfig],
+    native: &[netbaiot_codecs::CodecRegistration],
+) -> std::result::Result<CodecRegistry, netbaiot_codecs::vendor::declarative::ConfigError> {
+    use netbaiot_codecs::vendor::declarative::ConfigError;
     use netbaiot_codecs::vendor::{declarative::DeclarativeCodec, registration, vendor_id};
     if plans.len().saturating_add(native.len()) > 60 {
-        return Err(Error::Configuration);
+        return Err(ConfigError::new(
+            "payload_codecs",
+            "Combined declarative and native codec count exceeds 60.",
+        ));
     }
     let codec_limits = CodecLimits {
         input_bytes: limits
@@ -63,21 +75,63 @@ pub(crate) fn configured_codec_registry(
             .max(limits.max_tcp_frame_size),
         ..CodecLimits::default()
     };
-    let mut entries =
-        netbaiot_codecs::builtins(codec_limits.clone()).map_err(|_| Error::Configuration)?;
-    for (id, version, codec) in native {
-        vendor_id(id.as_str(), *version).map_err(|_| Error::Configuration)?;
+    let mut entries = netbaiot_codecs::builtins(codec_limits.clone())
+        .map_err(|_| ConfigError::new("limits", "Codec byte limits are invalid."))?;
+    for (index, (id, version, codec)) in native.iter().enumerate() {
+        vendor_id(id.as_str(), *version).map_err(|_| {
+            ConfigError::new(
+                format!("native_codecs[{index}]"),
+                "Native codec ID/version is invalid.",
+            )
+        })?;
+        if entries
+            .iter()
+            .any(|(other_id, other_version, _)| other_id == id && other_version == version)
+        {
+            return Err(ConfigError::new(
+                format!("native_codecs[{index}]"),
+                "Duplicate codec ID/version.",
+            ));
+        }
         entries.push((id.clone(), *version, codec.clone()));
     }
-    for plan in plans {
-        let codec = DeclarativeCodec::compile(plan, codec_limits.clone())
-            .map_err(|_| Error::Configuration)?;
+    for (index, plan) in plans.iter().enumerate() {
+        let prefix = format!("payload_codecs[{index}]");
+        if entries
+            .iter()
+            .any(|(id, version, _)| id.as_str() == plan.id && *version == plan.version)
+        {
+            return Err(ConfigError::new(
+                format!("{prefix}.id"),
+                "Duplicate codec ID/version.",
+            ));
+        }
+        for (command_index, command) in plan.commands.iter().enumerate() {
+            if command.size > limits.max_command_bytes {
+                return Err(ConfigError::new(
+                    format!("{prefix}.commands[{command_index}].size"),
+                    "Command layout exceeds max_command_bytes.",
+                ));
+            }
+        }
+        let codec = DeclarativeCodec::compile_diagnostic(plan, codec_limits.clone()).map_err(
+            |mut error| {
+                error.path = if error.path.is_empty() {
+                    prefix.clone()
+                } else {
+                    format!("{prefix}.{}", error.path)
+                };
+                error
+            },
+        )?;
         entries.push(
-            registration(&plan.id, plan.version, Arc::new(codec))
-                .map_err(|_| Error::Configuration)?,
+            registration(&plan.id, plan.version, Arc::new(codec)).map_err(|_| {
+                ConfigError::new(format!("{prefix}.id"), "Codec ID/version is invalid.")
+            })?,
         );
     }
     CodecRegistry::new(entries)
+        .map_err(|_| ConfigError::new("payload_codecs", "Codec registry exceeds its limits."))
 }
 
 #[cfg(test)]
@@ -149,7 +203,7 @@ mod vendor_tests {
             config
                 .diagnostics()
                 .iter()
-                .any(|d| d.path == "payload_codecs")
+                .any(|d| d.path == "payload_codecs[0].messages[0].size")
         );
     }
     #[test]
@@ -164,5 +218,45 @@ mod vendor_tests {
         config.payload_codecs[0].id = "vendor-acme".into();
         config.payload_codecs = vec![config.payload_codecs[0].clone(); 61];
         assert!(config.validate().is_err());
+    }
+}
+
+#[cfg(test)]
+mod vendor_diagnostic_tests {
+    use super::*;
+    #[test]
+    fn command_layout_limit_and_duplicate_profiles_have_precise_paths() {
+        let original: Config =
+            serde_json::from_str(include_str!("../../../configs/vendor-codec.json")).unwrap();
+        let mut config: Config =
+            serde_json::from_str(include_str!("../../../configs/vendor-codec.json")).unwrap();
+        config.limits.max_command_bytes = 31;
+        assert!(
+            config
+                .diagnostics()
+                .iter()
+                .any(|d| d.path == "payload_codecs[0].commands[0].size")
+        );
+        config.limits.max_command_bytes = 32;
+        assert!(configured_codec_registry(&config.limits, &config.payload_codecs, &[]).is_ok());
+        config.payload_codecs.push(config.payload_codecs[0].clone());
+        assert!(
+            config
+                .diagnostics()
+                .iter()
+                .any(|d| d.path == "payload_codecs[1].id")
+        );
+        let mut config = original;
+        config.payload_codecs[0].commands[0]
+            .expires_at
+            .as_mut()
+            .unwrap()
+            .data_type = netbaiot_codecs::vendor::declarative::IntegerType::U32;
+        assert!(
+            config
+                .diagnostics()
+                .iter()
+                .any(|d| d.path == "payload_codecs[0].commands[0].expires_at.type")
+        );
     }
 }
