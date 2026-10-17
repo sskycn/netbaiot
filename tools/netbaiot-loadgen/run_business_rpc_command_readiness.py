@@ -337,7 +337,7 @@ def run():
                     "cargo": subprocess.check_output(["cargo", "--version"], text=True).strip(),
                     "profile": "release",
                     "business_transport": "mtls",
-                    "business_rpc_version": 3,
+                    "business_rpc_version": 4,
                 },
                 "config": profile,
                 "limits_config": {
